@@ -4,7 +4,7 @@
     <title>Login</title>
 </head>
 <body>
-    <h2>Laravel Login</h2>
+    <h2>login INKWISE</h2>
     <form method="POST" action="{{ route('login') }}">
         @csrf
         <label>Email:</label><br>
