@@ -2,49 +2,41 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\TemplateController;
+use Laravel\Socialite\Facades\Socialite;
 
+Route::get('/auth/google/redirect', function () {
+    return Socialite::driver('google')->redirect();
+})->name('google.login');
+
+Route::get('/auth/google/callback', function () {
+    $user = Socialite::driver('google')->user();
+    // Handle login or registration
+});
 // ----------------------------
-// Public Dashboard Preview
+// Public Pages
 // ----------------------------
 Route::get('/', function () {
-    return view('dashboard'); // Dashboard Blade: resources/views/dashboard.blade.php
-})->name('dashboard'); // <--- Named route fixes navigation links
+    return view('dashboard');
+})->name('dashboard');
+
+Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
+Route::post('/login', [AuthController::class, 'login']);
+
+Route::get('/register', [AuthController::class, 'showRegistrationForm'])->name('register');
+Route::post('/register', [AuthController::class, 'register']);
+
+Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // ----------------------------
-// Register, Login & Logout
-// ----------------------------
-// Guest-only routes
-Route::middleware('guest')->group(function () {
-    // Show Register Form
-    Route::get('/register', [AuthController::class, 'showRegisterForm'])->name('register');
-    // Handle Register Form Submission
-    Route::post('/register', [AuthController::class, 'register']);
-
-    // Show Login Form
-    Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
-    // Handle Login Form Submission
-    Route::post('/login', [AuthController::class, 'login']);
-});
-
-// ----------------------------
-// Protected Routes (requires login)
+// Protected Pages (Require Login)
 // ----------------------------
 Route::middleware('auth')->group(function () {
-    // Logout
-    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+    Route::get('/categories', [TemplateController::class, 'categories'])->name('categories');
 
-    // Order Page
-    Route::get('/order', function () {
-        return view('order'); // Blade: resources/views/order.blade.php
-    })->name('order');
+    // Template section based on category choice
+    Route::get('/templates/{category}', [TemplateController::class, 'templates'])->name('templates');
 
-    // Design Page (Dynamic ID)
-    Route::get('/design/{id}', function ($id) {
-        return view('design', compact('id')); // Blade: resources/views/design.blade.php
-    })->name('design');
-
-    // Optional: Profile Page (used in dropdown)
-    Route::get('/profile', function () {
-        return view('profile'); // Blade: resources/views/profile.blade.php
-    })->name('profile.edit');
+    // Optional: Preview individual template
+    Route::get('/template/preview/{id}', [TemplateController::class, 'preview'])->name('template.preview');
 });
