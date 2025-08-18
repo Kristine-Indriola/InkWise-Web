@@ -1,4 +1,5 @@
 <?php
+<<<<<<< Updated upstream
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
@@ -39,4 +40,36 @@ Route::middleware('auth')->group(function () {
 
     // Optional: Preview individual template
     Route::get('/template/preview/{id}', [TemplateController::class, 'preview'])->name('template.preview');
+=======
+
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\AdminLoginController;
+use App\Http\Controllers\AdminController;
+use App\Http\Controllers\Admin\TemplateController;
+
+Route::get('/', function () {
+    return redirect()->route('admin.login');
+});
+
+// --------------------
+// Admin Auth Routes
+// --------------------
+Route::get('/admin/login', [AdminLoginController::class, 'showLoginForm'])->name('admin.login');
+Route::post('/admin/login', [AdminLoginController::class, 'login'])->name('admin.login.submit');
+Route::get('/admin/logout', [AdminLoginController::class, 'logout'])->name('admin.logout');
+
+// --------------------
+// Admin Protected Routes
+// --------------------
+Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/dashboard', [AdminController::class, 'index'])->name('dashboard');
+
+    // Templates
+    Route::prefix('templates')->name('templates.')->group(function () {
+        Route::get('/', [TemplateController::class, 'index'])->name('index');
+        Route::get('/create', [TemplateController::class, 'create'])->name('create');
+        Route::post('/', [TemplateController::class, 'store'])->name('store');
+        Route::get('/editor/{id?}', [TemplateController::class, 'editor'])->name('editor');
+    });
+>>>>>>> Stashed changes
 });
