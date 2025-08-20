@@ -21,10 +21,16 @@ class DatabaseSeeder extends Seeder
             'password' => Hash::make('admin123'),
         ]);
 
+<<<<<<< Updated upstream
         // Create a default Owner account
         Owner::create([
             'email' => 'owner@test.com',
             'password' => Hash::make('secret123'),
+=======
+        User::factory()->create([
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+>>>>>>> Stashed changes
         ]);
     }
 }

@@ -36,12 +36,12 @@
             </form>
 
             @guest
-                <!-- Sign In Button -->
-                <a href="{{ route('register') }}" 
-                   class="text-white px-5 py-2 font-semibold animate-gradient"
-                   style="background: linear-gradient(90deg, #8c52ff, #5ce1e6); border-radius: 65px; font-family: 'Seasons', serif;">
+                <!-- Sign In Button (Modal Trigger) -->
+                <button id="openSignup" 
+                        class="text-white px-5 py-2 font-semibold animate-gradient rounded-full"
+                        style="background: linear-gradient(90deg, #8c52ff, #5ce1e6); font-family: 'Seasons', serif;">
                    Sign in
-                </a>
+                </button>
             @else
                 <!-- Customer Dropdown -->
                 <div class="relative group">
@@ -52,19 +52,11 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-
-                    <!-- Dropdown Menu -->
-                    <div class="absolute right-0 mt-2 w-40 bg-white shadow-lg rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-50">
-                        <a href="{{ route('logout') }}" 
-                           class="block px-4 py-2 text-gray-700 hover:bg-gray-100">Log out</a>
-                    </div>
                 </div>
             @endguest
         </div>
     </div>
 </header>
-
-
 
 
     <!-- Main Content -->
@@ -117,57 +109,6 @@
             </div>
         </div>
     </main>
-
-    <!-- Floating Sign In / Join Box -->
-    <div id="signupModal" class="fixed inset-0 flex items-center justify-center z-50 hidden">
-        <div class="bg-white shadow-2xl rounded-2xl w-full max-w-md p-8 relative animate-fade-in-up">
-            <!-- Close Button -->
-            <button id="closeSignup" class="absolute top-3 right-3 text-gray-400 hover:text-gray-600">&times;</button>
-
-            <!-- Title -->
-            <h2 class="text-3xl font-bold mb-6 text-center" style="color:#8c52ff; font-family:'Playfair Display', serif;">
-                Join Inkwise
-            </h2>
-
-            <!-- Form -->
-            <form action="{{ url('/register') }}" method="POST" class="space-y-4">
-                @csrf
-                <div>
-                    <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
-                    <input type="email" id="email" name="email" required placeholder="Enter your email"
-                           class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 p-3">
-                </div>
-
-                <div>
-                    <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
-                    <input type="password" id="password" name="password" required placeholder="Enter your password"
-                           class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 p-3">
-                </div>
-
-                <div class="flex items-start space-x-2 text-sm">
-                    <input type="checkbox" required class="mt-1">
-                    <span>By signing up, I accept InkWise <a href="{{ url('/terms') }}" class="text-indigo-600">Terms of Use</a> & <a href="{{ url('/privacy') }}" class="text-indigo-600">Privacy Policy</a>.</span>
-                </div>
-
-                <button type="button" 
-                        class="w-full flex items-center justify-center space-x-2 border border-gray-300 rounded-lg py-2 hover:bg-gray-50">
-                    <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" class="w-5 h-5">
-                    <span class="text-gray-700 font-medium">Log in with Google</span>
-                </button>
-
-                <button type="submit" 
-                        class="w-full py-3 text-white font-semibold rounded-lg animate-gradient"
-                        style="background: linear-gradient(90deg, #8c52ff, #5ce1e6);">
-                    Create Account
-                </button>
-
-                <p class="text-sm text-center text-gray-600">
-                    Already have an account? 
-                    <a href="{{ url('/login') }}" class="text-indigo-600 hover:underline">Login</a>
-                </p>
-            </form>
-        </div>
-    </div>
 
 <!-- Categories Section -->
 <section id="categories" class="py-16 relative overflow-hidden">
@@ -226,9 +167,9 @@
     </div>
 </section>
 
+
 <!-- Contact Section -->
-<section id="contact" class="py-16 bg-gradient-to-r from-indigo-500 to-blue-600 text-white">
-    <!-- Contact Us Section -->
+ 
 <section id="contact" class="py-16 bg-white shadow-inner">
   <div class="max-w-6xl mx-auto px-6">
     <h2 class="text-3xl font-bold text-center mb-6 text-gray-800">Contact Us</h2>
@@ -238,7 +179,7 @@
     
     <div class="grid md:grid-cols-2 gap-10">
       <!-- Contact Info -->
-      <div class="bg-gradient-to-r from-blue-500 to-skyblue-500 p-8 rounded-2xl shadow-lg text-white">
+      <div class="bg-gradient-to-r from-blue-500 to-sky-500 p-8 rounded-2xl shadow-lg text-white">
         <h3 class="text-xl font-semibold mb-4">Merwen Printing Services – InkWise</h3>
         <p class="mb-3"><strong>📍 Address:</strong> 123 Rue de Paris, 75001 Paris, France</p>
         <p class="mb-3"><strong>📞 Phone:</strong> +33 1 23 45 67 89</p>
@@ -246,24 +187,18 @@
         <p><strong>🕒 Business Hours:</strong><br>Monday – Saturday: 9:00 AM – 7:00 PM</p>
       </div>
 
-    <div class="max-w-5xl mx-auto px-6 text-center">
-        <h2 class="text-3xl font-bold mb-6">Contact Us</h2>
-        <form class="space-y-4 max-w-xl mx-auto animate-fade-in-up">
-            <input type="text" placeholder="Your Name" class="w-full p-3 border rounded-lg text-black">
-            <input type="email" placeholder="Your Email" class="w-full p-3 border rounded-lg text-black">
-            <textarea placeholder="Your Message" rows="4" class="w-full p-3 border rounded-lg text-black"></textarea>
-            <button class="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">Send Message</button>
-        </form>
+      <!-- Contact Form -->
+      <form class="space-y-4 bg-white p-6 rounded-2xl shadow-lg">
+        <input type="text" placeholder="Your Name" class="w-full p-3 border rounded-lg text-black">
+        <input type="email" placeholder="Your Email" class="w-full p-3 border rounded-lg text-black">
+        <textarea placeholder="Your Message" rows="4" class="w-full p-3 border rounded-lg text-black"></textarea>
+        <button class="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">Send Message</button>
+      </form>
     </div>
+  </div>
 </section>
-<div class="flex items-center space-x-4">
-    @auth
-        <span class="text-gray-700 font-semibold">Hello, {{ auth()->user()->email }}</span>
-        <a href="{{ route('logout') }}" class="text-white px-5 py-2 font-semibold animate-gradient" style="background: linear-gradient(90deg, #8c52ff, #5ce1e6); border-radius: 65px;">Logout</a>
-    @else
-        <a href="{{ route('register') }}" class="text-white px-5 py-2 font-semibold animate-gradient" style="background: linear-gradient(90deg, #8c52ff, #5ce1e6); border-radius: 65px;">Sign in</a>
-    @endauth
-</div>
+
+<!-- Floating Sign In / Join Box -->
 <div id="signupModal" class="fixed inset-0 flex items-center justify-center z-50 hidden">
     <div class="bg-white shadow-2xl rounded-2xl w-full max-w-md p-8 relative animate-fade-in-up">
         <!-- Close Button -->
@@ -299,17 +234,13 @@
                 <input type="checkbox" required class="mt-1">
                 <span>By signing up, I accept InkWise <a href="{{ url('/terms') }}" class="text-indigo-600">Terms of Use</a> & <a href="{{ url('/privacy') }}" class="text-indigo-600">Privacy Policy</a>.</span>
             </div>
-<a href="{{ route('google.login') }}" 
-   class="w-full flex items-center justify-center space-x-2 border border-gray-300 rounded-lg py-2 hover:bg-gray-50">
-    <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" class="w-5 h-5">
-    <span class="text-gray-700 font-medium">Log in with Google</span>
-</a>
 
-            <button type="button" 
-                    class="w-full flex items-center justify-center space-x-2 border border-gray-300 rounded-lg py-2 hover:bg-gray-50">
+            <!-- Google Login -->
+            <a href="{{ route('google.login') }}" 
+               class="w-full flex items-center justify-center space-x-2 border border-gray-300 rounded-lg py-2 hover:bg-gray-50">
                 <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" class="w-5 h-5">
                 <span class="text-gray-700 font-medium">Log in with Google</span>
-            </button>
+            </a>
 
             <button type="submit" 
                     class="w-full py-3 text-white font-semibold rounded-lg animate-gradient"
@@ -323,8 +254,8 @@
             </p>
         </form>
     </div>
-</div>
 
+</div>
 
 
 
