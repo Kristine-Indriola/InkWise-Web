@@ -5,45 +5,75 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
-    public function showLoginForm() {
-        return view('auth.login');
-    }
-
-    public function login(Request $request) {
-        $credentials = $request->only('email', 'password');
-
-        if (Auth::attempt($credentials)) {
-            return redirect()->intended('/categories');
-        }
-
-        return back()->withErrors(['email' => 'Invalid credentials']);
-    }
-
-    public function showRegistrationForm() {
+    // ------------------------
+    // Show Register Form
+    // ------------------------
+    public function showRegisterForm()
+    {
         return view('auth.register');
     }
 
-    public function register(Request $request) {
+    // ------------------------
+    // Handle Registration
+    // ------------------------
+    public function register(Request $request)
+    {
         $request->validate([
-            'email' => 'required|email|unique:users',
-            'password' => 'required|min:6',
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|email|unique:users,email',
+            'password' => 'required|min:6|confirmed',
         ]);
 
         $user = User::create([
-            'email' => $request->email,
-            'password' => bcrypt($request->password),
+            'name'     => $request->name,
+            'email'    => $request->email,
+            'password' => Hash::make($request->password),
         ]);
 
         Auth::login($user);
 
-        return redirect('/categories');
+        return redirect()->route('dashboard');
     }
 
-    public function logout() {
+    // ------------------------
+    // Show Login Form
+    // ------------------------
+    public function showLoginForm()
+    {
+        return view('auth.login');
+    }
+
+    // ------------------------
+    // Handle Login
+    // ------------------------
+    public function login(Request $request)
+{
+    $credentials = $request->only('email', 'password');
+
+    if (Auth::attempt($credentials)) {
+        $request->session()->regenerate();
+        return redirect()->route('dashboard'); // ✅ redirect to dashboard
+    }
+
+    return back()->withErrors([
+        'email' => 'Invalid login credentials.',
+    ]);
+}
+
+
+    // ------------------------
+    // Handle Logout
+    // ------------------------
+    public function logout(Request $request)
+    {
         Auth::logout();
-        return redirect('/');
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect()->route('dashboard');
     }
 }

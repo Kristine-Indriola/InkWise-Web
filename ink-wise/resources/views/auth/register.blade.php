@@ -1,65 +1,39 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register - InkWise</title>
-    @vite('resources/css/app.css')
-</head>
-<body class="bg-gray-50 flex items-center justify-center min-h-screen">
-    <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
-        <h1 class="text-3xl font-bold text-center mb-6 text-indigo-600">Create Account</h1>
-        <form action="{{ route('register') }}" method="POST" class="space-y-4">
-            @csrf
-            <!-- Name Field -->
-            <div>
-                <label for="name" class="block text-gray-700 font-medium">Full Name</label>
-                <input type="text" name="name" id="name" required placeholder="Enter your full name"
-                       class="w-full p-3 border rounded-lg focus:ring focus:ring-indigo-200">
+<!-- REGISTER MODAL -->     @vite('resources/css/app.css')
+    <div id="registerModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md transform transition-all scale-95 animate-fade-in">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-gray-800">Register</h2>
+                <button id="closeRegister" class="text-gray-400 hover:text-gray-600">✖</button>
+            </div>
+            <form method="POST" action="{{ route('register') }}" class="space-y-4">
+                @csrf
+                <input type="text" name="name" placeholder="Full Name"
+                       class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-indigo-300" required>
+                <input type="email" name="email" placeholder="Email"
+                       class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-indigo-300" required>
+                <input type="password" name="password" placeholder="Password"
+                       class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-indigo-300" required>
+                <input type="password" name="password_confirmation" placeholder="Confirm Password"
+                       class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-indigo-300" required>
+                <button type="submit" class="w-full py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                    Register
+                </button>
+            </form>
+            <!-- Google register -->
+            <div class="mt-4">
+                <a href="{{ route('google.redirect') }}"
+                   class="flex items-center justify-center w-full px-4 py-2 border rounded-lg bg-white hover:bg-gray-100">
+                    <img src="https://www.svgrepo.com/show/355037/google.svg" alt="Google"
+                         class="w-5 h-5 mr-2">
+                    <span class="text-gray-700">Sign up with Google</span>
+                </a>
             </div>
 
-            <!-- Email Field -->
-            <div>
-                <label for="email" class="block text-gray-700 font-medium">Email</label>
-                <input type="email" name="email" id="email" required placeholder="Enter your email"
-                       class="w-full p-3 border rounded-lg focus:ring focus:ring-indigo-200">
-            </div>
-
-            <!-- Password Field -->
-            <div>
-                <label for="password" class="block text-gray-700 font-medium">Password</label>
-                <input type="password" name="password" id="password" required placeholder="Enter your password"
-                       class="w-full p-3 border rounded-lg focus:ring focus:ring-indigo-200">
-            </div>
-
-            <!-- Register Button -->
-            <button type="submit"
-                class="w-full py-3 text-white font-semibold rounded-lg animate-gradient"
-                style="background: linear-gradient(90deg, #8c52ff, #5ce1e6);">
-                Register
-            </button>
-        </form>
-
-        <!-- OR Divider -->
-        <div class="flex items-center my-4">
-            <hr class="flex-grow border-gray-300">
-            <span class="px-2 text-gray-500">OR</span>
-            <hr class="flex-grow border-gray-300">
+            <p class="mt-6 text-sm text-gray-600 text-center">
+                Already have an account?
+                <button id="openLoginFromRegister" class="text-indigo-600 hover:underline">
+                    Login
+                </button>
+            </p>
         </div>
-
-        <!-- Google Login Button -->
-        <form action="{{ route('google.login') }}" method="POST">
-            @csrf
-            <button type="submit" 
-                    class="w-full flex items-center justify-center space-x-2 border border-gray-300 rounded-lg py-2 hover:bg-gray-50">
-                <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" class="w-5 h-5">
-                <span class="text-gray-700 font-medium">Log in with Google</span>
-            </button>
-        </form>
-
-        <p class="text-sm text-center text-gray-600 mt-4">
-            Already have an account? <a href="{{ route('login') }}" class="text-indigo-600 hover:underline">Login</a>
-        </p>
     </div>
-</body>
-</html>

@@ -1,38 +1,79 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="csrf-token" content="{{ csrf_token() }}">
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InkWise</title>
+    @vite('resources/css/app.css')
+    @vite('resources/js/app.js')
+</head>
+<body class="antialiased bg-gray-50">
 
-        <title>{{ config('app.name', 'Laravel') }}</title>
+    <!-- Top Navigation Bar -->
+    <header class="bg-white shadow flex justify-between items-center px-6 py-4">
+        <h1 class="text-xl font-bold text-indigo-600">InkWise</h1>
 
-        <!-- Fonts -->
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
-        <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Seasons&display=swap" rel="stylesheet">
+        <nav>
+            @guest
+                <!-- Buttons that trigger modals -->
+                <button onclick="openModal('loginModal')" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Login</button>
+                <button onclick="openModal('registerModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Register</button>
+            @endguest
 
+            @auth
+                <a href="{{ route('dashboard') }}" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Dashboard</a>
+                <form action="{{ route('logout') }}" method="POST" class="inline">
+                    @csrf
+                    <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Logout</button>
+                </form>
+            @endauth
+        </nav>
+    </header>
 
-        <!-- Scripts -->
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
-    </head>
-    <body class="font-sans antialiased">
-        <div class="min-h-screen bg-gray-100">
-            @include('layouts.navigation')
+    <!-- Main Content -->
+    <main class="p-6">
+        @yield('content')
+    </main>
 
-            <!-- Page Heading -->
-            @isset($header)
-                <header class="bg-white shadow">
-                    <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                        {{ $header }}
-                    </div>
-                </header>
-            @endisset
-
-            <!-- Page Content -->
-            <main>
-                {{ $slot }}
-            </main>
+    <!-- 🔹 Login Modal -->
+    <div id="loginModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+        <div class="bg-white rounded-2xl shadow-lg p-8 w-96 relative">
+            <button onclick="closeModal('loginModal')" class="absolute top-3 right-3 text-gray-500 hover:text-black">✖</button>
+            <h2 class="text-xl font-bold text-center mb-4">Login</h2>
+            <form action="{{ route('login') }}" method="POST">
+                @csrf
+                <input type="email" name="email" placeholder="Email" required class="w-full mb-3 px-4 py-2 border rounded-lg">
+                <input type="password" name="password" placeholder="Password" required class="w-full mb-3 px-4 py-2 border rounded-lg">
+                <button type="submit" class="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700">Login</button>
+            </form>
         </div>
-    </body>
+    </div>
+
+    <!-- 🔹 Register Modal -->
+    <div id="registerModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+        <div class="bg-white rounded-2xl shadow-lg p-8 w-96 relative">
+            <button onclick="closeModal('registerModal')" class="absolute top-3 right-3 text-gray-500 hover:text-black">✖</button>
+            <h2 class="text-xl font-bold text-center mb-4">Register</h2>
+            <form action="{{ route('register') }}" method="POST">
+                @csrf
+                <input type="text" name="name" placeholder="Full Name" required class="w-full mb-3 px-4 py-2 border rounded-lg">
+                <input type="email" name="email" placeholder="Email" required class="w-full mb-3 px-4 py-2 border rounded-lg">
+                <input type="password" name="password" placeholder="Password" required class="w-full mb-3 px-4 py-2 border rounded-lg">
+                <input type="password" name="password_confirmation" placeholder="Confirm Password" required class="w-full mb-3 px-4 py-2 border rounded-lg">
+                <button type="submit" class="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700">Register</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- JS for Modal -->
+    <script>
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+    </script>
+
+</body>
 </html>
