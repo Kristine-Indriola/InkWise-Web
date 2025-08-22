@@ -1,0 +1,189 @@
+/* ---------------------------------- */
+/* Tailwind Base, Components, Utilities */
+/* ---------------------------------- */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------- */
+/* Animations */
+/* ---------------------------------- */
+
+/* Pop-in Animation */
+@keyframes pop {
+  0% { transform: scale(0.95); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-pop {
+  animation: pop 0.4s ease-out;
+}
+
+/* Gradient Background Animation */
+@keyframes gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient 5s ease infinite;
+}
+
+/* Gradient Horizontal Animation */
+@keyframes gradient-x {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.animate-gradient-x {
+  background-size: 200% 200%;
+  animation: gradient-x 8s ease infinite;
+}
+
+/* Fade Animations */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up { animation: fade-in-up 1s ease forwards; }
+
+@keyframes fade-in-down {
+  from { opacity: 0; transform: translateY(-20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-down { animation: fade-in-down 1s ease forwards; }
+
+@keyframes fade-in-left {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.animate-fade-in-left { animation: fade-in-left 1s ease forwards; }
+
+@keyframes fade-in-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.animate-fade-in-right { animation: fade-in-right 1s ease forwards; }
+
+/* Floating Animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+.animate-float.delay-200 { animation-delay: 0.2s; }
+.animate-float.delay-400 { animation-delay: 0.4s; }
+.animate-float.delay-600 { animation-delay: 0.6s; }
+
+/* Fade-in for Modals */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Dropdown Animation */
+@keyframes drop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------------------------------- */
+/* Global Styles */
+/* ---------------------------------- */
+html { scroll-behavior: smooth; }
+
+/* ---------------------------------- */
+/* Flip Card Styles */
+/* ---------------------------------- */
+.flip-card { perspective: 1000px; }
+.flip-card-inner {
+  position: relative;
+  width: 100%;
+  height: 24rem;
+  text-align: center;
+  transition: transform 0.8s;
+  transform-style: preserve-3d;
+}
+.flip-card:hover .flip-card-inner,
+.flip-card.flipped .flip-card-inner {
+  transform: rotateY(180deg);
+}
+.flip-card-front, .flip-card-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  border-radius: 1rem;
+}
+.flip-card-back { transform: rotateY(180deg); }
+
+/* ---------------------------------- */
+/* Buttons */
+/* ---------------------------------- */
+
+/* Sign In Button */
+#openLogin {
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 10px rgba(140, 82, 255, 0.3);
+}
+#openLogin:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 14px rgba(140, 82, 255, 0.5);
+}
+
+/* User Dropdown */
+#userDropdownBtn {
+  background: transparent;
+  font-weight: 600;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  transition: background 0.2s;
+}
+#userDropdownBtn:hover {
+  background: rgba(140, 82, 255, 0.1);
+}
+#userDropdown {
+  animation: drop 0.12s ease-out;
+  overflow: hidden;
+}
+#userDropdown button {
+  transition: background 0.2s;
+}
+#userDropdown button:hover {
+  background: #f3f4f6;
+}
+
+/* ---------------------------------- */
+/* Modal Styles */
+/* ---------------------------------- */
+.modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+  background: rgba(0,0,0,0.5);
+  z-index: 50;
+}
+.modal-content {
+  background: white;
+  border-radius: 1rem;
+  padding: 2rem;
+  max-width: 420px;
+  width: 100%;
+  animation: pop 0.4s ease-out;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+.modal-header {
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+}
+
+/* Modals Fade-in Animation */
+#loginModal:not(.hidden),
+#registerModal:not(.hidden) {
+  animation: fadeIn 0.15s ease-out;
+}
