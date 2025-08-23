@@ -11,47 +11,85 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\TemplateController;
 use App\Http\Controllers\Owner\HomeController;
 use App\Http\Controllers\OwnerLoginController;
+use App\Http\Controllers\CostumerAuthController;
 
-// Owner auth
+// Admin controllers
 use App\Http\Controllers\Auth\AdminLoginController;
 use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
+
+
 
 /*
 |--------------------------------------------------------------------------
 | Google OAuth
 |--------------------------------------------------------------------------
 */
-Route::get('/auth/google/redirect', function () {
+/*Route::get('/auth/google/redirect', function () {
     return Socialite::driver('google')->redirect();
 })->name('google.login');
 
 Route::get('/auth/google/callback', function () {
     $user = Socialite::driver('google')->user();
     // TODO: Handle login or registration for Google user
+});*/
+
+
+/*
+|--------------------------------------------------------------------------
+| Customer (Costumer) Side
+|--------------------------------------------------------------------------
+*/
+
+/*
+|--------------------------------------------------------------------------
+| Dashboard / Home
+|--------------------------------------------------------------------------
+*/
+
+/*
+|--------------------------------------------------------------------------
+| Costumer Auth (floating modals)
+|--------------------------------------------------------------------------
+*/
+// Authentication routes
+Route::get('/costumer/login', [CostumerAuthController::class, 'showLoginForm'])->name('costumer.login.form');
+Route::post('/costumer/login', [CostumerAuthController::class, 'login'])->name('costumer.login');
+
+Route::get('/costumer/register', [CostumerAuthController::class, 'showRegisterForm'])->name('costumer.register.form');
+Route::post('/costumer/register', [CostumerAuthController::class, 'register'])->name('costumer.register');
+
+Route::post('/costumer/logout', [CostumerAuthController::class, 'logout'])->name('costumer.logout');
+
+// Authenticated-only routes
+Route::middleware('auth')->group(function () {
+    Route::post('/costumer-logout', [CostumerAuthController::class, 'logout'])->name('costumer.logout');
 });
 
-/*
-|--------------------------------------------------------------------------
-| Public Pages
-|--------------------------------------------------------------------------
-*/
-
-Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
-Route::post('/login', [AuthController::class, 'login']);
-Route::get('/register', [AuthController::class, 'showRegistrationForm'])->name('register');
-Route::post('/register', [AuthController::class, 'register']);
-Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
-
-/*
-|--------------------------------------------------------------------------
-| Protected Pages (Default user)
-|--------------------------------------------------------------------------
-*/
+// Protected Customer Routes
 Route::middleware('auth')->group(function () {
     Route::get('/categories', [TemplateController::class, 'categories'])->name('categories');
     Route::get('/templates/{category}', [TemplateController::class, 'templates'])->name('templates');
     Route::get('/template/preview/{id}', [TemplateController::class, 'preview'])->name('template.preview');
 });
+// Simple placeholders to avoid 404 during dev
+Route::get('/search', function (\Illuminate\Http\Request $request) {
+    return 'Search for: ' . e($request->query('query', ''));
+})->name('search');
+
+Route::get('/order', function () {
+    return 'Order page placeholder';
+})->name('order');
+
+Route::get('/design/{id}', function ($id) {
+    return 'Design preview placeholder for ID: ' . e($id);
+})->name('design.show');
+
+// ----------------------------
+// Temporary Google Redirect (Fix)
+// ----------------------------
+Route::get('/auth/google', function () {
+    return 'Google login placeholder until controller is ready.';
+})->name('google.redirect');
 
 /*
 |--------------------------------------------------------------------------
@@ -100,3 +138,14 @@ Route::prefix('owner')->name('owner.')->middleware('auth:owner')->group(function
   
 
 
+Route::get('/order-list', function () {
+    return view('Staff.order_list');
+})->name('order.list');
+
+Route::get('/customer-profile', function () {
+    return view('Staff.customer_profile');
+})->name('customer.profile');
+
+Route::get('/notify-customers', function () {
+    return view('Staff.notify_customers');
+})->name('notify.customers');
