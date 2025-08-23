@@ -129,3 +129,14 @@ Route::prefix('owner')->name('owner.')->middleware('auth:owner')->group(function
 
 
 
+Route::get('/order-list', function () {
+    return view('Staff.order_list');
+})->name('order.list');
+
+Route::get('/customer-profile', function () {
+    return view('Staff.customer_profile');
+})->name('customer.profile');
+
+Route::get('/notify-customers', function () {
+    return view('Staff.notify_customers');
+})->name('notify.customers');
