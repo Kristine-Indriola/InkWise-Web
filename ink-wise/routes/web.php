@@ -45,7 +45,7 @@ Route::get('/auth/google/callback', function () {
 Route::get('/', function () {
     return view('dashboard');
 })->name('dashboard');
-
+//dashboard 
 
 
 /*
