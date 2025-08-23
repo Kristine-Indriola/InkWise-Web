@@ -15,21 +15,23 @@ class OwnerLoginController extends Controller
     }
 
     public function login(Request $request)
-    {
-        $credentials = $request->validate([
-            'email'    => ['required','email'],
-            'password' => ['required'],
-        ]);
+{
 
-        if (Auth::guard('owner')->attempt($credentials, $request->boolean('remember'))) {
+    $credentials = $request->validate([
+        'email'    => ['required','email'],
+        'password' => ['required'],
+    ]);
+
+    if (Auth::guard(name: 'owner')->attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
-            return redirect()->intended(route('owner.home'));
-        }
-
-        return back()
-            ->withErrors(['email' => 'Invalid credentials provided.'])
-            ->onlyInput('email');
+            return view('owner.owner-home');
     }
+
+    return back()
+        ->withErrors(['email' => 'Invalid credentials provided.'])
+        ->onlyInput('email');
+}
+
 
     public function logout(Request $request)
     {

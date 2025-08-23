@@ -10,6 +10,11 @@ class Owner extends Authenticatable
     use Notifiable;
 
     /**
+     * The guard for this model.
+     */
+    protected $guard = 'owner'; // Specify the 'owner' guard
+
+    /**
      * The attributes that are mass assignable.
      */
     protected $fillable = [
