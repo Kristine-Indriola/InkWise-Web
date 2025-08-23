@@ -121,24 +121,54 @@
 <body>
   <!-- Sidebar -->
   <aside class="sidebar">
-    <h2>InkWise</h2>
+  <h2>InkWise</h2>
 
-    <div class="profile">
-      <div class="avatar">👤</div>
-      <div>
-        <div style="font-weight:700;">Owner Profile</div>
-        <div style="color:#64748b;font-size:12px;">{{ auth('owner')->user()->email ?? 'owner@example.com' }}</div>
-      </div>
+  <div class="profile">
+    <div class="avatar">👤</div>
+    <div>
+      <div style="font-weight:700;">Owner Profile</div>
+      <div style="color:#64748b;font-size:12px;">{{ auth('owner')->user()->email ?? 'owner@example.com' }}</div>
     </div>
+  </div>
 
-    <ul class="navlist">
-      <li><span class="text">Dashboard</span><span class="ico">🏠</span></li>
-      <li><span class="text">Approve Staff Account</span><span class="ico">✅</span></li>
-      <li><span class="text">Monitor Order Workflow</span><span class="ico">🧭</span></li>
-      <li><span class="text">Track Inventory</span><span class="ico">📦</span></li>
-      <li><span class="text">View Transactions</span><span class="ico">💳</span></li>
-    </ul>
-  </aside>
+  <ul class="navlist">
+    <li>
+      <a href="{{ route('owner.home') }}" class="text-decoration-none">
+        <button class="sidebar-btn">
+          <span class="text">Dashboard</span><span class="ico">🏠</span>
+        </button>
+      </a>
+    </li>
+    <li>
+      <a href="{{ route('owner.approve-staff') }}" class="text-decoration-none">
+        <button class="sidebar-btn">
+          <span class="text">Approve Staff Account</span><span class="ico">✅</span>
+        </button>
+      </a>
+    </li>
+    <li>
+      <a href="{{ route('owner.order.workflow') }}" class="text-decoration-none">
+        <button class="sidebar-btn">
+          <span class="text">Monitor Order Workflow</span><span class="ico">🧭</span>
+        </button>
+      </a>
+    </li>
+    <li>
+      <a href="{{ route('owner.inventory-track') }}" class="text-decoration-none">
+        <button class="sidebar-btn">
+          <span class="text">Track Inventory</span><span class="ico">📦</span>
+        </button>
+      </a>
+    </li>
+    <li>
+      <a href="{{ route('owner.transactions-view') }}" class="text-decoration-none">
+        <button class="sidebar-btn">
+          <span class="text">View Transactions</span><span class="ico">💳</span>
+        </button>
+      </a>
+    </li>
+  </ul>
+</aside>
 
   <!-- Main -->
   <section class="main-content">
@@ -227,14 +257,14 @@
       type: 'bar',
       data: {
         labels: [
-          'Invitation - Birthday Barbie',
+          'Invitation - Birthday Party',
           'Keychain',
           'Invitation - Floral Pink'
         ],
         datasets: [{
           label: 'Units Sold',
           data: [12, 15, 20],
-          backgroundColor: ['#60a5fa','#3b82f6','#1d4ed8'],
+          backgroundColor: ['#68b4e3ff','#4487daff','#1147dbff'],
           borderRadius: 6
         }]
       },

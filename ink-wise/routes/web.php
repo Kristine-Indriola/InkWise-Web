@@ -1,19 +1,20 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Laravel\Socialite\Facades\Socialite;
+use App\Http\Controllers\AuthController;
 
 // Public auth/controllers
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\TemplateController;
+use Laravel\Socialite\Facades\Socialite;
+use App\Http\Controllers\AdminController;
 
 // Admin controllers
-use App\Http\Controllers\Auth\AdminLoginController;
-use App\Http\Controllers\AdminController;
-use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
+use App\Http\Controllers\TemplateController;
+use App\Http\Controllers\Owner\HomeController;
+use App\Http\Controllers\OwnerLoginController;
 
 // Owner auth
-use App\Http\Controllers\OwnerLoginController;
+use App\Http\Controllers\Auth\AdminLoginController;
+use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
 
 /*
 |--------------------------------------------------------------------------
@@ -84,12 +85,18 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
 | Require auth:owner
 |--------------------------------------------------------------------------
 */
-Route::get('owner/login', [OwnerLoginController::class, 'showLoginForm'])->name('owner.login');
+
+Route::get('/owner/login', [OwnerLoginController::class, 'showLoginForm'])->name('owner.login');
 Route::post('/owner/login', [OwnerLoginController::class, 'login'])->name('owner.login.submit');
+
 Route::prefix('owner')->name('owner.')->middleware('auth:owner')->group(function () {
-    Route::get('/home', fn () => view('owner.owner-home'))->name('home');
+    Route::get('/home', [HomeController::class, 'index'])->name('home');
+    Route::get('/approve-staff', fn () => view('owner.owner-appstaff'))->name('approve-staff');
+    Route::get('/order/workflow', fn () => view('owner.order-workflow'))->name('order.workflow');
+    Route::get('/inventory/track', fn () => view('owner.inventory-track'))->name('inventory-track');
+    Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
     Route::post('/logout', [OwnerLoginController::class, 'logout'])->name('logout');
 });
-
+  
 
 

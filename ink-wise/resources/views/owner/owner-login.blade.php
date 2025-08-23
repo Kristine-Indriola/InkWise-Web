@@ -92,7 +92,7 @@
 
     <div class="login-container">
         <h1>Owner Login</h1>
-        <form method="POST" >
+        <form method="POST" action="{{ route('owner.login.submit') }}">
             @csrf
             <input type="email" name="email" placeholder="Enter Email" required>
             <input type="password" name="password" placeholder="Enter Password" required>
