@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Auth;
 
 class OwnerLoginController extends Controller
 {
+    // ⛔ No __construct() here
+
     public function showLoginForm()
     {
         return view('owner.owner-login');
@@ -19,14 +21,14 @@ class OwnerLoginController extends Controller
             'password' => ['required'],
         ]);
 
-        if (Auth::guard('owner')->attempt($credentials)) {
+        if (Auth::guard('owner')->attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
-            return redirect()->intended('/owner/home');
+            return redirect()->intended(route('owner.home'));
         }
 
-        return back()->withErrors([
-            'email' => 'Invalid credentials.',
-        ]);
+        return back()
+            ->withErrors(['email' => 'Invalid credentials provided.'])
+            ->onlyInput('email');
     }
 
     public function logout(Request $request)
@@ -35,6 +37,6 @@ class OwnerLoginController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect('/owner/login');
+        return redirect()->route('owner.login');
     }
 }

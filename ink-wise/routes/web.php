@@ -42,11 +42,6 @@ Route::get('/auth/google/callback', function () {
 | Dashboard / Home
 |--------------------------------------------------------------------------
 */
-Route::get('/', function () {
-    return view('dashboard');
-})->name('dashboard');
-//dashboard 
-
 
 /*
 |--------------------------------------------------------------------------
@@ -118,19 +113,19 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     });
 });
 
+
 /*
 |--------------------------------------------------------------------------
-| Owner Auth (separate guard)
+| Authenticated owner routes
+| Require auth:owner
 |--------------------------------------------------------------------------
 */
-Route::middleware('guest:owner')->group(function () {
-    Route::get('/owner/login', [OwnerLoginController::class, 'showLoginForm'])->name('owner.login');
-    Route::post('/owner/login', [OwnerLoginController::class, 'login'])->name('owner.login.submit');
+Route::get('owner/login', [OwnerLoginController::class, 'showLoginForm'])->name('owner.login');
+Route::post('/owner/login', [OwnerLoginController::class, 'login'])->name('owner.login.submit');
+Route::prefix('owner')->name('owner.')->middleware('auth:owner')->group(function () {
+    Route::get('/home', fn () => view('owner.owner-home'))->name('home');
+    Route::post('/logout', [OwnerLoginController::class, 'logout'])->name('logout');
 });
 
-Route::middleware('auth:owner')->prefix('owner')->name('owner.')->group(function () {
-    Route::post('/logout', [OwnerLoginController::class, 'logout'])->name('logout');
-    Route::get('/home', function () {
-        return view('owner.home');
-    })->name('home');
-});
+
+
