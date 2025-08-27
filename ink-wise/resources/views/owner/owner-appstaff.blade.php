@@ -36,24 +36,59 @@
       background:#eef2ff; display:grid; place-items:center; font-weight:800; color:#475569;
     }
 
-    /* Sidebar nav */
-    .navlist { list-style:none; padding:8px 0; margin:0; }
-    .navlist li {
-      display:flex; justify-content:space-between; align-items:center;
-      margin:8px 12px; padding:10px 12px; border-radius:10px;
-      cursor:pointer; transition:background .15s;
+    /* Sidebar nav — same as latest code */
+    .navlist { list-style:none; padding:6px 6px; margin:0; }
+    .navlist li { margin: 2px 6px; }
+    .navlist a { text-decoration: none; color: inherit; display: block; }
+
+    .sidebar-btn {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 28px; /* text | icon column */
+      align-items: center;
+      gap: 12px;
+      padding: 14px 14px;
+      padding-right: 12px;
+      background: transparent;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      text-align: left;
+      font-size: 15px;
+      color: #1f2937;
+      white-space: nowrap; /* keep items in one line */
     }
-    .navlist li:hover { background:#f1f5ff; }
-    .navlist span.text { font-size:15px; }
+    .sidebar-btn:hover { background: #f7faff; }
+    .sidebar-btn:active { background:#eef4ff; }
+
+    .navlist span.text {
+      font-size: 15px;
+      color: #1f2937;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     .ico {
-      width:30px; height:30px; border-radius:50%; display:grid; place-items:center;
-      background:#f3f4f6; border:1px solid #e5e7eb; font-size:16px; margin-left:10px;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent; /* no gray chip */
+      border: 0;
+      margin: 0;
+      font-size: 20px;
+      line-height: 1;          /* avoids baseline wobble */
+      justify-self: end;       /* stick to right column edge */
+      flex-shrink: 0;
     }
 
     /* Main content layout */
     .main-content { flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
     .topbar {
       display: flex; justify-content: space-between; align-items: center;
+      font-size: 21px;
       background: #fff; padding: 14px 20px; border-bottom: 1px solid #ddd;
     }
 
@@ -67,7 +102,7 @@
     }
     .table-container h3 {
       margin-bottom: 16px;
-      font-size: 20px;
+      font-size: 19px;
       font-weight: 700;
     }
 
@@ -77,20 +112,17 @@
       border-collapse: collapse;
       margin-bottom: 20px;
     }
-    table, th, td {
-      border: 1px solid #e5e7eb;
-    }
+    table, th, td { border: 1px solid #e5e7eb; }
     th, td {
       padding: 12px;
+      font-size: 15px;
       text-align: center;
     }
     th {
       background-color: #f1f5ff;
       color: #475569;
     }
-    td {
-      color: #64748b;
-    }
+    td { color: #64748b; }
     td button {
       padding: 8px 16px;
       border-radius: 8px;
@@ -98,19 +130,10 @@
       border: none;
       font-weight: bold;
     }
-    .btn-approve {
-      background-color: #10b981;
-      color: white;
-    }
-    .btn-reject {
-      background-color: #ef4444;
-      color: white;
-    }
-    .btn-approve:hover, .btn-reject:hover {
-      opacity: 0.8;
-    }
+    .btn-approve { background-color: #10b981; color: white; }
+    .btn-reject { background-color: #ef4444; color: white; }
+    .btn-approve:hover, .btn-reject:hover { opacity: 0.8; }
 
-    /* Responsive */
     @media (max-width: 640px){
       .sidebar { width: 200px; }
       .table-container { margin: 10px; }
@@ -130,11 +153,41 @@
     </div>
 
     <ul class="navlist">
-      <li><span class="text">Dashboard</span><span class="ico">🏠</span></li>
-      <li><span class="text">Approve Staff Account</span><span class="ico">✅</span></li>
-      <li><span class="text">Monitor Order Workflow</span><span class="ico">🧭</span></li>
-      <li><span class="text">Track Inventory</span><span class="ico">📦</span></li>
-      <li><span class="text">View Transactions</span><span class="ico">💳</span></li>
+      <li>
+        <a href="{{ route('owner.home') }}">
+          <button class="sidebar-btn">
+            <span class="text">Dashboard</span><span class="ico">🏠</span>
+          </button>
+        </a>
+      </li>
+      <li>
+        <a href="{{ route('owner.approve-staff') }}">
+          <button class="sidebar-btn">
+            <span class="text">Approve Staff Account</span><span class="ico">✅</span>
+          </button>
+        </a>
+      </li>
+      <li>
+        <a href="{{ route('owner.order.workflow') }}">
+          <button class="sidebar-btn">
+            <span class="text">Monitor Order Workflow</span><span class="ico">🧭</span>
+          </button>
+        </a>
+      </li>
+      <li>
+        <a href="{{ route('owner.inventory-track') }}">
+          <button class="sidebar-btn">
+            <span class="text">Track Inventory</span><span class="ico">📦</span>
+          </button>
+        </a>
+      </li>
+      <li>
+        <a href="{{ route('owner.transactions-view') }}">
+          <button class="sidebar-btn">
+            <span class="text">View Transactions</span><span class="ico">💳</span>
+          </button>
+        </a>
+      </li>
     </ul>
   </aside>
 
