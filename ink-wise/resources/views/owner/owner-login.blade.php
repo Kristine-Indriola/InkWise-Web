@@ -14,7 +14,7 @@
             height: 100vh;
             overflow: hidden;
             position: relative;
-            background-color: #f4f6f8;
+            background: linear-gradient(to right, #9dc2ec, #f4f3e1);
         }
 
         .video-background {
@@ -46,13 +46,20 @@
         }
 
         .login-container input[type="email"],
-        .login-container input[type="password"] {
+        .login-container input[type="password"],
+        .login-container input[type="text"] {
             padding: 12px;
             margin: 12px 0;
             border: 1px solid #ccc;
             border-radius: 6px;
             width: 100%;
             font-size: 15px;
+            box-sizing: border-box;
+            height: 40px; /* Fixed height */
+            min-height: 40px; /* Fixed minimum height */
+            line-height: 1.5;
+            font-family: 'Arial', sans-serif;
+            transition: none; /* Ensure no transition on height change */
         }
 
         .login-container button {
@@ -82,6 +89,12 @@
 
         .show-password input {
             margin-right: 6px;
+            cursor: pointer;
+        }
+
+        .show-password label {
+            margin: 0;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -95,9 +108,10 @@
         <form method="POST" action="{{ route('owner.login.submit') }}">
             @csrf
             <input type="email" name="email" placeholder="Enter Email" required>
-            <input type="password" name="password" placeholder="Enter Password" required>
+            <input type="password" name="password" placeholder="Enter Password" required id="passwordField" class="password-field">
             <div class="show-password">
-                <input type="checkbox" id="togglePassword"> Show Password
+                <input type="checkbox" id="togglePassword">
+                <label for="togglePassword">Show Password</label>
             </div>
             <button type="submit">Login</button>
         </form>
@@ -105,8 +119,12 @@
 
     <script>
         document.getElementById('togglePassword').addEventListener('change', function() {
-            const passwordField = document.querySelector('input[name="password"]');
-            passwordField.type = this.checked ? 'text' : 'password';
+            const passwordField = document.getElementById('passwordField');
+            if (this.checked) {
+                passwordField.type = 'text'; // Show password
+            } else {
+                passwordField.type = 'password'; // Hide password
+            }
         });
     </script>
 </body>

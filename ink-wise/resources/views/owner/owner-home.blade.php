@@ -37,24 +37,65 @@
       background:#eef2ff; display:grid; place-items:center; font-weight:800; color:#475569;
     }
 
-    /* Sidebar nav (text left, icon right) */
-    .navlist { list-style:none; padding:8px 0; margin:0; }
-    .navlist li {
-      display:flex; justify-content:space-between; align-items:center;
-      margin:8px 12px; padding:10px 12px; border-radius:10px;
-      cursor:pointer; transition:background .15s;
+    /* Sidebar nav */
+    .navlist { list-style:none; padding:6px 6px; margin:0; }
+    .navlist li { margin: 2px 6px; }
+
+    .sidebar-btn {
+      width: 100%;
+      /* changed to grid so icons align in a fixed column */
+      display: grid;
+      grid-template-columns: 1fr 28px; /* text | icon */
+      align-items: center;
+      gap: 12px;
+      padding: 14px 14px;
+      padding-right: 12px; /* a bit of right breathing room */
+      background: transparent;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      text-align: left;
+      font-size: 15px;
+      color: #1f2937;
+      text-decoration: none;
+      white-space: nowrap; /* keep text on one line */
     }
-    .navlist li:hover { background:#f1f5ff; }
-    .navlist span.text { font-size:15px; }
+    .sidebar-btn:hover { background: #f7faff; }
+    .sidebar-btn:active { background:#eef4ff; }
+
+    .navlist span.text {
+      font-size: 15px;
+      color: #1f2937;
+      white-space: nowrap; /* prevent wrapping */
+      overflow: hidden;
+      text-overflow: ellipsis;
+      /* occupies the flexible column; grid handles width */
+    }
+
+    /* Icon: fixed-size right column, centered, no circle */
     .ico {
-      width:30px; height:30px; border-radius:50%; display:grid; place-items:center;
-      background:#f3f4f6; border:1px solid #e5e7eb; font-size:16px; margin-left:10px;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent; /* remove gray chip */
+      border: 0;
+      margin: 0;              /* no shift */
+      font-size: 18px;        /* adjust icon size */
+      line-height: 1;         /* avoid baseline wobble */
+      justify-self: end;      /* stick to the right edge */
+      flex-shrink: 0;
     }
+
+    /* Remove blue link underline globally in sidebar */
+    .navlist a { text-decoration: none; color: inherit; display: block; }
 
     /* Main content layout */
     .main-content { flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
     .topbar {
       display: flex; justify-content: space-between; align-items: center;
+      font-size: 21px;
       background: #fff; padding: 14px 20px; border-bottom: 1px solid #ddd;
     }
 
@@ -88,7 +129,7 @@
     .card h3 { margin: 6px 0 6px; font-size: 16px; }
     .card p  { margin: 0; color: #64748b; font-size: 14px; }
 
-    /* Charts area — larger containers */
+    /* Charts area */
     .charts {
       display: flex;
       gap: 20px;
@@ -101,12 +142,11 @@
       border-radius: 12px;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
       border: 1px solid #e6e8ef;
-      height: 450px; /* Increased height */
+      height: 450px;
     }
     .chart-container h3 { margin: 6px 0 12px; font-size: 16px; }
     canvas { width: 100% !important; height: 100% !important; }
 
-    /* Responsive */
     @media (max-width: 1100px){
       .cards { grid-template-columns: repeat(2, 1fr); }
       .charts { flex-direction: column; }
@@ -133,35 +173,35 @@
 
   <ul class="navlist">
     <li>
-      <a href="{{ route('owner.home') }}" class="text-decoration-none">
+      <a href="{{ route('owner.home') }}">
         <button class="sidebar-btn">
           <span class="text">Dashboard</span><span class="ico">🏠</span>
         </button>
       </a>
     </li>
     <li>
-      <a href="{{ route('owner.approve-staff') }}" class="text-decoration-none">
+      <a href="{{ route('owner.approve-staff') }}">
         <button class="sidebar-btn">
           <span class="text">Approve Staff Account</span><span class="ico">✅</span>
         </button>
       </a>
     </li>
     <li>
-      <a href="{{ route('owner.order.workflow') }}" class="text-decoration-none">
+      <a href="{{ route('owner.order.workflow') }}">
         <button class="sidebar-btn">
           <span class="text">Monitor Order Workflow</span><span class="ico">🧭</span>
         </button>
       </a>
     </li>
     <li>
-      <a href="{{ route('owner.inventory-track') }}" class="text-decoration-none">
+      <a href="{{ route('owner.inventory-track') }}">
         <button class="sidebar-btn">
           <span class="text">Track Inventory</span><span class="ico">📦</span>
         </button>
       </a>
     </li>
     <li>
-      <a href="{{ route('owner.transactions-view') }}" class="text-decoration-none">
+      <a href="{{ route('owner.transactions-view') }}">
         <button class="sidebar-btn">
           <span class="text">View Transactions</span><span class="ico">💳</span>
         </button>
@@ -172,7 +212,6 @@
 
   <!-- Main -->
   <section class="main-content">
-    <!-- Topbar -->
     <div class="topbar">
       <div><strong>Welcome, Owner!</strong></div>
       <form method="POST" action="{{ route('owner.logout') }}">
@@ -183,11 +222,10 @@
       </form>
     </div>
 
-    <!-- Stat cards with inline SVG icons -->
+    <!-- Stat cards -->
     <div class="cards">
       <div class="card">
-        <div class="stat-icon icon-sales" aria-hidden="true">
-          <!-- chart-line -->
+        <div class="stat-icon icon-sales">
           <svg viewBox="0 0 24 24">
             <path d="M3 3v18h18"/>
             <path d="M7 15l4-4 3 3 5-5"/>
@@ -198,8 +236,7 @@
       </div>
 
       <div class="card">
-        <div class="stat-icon icon-stock" aria-hidden="true">
-          <!-- box-open (simplified) -->
+        <div class="stat-icon icon-stock">
           <svg viewBox="0 0 24 24">
             <path d="M3 7l9 4 9-4-9-4-9 4z"/>
             <path d="M3 7v6l9 4 9-4V7"/>
@@ -211,8 +248,7 @@
       </div>
 
       <div class="card">
-        <div class="stat-icon icon-pending" aria-hidden="true">
-          <!-- hourglass -->
+        <div class="stat-icon icon-pending">
           <svg viewBox="0 0 24 24">
             <path d="M6 3h12"/>
             <path d="M6 21h12"/>
@@ -225,8 +261,7 @@
       </div>
 
       <div class="card">
-        <div class="stat-icon icon-bell" aria-hidden="true">
-          <!-- bell -->
+        <div class="stat-icon icon-bell">
           <svg viewBox="0 0 24 24">
             <path d="M15 17H9a4 4 0 0 1-4-4V9a7 7 0 1 1 14 0v4a4 4 0 0 1-4 4z"/>
             <path d="M10 21a2 2 0 0 0 4 0"/>
@@ -237,7 +272,7 @@
       </div>
     </div>
 
-    <!-- Charts (enlarged) -->
+    <!-- Charts -->
     <div class="charts">
       <div class="chart-container">
         <h3>Top-Selling Products</h3>
@@ -251,16 +286,11 @@
   </section>
 
   <script>
-    // Bar Chart (Top-Selling Products) — improved label layout
     const barCtx = document.getElementById('barChart').getContext('2d');
     new Chart(barCtx, {
       type: 'bar',
       data: {
-        labels: [
-          'Invitation - Birthday Party',
-          'Keychain',
-          'Invitation - Floral Pink'
-        ],
+        labels: ['Invitation - Birthday Party','Keychain','Invitation - Floral Pink'],
         datasets: [{
           label: 'Units Sold',
           data: [12, 15, 20],
@@ -272,46 +302,39 @@
         responsive: true,
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
-        layout: { padding: { bottom: 40 } }, // more room for labels
+        layout: { padding: { bottom: 30 } }, /* make room for labels */
         scales: {
-          y: { beginAtZero: true, grid: { color: '#eef2f7' } },
+          y: {
+            beginAtZero: true,
+            grid: { color: '#eef2f7' }
+          },
           x: {
             grid: { display: false },
             ticks: {
-              autoSkip: false,   // show all labels
-              maxRotation: 0,   // keep horizontal
+              autoSkip: false,         /* keep all labels */
+              maxRotation: 0,          /* no tilt */
               minRotation: 0,
-              align: 'center',  // center align the labels
-              padding: 10,
-              font: { size: 12 }
+              align: 'center',
+              callback: function(value){
+                const label = this.getLabelForValue(value);
+                return label.length > 22 ? label.slice(0,22) + '…' : label; /* truncate if too long */
+              }
             }
           }
         }
       }
     });
 
-    // Line Chart (Inventory Movement)
     const lineCtx = document.getElementById('lineChart').getContext('2d');
     new Chart(lineCtx, {
       type: 'line',
-      data: {
-        labels: ['Week 1','Week 2','Week 3','Week 4'],
-        datasets: 
-          [
-            { label: 'Incoming Stock', data: [20,40,25,35], borderColor: '#16a34a', fill:false, tension:.3 },
-            { label: 'Outgoing Stock', data: [70,30,20,50], borderColor: '#ef4444', fill:false, tension:.3 }
-          ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: { beginAtZero: true, grid: { color: '#eef2f7' } },
-          x: { grid: { display: false } }
-        }
-      }
+      data: { labels: ['Week 1','Week 2','Week 3','Week 4'],
+        datasets: [
+          { label: 'Incoming Stock', data: [20,40,25,35], borderColor: '#16a34a', fill:false, tension:.3 },
+          { label: 'Outgoing Stock', data: [70,30,20,50], borderColor: '#ef4444', fill:false, tension:.3 }
+        ]},
+      options: { responsive: true, maintainAspectRatio: false }
     });
   </script>
 </body>
 </html>
-
