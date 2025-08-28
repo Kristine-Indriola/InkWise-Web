@@ -16,22 +16,30 @@ class RedirectIfAuthenticated
      * @param  string|null  ...$guards
      * @return mixed
      */
+
     public function handle(Request $request, Closure $next, ...$guards)
     {
-        $guards = empty($guards) ? [null] : $guards;
-
         foreach ($guards as $guard) {
             if (Auth::guard($guard)->check()) {
-                // 👇 Owners redirect to /owner/home
-                if ($guard === 'owner') {
-                    return redirect()->route('owner.home');
-                }
+                $user = Auth::user();
 
-                // 👇 Default users (if you also use web auth)
-                return redirect('/home');
+                // Redirect based on role
+                switch ($user->role) {
+                    case 'admin':
+                        return redirect()->route('admin.dashboard');
+                    case 'owner':
+                        return redirect()->route('owner.owner-home');
+                    case 'staff':
+                        return redirect()->route('staff.dashboard');
+                    case 'customer':
+                        return redirect()->route('customer.dashboard');
+                    default:
+                        return redirect()->route('categories'); // fallback
+                }
             }
         }
 
         return $next($request);
     }
+
 }

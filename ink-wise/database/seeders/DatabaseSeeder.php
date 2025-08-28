@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-use App\Models\Owner;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -16,15 +15,24 @@ class DatabaseSeeder extends Seeder
     {
         // Create a default Admin user
         User::create([
-            'name' => 'Admin',
+            'first_name' => 'System',
+            'middle_name' => null,
+            'last_name' => 'Admin',
             'email' => 'admin@example.com',
             'password' => Hash::make('admin123'),
+            'role' => 'admin',
+            'status' => 'active',
         ]);
 
         // Create a default Owner account
-        Owner::create([
+        User::create([
+            'first_name' => 'Default',
+            'middle_name' => null,
+            'last_name' => 'Owner',
             'email' => 'owner@test.com',
             'password' => Hash::make('secret123'),
+            'role' => 'owner',
+            'status' => 'active',
         ]);
 
 

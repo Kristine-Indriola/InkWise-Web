@@ -2,34 +2,92 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
-
-// Public auth/controllers
-<<<<<<< Updated upstream
 use Laravel\Socialite\Facades\Socialite;
 use App\Http\Controllers\AdminController;
-
-// Admin controllers
 use App\Http\Controllers\TemplateController;
 use App\Http\Controllers\Owner\HomeController;
 use App\Http\Controllers\OwnerLoginController;
 use App\Http\Controllers\CostumerAuthController;
-
-// Admin controllers
 use App\Http\Controllers\Auth\AdminLoginController;
-=======
-use App\Http\Controllers\CostumerAuthController;
-use App\Http\Controllers\TemplateController; 
 use App\Http\Controllers\StaffAuthController;
 use App\Http\Controllers\Staff\StaffLoginController;
-
-
-
-// Admin controllers
-use App\Http\Controllers\Auth\AdminLoginController;
-use App\Http\Controllers\AdminController;
->>>>>>> Stashed changes
 use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
+use App\Http\Controllers\Admin\UserManagementController;
+use App\Http\Controllers\Admin\InventoryController;
+use App\Http\Controllers\Admin\MaterialController;
+use App\Http\Controllers\Owner\OwnerController;
+use App\Http\Controllers\Customer\CustomerController;
 
+
+/*
+|--------------------------------------------------------------------------
+| Role-based Dashboards
+|--------------------------------------------------------------------------
+*/
+/*
+|--------------------------------------------------------------------------
+| Admin Protected
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () { 
+    Route::get('/dashboard', [AdminController::class, 'index'])->name('dashboard'); 
+
+    // Templates 
+    Route::prefix('templates')->name('templates.')->group(function () { 
+    Route::get('/', [AdminTemplateController::class, 'index'])->name('index'); 
+    Route::get('/create', [AdminTemplateController::class, 'create'])->name('create'); 
+    Route::post('/', [AdminTemplateController::class, 'store'])->name('store'); 
+    Route::get('/editor/{id?}', [AdminTemplateController::class, 'editor'])->name('editor'); }); 
+    
+    // ✅ User Management 
+    Route::prefix('users')->name('users.')->group(function () { 
+        Route::get('/', [UserManagementController::class, 'index'])->name('index'); 
+        Route::get('/create', [\App\Http\Controllers\Admin\UserManagementController::class, 'create'])->name('create'); 
+        Route::post('/', [\App\Http\Controllers\Admin\UserManagementController::class, 'store'])->name('store'); 
+        Route::get('/{id}/edit', [UserManagementController::class, 'edit'])->name('edit'); // Edit form 
+        Route::put('/{id}', [UserManagementController::class, 'update'])->name('update'); // Update user 
+        Route::delete('/{id}', [UserManagementController::class, 'destroy'])->name('destroy'); // Delete user 
+        });
+
+     Route::prefix('inventory')->name('inventory.')->group(function () {
+        Route::get('/', [InventoryController::class, 'index'])->name('index');
+        Route::get('/create', [InventoryController::class, 'create'])->name('create');
+        Route::post('/', [InventoryController::class, 'store'])->name('store');
+        Route::get('/{id}/edit', [InventoryController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [InventoryController::class, 'update'])->name('update');
+        Route::delete('/{id}', [InventoryController::class, 'destroy'])->name('destroy');
+    });
+
+     Route::prefix('materials')->name('materials.')->group(function () {
+        Route::get('/', [MaterialController::class, 'index'])->name('index');
+        Route::get('/create', [MaterialController::class, 'create'])->name('create');
+        Route::post('/', [MaterialController::class, 'store'])->name('store');
+        Route::get('/{id}/edit', [MaterialController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [MaterialController::class, 'update'])->name('update');
+        Route::delete('/{id}', [MaterialController::class, 'destroy'])->name('destroy');
+    });
+
+
+});
+
+
+
+
+Route::middleware(['auth', 'role:owner'])->group(function () {
+    Route::get('/owner/home', [OwnerController::class, 'index'])->name('owner.owner-home');
+});
+
+/*Route::middleware(['auth', 'role:staff'])->group(function () {
+    Route::get('/staff/dashboard', [StaffController::class, 'index'])->name('staff.dashboard');
+});
+
+Route::middleware(['auth', 'role:customer'])->group(function () {
+    Route::get('/customer/dashboard', [CustomerController::class, 'index'])->name('customer.dashboard');
+});*/
+
+Route::get('/unauthorized', function () {
+    return view('errors.unauthorized');
+})->name('unauthorized');
 
 
 /*
@@ -41,17 +99,12 @@ use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
     return Socialite::driver('google')->redirect();
 })->name('google.login');
 
+Route::get('/auth/google/redirect', fn () => Socialite::driver('google')->redirect())->name('google.login');
 Route::get('/auth/google/callback', function () {
     $user = Socialite::driver('google')->user();
     // TODO: Handle login or registration for Google user
 });*/
 
-
-/*
-|--------------------------------------------------------------------------
-| Customer (Costumer) Side
-|--------------------------------------------------------------------------
-*/
 
 /*
 |--------------------------------------------------------------------------
@@ -79,6 +132,12 @@ Route::post('/costumer/logout', [CostumerAuthController::class, 'logout'])->name
 Route::middleware('auth')->group(function () {
     Route::post('/costumer-logout', [CostumerAuthController::class, 'logout'])->name('costumer.logout');
 });
+/*Route::middleware('auth')->group(function () {
+    Route::get('/categories', [TemplateController::class, 'categories'])->name('categories');
+    Route::get('/templates/{category}', [TemplateController::class, 'templates'])->name('templates');
+    Route::get('/template/preview/{id}', [TemplateController::class, 'preview'])->name('template.preview');
+});*/
+
 
 // Templatehome category pages
 Route::get('/templates/wedding', function () {
@@ -137,27 +196,10 @@ Route::get('/admin/login', [AdminLoginController::class, 'showLoginForm'])->name
 Route::post('/admin/login', [AdminLoginController::class, 'login'])->name('admin.login.submit');
 Route::get('/admin/logout', [AdminLoginController::class, 'logout'])->name('admin.logout');
 
-/*
-|--------------------------------------------------------------------------
-| Admin Protected
-|--------------------------------------------------------------------------
-*/
-Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
-    Route::get('/dashboard', [AdminController::class, 'index'])->name('dashboard');
-
-    Route::prefix('templates')->name('templates.')->group(function () {
-        Route::get('/', [AdminTemplateController::class, 'index'])->name('index');
-        Route::get('/create', [AdminTemplateController::class, 'create'])->name('create');
-        Route::post('/', [AdminTemplateController::class, 'store'])->name('store');
-        Route::get('/editor/{id?}', [AdminTemplateController::class, 'editor'])->name('editor');
-    });
-});
-
 
 /*
 |--------------------------------------------------------------------------
-| Authenticated owner routes
-| Require auth:owner
+| Owner Auth
 |--------------------------------------------------------------------------
 */
 
@@ -185,6 +227,4 @@ Route::prefix('staff')->name('staff.')->middleware('auth:staff')->group(function
     Route::get('/customer-profile', fn () => view('Staff.customer_profile'))->name('customer.profile');
     Route::get('/notify-customers', fn () => view('Staff.notify_customers'))->name('notify.customers');   
 });
-
-
 

@@ -1,30 +1,47 @@
 @extends('layouts.admin')
 
+@section('title', 'Create Template')
+
 @section('content')
-    <h1>Create Template</h1>
+<div class="max-w-3xl mx-auto bg-white shadow-lg rounded-2xl p-6">
+    <h1 class="text-2xl font-bold mb-6">Create New Template</h1>
 
-    <form method="POST" action="{{ route('admin.templates.store') }}" enctype="multipart/form-data">
-        @csrf
-        <label>Title</label>
-        <input type="text" name="title" required><br><br>
-
-        <label>Type</label>
-        <select name="type" required>
-            <option value="invitation">Invitation</option>
-            <option value="giveaway">Giveaway</option>
-        </select><br><br>
-
-        <label>Upload File</label>
-        <input type="file" name="file" required><br><br>
-
-        <button type="submit">Save Template</button>
-    </form>
-
-     <h1>Templates</h1>
-    <a href="{{ route('admin.templates.create') }}" class="btn btn-primary">+ Add Template</a>
-
-    @if(session('success'))
-        <div class="alert alert-success">{{ session('success') }}</div>
+    @if ($errors->any())
+        <div class="bg-red-100 text-red-700 p-3 rounded mb-4">
+            <ul class="list-disc pl-5">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
     @endif
-    
+
+    <form action="{{ route('admin.templates.store') }}" method="POST" enctype="multipart/form-data" class="space-y-4">
+        @csrf
+
+        <div>
+            <label for="name" class="block font-medium">Template Name</label>
+            <input type="text" id="name" name="name" 
+                   class="w-full border rounded-lg p-2" 
+                   value="{{ old('name') }}" required>
+        </div>
+
+        <div>
+            <label for="category" class="block font-medium">Category</label>
+            <input type="text" id="category" name="category" 
+                   class="w-full border rounded-lg p-2" 
+                   value="{{ old('category') }}" required>
+        </div>
+
+        <div>
+            <label for="file" class="block font-medium">Upload File (optional)</label>
+            <input type="file" id="file" name="file" class="w-full border rounded-lg p-2">
+        </div>
+
+        <div class="flex justify-end space-x-3">
+            <a href="{{ route('admin.templates.index') }}" class="px-4 py-2 bg-gray-300 rounded-lg">Cancel</a>
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg">Save Template</button>
+        </div>
+    </form>
+</div>
 @endsection

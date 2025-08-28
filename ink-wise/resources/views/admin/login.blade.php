@@ -6,26 +6,18 @@
     <title>InkWise System - Login</title>
     <style>
         body {
-            margin: 0;
-            font-family: 'Arial', sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-            position: relative;
-        }
+    margin: 0;
+    font-family: 'Arial', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+    background: url('/admin-image/background.png') no-repeat center center fixed;
+    background-size: cover;
+}
 
-        /* Video background */
-        .video-background {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover; /* Ensures the video covers the entire screen */
-            z-index: -1; /* Places the video behind the content */
-        }
+
 
         .login-container {
             background-color: rgba(255, 255, 255, 0.8); /* White background with transparency */
@@ -97,10 +89,6 @@
 </head>
 <body>
     <!-- Video background -->
-    <video autoplay muted loop class="video-background">
-        <source src="https://imgur.com/AbadHPL.mp4" type="video/mp4">
-        Your browser does not support the video tag.
-    </video>
 
     <div class="login-container">
         <h1>Welcome to InkWise</h1>
