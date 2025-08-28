@@ -1,20 +1,24 @@
 <?php
+namespace App\Http\Controllers\Admin;
 
-namespace App\Http\Controllers;
-
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 
 class TemplateController extends Controller
 {
-    public function categories() {
-        return view('categories'); 
+    public function index()
+    {
+        // later you can fetch templates from DB
+        return view('admin.templates.index');
     }
 
-    public function templates($category) {
-        return view('templates', ['category' => $category]);
+    public function create()
+    {
+        return view('admin.templates.create');
     }
 
-    public function preview($id) {
-        return view('template-preview', ['id' => $id]);
+    public function store(Request $request)
+    {
+        // save template logic later
     }
 }
