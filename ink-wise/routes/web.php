@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 
 // Public auth/controllers
+<<<<<<< Updated upstream
 use Laravel\Socialite\Facades\Socialite;
 use App\Http\Controllers\AdminController;
 
@@ -15,6 +16,18 @@ use App\Http\Controllers\CostumerAuthController;
 
 // Admin controllers
 use App\Http\Controllers\Auth\AdminLoginController;
+=======
+use App\Http\Controllers\CostumerAuthController;
+use App\Http\Controllers\TemplateController; 
+use App\Http\Controllers\StaffAuthController;
+use App\Http\Controllers\Staff\StaffLoginController;
+
+
+
+// Admin controllers
+use App\Http\Controllers\Auth\AdminLoginController;
+use App\Http\Controllers\AdminController;
+>>>>>>> Stashed changes
 use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
 
 
@@ -161,15 +174,17 @@ Route::prefix('owner')->name('owner.')->middleware('auth:owner')->group(function
 });
   
 
+/*Route::get('/Staff/login', [StaffLoginController::class, 'showLoginForm'])->name('Staff.login');
+Route::post('/Staff/login', [StaffLoginController::class, 'login'])->name('Staff.login.submit');
+Route::post('/Staff/logout', [StaffLoginController::class, 'logout'])->name('taff.logout');
+*/
+Route::prefix('staff')->name('staff.')->middleware('auth:staff')->group(function () {
+    Route::get('/dashboard', fn () => view('Staff.dashboard'))->name('dashboard');
+    Route::get('/assigned-orders', fn () => view('Staff.assigned_orders'))->name('assigned.orders');
+    Route::get('/order-list', fn () => view('Staff.order_list'))->name('order.list');
+    Route::get('/customer-profile', fn () => view('Staff.customer_profile'))->name('customer.profile');
+    Route::get('/notify-customers', fn () => view('Staff.notify_customers'))->name('notify.customers');   
+});
 
-Route::get('/order-list', function () {
-    return view('Staff.order_list');
-})->name('order.list');
 
-Route::get('/customer-profile', function () {
-    return view('Staff.customer_profile');
-})->name('customer.profile');
 
-Route::get('/notify-customers', function () {
-    return view('Staff.notify_customers');
-})->name('notify.customers');

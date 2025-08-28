@@ -27,6 +27,11 @@ return [
             'driver' => 'session',
             'provider' => 'owners',
         ],
+
+        'staff' => [
+        'driver' => 'session',
+        'provider' => 'staffs', // must match the provider below
+    ],
     ],
 
     /*
@@ -44,6 +49,11 @@ return [
             'driver' => 'eloquent',
             'model' => App\Models\Owner::class, // 👈 make sure this model exists
         ],
+
+        'staffs' => [
+        'driver' => 'eloquent',
+        'model' => App\Models\Staff::class, // create Staff model if not yet existing
+    ],
     ],
 
     /*
