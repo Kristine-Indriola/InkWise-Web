@@ -7,14 +7,15 @@ use Illuminate\Http\Request;
 
 class Authenticate extends Middleware
 {
-    protected function redirectTo(Request $request): ?string
-    {
-        if (!$request->expectsJson()) {
-            if ($request->routeIs('owner.*')) {
-                return route('owner.login');   // unauthenticated owner → owner login
-            }
-            return route('owner.login');             // keep if you also have regular web login
+    protected function redirectTo($request)
+{
+    if (! $request->expectsJson()) {
+        if ($request->is('staff/*')) {
+            return route('Staff.dashboard');  // 👈 staff login
+        } elseif ($request->is('owner/*')) {
+            return route('owner.login');  // 👈 owner login
         }
-        return null;
+        return route('login'); // fallback (normal user login)
     }
+}
 }
