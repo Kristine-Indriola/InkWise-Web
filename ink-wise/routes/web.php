@@ -42,7 +42,9 @@ Route::get('/auth/google/callback', function () {
 | Dashboard / Home
 |--------------------------------------------------------------------------
 */
-
+Route::get('/', function () {
+    return view('dashboard');
+})->name('dashboard');
 /*
 |--------------------------------------------------------------------------
 | Costumer Auth (floating modals)
@@ -62,12 +64,33 @@ Route::middleware('auth')->group(function () {
     Route::post('/costumer-logout', [CostumerAuthController::class, 'logout'])->name('costumer.logout');
 });
 
-// Protected Customer Routes
-Route::middleware('auth')->group(function () {
-    Route::get('/categories', [TemplateController::class, 'categories'])->name('categories');
-    Route::get('/templates/{category}', [TemplateController::class, 'templates'])->name('templates');
-    Route::get('/template/preview/{id}', [TemplateController::class, 'preview'])->name('template.preview');
-});
+// Templatehome category pages
+Route::get('/templates/wedding', function () {
+    return view('costumertemplates.wedding');
+})->name('templates.wedding');
+
+Route::get('/templates/birthday', function () {
+    return view('costumertemplates.birthday');
+})->name('templates.birthday');
+
+Route::get('/templates/baptism', function () {
+    return view('costumertemplates.baptism');
+})->name('templates.baptism');
+
+Route::get('/templates/corporate', function () {
+    return view('costumertemplates.corporate');
+})->name('templates.corporate');
+
+//costumer templates inviatations 
+Route::get('/templates/wedding/invitations', function () {
+    return view('costumerInvitations.weddinginvite');
+})->name('templates.wedding.invitations');
+
+//costumer templates giveaways 
+Route::get('/templates/wedding/giveaways', function () {
+    return view('costumerGiveaways.weddinggive');
+})->name('templates.wedding.giveaways');
+
 // Simple placeholders to avoid 404 during dev
 Route::get('/search', function (\Illuminate\Http\Request $request) {
     return 'Search for: ' . e($request->query('query', ''));
@@ -87,6 +110,7 @@ Route::get('/design/{id}', function ($id) {
 Route::get('/auth/google', function () {
     return 'Google login placeholder until controller is ready.';
 })->name('google.redirect');
+
 
 /*
 |--------------------------------------------------------------------------

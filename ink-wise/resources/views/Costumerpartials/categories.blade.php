@@ -1,69 +1,101 @@
-<section class="py-8">
-  <h2 class="text-center text-3xl font-bold text-indigo-700 mb-6" style="font-family: 'Seasons', serif;">
-    Find your perfect match
-  </h2>
+<!-- Categories Section -->
+<section id="categories" class="py-16">
+    <hr class="section-divider">
+    <div class="max-w-7xl mx-auto px-6 text-center">
+        <h2 class="text-3xl font-bold mb-6">Categories</h2>
+        <p class="text-lg text-gray-600">Browse through our ready-made templates designed for all occasions.</p>
+        
+        <!-- Grid for categories -->
+        <div class="mt-12 grid grid-cols-1 sm:grid-cols-2 gap-12 justify-center">
+            
+            <!-- Invitations -->
+            <div>
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Invitations</h3>
+                <div class="accordion-gallery flex space-x-2 overflow-hidden rounded-xl">
+                    
+                    <!-- Wedding -->
+                    <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
+                        <a href="/wedding">
+                            <img src="{{ asset('costumerimage/invite1.png') }}" 
+                                 alt="Wedding Invitation" 
+                                 class="w-full h-64 object-cover transition-transform duration-500 hover:scale-110">
+                        </a>
+                    </div>
+                    
+                    <!-- Baptism -->
+                    <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
+                        <a href="/templates.baptism">
+                            <img src="{{ asset('costumerimage/invite2.png') }}" 
+                                 alt="Baptism Invitation" 
+                                 class="w-full h-64 object-cover transition-transform duration-500 hover:scale-110">
+                        </a>
+                    </div>
+                    
+                    <!-- Birthday -->
+                    <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
+                        <a href="/birthday">
+                            <img src="{{ asset('costumerimage/invite3.png') }}" 
+                                 alt="Birthday Invitation" 
+                                 class="w-full h-64 object-cover transition-transform duration-500 hover:scale-110">
+                        </a>
+                    </div>
+                    
+                    <!-- Corporate -->
+                    <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
+                        <a href="/corporate">
+                            <img src="{{ asset('costumerimage/invite4.png') }}" 
+                                 alt="Corporate Invitation" 
+                                 class="w-full h-64 object-cover transition-transform duration-500 hover:scale-110">
+                        </a>
+                    </div>
+                </div>
+                <p class="text-sm text-gray-600 mt-4">Elegant invitations with various themes.</p>
+            </div>
 
-  <div class="flex flex-col gap-8 items-center">
+            <!-- Giveaways -->
+            <div>
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Giveaways</h3>
+                <div class="accordion-gallery flex space-x-2 overflow-hidden rounded-xl">
+                    
+                    <!-- Wedding -->
+                    <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
+                        <a href="/wedding">
+                            <img src="{{ asset('costumerimage/ribbon.png') }}" 
+                                 alt="Wedding Giveaway" 
+                                 class="w-full h-64 object-cover transition-transform duration-500 hover:scale-110">
+                        </a>
+                    </div>
+                    
+                    <!-- Baptism -->
+                    <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
+                        <a href="/baptism">
+                            <img src="{{ asset('costumerimage/stapler.png') }}" 
+                                 alt="Baptism Giveaway" 
+                                 class="w-full h-64 object-cover transition-transform duration-500 hover:scale-110">
+                        </a>
+                    </div>
+                    
+                    <!-- Birthday -->
+                    <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
+                        <a href="/birthday">
+                            <img src="{{ asset('costumerimage/happy.png') }}" 
+                                 alt="Birthday Giveaway" 
+                                 class="w-full h-64 object-cover transition-transform duration-500 hover:scale-110">
+                        </a>
+                    </div>
+                    
+                    <!-- Corporate -->
+                    <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
+                        <a href="/corporate">
+                            <img src="{{ asset('costumerimage/gift.png') }}" 
+                                 alt="Corporate Giveaway" 
+                                 class="w-full h-64 object-cover transition-transform duration-500 hover:scale-110">
+                        </a>
+                    </div>
+                </div>
+                <p class="text-sm text-gray-600 mt-4">Creative giveaways for every occasion.</p>
+            </div>
 
-    <!-- Birthday -->
-    <div class="relative flex items-center gap-8">
-      <img src="/image/star.png" class="absolute -top-6 -left-8 w-12 h-12 rotate-12" alt="">
-      <img src="/image/gift.png" class="absolute -bottom-6 right-10 w-12 h-12" alt="">
-
-      <div class="w-80 rounded-3xl shadow-xl overflow-hidden border-4 border-pink-300 transition-transform hover:scale-105">
-        <img src="/image/birthday.png" alt="Birthday" class="w-full h-40 object-cover">
-      </div>
-
-      <div class="max-w-sm">
-        <h3 class="text-pink-600 text-2xl text-center font-extrabold">Birthday</h3>
-        <p class="text-pink-500 text-sm text-center">Choose from Unique Birthday Invitation and Giveaways Designs</p>
-      </div>
+        </div>
     </div>
-
-    <!-- Wedding -->
-    <div class="relative flex items-center gap-8">
-      <img src="/image/ring.png" class="absolute -top-6 -right-8 w-20 h-20 rotate-12 z-20" alt="">
-      <img src="/image/ribbon.png" class="absolute -bottom-6 left-10 w-12 h-12 rotate-12" alt="">
-
-      <div class="max-w-sm">
-        <h3 class="text-yellow-700 text-center text-2xl font-extrabold">Wedding</h3>
-        <p class="text-yellow-600 text-sm text-center">Choose from Unique Wedding Invitation and Giveaways Designs</p>
-      </div>
-
-      <div class="w-72 rounded-3xl shadow-xl overflow-hidden border-4 border-yellow-400 transition-transform hover:scale-105">
-        <img src="/image/wedding.png" alt="Wedding" class="w-full h-40 object-cover">
-      </div>
-    </div>
-
-    <!-- Corporate -->
-    <div class="relative flex items-center gap-8">
-      <img src="/image/Glass.png" class="absolute -top-6 -left-8 w-20 h-20 rotate-12 z-20" alt="">
-      <img src="/image/paperclip.png" class="absolute -bottom-6 left-44 w-12 h-12 rotate-12 z-20" alt="">
-
-      <div class="w-72 -rotate-2 rounded-3xl shadow-xl overflow-hidden border-4 border-orange-400 transition-transform hover:scale-105">
-        <img src="/image/corporate.png" alt="Corporate" class="w-full h-40 object-cover">
-      </div>
-
-      <div class="max-w-sm">
-        <h3 class="text-orange-600 text-center text-2xl font-extrabold">Corporate</h3>
-        <p class="text-orange-500 text-center">Choose from Unique Corporate Invitation and Giveaways Designs</p>
-      </div>
-    </div>
-
-    <!-- Baptism -->
-    <div class="relative flex items-center gap-8">
-      <img src="/image/footprint.png" class="absolute -top-6 -right-8 w-20 h-20 rotate-12 z-20" alt="">
-      <img src="/image/cloud.png" class="absolute -bottom-8 left-32 w-12 h-12 rotate-12" alt="">
-
-      <div class="max-w-sm">
-        <h3 class="text-blue-600 text-2xl font-extrabold text-center">Baptism</h3>
-        <p class="text-blue-500 text-sm text-center">Choose from Unique Baptism Invitation and Giveaways Designs</p>
-      </div>
-
-      <div class="w-72 rotate-3 rounded-3xl shadow-xl overflow-hidden border-4 border-blue-400 transition-transform hover:scale-105">
-        <img src="/image/baptism.png" alt="Baptism" class="w-full h-40 object-cover">
-      </div>
-    </div>
-
-  </div>
 </section>

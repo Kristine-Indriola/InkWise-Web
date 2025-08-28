@@ -43,7 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Auto-open logic from server (dashboard.blade passes window.__OPEN_MODAL__)
+  // Auto-open logic
   const open = (typeof window.__OPEN_MODAL__ === 'string') ? window.__OPEN_MODAL__ : null;
   if (open === 'login')   { show(loginModal); hide(registerModal); }
   if (open === 'register'){ show(registerModal); hide(loginModal); }
