@@ -1,4 +1,6 @@
 <section id="contact" class="py-16 bg-white shadow-inner">
+  <hr class="section-divider">
+
   <div class="max-w-6xl mx-auto px-6">
     <h2 class="text-3xl font-bold text-center mb-6 text-gray-800">Contact Us</h2>
     <p class="text-center text-gray-600 mb-10">

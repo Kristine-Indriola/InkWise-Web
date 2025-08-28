@@ -1,70 +1,87 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>InkWise | @yield('title', 'Home')</title>
 
-    <title>{{ config('app.name', 'InkWise') }} - @yield('title')</title>
+    {{-- Tailwind and Laravel Vite --}}
+    @vite('resources/css/app.css')
+    @vite('resources/js/app.js')
 
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Seasons&display=swap" rel="stylesheet">
+    {{-- Custom Styles --}}
+    <!-- CSS -->
+<link rel="stylesheet" href="{{ asset('css/costumertemplates.css') }}">
 
-    <!-- Scripts -->
-    @vite(['resources/css/Costumer.css', 'resources/js/Costumer.js'])
+<!-- JS -->
+<script src="{{ asset('js/costumertemplates.js') }}"></script>
+
+
 </head>
-<body class="font-sans antialiased bg-gray-50">
+<body class="antialiased bg-gray-50 text-gray-800">
 
-    <div class="min-h-screen">
-        <!-- Top Navigation -->
-        <nav class="bg-white shadow">
-            <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-                <a href="{{ route('dashboard') }}" class="text-2xl font-bold text-gray-800">InkWise</a>
+    <!-- ======================= Navbar ======================= -->
+    <header class="bg-white shadow-md fixed w-full top-0 left-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 flex justify-between items-center h-16">
+            <!-- Logo -->
+            <a href="/" class="text-2xl font-bold text-indigo-700">InkWise</a>
 
-                <div class="flex items-center space-x-4">
-                    @auth
-                        <!-- Customer Dropdown -->
-                        <div class="relative" x-data="{ open: false }">
-                            <button @click="open = !open" class="flex items-center px-4 py-2 bg-gray-100 rounded hover:bg-gray-200">
-                                {{ Auth::user()->name }}
-                                <svg class="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                                </svg>
-                            </button>
+            <!-- Navigation -->
+            <nav class="hidden md:flex gap-6">
+                <a href="/" class="text-gray-700 hover:text-indigo-600 transition">Home</a>
+                <a href="/templates" class="text-gray-700 hover:text-indigo-600 transition">Templates</a>
+                <a href="/about" class="text-gray-700 hover:text-indigo-600 transition">About</a>
+                <a href="/contact" class="text-gray-700 hover:text-indigo-600 transition">Contact</a>
+            </nav>
 
-                            <div x-show="open" @click.outside="open = false" class="absolute right-0 mt-2 w-48 bg-white border rounded shadow-md z-50">
-                                <form method="POST" action="{{ route('logout') }}">
-                                    @csrf
-                                    <button type="submit" class="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100">
-                                        Logout
-                                    </button>
-                                </form>
-                            </div>
+            <!-- Auth Section -->
+            <div>
+                @auth
+                    <!-- If logged in -->
+                    <div class="relative group">
+                        <button class="bg-indigo-600 text-white px-4 py-2 rounded-full shadow hover:bg-indigo-700 transition">
+                            {{ Auth::user()->name }}
+                        </button>
+                        <div class="absolute right-0 mt-2 w-40 bg-white border rounded-md shadow-lg hidden group-hover:block">
+                            <a href="/dashboard" class="block px-4 py-2 hover:bg-gray-100">Dashboard</a>
+                            <form method="POST" action="{{ route('logout') }}">
+                                @csrf
+                                <button type="submit" class="w-full text-left px-4 py-2 hover:bg-gray-100">Logout</button>
+                            </form>
                         </div>
-                    @else
-                        <a href="{{ route('login') }}" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Sign In</a>
-                        <a href="{{ route('register') }}" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Register</a>
-                    @endauth
-                </div>
+                    </div>
+                @else
+                    <!-- If guest -->
+                    <a href="/login" class="bg-indigo-600 text-white px-4 py-2 rounded-full shadow hover:bg-indigo-700 transition">
+                        Sign In
+                    </a>
+                @endauth
             </div>
-        </nav>
+        </div>
+    </header>
 
-        <!-- Page Header -->
-        @isset($header)
-            <header class="bg-white shadow">
-                <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                    {{ $header }}
-                </div>
-            </header>
-        @endisset
+    <!-- Spacer to prevent content from hiding behind navbar -->
+    <div class="h-16"></div>
 
-        <!-- Page Content -->
-        <main class="py-6 px-4">
-            {{ $slot }}
-        </main>
-    </div>
+    <!-- ======================= Main Content ======================= -->
+    <main class="max-w-7xl mx-auto px-6 py-8">
+        @yield('content')
+    </main>
 
+    <!-- ======================= Footer ======================= -->
+    <footer class="bg-indigo-700 text-white py-6 mt-12">
+        <div class="max-w-7xl mx-auto px-6 flex justify-between items-center">
+            <p>&copy; {{ date('Y') }} InkWise. All rights reserved.</p>
+            <div class="flex gap-4">
+                <a href="#" class="hover:text-gray-300">Facebook</a>
+                <a href="#" class="hover:text-gray-300">Instagram</a>
+                <a href="#" class="hover:text-gray-300">LinkedIn</a>
+            </div>
+        </div>
+    </footer>
+
+    {{-- Custom Scripts --}}
+    <script src="{{ asset('js/templates.js') }}"></script>
 </body>
 </html>
