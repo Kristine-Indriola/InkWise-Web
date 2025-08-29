@@ -36,6 +36,8 @@ class AuthenticatedSessionController extends Controller
                 return redirect()->route('admin.dashboard');
             case 'owner':
                 return redirect()->route('owner.owner-home');
+            case 'staff':
+                return redirect()->route('staff.dashboard');
             default:
                 return redirect()->route('customer.dashboard');
         }

@@ -154,7 +154,7 @@
   <section class="main-content">
     <div class="topbar">
       <div><strong>Welcome, Owner!</strong></div>
-      <form method="POST" action="{{ route('owner.logout') }}">
+      <form method="POST" action="{{ route('logout') }}">
         @csrf
         <button type="submit" style="padding:8px 14px;border:1px solid #e5e7eb;background:#fff;border-radius:8px;cursor:pointer">
           Logout

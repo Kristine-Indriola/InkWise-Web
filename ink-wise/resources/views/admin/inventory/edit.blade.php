@@ -22,6 +22,7 @@
             </select>
         </div>
 
+
         <div class="form-group">
             <label for="stock_level">Stock Level</label>
             <input type="number" name="stock_level" id="stock_level" value="{{ $inventory->stock_level }}" required>
