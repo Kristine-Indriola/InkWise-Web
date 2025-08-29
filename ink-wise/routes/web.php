@@ -6,17 +6,18 @@ use Laravel\Socialite\Facades\Socialite;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\TemplateController;
 use App\Http\Controllers\Owner\HomeController;
-use App\Http\Controllers\OwnerLoginController;
+//use App\Http\Controllers\OwnerLoginController;
 use App\Http\Controllers\CostumerAuthController;
-use App\Http\Controllers\Auth\AdminLoginController;
-use App\Http\Controllers\StaffAuthController;
-use App\Http\Controllers\Staff\StaffLoginController;
+//use App\Http\Controllers\Auth\AdminLoginController;
+//use App\Http\Controllers\StaffAuthController;
+//use App\Http\Controllers\Staff\StaffLoginController;
 use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\MaterialController;
 use App\Http\Controllers\Owner\OwnerController;
 use App\Http\Controllers\Customer\CustomerController;
+use App\Http\Controllers\Auth\RoleLoginController;
 
 
 /*
@@ -71,11 +72,6 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
 });
 
 
-
-
-Route::middleware(['auth', 'role:owner'])->group(function () {
-    Route::get('/owner/home', [OwnerController::class, 'index'])->name('owner.owner-home');
-});
 
 /*Route::middleware(['auth', 'role:staff'])->group(function () {
     Route::get('/staff/dashboard', [StaffController::class, 'index'])->name('staff.dashboard');
@@ -192,9 +188,10 @@ Route::get('/auth/google', function () {
 | Admin Auth
 |--------------------------------------------------------------------------
 */
-Route::get('/admin/login', [AdminLoginController::class, 'showLoginForm'])->name('admin.login');
-Route::post('/admin/login', [AdminLoginController::class, 'login'])->name('admin.login.submit');
-Route::get('/admin/logout', [AdminLoginController::class, 'logout'])->name('admin.logout');
+// login of all roles
+Route::get('/login', [RoleLoginController::class, 'showLoginForm'])->name('login');
+Route::post('/login', [RoleLoginController::class, 'login'])->name('login.submit');
+Route::post('/logout', [RoleLoginController::class, 'logout'])->name('logout');
 
 
 /*
@@ -203,28 +200,21 @@ Route::get('/admin/logout', [AdminLoginController::class, 'logout'])->name('admi
 |--------------------------------------------------------------------------
 */
 
-Route::get('/owner/login', [OwnerLoginController::class, 'showLoginForm'])->name('owner.login');
-Route::post('/owner/login', [OwnerLoginController::class, 'login'])->name('owner.login.submit');
 
-Route::prefix('owner')->name('owner.')->middleware('auth:owner')->group(function () {
+Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/home', [HomeController::class, 'index'])->name('home');
     Route::get('/approve-staff', fn () => view('owner.owner-appstaff'))->name('approve-staff');
     Route::get('/order/workflow', fn () => view('owner.order-workflow'))->name('order.workflow');
     Route::get('/inventory/track', fn () => view('owner.inventory-track'))->name('inventory-track');
     Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
-    Route::post('/logout', [OwnerLoginController::class, 'logout'])->name('logout');
 });
   
 
-/*Route::get('/Staff/login', [StaffLoginController::class, 'showLoginForm'])->name('Staff.login');
-Route::post('/Staff/login', [StaffLoginController::class, 'login'])->name('Staff.login.submit');
-Route::post('/Staff/logout', [StaffLoginController::class, 'logout'])->name('taff.logout');
-*/
-Route::prefix('staff')->name('staff.')->middleware('auth:staff')->group(function () {
-    Route::get('/dashboard', fn () => view('Staff.dashboard'))->name('dashboard');
-    Route::get('/assigned-orders', fn () => view('Staff.assigned_orders'))->name('assigned.orders');
-    Route::get('/order-list', fn () => view('Staff.order_list'))->name('order.list');
-    Route::get('/customer-profile', fn () => view('Staff.customer_profile'))->name('customer.profile');
-    Route::get('/notify-customers', fn () => view('Staff.notify_customers'))->name('notify.customers');   
-});
+Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
 
+    Route::get('/dashboard', fn () => view('staff.dashboard'))->name('dashboard');
+    Route::get('/assigned-orders', fn () => view('staff.assigned_orders'))->name('assigned.orders');
+    Route::get('/order-list', fn () => view('staff.order_list'))->name('order.list');
+    Route::get('/customer-profile', fn () => view('staff.customer_profile'))->name('customer.profile');
+    Route::get('/notify-customers', fn () => view('staff.notify_customers'))->name('notify.customers');   
+});

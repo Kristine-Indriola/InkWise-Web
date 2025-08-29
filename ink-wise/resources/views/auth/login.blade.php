@@ -96,6 +96,14 @@
             margin: 0;
             cursor: pointer;
         }
+
+        .role-hint {
+            text-align: center;
+            font-size: 13px;
+            color: #555;
+            margin-top: 10px;
+        }
+        
     </style>
 </head>
 <body>
@@ -104,8 +112,8 @@
     </video>
 
     <div class="login-container">
-        <h1>Owner Login</h1>
-        <form method="POST" action="{{ route('owner.login.submit') }}">
+        <h1>InkWise System - User Login</h1>
+        <form method="POST" action="{{ route('login.submit') }}">
             @csrf
             <input type="email" name="email" placeholder="Enter Email" required>
             <input type="password" name="password" placeholder="Enter Password" required id="passwordField" class="password-field">
@@ -115,6 +123,11 @@
             </div>
             <button type="submit">Login</button>
         </form>
+    <div class="role-hint">
+        Use your registered email and password. <br>
+        (Works for <strong>Owner</strong> and <strong>Staff</strong> accounts)
+    </div>
+
     </div>
 
     <script>

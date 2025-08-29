@@ -24,11 +24,11 @@
       </div>
       <nav class="flex-1 p-4">
         <ul class="space-y-2">
-          <li><a href="{{ route('dashboard') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Dashboard</a></li>
-          <li><a href="{{ route('assigned.orders') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Assigned Orders</a></li>
-          <li><a href="{{ route('order.list') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Order List</a></li>
-          <li><a href="{{ route('customer.profile') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Customer Profiles</a></li>
-          <li><a href="{{ route('notify.customers') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Notify Customers</a></li>
+          <li><a href="{{ route('staff.dashboard') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Dashboard</a></li>
+          <li><a href="{{ route('staff.assigned.orders') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Assigned Orders</a></li>
+          <li><a href="{{ route('staff.order.list') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Order List</a></li>
+          <li><a href="{{ route('staff.customer.profile') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Customer Profiles</a></li>
+          <li><a href="{{ route('staff.notify.customers') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Notify Customers</a></li>
         </ul>
       </nav>
     </aside>
@@ -45,7 +45,7 @@
             <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs px-1 rounded-full">1</span>
           </button>
           <button>⚙</button>
-          <form method="POST" action="#">
+          <form method="POST" action="{{ route('logout') }}">
             @csrf
             <button type="submit" class="bg-red-600 text-white px-3 py-1 rounded">Logout</button>
           </form>

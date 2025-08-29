@@ -142,7 +142,7 @@
     <!-- NEW top bar -->
     <div class="topbar">
       <div><strong>Welcome, Owner!</strong></div>
-      <form method="POST" action="{{ route('owner.logout') }}">
+      <form method="POST" action="{{ route('logout') }}">
         @csrf
         <button type="submit" class="logout-btn">Logout</button>
       </form>

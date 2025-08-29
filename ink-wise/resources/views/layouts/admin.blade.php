@@ -17,11 +17,20 @@
         <div class="container">
             <a class="navbar-brand" href="{{ route('admin.dashboard') }}">Admin Panel</a>
             <div>
-                <a class="nav-link d-inline text-white" href="{{ route('admin.dashboard') }}">Dashboard</a>
-                <a class="nav-link d-inline text-white" href="{{ route('admin.templates.index') }}">Templates</a>
-                <a class="nav-link d-inline text-white" href="{{ route('admin.logout') }}">Logout</a>
-            </div>
-        </div>
+    <a class="nav-link d-inline text-white" href="{{ route('admin.dashboard') }}">Dashboard</a>
+    <a class="nav-link d-inline text-white" href="{{ route('admin.templates.index') }}">Templates</a>
+
+    <!-- Hidden Logout Form -->
+    <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
+        @csrf
+    </form>
+
+    <!-- Logout Link -->
+    <a class="nav-link d-inline text-white" href="#"
+       onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+        Logout
+    </a>
+</div>
     </nav>
 
     <div class="container">
