@@ -1,4 +1,3 @@
-  <!-- Sidebar -->
   <aside class="sidebar">
   <h2>InkWise</h2>
 
@@ -12,35 +11,35 @@
 
   <ul class="navlist">
     <li>
-      <a href="{{ route('owner.home') }}" class="text-decoration-none">
+      <a href="{{ route('owner.home') }}">
         <button class="sidebar-btn">
           <span class="text">Dashboard</span><span class="ico">🏠</span>
         </button>
       </a>
     </li>
     <li>
-      <a href="{{ route('owner.approve-staff') }}" class="text-decoration-none">
+      <a href="{{ route('owner.approve-staff') }}">
         <button class="sidebar-btn">
           <span class="text">Approve Staff Account</span><span class="ico">✅</span>
         </button>
       </a>
     </li>
     <li>
-      <a href="{{ route('owner.order.workflow') }}" class="text-decoration-none">
+      <a href="{{ route('owner.order.workflow') }}">
         <button class="sidebar-btn">
           <span class="text">Monitor Order Workflow</span><span class="ico">🧭</span>
         </button>
       </a>
     </li>
     <li>
-      <a href="{{ route('owner.inventory-track') }}" class="text-decoration-none">
+      <a href="{{ route('owner.inventory-track') }}">
         <button class="sidebar-btn">
           <span class="text">Track Inventory</span><span class="ico">📦</span>
         </button>
       </a>
     </li>
     <li>
-      <a href="{{ route('owner.transactions-view') }}" class="text-decoration-none">
+      <a href="{{ route('owner.transactions-view') }}">
         <button class="sidebar-btn">
           <span class="text">View Transactions</span><span class="ico">💳</span>
         </button>
