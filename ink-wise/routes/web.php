@@ -207,6 +207,7 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/order/workflow', fn () => view('owner.order-workflow'))->name('order.workflow');
     Route::get('/inventory/track', fn () => view('owner.inventory-track'))->name('inventory-track');
     Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
+    Route::get('/reports', fn () => view('owner.owner-reports'))->name('reports');
 });
   
 
