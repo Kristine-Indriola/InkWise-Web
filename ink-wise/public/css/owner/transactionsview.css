@@ -1,0 +1,51 @@
+/* Main content transactions-view*/
+    .main-content { flex:1; display:flex; flex-direction:column; min-height:100vh; }
+
+    /* Topbar (Welcome + Logout) */
+    .topbar{
+      display:flex; justify-content:space-between; align-items:center;
+      font-size: 21px;
+      background:#fff; padding:14px 20px; border-bottom:1px solid #ddd;
+    }
+
+    .logout-btn{
+      padding:8px 14px; border:1px solid #e5e7eb; background:#fff;
+      border-radius:8px; cursor:pointer; font-size:14px;
+    }
+    .logout-btn:hover{ background:#f7f7f7; }
+
+    /* Panel */
+    .panel {
+      background:#fff;
+      margin: 24px;
+      padding: 20px;
+      border-radius: 16px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.08);
+    }
+    .panel h2{ margin: 4px 0 14px; font-size: 20px; color:#1f2937; }
+
+    /* Search input */
+    .search-wrap{ display:flex; justify-content:flex-start; margin-bottom:16px; }
+    .search-input{
+      width: 420px; max-width: 90%; padding:10px 14px;
+      border:2px solid #cfd4dc; border-radius:10px; outline:none;
+      font-size:14px; background:#fafafa;
+    }
+    .search-input:focus{ border-color:#98a2b3; background:#fff; }
+
+    /* Table */
+    .table-wrap{ overflow-x:auto; border-radius: 10px; font-size: 15px }
+    table{ width:100%; border-collapse:collapse; background:#fff; }
+    th, td{ padding: 14px 16px; text-align:center; border:1px solid #dfe3ea; }
+    th{ background:#e9edf3; color:#374151; font-weight:700; }
+    td{ color:#4b5563; }
+
+    /* Status pills */
+    .pill{ display:inline-block; padding:8px 14px; border-radius:999px; font-weight:700; font-size:13px; }
+    .pill-paid{ background:#22c55e; color:#fff; }
+    .pill-pending{ background:#f59e0b; color:#fff; }
+
+    @media (max-width: 640px){
+      .sidebar { width: 210px; }
+      .panel { margin: 16px; }
+    }
