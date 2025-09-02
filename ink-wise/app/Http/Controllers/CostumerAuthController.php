@@ -2,71 +2,57 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
+use App\Models\Costumer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 
 class CostumerAuthController extends Controller
 {
-    // Show login modal
-    public function showLoginForm()
-    {
-        return view('auth.costumer.login');
+    public function showRegister() {
+        return view('costumer.register');
     }
 
-    // Handle login
-    public function login(Request $request)
-    {
-        $credentials = $request->validate([
-            'email' => 'required|email',
-            'password' => 'required|min:6',
+    public function showLogin() {
+        return view('costumer.login');
+    }
+
+    public function register(Request $request) {
+        $request->validate([
+            'name' => 'required',
+            'email' => 'required|email|unique:costumers',
+            'password' => 'required|min:6|confirmed',
         ]);
 
-        if (Auth::attempt($credentials)) {
-            $request->session()->regenerate();
-            return redirect()->route('dashboard')->with('success', 'Welcome back!');
+        $costumer = Costumer::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+        ]);
+
+        Auth::guard('costumer')->login($costumer);
+
+        return redirect()->route('costumer.dashboard');
+    }
+
+    public function login(Request $request) {
+        $credentials = $request->only('email', 'password');
+
+        if (Auth::guard('costumer')->attempt($credentials)) {
+            return redirect()->route('costumer.dashboard');
         }
 
-        return back()->withErrors([
-            'email' => 'Invalid email or password.',
-        ]);
+        return back()->withErrors(['email' => 'Invalid email or password']);
     }
 
-    // Show register modal
-    public function showRegisterForm()
-    {
-        return view('auth.costumer.register');
+    public function dashboard() {
+        return view('costumer.dashboard', ['costumer' => Auth::guard('costumer')->user()]);
     }
 
-    // Handle register
-    public function register(Request $request)
-    {
-        $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:6|confirmed',
-        ]);
-
-        $user = User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
-        ]);
-
-        Auth::login($user);
-        $request->session()->regenerate();
-
-        return redirect()->route('dashboard')->with('success', 'Welcome, ' . $user->name . '!');
-    }
-
-    // Logout
-    public function logout(Request $request)
-    {
-        Auth::logout();
+    public function logout(Request $request) {
+        Auth::guard('costumer')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
-
-        return redirect()->route('dashboard');
+        return redirect()->route('costumer.login.form');
     }
 }

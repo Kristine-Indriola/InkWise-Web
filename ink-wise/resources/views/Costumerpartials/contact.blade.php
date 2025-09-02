@@ -1,3 +1,5 @@
+
+{{-- contact blade the include inside the dashboard blade --}}
 <section id="contact" class="py-16 bg-white shadow-inner">
   <hr class="section-divider">
 

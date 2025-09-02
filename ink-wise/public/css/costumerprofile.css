@@ -1,0 +1,77 @@
+
+    /* sidebar gradient + subtle hover */
+    .sidebar {
+      background: linear-gradient(180deg, #d3b7ff 0%, #a6b7ff 50%, #bce6ff 100%);
+    }
+    .nav-item.active,
+    .nav-item:hover {
+      background: linear-gradient(90deg, rgba(255,255,255,0.7), rgba(255,255,255,0.25));
+    }
+    /* card ring */
+    .card {
+      border-radius: 16px;
+      box-shadow: 0 10px 22px rgba(0,0,0,.06);
+    }
+    /* little red dot on bell */
+    .ping-dot::after{
+      content:"";
+      position:absolute; top:-2px; right:-2px;
+      width:10px; height:10px; border-radius:9999px;
+      background:#ef4444; border:2px solid white;
+    }
+    /* mini help bubble */
+    .help-bubble{
+      box-shadow: 0 8px 24px rgba(0,0,0,.12);
+      border-radius: 14px;
+    }
+/* costumerprofile.css */
+
+/* Layout colors */
+:root {
+    --color1: #fcb2a6;
+    --color2: #fec5bb;
+    --color3: #faa291;
+    --color4: #fed9d3;
+    --color5: #e97d69;
+}
+
+/* Sidebar gradient + hover */
+.sidebar {
+    background: linear-gradient(180deg, var(--color1) 0%, var(--color2) 50%, var(--color3) 100%);
+}
+
+.nav-item.active,
+.nav-item:hover {
+    background: linear-gradient(90deg, rgba(255,255,255,0.7), rgba(255,255,255,0.25));
+}
+
+/* Card styling */
+.card {
+    border-radius: 16px;
+    box-shadow: 0 10px 22px rgba(0,0,0,.06);
+}
+
+/* Help bubble */
+.help-bubble {
+    box-shadow: 0 8px 24px rgba(0,0,0,.12);
+    border-radius: 14px;
+}
+
+/* Center welcome message */
+.welcome-section {
+    text-align: center;
+    margin: 2rem 0;
+}
+
+.welcome-section h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.5rem;
+    font-weight: 700;
+}
+
+.welcome-section p {
+    font-family: 'Dancing Script', cursive;
+    font-size: 1.25rem;
+    color: #555;
+    margin-top: 0.25rem;
+}

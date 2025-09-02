@@ -1,3 +1,5 @@
+
+/* Costumertemplate js */
 // === Modal Logic ===
 function openTemplateModal(type) {
     const modal = document.getElementById("templateModal");

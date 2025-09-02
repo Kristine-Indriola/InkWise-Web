@@ -5,10 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wedding Templates</title>
 
-    {{-- Laravel vite --}}
-    @vite('resources/css/costumertemplate.css')
-    @vite('resources/js/costumertemplate.js')
-    @vite('resources/css/costumer.css')
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Seasons&display=swap');
+        @import url('https://fonts.cdnfonts.com/css/edwardian-script-itc');
+        
+    </style>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ asset('css/costumer.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/costumertemplate.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/templates.css') }}">
+
+    <!-- Custom JS -->
+    <script src="{{ asset('js/costumer.js') }}" defer></script>
+    <script src="{{ asset('js/costumertemplate.js') }}" defer></script>
+
+    <!-- Alpine.js for interactivity -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.10.2/cdn.min.js" defer></script>
+
 </head>
 <body id="wedding" class="antialiased bg-gray-50 wedding">
 
@@ -46,13 +62,15 @@
                 @auth
                 <div class="relative">
                     <!-- User Button -->
-                    <button 
-                        id="userDropdownBtn"
-                        class="flex items-center px-5 py-2 font-semibold text-white rounded-full animate-gradient"
-                        style="font-family: 'Seasons', serif;">
-                        {{ Auth::user()->name }}
-                        <span class="ml-1">▼</span>
-                    </button>
+                   <!-- User Button -->
+<button 
+    id="userDropdownBtn"
+    class="flex items-center px-5 py-2 font-semibold text-white rounded-full animate-gradient"
+    style="font-family: 'Seasons', serif;">
+    {{ Auth::guard('costumer')->check() ? Auth::guard('costumer')->user()->name : 'Guest' }}
+    <span class="ml-1">▼</span>
+</button>
+
 
                     <!-- Dropdown Menu -->
                     <div 
