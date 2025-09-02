@@ -19,6 +19,10 @@ use App\Http\Controllers\Owner\OwnerController;
 use App\Http\Controllers\Customer\CustomerController;
 
 
+
+
+
+
 /*
 |--------------------------------------------------------------------------
 | Role-based Dashboards
@@ -108,38 +112,32 @@ Route::get('/auth/google/callback', function () {
 
 /*
 |--------------------------------------------------------------------------
-| Dashboard / Home
+| COSTUMER ROUTES
 |--------------------------------------------------------------------------
 */
+//Costumer Dashboard/Home route
 Route::get('/', function () {
     return view('dashboard');
 })->name('dashboard');
-/*
-|--------------------------------------------------------------------------
-| Costumer Auth (floating modals)
-|--------------------------------------------------------------------------
-*/
-// Authentication routes
-Route::get('/costumer/login', [CostumerAuthController::class, 'showLoginForm'])->name('costumer.login.form');
-Route::post('/costumer/login', [CostumerAuthController::class, 'login'])->name('costumer.login');
 
-Route::get('/costumer/register', [CostumerAuthController::class, 'showRegisterForm'])->name('costumer.register.form');
+// Guest routes (register / login)
+Route::get('/costumer/register', [CostumerAuthController::class, 'showRegister'])->name('costumer.register.form');
 Route::post('/costumer/register', [CostumerAuthController::class, 'register'])->name('costumer.register');
 
+Route::get('/costumer/login', [CostumerAuthController::class, 'showLogin'])->name('costumer.login.form');
+Route::post('/costumer/login', [CostumerAuthController::class, 'login'])->name('costumer.login');
+
+Route::get('/costumer/dashboard', [CostumerAuthController::class, 'dashboard'])->name('costumer.dashboard');
 Route::post('/costumer/logout', [CostumerAuthController::class, 'logout'])->name('costumer.logout');
 
-// Authenticated-only routes
-Route::middleware('auth')->group(function () {
-    Route::post('/costumer-logout', [CostumerAuthController::class, 'logout'])->name('costumer.logout');
-});
+
 /*Route::middleware('auth')->group(function () {
     Route::get('/categories', [TemplateController::class, 'categories'])->name('categories');
     Route::get('/templates/{category}', [TemplateController::class, 'templates'])->name('templates');
     Route::get('/template/preview/{id}', [TemplateController::class, 'preview'])->name('template.preview');
 });*/
 
-
-// Templatehome category pages
+// COSTUMER Templatehome category pages
 Route::get('/templates/wedding', function () {
     return view('costumertemplates.wedding');
 })->name('templates.wedding');
@@ -156,28 +154,34 @@ Route::get('/templates/corporate', function () {
     return view('costumertemplates.corporate');
 })->name('templates.corporate');
 
-//costumer templates inviatations 
+//COSTUMER templates inviatations 
 Route::get('/templates/wedding/invitations', function () {
     return view('costumerInvitations.weddinginvite');
 })->name('templates.wedding.invitations');
 
-//costumer templates giveaways 
+//COSTUMER templates giveaways 
 Route::get('/templates/wedding/giveaways', function () {
     return view('costumerGiveaways.weddinggive');
 })->name('templates.wedding.giveaways');
+
+// COSTUMER order and design pages
+Route::get('/order/birthday', function () {
+    return view('costumertemplates.birthday');  // <-- points to your blade file
+})->name('order.birthday');
+
+// Costumer Dashboard (temporary page to preview)
+//Route::view('/costumer-dashboard', 'costumerprofile.dashboard')->name('costumer.dashboard');
+
+// (Optional) fake profile update – for now it just redirects back
+Route::post('/costumer/profile', function (\Illuminate\Http\Request $request) {
+    // TODO: save profile later
+    return back()->with('status', 'Profile updated (demo).');
+})->name('costumer.profile.update');
 
 // Simple placeholders to avoid 404 during dev
 Route::get('/search', function (\Illuminate\Http\Request $request) {
     return 'Search for: ' . e($request->query('query', ''));
 })->name('search');
-
-Route::get('/order', function () {
-    return 'Order page placeholder';
-})->name('order');
-
-Route::get('/design/{id}', function ($id) {
-    return 'Design preview placeholder for ID: ' . e($id);
-})->name('design.show');
 
 // ----------------------------
 // Temporary Google Redirect (Fix)
@@ -185,6 +189,10 @@ Route::get('/design/{id}', function ($id) {
 Route::get('/auth/google', function () {
     return 'Google login placeholder until controller is ready.';
 })->name('google.redirect');
+
+// ----------------------------
+// COSTUMER ROUTES END
+// ----------------------------
 
 
 /*

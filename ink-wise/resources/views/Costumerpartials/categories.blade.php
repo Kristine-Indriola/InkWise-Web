@@ -1,5 +1,7 @@
+
+
 <!-- Categories Section -->
-<section id="categories" class="py-16">
+<section id="categories" class="categories-section py-16">
     <hr class="section-divider">
     <div class="max-w-7xl mx-auto px-6 text-center">
         <h2 class="text-3xl font-bold mb-6">Categories</h2>
@@ -15,37 +17,37 @@
                     
                     <!-- Wedding -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
-                        <a href="/wedding">
+                        <a href="{{ url('/templates/wedding/invitations') }}">
                             <img src="{{ asset('costumerimage/invite1.png') }}" 
                                  alt="Wedding Invitation" 
-                                 class="w-full h-64 object-cover transition-transform duration-500 hover:scale-110">
+                                 class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
                     </div>
                     
                     <!-- Baptism -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
-                        <a href="/templates.baptism">
+                        <a href="{{ url('/templates/baptism') }}">
                             <img src="{{ asset('costumerimage/invite2.png') }}" 
                                  alt="Baptism Invitation" 
-                                 class="w-full h-64 object-cover transition-transform duration-500 hover:scale-110">
+                                 class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
                     </div>
                     
                     <!-- Birthday -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
-                        <a href="/birthday">
+                        <a href="{{ url('/templates/birthday') }}">
                             <img src="{{ asset('costumerimage/invite3.png') }}" 
                                  alt="Birthday Invitation" 
-                                 class="w-full h-64 object-cover transition-transform duration-500 hover:scale-110">
+                                 class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
                     </div>
                     
                     <!-- Corporate -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
-                        <a href="/corporate">
+                        <a href="{{ url('/templates/corporate') }}">
                             <img src="{{ asset('costumerimage/invite4.png') }}" 
                                  alt="Corporate Invitation" 
-                                 class="w-full h-64 object-cover transition-transform duration-500 hover:scale-110">
+                                 class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
                     </div>
                 </div>
@@ -59,37 +61,37 @@
                     
                     <!-- Wedding -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
-                        <a href="/wedding">
+                        <a href="{{ url('/templates/wedding/giveaways') }}">
                             <img src="{{ asset('costumerimage/ribbon.png') }}" 
                                  alt="Wedding Giveaway" 
-                                 class="w-full h-64 object-cover transition-transform duration-500 hover:scale-110">
+                                 class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
                     </div>
                     
                     <!-- Baptism -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
-                        <a href="/baptism">
+                        <a href="{{ url('/templates/baptism/giveaways') }}">
                             <img src="{{ asset('costumerimage/stapler.png') }}" 
                                  alt="Baptism Giveaway" 
-                                 class="w-full h-64 object-cover transition-transform duration-500 hover:scale-110">
+                                 class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
                     </div>
                     
                     <!-- Birthday -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
-                        <a href="/birthday">
+                        <a href="{{ url('/templates/birthday/giveaways') }}">
                             <img src="{{ asset('costumerimage/happy.png') }}" 
                                  alt="Birthday Giveaway" 
-                                 class="w-full h-64 object-cover transition-transform duration-500 hover:scale-110">
+                                 class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
                     </div>
                     
                     <!-- Corporate -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
-                        <a href="/corporate">
+                        <a href="{{ url('/templates/corporate/giveaways') }}">
                             <img src="{{ asset('costumerimage/gift.png') }}" 
                                  alt="Corporate Giveaway" 
-                                 class="w-full h-64 object-cover transition-transform duration-500 hover:scale-110">
+                                 class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
                     </div>
                 </div>

@@ -1,9 +1,4 @@
-/* ---------------------------------- */
-/* Tailwind Base, Components, Utilities */
-/* ---------------------------------- */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Costumer css */
 
 /* ---------------------------------- */
 /* Animations */
@@ -117,6 +112,15 @@ html { scroll-behavior: smooth; }
 /* ---------------------------------- */
 /* Modal Styles */
 /* ---------------------------------- */
+/* Adjust input height inside modals */
+.modal input[type="text"],
+.modal input[type="email"],
+.modal input[type="password"] {
+  height: 40px;          /* ~Tailwind h-10 */
+  padding: 0 0.75rem;    /* left/right padding */
+  font-size: 1rem;       /* readable text */
+  border-radius: 0.5rem; /* match rounded-lg */
+}
 .modal {
   position: fixed;
   inset: 0;
@@ -193,6 +197,22 @@ html { scroll-behavior: smooth; }
   border-radius: 999px;
 }
 
+
+/* templates */
+#templates p {
+    font-family: 'Dancing Script', cursive;
+    font-size: 1.200rem;
+    color: #555;
+    margin-top: 0.25rem;
+}
+
+/* contact */
+#contact h2, h3 {
+  font-family: 'Playfair Display', serif;
+    font-size: 2.25rem; /* slightly smaller than welcome H1 */
+    font-weight: 700;
+}
+
 /* ----------------------------- */
 /* Animated Gradient for About */
 /* ----------------------------- */
@@ -201,6 +221,13 @@ html { scroll-behavior: smooth; }
   background-size: 800% 800%;
   animation: waveGradient 15s ease infinite;
 }
+#about h2 {
+  font-family: 'Playfair Display', serif;
+    font-size: 2.25rem; /* slightly smaller than welcome H1 */
+    font-weight: 700;
+}
+
+/* Animation Keyframes */
 
 @keyframes waveGradient {
   0%   { background-position: 0% 50%; }
@@ -208,7 +235,22 @@ html { scroll-behavior: smooth; }
   100% { background-position: 0% 50%; }
 }
 
+/* Categories Section Styling */
+.categories-section h2, h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.25rem; /* slightly smaller than welcome H1 */
+    font-weight: 700;
+}
+
+.categories-section p {
+    font-family: 'Dancing Script', cursive;
+    font-size: 1.200rem;
+    color: #555;
+    margin-top: 0.25rem;
+}
+
 /* ===== categories Backgrounds ===== */
+
 .gradient-pink {
  background: linear-gradient(135deg,  #ea137b,  #f0a3db, #fd7cc3,#e852c0,#f0a3db);
 }

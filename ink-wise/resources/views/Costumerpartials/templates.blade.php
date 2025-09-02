@@ -1,3 +1,5 @@
+
+
 <section id="templates" class="py-12">
   <hr class="section-divider">
   <h2 class="text-center text-3xl font-bold text-indigo-700 mb-10" style="font-family: 'Seasons', serif;">
