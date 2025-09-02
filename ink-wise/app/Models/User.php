@@ -17,15 +17,19 @@ class User extends Authenticatable
      *
      * @var list<string>
      */
-    protected $fillable = [
-    'first_name',
-    'middle_name',
-    'last_name',
-    'email',
-    'password',
-    'role',
-    'status',
-];
+    use Notifiable;
+
+    protected $primaryKey = 'user_id';
+    public $incrementing = true;
+    protected $keyType = 'int';
+
+
+   protected $fillable = [
+        'email',
+        'password',
+        'role',
+        'status',
+    ];
 
 
     /**
@@ -50,4 +54,12 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+     public function staff()
+{
+    return $this->hasOne(Staff::class, 'user_id', 'user_id');
+}
+
+
+
 }

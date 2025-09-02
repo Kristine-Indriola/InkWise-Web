@@ -45,14 +45,16 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::get('/editor/{id?}', [AdminTemplateController::class, 'editor'])->name('editor'); }); 
     
     // ✅ User Management 
-    Route::prefix('users')->name('users.')->group(function () { 
-        Route::get('/', [UserManagementController::class, 'index'])->name('index'); 
-        Route::get('/create', [\App\Http\Controllers\Admin\UserManagementController::class, 'create'])->name('create'); 
-        Route::post('/', [\App\Http\Controllers\Admin\UserManagementController::class, 'store'])->name('store'); 
-        Route::get('/{id}/edit', [UserManagementController::class, 'edit'])->name('edit'); // Edit form 
-        Route::put('/{id}', [UserManagementController::class, 'update'])->name('update'); // Update user 
-        Route::delete('/{id}', [UserManagementController::class, 'destroy'])->name('destroy'); // Delete user 
-        });
+    // ✅ User Management 
+Route::prefix('users')->name('users.')->group(function () { 
+    Route::get('/', [UserManagementController::class, 'index'])->name('index'); 
+    Route::get('/create', [UserManagementController::class, 'create'])->name('create'); 
+    Route::post('/', [UserManagementController::class, 'store'])->name('store'); 
+    Route::get('/{user_id}/edit', [UserManagementController::class, 'edit'])->name('edit'); // Edit form 
+    Route::put('/{user_id}', [UserManagementController::class, 'update'])->name('update'); // Update user 
+    Route::delete('/{user_id}', [UserManagementController::class, 'destroy'])->name('destroy'); // Delete user 
+});
+
 
      Route::prefix('inventory')->name('inventory.')->group(function () {
         Route::get('/', [InventoryController::class, 'index'])->name('index');

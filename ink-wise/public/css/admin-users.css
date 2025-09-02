@@ -1,0 +1,113 @@
+/* Container styling */
+.container {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+    background-color: #bdabab;
+}
+
+/* Heading */
+.container h1 {
+    font-size: 24px;
+    margin-bottom: 15px;
+}
+
+/* Buttons */
+a, button {
+    font-size: 14px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    text-decoration: none;
+    display: inline-block;
+    cursor: pointer;
+    transition: 0.2s ease;
+    border: none;
+}
+
+a:hover, button:hover {
+    opacity: 0.85;
+}
+
+/* Button colors */
+.bg-blue-600 { background-color: #2563eb; color: #fff; }
+.bg-blue-600:hover { background-color: #1e40af; }
+
+.bg-yellow-500 { background-color: #facc15; color: #000; }
+.bg-yellow-500:hover { background-color: #eab308; }
+
+.bg-red-600 { background-color: #dc2626; color: #fff; }
+.bg-red-600:hover { background-color: #b91c1c; }
+
+/* Success message */
+.bg-green-100 {
+    background-color: #d1fae5;
+    color: #065f46;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+/* Table styling */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #fff;
+    box-shadow: 0 0 5px rgba(0,0,0,0.05);
+    table-layout: auto; /* Flexible columns */
+    word-wrap: break-word; /* Wrap long text */
+}
+
+th, td {
+    padding: 12px 15px;
+    border: 1px solid #ddd;
+    text-align: left;
+    font-size: 14px;
+}
+
+th {
+    background-color: #f1f1f1;
+    font-weight: 600;
+}
+
+tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+tr:hover {
+    background-color: #ececec;
+}
+
+/* Table responsive scroll */
+.overflow-x-auto {
+    overflow-x: auto;
+}
+
+/* Small screens adjustments */
+@media (max-width: 768px) {
+    th, td {
+        padding: 10px 8px;
+        font-size: 13px;
+    }
+}
+
+/* Badge styling */
+.badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 12px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+/* Role colors */
+.role-owner { background-color: #2563eb; } /* Blue */
+.role-staff { background-color: #f59e0b; } /* Orange */
+
+/* Status colors */
+.status-active { background-color: #16a34a; }   /* Green */
+.status-inactive { background-color: #dc2626; } /* Red */
+
+
