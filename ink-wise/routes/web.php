@@ -1,24 +1,23 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AuthController;
 use Laravel\Socialite\Facades\Socialite;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\TemplateController;
 use App\Http\Controllers\Owner\HomeController;
+use App\Http\Controllers\Owner\OwnerController;
 //use App\Http\Controllers\OwnerLoginController;
-use App\Http\Controllers\customerAuthController;
 //use App\Http\Controllers\Auth\AdminLoginController;
 //use App\Http\Controllers\StaffAuthController;
 //use App\Http\Controllers\Staff\StaffLoginController;
-use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
-use App\Http\Controllers\Admin\UserManagementController;
-use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\MaterialController;
-use App\Http\Controllers\Owner\OwnerController;
-use App\Http\Controllers\customer\customerController;
 use App\Http\Controllers\Auth\RoleLoginController;
+use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\customerProfileController;
+use App\Http\Controllers\Auth\CustomerAuthController;
+use App\Http\Controllers\Customer\CustomerController;
+use App\Http\Controllers\Admin\UserManagementController;
+use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
 
 
 
@@ -85,7 +84,7 @@ Route::prefix('users')->name('users.')->group(function () {
 });
 
 Route::middleware(['auth', 'role:customer'])->group(function () {
-    Route::get('/customer/dashboard', [customerController::class, 'index'])->name('customer.dashboard');
+    Route::get('/customer/dashboard', [CustomerController::class, 'index'])->name('customer.dashboard');
 });*/
 
 Route::get('/unauthorized', function () {
@@ -130,14 +129,14 @@ Route::get('/dashboard', function () {
 })->name('customer.dashboard');
 
 // Guest routes (register / login)
-Route::get('/customer/register', [customerAuthController::class, 'showRegister'])->name('customer.register.form');
-Route::post('/customer/register', [customerAuthController::class, 'register'])->name('customer.register');
+Route::get('/customer/register', [CustomerAuthController::class, 'showRegister'])->name('customer.register.form');
+Route::post('/customer/register', [CustomerAuthController::class, 'register'])->name('customer.register');
 
-Route::get('/customer/login', [customerAuthController::class, 'showLogin'])->name('customer.login.form');
-Route::post('/customer/login', [customerAuthController::class, 'login'])->name('customer.login');
+Route::get('/customer/login', [CustomerAuthController::class, 'showLogin'])->name('customer.login.form');
+Route::post('/customer/login', [CustomerAuthController::class, 'login'])->name('customer.login');
 
-Route::get('/customerprofile/dashboard', [customerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');
-Route::post('/customer/logout', [customerAuthController::class, 'logout'])->name('customer.logout');
+Route::get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');
+Route::post('/customer/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
 
 //customer Profile pages
 Route::middleware(['auth:customer'])->group(function () {

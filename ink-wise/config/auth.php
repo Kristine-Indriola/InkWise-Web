@@ -17,7 +17,7 @@ return [
     | Authentication Guards
     |--------------------------------------------------------------------------
     */
-    'guards' => [
+   'guards' => [
         'web' => [
             'driver' => 'session',
             'provider' => 'users',
@@ -29,17 +29,10 @@ return [
         ],
 
         'staff' => [
-        'driver' => 'session',
-        'provider' => 'staffs', // must match the provider below
-    ],
-        // 👇 NEW guard for customer
-    'guards' => [
-    'customer' => [
-        'driver' => 'session',
-        'provider' => 'customers',
-    ],
-],
-    // 👇 NEW guard for customer
+            'driver' => 'session',
+            'provider' => 'staffs',
+        ],
+
         'customer' => [
             'driver' => 'session',
             'provider' => 'customers',
@@ -59,23 +52,17 @@ return [
 
         'owners' => [
             'driver' => 'eloquent',
-            'model' => App\Models\Owner::class, // 👈 make sure this model exists
+            'model' => App\Models\Owner::class,
         ],
 
         'staffs' => [
-        'driver' => 'eloquent',
-        'model' => App\Models\Staff::class, // create Staff model if not yet existing
-    ],
-    'providers' => [
-    'customers' => [
-        'driver' => 'eloquent',
-        'model' => App\Models\customer::class,
-    ],
-],
-    // 👇 NEW provider for customer
+            'driver' => 'eloquent',
+            'model' => App\Models\Staff::class,
+        ],
+
         'customers' => [
             'driver' => 'eloquent',
-            'model' => App\Models\customer::class,
+            'model' => App\Models\Customer::class,
         ],
     ],
 
@@ -107,7 +94,8 @@ return [
             'throttle' => 60,
         ],
     ],
-        // 👇 NEW password reset for customer
+
+       
         'customers' => [
             'provider' => 'customers',
             'table' => 'password_reset_tokens',
