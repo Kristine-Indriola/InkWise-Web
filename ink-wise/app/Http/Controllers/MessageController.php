@@ -9,9 +9,9 @@ use Illuminate\Support\Facades\Auth;
 class MessageController extends Controller
 {
    // Show chat with a customer
-    public function chatWithCustomer($customerId)
+    public function chatWithcustomer($customerId)
     {
-        $customer = Customer::findOrFail($customerId);
+        $customer = customer::findOrFail($customerId);
 
         $messages = Message::where(function ($q) use ($customer) {
                 $q->where('sender_id', $customer->id)
@@ -28,9 +28,9 @@ class MessageController extends Controller
     }
 
     // Send message
-    public function sendToCustomer(Request $request, $customerId)
+    public function sendTocustomer(Request $request, $customerId)
     {
-        $customer = Customer::findOrFail($customerId);
+        $customer = customer::findOrFail($customerId);
 
         Message::create([
             'sender_id'   => Auth::id(),

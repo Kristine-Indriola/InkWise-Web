@@ -35,14 +35,14 @@
       <h3 class="orders-title">Confirmed Orders &amp; Status</h3>
 
       <div class="search-wrap">
-        <input class="search-input" type="text" placeholder="Search by order Id, Customer, Product" />
+        <input class="search-input" type="text" placeholder="Search by order Id, customer, Product" />
       </div>
 
       <table class="orders-table">
         <thead>
           <tr>
             <th>Order ID</th>
-            <th>Customer Name</th>
+            <th>customer Name</th>
             <th>Date Ordered</th>
             <th>Order Details</th>
             <th>Status</th>

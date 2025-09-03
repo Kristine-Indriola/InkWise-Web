@@ -255,7 +255,7 @@
     </div>
     <ul>
       <li class="active"><i>🏠</i> Dashboard</li>
-      <li><i>👥</i> Customer Accounts</li>
+      <li><i>👥</i> customer Accounts</li>
       <li><a href="{{ route('admin.users.index' ) }}"><i>👤</i> Staff Accounts</a></li>
       <li><a href="{{ route('admin.templates.index') }}"><i>📑</i> Templates</a></li> 
       <li><i>📦</i> Order Summaries</li>

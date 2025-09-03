@@ -43,7 +43,7 @@
             <tr>
               <th>Transaction ID</th>
               <th>Order ID</th>
-              <th>Customer</th>
+              <th>customer</th>
               <th>Payment Method</th>
               <th>Date</th>
               <th>Amount (PHP)</th>

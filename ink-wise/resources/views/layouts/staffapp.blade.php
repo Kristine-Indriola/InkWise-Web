@@ -27,8 +27,8 @@
           <li><a href="{{ route('staff.dashboard') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Dashboard</a></li>
           <li><a href="{{ route('staff.assigned.orders') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Assigned Orders</a></li>
           <li><a href="{{ route('staff.order.list') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Order List</a></li>
-          <li><a href="{{ route('staff.customer.profile') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Customer Profiles</a></li>
-          <li><a href="{{ route('staff.notify.customers') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Notify Customers</a></li>
+          <li><a href="{{ route('staff.customer.profile') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> customer Profiles</a></li>
+          <li><a href="{{ route('staff.notify.customers') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Notify customers</a></li>
         </ul>
       </nav>
     </aside>
@@ -64,7 +64,7 @@
         </div>
         <div class="bg-white p-6 rounded-lg shadow text-center border border-purple-400">
           <p class="text-3xl font-bold">8</p>
-          <p class="text-gray-500">Customers</p>
+          <p class="text-gray-500">customers</p>
         </div>
       </section>
 

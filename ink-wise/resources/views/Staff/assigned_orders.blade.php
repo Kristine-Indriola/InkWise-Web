@@ -7,7 +7,7 @@
       <thead>
         <tr class="bg-gray-200 text-left">
           <th class="p-2">Order ID</th>
-          <th class="p-2">Customer</th>
+          <th class="p-2">customer</th>
           <th class="p-2">Status</th>
         </tr>
       </thead>
