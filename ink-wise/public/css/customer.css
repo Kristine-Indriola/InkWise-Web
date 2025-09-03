@@ -1,0 +1,270 @@
+/* customer css */
+
+/* ---------------------------------- */
+/* Animations */
+/* ---------------------------------- */
+
+/* Floating Animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+.animate-float.delay-200 { animation-delay: 0.2s; }
+.animate-float.delay-400 { animation-delay: 0.4s; }
+.animate-float.delay-600 { animation-delay: 0.6s; }
+
+/* Fade-in for Modals */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Dropdown Animation */
+@keyframes drop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------------------------------- */
+/* Global Styles */
+/* ---------------------------------- */
+html { scroll-behavior: smooth; }
+
+/* Gradient Background Utility */
+.bg-inkwise-gradient {
+  background: linear-gradient(135deg, #e97d69, #faa291, #fcb2a6, #fec5bb, #fed9d3);
+}
+
+/* Gradient Hover Utility */
+.hover-gradient:hover {
+  background: linear-gradient(135deg, #fed9d3, #fec5bb, #fcb2a6, #faa291, #e97d69);
+}
+
+/* ---------------------------------- */
+/* Flip Card Styles */
+/* ---------------------------------- */
+.flip-card { perspective: 1000px; }
+.flip-card-inner {
+  position: relative;
+  width: 100%;
+  height: 24rem;
+  text-align: center;
+  transition: transform 0.8s;
+  transform-style: preserve-3d;
+}
+.flip-card:hover .flip-card-inner,
+.flip-card.flipped .flip-card-inner {
+  transform: rotateY(180deg);
+}
+.flip-card-front, .flip-card-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  border-radius: 1rem;
+}
+.flip-card-back { transform: rotateY(180deg); }
+
+/* ---------------------------------- */
+/* Buttons */
+/* ---------------------------------- */
+
+/* Sign In Button */
+#openLogin {
+  transition: transform 0.2s, box-shadow 0.2s;
+
+  background: linear-gradient(135deg, #e97d69, #faa291, #fcb2a6, #fec5bb, #fed9d3);
+  color: white;
+  font-weight: bold;
+}
+#openLogin:hover {
+  transform: scale(1.05);
+  background: linear-gradient(135deg, #fed9d3, #fec5bb, #fcb2a6, #faa291, #e97d69);
+  box-shadow: 0 6px 14px rgba(237, 83, 6, 0.5);
+}
+
+/* User Dropdown */
+#userDropdownBtn {
+  background: linear-gradient(135deg, #e97d69, #faa291, #fcb2a6, #fec5bb, #fed9d3);
+  font-weight: 600;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  color: white;
+  transition: background 0.2s;
+}
+#userDropdownBtn:hover {
+  background: linear-gradient(135deg, #fed9d3, #fec5bb, #fcb2a6, #faa291, #e97d69);
+}
+#userDropdown {
+  animation: drop 0.12s ease-out;
+  overflow: hidden;
+}
+#userDropdown button {
+  transition: background 0.2s;
+}
+#userDropdown button:hover {
+  background: #f3f4f6;
+}
+
+/* ---------------------------------- */
+/* Modal Styles */
+/* ---------------------------------- */
+/* Adjust input height inside modals */
+.modal input[type="text"],
+.modal input[type="email"],
+.modal input[type="password"] {
+  height: 40px;          /* ~Tailwind h-10 */
+  padding: 0 0.75rem;    /* left/right padding */
+  font-size: 1rem;       /* readable text */
+  border-radius: 0.5rem; /* match rounded-lg */
+}
+.modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+  background: rgba(0,0,0,0.5);
+  z-index: 50;
+}
+.modal-content {
+  background: white;
+  border-radius: 1rem;
+  padding: 2rem;
+  max-width: 420px;
+  width: 100%;
+  animation: pop 0.4s ease-out;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+.modal-header {
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+}
+
+/* Modals Fade-in Animation */
+#loginModal:not(.hidden),
+#registerModal:not(.hidden) {
+  animation: fadeIn 0.15s ease-out;
+}
+
+        /* ===========================
+           Custom Styles
+        ============================ */
+        /* Gradient for buttons and animations */
+        .animate-gradient {
+            background: linear-gradient(135deg, #e97d69, #faa291, #fcb2a6, #fec5bb, #fed9d3);
+            background-size: 200% 200%;
+            animation: gradientMove 5s infinite;
+        }
+
+        @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Fixed navbar */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: white;
+        }
+
+       /* Categories Section */
+
+
+/* ----------------------------- */
+/* Logo Styling */
+/* ----------------------------- */
+.logo-i {
+  color: #f28c8c; /* Light red */
+}
+
+/* ----------------------------- */
+/* Dividers Between Sections */
+/* ----------------------------- */
+.section-divider {
+  height: 2px;
+  width: 90%;
+  margin: 2rem auto;
+  background: white;
+  border-radius: 999px;
+}
+
+
+/* templates */
+#templates p {
+    font-family: 'Dancing Script', cursive;
+    font-size: 1.200rem;
+    color: #555;
+    margin-top: 0.25rem;
+}
+
+/* contact */
+#contact h2, h3 {
+  font-family: 'Playfair Display', serif;
+    font-size: 2.25rem; /* slightly smaller than welcome H1 */
+    font-weight: 700;
+}
+
+/* ----------------------------- */
+/* Animated Gradient for About */
+/* ----------------------------- */
+#about {
+  background: linear-gradient(270deg, #fcb2a6, #fec5bb, #faa291, #fed9d3, #e97d69);
+  background-size: 800% 800%;
+  animation: waveGradient 15s ease infinite;
+}
+#about h2 {
+  font-family: 'Playfair Display', serif;
+    font-size: 2.25rem; /* slightly smaller than welcome H1 */
+    font-weight: 700;
+}
+
+/* Animation Keyframes */
+
+@keyframes waveGradient {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Categories Section Styling */
+.categories-section h2, h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.25rem; /* slightly smaller than welcome H1 */
+    font-weight: 700;
+}
+
+.categories-section p {
+    font-family: 'Dancing Script', cursive;
+    font-size: 1.200rem;
+    color: #555;
+    margin-top: 0.25rem;
+}
+
+/* ===== categories Backgrounds ===== */
+
+.gradient-pink {
+ background: linear-gradient(135deg,  #ea137b,  #f0a3db, #fd7cc3,#e852c0,#f0a3db);
+}
+
+.gradient-skyblue {
+  background: linear-gradient(135deg, #a1c4fd, #c2e9fb, #89f7fe, #66a6ff, #3b8d99);
+}
+
+.gradient-yellow {
+  background: linear-gradient(135deg, #fff6b7, #fdd819, #fceabb, #f8b500, #ffd700);
+}
+
+.gradient-orange {
+  background: linear-gradient(135deg, #ff9a8b, #ff6a00, #ff9966, #ff5f6d, #ff512f);
+}
+
+

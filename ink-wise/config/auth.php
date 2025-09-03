@@ -32,17 +32,17 @@ return [
         'driver' => 'session',
         'provider' => 'staffs', // must match the provider below
     ],
-        // 👇 NEW guard for costumer
+        // 👇 NEW guard for customer
     'guards' => [
-    'costumer' => [
+    'customer' => [
         'driver' => 'session',
-        'provider' => 'costumers',
+        'provider' => 'customers',
     ],
 ],
-    // 👇 NEW guard for costumer
-        'costumer' => [
+    // 👇 NEW guard for customer
+        'customer' => [
             'driver' => 'session',
-            'provider' => 'costumers',
+            'provider' => 'customers',
         ],
     ],
 
@@ -67,15 +67,15 @@ return [
         'model' => App\Models\Staff::class, // create Staff model if not yet existing
     ],
     'providers' => [
-    'costumers' => [
+    'customers' => [
         'driver' => 'eloquent',
-        'model' => App\Models\Costumer::class,
+        'model' => App\Models\customer::class,
     ],
 ],
-    // 👇 NEW provider for costumer
-        'costumers' => [
+    // 👇 NEW provider for customer
+        'customers' => [
             'driver' => 'eloquent',
-            'model' => App\Models\Costumer::class,
+            'model' => App\Models\customer::class,
         ],
     ],
 
@@ -101,15 +101,15 @@ return [
 
         'passwords' => [
         'users' => [
-            'provider' => 'costumers',
+            'provider' => 'customers',
             'table' => 'password_reset_tokens',
             'expire' => 60,
             'throttle' => 60,
         ],
     ],
-        // 👇 NEW password reset for costumer
-        'costumers' => [
-            'provider' => 'costumers',
+        // 👇 NEW password reset for customer
+        'customers' => [
+            'provider' => 'customers',
             'table' => 'password_reset_tokens',
             'expire' => 60,
             'throttle' => 60,

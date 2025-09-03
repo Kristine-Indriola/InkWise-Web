@@ -16,12 +16,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="{{ asset('css/costumer.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/customer.css') }}">
     <link rel="stylesheet" href="{{ asset('css/templates.css') }}">
 
     <!-- Custom JS -->
-    <script src="{{ asset('js/costumer.js') }}" defer></script>
-    <script src="{{ asset('js/costumertemplate.js') }}" defer></script>
+    <script src="{{ asset('js/customer.js') }}" defer></script>
+    <script src="{{ asset('js/customertemplate.js') }}" defer></script>
 
     <!-- Alpine.js for interactivity -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.10.2/cdn.min.js" defer></script>
@@ -50,7 +50,7 @@
             <a href="#contact" class="text-gray-700 hover:text-[#f6b3b2]">Contact</a>
         </nav>
 
-        <!-- Search + Sign Up / Customer Name -->
+        <!-- Search + Sign Up / customer Name -->
   <div class="flex items-center space-x-4 relative">
     <!-- Search Form -->
     <form action="{{ url('/search') }}" method="GET" class="hidden md:flex">
@@ -58,9 +58,9 @@
                class="border rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring focus:ring-indigo-200">
     </form>
   
-   @guest('costumer')
+   @guest('customer')
     <!-- Sign In Button -->
-    <a href="#"
+    <a href="{{ route('customer.login') }}"
        id="openLogin"
        class="text-white px-5 py-2 font-semibold animate-gradient rounded-full"
        style="background: linear-gradient(90deg, #8c52ff, #5ce1e6); font-family: 'Seasons', serif;">
@@ -68,30 +68,42 @@
     </a>
 @endguest
 
-@auth('costumer')
-    <!-- User Dropdown -->
-    <div class="relative">
-        <button id="userDropdownBtn" class="flex items-center">
-            {{ Auth::guard('costumer')->user()->name }} <span class="ml-1">▼</span>
-        </button>
-        <div id="userDropdown" class="absolute right-0 mt-2 w-40 bg-white text-black rounded-lg shadow-lg hidden">
-            <form method="POST" action="{{ route('costumer.logout') }}">
-                @csrf
-                <button type="submit" class="block px-4 py-2 w-full text-left">Log Out</button>
-            </form>
-        </div>
+@auth('customer')
+   <!-- User Dropdown -->
+<div class="relative">
+    <!-- Dropdown Button -->
+    <button id="userDropdownBtn" class="flex items-center px-3 py-2 bg-gray-100 rounded hover:bg-gray-200">
+        {{ Auth::guard('customer')->user()->name }}
+        <span id="dropdownArrow" class="ml-1 transition-transform">▼</span>
+    </button>
+
+    <!-- Dropdown Menu -->
+    <div id="userDropdownMenu"
+         class="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg hidden">
+        <!-- Profile -->
+        <a href="{{ route('customerprofile.dashboard') }}"
+           class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
+            Profile
+        </a>
+
+        <!-- Logout -->
+        <a href="#"
+           onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
+           class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
+            Logout
+        </a>
     </div>
+</div>
+
+<!-- Hidden logout form -->
+<form id="logout-form" action="{{ route('customer.logout') }}" method="POST" class="hidden">
+    @csrf
+</form>
+
 @endauth
-
-
     </div>
 </header>
 
-<a href="{{ route('costumer.dashboard') }}"
-   class="px-6 py-3 font-semibold text-white hover:scale-105 transition-transform rounded-full"
-   style="background: linear-gradient(135deg,#6c7cff,#7dd3fc); font-family: 'Playfair Display', serif;">
-   Costumer Dashboard (Temp)
-</a>
 
 <main class="py-6 px-4">
         @yield('content')
@@ -139,13 +151,13 @@
                 <!-- Front (Video) -->
                 <div class="flip-card-front bg-white shadow-lg rounded-4x3 overflow-hidden flex items-center justify-center">
                     <video class="w-full h-96 object-cover rounded-2xl" autoplay loop muted>
-                        <source src="{{ asset('costumerVideo/invitation.mp4') }}" type="video/mp4">
+                        <source src="{{ asset('customerVideo/invitation.mp4') }}" type="video/mp4">
                         Your browser does not support the video tag.
                     </video>
                 </div>
                 <!-- Back (Image) -->
                 <div class="flip-card-back bg-white shadow-lg rounded-2xl overflow-hidden">
-                    <img src="{{ asset('costumerimage/invitation.png') }}" alt="Invitation Design" class="w-full h-96 object-cover">
+                    <img src="{{ asset('customerimage/invitation.png') }}" alt="Invitation Design" class="w-full h-96 object-cover">
                 </div>
             </div>
         </div>
@@ -154,22 +166,22 @@
 
 {{-- include modals --}}
 {{-- Login and Register Modals --}}
-@include('auth.costumer.login')
-@include('auth.costumer.register')
+@include('auth.customer.login')
+@include('auth.customer.register')
 
 
 {{-- Templates Section --}}
-@include('Costumerpartials.templates')
+@include('customerpartials.templates')
 
 {{-- Categories Section --}}
-@include('Costumerpartials.categories')
+@include('customerpartials.categories')
 
 
 {{-- About Section --}}
-@include('Costumerpartials.about')
+@include('customerpartials.about')
 
 {{-- Contact Section --}}
-@include('Costumerpartials.contact')
+@include('customerpartials.contact')
 
 
 

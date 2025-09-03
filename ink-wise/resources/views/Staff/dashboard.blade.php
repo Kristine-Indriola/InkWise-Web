@@ -12,7 +12,7 @@
     </div>
     <div class="bg-white p-6 rounded-lg shadow text-center border border-purple-400">
         <p class="text-3xl font-bold">8</p>
-        <p class="text-gray-500">Customers</p>
+        <p class="text-gray-500">customers</p>
     </div>
 </div>
 @endsection
