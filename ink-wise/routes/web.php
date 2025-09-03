@@ -7,7 +7,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\TemplateController;
 use App\Http\Controllers\Owner\HomeController;
 //use App\Http\Controllers\OwnerLoginController;
-use App\Http\Controllers\CostumerAuthController;
+use App\Http\Controllers\Auth\CustomerAuthController;
 //use App\Http\Controllers\Auth\AdminLoginController;
 //use App\Http\Controllers\StaffAuthController;
 //use App\Http\Controllers\Staff\StaffLoginController;
@@ -119,14 +119,16 @@ Route::get('/', function () {
 })->name('dashboard');
 
 // Guest routes (register / login)
-Route::get('/costumer/register', [CostumerAuthController::class, 'showRegister'])->name('costumer.register.form');
-Route::post('/costumer/register', [CostumerAuthController::class, 'register'])->name('costumer.register');
 
-Route::get('/costumer/login', [CostumerAuthController::class, 'showLogin'])->name('costumer.login.form');
-Route::post('/costumer/login', [CostumerAuthController::class, 'login'])->name('costumer.login');
+Route::get('/customer/register', [CustomerAuthController::class, 'showRegister'])->name('customer.register.form');
+Route::post('/customer/register', [CustomerAuthController::class, 'register'])->name('customer.register.submit');
 
-Route::get('/costumer/dashboard', [CostumerAuthController::class, 'dashboard'])->name('costumer.dashboard');
-Route::post('/costumer/logout', [CostumerAuthController::class, 'logout'])->name('costumer.logout');
+Route::get('/customer/login', [CustomerAuthController::class, 'showLogin'])->name('customer.login.form');
+Route::post('/customer/login', [CustomerAuthController::class, 'login'])->name('customer.login');
+
+Route::get('/customer/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');
+Route::post('/customer/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
+
 
 
 /*Route::middleware('auth')->group(function () {

@@ -17,7 +17,7 @@ return [
     | Authentication Guards
     |--------------------------------------------------------------------------
     */
-    'guards' => [
+   'guards' => [
         'web' => [
             'driver' => 'session',
             'provider' => 'users',
@@ -29,20 +29,13 @@ return [
         ],
 
         'staff' => [
-        'driver' => 'session',
-        'provider' => 'staffs', // must match the provider below
-    ],
-        // 👇 NEW guard for costumer
-    'guards' => [
-    'costumer' => [
-        'driver' => 'session',
-        'provider' => 'costumers',
-    ],
-],
-    // 👇 NEW guard for costumer
-        'costumer' => [
             'driver' => 'session',
-            'provider' => 'costumers',
+            'provider' => 'staffs',
+        ],
+
+        'customer' => [
+            'driver' => 'session',
+            'provider' => 'customers',
         ],
     ],
 
@@ -59,23 +52,17 @@ return [
 
         'owners' => [
             'driver' => 'eloquent',
-            'model' => App\Models\Owner::class, // 👈 make sure this model exists
+            'model' => App\Models\Owner::class,
         ],
 
         'staffs' => [
-        'driver' => 'eloquent',
-        'model' => App\Models\Staff::class, // create Staff model if not yet existing
-    ],
-    'providers' => [
-    'costumers' => [
-        'driver' => 'eloquent',
-        'model' => App\Models\Costumer::class,
-    ],
-],
-    // 👇 NEW provider for costumer
-        'costumers' => [
             'driver' => 'eloquent',
-            'model' => App\Models\Costumer::class,
+            'model' => App\Models\Staff::class,
+        ],
+
+        'customers' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\Customer::class,
         ],
     ],
 
@@ -101,15 +88,16 @@ return [
 
         'passwords' => [
         'users' => [
-            'provider' => 'costumers',
+            'provider' => 'customers',
             'table' => 'password_reset_tokens',
             'expire' => 60,
             'throttle' => 60,
         ],
     ],
-        // 👇 NEW password reset for costumer
-        'costumers' => [
-            'provider' => 'costumers',
+
+       
+        'customers' => [
+            'provider' => 'customers',
             'table' => 'password_reset_tokens',
             'expire' => 60,
             'throttle' => 60,
