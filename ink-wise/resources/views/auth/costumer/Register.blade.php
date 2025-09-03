@@ -14,11 +14,27 @@
         <h2 class="text-xl font-bold text-center text-gray-800 mb-5">Create Account</h2>
 
         <!-- Register Form -->
-        <form method="POST" action="{{ route('costumer.register') }}">
+       <form method="POST" action="{{ route('customer.register.submit') }}">
     @csrf
+
     <div>
-        <label for="name">Name</label>
-        <input type="text" name="name" required>
+        <label for="first_name">First Name</label>
+        <input type="text" name="first_name" required>
+    </div>
+
+    <div>
+        <label for="middle_name">Middle Name</label>
+        <input type="text" name="middle_name">
+    </div> 
+
+    <div>
+        <label for="last_name">Last Name</label>
+        <input type="text" name="last_name" required>
+    </div>
+
+    <div>
+        <label for="contact_number">Contact Number</label>
+        <input type="text" name="contact_number">
     </div>
 
     <div>
@@ -36,7 +52,10 @@
         <input type="password" name="password_confirmation" required>
     </div>
 
-    <button type="submit">Register</button>
+    <button type="submit"
+        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg shadow-md transition">
+        Sign Up
+    </button>
 </form>
         <!-- Submit -->
         <button type="submit"

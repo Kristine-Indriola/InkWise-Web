@@ -1,4 +1,4 @@
-<!-- resources/views/auth/Costumerlogin.blade.php -->
+<!-- resources/views/auth/Customerlogin.blade.php -->
 
 <div id="loginModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden z-50">
     <div class="bg-white rounded-2xl shadow-lg w-full max-w-md p-6 relative">
@@ -12,7 +12,7 @@
         <h2 class="text-2xl font-bold text-center text-gray-800 mb-4">Sign In</h2>
 
         <!-- Login Form -->
-        <form method="POST" action="{{ route('costumer.login') }}" class="space-y-4">
+        <form method="POST" action="{{ route('customer.login') }}" class="space-y-4">
             @csrf
 
             <!-- Email -->
