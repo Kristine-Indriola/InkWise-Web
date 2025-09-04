@@ -55,16 +55,15 @@
                     class="border rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring focus:ring-indigo-200">
             </form>
 
-            @auth('customer')
-   <!-- User Dropdown -->
-<div class="relative">
-    <!-- Dropdown Button -->
-    <button id="userDropdownBtn" class="flex items-center px-3 py-2 bg-gray-100 rounded hover:bg-gray-200">
-        {{ Auth::guard('customer')->user()->name }}
-    </button>
-@endauth
-        </div>
+            @auth
+    <div class="relative">
+        <!-- Dropdown Button -->
+        <button id="userDropdownBtn" class="flex items-center px-3 py-2 bg-gray-100 rounded hover:bg-gray-200">
+            {{ Auth::user()->customer?->first_name ?? Auth::user()->email }}
+        </button>
+        @endauth
     </div>
+        </div>
 </header>
       <!-- Welcome Section -->
 <div class="welcome-section">

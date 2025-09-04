@@ -148,7 +148,7 @@ Route::get('/customer/my-orders', function () {
 })->name('customer.my_orders');
 Route::get('/customer/dshboard', function () {
     return view('customerprofile.dashboard');
-})->name('customer.dashboard');
+})->name('customerprofile.dashboard');
 
 // customer Templatehome category pages
 Route::get('/templates/wedding', function () {

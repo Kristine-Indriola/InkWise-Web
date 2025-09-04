@@ -58,38 +58,35 @@
                     class="border rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring focus:ring-indigo-200">
             </form>
             @endguest
+@auth
+    <div class="relative">
+        <!-- Dropdown Button -->
+        <button id="userDropdownBtn" class="flex items-center px-3 py-2 bg-gray-100 rounded hover:bg-gray-200">
+            {{ Auth::user()->customer?->first_name ?? Auth::user()->email }}
+            <span id="dropdownArrow" class="ml-1 transition-transform">▼</span>
+        </button>
 
-             @auth('customer')
-   <!-- User Dropdown -->
-<div class="relative">
-    <!-- Dropdown Button -->
-    <button id="userDropdownBtn" class="flex items-center px-3 py-2 bg-gray-100 rounded hover:bg-gray-200">
-        {{ Auth::guard('customer')->user()->name }}
-    </button>
-    <!-- Dropdown Menu -->
-    <div id="userDropdownMenu"
-         class="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg hidden">
-        <!-- Profile -->
-        <a href="{{ route('customerprofile.dashboard') }}"
-           class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
-            Profile
-        </a>
+        <!-- Dropdown Menu -->
+        <div id="userDropdownMenu"
+             class="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg hidden">
+            <!-- Profile -->
+            <a href="{{ route('customerprofile.dashboard') }}"
+               class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
+                Profile
+            </a>
 
-        <!-- Logout -->
-        <a href="#"
-           onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
-           class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
-            Logout
-        </a>
+            <!-- Logout -->
+            <form id="logout-form" action="{{ route('customer.logout') }}" method="POST">
+                @csrf
+                <button type="submit"
+                        class="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100">
+                    Logout
+                </button>
+            </form>
+        </div>
     </div>
-</div>
-
-<!-- Hidden logout form -->
-<form id="logout-form" action="{{ route('customer.logout') }}" method="POST" class="hidden">
-    @csrf
-</form>
-
 @endauth
+
 
             </nav>
         </div>
