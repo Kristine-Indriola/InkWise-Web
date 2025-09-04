@@ -30,7 +30,7 @@ class CustomerAuthController extends Controller
             'password' => 'required|min:6|confirmed',
         ]);
 
-        // 1️⃣ Create the user (login credentials)
+        //1️⃣ Create the user (login credentials)
         $user = User::create([
             'email' => $request->email,
             'password' => Hash::make($request->password),
@@ -76,6 +76,6 @@ class CustomerAuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('customer.login.form');
+        return redirect()->route('customer.dashboard');
     }
 }
