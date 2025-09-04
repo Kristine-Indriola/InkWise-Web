@@ -4,40 +4,59 @@
     margin: 0 auto;
     padding: 20px;
     font-family: Arial, sans-serif;
-    background-color: #bdabab;
+    background-color: #f0f2eb;
 }
 
 /* Heading */
 .container h1 {
     font-size: 24px;
+    margin-bottom: 20px;
+    font-weight: bold;
+    color: #333;
+}
+
+/* Action bar */
+.actions-bar {
     margin-bottom: 15px;
 }
 
 /* Buttons */
-a, button {
+.btn {
     font-size: 14px;
-    padding: 6px 12px;
-    border-radius: 4px;
+    padding: 8px 14px;
+    border-radius: 6px;
     text-decoration: none;
     display: inline-block;
     cursor: pointer;
     transition: 0.2s ease;
     border: none;
+    font-weight: 600;
 }
 
-a:hover, button:hover {
-    opacity: 0.85;
+/* Button variations */
+.btn-primary {
+    background-color: #2563eb;
+    color: #fff;
+}
+.btn-primary:hover {
+    background-color: #1e40af;
 }
 
-/* Button colors */
-.bg-blue-600 { background-color: #2563eb; color: #fff; }
-.bg-blue-600:hover { background-color: #1e40af; }
+.btn-warning {
+    background-color: #facc15;
+    color: #000;
+}
+.btn-warning:hover {
+    background-color: #eab308;
+}
 
-.bg-yellow-500 { background-color: #facc15; color: #000; }
-.bg-yellow-500:hover { background-color: #eab308; }
-
-.bg-red-600 { background-color: #dc2626; color: #fff; }
-.bg-red-600:hover { background-color: #b91c1c; }
+.btn-danger {
+    background-color: #dc2626;
+    color: #fff;
+}
+.btn-danger:hover {
+    background-color: #b91c1c;
+}
 
 /* Success message */
 .bg-green-100 {
@@ -54,8 +73,8 @@ table {
     border-collapse: collapse;
     background-color: #fff;
     box-shadow: 0 0 5px rgba(0,0,0,0.05);
-    table-layout: auto; /* Flexible columns */
-    word-wrap: break-word; /* Wrap long text */
+    table-layout: auto;
+    word-wrap: break-word;
 }
 
 th, td {
@@ -78,23 +97,17 @@ tr:hover {
     background-color: #ececec;
 }
 
-/* Table responsive scroll */
-.overflow-x-auto {
-    overflow-x: auto;
-}
-
-/* Small screens adjustments */
-@media (max-width: 768px) {
-    th, td {
-        padding: 10px 8px;
-        font-size: 13px;
-    }
+/* Actions column */
+.actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
 }
 
 /* Badge styling */
 .badge {
     display: inline-block;
-    padding: 3px 8px;
+    padding: 4px 10px;
     border-radius: 12px;
     color: #fff;
     font-size: 12px;
@@ -110,4 +123,14 @@ tr:hover {
 .status-active { background-color: #16a34a; }   /* Green */
 .status-inactive { background-color: #dc2626; } /* Red */
 
-
+/* Responsive */
+@media (max-width: 768px) {
+    th, td {
+        padding: 10px 8px;
+        font-size: 13px;
+    }
+    .actions {
+        flex-direction: column;
+        gap: 6px;
+    }
+}

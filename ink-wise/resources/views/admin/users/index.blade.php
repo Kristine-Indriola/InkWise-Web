@@ -3,9 +3,10 @@
 @section('title', 'Manage Users')
 
 @section('content')
+<link rel="stylesheet" href="{{ asset('css/admin-users.css') }}">
+
 <div class="container">
-    <link rel="stylesheet" href="{{ asset('css/admin-users.css') }}">
-    <h1>STAFF MANAGEMENT</h1>
+    <h1>👥 Staff Management</h1>
 
     {{-- Success Message --}}
     @if(session('success'))
@@ -15,9 +16,11 @@
     @endif
 
     {{-- Add New User --}}
-    <a href="{{ route('admin.users.create') }}" class="bg-blue-600">
-        ➕ Add New Staff
-    </a>
+    <div class="actions-bar">
+        <a href="{{ route('admin.users.create') }}" class="btn btn-primary">
+            ➕ Add New Staff
+        </a>
+    </div>
 
     {{-- Users Table --}}
     <div class="overflow-x-auto" style="margin-top:15px;">
@@ -30,7 +33,7 @@
                     <th>Email</th>
                     <th>Contact Number</th>
                     <th>Status</th>
-                    <th>Actions</th>
+                    <th class="text-center">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -38,34 +41,34 @@
                     <tr>
                         <td>{{ $user->user_id }}</td>
                         <td>
-    <span class="badge {{ $user->role === 'owner' ? 'role-owner' : 'role-staff' }}">
-        {{ ucfirst($user->role) }}
-    </span>
-</td>
+                            <span class="badge {{ $user->role === 'owner' ? 'role-owner' : 'role-staff' }}">
+                                {{ ucfirst($user->role) }}
+                            </span>
+                        </td>
                         <td>
                             {{ $user->staff->first_name ?? '' }}
                             {{ $user->staff->middle_name ?? '' }}
                             {{ $user->staff->last_name ?? '' }}
                         </td>
                         <td>{{ $user->email }}</td>
-                        <td>{{ $user->staff->contact_number ?? '' }}</td>
+                        <td>{{ $user->staff->contact_number ?? '-' }}</td>
                         <td>
-    <span class="badge {{ $user->status === 'active' ? 'status-active' : 'status-inactive' }}">
-        {{ ucfirst($user->status) }}
-    </span>
-</td>
-                        <td>
-                            <a href="{{ route('admin.users.edit', $user->user_id) }}" class="bg-yellow-500">✏️ Edit</a>
-                            <form method="POST" action="{{ route('admin.users.destroy', $user->user_id) }}" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this user?');">
+                            <span class="badge {{ $user->status === 'active' ? 'status-active' : 'status-inactive' }}">
+                                {{ ucfirst($user->status) }}
+                            </span>
+                        </td>
+                        <td class="actions">
+                            <a href="{{ route('admin.users.edit', $user->user_id) }}" class="btn btn-warning">✏ Edit</a>
+                            <form method="POST" action="{{ route('admin.users.destroy', $user->user_id) }}" onsubmit="return confirm('Are you sure you want to delete this user?');">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="bg-red-600">🗑️ Delete</button>
+                                <button type="submit" class="btn btn-danger">🗑 Delete</button>
                             </form>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-center">No users found.</td>
+                        <td colspan="7" class="text-center">No staff accounts found.</td>
                     </tr>
                 @endforelse
             </tbody>

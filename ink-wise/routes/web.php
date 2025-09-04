@@ -36,7 +36,15 @@ use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
 */
 Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () { 
     Route::get('/dashboard', [AdminController::class, 'index'])->name('dashboard'); 
+     // Show profile
+   // Show profile
+    Route::get('/profile', [AdminController::class, 'show'])->name('profile.show');
 
+    // Edit profile
+    Route::get('/profile/edit', [AdminController::class, 'edit'])->name('profile.edit');
+
+    // Update profile
+    Route::put('/profile/update', [AdminController::class, 'update'])->name('profile.update');
     // Templates 
     Route::prefix('templates')->name('templates.')->group(function () { 
     Route::get('/', [AdminTemplateController::class, 'index'])->name('index'); 
@@ -75,7 +83,7 @@ Route::prefix('users')->name('users.')->group(function () {
     });
 
 
-});
+ });
 
 
 
