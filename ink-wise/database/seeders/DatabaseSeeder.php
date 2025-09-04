@@ -42,10 +42,23 @@ class DatabaseSeeder extends Seeder
             'status' => 'active',
         ]);
 
-        // Staff details
+        // Staff & Admin details
         DB::table('staff')->insert([
+            // Admin profile
             [
-                'user_id' => $staff1->user_id, // ✅ must match PK column name
+                'user_id' => $admin->user_id, // ✅ FK to users table
+                'role' => 'admin',
+                'first_name' => 'Super',
+                'middle_name' => null,
+                'last_name' => 'Admin',
+                'contact_number' => '0917-000-0000',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            // Staff 1 profile
+            [
+                'user_id' => $staff1->user_id,
+                'role' => 'staff',
                 'first_name' => 'John',
                 'middle_name' => 'M.',
                 'last_name' => 'Doe',
@@ -53,8 +66,10 @@ class DatabaseSeeder extends Seeder
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
+            // Staff 2 profile
             [
                 'user_id' => $staff2->user_id,
+                'role' => 'staff',
                 'first_name' => 'Jane',
                 'middle_name' => null,
                 'last_name' => 'Smith',
