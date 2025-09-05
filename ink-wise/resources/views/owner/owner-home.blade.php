@@ -3,7 +3,7 @@
 @section('content')
 @include('layouts.owner.sidebar')
 
-<!-- Main Section -->
+<!-- Main Section with Adjusted Layout -->
 <section class="main-content">
   <!-- Topbar -->
   <div class="topbar">
