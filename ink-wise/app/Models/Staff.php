@@ -9,9 +9,8 @@ class Staff extends Model
 {
     use HasFactory;
 
-    protected $table = 'staff'; // explicitly set table name
-
-    protected $primaryKey = 'staff_id'; // if your PK is staff_id, adjust accordingly
+    protected $table = 'staff';
+    protected $primaryKey = 'staff_id';
 
     protected $fillable = [
         'user_id',
@@ -20,9 +19,10 @@ class Staff extends Model
         'last_name',
         'contact_number',
         'role',
+        'status', // add status here
     ];
 
-    // Optional: define relation to User
+    // Relationship to User
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');

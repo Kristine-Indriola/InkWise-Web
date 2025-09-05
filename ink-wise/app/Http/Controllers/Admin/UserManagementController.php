@@ -10,64 +10,55 @@ use Illuminate\Support\Facades\Hash;
 
 class UserManagementController extends Controller
 {
-    // Show create user form
+    // Show create staff form
     public function create()
     {
         return view('admin.users.create');
     }
 
-    // Store new user
+    // Store new staff account
     public function store(Request $request)
     {
         $request->validate([
-            'first_name'   => 'required|string|max:50',
-            'middle_name'  => 'nullable|string|max:50',
-            'last_name'    => 'required|string|max:50',
+            'first_name'     => 'required|string|max:50',
+            'middle_name'    => 'nullable|string|max:50',
+            'last_name'      => 'required|string|max:50',
             'contact_number' => 'required|string|max:50',
-            'email'        => 'required|email|unique:users,email',
-            'password'     => 'required|min:6|confirmed',
-            'role'         => 'required|in:owner,staff',
+            'email'          => 'required|email|unique:users,email',
         ]);
 
-        // Create user
+        // Create user (inactive by default)
         $user = User::create([
             'email'    => $request->email,
-            'password' => Hash::make($request->password),
-            'role'     => $request->role,
-             'status' => 'inactive',
+            'password' => Hash::make('defaultpassword'), // Admin can set default password
+            'role'     => 'staff',
+            'status'   => 'inactive', // inactive until owner approves
         ]);
 
-        // Create staff record
+        // Create staff record (pending by default)
         Staff::create([
-            'user_id'      => $user->user_id,
-            'role'         => $request->role,
-            'first_name'   => $request->first_name,
-            'middle_name'  => $request->middle_name,
-            'last_name'    => $request->last_name,
-            'contact_number' => $request->contact_number,
-             'status' => 'pending', // always pending
+            'user_id'       => $user->user_id,
+            'first_name'    => $request->first_name,
+            'middle_name'   => $request->middle_name,
+            'last_name'     => $request->last_name,
+            'contact_number'=> $request->contact_number,
+            'role'          => 'staff',
+            'status'        => 'pending', // pending by default
         ]);
 
         return redirect()->route('admin.users.index')
-                         ->with('success', 'User account created successfully!');
+                         ->with('success', 'Staff account created and pending approval.');
     }
 
-    // List all users
+    // List all staff accounts with status
     public function index()
-{
-    $users = User::with('staff')
-                 ->where('role', '!=', 'customer')
-                 ->get();
+    {
+        $users = User::with('staff')
+             ->where('role', '!=', 'customer') // admin, owner, staff
+             ->get();
 
-    $pendingStaff = User::with('staff')
-                        ->whereHas('staff', function($q){
-                            $q->where('status', 'pending');
-                        })
-                        ->get();
-
-    return view('admin.users.index', compact('users', 'pendingStaff'));
-}
-
+        return view('admin.users.index', compact('users'));
+    }
 
     // Show edit form
     public function edit($user_id)
@@ -76,7 +67,7 @@ class UserManagementController extends Controller
         return view('admin.users.edit', compact('user'));
     }
 
-    // Update user
+    // Update staff account (admin can only update details)
     public function update(Request $request, $user_id)
     {
         $user = User::with('staff')->findOrFail($user_id);
@@ -87,21 +78,16 @@ class UserManagementController extends Controller
             'last_name'      => 'required|string|max:50',
             'contact_number' => 'required|string|max:50',
             'email'          => 'required|email|unique:users,email,' . $user_id . ',user_id',
-            'role'           => 'required|in:owner,staff',
-            'status'         => 'required|in:active,inactive',
         ]);
 
-        // Update user
+        // Update user email only
         $user->update([
-            'email'  => $request->email,
-            'role'   => $request->role,
-            'status' => $request->status,
+            'email' => $request->email,
         ]);
 
-        // Update staff
+        // Update staff details
         if ($user->staff) {
             $user->staff->update([
-                'role'           => $request->role,
                 'first_name'     => $request->first_name,
                 'middle_name'    => $request->middle_name,
                 'last_name'      => $request->last_name,
@@ -110,44 +96,15 @@ class UserManagementController extends Controller
         }
 
         return redirect()->route('admin.users.index')
-                         ->with('success', 'User updated successfully!');
+                         ->with('success', 'Staff details updated successfully.');
     }
 
-    // Delete user
+    // Delete staff account
     public function destroy($user_id)
     {
         $user = User::findOrFail($user_id);
         $user->delete(); // cascade deletes staff
         return redirect()->route('admin.users.index')
-                         ->with('success', 'User deleted successfully!');
+                         ->with('success', 'Staff account deleted successfully.');
     }
-
-    // Approve pending staff
-public function approve($user_id)
-{
-    $user = User::with('staff')->findOrFail($user_id);
-
-    if ($user->staff && $user->staff->status === 'pending') {
-        $user->staff->update(['status' => 'approved']); // mark as approved
-        $user->update(['status' => 'active']); // optional: activate user
-    }
-
-    return redirect()->route('admin.users.index')
-                     ->with('success', 'Staff account approved successfully!');
-}
-
-// Reject pending staff
-public function reject($user_id)
-{
-    $user = User::with('staff')->findOrFail($user_id);
-
-    if ($user->staff && $user->staff->status === 'pending') {
-        $user->staff->update(['status' => 'rejected']); // mark as rejected
-        $user->update(['status' => 'inactive']); // optional: deactivate user
-    }
-
-    return redirect()->route('admin.users.index')
-                     ->with('success', 'Staff account rejected successfully!');
-}
-
 }

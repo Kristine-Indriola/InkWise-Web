@@ -4,6 +4,7 @@
 
 @section('content')
 <div class="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-md mt-10">
+      <link rel="stylesheet" href="{{ asset('css/admin-css/create_account.css') }}">
     <h2 class="text-2xl font-bold text-gray-800 mb-6">Create Staff Account</h2>
 
     @if(session('success'))
@@ -23,8 +24,7 @@
         </div>
     @endif
 
-    <form method="POST" action="{{ route('staff.store') }}">
-        @csrf
+<form method="POST" action="{{ route('admin.users.store') }}">        @csrf
 
         {{-- First Name --}}
         <div class="mb-4">
