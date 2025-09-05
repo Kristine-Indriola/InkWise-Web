@@ -253,7 +253,7 @@
              alt="Admin Avatar" 
              style="border-radius:50%; margin-right:10px; width:55px; height:55px; border:2px solid #6a2ebc;">
         <div>
-                <strong>{{ Auth::user()->name ?? 'Admin Profile' }}</strong> 
+                <strong>{{ Auth::user()->name ?? 'Admin' }}</strong> 
                 <span style="color:green;">✔</span>
             </div>
         </a>
@@ -263,7 +263,9 @@
     <a href="{{ route('admin.dashboard') }}"><i>🏠</i> Dashboard</a>
   </li>
 
-   <li><i>👥</i> Customer Accounts</li>
+   <li class="{{ request()->routeIs('admin.customers.*') ? 'active' : '' }}">
+    <a href="{{ route('admin.customers.index') }}"><i>👥</i> Customer Accounts</a>
+</li>
 
   <li class="{{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
     <a href="{{ route('admin.users.index') }}"><i>👤</i> Staff Accounts</a>
@@ -275,11 +277,14 @@
 
   <li><i>📦</i> Order Summaries</li>
 
-  <li class="{{ request()->routeIs('admin.materials.*') ? 'active' : '' }}">
-    <a href="{{ route('admin.materials.index') }}"><i>📑</i> Inventory</a>
-  </li>
+ <li class="{{ request()->routeIs('admin.messages.*') ? 'active' : '' }}">
+    <a href="{{ route('admin.messages.index') }}"><i>💬</i> Messages</a>
+</li>
 
-  <li><i>💬</i> Messages</li> 
+<li class="{{ request()->routeIs('admin.materials.*') ? 'active' : '' }}">
+    <a href="{{ route('admin.materials.index') }}"><i>📝</i> Materials</a>
+</li>
+
   <li><i>📊</i> Reports</li>
 </ul>
 

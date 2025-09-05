@@ -16,11 +16,12 @@ return new class extends Migration
             $table->foreignId('user_id')
                   ->constrained('users', 'user_id')
                   ->onDelete('cascade'); // ✅ correct FK column
-            $table->enum('role', ['admin', 'owner', 'staff', 'customer'])->default('staff');
+            $table->enum('role', ['admin', 'owner', 'staff'])->default('staff');
                   $table->string('first_name');
             $table->string('middle_name')->nullable();
             $table->string('last_name');
             $table->string('contact_number');
+             $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
             $table->timestamps();
         });
     }

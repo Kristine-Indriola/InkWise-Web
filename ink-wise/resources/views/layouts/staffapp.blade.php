@@ -29,6 +29,9 @@
           <li><a href="{{ route('staff.order.list') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Order List</a></li>
           <li><a href="{{ route('staff.customer.profile') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> customer Profiles</a></li>
           <li><a href="{{ route('staff.notify.customers') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Notify customers</a></li>
+</li>
+          
+          
         </ul>
       </nav>
     </aside>
