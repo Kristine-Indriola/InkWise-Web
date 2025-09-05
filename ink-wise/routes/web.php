@@ -55,15 +55,18 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::get('/editor/{id?}', [AdminTemplateController::class, 'editor'])->name('editor'); }); 
     
     // ✅ User Management 
-    // ✅ User Management 
-Route::prefix('users')->name('users.')->group(function () { 
-    Route::get('/', [UserManagementController::class, 'index'])->name('index'); 
-    Route::get('/create', [UserManagementController::class, 'create'])->name('create'); 
-    Route::post('/', [UserManagementController::class, 'store'])->name('store'); 
-    Route::get('/{user_id}/edit', [UserManagementController::class, 'edit'])->name('edit'); // Edit form 
-    Route::put('/{user_id}', [UserManagementController::class, 'update'])->name('update'); // Update user 
-    Route::delete('/{user_id}', [UserManagementController::class, 'destroy'])->name('destroy'); // Delete user 
-});
+
+    Route::prefix('users')->name('users.')->group(function () {
+        Route::get('/', [UserManagementController::class, 'index'])->name('index');        // admin.users.index
+        Route::get('/create', [UserManagementController::class, 'create'])->name('create'); // admin.users.create
+        Route::post('/', [UserManagementController::class, 'store'])->name('store');        // admin.users.store
+        Route::get('/{user_id}/edit', [UserManagementController::class, 'edit'])->name('edit');    // admin.users.edit
+        Route::put('/{user_id}', [UserManagementController::class, 'update'])->name('update');    // admin.users.update
+        Route::delete('/{user_id}', [UserManagementController::class, 'destroy'])->name('destroy'); // admin.users.destroy
+    });
+
+
+
 
 
      Route::prefix('inventory')->name('inventory.')->group(function () {
@@ -239,14 +242,23 @@ Route::post('/logout', [RoleLoginController::class, 'logout'])->name('logout');
 
 Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/home', [HomeController::class, 'index'])->name('home');
-    Route::get('/approve-staff', fn () => view('owner.owner-appstaff'))->name('approve-staff');
+
+    // Staff management (approved + pending)
+    // Staff management (single page)
+    Route::get('/staff', [OwnerController::class, 'staffIndex'])->name('staff.index');
+
+    // Approve/reject staff
+    Route::post('/staff/{staff}/approve', [OwnerController::class, 'approveStaff'])->name('staff.approve');
+    Route::post('/staff/{staff}/reject', [OwnerController::class, 'rejectStaff'])->name('staff.reject');
+
+
+    // Other pages
     Route::get('/order/workflow', fn () => view('owner.order-workflow'))->name('order.workflow');
     Route::get('/inventory/track', fn () => view('owner.inventory-track'))->name('inventory-track');
     Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
     Route::get('/reports', fn () => view('owner.owner-reports'))->name('reports');
-    Route::post('staff/{staff}/approve', [OwnerController::class, 'approve'])->name('staff.approve');
-    Route::post('staff/{staff}/reject', [OwnerController::class, 'reject'])->name('staff.reject');
 });
+
 
 
   

@@ -11,7 +11,9 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        // --------------------
         // Admin
+        // --------------------
         $admin = User::create([
             'email' => 'admin@example.com',
             'password' => Hash::make('admin123'),
@@ -19,7 +21,9 @@ class DatabaseSeeder extends Seeder
             'status' => 'active',
         ]);
 
+        // --------------------
         // Owner
+        // --------------------
         $owner = User::create([
             'email' => 'owner@test.com',
             'password' => Hash::make('secret123'),
@@ -27,31 +31,36 @@ class DatabaseSeeder extends Seeder
             'status' => 'active',
         ]);
 
-        // Staff users
+        // --------------------
+        // Staff accounts (pending)
+        // --------------------
         $staff1 = User::create([
             'email' => 'staff1@test.com',
             'password' => Hash::make('staff123'),
             'role' => 'staff',
-            'status' => 'active',
+            'status' => 'inactive', // inactive until approved
         ]);
 
         $staff2 = User::create([
             'email' => 'staff2@test.com',
             'password' => Hash::make('staff123'),
             'role' => 'staff',
-            'status' => 'active',
+            'status' => 'inactive', // inactive until approved
         ]);
 
+        // --------------------
         // Staff & Admin details
+        // --------------------
         DB::table('staff')->insert([
             // Admin profile
             [
-                'user_id' => $admin->user_id, // ✅ FK to users table
+                'user_id' => $admin->user_id,
                 'role' => 'admin',
                 'first_name' => 'Super',
                 'middle_name' => null,
                 'last_name' => 'Admin',
                 'contact_number' => '0917-000-0000',
+                'status' => 'approved', // approved by default
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
@@ -62,7 +71,8 @@ class DatabaseSeeder extends Seeder
                 'first_name' => 'John',
                 'middle_name' => 'M.',
                 'last_name' => 'Doe',
-                'contact_number' => '123-456-7890',
+                'contact_number' => '0917-111-1111',
+                'status' => 'pending', // pending approval
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
@@ -73,7 +83,8 @@ class DatabaseSeeder extends Seeder
                 'first_name' => 'Jane',
                 'middle_name' => null,
                 'last_name' => 'Smith',
-                'contact_number' => '123-456-7890',
+                'contact_number' => '0917-222-2222',
+                'status' => 'pending', // pending approval
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
