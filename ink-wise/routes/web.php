@@ -226,7 +226,11 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/inventory/track', fn () => view('owner.inventory-track'))->name('inventory-track');
     Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
     Route::get('/reports', fn () => view('owner.owner-reports'))->name('reports');
+    Route::post('staff/{staff}/approve', [OwnerController::class, 'approve'])->name('staff.approve');
+    Route::post('staff/{staff}/reject', [OwnerController::class, 'reject'])->name('staff.reject');
 });
+
+
   
 
 Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
