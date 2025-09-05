@@ -3,13 +3,15 @@
 use Illuminate\Support\Facades\Route;
 use Laravel\Socialite\Facades\Socialite;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\MessageController;
 use App\Http\Controllers\TemplateController;
 use App\Http\Controllers\Owner\HomeController;
-use App\Http\Controllers\Owner\OwnerController;
 //use App\Http\Controllers\OwnerLoginController;
 //use App\Http\Controllers\Auth\AdminLoginController;
 //use App\Http\Controllers\StaffAuthController;
 //use App\Http\Controllers\Staff\StaffLoginController;
+use App\Http\Controllers\Owner\OwnerController;
+use App\Http\Controllers\AdminCustomerController;
 use App\Http\Controllers\Admin\MaterialController;
 use App\Http\Controllers\Auth\RoleLoginController;
 use App\Http\Controllers\Admin\InventoryController;
@@ -37,7 +39,6 @@ use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
 Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () { 
     Route::get('/dashboard', [AdminController::class, 'index'])->name('dashboard'); 
      // Show profile
-   // Show profile
     Route::get('/profile', [AdminController::class, 'show'])->name('profile.show');
 
     // Edit profile
@@ -45,6 +46,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
 
     // Update profile
     Route::put('/profile/update', [AdminController::class, 'update'])->name('profile.update');
+    
     // Templates 
     Route::prefix('templates')->name('templates.')->group(function () { 
     Route::get('/', [AdminTemplateController::class, 'index'])->name('index'); 
@@ -82,8 +84,24 @@ Route::prefix('users')->name('users.')->group(function () {
         Route::delete('/{id}', [MaterialController::class, 'destroy'])->name('destroy');
     });
 
+   Route::prefix('customers')->name('customers.')->group(function () {
+        Route::get('/', [AdminCustomerController::class, 'index'])->name('index'); 
+        // Optional: Add more customer routes (show/edit/delete) here later
+    });
 
- });
+    // Messages routes
+      Route::prefix('messages')->name('messages.')->group(function () {
+        Route::get('/', [MessageController::class, 'index'])->name('index'); // ✅ admin.messages.index
+        Route::get('/chat/{customerId}', [MessageController::class, 'chatWithCustomer'])->name('chat');
+        Route::post('/send/{customerId}', [MessageController::class, 'sendToCustomer'])->name('send');
+    });
+
+});
+
+
+
+
+
 
 
 
@@ -239,5 +257,9 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
     Route::get('/assigned-orders', fn () => view('staff.assigned_orders'))->name('assigned.orders');
     Route::get('/order-list', fn () => view('staff.order_list'))->name('order.list');
     Route::get('/customer-profile', fn () => view('staff.customer_profile'))->name('customer.profile');
-    Route::get('/notify-customers', fn () => view('staff.notify_customers'))->name('notify.customers');   
+    Route::get('/notify-customers', fn () => view('staff.notify_customers'))->name('notify.customers');
+
+    // Messages routes
+
+
 });

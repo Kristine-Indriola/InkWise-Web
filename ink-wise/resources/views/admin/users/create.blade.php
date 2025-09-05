@@ -1,19 +1,20 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create User</title>
-    <link rel="stylesheet" href="{{ asset('css/admin-css/create_account.css') }}">
-</head>
-<body>
+@extends('layouts.admin')
 
-<div class="container">
-    <h2>Create New User</h2>
+@section('title', 'Create Staff Account')
+
+@section('content')
+<div class="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-md mt-10">
+    <h2 class="text-2xl font-bold text-gray-800 mb-6">Create Staff Account</h2>
+
+    @if(session('success'))
+        <div class="mb-4 p-3 bg-green-100 text-green-800 rounded-lg">
+            {{ session('success') }}
+        </div>
+    @endif
 
     {{-- Display Validation Errors --}}
     @if ($errors->any())
-        <div class="bg-red-100">
+        <div class="mb-4 p-3 bg-red-100 text-red-800 rounded-lg">
             <ul>
                 @foreach ($errors->all() as $error)
                     <li>{{ $error }}</li>
@@ -22,71 +23,54 @@
         </div>
     @endif
 
-    <form method="POST" action="{{ route('admin.users.store') }}">
+    <form method="POST" action="{{ route('staff.store') }}">
         @csrf
 
-        <!-- Role -->
-        <div class="form-row">
-            <div class="form-group">
-                <label>Role</label>
-                <select name="role" required>
-                    <option value="owner" {{ old('role') === 'owner' ? 'selected' : '' }}>Owner</option>
-                    <option value="staff" {{ old('role', 'staff') === 'staff' ? 'selected' : '' }}>Staff</option>
-                </select>
-            </div>
+        {{-- First Name --}}
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">First Name</label>
+            <input type="text" name="first_name" value="{{ old('first_name') }}" class="w-full px-3 py-2 border rounded-lg" required>
         </div>
 
-        <!-- Name fields in a row -->
-        <div class="form-row">
-            <div class="form-group">
-                <label>First Name</label>
-                <input type="text" name="first_name" value="{{ old('first_name') }}" required>
-            </div>
-            <div class="form-group">
-                <label>Middle Name <small>(optional)</small></label>
-                <input type="text" name="middle_name" value="{{ old('middle_name') }}">
-            </div>
-            <div class="form-group">
-                <label>Last Name</label>
-                <input type="text" name="last_name" value="{{ old('last_name') }}" required>
-            </div>
+        {{-- Middle Name --}}
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Middle Name</label>
+            <input type="text" name="middle_name" value="{{ old('middle_name') }}" class="w-full px-3 py-2 border rounded-lg">
         </div>
 
-        <!-- Contact Number -->
-        <div class="form-row">
-            <div class="form-group full-width">
-                <label>Contact Number</label>
-                <input type="text" name="contact_number" value="{{ old('contact_number') }}" required>
-            </div>
+        {{-- Last Name --}}
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Last Name</label>
+            <input type="text" name="last_name" value="{{ old('last_name') }}" class="w-full px-3 py-2 border rounded-lg" required>
         </div>
 
-        <!-- Email -->
-        <div class="form-row">
-            <div class="form-group full-width">
-                <label>Email</label>
-                <input type="email" name="email" value="{{ old('email') }}" required>
-            </div>
+        {{-- Contact Number --}}
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Contact Number</label>
+            <input type="text" name="contact_number" value="{{ old('contact_number') }}" class="w-full px-3 py-2 border rounded-lg" required>
         </div>
 
-        <!-- Password fields -->
-        <div class="form-row">
-            <div class="form-group">
-                <label>Password <small>(min 6 characters)</small></label>
-                <input type="password" name="password" required>
-            </div>
-            <div class="form-group">
-                <label>Confirm Password</label>
-                <input type="password" name="password_confirmation" required>
-            </div>
+        {{-- Email --}}
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Email</label>
+            <input type="email" name="email" value="{{ old('email') }}" class="w-full px-3 py-2 border rounded-lg" required>
         </div>
 
-        <!-- Buttons -->
-        <div class="form-row buttons-row">
-            <button type="submit">Create User</button>
-            <a href="{{ url()->previous() }}" class="cancel-btn">Cancel</a>
+        {{-- Password --}}
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Password</label>
+            <input type="password" name="password" class="w-full px-3 py-2 border rounded-lg" required>
+        </div>
+
+        {{-- Hidden Fields --}}
+        <input type="hidden" name="role" value="staff">
+        <input type="hidden" name="status" value="pending"> {{-- Newly created accounts are pending --}}
+
+        <div class="flex justify-end">
+            <button type="submit" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                Create Account
+            </button>
         </div>
     </form>
 </div>
-
-</body>
-</html>
+@endsection
