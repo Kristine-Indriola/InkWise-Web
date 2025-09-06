@@ -53,6 +53,46 @@
         @else
             <p class="text-red-600 font-medium">⚠ No staff profile found for this admin.</p>
         @endif
+
+        {{-- Address Info --}}
+        @if($admin->address)
+            <div class="mt-6">
+                <h3 class="text-lg font-semibold text-gray-700 mb-2">Address</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="profile-label">Street</label>
+                        <p class="profile-info">{{ $admin->address->street ?? '-' }}</p>
+                    </div>
+
+                    <div>
+                        <label class="profile-label">Barangay</label>
+                        <p class="profile-info">{{ $admin->address->barangay ?? '-' }}</p>
+                    </div>
+
+                    <div>
+                        <label class="profile-label">City</label>
+                        <p class="profile-info">{{ $admin->address->city ?? '-' }}</p>
+                    </div>
+
+                    <div>
+                        <label class="profile-label">Province</label>
+                        <p class="profile-info">{{ $admin->address->province ?? '-' }}</p>
+                    </div>
+
+                    <div>
+                        <label class="profile-label">Postal Code</label>
+                        <p class="profile-info">{{ $admin->address->postal_code ?? '-' }}</p>
+                    </div>
+
+                    <div>
+                        <label class="profile-label">Country</label>
+                        <p class="profile-info">{{ $admin->address->country ?? '-' }}</p>
+                    </div>
+                </div>
+            </div>
+        @else
+            <p class="text-red-600 font-medium mt-4">⚠ No address found for this admin.</p>
+        @endif
     </div>
 
     <div class="flex justify-end mt-8">

@@ -23,7 +23,6 @@ class Customer extends Model
         'middle_name',
         'last_name',
         'contact_number',
-        'address_id',
         'user_id',
     ];
 
@@ -31,5 +30,10 @@ class Customer extends Model
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
+    }
+
+    public function addresses()
+    {
+        return $this->hasMany(Address::class, 'user_id', 'user_id');
     }
 }

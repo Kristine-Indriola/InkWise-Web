@@ -15,8 +15,19 @@
         </div>
     @endif
 
-    {{-- Add New Staff --}}
-    <div class="actions-bar mb-4">
+    {{-- Search Bar + Add Staff --}}
+    <div class="actions-bar mb-4 flex justify-between items-center">
+        <form action="{{ route('admin.users.index') }}" method="GET" class="flex gap-2">
+            <input 
+                type="text" 
+                name="search" 
+                value="{{ request('search') }}" 
+                placeholder="🔍 Search by Staff ID or Name" 
+                class="border p-2 rounded w-64"
+            >
+            <button type="submit" class="btn btn-primary">Search</button>
+        </form>
+
         <a href="{{ route('admin.users.create') }}" class="btn btn-primary">
             ➕ Add New Staff
         </a>
@@ -27,11 +38,12 @@
         <table>
             <thead>
                 <tr>
-                    <th>ID</th>
+                    <th>Staff ID</th>
                     <th>Role</th>
                     <th>Full Name</th>
                     <th>Email</th>
                     <th>Contact Number</th>
+                    <th>Address</th>
                     <th>Status</th>
                     <th class="text-center">Actions</th>
                 </tr>
@@ -39,10 +51,10 @@
             <tbody>
                 @forelse($users as $user)
                     <tr class="{{ optional($user->staff)->status === 'pending' ? 'pending-row' : '' }}">
-                        <td>{{ $user->user_id }}</td>
+                        <td>{{ optional($user->staff)->staff_id ?? '—' }}</td>
                         <td>
                             <span class="badge 
-                                {{ $user->role === 'owner' ? 'role-owner' : 'role-staff' }}">
+                                {{ $user->role === 'owner' ? 'role-owner' : ($user->role === 'admin' ? 'role-admin' : 'role-staff') }}">
                                 {{ ucfirst($user->role) }}
                             </span>
                         </td>
@@ -54,12 +66,20 @@
                         <td>{{ $user->email }}</td>
                         <td>{{ optional($user->staff)->contact_number ?? '-' }}</td>
                         <td>
-    <span class="badge 
-        {{ optional($user->staff)->status === 'approved' ? 'status-active' : (optional($user->staff)->status === 'pending' ? 'status-pending' : 'status-inactive') }}">
-        {{ ucfirst(optional($user->staff)->status ?? $user->status) }}
-    </span>
-</td>
-
+                            @if(optional($user->staff)->address)
+                                {{ $user->staff->address->street ?? '' }},
+                                {{ $user->staff->address->city ?? '' }},
+                                {{ $user->staff->address->province ?? '' }}
+                            @else
+                                <span class="text-gray-400 italic">No address</span>
+                            @endif
+                        </td>
+                        <td>
+                            <span class="badge 
+                                {{ optional($user->staff)->status === 'approved' ? 'status-active' : (optional($user->staff)->status === 'pending' ? 'status-pending' : 'status-inactive') }}">
+                                {{ ucfirst(optional($user->staff)->status ?? $user->status) }}
+                            </span>
+                        </td>
                         <td class="actions flex gap-1">
                             <a href="{{ route('admin.users.edit', $user->user_id) }}" class="btn btn-warning">✏ Edit</a>
                             <form method="POST" action="{{ route('admin.users.destroy', $user->user_id) }}" onsubmit="return confirm('Are you sure you want to delete this user?');">
@@ -71,7 +91,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-center">No staff accounts found.</td>
+                        <td colspan="8" class="text-center">No staff accounts found.</td>
                     </tr>
                 @endforelse
             </tbody>

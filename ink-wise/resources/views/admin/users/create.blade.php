@@ -4,7 +4,7 @@
 
 @section('content')
 <div class="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-md mt-10">
-      <link rel="stylesheet" href="{{ asset('css/admin-css/create_account.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/admin-css/create_account.css') }}">
     <h2 class="text-2xl font-bold text-gray-800 mb-6">Create Staff Account</h2>
 
     @if(session('success'))
@@ -24,7 +24,8 @@
         </div>
     @endif
 
-<form method="POST" action="{{ route('admin.users.store') }}">        @csrf
+    <form method="POST" action="{{ route('admin.users.store') }}">
+        @csrf
 
         {{-- First Name --}}
         <div class="mb-4">
@@ -62,11 +63,45 @@
             <input type="password" name="password" class="w-full px-3 py-2 border rounded-lg" required>
         </div>
 
+        {{-- Address Fields --}}
+        <h3 class="text-lg font-semibold text-gray-700 mb-4 mt-6">📍 Address</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Street</label>
+                <input type="text" name="street" value="{{ old('street') }}" class="w-full px-3 py-2 border rounded-lg">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Barangay</label>
+                <input type="text" name="barangay" value="{{ old('barangay') }}" class="w-full px-3 py-2 border rounded-lg">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700">City</label>
+                <input type="text" name="city" value="{{ old('city') }}" class="w-full px-3 py-2 border rounded-lg">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Province</label>
+                <input type="text" name="province" value="{{ old('province') }}" class="w-full px-3 py-2 border rounded-lg">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Postal Code</label>
+                <input type="text" name="postal_code" value="{{ old('postal_code') }}" class="w-full px-3 py-2 border rounded-lg">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Country</label>
+                <input type="text" name="country" value="{{ old('country') }}" class="w-full px-3 py-2 border rounded-lg">
+            </div>
+        </div>
+
         {{-- Hidden Fields --}}
         <input type="hidden" name="role" value="staff">
         <input type="hidden" name="status" value="pending"> {{-- Newly created accounts are pending --}}
 
-        <div class="flex justify-end">
+        <div class="flex justify-end mt-6">
             <button type="submit" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
                 Create Account
             </button>

@@ -12,16 +12,19 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('staff', function (Blueprint $table) {
-            $table->id('staff_id');
+            // ❌ don't use auto-increment
+            $table->integer('staff_id')->primary(); // 4-digit random ID
+            
             $table->foreignId('user_id')
                   ->constrained('users', 'user_id')
-                  ->onDelete('cascade'); // ✅ correct FK column
+                  ->onDelete('cascade');
+            
             $table->enum('role', ['admin', 'owner', 'staff'])->default('staff');
-                  $table->string('first_name');
+            $table->string('first_name');
             $table->string('middle_name')->nullable();
             $table->string('last_name');
             $table->string('contact_number');
-             $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
+            $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
             $table->timestamps();
         });
     }

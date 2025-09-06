@@ -20,7 +20,6 @@ return new class extends Migration
             $table->string('middle_name')->nullable();
             $table->string('last_name');
             $table->string('contact_number')->nullable();
-            $table->unsignedBigInteger('address_id')->nullable();
             $table->timestamps();
 
             // Optional: if you have an addresses table

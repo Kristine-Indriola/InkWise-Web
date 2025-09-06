@@ -60,16 +60,50 @@
             <input type="text" name="contact_number" value="{{ old('contact_number', $admin->staff->contact_number ?? '') }}" class="profile-input">
         </div>
 
+        {{-- Address Fields --}}
+        <h3 class="text-lg font-semibold text-gray-700 mb-4 mt-6">📍 Address</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="profile-label">Street</label>
+                <input type="text" name="street" value="{{ old('street', $admin->address->street ?? '') }}" class="profile-input">
+            </div>
+
+            <div>
+                <label class="profile-label">Barangay</label>
+                <input type="text" name="barangay" value="{{ old('barangay', $admin->address->barangay ?? '') }}" class="profile-input">
+            </div>
+
+            <div>
+                <label class="profile-label">City</label>
+                <input type="text" name="city" value="{{ old('city', $admin->address->city ?? '') }}" class="profile-input">
+            </div>
+
+            <div>
+                <label class="profile-label">Province</label>
+                <input type="text" name="province" value="{{ old('province', $admin->address->province ?? '') }}" class="profile-input">
+            </div>
+
+            <div>
+                <label class="profile-label">Postal Code</label>
+                <input type="text" name="postal_code" value="{{ old('postal_code', $admin->address->postal_code ?? '') }}" class="profile-input">
+            </div>
+
+            <div>
+                <label class="profile-label">Country</label>
+                <input type="text" name="country" value="{{ old('country', $admin->address->country ?? '') }}" class="profile-input">
+            </div>
+        </div>
+
         {{-- Password --}}
-        <div class="mb-4">
+        <div class="mb-4 mt-6">
             <label class="profile-label">New Password (leave blank to keep current)</label>
             <input type="password" name="password" class="profile-input">
         </div>
 
         <div class="flex justify-end mt-6">
-    <a href="{{ route('admin.profile.show') }}" class="profile-cancel mr-2">✖ Cancel</a>
-    <button type="submit" class="profile-btn">💾 Save Changes</button>
-</div>
+            <a href="{{ route('admin.profile.show') }}" class="profile-cancel mr-2">✖ Cancel</a>
+            <button type="submit" class="profile-btn">💾 Save Changes</button>
+        </div>
     </form>
 </div>
 @endsection

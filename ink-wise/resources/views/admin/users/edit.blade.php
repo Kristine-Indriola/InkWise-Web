@@ -69,6 +69,39 @@
             </div>
         </div>
 
+        <!-- Address Section -->
+        <h3 class="mt-6 mb-2">📍 Address</h3>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Street</label>
+                <input type="text" name="street" value="{{ old('street', $user->staff->address->street ?? '') }}">
+            </div>
+            <div class="form-group">
+                <label>Barangay</label>
+                <input type="text" name="barangay" value="{{ old('barangay', $user->staff->address->barangay ?? '') }}">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>City</label>
+                <input type="text" name="city" value="{{ old('city', $user->staff->address->city ?? '') }}">
+            </div>
+            <div class="form-group">
+                <label>Province</label>
+                <input type="text" name="province" value="{{ old('province', $user->staff->address->province ?? '') }}">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Postal Code</label>
+                <input type="text" name="postal_code" value="{{ old('postal_code', $user->staff->address->postal_code ?? '') }}">
+            </div>
+            <div class="form-group">
+                <label>Country</label>
+                <input type="text" name="country" value="{{ old('country', $user->staff->address->country ?? '') }}">
+            </div>
+        </div>
+
         <!-- Status -->
         <div class="form-row">
             <div class="form-group full-width">

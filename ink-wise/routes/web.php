@@ -46,6 +46,9 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
 
     // Update profile
     Route::put('/profile/update', [AdminController::class, 'update'])->name('profile.update');
+
+    Route::get('/admin/users/{id}', [UserManagementController::class, 'show'])
+     ->name('admin.users.show');
     
     // Templates 
     Route::prefix('templates')->name('templates.')->group(function () { 
@@ -252,7 +255,7 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::post('/staff/{staff}/reject', [OwnerController::class, 'rejectStaff'])->name('staff.reject');
 
 
-    // Other pages
+    // Other pagesgut
     Route::get('/order/workflow', fn () => view('owner.order-workflow'))->name('order.workflow');
     Route::get('/inventory/track', fn () => view('owner.inventory-track'))->name('inventory-track');
     Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
