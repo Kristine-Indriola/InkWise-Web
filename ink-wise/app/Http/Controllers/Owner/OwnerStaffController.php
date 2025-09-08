@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Owner;
 use App\Models\Staff;
 use App\Http\Controllers\Controller;
 
-class OwnerController extends Controller
+class OwnerStaffController extends Controller
 {
     public function index()
     {
@@ -32,7 +32,7 @@ class OwnerController extends Controller
         $staff->update(['status' => 'approved']);
         $staff->user?->update(['status' => 'active']);
 
-        return back()->with('success', 'Staff approved successfully.');
+        return back()->with('success', 'Staff Approved Successfully.');
     }
 
     public function rejectStaff($staff_id)
