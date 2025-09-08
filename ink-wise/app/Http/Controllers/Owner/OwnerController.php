@@ -47,7 +47,7 @@ class OwnerController extends Controller
             $staff->user->update(['status' => 'active']);
         }
 
-        return back()->with('success', 'Staff approved successfully.');
+        return redirect()->route('owner.staff.index', ['pending' => 'open'])->with('success', 'Staff Approved Successfully!');
     }
 
     // Reject staff

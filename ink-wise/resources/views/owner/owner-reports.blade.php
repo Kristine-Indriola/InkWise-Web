@@ -1,9 +1,9 @@
 @extends('layouts.owner.app')
-@include('layouts.owner.sidebar')
 @section('content')
+@include('layouts.owner.sidebar')
   <section class="main-content">
     <div class="topbar">
-      <!-- Welcome Text (left-aligned) -->
+      
       <div class="welcome-text"><strong>Welcome, Owner!</strong></div>
 
       <!-- Actions: Notification Icon and Logout Button (right-aligned) -->

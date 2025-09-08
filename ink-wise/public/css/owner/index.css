@@ -73,12 +73,16 @@ body {
   white-space: nowrap; /* keep text on one line */
 }
 
-.sidebar-btn:hover {
-  background: #f7faff;
+.sidebar-btn:hover,
+.sidebar-btn:focus,
+.sidebar-btn:active {
+  background: #e3f0ff;
+  outline: none;
+  transition: background 0.2s, color 0.2s;
 }
 
-.sidebar-btn:active {
-  background: #eef4ff;
+.sidebar-btn.active {
+  background: #e3f0ff;
 }
 
 .navlist span.text {
@@ -115,6 +119,21 @@ body {
   flex: 1; /* Take up the remaining space */
   padding: 20px;
   background-color: #f8f9fa; 
+  min-width:0;
+}
+
+/* page-level wrapper you can reuse */
+.page-inner{
+  max-width: 1200px;          /* adjust to taste (e.g., 1280px) */
+  margin: 0 auto;             /* center the content */
+}
+
+/* optional: a panel look for sections */
+.panel{
+  background:#fff;
+  border:1px solid #e6e8ef;
+  border-radius:12px;
+  padding:18px;
 }
 
 /* Topbar */
