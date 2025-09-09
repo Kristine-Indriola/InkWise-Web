@@ -6,19 +6,16 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('staff', function (Blueprint $table) {
-            // ❌ don't use auto-increment
-            $table->integer('staff_id')->primary(); // 4-digit random ID
-            
+            // Custom staff_id (no auto-increment)
+            $table->unsignedBigInteger('staff_id')->primary();
+
             $table->foreignId('user_id')
                   ->constrained('users', 'user_id')
                   ->onDelete('cascade');
-            
+
             $table->enum('role', ['admin', 'owner', 'staff'])->default('staff');
             $table->string('first_name');
             $table->string('middle_name')->nullable();
@@ -29,9 +26,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('staff');

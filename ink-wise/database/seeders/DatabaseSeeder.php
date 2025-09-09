@@ -99,6 +99,7 @@ class DatabaseSeeder extends Seeder
             [
                 'user_id'    => $staff1->user_id,
                 'street'     => '123 Main St',
+                'barangay'   => 'Quezon',
                 'city'       => 'Quezon City',
                 'province'   => 'Metro Manila',
                 'postal_code'=> '1100',
@@ -109,6 +110,7 @@ class DatabaseSeeder extends Seeder
             [
                 'user_id'    => $staff2->user_id,
                 'street'     => '456 Sampaguita Ave',
+                'barangay'   => 'Quezon',
                 'city'       => 'Makati',
                 'province'   => 'Metro Manila',
                 'postal_code'=> '1200',
@@ -120,6 +122,7 @@ class DatabaseSeeder extends Seeder
 
                 'user_id'    => $owner->user_id,
                 'street'     => '123 Main St',
+                'barangay'   => 'Quezon',
                 'city'       => 'Quezon City',
                 'province'   => 'Metro Manila',
                 'postal_code'=> '1100',
@@ -130,6 +133,7 @@ class DatabaseSeeder extends Seeder
             [
                 'user_id'    => $admin->user_id,
                 'street'     => '456 Sampaguita Ave',
+                'barangay'   => 'Quezon',
                 'city'       => 'Makati',
                 'province'   => 'Metro Manila',
                 'postal_code'=> '1200',
