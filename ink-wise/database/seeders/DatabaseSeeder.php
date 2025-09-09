@@ -36,10 +36,10 @@ class DatabaseSeeder extends Seeder
         // Staff accounts (pending)
         // --------------------
         $staff1 = User::create([
-            'email'    => 'staff1@test.com',
+            'email'    => 'staff@test.com',
             'password' => Hash::make('staff123'),
             'role'     => 'staff',
-            'status'   => 'inactive',
+            'status'   => 'active',
         ]);
 
         $staff2 = User::create([
@@ -75,11 +75,11 @@ class DatabaseSeeder extends Seeder
         Staff::create([
             'user_id'        => $staff1->user_id,
             'role'           => 'staff',
-            'first_name'     => 'John',
+            'first_name'     => 'Staff',
             'middle_name'    => 'M.',
-            'last_name'      => 'Doe',
+            'last_name'      => 'Test',
             'contact_number' => '0917-111-1111',
-            'status'         => 'pending',
+            'status'         => 'approved',
         ]);
 
         Staff::create([
