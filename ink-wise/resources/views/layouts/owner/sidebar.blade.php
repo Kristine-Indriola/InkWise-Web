@@ -1,10 +1,13 @@
+@extends('layouts.owner.app')
+
 <aside class="sidebar">
   <h2>InkWise</h2>
 
   <div class="profile">
     <div class="avatar">👤</div>
     <div>
-      <div style="font-weight:700;">Owner Profile</div>
+      <div style="font-weight:700;"><a href="{{ route('owner.profile.show') }}">Owner Profile </a>
+</div>
       <div style="color:#64748b;font-size:12px;">{{ auth('owner')->user()->email ?? 'owner@example.com' }}</div>
     </div>
   </div>

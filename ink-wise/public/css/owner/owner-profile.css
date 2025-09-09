@@ -1,0 +1,95 @@
+/* === Container === */
+.profile-container {
+    max-width: 720px;
+    margin: 3rem auto;
+    padding: 2rem;
+    background: #ffffff;
+    border-radius: 1.25rem;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+}
+
+/* === Avatar === */
+.profile-avatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    border: 4px solid #4F46E5;
+    object-fit: cover;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+/* === Labels and Info === */
+.profile-label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #4B5563;
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.profile-info {
+    font-size: 1rem;
+    color: #111827;
+    padding: 0.5rem 0.75rem;
+    background: #F9FAFB;
+    border: 1px solid #E5E7EB;
+    border-radius: 0.5rem;
+}
+
+/* === Section Title === */
+h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.5rem;
+}
+
+/* === Edit Button === */
+.profile-btn {
+    display: inline-block;
+    padding: 0.6rem 1.2rem;
+    background: #4F46E5;
+    color: #fff;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    text-decoration: none;
+    transition: all 0.2s ease-in-out;
+}
+
+.profile-btn:hover {
+    background: #4338CA;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(79,70,229,0.4);
+}
+
+/* === Alerts === */
+.text-red-600 {
+    color: #DC2626;
+}
+
+/* === Responsive === */
+@media (max-width: 768px) {
+    .profile-container {
+        padding: 1.5rem;
+    }
+
+    .profile-avatar {
+        width: 100px;
+        height: 100px;
+    }
+
+    .profile-info {
+        font-size: 0.95rem;
+    }
+}
+
+.section-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 1rem;
+    border-left: 4px solid #4F46E5;
+    padding-left: 0.5rem;
+}
