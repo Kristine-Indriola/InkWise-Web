@@ -5,16 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Staff Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Cinzel:wght@600&display=swap" rel="stylesheet">
+
+  <style>
+    .logo-script {
+      font-family: 'Great Vibes', cursive;
+    }
+    .logo-serif {
+      font-family: 'Cinzel', serif;
+    }
+  </style>
 </head>
 <body class="bg-gray-100 font-sans">
 
   <div class="flex h-screen">
-    
+   
     <!-- Sidebar -->
     <aside class="w-64 bg-white border-r flex flex-col">
-      <div class="p-4 text-2xl font-bold text-purple-700 border-b"> 
-        <span class="italic">Inkwise</span>
+      <div class="p-4 text-2xl font-bold text-purple-700 border-b flex items-center">
+        <span class="logo-script text-4xl text-purple-500">I</span>
+        <span class="logo-serif text-2xl ml-1 text-blue-600">nkwise</span>
       </div>
+
       <div class="p-4 flex items-center border-b">
         <img src="https://via.placeholder.com/40" class="rounded-full mr-3">
         <div>
@@ -22,6 +36,7 @@
           <span class="text-green-500 text-sm">● Online</span>
         </div>
       </div>
+     
       <nav class="flex-1 p-4">
         <ul class="space-y-2">
           <li><a href="{{ route('staff.dashboard') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Dashboard</a></li>
@@ -38,7 +53,7 @@
 
     <!-- Main Content -->
     <main class="flex-1 flex flex-col">
-      
+     
       <!-- Top Bar -->
       <header class="flex justify-between items-center bg-white p-4 border-b">
         <h1 class="text-xl font-bold">Welcome, Staff!</h1>
@@ -54,8 +69,9 @@
           </form>
         </div>
       </header>
-
+     
       <!-- Dashboard Stats -->
+       <!--
       <section class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
         <div class="bg-white p-6 rounded-lg shadow text-center border border-purple-400">
           <p class="text-3xl font-bold">12</p>
@@ -70,8 +86,9 @@
           <p class="text-gray-500">customers</p>
         </div>
       </section>
-
+  -->
       <!-- Page Content -->
+   
       <section class="p-6">
         @yield('content')
       </section>
@@ -80,3 +97,4 @@
 
 </body>
 </html>
+

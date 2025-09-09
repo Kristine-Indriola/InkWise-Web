@@ -1,0 +1,96 @@
+/* staff.css */
+
+/* General layout */
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f9f9fb;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 220px;
+  background: #fff;
+  border-right: 1px solid #ccc;
+  padding: 1rem;
+  height: 100vh;
+}
+
+.sidebar h2 {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-bottom: 1.5rem;
+  color: #6a0dad; /* InkWise purple */
+}
+
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+}
+
+.sidebar ul li {
+  margin: 0.8rem 0;
+}
+
+.sidebar ul li a {
+  text-decoration: none;
+  color: #333;
+  display: flex;
+  align-items: center;
+  font-size: 0.95rem;
+}
+
+.sidebar ul li a:hover {
+  color: #6a0dad;
+}
+
+/* Dashboard content */
+.dashboard {
+  flex-grow: 1;
+  padding: 2rem;
+}
+
+.dashboard h1 {
+  font-size: 1.8rem;
+  margin-bottom: 2rem;
+}
+
+/* Cards */
+.dashboard-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
+}
+
+.card {
+  background: #fff;
+  padding: 2rem;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  text-align: center;
+  transition: 0.3s;
+}
+
+.card:hover {
+  border-color: #6a0dad; /* hover purple border */
+}
+
+.card h2 {
+  font-size: 2rem;
+  color: #000;
+  margin-bottom: 0.5rem;
+}
+
+.card p {
+  font-size: 1rem;
+  color: #555;
+}
+
+/* Top bar */
+.topbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background: #fff;
+  border-bottom: 2px solid #6a0dad;
+}
