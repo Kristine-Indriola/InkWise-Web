@@ -3,109 +3,110 @@
 @section('title', 'Create Staff Account')
 
 @section('content')
-<div class="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-md mt-10">
-    <link rel="stylesheet" href="{{ asset('css/admin-css/create_account.css') }}">
-    <h2 class="text-2xl font-bold text-gray-800 mb-6">Create Staff Account</h2>
+<div class="container">
+    <div class="card">
+          <link rel="stylesheet" href="{{ asset('css/edit-users.css') }}">
+        <h2 class="form-title">➕ Create Staff Account</h2>
 
-    @if(session('success'))
-        <div class="mb-4 p-3 bg-green-100 text-green-800 rounded-lg">
-            {{ session('success') }}
-        </div>
-    @endif
+        {{-- Success Message --}}
+        @if(session('success'))
+            <div class="alert success">
+                {{ session('success') }}
+            </div>
+        @endif
 
-    {{-- Display Validation Errors --}}
-    @if ($errors->any())
-        <div class="mb-4 p-3 bg-red-100 text-red-800 rounded-lg">
-            <ul>
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </div>
-    @endif
+        {{-- Validation Errors --}}
+        @if ($errors->any())
+            <div class="alert error">
+                <ul>
+                    @foreach ($errors->all() as $error)
+                        <li>⚠️ {{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
 
-    <form method="POST" action="{{ route('admin.users.store') }}">
-        @csrf
+        <form method="POST" action="{{ route('admin.users.store') }}">
+            @csrf
 
-        {{-- First Name --}}
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">First Name</label>
-            <input type="text" name="first_name" value="{{ old('first_name') }}" class="w-full px-3 py-2 border rounded-lg" required>
-        </div>
-
-        {{-- Middle Name --}}
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">Middle Name</label>
-            <input type="text" name="middle_name" value="{{ old('middle_name') }}" class="w-full px-3 py-2 border rounded-lg">
-        </div>
-
-        {{-- Last Name --}}
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">Last Name</label>
-            <input type="text" name="last_name" value="{{ old('last_name') }}" class="w-full px-3 py-2 border rounded-lg" required>
-        </div>
-
-        {{-- Contact Number --}}
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">Contact Number</label>
-            <input type="text" name="contact_number" value="{{ old('contact_number') }}" class="w-full px-3 py-2 border rounded-lg" required>
-        </div>
-
-        {{-- Email --}}
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">Email</label>
-            <input type="email" name="email" value="{{ old('email') }}" class="w-full px-3 py-2 border rounded-lg" required>
-        </div>
-
-        {{-- Password --}}
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">Password</label>
-            <input type="password" name="password" class="w-full px-3 py-2 border rounded-lg" required>
-        </div>
-
-        {{-- Address Fields --}}
-        <h3 class="text-lg font-semibold text-gray-700 mb-4 mt-6">📍 Address</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Street</label>
-                <input type="text" name="street" value="{{ old('street') }}" class="w-full px-3 py-2 border rounded-lg">
+            <!-- Name Section -->
+            <h3 class="section-title">👤 Personal Information</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>First Name</label>
+                    <input type="text" name="first_name" value="{{ old('first_name') }}" required>
+                </div>
+                <div class="form-group">
+                    <label>Middle Name</label>
+                    <input type="text" name="middle_name" value="{{ old('middle_name') }}">
+                </div>
+                <div class="form-group">
+                    <label>Last Name</label>
+                    <input type="text" name="last_name" value="{{ old('last_name') }}" required>
+                </div>
             </div>
 
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Barangay</label>
-                <input type="text" name="barangay" value="{{ old('barangay') }}" class="w-full px-3 py-2 border rounded-lg">
+            <!-- Contact -->
+            <div class="form-group">
+                <label>Contact Number</label>
+                <input type="text" name="contact_number" value="{{ old('contact_number') }}" required>
             </div>
 
-            <div>
-                <label class="block text-sm font-medium text-gray-700">City</label>
-                <input type="text" name="city" value="{{ old('city') }}" class="w-full px-3 py-2 border rounded-lg">
+            <!-- Email + Password -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" name="email" value="{{ old('email') }}" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" name="password" required>
+                </div>
             </div>
 
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Province</label>
-                <input type="text" name="province" value="{{ old('province') }}" class="w-full px-3 py-2 border rounded-lg">
+            <!-- Address -->
+            <h3 class="section-title">📍 Address</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Street</label>
+                    <input type="text" name="street" value="{{ old('street') }}">
+                </div>
+                <div class="form-group">
+                    <label>Barangay</label>
+                    <input type="text" name="barangay" value="{{ old('barangay') }}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>City</label>
+                    <input type="text" name="city" value="{{ old('city') }}">
+                </div>
+                <div class="form-group">
+                    <label>Province</label>
+                    <input type="text" name="province" value="{{ old('province') }}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Postal Code</label>
+                    <input type="text" name="postal_code" value="{{ old('postal_code') }}">
+                </div>
+                <div class="form-group">
+                    <label>Country</label>
+                    <input type="text" name="country" value="{{ old('country') }}">
+                </div>
             </div>
 
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Postal Code</label>
-                <input type="text" name="postal_code" value="{{ old('postal_code') }}" class="w-full px-3 py-2 border rounded-lg">
+            <!-- Hidden Fields -->
+            <input type="hidden" name="role" value="staff">
+            <input type="hidden" name="status" value="pending">
+
+            <!-- Buttons -->
+            <div class="form-actions">
+                <button type="submit" class="btn-primary">💼 Create Account</button>
+                <a href="{{ url()->previous() }}" class="btn-secondary">❌ Cancel</a>
             </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Country</label>
-                <input type="text" name="country" value="{{ old('country') }}" class="w-full px-3 py-2 border rounded-lg">
-            </div>
-        </div>
-
-        {{-- Hidden Fields --}}
-        <input type="hidden" name="role" value="staff">
-        <input type="hidden" name="status" value="pending"> {{-- Newly created accounts are pending --}}
-
-        <div class="flex justify-end mt-6">
-            <button type="submit" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-                Create Account
-            </button>
-        </div>
-    </form>
+        </form>
+    </div>
 </div>
 @endsection

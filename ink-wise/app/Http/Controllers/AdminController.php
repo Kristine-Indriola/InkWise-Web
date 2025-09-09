@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Material;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -10,7 +11,8 @@ class AdminController extends Controller
 {
     public function index()
     {
-        return view('admin.dashboard');
+         $materials = Material::with('inventory')->get();
+    return view('admin.dashboard', compact('materials'));
     }
 
     // Show profile info

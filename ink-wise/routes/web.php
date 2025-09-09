@@ -15,6 +15,7 @@ use App\Http\Controllers\AdminCustomerController;
 use App\Http\Controllers\Admin\MaterialController;
 use App\Http\Controllers\Auth\RoleLoginController;
 use App\Http\Controllers\Admin\InventoryController;
+use App\Http\Controllers\Admin\MaterialsController;
 use App\Http\Controllers\customerProfileController;
 use App\Http\Controllers\Auth\CustomerAuthController;
 use App\Http\Controllers\Customer\CustomerController;
@@ -48,8 +49,13 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::put('/profile/update', [AdminController::class, 'update'])->name('profile.update');
 
     Route::get('/admin/users/{id}', [UserManagementController::class, 'show'])
-     ->name('admin.users.show');
+     ->name('admin.users.show'); 
+
+     Route::get('/materials/notification', [MaterialController::class, 'notification'])
+     ->name('admin.materials.notification');
+
     
+
     // Templates 
     Route::prefix('templates')->name('templates.')->group(function () { 
     Route::get('/', [AdminTemplateController::class, 'index'])->name('index'); 
@@ -59,14 +65,16 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     
     // ✅ User Management 
 
-    Route::prefix('users')->name('users.')->group(function () {
-        Route::get('/', [UserManagementController::class, 'index'])->name('index');        // admin.users.index
-        Route::get('/create', [UserManagementController::class, 'create'])->name('create'); // admin.users.create
-        Route::post('/', [UserManagementController::class, 'store'])->name('store');        // admin.users.store
-        Route::get('/{user_id}/edit', [UserManagementController::class, 'edit'])->name('edit');    // admin.users.edit
-        Route::put('/{user_id}', [UserManagementController::class, 'update'])->name('update');    // admin.users.update
-        Route::delete('/{user_id}', [UserManagementController::class, 'destroy'])->name('destroy'); // admin.users.destroy
-    });
+  Route::prefix('users')->name('users.')->group(function () {
+    Route::get('/', [UserManagementController::class, 'index'])->name('index');
+    Route::get('/create', [UserManagementController::class, 'create'])->name('create');
+    Route::post('/', [UserManagementController::class, 'store'])->name('store');
+    Route::get('/{user_id}', [UserManagementController::class, 'show'])->name('show'); // ✅ Added
+    Route::get('/{user_id}/edit', [UserManagementController::class, 'edit'])->name('edit');
+    Route::put('/{user_id}', [UserManagementController::class, 'update'])->name('update');
+    Route::delete('/{user_id}', [UserManagementController::class, 'destroy'])->name('destroy');
+});
+
 
 
 

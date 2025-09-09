@@ -11,8 +11,8 @@ class Staff extends Model
 
     protected $table = 'staff';
     protected $primaryKey = 'staff_id';
-    public $incrementing = false; // 🔑 not auto-increment
-    protected $keyType = 'int';   // 🔑 integer type
+    public $incrementing = false; // ❌ stop auto-increment
+    protected $keyType = 'int';   // staff_id is an integer
 
     protected $fillable = [
         'user_id',
@@ -24,20 +24,6 @@ class Staff extends Model
         'status',
     ];
 
-    // 🔥 Auto-generate random 4-digit staff_id
-    protected static function booted()
-    {
-        static::creating(function ($staff) {
-            if (!$staff->staff_id) {
-                do {
-                    $randomId = rand(1000, 9999); // generate 4-digit random
-                } while (self::where('staff_id', $randomId)->exists()); // ensure uniqueness
-
-                $staff->staff_id = $randomId;
-            }
-        });
-    }
-
     // Relationship to User
     public function user()
     {
@@ -47,5 +33,21 @@ class Staff extends Model
     public function address()
     {
         return $this->hasOne(Address::class, 'user_id', 'user_id');
+    }
+
+    // 🔹 Auto-generate random staff_id when creating
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($staff) {
+            if (empty($staff->staff_id)) {
+                do {
+                    $randomId = random_int(1000, 9999); // 🎲 4-digit random ID
+                } while (self::where('staff_id', $randomId)->exists());
+
+                $staff->staff_id = $randomId;
+            }
+        });
     }
 }
