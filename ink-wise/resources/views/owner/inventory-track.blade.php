@@ -1,3 +1,7 @@
+@php
+    $materials = $materials ?? collect();
+@endphp
+
 @extends('layouts.owner.app')
 
 @push('styles')

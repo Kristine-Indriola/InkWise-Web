@@ -9,10 +9,11 @@ use App\Http\Controllers\Controller;
 class OwnerInventoryController extends Controller
 {
     public function index()
-    {
-        $materials = \App\Models\Material::with('inventory')->get();
-        return view('owner.inventory-track', compact('materials'));
-    }
+{
+    $materials = Material::with('inventory')->get();
+    return view('owner.inventory-track', compact('materials')); 
+    // Blade path must be: resources/views/owner/inventory-track.blade.php
+}
 
   public function track(Request $request)
 {
