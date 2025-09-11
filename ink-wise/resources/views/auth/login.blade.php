@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>InkWise System - Owner Login</title>
+    <title>InkWise System - Login</title>
     <style>
         body {
             margin: 0;
@@ -112,21 +112,39 @@
     </video>
 
     <div class="login-container">
-        <h1>InkWise System - User Login</h1>
-        <form method="POST" action="{{ route('login.submit') }}">
-            @csrf
-            <input type="email" name="email" placeholder="Enter Email" required>
-            <input type="password" name="password" placeholder="Enter Password" required id="passwordField" class="password-field">
-            <div class="show-password">
-                <input type="checkbox" id="togglePassword">
-                <label for="togglePassword">Show Password</label>
-            </div>
-            <button type="submit">Login</button>
-        </form>
+    <h1>InkWise System - User Login</h1>
+
+    {{-- 🔴 Show error messages --}}
+    @if($errors->has('login_error'))
+        <div style="color: red; margin-bottom: 12px; text-align: center; font-size: 14px;">
+            {{ $errors->first('login_error') }}
+        </div>
+    @endif
+
+    {{-- 🟢 Show success messages (like logout) --}}
+    @if(session('success'))
+        <div style="color: green; margin-bottom: 12px; text-align: center; font-size: 14px;">
+            {{ session('success') }}
+        </div>
+    @endif
+
+    <form method="POST" action="{{ route('login.submit') }}">
+        @csrf
+        <input type="email" name="email" placeholder="Enter Email" required>
+        <input type="password" name="password" placeholder="Enter Password" required id="passwordField" class="password-field">
+        <div class="show-password">
+            <input type="checkbox" id="togglePassword">
+            <label for="togglePassword">Show Password</label>
+        </div>
+        <button type="submit">Login</button>
+    </form>
+
     <div class="role-hint">
         Use your registered email and password. <br>
         (Works for <strong>Owner</strong> and <strong>Staff</strong> accounts)
     </div>
+</div>
+
 
 
     </div>

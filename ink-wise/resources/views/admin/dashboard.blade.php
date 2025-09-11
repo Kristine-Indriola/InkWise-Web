@@ -3,6 +3,15 @@
 @section('title', 'Dashboard')
 
 @section('content')
+
+  {{-- ✅ Greeting Message --}}
+  @if(session('success'))
+      <div id="greetingMessage" 
+           style="background: #dff0d8; color: #3c763d; padding: 12px; border-radius: 6px; margin-bottom: 20px; transition: opacity 1s ease;">
+          {{ session('success') }}
+      </div>
+  @endif
+
   <div class="cards">
     <div class="card">
       <div>🛒</div>
@@ -75,4 +84,16 @@
       background-color: #f1f1f1;
     }
   </style>
+
+  <script>
+    // Auto-hide greeting after 4 seconds
+    setTimeout(() => {
+        const greeting = document.getElementById('greetingMessage');
+        if (greeting) {
+            greeting.style.opacity = '0'; // fade out
+            setTimeout(() => greeting.remove(), 1000); // remove after fade
+        }
+    }, 4000);
+  </script>
+
 @endsection

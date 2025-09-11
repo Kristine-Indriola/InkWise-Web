@@ -65,6 +65,16 @@ public function index(Request $request)
         });
     }
 
+        if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('material_name', 'like', "%{$search}%")
+              ->orWhere('material_type', 'like', "%{$search}%")
+              ->orWhere('unit', 'like', "%{$search}%");
+        });
+    }
+
+
     $materials = $query->get();
 
     return view('admin.materials.index', compact('materials'));
@@ -86,7 +96,7 @@ public function update(Request $request, $id)
         'unit_cost'      => 'required|numeric|min:0',
         'stock_level'    => 'required|integer|min:0',
         'reorder_level'  => 'required|integer|min:0',
-        'remarks'        => 'nullable|string',
+        // removed remarks validation since it's automatic
     ]);
 
     // ✅ Update Material
@@ -99,25 +109,35 @@ public function update(Request $request, $id)
         'date_updated'  => now(),
     ]);
 
+    // ✅ Auto-generate remarks based on stock
+    $stockLevel   = $request->stock_level;
+    $reorderLevel = $request->reorder_level;
+    $remarks = 'In Stock';
+
+    if ($stockLevel <= 0) {
+        $remarks = 'Out of Stock';
+    } elseif ($stockLevel > 0 && $stockLevel <= $reorderLevel) {
+        $remarks = 'Low Stock';
+    }
+
     // ✅ Update or create Inventory
     if ($material->inventory) {
         $material->inventory->update([
-            'stock_level'   => $request->stock_level,
-            'reorder_level' => $request->reorder_level,
-            'remarks'       => $request->remarks,
+            'stock_level'   => $stockLevel,
+            'reorder_level' => $reorderLevel,
+            'remarks'       => $remarks,
         ]);
     } else {
         $material->inventory()->create([
-            'stock_level'   => $request->stock_level,
-            'reorder_level' => $request->reorder_level,
-            'remarks'       => $request->remarks,
+            'stock_level'   => $stockLevel,
+            'reorder_level' => $reorderLevel,
+            'remarks'       => $remarks,
         ]);
     }
 
     return redirect()->route('admin.materials.index')
                      ->with('success', 'Material updated successfully with inventory.');
 }
-
 
 public function destroy($id)
 {
