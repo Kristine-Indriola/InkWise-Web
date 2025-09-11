@@ -8,45 +8,34 @@ use App\Http\Controllers\Controller;
 
 class OwnerInventoryController extends Controller
 {
-    public function index()
-{
-    $materials = Material::with('inventory')->get();
-    return view('owner.inventory-track', compact('materials')); 
-    // Blade path must be: resources/views/owner/inventory-track.blade.php
-}
+    public function index(Request $request)
+    {
+        $query = $request->input('search');
+
+        $materials = Material::with('inventory')
+            ->when($query, function ($q) use ($query) {
+                $q->where('material_name', 'like', "%$query%")
+                  ->orWhere('material_type', 'like', "%$query%");
+            })
+            ->get();
+
+        return view('owner.inventory-track', compact('materials')); 
+        // Blade path: resources/views/owner/inventory-track.blade.php
+    }
 
   public function track(Request $request)
 {
-    $materials = Material::with('inventory')->get();
+    $query = \App\Models\Material::with('inventory');
 
-    if ($request->status === 'low') {
-        $materials = $materials->filter(function ($m) {
-            $stock = $m->inventory->stock_level ?? 0;
-            $reorder = $m->inventory->reorder_level ?? 0;
-            return $stock > 0 && $stock <= $reorder;
+    if ($search = $request->input('search')) {
+        $query->where(function($q) use ($search) {
+            $q->where('material_name', 'like', "%{$search}%")
+              ->orWhere('material_type', 'like', "%{$search}%");
         });
     }
 
-    if ($request->status === 'out') {
-        $materials = $materials->filter(function ($m) {
-            $stock = $m->inventory->stock_level ?? 0;
-            return $stock == 0;
-        });
-    }
+    $materials = $query->get();
 
-    return view('owner.inventory.track', compact('materials'));
+    return view('owner.inventory-track', compact('materials'));
 }
-
-    public function searchMaterials(Request $request)
-        {
-            // Get the search query from the request
-            $query = $request->input('search');
-            
-            $materials = Material::where('material_name', 'like', "%$query%")
-                                ->orWhere('material_type', 'like', "%$query%")
-                                ->get();
-
-            return view('owner.materials.index', compact('materials'));
-        }
-
 }
