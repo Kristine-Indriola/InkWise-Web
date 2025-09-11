@@ -4,18 +4,27 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>@yield('title', 'InkWise Dashboard')</title>
+    <!-- Page-specific CSS -->
+  @stack('styles')
+
+  <!-- Font Awesome -->
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&display=swap" rel="stylesheet">
+
   <style>
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
-      font-family: "Segoe UI", Tahoma, sans-serif;
+       font-family: 'Nunito', sans-serif;
+       font-weight: 600;
     }
 
     body {
       background: #f4f6f9;
       display: flex;
       min-height: 100vh;
+       font-family: 'Nunito', sans-serif;
+       font-weight: 600;
     }
 
     /* Sidebar */
@@ -40,11 +49,13 @@
       height: 55px;
       border-radius: 50%;
       margin-right: 12px;
-      border: 2px solid #6a2ebc;
+      border: 2px solid #8c52ff;
     }
 
     .sidebar .profile strong {
       font-size: 15px;
+       font-family: 'Nunito', sans-serif;
+    font-weight: 600;
       color: #333;
     }
 
@@ -60,6 +71,8 @@
       padding: 10px;
       border-radius: 8px;
       transition: 0.2s;
+       font-family: 'Nunito', sans-serif;
+    font-weight: 600;
     }
 
     .sidebar ul li i {
@@ -68,7 +81,7 @@
 
     .sidebar ul li:hover,
     .sidebar ul li.active {
-      background: #6a2ebc;
+      background: #8c52ff;
       color: #fff;
       cursor: pointer;
     }
@@ -111,6 +124,8 @@
       text-decoration: none;
       transition: 0.3s ease;
       cursor: pointer;
+       font-family: 'Nunito', sans-serif;
+    font-weight: 600;
     }
 
     .topbar .icons .notif-btn {
@@ -122,6 +137,8 @@
       background: #f44336;
       color: white;
       font-weight: bold;
+       font-family: 'Nunito', sans-serif;
+    font-weight: 600;
     }
 
     .topbar .icons .settings-btn {
@@ -166,6 +183,8 @@
       font-size: 14px;
       box-shadow: 0 4px 8px rgba(0,0,0,0.05);
       transition: 0.3s;
+       font-family: 'Nunito', sans-serif;
+    font-weight: 600;
     }
 
     .card:hover {
@@ -175,6 +194,8 @@
 
     .card div {
       font-size: 30px;
+       font-family: 'Nunito', sans-serif;
+    font-weight: 600;
     }
 
     .card h3 {
@@ -306,5 +327,8 @@
       @yield('content')
     </div>
   </div>
+  
+  <!-- Page-specific JS -->
+  @stack('scripts')
 </body>
 </html>

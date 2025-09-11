@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>customerprofile Dashboard • Inkwise</title>
+  
 
   <style>
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Seasons&display=swap');
@@ -15,11 +16,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="{{ asset('css/customer.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/customerprofile.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/customertemplates.css') }}">
-    <script src="{{ asset('js/customertemplate.js') }}" defer></script>
-    <script src="{{ asset('js/customerprofile.js') }}" defer></script>
+    <link rel="stylesheet" href="{{ asset('css/customer/customer.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/customer/customerprofile.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/customer/customertemplates.css') }}">
+    <script src="{{ asset('js/customer/customertemplate.js') }}" defer></script>
+    <script src="{{ asset('js/customer/customerprofile.js') }}" defer></script>
     <!-- Alpine.js for interactivity -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.10.2/cdn.min.js" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Dancing+Script&display=swap" rel="stylesheet">
@@ -31,39 +32,72 @@
 <body class="bg-gray-50 text-gray-800">
   <!-- Top Bar -->
   <!-- Top Navigation Bar -->
-<header class="shadow animate-fade-in-down">
+<header class="shadow animate-fade-in-down bg-white">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
         <!-- Logo -->
         <div class="flex items-center animate-bounce-slow">
-           <span class="text-5xl font-bold logo-i"style="font-family: Edwardian Script ITC;" >I</span>
-            <span class="text-2xl font-bold" style="font-family: 'Playfair Display', serif; color: black;">nkwise</span>
+            <span class="text-5xl font-bold logo-i" style="font-family: Edwardian Script ITC; color:#06b6d4;">I</span>
+            <span class="text-2xl font-bold" style="font-family: 'Playfair Display', serif; color: #0891b2;">nkwise</span>
         </div>
 
         <!-- Navigation Links -->
         <nav class="hidden md:flex space-x-6">
-            <a href="{{ route('dashboard') }}" class="text-gray-700 hover:text-[#f6b3b2]">Home</a>
-            <a href="{{ route('templates.wedding') }}" class="text-gray-700 hover:text-[#f6b3b2]">Wedding</a>
-                <a href="{{ route('templates.birthday') }}" class="text-gray-700 hover:text-[#f6b3b2]">Birthday</a>
-                <a href="{{ route('templates.baptism') }}" class="text-gray-700 hover:text-[#f6b3b2]">Baptism</a>
-                <a href="{{ route('templates.corporate') }}" class="text-gray-700 hover:text-[#f6b3b2]">Corporate</a>
+            <a href="{{ route('dashboard') }}" class="text-gray-700 hover:text-[#06b6d4]">Home</a>
+            <a href="#categories" class="text-gray-700 hover:text-[#06b6d4]">Categories</a>
+            <a href="#templates" class="text-gray-700 hover:text-[#06b6d4]">Templates</a>
+            <a href="#about" class="text-gray-700 hover:text-[#06b6d4]">About</a>
+            <a href="#contact" class="text-gray-700 hover:text-[#06b6d4]">Contact</a>
         </nav>
 
         <!-- Search + Sign Up / customer Name -->
-        <div class="flex items-center space-x-3">
-            <form action="{{ route('dashboard') }}" method="GET" class="hidden md:flex">
-                <input type="text" name="query" placeholder="Search..."
-                    class="border rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring focus:ring-indigo-200">
+        <div class="flex items-center space-x-4 relative">
+            <!-- Search Form -->
+            <form action="{{ url('/search') }}" method="GET" class="hidden md:flex">
+                <input type="text" name="query" placeholder="Search..." 
+                       class="border rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring focus:ring-[#06b6d4]">
             </form>
+          
+            {{-- If not logged in --}}
+            @guest
+                <a href="{{ route('customer.login') }}"
+                   id="openLogin"
+                   class="text-white px-5 py-2 font-semibold animate-ocean rounded-full"
+                   style="font-family: 'Seasons', serif;">
+                   Sign in
+                </a>
+            @endguest
 
+            {{-- If logged in --}}
             @auth
-    <div class="relative">
-        <!-- Dropdown Button -->
-        <button id="userDropdownBtn" class="flex items-center px-3 py-2 bg-gray-100 rounded hover:bg-gray-200">
-            {{ Auth::user()->customer?->first_name ?? Auth::user()->email }}
-        </button>
-        @endauth
-    </div>
+                <div class="relative">
+                    <!-- Dropdown Button -->
+                    <button id="userDropdownBtn" class="flex items-center px-3 py-2 bg-[#e0f7fa] rounded hover:bg-[#06b6d4] hover:text-white">
+                        {{ Auth::user()->customer?->first_name ?? Auth::user()->email }}
+                        <span id="dropdownArrow" class="ml-1 transition-transform">▼</span>
+                    </button>
+
+                    <!-- Dropdown Menu -->
+                    <div id="userDropdownMenu"
+                         class="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg hidden">
+                        <!-- Profile -->
+                        <a href="{{ route('customerprofile.dashboard') }}"
+                           class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa]">
+                            Profile
+                        </a>
+
+                        <!-- Logout -->
+                        <form id="logout-form" action="{{ route('customer.logout') }}" method="POST">
+                            @csrf
+                            <button type="submit"
+                                    class="block w-full text-left px-4 py-2 text-gray-700 hover:bg-[#e0f7fa]">
+                                Logout
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            @endauth
         </div>
+    </div>
 </header>
       <!-- Welcome Section -->
 <div class="welcome-section">
@@ -137,6 +171,7 @@
           </div>
         </div>
 
+        
         <form method="POST" action="{{ route('customer.profile.update') }}" class="mt-8 space-y-4">
           @csrf
         <div class="grid md:grid-cols-2 gap-4">
@@ -173,12 +208,54 @@
                class="w-full mt-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200">
     </div>
 
-    <!-- Address -->
-    <div class="md:col-span-2">
-        <label class="text-sm text-gray-600">Delivery Address</label>
-        <input type="text" name="address" placeholder="Enter Address"
+    <!-- Address Fields -->
+<div class="md:col-span-2 grid grid-cols-2 gap-4">
+    <div>
+        <label class="text-sm text-gray-600">House / Unit / Lot No.</label>
+        <input type="text" name="house_number" placeholder="e.g. 123"
                class="w-full mt-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200">
     </div>
+
+    <div>
+        <label class="text-sm text-gray-600">Street</label>
+        <input type="text" name="street" placeholder="e.g. Mabini St."
+               class="w-full mt-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200">
+    </div>
+
+    <div>
+        <label class="text-sm text-gray-600">Barangay</label>
+        <input type="text" name="barangay" placeholder="e.g. Brgy. San Isidro"
+               class="w-full mt-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200">
+    </div>
+
+    <div>
+        <label class="text-sm text-gray-600">City / Municipality</label>
+        <input type="text" name="city" placeholder="e.g. Quezon City"
+               class="w-full mt-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200">
+    </div>
+
+    <div>
+        <label class="text-sm text-gray-600">Province</label>
+        <input type="text" name="province" placeholder="e.g. Metro Manila"
+               class="w-full mt-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200">
+    </div>
+
+    <div>
+        <label class="text-sm text-gray-600">Postal Code</label>
+        <input type="text" name="postal_code" placeholder="e.g. 1101"
+               class="w-full mt-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200">
+    </div>
+
+    <div class="md:col-span-2">
+        <label class="text-sm text-gray-600">Country</label>
+        <input type="text" name="country" value="Philippines"
+               class="w-full mt-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200">
+    </div>
+</div>
+
+<!-- Hidden Full Address -->
+<input type="hidden" name="full_address" id="full_address">
+
 
     <!-- Password -->
     <div>
@@ -222,7 +299,7 @@
     <button class="mt-3 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs">Start Help</button>
   </div>
 
-  
+
 
 </body>
 </html>

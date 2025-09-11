@@ -45,14 +45,15 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
 
     // Update profile
     Route::put('/profile/update', [AdminController::class, 'update'])->name('profile.update');
+   
     // Templates 
     Route::prefix('templates')->name('templates.')->group(function () { 
     Route::get('/', [AdminTemplateController::class, 'index'])->name('index'); 
     Route::get('/create', [AdminTemplateController::class, 'create'])->name('create'); 
     Route::post('/', [AdminTemplateController::class, 'store'])->name('store'); 
-    Route::get('/editor/{id?}', [AdminTemplateController::class, 'editor'])->name('editor'); }); 
+    Route::get('/editor/{id?}', [AdminTemplateController::class, 'editor'])->name('editor');
+    Route::delete('/{id}', [AdminTemplateController::class, 'destroy'])->name('destroy'); }); 
     
-    // ✅ User Management 
     // ✅ User Management 
 Route::prefix('users')->name('users.')->group(function () { 
     Route::get('/', [UserManagementController::class, 'index'])->name('index'); 
@@ -157,6 +158,9 @@ Route::get('/customer/my-orders', function () {
 Route::get('/customer/dshboard', function () {
     return view('customerprofile.dashboard');
 })->name('customerprofile.dashboard');
+Route::get('/customerprofile/order', function () {
+    return view('customerprofile.orderform');
+})->name('customerprofile.orderform');
 
 // customer Templatehome category pages
 Route::get('/templates/wedding', function () {
@@ -177,11 +181,24 @@ Route::get('/templates/corporate', function () {
 Route::get('/templates/wedding/invitations', function () {
     return view('customerInvitations.weddinginvite');
 })->name('templates.wedding.invitations');
+Route::get('/templates/birthday/invitations', function () {
+    return view('customerInvitations.birthdayinvite');
+})->name('templates.birthday.invitations');
+Route::get('/templates/corporate/invitations', function () {
+    return view('customerInvitations.corporateinvite');
+})->name('templates.corporate.invitations');
+Route::get('/templates/baptism/invitations', function () {
+    return view('customerInvitations.baptisminvite');
+})->name('templates.baptism.invitations');
 
 //customer templates giveaways 
 Route::get('/templates/wedding/giveaways', function () {
     return view('customerGiveaways.weddinggive');
 })->name('templates.wedding.giveaways');
+Route::get('/templates/birthday/giveaways', function () {
+    return view('customerGiveaways.birthdaygive');
+})->name('templates.birthday.giveaways');
+
 
 // customer order and design pages
 Route::get('/order/birthday', function () {

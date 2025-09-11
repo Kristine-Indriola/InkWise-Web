@@ -13,19 +13,19 @@
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="{{ asset('css/customer.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/customer/customer.css') }}">
     <link rel="stylesheet" href="{{ asset('css/customertemplate.css') }}">
     <link rel="stylesheet" href="{{ asset('css/templates.css') }}">
 
     <!-- Custom JS -->
-    <script src="{{ asset('js/customer.js') }}" defer></script>
-    <script src="{{ asset('js/customertemplate.js') }}" defer></script>
+    <script src="{{ asset('js/customer/customer.js') }}" defer></script>
+    <script src="{{ asset('js/customer/customertemplate.js') }}" defer></script>
 
     <!-- Alpine.js for interactivity -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.10.2/cdn.min.js" defer></script>
 
 <!-- JS -->
-<script src="{{ asset('js/customertemplate.js') }}"></script>
+<script src="{{ asset('js/customer/customertemplate.js') }}"></script>
 
 
 
@@ -100,7 +100,7 @@
             <div class="cards-grid">
                 <!-- Invitation Card -->
                 <div class="template-card" onclick="openTemplateModal('invitation')">
-                    <img src="/customerimage/baptisminvite.png" alt="Wedding Invitation" class="card-image">
+                    <img src="/customerimages/image/baptisminvite.png" alt="Wedding Invitation" class="card-image">
                     <div class="card-overlay">
                         <h2 class="card-title">Baptism  Invitations</h2>
                         <p class="card-text">Peaceful invitation designs to celebrate new blessings.</p>
@@ -109,7 +109,7 @@
 
                 <!-- Giveaways Card -->
                 <div class="template-card" onclick="openTemplateModal('giveaways')">
-                    <img src="/customerimage/baptismgive.png" alt="Wedding Giveaway" class="card-image">
+                    <img src="/customerimages/image/baptismgive.png" alt="Wedding Giveaway" class="card-image">
                     <div class="card-overlay">
                         <h2 class="card-title">Baptism  Giveaways</h2>
                         <p class="card-text">Graceful and thoughtful giveaways for your guests.</p>

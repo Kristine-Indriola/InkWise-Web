@@ -14,13 +14,13 @@
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="{{ asset('css/customer.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/customer/customer.css') }}">
     <link rel="stylesheet" href="{{ asset('css/customertemplate.css') }}">
     <link rel="stylesheet" href="{{ asset('css/templates.css') }}">
 
     <!-- Custom JS -->
-    <script src="{{ asset('js/customer.js') }}" defer></script>
-    <script src="{{ asset('js/customertemplate.js') }}" defer></script>
+    <script src="{{ asset('js/customer/customer.js') }}" defer></script>
+    <script src="{{ asset('js/customer/customertemplate.js') }}" defer></script>
 
     <!-- Alpine.js for interactivity -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.10.2/cdn.min.js" defer></script>
@@ -102,7 +102,7 @@
             <div class="cards-grid">
                 <!-- Invitation Card -->
                 <div class="template-card" onclick="window.location.href='{{ route('templates.wedding.invitations') }}'">
-                    <img src="/customerimage/weddinginvite.png" alt="Wedding Invitation" class="card-image">
+                    <img src="/customerimages/image/weddinginvite.png" alt="Wedding Invitation" class="card-image">
                     <div class="card-overlay">
                         <h2 class="card-title">Wedding Invitations</h2>
                         <p class="card-text">Elegant & modern invitation templates for your wedding day.</p>
@@ -111,7 +111,7 @@
 
                 <!-- Giveaways Card -->
                 <div class="template-card" onclick="window.location.href='{{ route('templates.wedding.giveaways') }}'">
-                    <img src="/customerimage/weddinggive.png" alt="Wedding Giveaway" class="card-image">
+                    <img src="/customerimages/image/weddinggive.png" alt="Wedding Giveaway" class="card-image">
                     <div class="card-overlay">
                         <h2 class="card-title">Wedding Giveaways</h2>
                         <p class="card-text">Beautifully crafted giveaway designs to impress your guests.</p>
