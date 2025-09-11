@@ -20,6 +20,7 @@ use App\Http\Controllers\customerProfileController;
 use App\Http\Controllers\Auth\CustomerAuthController;
 use App\Http\Controllers\Customer\CustomerController;
 use App\Http\Controllers\Admin\UserManagementController;
+use App\Http\Controllers\Owner\OwnerInventoryController;
 use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
 
 
