@@ -1,9 +1,10 @@
 @extends('layouts.owner.app')
 
 @section('content')
+
+
 @include('layouts.owner.sidebar')
 
-@php $materials = $materials ?? collect(); @endphp
 
 
 <section class="main-content">
