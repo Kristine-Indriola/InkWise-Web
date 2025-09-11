@@ -1,64 +1,120 @@
-@extends('layouts.admin')
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit User</title>
+    <link rel="stylesheet" href="{{ asset('css/edit-users.css') }}">
+</head>
+<body>
 
-@section('title', 'Edit User')
+<div class="container">
+    <div class="card">
+        <h2 class="form-title">✏️ Edit User</h2>
 
-@section('content')
-<div class="max-w-lg mx-auto bg-white p-6 rounded-lg shadow-md">
-    <h2 class="text-2xl font-bold mb-4 text-center">Edit User</h2>
+        {{-- Display Validation Errors --}}
+        @if ($errors->any())
+            <div class="alert">
+                <ul>
+                    @foreach ($errors->all() as $error)
+                        <li>⚠️ {{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
 
-    @if ($errors->any())
-        <div class="bg-red-100 text-red-700 p-3 rounded mb-4">
-            <ul>
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </div>
-    @endif
+        <form method="POST" action="{{ route('admin.users.update', $user->user_id) }}">
+            @csrf
+            @method('PUT')
 
-    <form method="POST" action="{{ route('admin.users.update', $user->id) }}">
-        @csrf
-        @method('PUT')
+            <!-- Role -->
+            <div class="form-group">
+                <label>Role</label>
+                <select name="role" required>
+                    <option value="owner" {{ $user->role === 'owner' ? 'selected' : '' }}>Owner</option>
+                      <option value="admin" {{ $user->role === 'admin' ? 'selected' : '' }}>Admin</option>
+                    <option value="staff" {{ $user->role === 'staff' ? 'selected' : '' }}>Staff</option>
+                </select>
+            </div>
 
-        <div class="mb-3">
-            <label class="block font-semibold">First Name</label>
-            <input type="text" name="first_name" value="{{ $user->first_name }}" class="w-full p-2 border rounded" required>
-        </div>
+            <!-- Name fields -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label>First Name</label>
+                    <input type="text" name="first_name" value="{{ old('first_name', $user->staff->first_name ?? '') }}" required>
+                </div>
+                <div class="form-group">
+                    <label>Middle Name <small>(optional)</small></label>
+                    <input type="text" name="middle_name" value="{{ old('middle_name', $user->staff->middle_name ?? '') }}">
+                </div>
+                <div class="form-group">
+                    <label>Last Name</label>
+                    <input type="text" name="last_name" value="{{ old('last_name', $user->staff->last_name ?? '') }}" required>
+                </div>
+            </div>
 
-        <div class="mb-3">
-            <label class="block font-semibold">Middle Name</label>
-            <input type="text" name="middle_name" value="{{ $user->middle_name }}" class="w-full p-2 border rounded">
-        </div>
+            <!-- Contact -->
+            <div class="form-group">
+                <label>Contact Number</label>
+                <input type="text" name="contact_number" value="{{ old('contact_number', $user->staff->contact_number ?? '') }}" required>
+            </div>
 
-        <div class="mb-3">
-            <label class="block font-semibold">Last Name</label>
-            <input type="text" name="last_name" value="{{ $user->last_name }}" class="w-full p-2 border rounded" required>
-        </div>
+            <!-- Email -->
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" name="email" value="{{ old('email', $user->email) }}" required>
+            </div>
 
-        <div class="mb-3">
-            <label class="block font-semibold">Email</label>
-            <input type="email" name="email" value="{{ $user->email }}" class="w-full p-2 border rounded" required>
-        </div>
+            <!-- Address -->
+            <h3 class="section-title">📍 Address</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Street</label>
+                    <input type="text" name="street" value="{{ old('street', $user->staff->address->street ?? '') }}">
+                </div>
+                <div class="form-group">
+                    <label>Barangay</label>
+                    <input type="text" name="barangay" value="{{ old('barangay', $user->staff->address->barangay ?? '') }}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>City</label>
+                    <input type="text" name="city" value="{{ old('city', $user->staff->address->city ?? '') }}">
+                </div>
+                <div class="form-group">
+                    <label>Province</label>
+                    <input type="text" name="province" value="{{ old('province', $user->staff->address->province ?? '') }}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Postal Code</label>
+                    <input type="text" name="postal_code" value="{{ old('postal_code', $user->staff->address->postal_code ?? '') }}">
+                </div>
+                <div class="form-group">
+                    <label>Country</label>
+                    <input type="text" name="country" value="{{ old('country', $user->staff->address->country ?? 'Philippines') }}">
+                </div>
+            </div>
 
-        <div class="mb-3">
-            <label class="block font-semibold">Role</label>
-            <select name="role" class="w-full p-2 border rounded" required>
-                <option value="owner" {{ $user->role == 'owner' ? 'selected' : '' }}>Owner</option>
-                <option value="staff" {{ $user->role == 'staff' ? 'selected' : '' }}>Staff</option>
-            </select>
-        </div>
+            <!-- Status -->
+            <div class="form-group">
+                <label>Status</label>
+                <select name="status" required>
+                    <option value="active" {{ $user->status === 'active' ? 'selected' : '' }}>Active</option>
+                    <option value="inactive" {{ $user->status === 'inactive' ? 'selected' : '' }}>Inactive</option>
+                </select>
+            </div>
 
-        <div class="mb-3">
-            <label class="block font-semibold">Status</label>
-            <select name="status" class="w-full p-2 border rounded" required>
-                <option value="active" {{ $user->status == 'active' ? 'selected' : '' }}>Active</option>
-                <option value="inactive" {{ $user->status == 'inactive' ? 'selected' : '' }}>Inactive</option>
-            </select>
-        </div>
-
-        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
-            Update User
-        </button>
-    </form>
+            <!-- Buttons -->
+            <div class="form-actions">
+                <button type="submit" class="btn-primary">💾 Update User</button>
+                <a href="{{ url()->previous() }}" class="btn-secondary">❌ Cancel</a>
+            </div>
+        </form>
+    </div>
 </div>
-@endsection
+
+</body>
+</html>

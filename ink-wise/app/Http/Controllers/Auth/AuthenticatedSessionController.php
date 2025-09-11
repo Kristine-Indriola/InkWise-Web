@@ -41,6 +41,7 @@ class AuthenticatedSessionController extends Controller
             default:
                 return redirect()->route('customer.dashboard');
         }
+        
     }
 
     /**

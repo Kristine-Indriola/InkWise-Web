@@ -1,0 +1,189 @@
+/* ===== Wrapper ===== */
+.profile-wrapper {
+    max-width: 850px;
+    margin: 30px auto;
+    padding: 0 15px;
+    font-family: "Segoe UI", sans-serif;
+    color: #111827;
+}
+
+/* ===== Back Button ===== */
+.btn-back {
+    display: inline-block;
+    margin-bottom: 18px;
+    background: #daaee3;
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background 0.2s, transform 0.2s;
+}
+.btn-back:hover {
+    background: #e285f0;
+    transform: translateY(-1px);
+}
+
+/* ===== Card ===== */
+.profile-card {
+    background: #fbf3fb;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+/* ===== Header ===== */
+.profile-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 1px solid #c2c3c5;
+    padding-bottom: 14px;
+}
+.avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: #7685a7;
+    color: #fff;
+    font-size: 22px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(37,99,235,0.25);
+}
+.profile-header-info h2 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+    color: #111827;
+}
+.profile-header-info p { margin: 3px 0; font-size: 14px; }
+
+/* ===== Badges ===== */
+.role-badge, .status-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+.role.admin { background: #d1fae5; color: #065f46; }
+.role.staff { background: #fef3c7; color: #92400e; }
+.role.owner { background: #dbeafe; color: #1e40af; }
+.status.approved { background: #10b981; color: #fff; }
+.status.pending { background: #f59e0b; color: #fff; }
+.status.rejected { background: #ef4444; color: #fff; }
+
+/* ===== Tabs ===== */
+.tabs {
+    display: flex;
+    border-bottom: 1px solid #e5e7eb;
+}
+.tab-btn {
+    flex: 1;
+    padding: 10px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 14px;
+    color: #374151;
+    transition: 0.2s;
+    position: relative;
+}
+.tab-btn:hover {
+    background: #f3f4f6;
+    color: #2563eb;
+}
+.tab-btn.active {
+    color: #2563eb;
+}
+.tab-btn.active::after {
+    content: "";
+    position: absolute;
+    bottom: -1px;
+    left: 20%;
+    width: 60%;
+    height: 3px;
+    background: #2563eb;
+    border-radius: 2px;
+}
+.tab-content { display: none; padding-top: 15px; }
+.tab-content.active { display: block; }
+
+/* ===== Info Section ===== */
+.profile-info {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.profile-info div {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.profile-info span {
+    font-weight: 600;
+    color: #374151;
+    font-size: 14px;
+}
+.profile-info p { margin: 0; font-size: 14px; }
+
+/* ===== Password ===== */
+.password-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.password-group input {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #d1d5db;
+    font-size: 13px;
+    width: 180px;
+    background: #f3f4f6;
+}
+.password-group button {
+    background: #e5e7eb;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 6px 10px;
+    transition: 0.2s;
+}
+.password-group button:hover {
+    background: #d1d5db;
+}
+
+/* ===== Actions ===== */
+.profile-actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 12px;
+}
+.btn {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: background 0.2s, transform 0.2s;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn-edit { background: #fde68a; color: #78350f; }
+.btn-edit:hover { background: #fcd34d; }
+.btn-delete { background: #ef4444; color: #fff; }
+.btn-delete:hover { background: #dc2626; }
+
+/* ===== Helpers ===== */
+.text-muted { color: #6b7280; font-size: 13px; }
+

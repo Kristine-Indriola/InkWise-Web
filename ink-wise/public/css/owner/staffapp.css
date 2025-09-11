@@ -1,0 +1,382 @@
+/* ===== Staff Management and Pending Staff Accounts (Scoped) ===== */
+/* .staff-page {
+  --wrap: 1200px; page max width
+  --radius: 12px;
+  --border: #e6e8ef;
+  --muted: #e5e7eb;
+  --shadow: 0 2px 6px rgba(0, 0, 0, .04);
+  --head-bg: #eef2f7;
+  --text: #111827;
+  --page-pad: 20px;
+} */
+
+/* Page body settings */
+.staff-page .page-inner {
+  /* max-width: var(--wrap); */
+  margin: 0 auto 24px;
+  padding: 0 var(--page-pad) 24px;
+  font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  background: transparent;
+}
+
+/* ---------- Topbar (same as Staff Management) ---------- */
+.staff-page > .topbar {
+  width: auto !important;
+  /* max-width: var(--wrap); same width as the table */
+  margin: 20px auto 18px;
+  padding: 14px 20px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: none !important;
+}
+
+.staff-page .welcome-text {
+  font-weight: 700;
+  font-size: 22px;
+  color: var(--text);
+}
+
+.staff-page .topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.staff-page .icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--muted);
+  background: #fff;
+  border-radius: 9999px;
+  cursor: pointer;
+}
+
+.staff-page .icon-btn:hover {
+  background: #f8fafc;
+}
+
+.staff-page .icon-btn svg {
+  width: 20px;
+  height: 20px;
+  color: #1f2937;
+}
+
+.staff-page .icon-btn .badge {
+  position: relative;
+  top: -6px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+}
+
+.staff-page .logout-btn {
+  padding: 8px 14px;
+  border: 1px solid var(--muted);
+  background: #fff;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.staff-page .logout-btn:hover {
+  background: #f3f4f6;
+}
+
+/* ---------- Panels ---------- */
+.staff-page .panel {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+
+.staff-page .page-inner h1,
+.staff-page .page-inner h2 {
+  font-size: 24px;
+  line-height: 1.25;
+  margin: 6px 0 14px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+/* ---------- Table Styling (Both Tables: Pending and Approved) ---------- */
+.staff-page .table-wrap {
+  overflow: auto;
+  border-radius: var(--radius);
+  background: #fff;
+  border: 1px solid var(--border);
+}
+
+.staff-page table {
+  /* width: 100%; */
+  /* min-width: 720px; */
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #fff;
+}
+
+/* Table headers */
+.staff-page thead th {
+  background: var(--head-bg);
+  color: #374151;
+  font-weight: 700;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  font-size: 13.5px;
+}
+
+.staff-page th:first-child {
+  border-top-left-radius: var(--radius);
+}
+
+.staff-page th:last-child {
+  border-top-right-radius: var(--radius);
+}
+
+/* Table body */
+.staff-page tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #eef2f7;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.staff-page tbody tr:nth-child(even) {
+  background: #fafbff;
+}
+
+.staff-page tbody tr:hover {
+  background: #f5f7ff;
+}
+
+/* Action buttons */
+.staff-page .actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* Buttons */
+.staff-page .btn {
+  padding: 8px 16px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.staff-page .btn-success {
+  background-color: #16a34a;
+  color: white;
+}
+
+.staff-page .btn-danger {
+  background-color: #dc2626;
+  color: white;
+}
+
+.staff-page .btn:hover {
+  opacity: 0.8;
+}
+
+/* Pending Staff Modal (Bottom Sheet) */
+.sheet-backdrop {
+  position: relative;
+  inset: 0;
+  background: rgba(0, 0, 0, .5);
+  z-index: 60;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s ease;
+}
+
+.sheet-backdrop.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Modal - Panel */
+/* .sheet-panel {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%) translateY(100%);
+  /* width: calc(var(--wrap) - var(--page-pad) * 2); Adjust width consistency */
+  /* max-width: 100%; Ensure max width does not stretch too much */
+  /* background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .15);
+  padding: 18px;
+  transition: transform .25s ease;
+  z-index: 100;
+} */ */
+
+/* Modal header */
+.sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.sheet-header h2 {
+  font-weight: 800;
+  font-size: 20px;
+  margin: 0;
+}
+
+/* Modal Close Button */
+.sheet-close {
+  font-size: 24px;
+  line-height: 1;
+  background: #fff;
+  border: 1px solid var(--muted);
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* Modal Table Styling (Pending Staff Table) */
+.sheet-panel table {
+  /* width: 100%; */
+  padding: 12px 14px;
+}
+
+.sheet-panel table th,
+.sheet-panel table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.sheet-panel table thead {
+  background-color: #f3f4f6;
+  font-weight: 700;
+  color: #374151;
+}
+
+.sheet-panel table tbody tr:nth-child(even) {
+  background-color: #fafbff;
+}
+
+.sheet-panel table tbody tr:hover {
+  background-color: #f5f7ff;
+}
+
+button#pendingBtn.pending-btn {
+  background-color: #16a34a !important;
+  color: #fff !important;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color .2s ease;
+}
+
+button#pendingBtn.pending-btn:hover {
+  background-color: #15803d !important; /* darker green */
+}
+
+#staffScreen button.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: background-color .2s, border-color .2s, transform .1s;
+}
+#staffScreen button.btn:active { transform: scale(0.97); }
+
+#staffScreen button.btn-success {
+  background-color: #16a34a;
+  border-color: #15803d;
+  color: #fff;
+}
+#staffScreen button.btn-success:hover {
+  background-color: #15803d;
+  border-color: #166534;
+}
+
+#staffScreen button.btn-danger {
+  background-color: #dc2626;
+  border-color: #b91c1c;
+  color: #fff;
+}
+#staffScreen button.btn-danger:hover {
+  background-color: #b91c1c;
+  border-color: #991b1b;
+}
+
+.back-btn {
+    display: flex;
+    align-items: center;
+    background-color: #16a34a; /* Green color */
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.back-btn svg {
+    margin-right: 8px; /* Space between the icon and text */
+}
+
+.back-btn:hover {
+    background-color: #15803d; /* Darker green on hover */
+}
+
+
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1024px) {
+  .staff-page {
+    --wrap: 92vw;
+  }
+
+  .sheet-panel {
+    width: calc(100% - var(--page-pad) * 2); /* Ensure it fits within smaller screens */
+  }
+}
+
+@media (max-width: 768px) {
+  .staff-page thead th,
+  .staff-page tbody td {
+    padding: 10px 8px;
+    font-size: 13px;
+  }
+
+  .staff-page .actions {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .sheet-panel {
+    width: calc(100% - var(--page-pad) * 2); /* Adjust for mobile */
+  }
+}
+
+@media (max-width: 640px) {
+  .staff-page .panel-header h2 {
+    font-size: 20px;
+  }
+}

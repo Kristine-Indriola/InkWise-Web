@@ -11,35 +11,43 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // USERS TABLE
         Schema::create('users', function (Blueprint $table) {
-            $table->id();
-            $table->string('first_name');
-            $table->string('middle_name')->nullable();
-            $table->string('last_name');
+            $table->id('user_id'); // PK is user_id
             $table->string('email')->unique();
             $table->string('password');
             $table->enum('role', ['admin', 'owner', 'staff', 'customer'])->default('staff');
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->timestamps();
-
         });
 
+        // PASSWORD RESET TOKENS
         Schema::create('password_reset_tokens', function (Blueprint $table) {
-            $table->string('email')->primary();
+            $table->id('token_id');
+            $table->unsignedBigInteger('user_id'); // FK to users.user_id
             $table->string('token');
             $table->timestamp('created_at')->nullable();
+
+            // FK constraint
+            $table->foreign('user_id')
+                  ->references('user_id')->on('users')
+                  ->onDelete('cascade');
         });
 
+        // SESSIONS TABLE
         Schema::create('sessions', function (Blueprint $table) {
             $table->string('id')->primary();
-            $table->foreignId('user_id')->nullable()->index();
+            $table->unsignedBigInteger('user_id')->nullable()->index(); // FK to users.user_id
             $table->string('ip_address', 45)->nullable();
             $table->text('user_agent')->nullable();
             $table->longText('payload');
             $table->integer('last_activity')->index();
-        });
 
-    
+            // FK constraint
+            $table->foreign('user_id')
+                  ->references('user_id')->on('users')
+                  ->onDelete('cascade');
+        });
     }
 
     /**
