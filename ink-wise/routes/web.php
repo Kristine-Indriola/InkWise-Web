@@ -281,14 +281,14 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
 
     // Other pagesgut
     Route::get('/order/workflow', fn () => view('owner.order-workflow'))->name('order.workflow');
-    Route::get('/inventory/track', fn () => view('owner.inventory-track'))->name('inventory-track');
+    Route::get('/inventory', [OwnerInventoryController::class, 'index'])->name('inventory.index');
+    Route::get('/inventory/track', [OwnerInventoryController::class, 'track'])->name('inventory-track');
     Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
     Route::get('/reports', fn () => view('owner.owner-reports'))->name('reports');
 
     // In routes/web.php
 
-    Route::get('/materials/search', [OwnerInventoryController::class, 'searchMaterials'])->name('materials.search');
-
+    
     
     Route::get('/owner/materials/low-stock', [OwnerInventoryController::class, 'track'])
     ->name('owner.materials.lowStock')
@@ -297,6 +297,9 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/owner/materials/out-stock', [OwnerInventoryController::class, 'track'])
     ->name('owner.materials.outStock')
     ->defaults('status', 'out');
+
+    Route::get('/owner/inventory-track', [OwnerInventoryController::class, 'inventoryTrack'])
+    ->name('owner.inventory-track');
 
 
 });

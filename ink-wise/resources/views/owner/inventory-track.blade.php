@@ -35,7 +35,7 @@
           <path d="M15 17H9a4 4 0 0 1-4-4V9a7 7 0 1 1 14 0v4a4 4 0 0 1-4 4z"/>
           <path d="M10 21a2 2 0 0 0 4 0"/>
         </svg>
-        <span class="badge">2</span> 
+        <span class="badge">{{ $notifCount }}</span> 
       </button>
 
       <form method="POST" action="{{ route('logout') }}">
@@ -45,16 +45,16 @@
     </div>
   </div>
        
-
   <div class="panel">
     <h3>Stock Levels</h3>
 
-     <form method="GET" action="{{ route('owner.materials.search') }}">
-      <div class="search-wrap" style="padding: 6px 12px;">
-        <input class="search-input" type="text" name="search" placeholder="Search by item name or category..." value="{{ request()->input('search') }}" />
-        <button type="submit" class="search-btn" style="padding: 1px 8px; font-size: 13px;">Search</button>
-      </div>
-    </form>
+    {{-- SEARCH FORM --}}
+   <form method="GET" action="{{ route('owner.inventory-track') }}">
+  <div class="search-wrap" style="padding: 6px 12px;">
+    <input class="search-input" type="text" name="search" placeholder="Search by item name or category..." value="{{ request()->input('search') }}" />
+    <button type="submit" class="search-btn" style="padding: 1px 8px; font-size: 13px;">Search</button>
+  </div>
+</form>
 
     <div class="table-wrap">
       <table class="inventory-table">
