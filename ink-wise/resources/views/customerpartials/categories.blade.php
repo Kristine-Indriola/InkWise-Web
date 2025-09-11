@@ -5,7 +5,10 @@
     <hr class="section-divider">
     <div class="max-w-7xl mx-auto px-6 text-center">
         <h2 class="text-3xl font-bold mb-6">Categories</h2>
-        <p class="text-lg text-gray-600">Browse through our ready-made templates designed for all occasions.</p>
+        <p class="text-lg text-gray-600 text-center mx-auto max-w-2xl">
+  See what's hot! Browse our most popular invitation and giveaways categories to find the perfect design for your event. Discover trendy themes and create invitations everyone will love.
+</p>
+
         
         <!-- Grid for categories -->
         <div class="mt-12 grid grid-cols-1 sm:grid-cols-2 gap-12 justify-center">
@@ -18,7 +21,7 @@
                     <!-- Wedding -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
                         <a href="{{ url('/templates/wedding/invitations') }}">
-                            <img src="{{ asset('customerimage/invite1.png') }}" 
+                            <img src="{{ asset('customerimages/image/invite1.png') }}" 
                                  alt="Wedding Invitation" 
                                  class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
@@ -26,8 +29,8 @@
                     
                     <!-- Baptism -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
-                        <a href="{{ url('/templates/baptism') }}">
-                            <img src="{{ asset('customerimage/invite2.png') }}" 
+                        <a href="{{ url('/templates/baptism/invitations') }}">
+                            <img src="{{ asset('customerimages/image/invite2.png') }}" 
                                  alt="Baptism Invitation" 
                                  class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
@@ -35,8 +38,8 @@
                     
                     <!-- Birthday -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
-                        <a href="{{ url('/templates/birthday') }}">
-                            <img src="{{ asset('customerimage/invite3.png') }}" 
+                        <a href="{{ url('/templates/birthday/invitations') }}">
+                            <img src="{{ asset('customerimages/image/invite3.png') }}" 
                                  alt="Birthday Invitation" 
                                  class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
@@ -44,8 +47,8 @@
                     
                     <!-- Corporate -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
-                        <a href="{{ url('/templates/corporate') }}">
-                            <img src="{{ asset('customerimage/invite4.png') }}" 
+                        <a href="{{ url('/templates/corporate/invitations') }}">
+                            <img src="{{ asset('customerimages/image/invite4.png') }}" 
                                  alt="Corporate Invitation" 
                                  class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
@@ -62,7 +65,7 @@
                     <!-- Wedding -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
                         <a href="{{ url('/templates/wedding/giveaways') }}">
-                            <img src="{{ asset('customerimage/weddinggive.png') }}" 
+                            <img src="{{ asset('customerimages/image/weddinggive.png') }}" 
                                  alt="Wedding Giveaway" 
                                  class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
@@ -71,7 +74,7 @@
                     <!-- Baptism -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
                         <a href="{{ url('/templates/baptism/giveaways') }}">
-                            <img src="{{ asset('customerimage/baptismgive.png') }}" 
+                            <img src="{{ asset('customerimages/image/baptismgive.png') }}" 
                                  alt="Baptism Giveaway" 
                                  class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
@@ -80,7 +83,7 @@
                     <!-- Birthday -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
                         <a href="{{ url('/templates/birthday/giveaways') }}">
-                            <img src="{{ asset('customerimage/birthdaygive.png') }}" 
+                            <img src="{{ asset('customerimages/image/birthdaygive.png') }}" 
                                  alt="Birthday Giveaway" 
                                  class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
@@ -89,7 +92,7 @@
                     <!-- Corporate -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
                         <a href="{{ url('/templates/corporate/giveaways') }}">
-                            <img src="{{ asset('customerimage/corporategive.png') }}" 
+                            <img src="{{ asset('customerimages/image/corporategive.png') }}" 
                                  alt="Corporate Giveaway" 
                                  class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>

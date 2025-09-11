@@ -13,19 +13,19 @@
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="{{ asset('css/customer.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/customer/customer.css') }}">
     <link rel="stylesheet" href="{{ asset('css/customertemplate.css') }}">
     <link rel="stylesheet" href="{{ asset('css/templates.css') }}">
 
     <!-- Custom JS -->
-    <script src="{{ asset('js/customertemplate.js') }}" defer></script>
-    <script src="{{ asset('js/customer.js') }}" defer></script>
+    <script src="{{ asset('js/customer/customertemplate.js') }}" defer></script>
+    <script src="{{ asset('js/customer/customer.js') }}" defer></script>
 
     <!-- Alpine.js for interactivity -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.10.2/cdn.min.js" defer></script>
 
 <!-- JS -->
-<script src="{{ asset('js/customertemplate.js') }}"></script>
+<script src="{{ asset('js/customer/customertemplate.js') }}"></script>
 
 
 </head>
@@ -106,8 +106,8 @@
 
             <div class="cards-grid">
                 <!-- Invitation Card -->
-                <div class="template-card" onclick="openTemplateModal('invitation')">
-                    <img src="/customerimage/birthdayinvite.png" alt="Wedding Invitation" class="card-image">
+                <div class="template-card" onclick="window.location.href='{{ route('templates.birthday.invitations') }}'">
+                    <img src="/customerimages/image/birthdayinvite.png" alt="birthday Invitation" class="card-image">
                     <div class="card-overlay">
                         <h2 class="card-title">Birthday Invitations</h2>
                         <p class="card-text">Playful and stylish invitation templates for birthdays.</p>
@@ -116,7 +116,7 @@
 
                 <!-- Giveaways Card -->
                 <div class="template-card" onclick="openTemplateModal('giveaways')">
-                    <img src="/customerimage/birthdaygive.png" alt="Wedding Giveaway" class="card-image">
+                    <img src="/customerimages/image/birthdaygive.png" alt="birthday Giveaway" class="card-image">
                     <div class="card-overlay">
                         <h2 class="card-title">Birthday Giveaways</h2>
                         <p class="card-text">Exciting giveaway designs to celebrate in style.</p>

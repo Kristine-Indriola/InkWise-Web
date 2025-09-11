@@ -13,19 +13,19 @@
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="{{ asset('css/customer.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/customer/customer.css') }}">
     <link rel="stylesheet" href="{{ asset('css/customertemplate.css') }}">
     <link rel="stylesheet" href="{{ asset('css/templates.css') }}">
 
     <!-- Custom JS -->
-    <script src="{{ asset('js/customertemplate.js') }}" defer></script>
+    <script src="{{ asset('js/customer/customertemplate.js') }}" defer></script>
 
     <!-- Alpine.js for interactivity -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.10.2/cdn.min.js" defer></script>
 
 <!-- JS -->
-<script src="{{ asset('js/customertemplate.js') }}"></script>
-<script src="{{ asset('js/customer.js') }}" defer></script>
+<script src="{{ asset('js/customer/customertemplate.js') }}"></script>
+<script src="{{ asset('js/customer/customer.js') }}" defer></script>
 
 </head>
 <body id="wedding-give" class="antialiased bg-gray-50 wedding">

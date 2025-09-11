@@ -12,11 +12,11 @@
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="{{ asset('css/customer.css') }}">
+  <link rel="stylesheet" href="{{ asset('css/customer/customer.css') }}">
   <link rel="stylesheet" href="{{ asset('css/customerprofile.css') }}">
-  <link rel="stylesheet" href="{{ asset('css/customertemplates.css') }}">
+  <link rel="stylesheet" href="{{ asset('css/customer/customertemplates.css') }}">
 
-  <script src="{{ asset('js/customertemplate.js') }}" defer></script>
+  <script src="{{ asset('js/customer/customertemplate.js') }}" defer></script>
   <script src="{{ asset('js/customerprofile.js') }}" defer></script>
 
   <!-- Alpine.js -->
@@ -54,6 +54,7 @@
       border-radius: 12px;
       overflow: hidden;
     }
+    
 
     .orders-table th,
     .orders-table td {
@@ -138,6 +139,7 @@
             class="border rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring focus:ring-indigo-200">
         </form>
 
+        
        @auth
     <div class="relative">
         <!-- Dropdown Button -->
@@ -161,7 +163,7 @@
     <!-- Sidebar -->
     <aside class="sidebar rounded-2xl p-4 md:col-span-1 h-full bg-white shadow">
   <nav class="space-y-2">
-    <a href="{{ route('customer.dashboard') }}" 
+    <a href="{{ route('customerprofile.dashboard') }}" 
        class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition hover:bg-gray-100">
       <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
         <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-5 0-9 2.5-9 5.5A1.5 1.5 0 0 0 4.5 21h15a1.5 1.5 0 0 0 1.5-1.5C21 16.5 17 14 12 14Z"/>
@@ -201,7 +203,9 @@
 
     <!-- Orders Table -->
     <section class="md:col-span-4">
-      <table class="orders-table">
+      <div class="card bg-white p-6 md:p-8 border border-gray-100">
+  <h2 class="text-xl font-semibold mb-6">My Orders</h2>
+  <table class="orders-table">
         <thead>
           <tr>
             <th>Order ID</th>
@@ -243,6 +247,7 @@
           </tr>
         </tbody>
       </table>
+</div>
     </section>
 
   </main>

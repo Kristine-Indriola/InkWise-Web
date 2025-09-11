@@ -3,8 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>InkWise System - Owner Login</title>
+
+    
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+
     <title>InkWise System - Login</title>
+
     <style>
+
+        body, .login-container, .login-container h1, .login-container input, .login-container button, .role-hint {
+        font-family: 'Poppins', sans-serif;
+        font-size: 22px;
+
+    }
         body {
             margin: 0;
             font-family: 'Arial', sans-serif;
@@ -14,7 +27,7 @@
             height: 100vh;
             overflow: hidden;
             position: relative;
-            background: linear-gradient(to right, #9dc2ec, #f4f3e1);
+            background: linear-gradient(120deg, #a3c7d9 0%, #dce5e2 50%, #f8f5ed 100%);
         }
 
         .video-background {
@@ -29,13 +42,18 @@
         }
 
         .login-container {
-            background-color: rgba(255, 255, 255, 0.92);
+             border-radius: 12px; /* rectangle with slight rounding */
+      background: rgba(255, 255, 255, 0.15); /* transparency */
+      backdrop-filter: blur(12px); /* glass effect */
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3); /* strong shadow so transparent part is visible */
+            backdrop-filter: blur(10px); /* glass effect */
             padding: 40px 35px;
             border-radius: 12px;
             box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
             width: 100%;
             max-width: 380px;
         }
+      
 
         .login-container h1 {
             text-align: center;
@@ -107,9 +125,11 @@
     </style>
 </head>
 <body>
-    <video autoplay muted loop class="video-background">
-        <source src="https://imgur.com/AbadHPL.mp4" type="video/mp4">
-    </video>
+
+    <!-- filepath: c:\xampp\htdocs\InkWise-Web\ink-wise\resources\views\auth\login.blade.php -->
+<div class="login-container">
+    <img src="{{ asset('adminimage/inkwise.png') }}" alt="InkWise Logo" style="display:block; margin:0 auto 18px auto; max-width:120px;">
+    <h1>User Login</h1>
 
     <div class="login-container">
     <h1>InkWise System - User Login</h1>
@@ -128,6 +148,7 @@
         </div>
     @endif
 
+
     <form method="POST" action="{{ route('login.submit') }}">
         @csrf
         <input type="email" name="email" placeholder="Enter Email" required>
@@ -139,6 +160,9 @@
         <button type="submit">Login</button>
     </form>
 
+
+
+
     <div class="role-hint">
         Use your registered email and password. <br>
         (Works for <strong>Owner</strong> and <strong>Staff</strong> accounts)
@@ -147,7 +171,10 @@
 
 
 
+
+
     </div>
+
 
     <script>
         document.getElementById('togglePassword').addEventListener('change', function() {
