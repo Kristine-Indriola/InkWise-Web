@@ -1,0 +1,127 @@
+/* ====== General ====== */
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #fbfaf5;
+    margin: 0;
+    padding: 0;
+}
+
+/* Container */
+.container {
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 20px;
+}
+
+/* Card */
+.card {
+    background: #f0ecec;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+
+/* Titles */
+.form-title {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.section-title {
+    margin: 25px 0 15px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #444;
+}
+
+/* Alerts */
+.alert {
+    background: #ffe5e5;
+    border: 1px solid #ffcccc;
+    color: #b30000;
+    padding: 10px 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+/* Form */
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.form-row {
+    display: flex;
+    gap: 16px;
+}
+
+.form-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+label {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #333;
+}
+
+input, select {
+    padding: 10px 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input:focus, select:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.2);
+    outline: none;
+}
+
+/* Buttons */
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.btn-primary,
+.btn-secondary {
+    padding: 6px 14px; /* smaller padding */
+    border-radius: 6px;
+    font-size: 13px;   /* slightly smaller font */
+    font-weight: 500;  /* less bold */
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+/* Primary Button */
+.btn-primary {
+    border: none;
+    background: #007bff;
+    color: #fff;
+}
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+/* Secondary Button */
+.btn-secondary {
+    background: #e9ecef;
+    color: #333;
+    text-decoration: none;
+}
+.btn-secondary:hover {
+    background: #d6d8db;
+}
+

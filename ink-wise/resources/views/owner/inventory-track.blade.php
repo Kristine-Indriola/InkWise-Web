@@ -1,69 +1,100 @@
-@extends('layouts.owner.app')
-@section('content')
-@include('layouts.owner.sidebar') 
+@php
+    $materials = $materials ?? collect();
+@endphp
 
-  <!-- Main -->
-  <section class="main-content">
-    <div class="topbar">
-    <!-- Welcome Text (left-aligned) -->
+@extends('layouts.owner.app')
+
+@push('styles')
+  <link rel="stylesheet" href="css/owner/staffapp.css">
+@endpush
+
+@section('content')
+@include('layouts.owner.sidebar')
+
+<section class="main-content">
+  <div class="topbar">
     <div class="welcome-text"><strong>Welcome, Owner!</strong></div>
 
-    <!-- Actions: Notification Icon and Logout Button (right-aligned) -->
     <div class="topbar-actions">
-      <!-- Notification Icon -->
+      @php
+          $lowCount = \App\Models\Material::whereHas('inventory', function($q) {
+              $q->whereColumn('stock_level', '<=', 'reorder_level')
+                ->where('stock_level', '>', 0);
+          })->count();
+
+          $outCount = \App\Models\Material::whereHas('inventory', function($q) {
+              $q->where('stock_level', '<=', 0);
+          })->count();
+
+          $notifCount = $lowCount + $outCount;
+      @endphp
+
       <button type="button" class="icon-btn" aria-label="Notifications">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M15 17H9a4 4 0 0 1-4-4V9a7 7 0 1 1 14 0v4a4 4 0 0 1-4 4z"/>
           <path d="M10 21a2 2 0 0 0 4 0"/>
         </svg>
-        <span class="badge">2</span> {{-- Notification count --}}
+        <span class="badge">{{ $notifCount }}</span> 
       </button>
 
-      <!-- Logout Button -->
       <form method="POST" action="{{ route('logout') }}">
         @csrf
-        <button type="submit" class="logout-btn">
-          Logout
-        </button>
+        <button type="submit" class="logout-btn">Logout</button>
       </form>
     </div>
   </div>
+       
+  <div class="panel">
+    <h3>Stock Levels</h3>
 
-    <!-- Inventory Panel -->
-    <div class="panel">
-      <h3>Stock Levels</h3>
+    {{-- SEARCH FORM --}}
+   <form method="GET" action="{{ route('owner.inventory-track') }}">
+  <div class="search-wrap" style="padding: 6px 12px;">
+    <input class="search-input" type="text" name="search" placeholder="Search by item name or category..." value="{{ request()->input('search') }}" />
+    <button type="submit" class="search-btn" style="padding: 1px 8px; font-size: 13px;">Search</button>
+  </div>
+</form>
 
-      <div class="search-wrap">
-        <input class="search-input" type="text" placeholder="Search by item name, category…" />
-      </div>
+    <div class="table-wrap">
+      <table class="inventory-table">
+        <thead>
+          <tr>
+            <th>Item Name</th>
+            <th>Category</th>
+            <th>Stock Quantity</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          @forelse($materials as $material)
+            @php
+              $stock = $material->inventory->stock_level ?? 0;
+              $reorder = $material->inventory->reorder_level ?? 0;
 
-      <div class="table-wrap">
-        <table class="inventory-table">
-          <thead>
+              if ($stock <= 0) {
+                  $statusClass = 'out-of-stock';
+                  $statusText = 'Out of Stock';
+              } elseif ($stock <= $reorder) {
+                  $statusClass = 'low-stock';
+                  $statusText = 'Low Stock';
+              } else {
+                  $statusClass = 'in-stock';
+                  $statusText = 'In Stock';
+              }
+            @endphp
             <tr>
-              <th>Item Name</th>
-              <th>Category</th>
-              <th>Stock Quantity</th>
-              <th>Status</th>
+              <td>{{ $material->material_name }}</td>
+              <td>{{ $material->material_type }}</td>
+              <td>{{ $stock }}</td>
+              <td><span class="status {{ $statusClass }}">{{ $statusText }}</span></td>
             </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Glossy Paper 100gsm</td>
-              <td>Paper</td>
-              <td>1200</td>
-              <td><span class="status in-stock">In stock</span></td>
-            </tr>
-            <tr>
-              <td>Ink Cartridge Black</td>
-              <td>Ink</td>
-              <td>3</td>
-              <td><span class="status low-stock">Low Stock</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+          @empty
+            <tr><td colspan="4" class="text-center">No materials found.</td></tr>
+          @endforelse
+        </tbody>
+      </table>
     </div>
-  </section>
+  </div>
+</section>
 @endsection

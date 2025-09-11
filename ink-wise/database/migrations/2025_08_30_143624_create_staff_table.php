@@ -6,28 +6,26 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('staff', function (Blueprint $table) {
-            $table->id('staff_id');
+            // Custom staff_id (no auto-increment)
+            $table->unsignedBigInteger('staff_id')->primary();
+
             $table->foreignId('user_id')
                   ->constrained('users', 'user_id')
-                  ->onDelete('cascade'); // ✅ correct FK column
-            $table->enum('role', ['admin', 'owner', 'staff', 'customer'])->default('staff');
-                  $table->string('first_name');
+                  ->onDelete('cascade');
+
+            $table->enum('role', ['admin', 'owner', 'staff'])->default('staff');
+            $table->string('first_name');
             $table->string('middle_name')->nullable();
             $table->string('last_name');
             $table->string('contact_number');
+            $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
             $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('staff');

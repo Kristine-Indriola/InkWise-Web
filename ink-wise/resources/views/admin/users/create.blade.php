@@ -1,92 +1,122 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create User</title>
-    <link rel="stylesheet" href="{{ asset('css/admin-css/create_account.css') }}">
-</head>
-<body>
+@extends('layouts.admin')
 
+@section('title', 'Create Staff Account')
+
+@section('content')
 <div class="container">
-    <h2>Create New User</h2>
+    <div class="card">
+        <link rel="stylesheet" href="{{ asset('css/edit-users.css') }}">
+        <h2 class="form-title">➕ Create Staff Account</h2>
 
-    {{-- Display Validation Errors --}}
-    @if ($errors->any())
-        <div class="bg-red-100">
-            <ul>
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </div>
-    @endif
-
-    <form method="POST" action="{{ route('admin.users.store') }}">
-        @csrf
-
-        <!-- Role -->
-        <div class="form-row">
-            <div class="form-group">
-                <label>Role</label>
-                <select name="role" required>
-                    <option value="owner" {{ old('role') === 'owner' ? 'selected' : '' }}>Owner</option>
-                    <option value="staff" {{ old('role', 'staff') === 'staff' ? 'selected' : '' }}>Staff</option>
-                </select>
+        {{-- Success Message --}}
+        @if(session('success'))
+            <div class="alert success">
+                {{ session('success') }}
             </div>
-        </div>
+        @endif
 
-        <!-- Name fields in a row -->
-        <div class="form-row">
-            <div class="form-group">
-                <label>First Name</label>
-                <input type="text" name="first_name" value="{{ old('first_name') }}" required>
+        {{-- Validation Errors --}}
+        @if ($errors->any())
+            <div class="alert error">
+                <ul>
+                    @foreach ($errors->all() as $error)
+                        <li>⚠️ {{ $error }}</li>
+                    @endforeach
+                </ul>
             </div>
-            <div class="form-group">
-                <label>Middle Name <small>(optional)</small></label>
-                <input type="text" name="middle_name" value="{{ old('middle_name') }}">
-            </div>
-            <div class="form-group">
-                <label>Last Name</label>
-                <input type="text" name="last_name" value="{{ old('last_name') }}" required>
-            </div>
-        </div>
+        @endif
 
-        <!-- Contact Number -->
-        <div class="form-row">
-            <div class="form-group full-width">
+        <form method="POST" action="{{ route('admin.users.store') }}">
+            @csrf
+
+            <!-- Name Section -->
+            <h3 class="section-title">👤 Personal Information</h3>
+            <div class="form-row">
+
+                <div class="form-group">
+                    <label>Role</label>
+                    <select name="role" required>
+                        <option value="" disabled selected>-- Select Role --</option>
+                        <option value="staff" {{ old('role') == 'staff' ? 'selected' : '' }}>Staff</option>
+                        <option value="admin" {{ old('role') == 'admin' ? 'selected' : '' }}>admin</option>
+                        <option value="owner" {{ old('role') == 'owner' ? 'selected' : '' }}>Owner</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>First Name</label>
+                    <input type="text" name="first_name" value="{{ old('first_name') }}" required>
+                </div>
+                <div class="form-group">
+                    <label>Middle Name</label>
+                    <input type="text" name="middle_name" value="{{ old('middle_name') }}">
+                </div>
+                <div class="form-group">
+                    <label>Last Name</label>
+                    <input type="text" name="last_name" value="{{ old('last_name') }}" required>
+                </div>
+            </div>
+
+            <!-- Contact -->
+            <div class="form-group">
                 <label>Contact Number</label>
                 <input type="text" name="contact_number" value="{{ old('contact_number') }}" required>
             </div>
-        </div>
 
-        <!-- Email -->
-        <div class="form-row">
-            <div class="form-group full-width">
-                <label>Email</label>
-                <input type="email" name="email" value="{{ old('email') }}" required>
+            <!-- Email + Password -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" name="email" value="{{ old('email') }}" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" name="password" required>
+                </div>
             </div>
-        </div>
 
-        <!-- Password fields -->
-        <div class="form-row">
-            <div class="form-group">
-                <label>Password <small>(min 6 characters)</small></label>
-                <input type="password" name="password" required>
+            <!-- Address -->
+            <h3 class="section-title">📍 Address</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Street</label>
+                    <input type="text" name="street" value="{{ old('street') }}">
+                </div>
+                <div class="form-group">
+                    <label>Barangay</label>
+                    <input type="text" name="barangay" value="{{ old('barangay') }}">
+                </div>
             </div>
-            <div class="form-group">
-                <label>Confirm Password</label>
-                <input type="password" name="password_confirmation" required>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>City</label>
+                    <input type="text" name="city" value="{{ old('city') }}">
+                </div>
+                <div class="form-group">
+                    <label>Province</label>
+                    <input type="text" name="province" value="{{ old('province') }}">
+                </div>
             </div>
-        </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Postal Code</label>
+                    <input type="text" name="postal_code" value="{{ old('postal_code') }}">
+                </div>
+                <div class="form-group">
+                    <label>Country</label>
+                    <input type="text" name="country" value="{{ old('country') }}">
+                </div>
+            </div>
 
-        <!-- Buttons -->
-        <div class="form-row buttons-row">
-            <button type="submit">Create User</button>
-            <a href="{{ url()->previous() }}" class="cancel-btn">Cancel</a>
-        </div>
-    </form>
+            <!-- Hidden Fields -->
+            <input type="hidden" name="status" value="pending">
+
+            <!-- Buttons -->
+            <div class="form-actions">
+                <button type="submit" class="btn-primary">💼 Create Account</button>
+                <a href="{{ url()->previous() }}" class="btn-secondary">❌ Cancel</a>
+            </div>
+        </form>
+    </div>
 </div>
-
-</body>
-</html>
+@endsection

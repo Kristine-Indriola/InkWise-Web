@@ -19,7 +19,7 @@
       </a>
     </li>
     <li>
-      <a href="{{ route('owner.approve-staff') }}" class="text-decoration-none">
+      <a href="{{ route('owner.staff.approved') }}" class="text-decoration-none">
         <button class="sidebar-btn">
           <span class="text">Approve Staff Account</span><span class="ico">✅</span>
         </button>

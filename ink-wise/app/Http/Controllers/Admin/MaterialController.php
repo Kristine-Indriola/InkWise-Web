@@ -48,13 +48,38 @@ class MaterialController extends Controller
         return redirect()->route('admin.materials.index')->with('success', 'Material added successfully with inventory!');
     }
 
-    public function index()
+public function index(Request $request)
 {
-    // Get all materials with their inventory (stock + reorder level)
-    $materials = \App\Models\Material::with('inventory')->get();
+    $query = Material::with('inventory');
+
+    if ($request->status === 'low') {
+        $query->whereHas('inventory', function($q) {
+            $q->whereColumn('stock_level', '<=', 'reorder_level')
+              ->where('stock_level', '>', 0);
+        });
+    }
+
+    if ($request->status === 'out') {
+        $query->whereHas('inventory', function($q) {
+            $q->where('stock_level', '<=', 0);
+        });
+    }
+
+        if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('material_name', 'like', "%{$search}%")
+              ->orWhere('material_type', 'like', "%{$search}%")
+              ->orWhere('unit', 'like', "%{$search}%");
+        });
+    }
+
+
+    $materials = $query->get();
 
     return view('admin.materials.index', compact('materials'));
 }
+
 
 public function edit($id)
 {
@@ -65,16 +90,53 @@ public function edit($id)
 public function update(Request $request, $id)
 {
     $request->validate([
-        'material_name' => 'required|string|max:255',
-        'material_type' => 'required|string|max:100',
-        'unit' => 'required|string|max:50',
-        'unit_cost' => 'required|numeric|min:0',
+        'material_name'  => 'required|string|max:255',
+        'material_type'  => 'required|string|max:100',
+        'unit'           => 'required|string|max:50',
+        'unit_cost'      => 'required|numeric|min:0',
+        'stock_level'    => 'required|integer|min:0',
+        'reorder_level'  => 'required|integer|min:0',
+        // removed remarks validation since it's automatic
     ]);
 
-    $material = \App\Models\Material::findOrFail($id);
-    $material->update($request->all());
+    // ✅ Update Material
+    $material = Material::findOrFail($id);
+    $material->update([
+        'material_name' => $request->material_name,
+        'material_type' => $request->material_type,
+        'unit'          => $request->unit,
+        'unit_cost'     => $request->unit_cost,
+        'date_updated'  => now(),
+    ]);
 
-    return redirect()->route('admin.materials.index')->with('success', 'Material updated successfully.');
+    // ✅ Auto-generate remarks based on stock
+    $stockLevel   = $request->stock_level;
+    $reorderLevel = $request->reorder_level;
+    $remarks = 'In Stock';
+
+    if ($stockLevel <= 0) {
+        $remarks = 'Out of Stock';
+    } elseif ($stockLevel > 0 && $stockLevel <= $reorderLevel) {
+        $remarks = 'Low Stock';
+    }
+
+    // ✅ Update or create Inventory
+    if ($material->inventory) {
+        $material->inventory->update([
+            'stock_level'   => $stockLevel,
+            'reorder_level' => $reorderLevel,
+            'remarks'       => $remarks,
+        ]);
+    } else {
+        $material->inventory()->create([
+            'stock_level'   => $stockLevel,
+            'reorder_level' => $reorderLevel,
+            'remarks'       => $remarks,
+        ]);
+    }
+
+    return redirect()->route('admin.materials.index')
+                     ->with('success', 'Material updated successfully with inventory.');
 }
 
 public function destroy($id)
@@ -84,4 +146,25 @@ public function destroy($id)
 
     return redirect()->route('admin.materials.index')->with('success', 'Material deleted successfully.');
 }
+
+public function notification()
+{
+    $lowStock = Material::with('inventory')
+        ->whereHas('inventory', function($q) {
+            $q->whereColumn('stock_level', '<=', 'reorder_level')
+              ->where('stock_level', '>', 0);
+        })
+        ->get();
+
+    $outOfStock = Material::with('inventory')
+        ->whereHas('inventory', function($q) {
+            $q->where('stock_level', '<=', 0);
+        })
+        ->get();
+
+    return view('admin.materials.notification', compact('lowStock', 'outOfStock'));
+}
+
+
+
 }

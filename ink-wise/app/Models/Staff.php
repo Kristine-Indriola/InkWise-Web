@@ -9,9 +9,10 @@ class Staff extends Model
 {
     use HasFactory;
 
-    protected $table = 'staff'; // explicitly set table name
-
-    protected $primaryKey = 'staff_id'; // if your PK is staff_id, adjust accordingly
+    protected $table = 'staff';
+    protected $primaryKey = 'staff_id';
+    public $incrementing = false; // ❌ stop auto-increment
+    protected $keyType = 'int';   // staff_id is an integer
 
     protected $fillable = [
         'user_id',
@@ -20,11 +21,33 @@ class Staff extends Model
         'last_name',
         'contact_number',
         'role',
+        'status',
     ];
 
-    // Optional: define relation to User
+    // Relationship to User
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
+    }
+
+    public function address()
+    {
+        return $this->hasOne(Address::class, 'user_id', 'user_id');
+    }
+
+    // 🔹 Auto-generate random staff_id when creating
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($staff) {
+            if (empty($staff->staff_id)) {
+                do {
+                    $randomId = random_int(1000, 9999); // 🎲 4-digit random ID
+                } while (self::where('staff_id', $randomId)->exists());
+
+                $staff->staff_id = $randomId;
+            }
+        });
     }
 }

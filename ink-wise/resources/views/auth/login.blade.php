@@ -3,10 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>InkWise System - Owner Login</title>
 
     
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <title>InkWise System - Login</title>
+
     <style>
 
         body, .login-container, .login-container h1, .login-container input, .login-container button, .role-hint {
@@ -126,6 +130,25 @@
 <div class="login-container">
     <img src="{{ asset('adminimage/inkwise.png') }}" alt="InkWise Logo" style="display:block; margin:0 auto 18px auto; max-width:120px;">
     <h1>User Login</h1>
+
+    <div class="login-container">
+    <h1>InkWise System - User Login</h1>
+
+    {{-- 🔴 Show error messages --}}
+    @if($errors->has('login_error'))
+        <div style="color: red; margin-bottom: 12px; text-align: center; font-size: 14px;">
+            {{ $errors->first('login_error') }}
+        </div>
+    @endif
+
+    {{-- 🟢 Show success messages (like logout) --}}
+    @if(session('success'))
+        <div style="color: green; margin-bottom: 12px; text-align: center; font-size: 14px;">
+            {{ session('success') }}
+        </div>
+    @endif
+
+
     <form method="POST" action="{{ route('login.submit') }}">
         @csrf
         <input type="email" name="email" placeholder="Enter Email" required>
@@ -136,11 +159,22 @@
         </div>
         <button type="submit">Login</button>
     </form>
+
+
+
+
     <div class="role-hint">
         Use your registered email and password. <br>
         (Works for <strong>Owner</strong> and <strong>Staff</strong> accounts)
     </div>
 </div>
+
+
+
+
+
+    </div>
+
 
     <script>
         document.getElementById('togglePassword').addEventListener('change', function() {
