@@ -10,6 +10,7 @@ use App\Http\Controllers\Owner\HomeController;
 //use App\Http\Controllers\Auth\AdminLoginController;
 //use App\Http\Controllers\StaffAuthController;
 //use App\Http\Controllers\Staff\StaffLoginController;
+use App\Http\Controllers\StaffProfileController;
 use App\Http\Controllers\Owner\OwnerController;
 use App\Http\Controllers\AdminCustomerController;
 use App\Http\Controllers\Admin\MaterialController;
@@ -345,8 +346,10 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
     Route::get('/order-list', fn () => view('staff.order_list'))->name('order.list');
     Route::get('/customer-profile', fn () => view('staff.customer_profile'))->name('customer.profile');
     Route::get('/notify-customers', fn () => view('staff.notify_customers'))->name('notify.customers');
+    Route::get('/profile/edit', [StaffProfileController::class, 'edit'])->name('profile.edit');
+    Route::post('/profile/update', [StaffProfileController::class, 'update'])->name('profile.update');
+
 
     // Messages routes
-
 
 });
