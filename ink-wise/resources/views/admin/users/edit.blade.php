@@ -32,6 +32,7 @@
                 <label>Role</label>
                 <select name="role" required>
                     <option value="owner" {{ $user->role === 'owner' ? 'selected' : '' }}>Owner</option>
+                      <option value="admin" {{ $user->role === 'admin' ? 'selected' : '' }}>Admin</option>
                     <option value="staff" {{ $user->role === 'staff' ? 'selected' : '' }}>Staff</option>
                 </select>
             </div>

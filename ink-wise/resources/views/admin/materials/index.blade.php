@@ -48,6 +48,14 @@
 
     {{-- Add Material Button --}}
     <div class="top-actions">
+
+        <div class="search-bar">
+    <form method="GET" action="{{ route('admin.materials.index') }}">
+        <input type="text" name="search" value="{{ request('search') }}" placeholder="🔍 Search materials..." class="form-control">
+        <button type="submit" class="btn btn-secondary">Search</button>
+    </form>
+</div>
+
         <a href="{{ route('admin.materials.create') }}" class="btn btn-primary">➕ Add New Material</a>
     </div>
 
@@ -57,6 +65,8 @@
             ✅ {{ session('success') }}
         </div>
     @endif
+        {{-- Search Bar --}}
+
 
     {{-- Materials Table --}}
     <div class="table-wrapper">
@@ -98,7 +108,26 @@
                             </span>
                         </td>
                         <td>{{ $material->inventory->reorder_level ?? 'N/A' }}</td>
-                        <td>{{ $material->inventory->remarks ?? '' }}</td>
+                        <td>
+    @php
+        $stock = $material->inventory->stock_level ?? 0;
+        $reorder = $material->inventory->reorder_level ?? 0;
+
+        if ($stock <= 0) {
+            $remark = 'Out of Stock';
+            $remarkClass = 'stock-critical';
+        } elseif ($stock <= $reorder) {
+            $remark = 'Low Stock';
+            $remarkClass = 'stock-low';
+        } else {
+            $remark = 'In Stock';
+            $remarkClass = 'stock-ok';
+        }
+    @endphp
+
+    <span class="badge {{ $remarkClass }}">{{ $remark }}</span>
+</td>
+
                         <td class="actions">
                             <a href="{{ route('admin.materials.edit', $material->material_id) }}" class="btn btn-sm btn-warning">✏️</a>
                             <form action="{{ route('admin.materials.destroy', $material->material_id) }}" method="POST" style="display:inline;">

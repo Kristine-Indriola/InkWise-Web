@@ -17,6 +17,19 @@ class StaffAuthController extends Controller
     public function login(Request $request)
     {
         $credentials = $request->only('email', 'password');
+        $user = User::where('email', $credentials['email'])->first();
+
+        if (!$user || $user->role !== 'staff') {
+            return back()->withErrors([
+                'email' => 'No staff account found with this email.',
+            ]);
+        }
+
+        if ($user->status !== 'approved') {
+            return back()->withErrors([
+                'email' => 'Your account is not approved yet.',
+            ]);
+        }
 
         if (Auth::attempt($credentials)) {
             return redirect()->intended('dashboard');

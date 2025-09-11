@@ -24,42 +24,45 @@
             @csrf
             @method('PUT')
 
-            <div>
-                <label>Material Name</label>
-                <input type="text" name="material_name" value="{{ old('material_name', $material->material_name) }}" required>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Material Name</label>
+                    <input type="text" name="material_name" value="{{ old('material_name', $material->material_name) }}" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Material Type</label>
+                    <input type="text" name="material_type" value="{{ old('material_type', $material->material_type) }}" required>
+                </div>
             </div>
 
-            <div>
-                <label>Material Type</label>
-                <input type="text" name="material_type" value="{{ old('material_type', $material->material_type) }}" required>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Unit (e.g. pcs, ream, liter)</label>
+                    <input type="text" name="unit" value="{{ old('unit', $material->unit) }}" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Unit Cost</label>
+                    <input type="number" step="0.01" name="unit_cost" value="{{ old('unit_cost', $material->unit_cost) }}" required>
+                </div>
             </div>
 
-            <div>
-                <label>Unit (e.g. pcs, ream, liter)</label>
-                <input type="text" name="unit" value="{{ old('unit', $material->unit) }}" required>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Stock Level</label>
+                    <input type="number" name="stock_level" value="{{ old('stock_level', $material->inventory->stock_level ?? 0) }}" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Reorder Level</label>
+                    <input type="number" name="reorder_level" value="{{ old('reorder_level', $material->inventory->reorder_level ?? 0) }}" required>
+                </div>
             </div>
 
-            <div>
-                <label>Unit Cost</label>
-                <input type="number" step="0.01" name="unit_cost" value="{{ old('unit_cost', $material->unit_cost) }}" required>
-            </div>
-
-            <div>
-                <label>Stock Level</label>
-                <input type="number" name="stock_level" value="{{ old('stock_level', $material->inventory->stock_level ?? 0) }}" required>
-            </div>
-
-            <div>
-                <label>Reorder Level</label>
-                <input type="number" name="reorder_level" value="{{ old('reorder_level', $material->inventory->reorder_level ?? 0) }}" required>
-            </div>
-
-            <div>
-                <label>Remarks</label>
-                <textarea name="remarks">{{ old('remarks', $material->inventory->remarks ?? '') }}</textarea>
-            </div>
-
-            <div style="display:flex; flex-wrap:wrap; gap:10px;">
+            {{-- Remarks removed since it's automatic --}}
+            
+            <div class="btn-group">
                 <button type="submit">Update Material</button>
                 <a href="{{ route('admin.materials.index') }}" class="btn-back">Cancel</a>
             </div>

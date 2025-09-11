@@ -5,7 +5,7 @@
 @section('content')
 <div class="container">
     <div class="card">
-          <link rel="stylesheet" href="{{ asset('css/edit-users.css') }}">
+        <link rel="stylesheet" href="{{ asset('css/edit-users.css') }}">
         <h2 class="form-title">➕ Create Staff Account</h2>
 
         {{-- Success Message --}}
@@ -32,6 +32,17 @@
             <!-- Name Section -->
             <h3 class="section-title">👤 Personal Information</h3>
             <div class="form-row">
+
+                <div class="form-group">
+                    <label>Role</label>
+                    <select name="role" required>
+                        <option value="" disabled selected>-- Select Role --</option>
+                        <option value="staff" {{ old('role') == 'staff' ? 'selected' : '' }}>Staff</option>
+                        <option value="admin" {{ old('role') == 'admin' ? 'selected' : '' }}>admin</option>
+                        <option value="owner" {{ old('role') == 'owner' ? 'selected' : '' }}>Owner</option>
+                    </select>
+                </div>
+
                 <div class="form-group">
                     <label>First Name</label>
                     <input type="text" name="first_name" value="{{ old('first_name') }}" required>
@@ -98,7 +109,6 @@
             </div>
 
             <!-- Hidden Fields -->
-            <input type="hidden" name="role" value="staff">
             <input type="hidden" name="status" value="pending">
 
             <!-- Buttons -->

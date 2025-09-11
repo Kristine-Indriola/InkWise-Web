@@ -18,9 +18,11 @@
 /* Top Actions */
 .top-actions {
     display: flex;
-    justify-content: flex-end;
-    margin-bottom: 15px;
+    justify-content: space-between; /* search left, button right */
+    align-items: center;
+    margin: 20px 0;
 }
+
 
 /* Buttons */
 .btn {
@@ -176,4 +178,58 @@
 .summary-cards .low   { background: #f59e0b; }   /* Orange */
 .summary-cards .out   { background: #dc2626; }   /* Red */
 .summary-cards .qty   { background: #16a34a; }   /* Green */
+
+.search-bar form {
+    display: flex;
+    gap: 8px;
+}
+
+.search-bar input {
+    padding: 8px;
+    width: 220px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+}
+
+.search-bar button {
+    padding: 8px 14px;
+    border: none;
+    background: #3498db;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.search-bar button:hover {
+    background: #2980b9;
+}
+
+.badge.stock-ok {
+    background-color: #d1fae5; /* light green */
+    color: #065f46; /* dark green */
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.badge.stock-low {
+    background-color: #fef3c7; /* light yellow */
+    color: #92400e; /* dark orange */
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.badge.stock-critical {
+    background-color: #fee2e2; /* light red */
+    color: #991b1b; /* dark red */
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: bold;
+}
+
 

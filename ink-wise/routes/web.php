@@ -256,7 +256,9 @@ Route::post('/logout', [RoleLoginController::class, 'logout'])->name('logout');
 Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/home', [HomeController::class, 'index'])->name('home');
 
-     Route::get('/profile', [OwnerController::class, 'show'])->name('profile.show');
+    // Staff management (approved + pending)
+    // Staff management (single page)
+         Route::get('/profile', [OwnerController::class, 'show'])->name('profile.show');
 
     // Edit profile
     Route::get('/profile/edit', [OwnerController::class, 'edit'])->name('profile.edit');
@@ -265,6 +267,7 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::put('/profile/update', [OwnerController::class, 'update'])->name('profile.update');
 
     // Staff management (approved + pending)
+    
     Route::get('/staff', [OwnerController::class, 'staffIndex'])->name('staff.index');
 
     Route::get('/staff/search', [OwnerStaffController::class, 'search'])->name('staff.search');
@@ -278,7 +281,7 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
 
     // Other pagesgut
     Route::get('/order/workflow', fn () => view('owner.order-workflow'))->name('order.workflow');
-    Route::get('inventory-track', [OwnerInventoryController::class, 'index'])->name('inventory-track');
+    Route::get('/inventory/track', fn () => view('owner.inventory-track'))->name('inventory-track');
     Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
     Route::get('/reports', fn () => view('owner.owner-reports'))->name('reports');
 
