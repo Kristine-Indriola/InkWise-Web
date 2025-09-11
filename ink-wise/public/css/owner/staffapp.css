@@ -325,6 +325,26 @@ button#pendingBtn.pending-btn:hover {
   border-color: #991b1b;
 }
 
+.back-btn {
+    display: flex;
+    align-items: center;
+    background-color: #16a34a; /* Green color */
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.back-btn svg {
+    margin-right: 8px; /* Space between the icon and text */
+}
+
+.back-btn:hover {
+    background-color: #15803d; /* Darker green on hover */
+}
+
 
 
 /* ---------- Responsive ---------- */

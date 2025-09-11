@@ -1,5 +1,9 @@
 @extends('layouts.owner.app')
 
+@push('styles')
+  <link rel="stylesheet" href="css/owner/staffapp.css">
+@endpush
+
 @section('content')
 @include('layouts.owner.sidebar')
 
@@ -8,7 +12,6 @@
     <div class="welcome-text"><strong>Welcome, Owner!</strong></div>
 
     <div class="topbar-actions">
-      {{-- Notification (DB query here — safe for all pages) --}}
       @php
           $lowCount = \App\Models\Material::whereHas('inventory', function($q) {
               $q->whereColumn('stock_level', '<=', 'reorder_level')
@@ -22,7 +25,14 @@
           $notifCount = $lowCount + $outCount;
       @endphp
 
-      
+      <button type="button" class="icon-btn" aria-label="Notifications">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 17H9a4 4 0 0 1-4-4V9a7 7 0 1 1 14 0v4a4 4 0 0 1-4 4z"/>
+          <path d="M10 21a2 2 0 0 0 4 0"/>
+        </svg>
+        <span class="badge">2</span> 
+      </button>
 
       <form method="POST" action="{{ route('logout') }}">
         @csrf
@@ -30,13 +40,17 @@
       </form>
     </div>
   </div>
+       
 
   <div class="panel">
     <h3>Stock Levels</h3>
 
-    <div class="search-wrap">
-      <input class="search-input" type="text" placeholder="Search by item name, category…" />
-    </div>
+     <form method="GET" action="{{ route('owner.materials.search') }}">
+      <div class="search-wrap" style="padding: 6px 12px;">
+        <input class="search-input" type="text" name="search" placeholder="Search by item name or category..." value="{{ request()->input('search') }}" />
+        <button type="submit" class="search-btn" style="padding: 1px 8px; font-size: 13px;">Search</button>
+      </div>
+    </form>
 
     <div class="table-wrap">
       <table class="inventory-table">
@@ -55,7 +69,7 @@
               $reorder = $material->inventory->reorder_level ?? 0;
 
               if ($stock <= 0) {
-                  $statusClass = 'out-stock';
+                  $statusClass = 'out-of-stock';
                   $statusText = 'Out of Stock';
               } elseif ($stock <= $reorder) {
                   $statusClass = 'low-stock';

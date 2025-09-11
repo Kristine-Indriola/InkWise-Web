@@ -17,6 +17,7 @@ use App\Http\Controllers\Auth\RoleLoginController;
 use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\MaterialsController;
 use App\Http\Controllers\customerProfileController;
+use App\Http\Controllers\Owner\OwnerStaffController;
 use App\Http\Controllers\Auth\CustomerAuthController;
 use App\Http\Controllers\Customer\CustomerController;
 use App\Http\Controllers\Admin\UserManagementController;
@@ -264,8 +265,11 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::put('/profile/update', [OwnerController::class, 'update'])->name('profile.update');
 
     // Staff management (approved + pending)
-    // Staff management (single page)
     Route::get('/staff', [OwnerController::class, 'staffIndex'])->name('staff.index');
+
+    Route::get('/staff/search', [OwnerStaffController::class, 'search'])->name('staff.search');
+
+
 
     // Approve/reject staff
     Route::post('/staff/{staff}/approve', [OwnerController::class, 'approveStaff'])->name('staff.approve');
@@ -278,8 +282,18 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
     Route::get('/reports', fn () => view('owner.owner-reports'))->name('reports');
 
-    Route::get('/owner/materials/low-stock', [OwnerInventoryController::class, 'lowStock'])
-    ->name('owner.materials.lowStock');
+    // In routes/web.php
+
+    Route::get('/materials/search', [OwnerInventoryController::class, 'searchMaterials'])->name('materials.search');
+
+    
+    Route::get('/owner/materials/low-stock', [OwnerInventoryController::class, 'track'])
+    ->name('owner.materials.lowStock')
+    ->defaults('status', 'low');
+
+    Route::get('/owner/materials/out-stock', [OwnerInventoryController::class, 'track'])
+    ->name('owner.materials.outStock')
+    ->defaults('status', 'out');
 
 
 });

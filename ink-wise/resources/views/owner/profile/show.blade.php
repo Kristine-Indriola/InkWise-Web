@@ -5,10 +5,31 @@
 @section('content')
 @include('layouts.owner.sidebar')
 
+<section class="main-content">
+<div class="topbar">
+  <div class="welcome-text"><strong>Welcome, Owner!</strong></div>
+  <div class="topbar-actions">
+    <button type="button" class="icon-btn" aria-label="Notifications">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 17H9a4 4 0 0 1-4-4V9a7 7 0 1 1 14 0v4a4 4 0 0 1-4 4z"/>
+        <path d="M10 21a2 2 0 0 0 4 0"/>
+      </svg>
+      <span class="badge">2</span> 
+    </button>
+
+    <form method="POST" action="{{ route('logout') }}">
+      @csrf
+      <button type="submit" class="logout-btn">
+        Logout
+      </button>
+    </form>
+  </div>
+</div>
+
 <link rel="stylesheet" href="{{ asset('css/owner/owner-profile.css') }}">
 
 <div class="profile-container">
-    {{-- Top Section: Avatar + Name + Role --}}
     <div class="flex flex-col items-center text-center">
         <img src="https://ui-avatars.com/api/?name={{ urlencode(optional($owner->staff)->first_name . ' ' . optional($owner->staff)->last_name ?? $owner->email) }}&background=4F46E5&color=fff&bold=true" 
              alt="Owner Avatar" 
@@ -22,9 +43,7 @@
 
     <hr class="my-8 border-gray-300">
 
-    {{-- Info Sections --}}
     <div class="space-y-10">
-        {{-- User Info --}}
         <div>
             <h3 class="section-title">Account Information</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -67,7 +86,7 @@
 
         {{-- Address Info --}}
         <div>
-            <h3 class="section-title">Address Information</h3>
+            <h3 class="section-title">📍Address Information</h3>
             @if($owner->address)
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
@@ -113,4 +132,5 @@
         </a>
     </div>
 </div>
+</section>
 @endsection

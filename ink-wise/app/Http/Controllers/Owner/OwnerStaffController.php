@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Owner;
 
 use App\Models\Staff;
+use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 
 class OwnerStaffController extends Controller
@@ -48,4 +49,20 @@ class OwnerStaffController extends Controller
 
         return back()->with('error', 'Staff rejected.');
     }
+
+    public function search(Request $request)
+    {
+        // Get the search query from the request
+        $query = $request->input('search');
+        
+        // Search the staff table for matching staff (you can customize this as needed)
+        $staff = Staff::where('first_name', 'like', "%$query%")
+                      ->orWhere('last_name', 'like', "%$query%")
+                      ->get();
+
+        // Return a view with the results
+        return view('owner.staff.staff-list', compact('staff'));
+
+    }
+
 }
