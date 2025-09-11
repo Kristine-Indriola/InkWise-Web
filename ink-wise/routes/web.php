@@ -23,6 +23,7 @@ use App\Http\Controllers\Auth\CustomerAuthController;
 use App\Http\Controllers\Customer\CustomerController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Owner\OwnerInventoryController;
+use App\Http\Controllers\Admin\ReportsDashboardController;
 use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
 
 
@@ -81,6 +82,7 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::put('/{user_id}', [UserManagementController::class, 'update'])->name('update'); // Update user 
     Route::delete('/{user_id}', [UserManagementController::class, 'destroy'])->name('destroy'); // Delete user 
 
+    });
   Route::prefix('users')->name('users.')->group(function () {
     Route::get('/', [UserManagementController::class, 'index'])->name('index');
     Route::get('/create', [UserManagementController::class, 'create'])->name('create');
@@ -91,11 +93,6 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::delete('/{user_id}', [UserManagementController::class, 'destroy'])->name('destroy');
 
 });
-
-
-
-
-
 
      Route::prefix('inventory')->name('inventory.')->group(function () {
         Route::get('/', [InventoryController::class, 'index'])->name('index');
@@ -126,6 +123,17 @@ Route::prefix('users')->name('users.')->group(function () {
         Route::get('/chat/{customerId}', [MessageController::class, 'chatWithCustomer'])->name('chat');
         Route::post('/send/{customerId}', [MessageController::class, 'sendToCustomer'])->name('send');
     });
+
+     Route::get('reports', [ReportsDashboardController::class, 'index'])
+         ->name('reports.reports');
+
+    // Optional: Sales export
+    Route::get('reports/sales/export/{type}', [ReportsDashboardController::class, 'exportSales'])
+         ->name('reports.sales.export');
+
+    // Optional: Inventory export
+    Route::get('reports/inventory/export/{type}', [ReportsDashboardController::class, 'exportInventory'])
+         ->name('reports.inventory.export');
 
 });
 
