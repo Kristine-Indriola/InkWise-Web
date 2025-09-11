@@ -101,73 +101,79 @@ class UserManagementController extends Controller
     }
 
     // Update staff account
-    public function update(Request $request, $id)
+public function update(Request $request, $id)
 {
-    $user = User::findOrFail($id);
+    // Find the user
+    $user = User::with('staff', 'address')->findOrFail($id);
 
+    // ✅ Validation
     $request->validate([
-        'role' => 'required|in:staff,manager,owner',
-        'first_name' => 'required|string|max:255',
-        'middle_name' => 'nullable|string|max:255',
-        'last_name' => 'required|string|max:255',
+        'role'           => 'required|in:staff,manager,owner,admin', // include admin
+        'first_name'     => 'required|string|max:255',
+        'middle_name'    => 'nullable|string|max:255',
+        'last_name'      => 'required|string|max:255',
         'contact_number' => 'required|string|max:20',
-        'email' => 'required|email|unique:users,email,' . $user->user_id . ',user_id',
-        'status' => 'required|in:active,inactive',
-        'street' => 'nullable|string|max:255',
-        'barangay' => 'nullable|string|max:255',
-        'city' => 'nullable|string|max:255',
-        'province' => 'nullable|string|max:255',
-        'postal_code' => 'nullable|string|max:20',
-        'country' => 'nullable|string|max:255',
-        'password' => 'nullable|string|min:8', // ✅ add this to validation
+        'email'          => 'required|email|unique:users,email,' . $user->user_id . ',user_id',
+        'status'         => 'required|in:active,inactive',
+        'street'         => 'nullable|string|max:255',
+        'barangay'       => 'nullable|string|max:255',
+        'city'           => 'nullable|string|max:255',
+        'province'       => 'nullable|string|max:255',
+        'postal_code'    => 'nullable|string|max:20',
+        'country'        => 'nullable|string|max:255',
+        'password'       => 'nullable|string|min:8',
     ]);
 
-    // ✅ Update user basic info (except password)
+    // ✅ Update User table
     $user->update([
-        'role' => $request->role,
-        'email' => $request->email,
+        'role'   => $request->role,
+        'email'  => $request->email,
         'status' => $request->status,
     ]);
 
-    // ✅ Update password only if filled
+    // ✅ Update password if provided
     if ($request->filled('password')) {
         $user->update([
             'password' => Hash::make($request->password),
         ]);
     }
 
-    // ✅ Update staff details
-    $user->staff->update([
-        'first_name' => $request->first_name,
-        'middle_name' => $request->middle_name,
-        'last_name' => $request->last_name,
-        'contact_number' => $request->contact_number,
-    ]);
+    // ✅ Update Staff table
+    if ($user->staff) {
+        $user->staff->update([
+            'first_name'     => $request->first_name,
+            'middle_name'    => $request->middle_name,
+            'last_name'      => $request->last_name,
+            'contact_number' => $request->contact_number,
+            'role'           => $request->role, // match user role
+        ]);
+    }
 
-    // ✅ Update or create address
+    // ✅ Update or create Address table
     if ($user->address) {
         $user->address->update([
-            'street' => $request->street,
-            'barangay' => $request->barangay,
-            'city' => $request->city,
-            'province' => $request->province,
+            'street'      => $request->street,
+            'barangay'    => $request->barangay,
+            'city'        => $request->city,
+            'province'    => $request->province,
             'postal_code' => $request->postal_code,
-            'country' => $request->country,
+            'country'     => $request->country,
         ]);
     } else {
         $user->address()->create([
-            'street' => $request->street,
-            'barangay' => $request->barangay,
-            'city' => $request->city,
-            'province' => $request->province,
+            'street'      => $request->street,
+            'barangay'    => $request->barangay,
+            'city'        => $request->city,
+            'province'    => $request->province,
             'postal_code' => $request->postal_code,
-            'country' => $request->country,
+            'country'     => $request->country,
         ]);
     }
 
     return redirect()->route('admin.users.index')
-        ->with('success', 'User updated successfully.');
+                     ->with('success', 'User updated successfully.');
 }
+
 
 
     // Delete staff account
