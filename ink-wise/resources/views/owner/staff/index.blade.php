@@ -43,6 +43,13 @@
         👥 Staff Management
       </h2>
 
+      <div class="search-bar" style="margin-top: 20px; margin-bottom: 20px;">
+        <form action="{{ route('owner.staff.search') }}" method="GET">
+          <input type="text" name="search" placeholder="Search Staff by Name or Email" class="search-input">
+          <button type="submit" class="search-btn">Search</button>
+        </form>
+      </div>
+
       @if(session('success'))
         <div id="successToast" style="
           margin: 16px auto 24px auto;
@@ -107,7 +114,7 @@
                 <td><span class="badge status-active">Approved</span></td>
               </tr>
             @empty
-              <tr><td colspan="5" class="text-center">No approved staff yet.</td></tr>
+              <tr><td colspan="5" class="text-center">No staff found matching your search.</td></tr>
             @endforelse
           </tbody>
         </table>

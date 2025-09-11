@@ -22,6 +22,7 @@ body {
   font-size: 20px;
   margin: 0 20px 16px;
   color: #6c5ce7;
+  align-items: center;
 }
 
 .profile {
@@ -298,6 +299,20 @@ canvas {
   width: 100% !important;
   height: 100% !important;
 }
+
+.search-btn {
+    padding: 6px 12px;
+    background-color: rgb(64, 84, 209);
+    color: #f9f6f6;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    margin-left: 10px;
+  }
+  .search-btn:hover {
+    background-color: rgb(0, 0, 153);
+  }
 
 @media (max-width: 1100px) {
   .cards {
