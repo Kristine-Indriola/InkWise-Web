@@ -94,6 +94,12 @@ Route::prefix('users')->name('users.')->group(function () {
 
 });
 
+});
+
+
+
+
+
      Route::prefix('inventory')->name('inventory.')->group(function () {
         Route::get('/', [InventoryController::class, 'index'])->name('index');
         Route::get('/create', [InventoryController::class, 'create'])->name('create');
@@ -297,7 +303,7 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
 
     // Staff management (approved + pending)
     // Staff management (single page)
-         Route::get('/profile', [OwnerController::class, 'show'])->name('profile.show');
+     Route::get('/profile', [OwnerController::class, 'show'])->name('profile.show');
 
     // Edit profile
     Route::get('/profile/edit', [OwnerController::class, 'edit'])->name('profile.edit');
@@ -313,6 +319,7 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
 
 
 
+
     // Approve/reject staff
     Route::post('/staff/{staff}/approve', [OwnerController::class, 'approveStaff'])->name('staff.approve');
     Route::post('/staff/{staff}/reject', [OwnerController::class, 'rejectStaff'])->name('staff.reject');
@@ -324,8 +331,6 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/inventory/track', [OwnerInventoryController::class, 'track'])->name('inventory-track');
     Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
     Route::get('/reports', fn () => view('owner.owner-reports'))->name('reports');
-
-    // In routes/web.php
 
     
     
@@ -361,3 +366,4 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
     // Messages routes
 
 });
+
