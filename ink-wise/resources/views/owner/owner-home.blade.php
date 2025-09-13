@@ -43,25 +43,25 @@
       <p>$12,340</p>
     </div>
 
-    <!-- Low Stock Card -->
-<a href="{{ route('owner.inventory-track', ['status' => 'low']) }}" style="text-decoration:none; color:inherit;">
-  <div class="card">
-    <div class="stat-icon icon-stock">
-      <svg viewBox="0 0 24 24">
-        <path d="M3 7l9 4 9-4-9-4-9 4z"/>
-        <path d="M3 7v6l9 4 9-4V7"/>
-        <path d="M12 11v6"/>
-      </svg>
-    </div>
-    <h3>Low Stock</h3>
-    <p>
-  {{ \App\Models\Material::whereHas('inventory', function($q) {
-        $q->whereColumn('stock_level', '<=', 'reorder_level')
-          ->where('stock_level', '>', 0);
-    })->count() }} Items
-</p>
-  </div>
-</a>
+    <a href="{{ route('owner.inventory-track', ['status' => 'low']) }}" style="text-decoration:none; color:inherit;">
+      <div class="card">
+        <div class="stat-icon icon-stock">
+          <svg viewBox="0 0 24 24">
+            <path d="M3 7l9 4 9-4-9-4-9 4z"/>
+            <path d="M3 7v6l9 4 9-4V7"/>
+            <path d="M12 11v6"/>
+          </svg>
+        </div>
+        <h3>Low Stock</h3>
+        <p>
+          {{ \App\Models\Material::whereHas('inventory', function($q) {
+                $q->whereColumn('stock_level', '<=', 'reorder_level')
+                  ->where('stock_level', '>', 0);
+            })->count() }} Items
+        </p>
+      </div>
+    </a>
+
 
     <!-- Pending Orders Card -->
     <div class="card">

@@ -52,17 +52,56 @@ class OwnerStaffController extends Controller
 
     public function search(Request $request)
     {
-        // Get the search query from the request
         $query = $request->input('search');
-        
-        // Search the staff table for matching staff (you can customize this as needed)
-        $staff = Staff::where('first_name', 'like', "%$query%")
-                      ->orWhere('last_name', 'like', "%$query%")
-                      ->get();
 
-        // Return a view with the results
-        return view('owner.staff.staff-list', compact('staff'));
+        // If no query, show default staffIndex
+        if (empty($query)) {
+            return $this->staffIndex();
+        }
 
+        // Split query into terms (for multi-word names)
+        $terms = preg_split('/\s+/', $query, -1, PREG_SPLIT_NO_EMPTY);
+
+        // Search in approved staff
+        $approvedStaff = Staff::with('user')
+            ->where('status', 'approved')
+            ->where(function ($q) use ($terms, $query) {
+                foreach ($terms as $term) {
+                    $q->where(function ($q2) use ($term) {
+                        $q2->where('first_name', 'like', "%{$term}%")
+                        ->orWhere('middle_name', 'like', "%{$term}%")
+                        ->orWhere('last_name', 'like', "%{$term}%");
+                    });
+                }
+                // Also search email in users table
+                $q->orWhereHas('user', function ($q3) use ($query) {
+                    $q3->where('email', 'like', "%{$query}%");
+                });
+            })
+            ->get();
+
+        // Search in pending staff
+        $pendingStaff = Staff::with('user')
+            ->where('status', 'pending')
+            ->where(function ($q) use ($terms, $query) {
+                foreach ($terms as $term) {
+                    $q->where(function ($q2) use ($term) {
+                        $q2->where('first_name', 'like', "%{$term}%")
+                        ->orWhere('middle_name', 'like', "%{$term}%")
+                        ->orWhere('last_name', 'like', "%{$term}%");
+                    });
+                }
+                // Also search email in users table
+                $q->orWhereHas('user', function ($q3) use ($query) {
+                    $q3->where('email', 'like', "%{$query}%");
+                });
+            })
+            ->get();
+
+        return view('owner.staff.index', compact('approvedStaff', 'pendingStaff'))
+            ->with('search', $query);
     }
+
+
 
 }
