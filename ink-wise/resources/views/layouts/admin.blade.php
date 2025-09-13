@@ -432,7 +432,9 @@ body.dark-mode .btn-danger {
     <a href="{{ route('admin.materials.index') }}"><i>📝</i> Materials</a>
 </li>
 
-  <li><i>📊</i> Reports</li>
+  <li class="{{ request()->routeIs('admin.reports.*') ? 'active' : '' }}">
+            <a href="{{ route('admin.reports.reports') }}"><i>📊</i> Reports</a>
+        </li>
 </ul>
 
   </div>

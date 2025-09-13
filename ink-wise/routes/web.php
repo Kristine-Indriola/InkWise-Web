@@ -10,6 +10,7 @@ use App\Http\Controllers\Owner\HomeController;
 //use App\Http\Controllers\Auth\AdminLoginController;
 //use App\Http\Controllers\StaffAuthController;
 //use App\Http\Controllers\Staff\StaffLoginController;
+use App\Http\Controllers\StaffProfileController;
 use App\Http\Controllers\Owner\OwnerController;
 use App\Http\Controllers\AdminCustomerController;
 use App\Http\Controllers\Admin\MaterialController;
@@ -22,6 +23,7 @@ use App\Http\Controllers\Auth\CustomerAuthController;
 use App\Http\Controllers\Customer\CustomerController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Owner\OwnerInventoryController;
+use App\Http\Controllers\Admin\ReportsDashboardController;
 use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
 
 
@@ -80,6 +82,7 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::put('/{user_id}', [UserManagementController::class, 'update'])->name('update'); // Update user 
     Route::delete('/{user_id}', [UserManagementController::class, 'destroy'])->name('destroy'); // Delete user 
 
+    });
   Route::prefix('users')->name('users.')->group(function () {
     Route::get('/', [UserManagementController::class, 'index'])->name('index');
     Route::get('/create', [UserManagementController::class, 'create'])->name('create');
@@ -92,6 +95,7 @@ Route::prefix('users')->name('users.')->group(function () {
 });
 
 });
+
 
 
 
@@ -125,6 +129,17 @@ Route::prefix('users')->name('users.')->group(function () {
         Route::get('/chat/{customerId}', [MessageController::class, 'chatWithCustomer'])->name('chat');
         Route::post('/send/{customerId}', [MessageController::class, 'sendToCustomer'])->name('send');
     });
+
+     Route::get('reports', [ReportsDashboardController::class, 'index'])
+         ->name('reports.reports');
+
+    // Optional: Sales export
+    Route::get('reports/sales/export/{type}', [ReportsDashboardController::class, 'exportSales'])
+         ->name('reports.sales.export');
+
+    // Optional: Inventory export
+    Route::get('reports/inventory/export/{type}', [ReportsDashboardController::class, 'exportInventory'])
+         ->name('reports.inventory.export');
 
 });
 
@@ -344,9 +359,11 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
     Route::get('/order-list', fn () => view('staff.order_list'))->name('order.list');
     Route::get('/customer-profile', fn () => view('staff.customer_profile'))->name('customer.profile');
     Route::get('/notify-customers', fn () => view('staff.notify_customers'))->name('notify.customers');
+    Route::get('/profile/edit', [StaffProfileController::class, 'edit'])->name('profile.edit');
+    Route::post('/profile/update', [StaffProfileController::class, 'update'])->name('profile.update');
+
 
     // Messages routes
-
 
 });
 
