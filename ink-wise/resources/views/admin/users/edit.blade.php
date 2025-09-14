@@ -9,23 +9,17 @@
         <h2 class="form-title">✏️ Edit User</h2>
 
         {{-- Alerts --}}
-        @if(session('success'))
-            <div class="alert success">
-                ✅ {{ session('success') }}
-            </div>
-        @endif
-
-        @if(session('error'))
-            <div class="alert error">
-                🚫 {{ session('error') }}
-            </div>
-        @endif
-
-        @if(session('warning'))
-            <div class="alert warning">
-                ⚠️ {{ session('warning') }}
-            </div>
-        @endif
+        @foreach (['success', 'error', 'warning'] as $msg)
+            @if(session($msg))
+                <div class="alert {{ $msg }}">
+                    @if($msg === 'success') ✅
+                    @elseif($msg === 'error') 🚫
+                    @elseif($msg === 'warning') ⚠️
+                    @endif
+                    {{ session($msg) }}
+                </div>
+            @endif
+        @endforeach
 
         {{-- Validation Errors --}}
         @if ($errors->any())
@@ -47,27 +41,17 @@
                 <label>Role</label>
                 <select name="role" id="role" class="form-control" required>
                     <option value="">-- Select Role --</option>
-
-                    {{-- Owner --}}
-                    <option value="owner"
-                        {{ $user->role === 'owner' ? 'selected' : '' }}
-                        {{ $ownerCount - ($user->role === 'owner' ? 1 : 0) >= 1 ? 'disabled' : '' }}>
+                    <option value="owner" {{ $user->role === 'owner' ? 'selected' : '' }} {{ $ownerCount - ($user->role === 'owner' ? 1 : 0) >= 1 ? 'disabled' : '' }}>
                         Owner {{ $ownerCount - ($user->role === 'owner' ? 1 : 0) >= 1 ? '(Already Exists)' : '' }}
                     </option>
-
-                    {{-- Admin --}}
-                    <option value="admin"
-                        {{ $user->role === 'admin' ? 'selected' : '' }}
-                        {{ $adminCount - ($user->role === 'admin' ? 1 : 0) >= 1 ? 'disabled' : '' }}>
+                    <option value="admin" {{ $user->role === 'admin' ? 'selected' : '' }} {{ $adminCount - ($user->role === 'admin' ? 1 : 0) >= 1 ? 'disabled' : '' }}>
                         Admin {{ $adminCount - ($user->role === 'admin' ? 1 : 0) >= 1 ? '(Already Exists)' : '' }}
                     </option>
-
-                    {{-- Staff --}}
-                    <option value="staff"
-                        {{ $user->role === 'staff' ? 'selected' : '' }}>
-                        Staff
-                    </option>
+                    <option value="staff" {{ $user->role === 'staff' ? 'selected' : '' }}>Staff</option>
                 </select>
+                @error('role')
+                    <span class="field-error">{{ $message }}</span>
+                @enderror
             </div>
 
             <!-- Name fields -->
@@ -75,28 +59,55 @@
                 <div class="form-group">
                     <label>First Name</label>
                     <input type="text" name="first_name" value="{{ old('first_name', $user->staff->first_name ?? '') }}" required>
+                    @error('first_name') <span class="field-error">{{ $message }}</span> @enderror
                 </div>
                 <div class="form-group">
                     <label>Middle Name <small>(optional)</small></label>
                     <input type="text" name="middle_name" value="{{ old('middle_name', $user->staff->middle_name ?? '') }}">
+                    @error('middle_name') <span class="field-error">{{ $message }}</span> @enderror
                 </div>
                 <div class="form-group">
                     <label>Last Name</label>
                     <input type="text" name="last_name" value="{{ old('last_name', $user->staff->last_name ?? '') }}" required>
+                    @error('last_name') <span class="field-error">{{ $message }}</span> @enderror
                 </div>
             </div>
 
-            <!-- Contact -->
-            <div class="form-group">
-                <label>Contact Number</label>
-                <input type="text" name="contact_number" value="{{ old('contact_number', $user->staff->contact_number ?? '') }}" required>
+            <!-- Contact + Email Row -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Contact Number</label>
+                    <input type="text" name="contact_number" value="{{ old('contact_number', $user->staff->contact_number ?? '') }}" required>
+                    @error('contact_number') <span class="field-error">{{ $message }}</span> @enderror
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" name="email" value="{{ old('email', $user->email) }}" required>
+                    @error('email') <span class="field-error">{{ $message }}</span> @enderror
+                </div>
             </div>
 
-            <!-- Email -->
-            <div class="form-group">
-                <label>Email</label>
-                <input type="email" name="email" value="{{ old('email', $user->email) }}" required>
-            </div>
+                <!-- Current Password -->
+<div class="form-row">
+    <div class="form-group">
+        <label>Current Password <small>(required to confirm changes)</small></label>
+        <input type="password" name="current_password" required>
+        @error('current_password') <span class="field-error">{{ $message }}</span> @enderror
+    </div>
+</div>
+
+<!-- Password + Confirm Password Row -->
+<div class="form-row">
+    <div class="form-group">
+        <label>New Password <small>(leave blank to keep current)</small></label>
+        <input type="password" name="password">
+        @error('password') <span class="field-error">{{ $message }}</span> @enderror
+    </div>
+    <div class="form-group">
+        <label>Confirm New Password</label>
+        <input type="password" name="password_confirmation">
+    </div>
+</div>
 
             <!-- Address -->
             <h3 class="section-title">📍 Address</h3>

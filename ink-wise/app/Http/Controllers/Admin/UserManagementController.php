@@ -93,6 +93,16 @@ public function store(Request $request)
 
 
     // Other methods (index, edit, update, destroy, show) remain mostly unchanged
+
+    public function edit($user_id)
+     { $user = User::with(['staff','address'])
+        ->findOrFail($user_id); $ownerCount = $this->roleLimitCount('owner');
+         $adminCount = $this->roleLimitCount('admin'); 
+         $staffCount = $this->roleLimitCount('staff');
+          return view('admin.users.edit', compact('user', 'ownerCount', 'adminCount', 'staffCount'));
+        
+    }
+
     public function index(Request $request) 
     { $search = $request->input('search'); 
         $users = User::with(['staff','address']) 
@@ -115,30 +125,37 @@ public function store(Request $request)
                 ->with('error', '🚫 Archived accounts cannot be reactivated.');
         }
 
-        $request->validate([
-            'role'           => 'required|in:staff,owner,admin',
-            'first_name'     => 'required|string|max:255',
-            'middle_name'    => 'nullable|string|max:255',
-            'last_name'      => 'required|string|max:255',
-            'contact_number' => 'required|string|max:20',
-            'email'          => 'required|email|unique:users,email,' . $user->user_id . ',user_id',
-            'status'         => 'required|in:active,inactive',
-            'street'         => 'nullable|string|max:255',
-            'barangay'       => 'nullable|string|max:255',
-            'city'           => 'nullable|string|max:255',
-            'province'       => 'nullable|string|max:255',
-            'postal_code'    => 'nullable|string|max:20',
-            'country'        => 'nullable|string|max:255',
-            'password'       => 'nullable|string|min:8',
-        ]);
+       $request->validate([
+    'current_password' => 'required|string',
+    'role'             => 'required|in:staff,owner,admin',
+    'first_name'       => 'required|string|max:255',
+    'middle_name'      => 'nullable|string|max:255',
+    'last_name'        => 'required|string|max:255',
+    'contact_number'   => 'required|string|max:20',
+    'email'            => 'required|email|unique:users,email,' . $user->user_id . ',user_id',
+    'status'           => 'required|in:active,inactive',
+    'street'           => 'nullable|string|max:255',
+    'barangay'         => 'nullable|string|max:255',
+    'city'             => 'nullable|string|max:255',
+    'province'         => 'nullable|string|max:255',
+    'postal_code'      => 'nullable|string|max:20',
+    'country'          => 'nullable|string|max:255',
+    'password'         => 'nullable|string|min:8|confirmed',
+]);
+
+    if (!Hash::check($request->current_password, $user->password)) {
+    return redirect()->back()
+                     ->withInput()
+                     ->with('error', '🚫 Current password is incorrect.');
+}
 
         // Update User
-        $user->update([
-            'role'     => $request->role,
-            'email'    => $request->email,
-            'status'   => $request->status,
-            'password' => $request->password ? Hash::make($request->password) : $user->password,
-        ]);
+       $user->update([
+    'role'     => $request->role,
+    'email'    => $request->email,
+    'status'   => $request->status,
+    'password' => $request->password ? Hash::make($request->password) : $user->password,
+]);
 
         // Update Staff
         if ($user->staff) {
