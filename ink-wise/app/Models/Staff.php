@@ -24,11 +24,18 @@ class Staff extends Model
         'status',
     ];
 
+      // Scope to exclude archived staff
+    public function scopeNotArchived($query)
+    {
+        return $query->where('status', '!=', 'archived');
+    }
+
     // Relationship to User
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
     }
+
 
     public function address()
     {
