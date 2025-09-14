@@ -9,6 +9,7 @@
 @section('content')
 <div class="staff-page" style="--wrap: 1200px;"> 
 
+
   {{-- Topbar --}}
   <div class="topbar">
     <div class="welcome-text">

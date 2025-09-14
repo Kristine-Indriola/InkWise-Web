@@ -2,8 +2,8 @@ body {
   margin: 0;
   font-family: 'Arial', sans-serif;
   background-color: #f8f9fa;
-  display: flex;
   height: 100vh; /* Ensure full height layout */
+  
 }
 
 /* Sidebar */
@@ -13,9 +13,11 @@ body {
   border-right: 1px solid #ddd;
   height: 100vh;
   padding: 20px 0;
-  position: sticky;
+  position: fixed;
   flex-shrink: 0;
   top: 0;
+  left: 0;
+  z-index: 1000;
 }
 
 .sidebar h2 {
@@ -117,16 +119,25 @@ body {
 
 /* Main content layout */
 .main-content {
-  flex: 1; /* Take up the remaining space */
+  position: absolute;
+  top: 70px;             /* sits just below topbar */
+  left: 250px;           /* offset for sidebar */
+  right: 0;
+  bottom: 0;             /* fill to bottom of viewport */
+  
   padding: 20px;
-  background-color: #f8f9fa; 
-  min-width:0;
+  background-color: #f8f9fa;
+
+  overflow-y: auto;      /* scroll only inside this area */
+  display: flex;
+  flex-direction: column;
+  
 }
 
-/* page-level wrapper you can reuse */
 .page-inner{
-  max-width: 1200px;          /* adjust to taste (e.g., 1280px) */
-  margin: 0 auto;             /* center the content */
+  width: 100%;
+  max-width: 1200px;      
+  margin: 0 auto;           
 }
 
 /* optional: a panel look for sections */
@@ -139,19 +150,24 @@ body {
 
 /* Topbar */
 .topbar {
+  position: fixed;
+  top: 0;
+  left: 250px;    /* offset for sidebar */
+  right: 0;
+  height: 60px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-size: 21px;
   background: #fff;
-  padding: 14px 20px;
+  padding: 0 20px;
   border-bottom: 1px solid #ddd;
+  z-index: 999;
 }
 
 .topbar-actions {
   display: flex;
   gap: 12px;
-  justify-content: flex-end;
 }
 
 /* Adjusted for "Welcome, Owner!" */

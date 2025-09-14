@@ -34,6 +34,7 @@
 </style>
 
 <section class="main-content">
+
   <div class="topbar">
     <div class="welcome-text"><strong>Welcome, Owner!</strong></div>
     <div class="topbar-actions">
@@ -51,6 +52,7 @@
       </form>
     </div>
   </div>
+
 
   <div class="page-inner">
     <div class="panel">
