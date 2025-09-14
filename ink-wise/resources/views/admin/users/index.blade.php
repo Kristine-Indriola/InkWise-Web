@@ -9,6 +9,11 @@
 @section('content')
 <div class="container">
     <h1>👥 Staff Management</h1>
+    @if(session('warning'))
+    <div class="alert warning">
+        {{ session('warning') }}
+    </div>
+@endif
 
     {{-- Search bar --}}
    <form method="GET" action="{{ route('admin.users.index') }}" class="search-box">
@@ -53,13 +58,18 @@
                     {{ ucfirst(optional($user->staff)->status ?? $user->status) }}
                 </span>
             </td>
-            <td class="actions" onclick="event.stopPropagation();">
-                <a href="{{ route('admin.users.edit', $user->user_id) }}" class="btn btn-warning">✏ Edit</a>
-                <form action="{{ route('admin.users.destroy', $user->user_id) }}" method="POST" class="inline">
-                    @csrf @method('DELETE')
-                    <button type="submit" onclick="return confirm('Delete this staff?')" class="btn btn-danger">🗑 Delete</button>
-                </form>
-            </td>
+         <td class="actions" onclick="event.stopPropagation();">
+    @if(($user->staff)->status !== 'archived')
+        <a href="{{ route('admin.users.edit', $user->user_id) }}" class="btn btn-warning">✏ Edit</a>
+        <form action="{{ route('admin.users.destroy', $user->user_id) }}" method="POST" class="inline">
+            @csrf @method('DELETE')
+            <button type="submit" onclick="return confirm('Archive this staff account?')" class="btn btn-danger">📦 ARCHIVE</button>
+        </form>
+    @else
+        <span class="badge bg-secondary">📦 Archived</span>
+    @endif
+</td>
+
         </tr>
     @empty
         <tr>

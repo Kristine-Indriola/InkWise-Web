@@ -1,20 +1,35 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit User</title>
-    <link rel="stylesheet" href="{{ asset('css/edit-users.css') }}">
-</head>
-<body>
+@extends('layouts.admin')
 
+@section('title', 'Edit User')
+
+@section('content')
 <div class="container">
     <div class="card">
+        <link rel="stylesheet" href="{{ asset('css/edit-users.css') }}">
         <h2 class="form-title">✏️ Edit User</h2>
 
-        {{-- Display Validation Errors --}}
+        {{-- Alerts --}}
+        @if(session('success'))
+            <div class="alert success">
+                ✅ {{ session('success') }}
+            </div>
+        @endif
+
+        @if(session('error'))
+            <div class="alert error">
+                🚫 {{ session('error') }}
+            </div>
+        @endif
+
+        @if(session('warning'))
+            <div class="alert warning">
+                ⚠️ {{ session('warning') }}
+            </div>
+        @endif
+
+        {{-- Validation Errors --}}
         @if ($errors->any())
-            <div class="alert">
+            <div class="alert error">
                 <ul>
                     @foreach ($errors->all() as $error)
                         <li>⚠️ {{ $error }}</li>
@@ -23,17 +38,35 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('admin.users.update', $user->user_id) }}">
+        <form method="POST" action="{{ route('admin.users.update', $user->user_id) }}" onsubmit="return confirmStaffLimit()">
             @csrf
             @method('PUT')
 
             <!-- Role -->
             <div class="form-group">
                 <label>Role</label>
-                <select name="role" required>
-                    <option value="owner" {{ $user->role === 'owner' ? 'selected' : '' }}>Owner</option>
-                      <option value="admin" {{ $user->role === 'admin' ? 'selected' : '' }}>Admin</option>
-                    <option value="staff" {{ $user->role === 'staff' ? 'selected' : '' }}>Staff</option>
+                <select name="role" id="role" class="form-control" required>
+                    <option value="">-- Select Role --</option>
+
+                    {{-- Owner --}}
+                    <option value="owner"
+                        {{ $user->role === 'owner' ? 'selected' : '' }}
+                        {{ $ownerCount - ($user->role === 'owner' ? 1 : 0) >= 1 ? 'disabled' : '' }}>
+                        Owner {{ $ownerCount - ($user->role === 'owner' ? 1 : 0) >= 1 ? '(Already Exists)' : '' }}
+                    </option>
+
+                    {{-- Admin --}}
+                    <option value="admin"
+                        {{ $user->role === 'admin' ? 'selected' : '' }}
+                        {{ $adminCount - ($user->role === 'admin' ? 1 : 0) >= 1 ? 'disabled' : '' }}>
+                        Admin {{ $adminCount - ($user->role === 'admin' ? 1 : 0) >= 1 ? '(Already Exists)' : '' }}
+                    </option>
+
+                    {{-- Staff --}}
+                    <option value="staff"
+                        {{ $user->role === 'staff' ? 'selected' : '' }}>
+                        Staff
+                    </option>
                 </select>
             </div>
 
@@ -110,11 +143,23 @@
             <!-- Buttons -->
             <div class="form-actions">
                 <button type="submit" class="btn-primary">💾 Update User</button>
-                <a href="{{ url()->previous() }}" class="btn-secondary">❌ Cancel</a>
+                <a href="{{ route('admin.users.index') }}" class="btn-secondary">❌ Cancel</a>
             </div>
         </form>
     </div>
 </div>
 
-</body>
-</html>
+{{-- JavaScript Confirmation for Staff Limit --}}
+<script>
+function confirmStaffLimit() {
+    const role = document.getElementById('role').value;
+    @if($staffCount >= 3)
+        if(role === 'staff' && {{ $user->role === 'staff' ? 'false' : 'true' }}) {
+            return confirm("⚠️ Staff account limit reached. Do you still want to assign this role?");
+        }
+    @endif
+    return true;
+}
+</script>
+
+@endsection

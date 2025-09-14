@@ -8,10 +8,22 @@
         <link rel="stylesheet" href="{{ asset('css/edit-users.css') }}">
         <h2 class="form-title">➕ Create Staff Account</h2>
 
-        {{-- Success Message --}}
+        {{-- Alerts --}}
         @if(session('success'))
             <div class="alert success">
-                {{ session('success') }}
+                ✅ {{ session('success') }}
+            </div>
+        @endif
+
+        @if(session('error'))
+            <div class="alert error">
+                🚫 {{ session('error') }}
+            </div>
+        @endif
+
+        @if(session('warning'))
+            <div class="alert warning">
+                ⚠️ {{ session('warning') }}
             </div>
         @endif
 
@@ -26,20 +38,28 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('admin.users.store') }}">
+        <form method="POST" action="{{ route('admin.users.store') }}" onsubmit="return confirmStaffLimit()">
             @csrf
 
-            <!-- Name Section -->
+            <!-- Personal Information -->
             <h3 class="section-title">👤 Personal Information</h3>
             <div class="form-row">
-
                 <div class="form-group">
-                    <label>Role</label>
-                    <select name="role" required>
-                        <option value="" disabled selected>-- Select Role --</option>
-                        <option value="staff" {{ old('role') == 'staff' ? 'selected' : '' }}>Staff</option>
-                        <option value="admin" {{ old('role') == 'admin' ? 'selected' : '' }}>admin</option>
-                        <option value="owner" {{ old('role') == 'owner' ? 'selected' : '' }}>Owner</option>
+                    <label for="role">Role</label>
+                    <select name="role" id="role" class="form-control" required>
+                        <option value="">-- Select Role --</option>
+
+                        <option value="owner" {{ $ownerCount >= 1 ? 'disabled' : '' }}>
+                            Owner {{ $ownerCount >= 1 ? '(Already Exists)' : '' }}
+                        </option>
+
+                        <option value="admin" {{ $adminCount >= 1 ? 'disabled' : '' }}>
+                            Admin {{ $adminCount >= 1 ? '(Already Exists)' : '' }}
+                        </option>
+
+                        <option value="staff" {{ $staffCount >= 3 ? '' : '' }}>
+                            Staff
+                        </option>
                     </select>
                 </div>
 
@@ -57,13 +77,13 @@
                 </div>
             </div>
 
-            <!-- Contact -->
+            <!-- Contact Information -->
             <div class="form-group">
                 <label>Contact Number</label>
                 <input type="text" name="contact_number" value="{{ old('contact_number') }}" required>
             </div>
 
-            <!-- Email + Password -->
+            <!-- Email & Password -->
             <div class="form-row">
                 <div class="form-group">
                     <label>Email</label>
@@ -104,11 +124,11 @@
                 </div>
                 <div class="form-group">
                     <label>Country</label>
-                    <input type="text" name="country" value="{{ old('country') }}">
+                    <input type="text" name="country" value="{{ old('country', 'Philippines') }}">
                 </div>
             </div>
 
-            <!-- Hidden Fields -->
+            <!-- Hidden Status Field -->
             <input type="hidden" name="status" value="pending">
 
             <!-- Buttons -->
@@ -119,4 +139,18 @@
         </form>
     </div>
 </div>
+
+{{-- JavaScript Confirmation for Staff Limit --}}
+<script>
+function confirmStaffLimit() {
+    const role = document.getElementById('role').value;
+    @if($staffCount >= 3)
+        if(role === 'staff') {
+            return confirm("⚠️ Staff account limit reached. Do you still want to create another staff account?");
+        }
+    @endif
+    return true;
+}
+</script>
+
 @endsection

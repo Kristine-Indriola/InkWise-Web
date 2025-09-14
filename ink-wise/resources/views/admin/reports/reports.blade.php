@@ -3,19 +3,8 @@
 @section('title', 'Reports Dashboard')
 
 @push('styles')
-<link rel="stylesheet" href="{{ asset('css/owner/reports-dashboard.css') }}">
-<style>
-.tab-buttons { display: flex; gap: 1rem; margin-bottom: 1rem; }
-.tab-buttons button { padding: 0.5rem 1rem; border: none; border-radius: 0.5rem; cursor: pointer; }
-.tab-buttons button.active { background-color: #4F46E5; color: #fff; }
-.tab-content { display: none; }
-.tab-content.active { display: block; }
-.inventory-report-table, .sales-report-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-.inventory-report-table th, .inventory-report-table td,
-.sales-report-table th, .sales-report-table td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; }
-.export-btn { background: #4F46E5; color: #fff; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; margin-bottom: 10px; }
-.export-btn:hover { background: #3730A3; }
-</style>
+<link rel="stylesheet" href="{{ asset('css/reports.css') }}">
+
 @endpush
 
 @section('content')
