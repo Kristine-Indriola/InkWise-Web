@@ -141,7 +141,9 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::get('reports/inventory/export/{type}', [ReportsDashboardController::class, 'exportInventory'])
          ->name('reports.inventory.export');
 
-});
+
+
+
 
 
 
