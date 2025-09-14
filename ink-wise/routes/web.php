@@ -88,11 +88,6 @@ Route::prefix('users')->name('users.')->group(function () {
 
 });
 
-});
-
-
-
-
 
      Route::prefix('inventory')->name('inventory.')->group(function () {
         Route::get('/', [InventoryController::class, 'index'])->name('index');

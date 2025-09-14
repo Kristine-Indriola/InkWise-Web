@@ -58,12 +58,14 @@ form {
 .form-row {
     display: flex;
     gap: 16px;
+    flex-wrap: wrap; /* ensures responsiveness */
 }
 
 .form-group {
     flex: 1;
     display: flex;
     flex-direction: column;
+    position: relative; /* for error messages positioning */
 }
 
 label {
@@ -87,6 +89,13 @@ input:focus, select:focus {
     outline: none;
 }
 
+/* Inline Field Error */
+.field-error {
+    color: #b30000;
+    font-size: 13px;
+    margin-top: 4px;
+}
+
 /* Buttons */
 .form-actions {
     display: flex;
@@ -97,15 +106,14 @@ input:focus, select:focus {
 
 .btn-primary,
 .btn-secondary {
-    padding: 6px 14px; /* smaller padding */
+    padding: 6px 14px;
     border-radius: 6px;
-    font-size: 13px;   /* slightly smaller font */
-    font-weight: 500;  /* less bold */
+    font-size: 13px;
+    font-weight: 500;
     cursor: pointer;
     transition: background 0.2s;
 }
 
-/* Primary Button */
 .btn-primary {
     border: none;
     background: #007bff;
@@ -115,7 +123,6 @@ input:focus, select:focus {
     background: #0056b3;
 }
 
-/* Secondary Button */
 .btn-secondary {
     background: #e9ecef;
     color: #333;
@@ -125,3 +132,9 @@ input:focus, select:focus {
     background: #d6d8db;
 }
 
+/* ===== Responsive Adjustments ===== */
+@media (max-width: 600px) {
+    .form-row {
+        flex-direction: column;
+    }
+}
