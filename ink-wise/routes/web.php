@@ -10,8 +10,8 @@ use App\Http\Controllers\Owner\HomeController;
 //use App\Http\Controllers\Auth\AdminLoginController;
 //use App\Http\Controllers\StaffAuthController;
 //use App\Http\Controllers\Staff\StaffLoginController;
-use App\Http\Controllers\StaffProfileController;
 use App\Http\Controllers\Owner\OwnerController;
+use App\Http\Controllers\StaffProfileController;
 use App\Http\Controllers\AdminCustomerController;
 use App\Http\Controllers\Admin\MaterialController;
 use App\Http\Controllers\Auth\RoleLoginController;
@@ -21,8 +21,11 @@ use App\Http\Controllers\customerProfileController;
 use App\Http\Controllers\Owner\OwnerStaffController;
 use App\Http\Controllers\Auth\CustomerAuthController;
 use App\Http\Controllers\Customer\CustomerController;
+use App\Http\Controllers\Staff\StaffCustomerController;
+use App\Http\Controllers\Staff\StaffMaterialController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Owner\OwnerInventoryController;
+use App\Http\Controllers\Staff\StaffInventoryController;
 use App\Http\Controllers\Admin\ReportsDashboardController;
 use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
 
@@ -43,18 +46,9 @@ use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
 */
 Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () { 
     Route::get('/dashboard', [AdminController::class, 'index'])->name('dashboard'); 
-     // Show profile
     Route::get('/profile', [AdminController::class, 'show'])->name('profile.show');
-
-    // Edit profile
     Route::get('/profile/edit', [AdminController::class, 'edit'])->name('profile.edit');
-
-    // Update profile
     Route::put('/profile/update', [AdminController::class, 'update'])->name('profile.update');
-
-   
-
-
     Route::get('/admin/users/{id}', [UserManagementController::class, 'show'])
      ->name('admin.users.show'); 
 
@@ -353,17 +347,39 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
   
 
 Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
-
     Route::get('/dashboard', fn () => view('staff.dashboard'))->name('dashboard');
     Route::get('/assigned-orders', fn () => view('staff.assigned_orders'))->name('assigned.orders');
     Route::get('/order-list', fn () => view('staff.order_list'))->name('order.list');
-    Route::get('/customer-profile', fn () => view('staff.customer_profile'))->name('customer.profile');
     Route::get('/notify-customers', fn () => view('staff.notify_customers'))->name('notify.customers');
     Route::get('/profile/edit', [StaffProfileController::class, 'edit'])->name('profile.edit');
     Route::post('/profile/update', [StaffProfileController::class, 'update'])->name('profile.update');
 
+    // ✅ fixed: remove the extra "staff" in URL and name
+    Route::get('/customers', [StaffCustomerController::class, 'index'])
+        ->name('customer_profile'); 
 
-    // Messages routes
+    Route::get('/materials/notification', [StaffMaterialController::class, 'notification'])
+     ->name('staff.materials.notification');
 
+        
+
+
+    Route::prefix('inventory')->name('inventory.')->group(function () {
+        Route::get('/', [StaffInventoryController::class, 'index'])->name('index');
+        Route::get('/create', [StaffInventoryController::class, 'create'])->name('create');
+        Route::post('/', [StaffInventoryController::class, 'store'])->name('store');
+        Route::get('/{id}/edit', [StaffInventoryController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [StaffInventoryController::class, 'update'])->name('update');
+        Route::delete('/{id}', [StaffInventoryController::class, 'destroy'])->name('destroy');
+    });
+
+     Route::prefix('materials')->name('materials.')->group(function () {
+        Route::get('/', [StaffMaterialController::class, 'index'])->name('index');
+        Route::get('/create', [StaffMaterialController::class, 'create'])->name('create');
+        Route::post('/', [StaffMaterialController::class, 'store'])->name('store');
+        Route::get('/{id}/edit', [StaffMaterialController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [StaffMaterialController::class, 'update'])->name('update');
+        Route::delete('/{id}', [StaffMaterialController::class, 'destroy'])->name('destroy');
+    });
 });
 

@@ -1,0 +1,50 @@
+.notifications-container {
+    padding: 25px;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.notifications-container h1 {
+    font-size: 26px;
+    margin-bottom: 20px;
+    font-weight: bold;
+    color: #1e293b;
+}
+
+.notif-section {
+    margin-bottom: 30px;
+    padding: 20px;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+.notif-section h2 {
+    margin-bottom: 15px;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.notif-section.low h2 { color: #f59e0b; }
+.notif-section.out h2 { color: #dc2626; }
+
+.empty {
+    color: #64748b;
+    font-style: italic;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.table th, .table td {
+    padding: 12px;
+    border-bottom: 1px solid #e5e7eb;
+    text-align: left;
+}
+
+.table th {
+    background: #f9fafb;
+    font-weight: 600;
+}

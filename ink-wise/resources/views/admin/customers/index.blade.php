@@ -26,7 +26,9 @@
                         <img src="{{ $customer->profile_picture ?? 'https://via.placeholder.com/50' }}" 
                              alt="Profile" width="50">
                     </td>
-                    <td>{{ $customer->name }}</td>
+                    <td>
+                {{ optional($customer)->first_name }} {{ optional($customer)->middle_name }} {{ optional($customer)->last_name }}
+            </td>
                     <td>{{ $customer->email }}</td>
                     <td>{{ $customer->contact_number ?? '-' }}</td>
                     <td>{{ $customer->address ?? '-' }}</td>
