@@ -94,7 +94,7 @@ Route::prefix('users')->name('users.')->group(function () {
 
 });
 
-});
+
 
 
 
@@ -138,7 +138,7 @@ Route::prefix('users')->name('users.')->group(function () {
     // Optional: Inventory export
     Route::get('reports/inventory/export/{type}', [ReportsDashboardController::class, 'exportInventory'])
          ->name('reports.inventory.export');
-
+});
 
 
 
