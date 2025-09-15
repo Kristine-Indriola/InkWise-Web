@@ -8,7 +8,6 @@
   @stack('styles')
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700&display=swap" rel="stylesheet">
-  <!-- Add remixicon or fontisto for arrow icons -->
   <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css">
   <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-solid-rounded/css/uicons-solid-rounded.css">
   <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-solid-straight/css/uicons-solid-straight.css">
@@ -516,108 +515,56 @@ body.dark-mode .btn-warning {
     pointer-events: none;
   }
   </style>
+  <script>
+    // Apply theme on page load (before body renders)
+    (function() {
+      if (localStorage.getItem('theme') === 'dark') {
+        document.documentElement.classList.add('dark-mode');
+        document.body.classList.add('dark-mode');
+      } else {
+        document.documentElement.classList.remove('dark-mode');
+        document.body.classList.remove('dark-mode');
+      }
+    })();
+  </script>
 </head>
 <body>
   <!-- Sidebar -->
-
   <div class="sidebar" id="sidebar" style="padding-top:32px;">
-  <button class="collapse-btn" id="sidebarToggle" title="Toggle Sidebar" style="margin-left:auto; margin-right:0;">
-    <i class="fi fi-rr-angle-double-right" id="sidebarToggleIcon"></i>
-  </button>
-  <div class="profile" style="display:flex; flex-direction:column; align-items:center; justify-content:flex-start; margin-bottom:18px;">
-    <img src="/adminimage/inkwise.png" alt="InkWise Logo"
-         style="width:90px; height:90px; max-width:100%; max-height:100px; background:transparent; border-radius:24px; border:none; box-shadow:0 4px 16px rgba(0,0,0,0.07); object-fit:contain; margin-bottom:8px;">
-
-  <div class="sidebar">
-   <div class="profile">
-        <a href="{{ route('admin.profile.show') }}" 
-           style="display:flex; align-items:center; text-decoration:none; color:inherit;">
-            <img src="https://ui-avatars.com/api/?name={{ urlencode(optional(Auth::user()->staff)->first_name . ' ' . optional(Auth::user()->staff)->last_name ?? Auth::user()->email) }}&background=6a2ebc&color=fff&bold=true" 
-             alt="Admin Avatar" 
-             style="border-radius:50%; margin-right:10px; width:55px; height:55px; border:2px solid #6a2ebc;">
-        <div>
-                <strong>{{ Auth::user()->name ?? 'Admin' }}</strong> 
-                <span style="color:green;">✔</span>
-            </div>
-        </a>
+    <button class="collapse-btn" id="sidebarToggle" title="Toggle Sidebar" style="margin-left:auto; margin-right:0;">
+      <i class="fi fi-rr-angle-double-right" id="sidebarToggleIcon"></i>
+    </button>
+    <div class="profile" style="display:flex; flex-direction:column; align-items:center; justify-content:flex-start; margin-bottom:18px;">
+      <img src="/adminimage/inkwise.png" alt="InkWise Logo"
+           style="width:90px; height:90px; max-width:100%; max-height:100px; background:transparent; border-radius:24px; border:none; box-shadow:0 4px 16px rgba(0,0,0,0.07); object-fit:contain; margin-bottom:8px;">
     </div>
-   <ul>
-  <li class="{{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
-    <a href="{{ route('admin.dashboard') }}"><i>🏠</i> Dashboard</a>
-  </li>
-
-   <li class="{{ request()->routeIs('admin.customers.*') ? 'active' : '' }}">
-    <a href="{{ route('admin.customers.index') }}"><i>👥</i> Customer Accounts</a>
-</li>
-
-  <li class="{{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
-    <a href="{{ route('admin.users.index') }}"><i>👤</i> Staff Accounts</a>
-  </li>
-
-  <li class="{{ request()->routeIs('admin.templates.*') ? 'active' : '' }}">
-    <a href="{{ route('admin.templates.index') }}"><i>📑</i> Templates</a>
-  </li>
-
-  <li><i>📦</i> Order Summaries</li>
-
- <li class="{{ request()->routeIs('admin.messages.*') ? 'active' : '' }}">
-    <a href="{{ route('admin.messages.index') }}"><i>💬</i> Messages</a>
-</li>
-
-<li class="{{ request()->routeIs('admin.materials.*') ? 'active' : '' }}">
-    <a href="{{ route('admin.materials.index') }}"><i>📝</i> Materials</a>
-</li>
-
-  <li class="{{ request()->routeIs('admin.reports.*') ? 'active' : '' }}">
-            <a href="{{ route('admin.reports.reports') }}"><i>📊</i> Reports</a>
-        </li>
-</ul>
-
-
+    <ul>
+      <li class="{{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
+        <a href="{{ route('admin.dashboard') }}"><i class="fi fi-rr-house-chimney"></i> <span class="label">Dashboard</span></a>
+      </li>
+      <li class="{{ request()->routeIs('admin.customers.*') ? 'active' : '' }}">
+        <a href="{{ route('admin.customers.index') }}"><i class="fi fi-rr-user-pen"></i> <span class="label">Customer Accounts</span></a>
+      </li>
+      <li class="{{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
+        <a href="{{ route('admin.users.index') }}"><i class="fi fi-rr-user"></i> <span class="label">Staff Accounts</span></a>
+      </li>
+      <li class="{{ request()->routeIs('admin.templates.*') ? 'active' : '' }}">
+        <a href="{{ route('admin.templates.index') }}"><i class="fi fi-rr-template"></i> <span class="label">Templates</span></a>
+      </li>
+      <li>
+        <a href="#"><i class="fi fi-rr-list-check"></i> <span class="label">Order Summaries</span></a>
+      </li>
+      <li class="{{ request()->routeIs('admin.messages.*') ? 'active' : '' }}">
+        <a href="{{ route('admin.messages.index') }}"><i class="fi fi-rr-comment-dots"></i> <span class="label">Messages</span></a>
+      </li>
+      <li class="{{ request()->routeIs('admin.materials.*') ? 'active' : '' }}">
+        <a href="{{ route('admin.materials.index') }}"><i class="fi fi-rr-blog-pencil"></i> <span class="label">Materials</span></a>
+      </li>
+      <li>
+        <a href="#"><i class="fi fi-rr-document"></i> <span class="label">Reports</span></a>
+      </li>
+    </ul>
   </div>
-  <ul style="margin-top:0; padding-top:0;">
-    <li class="{{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" style="margin-top:10px;">
-      <a href="{{ route('admin.dashboard') }}">
-        <i class="fi fi-rr-house-chimney"></i> <span class="label">Dashboard</span>
-      </a>
-    </li>
-    <li class="{{ request()->routeIs('admin.customers.*') ? 'active' : '' }}">
-      <a href="{{ route('admin.customers.index') }}">
-        <i class="fi fi-rr-user-pen"></i> <span class="label">Customer Accounts</span>
-      </a>
-    </li>
-    <li class="{{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
-      <a href="{{ route('admin.users.index') }}">
-        <i class="fi fi-rr-user"></i> <span class="label">Staff Accounts</span>
-      </a>
-    </li>
-    <li class="{{ request()->routeIs('admin.templates.*') ? 'active' : '' }}">
-      <a href="{{ route('admin.templates.index') }}">
-        <i class="fi fi-rr-template"></i> <span class="label">Templates</span>
-      </a>
-    </li>
-    <li>
-      <a href="#">
-        <i class="fi fi-rr-list-check"></i> <span class="label">Order Summaries</span>
-      </a>
-    </li>
-    <li class="{{ request()->routeIs('admin.messages.*') ? 'active' : '' }}">
-      <a href="{{ route('admin.messages.index') }}">
-        <i class="fi fi-rr-comment-dots"></i> <span class="label">Messages</span>
-      </a>
-    </li>
-    <li class="{{ request()->routeIs('admin.materials.*') ? 'active' : '' }}">
-      <a href="{{ route('admin.materials.index') }}">
-        <i class="fi fi-rr-blog-pencil"></i> <span class="label">Materials</span>
-      </a>
-    </li>
-    <li>
-      <a href="#">
-        <i class="fi fi-rr-document"></i> <span class="label">Reports</span>
-      </a>
-    </li>
-  </ul>
-</div>
 
   <!-- Content Wrapper -->
   <div class="content-wrapper">
@@ -645,7 +592,7 @@ body.dark-mode .btn-warning {
               <span class="notif-badge">{{ $notifCount }}</span>
           @endif
         </a>
-        <!-- Day/Night Toggle Switch (centered between bell and profile) -->
+        <!-- Day/Night Toggle Switch -->
         <div id="theme-toggle-switch" class="theme-toggle-switch" title="Toggle dark/light mode" style="margin:0;">
           <span class="theme-toggle-label" id="theme-toggle-label">DAY</span>
           <span class="theme-toggle-knob" id="theme-toggle-knob">
