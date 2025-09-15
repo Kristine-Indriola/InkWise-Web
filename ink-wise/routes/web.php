@@ -23,6 +23,8 @@ use App\Http\Controllers\Customer\CustomerController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Owner\OwnerInventoryController;
 use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
+use App\Http\Controllers\AddressController;
+
 
 
 
@@ -58,18 +60,22 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
 
      Route::get('/materials/notification', [MaterialController::class, 'notification'])
      ->name('admin.materials.notification');
-
+ 
+     
     
 
 
     // Templates 
     Route::prefix('templates')->name('templates.')->group(function () { 
-    Route::get('/', [AdminTemplateController::class, 'index'])->name('index'); 
-    Route::get('/create', [AdminTemplateController::class, 'create'])->name('create'); 
-    Route::post('/', [AdminTemplateController::class, 'store'])->name('store'); 
-    Route::get('/editor/{id?}', [AdminTemplateController::class, 'editor'])->name('editor');
-    Route::delete('/{id}', [AdminTemplateController::class, 'destroy'])->name('destroy'); }); 
-    
+        Route::get('/', [AdminTemplateController::class, 'index'])->name('index'); 
+        Route::get('/create', [AdminTemplateController::class, 'create'])->name('create'); 
+        Route::post('/', [AdminTemplateController::class, 'store'])->name('store'); 
+        Route::get('/editor/{id?}', [AdminTemplateController::class, 'editor'])->name('editor');
+        Route::delete('/{id}', [AdminTemplateController::class, 'destroy'])->name('destroy');
+        // Move these two lines inside this group and fix the path:
+        Route::post('{id}/save-canvas', [AdminTemplateController::class, 'saveCanvas'])->name('saveCanvas');
+        Route::post('{id}/upload-preview', [AdminTemplateController::class, 'uploadPreview'])->name('uploadPreview');
+    }); 
     // ✅ User Management 
 
 Route::prefix('users')->name('users.')->group(function () { 
@@ -90,6 +96,9 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::delete('/{user_id}', [UserManagementController::class, 'destroy'])->name('destroy');
 
 });
+
+});
+
 
 
 
@@ -194,20 +203,30 @@ Route::post('/customer/login', [CustomerAuthController::class, 'login'])->name('
 Route::get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');
 Route::post('/customer/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
 
-//customer Profile pages
+// Customer Profile pages
 Route::middleware(['auth:customer'])->group(function () {
-    //Route::get('/customer/profile', [customerProfileController::class, 'edit'])->name('customer.profile.edit');
-    Route::put('/customer/profile', [customerProfileController::class, 'update'])->name('customer.profile.update');
+    // Addresses
+    Route::get('/customerprofile/addresses', [AddressController::class, 'index'])->name('customerprofile.addresses');
+    Route::post('/customerprofile/addresses', [AddressController::class, 'store'])->name('customerprofile.addresses.store');
+    Route::post('/customerprofile/addresses/{address}/delete', [AddressController::class, 'destroy'])->name('customerprofile.addresses.destroy');
+    Route::post('/customerprofile/addresses/{address}/update', [AddressController::class, 'update'])->name('customerprofile.addresses.update');
+    // Other customer-only pages
+    Route::get('/customer/my-orders', function () {
+        return view('customerprofile.my_purchase');
+    })->name('customer.my_purchase');
+    Route::get('/customerprofile/order', function () {
+        return view('customerprofile.orderform');
+    })->name('customerprofile.orderform');
+    Route::get('/customerprofile/settings', function () {
+        return view('customerprofile.settings');
+    })->name('customerprofile.settings');
+    
 });
-Route::get('/customer/my-orders', function () {
-    return view('customerprofile.my_orders');
-})->name('customer.my_orders');
-Route::get('/customer/dshboard', function () {
-    return view('customerprofile.dashboard');
-})->name('customerprofile.dashboard');
-Route::get('/customerprofile/order', function () {
-    return view('customerprofile.orderform');
-})->name('customerprofile.orderform');
+Route::get('/customerprofile/profile', [CustomerProfileController::class, 'edit'])->name('customerprofile.profile');
+
+
+
+
 
 // customer Templatehome category pages
 Route::get('/templates/wedding', function () {
@@ -237,6 +256,18 @@ Route::get('/templates/corporate/invitations', function () {
 Route::get('/templates/baptism/invitations', function () {
     return view('customerInvitations.baptisminvite');
 })->name('templates.baptism.invitations');
+
+
+Route::get('/product/preview', function () {
+    return view('customerInvitations.productpreview');
+})->name('productpreview');
+// Design editing route
+Route::get('/design/edit', function () {
+    return view('customerInvitations.editing');
+})->name('design.edit');
+Route::get('/order/form', function () {
+    return view('customerprofile.orderform');
+})->name('order.form');
 
 //customer templates giveaways 
 Route::get('/templates/wedding/giveaways', function () {
@@ -350,3 +381,7 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
 
 
 });
+
+
+
+

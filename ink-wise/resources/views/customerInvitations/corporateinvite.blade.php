@@ -12,6 +12,7 @@
     </h1>
     <p class="page-subtitle mb-10">Choose from our curated selection of elegant invitation designs.</p>
 
+    
     <!-- Cards Grid -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         

@@ -1,7 +1,7 @@
 <div id="registerModal"
      class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden z-50 px-2">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 relative transform transition-all scale-95 hover:scale-100 duration-300">
-
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 relative transform transition-all scale-95 hover:scale-100 duration-300 overflow-y-auto"
+         style="max-height: 90vh;">
         <!-- Close button -->
         <button id="closeRegister"
                 class="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition text-base font-bold">
@@ -10,10 +10,10 @@
 
         <!-- Modal Header -->
         <div class="text-center mb-5">
-            <h2 class="text-xl font-bold bg-gradient-to-r from-indigo-600 to-blue-400 bg-clip-text text-transparent">
+            <h2 class="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-blue-400 bg-clip-text text-transparent">
                 Create Account
             </h2>
-            <p class="text-gray-500 text-xs mt-1">Join InkWise and start your journey</p>
+            <p class="text-gray-500 text-sm mt-1">Join InkWise and start your journey</p>
         </div>
 
         <!-- Register Form -->
@@ -37,6 +37,13 @@
                     <input type="text" name="last_name" required
                            class="mt-1 w-full px-2 py-1.5 border rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-xs">
                 </div>
+            </div>
+
+            <!-- Birthdate -->
+            <div>
+                <label class="block text-xs font-medium text-gray-700">Birthdate</label>
+                <input type="date" name="birthdate" required
+                       class="mt-1 w-full px-2 py-1.5 border rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-xs">
             </div>
 
             <!-- Contact Number -->
@@ -89,6 +96,11 @@
             Continue with Google
         </a>
 
+        <!-- Terms and Privacy Message -->
+        <p class="text-[11px] text-gray-500 text-center mt-2 mb-1">
+            By signing up, you agree to InkWise's <a href="#" class="underline hover:text-indigo-600">Terms of Services</a> &amp; <a href="#" class="underline hover:text-indigo-600">privacy policy</a>
+        </p>
+
         <!-- Switch to Login -->
         <p class="text-center text-xs text-gray-600 mt-2">
             Already have an account?
@@ -96,3 +108,15 @@
         </p>
     </div>
 </div>
+
+<style>
+    .bg-white.overflow-y-auto::-webkit-scrollbar {
+        width: 0 !important;
+        background: transparent;
+    }
+
+    .bg-white.overflow-y-auto {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;     /* Firefox */
+    }
+</style>

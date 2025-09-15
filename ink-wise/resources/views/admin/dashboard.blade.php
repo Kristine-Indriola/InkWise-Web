@@ -83,6 +83,33 @@
     .clickable-table tbody tr:hover {
       background-color: #f1f1f1;
     }
+
+    .cards .card {
+      border: 2px solid #94b9ff !important;
+      background: #fff;
+      color: #94b9ff !important;
+      box-shadow: 0 4px 8px rgba(148, 185, 255, 0.15);
+    }
+    .cards .card h3,
+    .cards .card p,
+    .cards .card div {
+      color: #94b9ff !important;
+    }
+    .cards .card:hover {
+      box-shadow: 0 6px 18px rgba(148, 185, 255, 0.25);
+      background: #f0f6ff;
+      border-color: #94b9ff;
+    }
+    .stock h3 {
+      background: #94b9ff !important;
+      color: #fff !important;
+      padding: 12px 18px;
+      border-radius: 10px 10px 0 0;
+      margin: 0 -20px 15px -20px;
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: 1px;
+    }
   </style>
 
   <script>

@@ -70,47 +70,14 @@
             </div>
         </div>
 
+        
         <!-- Description -->
         <div class="create-group">
             <label for="description">Design Description</label>
             <textarea id="description" name="description" rows="4" placeholder="Describe the template design, style, and intended use..."></textarea>
         </div>
 
-        <!-- Paper Type + Trim Type -->
-        <div class="create-row">
-            <div class="create-group flex-1">
-                <label for="paper_type">Type of Paper</label>
-                <select id="paper_type" name="paper_type" required>
-                    <option value="">Select paper type</option>
-                    <option value="Matte">Matte</option>
-                    <option value="Glossy">Glossy</option>
-                    <option value="Linen">Linen</option>
-                    <option value="Pearl">Pearl</option>
-                    <option value="Recycled">Recycled</option>
-                </select>
-            </div>
-            <div class="create-group flex-1">
-                <label for="trim_type">Type of Trim</label>
-                <select id="trim_type" name="trim_type" required>
-                    <option value="">Select trim type</option>
-                    <option value="Square">Square</option>
-                    <option value="Rounded">Rounded</option>
-                    <option value="Scalloped">Scalloped</option>
-                    <option value="Ticket">Ticket</option>
-                </select>
-            </div>
-        </div>
-
-        <!-- Size -->
-        <div class="create-group flex-1">
-            <label for="size">Template Size</label>
-            <select id="size" name="size">
-                <option value="5x7">Standard (5x7)</option>
-                <option value="4x6">Postcard (4x6)</option>
-                <option value="A5">A5 (148 × 210 mm)</option>
-            </select>
-        </div>
-
+        
         <!-- Actions -->
         <div class="create-actions">
             <a href="{{ route('admin.templates.index') }}" class="btn-cancel">Cancel</a>
@@ -120,3 +87,4 @@
     </form>
 </div>
 @endsection
+

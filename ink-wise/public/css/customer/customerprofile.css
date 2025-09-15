@@ -1,5 +1,4 @@
-
-    /* sidebar gradient + subtle hover */
+/* sidebar gradient + subtle hover */
     .sidebar {
       background: linear-gradient(180deg, #d3b7ff 0%, #a6b7ff 50%, #bce6ff 100%);
     }
@@ -68,4 +67,46 @@
     font-size: 1.25rem;
     color: #555;
     margin-top: 0.25rem;
+}
+
+/* My Account dropdown hover color - transparent white */
+.nav-item,
+.block {
+  transition: background 0.2s;
+}
+
+/* Sidebar and dropdown hover - transparent white */
+.nav-item:hover,
+.block:hover {
+    background: rgba(255,255,255,0.6);
+}
+
+/* Zoom out the customer profile page a little bit */
+body {
+  zoom: 0.92; /* Slight zoom out for the whole page */
+}
+
+@media (max-width: 1024px) {
+  body {
+    zoom: 1; /* Reset zoom for tablets and below for better usability */
+  }
+}
+
+/* Optionally, adjust max-width for main content for a more zoomed-out look */
+.max-w-7xl {
+  max-width: 1280px !important;
+}
+
+/* Make the address form modal scrollable with invisible scrollbar */
+.address-form-modal {
+  max-height: 80vh;
+  overflow-y: auto;
+  padding-right: 8px;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+.address-form-modal::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  background: transparent;
 }

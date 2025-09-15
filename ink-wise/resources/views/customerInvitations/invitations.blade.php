@@ -12,6 +12,7 @@
         @import url('https://fonts.cdnfonts.com/css/edwardian-script-itc');
     </style>
 
+
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
      
@@ -24,6 +25,7 @@
     <script src="{{ asset('js/customer/customer.js') }}" defer></script>
     <script src="{{ asset('js/customer/template.js') }}" defer></script>
 
+    
     <!-- Alpine.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.10.2/cdn.min.js" defer></script>
 </head>
