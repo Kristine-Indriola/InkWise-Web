@@ -145,6 +145,14 @@ function confirmStaffLimit() {
     const role = document.getElementById('role').value;
     const staffCount = @json($staffCount);
 
+    // Password confirmation check
+    const password = document.querySelector('input[name="password"]').value;
+    const confirmPassword = document.querySelector('input[name="password_confirmation"]').value;
+    if (password !== confirmPassword) {
+        alert("❌ Password and Confirm Password do not match.");
+        return false;
+    }
+
     if(role === 'staff' && staffCount >= 3) {
         return confirm("⚠️ Staff account limit of 3 has been reached. Do you still want to create another staff account?");
     }
