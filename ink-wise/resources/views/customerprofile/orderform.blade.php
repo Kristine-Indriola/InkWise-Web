@@ -10,25 +10,38 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
-    
 </head>
 <body class="bg-gray-100">
 
 <div class="max-w-2xl mx-auto bg-white shadow rounded p-8 mt-10">
     <h2 class="text-2xl font-bold mb-6 text-center">Order Invitation</h2>
     <form id="orderForm">
-        <!-- Front Design -->
-        <div class="mb-4">
-            <label class="block font-semibold mb-1">Front Design</label>
-            <div class="border rounded p-3 bg-gray-50">Wedding Invitation - Elegant Theme</div>
+        <!-- Front & Back Image Preview -->
+        <div class="flex justify-center gap-6 mb-6">
+            <div class="text-center">
+                <div class="font-semibold mb-1">Front Design</div>
+                <img src="{{ asset('customerimages/invite/wedding3.jpg') }}" alt="Front Design" class="w-40 h-56 object-cover border rounded shadow">
+            </div>
+            <div class="text-center">
+                <div class="font-semibold mb-1">Back Design</div>
+                <img src="{{ asset('customerimages/invite/wed1.png') }}" alt="Back Design" class="w-40 h-56 object-cover border rounded shadow">
+            </div>
         </div>
         <!-- Event Type -->
         <div class="mb-4">
             <label class="block font-semibold mb-1">Event Type</label>
             <input type="text" class="form-input w-full" value="Wedding" readonly>
         </div>
-        <!-- Back Design -->
+        <!-- Trim Type -->
+        <div class="mb-4">
+            <label class="block font-semibold mb-1">Trim Type</label>
+            <select id="trimType" name="trimType" class="form-select w-full">
+                <option value="standard" data-price="20">Standard (+₱0)</option>
+                <option value="rounded" data-price="27">Rounded (+₱7)</option>
+                <option value="ticket" data-price="70">Ticket (+₱50)</option>
+            </select>
+        </div>
+        <!-- Back Design Text -->
         <div class="mb-4">
             <label class="block font-semibold mb-1">Back Design</label>
             <div class="border rounded p-3 bg-gray-50">
@@ -65,7 +78,7 @@
         </div>
         <!-- Confirm/Back Buttons -->
         <div class="flex justify-between mt-6">
-            <a href="{{ route('templates.wedding.invitations') }}" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">Back To Edit</a>
+            <a href="{{ route('design.edit') }}" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">Back To Edit</a>
             <button type="submit" class="order-confirm-btn px-6 py-2 bg-cyan-500 text-white rounded hover:bg-cyan-600">Confirm Design</button>
         </div>
     </form>
@@ -74,6 +87,7 @@
 <script src="{{ asset('js/customerorderform.js') }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Leaflet map
     var map = L.map('map').setView([13.41, 122.56], 6); // Center on Philippines
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
@@ -97,8 +111,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
     });
+
+    // Live price calculation
+    const quantityInput = document.getElementById('quantity');
+    const trimType = document.getElementById('trimType');
+    const pricePerInvitation = document.getElementById('pricePerInvitation');
+    const totalPrice = document.getElementById('totalPrice');
+
+    function updatePrice() {
+        const qty = parseInt(quantityInput.value) || 1;
+        const trimOption = trimType.options[trimType.selectedIndex];
+        const price = parseInt(trimOption.getAttribute('data-price')) || 20;
+        pricePerInvitation.textContent = price;
+        totalPrice.textContent = price * qty;
+    }
+
+    quantityInput.addEventListener('input', updatePrice);
+    trimType.addEventListener('change', updatePrice);
+
+    updatePrice();
 });
 </script>
-  
 </body>
 </html>

@@ -1,12 +1,14 @@
-@extends('customerprofile.dashboard')
+@extends('layouts.customerprofile')
 
 @section('title', 'Edit Profile')
+
 
 @section('content')
 <div class="card bg-white p-6 md:p-8 border border-gray-100">
   <h2 class="text-xl font-semibold mb-6">Profile Photo</h2>
-  <form method="POST" action="{{ route('customer.profile.update') }}" enctype="multipart/form-data" class="space-y-4">
+  <form method="POST" action="{{ route('customer.profile.update') }}" enctype="multipart/form-data">
     @csrf
+    @method('PUT')
     <!-- Photo + buttons -->
     <div class="flex items-center gap-5">
       <div id="avatarWrap" class="w-24 h-24 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center">
@@ -54,50 +56,36 @@
         <input type="text" name="phone" value="{{ old('phone', Auth::user()->customer?->phone) }}" placeholder="Enter Phone Number"
                class="w-full mt-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200">
       </div>
+      <!-- Date of Birth -->
+    
       <div>
-        <label class="text-sm text-gray-600">House / Unit / Lot No.</label>
-        <input type="text" name="house_number" value="{{ old('house_number', Auth::user()->customer?->house_number) }}" placeholder="e.g. 123"
+        <label class="text-sm text-gray-600">Date of Birth</label>
+        <input type="date" name="birthdate" value="{{ old('birthdate', Auth::user()->customer?->birthdate) }}"
                class="w-full mt-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200">
       </div>
+      <!-- Gender -->
       <div>
-        <label class="text-sm text-gray-600">Street</label>
-        <input type="text" name="street" value="{{ old('street', Auth::user()->customer?->street) }}" placeholder="e.g. Mabini St."
-               class="w-full mt-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200">
-      </div>
-      <div>
-        <label class="text-sm text-gray-600">Barangay</label>
-        <input type="text" name="barangay" value="{{ old('barangay', Auth::user()->customer?->barangay) }}" placeholder="e.g. Brgy. San Isidro"
-               class="w-full mt-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200">
-      </div>
-      <div>
-        <label class="text-sm text-gray-600">City / Municipality</label>
-        <input type="text" name="city" value="{{ old('city', Auth::user()->customer?->city) }}" placeholder="e.g. Quezon City"
-               class="w-full mt-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200">
-      </div>
-      <div>
-        <label class="text-sm text-gray-600">Province</label>
-        <input type="text" name="province" value="{{ old('province', Auth::user()->customer?->province) }}" placeholder="e.g. Metro Manila"
-               class="w-full mt-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200">
-      </div>
-      <div>
-        <label class="text-sm text-gray-600">Postal Code</label>
-        <input type="text" name="postal_code" value="{{ old('postal_code', Auth::user()->customer?->postal_code) }}" placeholder="e.g. 1101"
-               class="w-full mt-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200">
-      </div>
-      <div>
-        <label class="text-sm text-gray-600">Country</label>
-        <input type="text" name="country" value="{{ old('country', Auth::user()->customer?->country ?? 'Philippines') }}"
-               class="w-full mt-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200">
-      </div>
-      <div>
-        <label class="text-sm text-gray-600">New Password</label>
-        <input type="password" name="password" placeholder="Enter New Password"
-               class="w-full mt-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200">
-      </div>
-      <div>
-        <label class="text-sm text-gray-600">Confirm Password</label>
-        <input type="password" name="password_confirmation" placeholder="Confirm Password"
-               class="w-full mt-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200">
+        <label class="text-sm text-gray-600 block mb-1">Gender</label>
+        <div class="flex items-center gap-6 mt-1">
+          <label class="inline-flex items-center">
+            <input type="radio" name="gender" value="male"
+              {{ old('gender', Auth::user()->customer?->gender) == 'male' ? 'checked' : '' }}
+              class="form-radio text-indigo-600">
+            <span class="ml-2">Male</span>
+          </label>
+          <label class="inline-flex items-center">
+            <input type="radio" name="gender" value="female"
+              {{ old('gender', Auth::user()->customer?->gender) == 'female' ? 'checked' : '' }}
+              class="form-radio text-indigo-600">
+            <span class="ml-2">Female</span>
+          </label>
+          <label class="inline-flex items-center">
+            <input type="radio" name="gender" value="other"
+              {{ old('gender', Auth::user()->customer?->gender) == 'other' ? 'checked' : '' }}
+              class="form-radio text-indigo-600">
+            <span class="ml-2">Other</span>
+          </label>
+        </div>
       </div>
     </div>
     <div class="pt-2">

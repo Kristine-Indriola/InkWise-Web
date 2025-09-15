@@ -12,6 +12,7 @@
     </h1>
     <p class="page-subtitle mb-10">Choose from our curated selection of fun birthday invitation designs.</p>
 
+
     <!-- Cards Grid -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <!-- Card 1 -->
@@ -116,6 +117,32 @@
             </div>
         </div>
     </div>
+    
 </main>
 @endsection
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.video-swatches').forEach(group => {
+        const card = group.closest('.w-full');
+        const video = card.querySelector('.template-video');
+        const image = card.querySelector('.template-image');
+        const source = video ? video.querySelector('source') : null;
+
+        group.querySelectorAll('.swatch-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const videoSrc = btn.getAttribute('data-video');
+                if (video && image && source) {
+                    image.classList.add('hidden');
+                    video.classList.remove('hidden');
+                    if (source.src !== videoSrc) {
+                        source.src = videoSrc;
+                        video.load();
+                    }
+                    video.play();
+                }
+            });
+        });
+    });
+});
+</script>
 

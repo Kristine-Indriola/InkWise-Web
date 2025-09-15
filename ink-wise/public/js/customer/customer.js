@@ -3,13 +3,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const loginModal    = document.getElementById("loginModal");
   const registerModal = document.getElementById("registerModal");
 
+  
   const openLogin              = document.getElementById("openLogin");
   const openRegister           = document.getElementById("openRegister");
   const closeLogin             = document.getElementById("closeLogin");
   const closeRegister          = document.getElementById("closeRegister");
   const openLoginFromRegister  = document.getElementById("openLoginFromRegister");
   const openRegisterFromLogin  = document.getElementById("openRegisterFromLogin");
-
+  
   const userDropdownBtn = document.getElementById("userDropdownBtn");
   const userDropdown    = document.getElementById("userDropdown");
 

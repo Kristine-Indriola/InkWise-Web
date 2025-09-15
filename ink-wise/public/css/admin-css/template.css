@@ -52,26 +52,34 @@
 
 /* Template Card */
 .template-card {
-  background: #fff;
+  padding: 0;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  transition: box-shadow 0.2s;
-}
-
-.template-card:hover {
-  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  max-width: 320px;
+  margin: 0 auto;
 }
 
 /* Preview */
 .template-preview {
-  height: 120px;
+  padding: 16px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   background: #f3f4f6;
   border-radius: 10px 10px 0 0;
   font-size: 30px;
   color: #9ca3af;
+}
+
+.template-preview img {
+  max-width: 100%;
+  max-height: 260px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  margin-bottom: 12px;
 }
 
 /* Template Info */

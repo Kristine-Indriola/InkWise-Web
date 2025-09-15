@@ -13,12 +13,20 @@ class Material extends Model
     public $timestamps = false;
 
     protected $fillable = [
+        'sku',
         'material_name',
+        'occasion',
+        'product_type',
         'material_type',
+        'size',
+        'color',
+        'weight_gsm',
+        'volume_ml',
         'unit',
         'unit_cost',
-        'date_added',
-        'date_updated',
+        'stock_qty',
+        'reorder_point',
+        'description',
     ];
 
     public function inventory()

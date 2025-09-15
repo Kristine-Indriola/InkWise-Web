@@ -8,7 +8,7 @@
    <style>
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Seasons&display=swap');
         @import url('https://fonts.cdnfonts.com/css/edwardian-script-itc');
-    </style>
+   </style>
 
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -31,16 +31,16 @@
 
     
    <!-- Top Navigation Bar -->
-<header class="shadow animate-fade-in-down bg-white">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+<header class="shadow animate-fade-in-down bg-white w-full">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between h-16">
         <!-- Logo -->
-        <div class="flex items-center animate-bounce-slow">
-           <span class="text-5xl font-bold logo-i" style="font-family: Edwardian Script ITC; color:#06b6d4;">I</span>
+        <div class="flex items-center animate-bounce-slow flex-shrink-0">
+            <span class="text-5xl font-bold logo-i" style="font-family: Edwardian Script ITC; color:#06b6d4;">I</span>
             <span class="text-2xl font-bold" style="font-family: 'Playfair Display', serif; color: #0891b2;">nkwise</span>
         </div>
 
         <!-- Navigation Links -->
-        <nav class="hidden md:flex space-x-6">
+        <nav class="hidden md:flex flex-wrap space-x-6">
             <a href="#dashboard" class="text-gray-700 hover:text-[#06b6d4]">Home</a>
             <a href="#categories" class="text-gray-700 hover:text-[#06b6d4]">Categories</a>
             <a href="#templates" class="text-gray-700 hover:text-[#06b6d4]">Templates</a>
@@ -49,12 +49,12 @@
         </nav>
 
         <!-- Search + Sign Up / customer Name -->
-  <div class="flex items-center space-x-4 relative">
-    <!-- Search Form -->
-    <form action="{{ url('/search') }}" method="GET" class="hidden md:flex">
-        <input type="text" name="query" placeholder="Search..." 
-               class="border rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring focus:ring-[#06b6d4]">
-    </form>
+        <div class="flex items-center space-x-4 relative min-w-0">
+            <!-- Search Form -->
+            <form action="{{ url('/search') }}" method="GET" class="hidden md:flex">
+                <input type="text" name="query" placeholder="Search..." 
+                       class="border rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring focus:ring-[#06b6d4]">
+            </form>
   
    {{-- If not logged in --}}
 @guest
@@ -68,27 +68,36 @@
 
 {{-- If logged in --}}
 @auth
-    <div class="relative">
+    <div class="relative min-w-0 group">
         <!-- Dropdown Button -->
-        <button id="userDropdownBtn" class="flex items-center px-3 py-2 bg-[#e0f7fa] rounded hover:bg-[#06b6d4] hover:text-white">
-            {{ Auth::user()->customer?->first_name ?? Auth::user()->email }}
-            <span id="dropdownArrow" class="ml-1 transition-transform">▼</span>
+        <button id="userDropdownBtn" type="button"
+            class="flex items-center px-3 py-2 bg-[#e0f7fa] rounded hover:bg-[#06b6d4] hover:text-white min-w-0 max-w-[140px] overflow-hidden transition-colors duration-200 focus:outline-none">
+            <span class="truncate">
+                {{ Auth::user()->customer?->first_name ?? Auth::user()->email }}
+            </span>
         </button>
 
         <!-- Dropdown Menu -->
         <div id="userDropdownMenu"
-             class="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg hidden">
+             class="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-200 z-50 hidden group-hover:block">
             <!-- Profile -->
-            <a href="{{ route('customerprofile.dashboard') }}"
-               class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa]">
-                Profile
+            <a href="{{ route('customerprofile.profile') }}"
+               class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] transition-colors">
+                My Account
             </a>
-
+            <!-- My Purchase (no link) -->
+            <div class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] cursor-pointer transition-colors">
+                My Purchase
+            </div>
+            <!-- My Favorites (no link) -->
+            <div class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] cursor-pointer transition-colors">
+                My Favorites
+            </div>
             <!-- Logout -->
             <form id="logout-form" action="{{ route('customer.logout') }}" method="POST">
                 @csrf
                 <button type="submit"
-                        class="block w-full text-left px-4 py-2 text-gray-700 hover:bg-[#e0f7fa]">
+                        class="block w-full text-left px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] transition-colors">
                     Logout
                 </button>
             </form>
@@ -120,7 +129,7 @@
 
             <div class="flex space-x-4">
     <!-- Order Now -->
-    <a href="{{ route('templates.birthday.invitations') }}"
+    <a href="{{ route('templates.wedding.invitations') }}"
        class="px-6 py-3 text-white font-semibold hover:scale-105 transition-transform rounded-full"
        style="background:#06b6d4; font-family: 'Playfair Display', serif;">
        Order Now

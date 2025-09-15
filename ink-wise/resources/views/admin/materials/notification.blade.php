@@ -7,6 +7,7 @@
      <link rel="stylesheet" href="{{ asset('css/admin-css/notifications.css') }}">
     <h1>🔔 Stock Notifications</h1>
 
+    
     {{-- Low Stock Section --}}
     <div class="notif-section low">
         <h2>⚠️ Low Stock</h2>
