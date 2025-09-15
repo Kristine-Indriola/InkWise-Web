@@ -12,6 +12,7 @@ use App\Http\Controllers\Owner\HomeController;
 //use App\Http\Controllers\Staff\StaffLoginController;
 use App\Http\Controllers\Owner\OwnerController;
 use App\Http\Controllers\StaffProfileController;
+use App\Http\Controllers\VerificationController;
 use App\Http\Controllers\AdminCustomerController;
 use App\Http\Controllers\Admin\MaterialController;
 use App\Http\Controllers\Auth\RoleLoginController;
@@ -149,7 +150,6 @@ Route::prefix('users')->name('users.')->group(function () {
 
 
 
-
 /*Route::middleware(['auth', 'role:staff'])->group(function () {
     Route::get('/staff/dashboard', [StaffController::class, 'index'])->name('staff.dashboard');
 });
@@ -162,7 +162,8 @@ Route::get('/unauthorized', function () {
     return view('errors.unauthorized');
 })->name('unauthorized');
 
-
+Route::get('/verify-email/{token}', [VerificationController::class, 'verify'])
+->name('verify.email');
 /*
 |--------------------------------------------------------------------------
 | Google OAuth
