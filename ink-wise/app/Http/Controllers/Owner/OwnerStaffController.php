@@ -8,6 +8,8 @@ use App\Http\Controllers\Controller;
 
 class OwnerStaffController extends Controller
 {
+    protected $staffLimit = 3; // Maximum approved staff allowed
+
     public function index()
     {
         return view('owner.owner-home');
@@ -22,7 +24,7 @@ class OwnerStaffController extends Controller
         return view('owner.staff.index', compact('approvedStaff', 'pendingStaff'));
     }
 
-    public function approveStaff($staff_id)
+    public function approveStaff(Request $request, $staff_id)
     {
         $staff = Staff::with('user')->findOrFail($staff_id);
 
@@ -30,10 +32,21 @@ class OwnerStaffController extends Controller
             return back()->with('error', 'Staff account is not pending.');
         }
 
+        $approvedCount = Staff::where('status', 'approved')->count();
+
+        // If the limit is reached and confirmation is NOT given
+        if ($approvedCount >= $this->staffLimit && !$request->input('confirm')) {
+            return back()->with([
+                'warning' => "The approved staff limit of {$this->staffLimit} has been reached. Please confirm to approve anyway.",
+                'pendingStaffId' => $staff->staff_id
+            ]);
+        }
+
+        // Approve the staff
         $staff->update(['status' => 'approved']);
         $staff->user?->update(['status' => 'active']);
 
-        return back()->with('success', 'Staff Approved Successfully.');
+        return back()->with('success', 'Staff approved successfully.');
     }
 
     public function rejectStaff($staff_id)
@@ -52,17 +65,18 @@ class OwnerStaffController extends Controller
 
     public function search(Request $request)
     {
-        // Get the search query from the request
         $query = $request->input('search');
-        
-        // Search the staff table for matching staff (you can customize this as needed)
+
         $staff = Staff::where('first_name', 'like', "%$query%")
                       ->orWhere('last_name', 'like', "%$query%")
+                      ->orWhereHas('user', function($q) use ($query) {
+                          $q->where('email', 'like', "%$query%");
+                      })
                       ->get();
 
-        // Return a view with the results
-        return view('owner.staff.staff-list', compact('staff'));
+        $approvedStaff = $staff->where('status', 'approved');
+        $pendingStaff  = $staff->where('status', 'pending');
 
+        return view('owner.staff.index', compact('approvedStaff', 'pendingStaff'));
     }
-
 }

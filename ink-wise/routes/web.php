@@ -11,6 +11,7 @@ use App\Http\Controllers\Owner\HomeController;
 //use App\Http\Controllers\StaffAuthController;
 //use App\Http\Controllers\Staff\StaffLoginController;
 use App\Http\Controllers\Owner\OwnerController;
+use App\Http\Controllers\StaffProfileController;
 use App\Http\Controllers\AdminCustomerController;
 use App\Http\Controllers\Admin\MaterialController;
 use App\Http\Controllers\Auth\RoleLoginController;
@@ -20,8 +21,12 @@ use App\Http\Controllers\customerProfileController;
 use App\Http\Controllers\Owner\OwnerStaffController;
 use App\Http\Controllers\Auth\CustomerAuthController;
 use App\Http\Controllers\Customer\CustomerController;
+use App\Http\Controllers\Staff\StaffCustomerController;
+use App\Http\Controllers\Staff\StaffMaterialController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Owner\OwnerInventoryController;
+use App\Http\Controllers\Staff\StaffInventoryController;
+use App\Http\Controllers\Admin\ReportsDashboardController;
 use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
 use App\Http\Controllers\AddressController;
 
@@ -43,18 +48,9 @@ use App\Http\Controllers\AddressController;
 */
 Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () { 
     Route::get('/dashboard', [AdminController::class, 'index'])->name('dashboard'); 
-     // Show profile
     Route::get('/profile', [AdminController::class, 'show'])->name('profile.show');
-
-    // Edit profile
     Route::get('/profile/edit', [AdminController::class, 'edit'])->name('profile.edit');
-
-    // Update profile
     Route::put('/profile/update', [AdminController::class, 'update'])->name('profile.update');
-
-   
-
-
     Route::get('/admin/users/{id}', [UserManagementController::class, 'show'])
      ->name('admin.users.show'); 
 
@@ -86,6 +82,7 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::put('/{user_id}', [UserManagementController::class, 'update'])->name('update'); // Update user 
     Route::delete('/{user_id}', [UserManagementController::class, 'destroy'])->name('destroy'); // Delete user 
 
+    });
   Route::prefix('users')->name('users.')->group(function () {
     Route::get('/', [UserManagementController::class, 'index'])->name('index');
     Route::get('/create', [UserManagementController::class, 'create'])->name('create');
@@ -98,10 +95,6 @@ Route::prefix('users')->name('users.')->group(function () {
 });
 
 });
-
-
-
-
 
 
 
@@ -135,7 +128,20 @@ Route::prefix('users')->name('users.')->group(function () {
         Route::post('/send/{customerId}', [MessageController::class, 'sendToCustomer'])->name('send');
     });
 
-});
+     Route::get('reports', [ReportsDashboardController::class, 'index'])
+         ->name('reports.reports');
+
+    // Optional: Sales export
+    Route::get('reports/sales/export/{type}', [ReportsDashboardController::class, 'exportSales'])
+         ->name('reports.sales.export');
+
+    // Optional: Inventory export
+    Route::get('reports/inventory/export/{type}', [ReportsDashboardController::class, 'exportInventory'])
+         ->name('reports.inventory.export');
+
+
+
+
 
 
 
@@ -319,7 +325,7 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
 
     // Staff management (approved + pending)
     // Staff management (single page)
-         Route::get('/profile', [OwnerController::class, 'show'])->name('profile.show');
+     Route::get('/profile', [OwnerController::class, 'show'])->name('profile.show');
 
     // Edit profile
     Route::get('/profile/edit', [OwnerController::class, 'edit'])->name('profile.edit');
@@ -335,6 +341,7 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
 
 
 
+
     // Approve/reject staff
     Route::post('/staff/{staff}/approve', [OwnerController::class, 'approveStaff'])->name('staff.approve');
     Route::post('/staff/{staff}/reject', [OwnerController::class, 'rejectStaff'])->name('staff.reject');
@@ -346,8 +353,6 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/inventory/track', [OwnerInventoryController::class, 'track'])->name('inventory-track');
     Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
     Route::get('/reports', fn () => view('owner.owner-reports'))->name('reports');
-
-    // In routes/web.php
 
     
     
@@ -370,18 +375,38 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
   
 
 Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
-
     Route::get('/dashboard', fn () => view('staff.dashboard'))->name('dashboard');
     Route::get('/assigned-orders', fn () => view('staff.assigned_orders'))->name('assigned.orders');
     Route::get('/order-list', fn () => view('staff.order_list'))->name('order.list');
-    Route::get('/customer-profile', fn () => view('staff.customer_profile'))->name('customer.profile');
     Route::get('/notify-customers', fn () => view('staff.notify_customers'))->name('notify.customers');
+    Route::get('/profile/edit', [StaffProfileController::class, 'edit'])->name('profile.edit');
+    Route::post('/profile/update', [StaffProfileController::class, 'update'])->name('profile.update');
 
-    // Messages routes
+    // ✅ fixed: remove the extra "staff" in URL and name
+    Route::get('/customers', [StaffCustomerController::class, 'index'])
+        ->name('customer_profile'); 
+
+    Route::get('/materials/notification', [StaffMaterialController::class, 'notification'])
+     ->name('staff.materials.notification');
+
+        
 
 
+    Route::prefix('inventory')->name('inventory.')->group(function () {
+        Route::get('/', [StaffInventoryController::class, 'index'])->name('index');
+        Route::get('/create', [StaffInventoryController::class, 'create'])->name('create');
+        Route::post('/', [StaffInventoryController::class, 'store'])->name('store');
+        Route::get('/{id}/edit', [StaffInventoryController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [StaffInventoryController::class, 'update'])->name('update');
+        Route::delete('/{id}', [StaffInventoryController::class, 'destroy'])->name('destroy');
+    });
+
+     Route::prefix('materials')->name('materials.')->group(function () {
+        Route::get('/', [StaffMaterialController::class, 'index'])->name('index');
+        Route::get('/create', [StaffMaterialController::class, 'create'])->name('create');
+        Route::post('/', [StaffMaterialController::class, 'store'])->name('store');
+        Route::get('/{id}/edit', [StaffMaterialController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [StaffMaterialController::class, 'update'])->name('update');
+        Route::delete('/{id}', [StaffMaterialController::class, 'destroy'])->name('destroy');
+    });
 });
-
-
-
-

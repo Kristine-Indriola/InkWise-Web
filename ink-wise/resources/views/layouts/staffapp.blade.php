@@ -9,13 +9,15 @@
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Cinzel:wght@600&display=swap" rel="stylesheet">
 
+  <!-- Font Awesome (icons) -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+
   <style>
-    .logo-script {
-      font-family: 'Great Vibes', cursive;
-    }
-    .logo-serif {
-      font-family: 'Cinzel', serif;
-    }
+    .logo-script { font-family: 'Great Vibes', cursive; }
+    .logo-serif  { font-family: 'Cinzel', serif; }
+
+    /* small tweak so FA icons are centered in menu */
+    .sidebar .menu-icon { width: 1.25rem; display: inline-flex; justify-content: center; }
   </style>
 </head>
 <body class="bg-gray-100 font-sans">
@@ -23,30 +25,77 @@
   <div class="flex h-screen">
    
     <!-- Sidebar -->
-    <aside class="w-64 bg-white border-r flex flex-col">
+    <aside class="w-64 bg-white border-r flex flex-col sidebar">
       <div class="p-4 text-2xl font-bold text-purple-700 border-b flex items-center">
         <span class="logo-script text-4xl text-purple-500">I</span>
         <span class="logo-serif text-2xl ml-1 text-blue-600">nkwise</span>
       </div>
-
+<!--
       <div class="p-4 flex items-center border-b">
-        <img src="https://via.placeholder.com/40" class="rounded-full mr-3">
+        <img src="https://via.placeholder.com/40" alt="avatar" class="rounded-full mr-3">
         <div>
           <p class="font-semibold">Staff Profile</p>
           <span class="text-green-500 text-sm">● Online</span>
         </div>
       </div>
-     
+-->
       <nav class="flex-1 p-4">
         <ul class="space-y-2">
-          <li><a href="{{ route('staff.dashboard') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Dashboard</a></li>
-          <li><a href="{{ route('staff.assigned.orders') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Assigned Orders</a></li>
-          <li><a href="{{ route('staff.order.list') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Order List</a></li>
-          <li><a href="{{ route('staff.customer.profile') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> customer Profiles</a></li>
-          <li><a href="{{ route('staff.notify.customers') }}" class="flex items-center p-2 rounded hover:bg-gray-200"> Notify customers</a></li>
+    <li>
+        <a href="{{ route('staff.profile.edit') }}" class="flex items-center p-2 text-gray-700 hover:bg-purple-200 rounded-lg">
+  <i class="fa-solid fa-user-circle mr-2"></i> Profile
+</a>
+
+    </li>
+    <!-- Existing menu items below -->
+          <li>
+            <a href="{{ route('staff.dashboard') }}"
+               class="flex items-center p-2 rounded hover:bg-gray-100
+                      {{ request()->routeIs('staff.dashboard') ? 'bg-gray-100 text-purple-600 font-semibold' : 'text-gray-700' }}">
+              <span class="menu-icon mr-3"><i class="fa-solid fa-gauge-high"></i></span>
+              <span>Dashboard</span>
+            </a>
+          </li>
+
+          <li>
+            <a href="{{ route('staff.assigned.orders') }}"
+               class="flex items-center p-2 rounded hover:bg-gray-100
+                      {{ request()->routeIs('staff.assigned.orders') ? 'bg-gray-100 text-purple-600 font-semibold' : 'text-gray-700' }}">
+              <span class="menu-icon mr-3"><i class="fa-solid fa-clipboard-list"></i></span>
+              <span>Assigned Orders</span>
+            </a>
+          </li>
+
+          <li>
+            <a href="{{ route('staff.order.list') }}"
+               class="flex items-center p-2 rounded hover:bg-gray-100
+                      {{ request()->routeIs('staff.order.list') ? 'bg-gray-100 text-purple-600 font-semibold' : 'text-gray-700' }}">
+              <span class="menu-icon mr-3"><i class="fa-solid fa-list"></i></span>
+              <span>Order List</span>
+            </a>
+          </li>
+
+          <li>
+    <a href="{{ route('staff.customer_profile') }}"
+       class="flex items-center p-2 rounded hover:bg-gray-100
+              {{ request()->routeIs('staff.customer_profile') ? 'bg-gray-100 text-purple-600 font-semibold' : 'text-gray-700' }}">
+      <span class="menu-icon mr-3"><i class="fa-solid fa-users"></i></span>
+      <span>Customer Profiles</span>
+    </a>
 </li>
-          
-          
+
+          <li>
+            <a href="{{ route('staff.notify.customers') }}"
+               class="flex items-center p-2 rounded hover:bg-gray-100
+                      {{ request()->routeIs('staff.notify.customers') ? 'bg-gray-100 text-purple-600 font-semibold' : 'text-gray-700' }}">
+              <span class="menu-icon mr-3"><i class="fa-solid fa-bell"></i></span>
+              <span>Notify Customers</span>
+            </a>
+          </li>
+
+          <li class="{{ request()->routeIs('staff.materials.*') ? 'active' : '' }}">
+    <a href="{{ route('staff.materials.index') }}"><i>📝</i> Materials</a>
+</li>
         </ul>
       </nav>
     </aside>
@@ -58,11 +107,30 @@
       <header class="flex justify-between items-center bg-white p-4 border-b">
         <h1 class="text-xl font-bold">Welcome, Staff!</h1>
         <div class="flex items-center space-x-4">
-          <button class="relative">
-            🔔
-            <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs px-1 rounded-full">1</span>
+          <a href="{{ route('staff.staff.materials.notification') }}" class="nav-link">
+    🔔
+    @php
+        $lowCount = \App\Models\Material::whereHas('inventory', function($q) {
+            $q->whereColumn('stock_level', '<=', 'reorder_level')
+              ->where('stock_level', '>', 0);
+        })->count();
+
+        $outCount = \App\Models\Material::whereHas('inventory', function($q) {
+            $q->where('stock_level', '<=', 0);
+        })->count();
+
+        $notifCount = $lowCount + $outCount;
+    @endphp
+
+    @if($notifCount > 0)
+        <span class="notif-badge">{{ $notifCount }}</span>
+    @endif
+</a>
+
+          <button class="text-gray-600" aria-label="Settings">
+            <i class="fa-solid fa-gear"></i>
           </button>
-          <button>⚙</button>
+
           <form method="POST" action="{{ route('logout') }}">
             @csrf
             <button type="submit" class="bg-red-600 text-white px-3 py-1 rounded">Logout</button>
@@ -70,25 +138,7 @@
         </div>
       </header>
      
-      <!-- Dashboard Stats -->
-       <!--
-      <section class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="bg-white p-6 rounded-lg shadow text-center border border-purple-400">
-          <p class="text-3xl font-bold">12</p>
-          <p class="text-gray-500">Total Orders</p>
-        </div>
-        <div class="bg-white p-6 rounded-lg shadow text-center border border-purple-400">
-          <p class="text-3xl font-bold">5</p>
-          <p class="text-gray-500">Assigned Orders</p>
-        </div>
-        <div class="bg-white p-6 rounded-lg shadow text-center border border-purple-400">
-          <p class="text-3xl font-bold">8</p>
-          <p class="text-gray-500">customers</p>
-        </div>
-      </section>
-  -->
       <!-- Page Content -->
-   
       <section class="p-6">
         @yield('content')
       </section>
@@ -97,4 +147,3 @@
 
 </body>
 </html>
-

@@ -519,6 +519,7 @@ body.dark-mode .btn-warning {
 </head>
 <body>
   <!-- Sidebar -->
+
   <div class="sidebar" id="sidebar" style="padding-top:32px;">
   <button class="collapse-btn" id="sidebarToggle" title="Toggle Sidebar" style="margin-left:auto; margin-right:0;">
     <i class="fi fi-rr-angle-double-right" id="sidebarToggleIcon"></i>
@@ -526,6 +527,53 @@ body.dark-mode .btn-warning {
   <div class="profile" style="display:flex; flex-direction:column; align-items:center; justify-content:flex-start; margin-bottom:18px;">
     <img src="/adminimage/inkwise.png" alt="InkWise Logo"
          style="width:90px; height:90px; max-width:100%; max-height:100px; background:transparent; border-radius:24px; border:none; box-shadow:0 4px 16px rgba(0,0,0,0.07); object-fit:contain; margin-bottom:8px;">
+
+  <div class="sidebar">
+   <div class="profile">
+        <a href="{{ route('admin.profile.show') }}" 
+           style="display:flex; align-items:center; text-decoration:none; color:inherit;">
+            <img src="https://ui-avatars.com/api/?name={{ urlencode(optional(Auth::user()->staff)->first_name . ' ' . optional(Auth::user()->staff)->last_name ?? Auth::user()->email) }}&background=6a2ebc&color=fff&bold=true" 
+             alt="Admin Avatar" 
+             style="border-radius:50%; margin-right:10px; width:55px; height:55px; border:2px solid #6a2ebc;">
+        <div>
+                <strong>{{ Auth::user()->name ?? 'Admin' }}</strong> 
+                <span style="color:green;">✔</span>
+            </div>
+        </a>
+    </div>
+   <ul>
+  <li class="{{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
+    <a href="{{ route('admin.dashboard') }}"><i>🏠</i> Dashboard</a>
+  </li>
+
+   <li class="{{ request()->routeIs('admin.customers.*') ? 'active' : '' }}">
+    <a href="{{ route('admin.customers.index') }}"><i>👥</i> Customer Accounts</a>
+</li>
+
+  <li class="{{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
+    <a href="{{ route('admin.users.index') }}"><i>👤</i> Staff Accounts</a>
+  </li>
+
+  <li class="{{ request()->routeIs('admin.templates.*') ? 'active' : '' }}">
+    <a href="{{ route('admin.templates.index') }}"><i>📑</i> Templates</a>
+  </li>
+
+  <li><i>📦</i> Order Summaries</li>
+
+ <li class="{{ request()->routeIs('admin.messages.*') ? 'active' : '' }}">
+    <a href="{{ route('admin.messages.index') }}"><i>💬</i> Messages</a>
+</li>
+
+<li class="{{ request()->routeIs('admin.materials.*') ? 'active' : '' }}">
+    <a href="{{ route('admin.materials.index') }}"><i>📝</i> Materials</a>
+</li>
+
+  <li class="{{ request()->routeIs('admin.reports.*') ? 'active' : '' }}">
+            <a href="{{ route('admin.reports.reports') }}"><i>📊</i> Reports</a>
+        </li>
+</ul>
+
+
   </div>
   <ul style="margin-top:0; padding-top:0;">
     <li class="{{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" style="margin-top:10px;">
