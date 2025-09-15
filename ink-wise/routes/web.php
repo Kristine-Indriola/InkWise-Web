@@ -95,6 +95,7 @@ Route::prefix('users')->name('users.')->group(function () {
 
 });
 
+
      Route::prefix('inventory')->name('inventory.')->group(function () {
         Route::get('/', [InventoryController::class, 'index'])->name('index');
         Route::get('/create', [InventoryController::class, 'create'])->name('create');
@@ -136,6 +137,7 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::get('reports/inventory/export/{type}', [ReportsDashboardController::class, 'exportInventory'])
          ->name('reports.inventory.export');
 });
+
 
 
 
