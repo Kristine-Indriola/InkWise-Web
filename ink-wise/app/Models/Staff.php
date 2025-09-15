@@ -42,6 +42,11 @@ class Staff extends Model
         return $this->hasOne(Address::class, 'user_id', 'user_id');
     }
 
+    public function approval()
+{
+    return $this->hasOne(UserApproval::class);
+}
+
     // 🔹 Auto-generate random staff_id when creating
     protected static function boot()
     {
