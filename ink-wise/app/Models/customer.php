@@ -9,32 +9,27 @@ class Customer extends Model
 {
     use HasFactory;
 
-    protected $table = 'customers';
-    protected $primaryKey = 'customer_id';
+    // Table name
+    protected $table = 'customers'; // ✅ matches migration
+
+    // Primary key
+    protected $primaryKey = 'customer_id'; // ✅ matches migration
     public $incrementing = true;
     protected $keyType = 'int';
 
+    // Fillable fields
     protected $fillable = [
         'first_name',
         'middle_name',
         'last_name',
         'contact_number',
+        'address_id',
         'user_id',
-        'photo',
-        'phone',
-        'birthdate',
-        'gender',
     ];
 
-    // 🔹 Customer belongs to a User
+    // Relationships
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
-    }
-
-    // 🔹 Customer has one Address
-    public function address()
-    {
-        return $this->hasOne(Address::class, 'user_id', 'user_id');
     }
 }
