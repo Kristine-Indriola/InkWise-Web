@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="{{ asset('css/customer/preview.css') }}">
    <script src="{{ asset('js/customer/preview.js') }}" defer></script>
 
+   
 <body>
   <div class="container">
 

@@ -13,6 +13,7 @@
 </head>
 <body class="bg-gray-100">
 
+    
 <div class="max-w-2xl mx-auto bg-white shadow rounded p-8 mt-10">
     <h2 class="text-2xl font-bold mb-6 text-center">Order Invitation</h2>
     <form id="orderForm">

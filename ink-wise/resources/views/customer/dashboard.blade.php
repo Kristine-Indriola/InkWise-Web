@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inkwise Dashboard</title>
 
+
    <style>
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Seasons&display=swap');
         @import url('https://fonts.cdnfonts.com/css/edwardian-script-itc');
@@ -73,7 +74,7 @@
         <button id="userDropdownBtn" type="button"
             class="flex items-center px-3 py-2 bg-[#e0f7fa] rounded hover:bg-[#06b6d4] hover:text-white min-w-0 max-w-[140px] overflow-hidden transition-colors duration-200 focus:outline-none">
             <span class="truncate">
-                {{ Auth::user()->customer?->first_name ?? Auth::user()->email }}
+                {{ Auth::user()->customer?->first_name }}
             </span>
         </button>
 
@@ -173,15 +174,15 @@
 @include('auth.customer.register')
 
 {{-- Templates Section --}}
-@include('customerpartials.templates')
+@include('customer.partials.templates')
 
 {{-- Categories Section --}}
-@include('customerpartials.categories')
+@include('customer.partials.categories')
 
 {{-- About Section --}}
-@include('customerpartials.about')
+@include('customer.partials.about')
 
 {{-- Contact Section --}}
-@include('customerpartials.contact')
+@include('customer.partials.contact')
 </body>
 </html>

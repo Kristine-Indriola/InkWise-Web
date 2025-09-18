@@ -1,5 +1,5 @@
 @php($invitationType = 'Baptism')
-@extends('customerInvitations.invitations')
+@extends('customer.Invitations.invitations')
 
 @section('title', 'Wedding Invitations')
 
@@ -12,6 +12,7 @@
     </h1>
     <p class="page-subtitle mb-10">Choose from our curated selection of elegant invitation designs.</p>
 
+    
     <!-- Cards Grid -->
     
     

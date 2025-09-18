@@ -1,5 +1,5 @@
 @php($invitationType = 'Wedding')
-@extends('customerInvitations.invitations')
+@extends('customer.Invitations.invitations')
 
 @section('title', 'Wedding Invitations')
 <link rel="stylesheet" href="{{ asset('css/customer/template.css') }}">
@@ -12,6 +12,7 @@
     </h1>
     <p class="page-subtitle mb-10">Choose from our curated selection of elegant invitation designs.</p>
 
+    
     <!-- Individual Card Grids -->
     <div class="mx-auto max-w-7xl flex flex-wrap gap-6 justify-center">
         <!-- Card 1 -->

@@ -13,6 +13,8 @@
     </style>
 @endsection
 
+
+
 @section('content')
 <div class="card bg-white p-6 md:p-8 border border-gray-100">
     <div class="flex items-center justify-between mb-6">
@@ -52,7 +54,7 @@
                         data-address='@json($address)'>
                         Edit
                     </button>
-                    <form method="POST" action="{{ route('customerprofile.addresses.destroy', $address->address_id) }}" class="inline">
+                    <form method="POST" action="{{ route('customer.profile.addresses.destroy', $address->address_id) }}" class="inline">
                         @csrf
                         <button type="submit" class="text-[#1976d2] hover:underline bg-transparent border-0 p-0 m-0">Delete</button>
                     </form>
@@ -68,7 +70,7 @@
         <div class="address-form-modal bg-white rounded-lg shadow-lg p-6 w-full max-w-md mx-auto">
             <button id="closeAddAddress" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 text-xl font-bold">✖</button>
             <h3 class="text-lg font-semibold mb-4">Add New Address</h3>
-            <form method="POST" action="{{ route('customerprofile.addresses.store') }}">
+            <form method="POST" action="{{ route('customer.profile.addresses.store') }}">
                 @csrf
                 <!-- Hidden country field -->
                 <input type="hidden" name="country" value="Philippines">

@@ -1,5 +1,5 @@
 @php($invitationType = 'Birthday')
-@extends('customerInvitations.invitations')
+@extends('customer.Invitations.invitations')
 
 @section('title', 'Birthday Invitations')
 
@@ -12,6 +12,7 @@
     </h1>
     <p class="page-subtitle mb-10">Choose from our curated selection of fun birthday invitation designs.</p>
 
+    
 
     <!-- Cards Grid -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
