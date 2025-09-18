@@ -3,13 +3,14 @@
 use Illuminate\Support\Facades\Route;
 use Laravel\Socialite\Facades\Socialite;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AddressController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\TemplateController;
-use App\Http\Controllers\Owner\HomeController;
 //use App\Http\Controllers\OwnerLoginController;
 //use App\Http\Controllers\Auth\AdminLoginController;
 //use App\Http\Controllers\StaffAuthController;
 //use App\Http\Controllers\Staff\StaffLoginController;
+use App\Http\Controllers\Owner\HomeController;
 use App\Http\Controllers\Owner\OwnerController;
 use App\Http\Controllers\StaffProfileController;
 use App\Http\Controllers\VerificationController;
@@ -29,7 +30,6 @@ use App\Http\Controllers\Owner\OwnerInventoryController;
 use App\Http\Controllers\Staff\StaffInventoryController;
 use App\Http\Controllers\Admin\ReportsDashboardController;
 use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
-use App\Http\Controllers\AddressController;
 
 
 
@@ -57,8 +57,13 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
 
      Route::get('/materials/notification', [MaterialController::class, 'notification'])
      ->name('admin.materials.notification');
+
+     Route::get('/notifications', [AdminController::class, 'notifications'])
+        ->name('notifications');
  
-     
+     Route::get('/admin/notifications', [AdminController::class, 'notifications'])
+    ->name('admin.notifications')
+    ->middleware('auth');
     
 
 
@@ -161,7 +166,14 @@ Route::get('/unauthorized', function () {
 })->name('unauthorized');
 
 Route::get('/verify-email/{token}', [VerificationController::class, 'verify'])
-->name('verify.email');
+    ->name('verify.email');
+
+    Route::patch('/notifications/{id}/read', function ($id) {
+    $notification = auth()->user()->notifications()->findOrFail($id);
+    $notification->markAsRead();
+
+    return back()->with('success', 'Notification marked as read.');
+})->name('notifications.read');
 /*
 |--------------------------------------------------------------------------
 | Google OAuth
