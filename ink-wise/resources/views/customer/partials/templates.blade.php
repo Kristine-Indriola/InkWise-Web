@@ -11,6 +11,7 @@
       <img src="/customerimages/image/star.png" class="absolute -top-6 -left-8 w-12 h-12 rotate-12" alt="">
       <img src="/customerimages/image/gift.png" class="absolute -bottom-6 right-10 w-12 h-12" alt="">
 
+      
       <a href="{{ route('templates.birthday.invitations') }}" class="block w-80 -rotate-3 rounded-3xl shadow-xl overflow-hidden border-4 border-pink-300 cursor-pointer hover:scale-105 transition-transform">
         <img src="/customerimages/image/birthday.png" alt="Birthday" class="w-full h-40 object-cover">
       </a>

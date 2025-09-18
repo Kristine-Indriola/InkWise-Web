@@ -9,39 +9,33 @@ class CustomerProfileController extends Controller
 {
     public function update(Request $request)
     {
-        $request->validate([
+        $user = Auth::user();
+        $customer = $user->customer;
+
+        $validated = $request->validate([
             'first_name'  => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
             'last_name'   => 'required|string|max:255',
-            'email'       => 'required|email|max:255',
-            'phone'       => 'nullable|string|max:255',
+            'email'       => 'required|email|unique:users,email,' . $user->id,
+            'phone'       => 'nullable|string|max:20',
             'birthdate'   => 'nullable|date',
             'gender'      => 'nullable|in:male,female,other',
             'photo'       => 'nullable|image|max:2048',
         ]);
 
-        $user = Auth::user();
-        $customer = $user->customer;
-
-        // Update user email
-        $user->email = $request->email;
+        // Update user email if changed
+        $user->email = $validated['email'];
         $user->save();
 
         // Update customer fields
-        $customer->first_name = $request->first_name;
-        $customer->middle_name = $request->middle_name;
-        $customer->last_name = $request->last_name;
-        $customer->contact_number = $request->phone;
-        $customer->date_of_birth = $request->birthdate;
-        $customer->gender = $request->gender;
-
-        // Handle photo upload
+        $customer->fill($validated);
         if ($request->hasFile('photo')) {
-            $path = $request->file('photo')->store('avatars', 'public');
-            $customer->photo = $path;
+            $customer->photo = $request->file('photo')->store('customer_photos', 'public');
         }
-
         $customer->save();
+
+        // Refresh session
+        Auth::setUser($user->fresh());
 
         return back()->with('status', 'Profile updated successfully!');
     }

@@ -115,6 +115,7 @@ Route::prefix('users')->name('users.')->group(function () {
         Route::get('/{id}/edit', [MaterialController::class, 'edit'])->name('edit');
         Route::put('/{id}', [MaterialController::class, 'update'])->name('update');
         Route::delete('/{id}', [MaterialController::class, 'destroy'])->name('destroy');
+        
     });
 
    Route::prefix('customers')->name('customers.')->group(function () {
@@ -182,126 +183,78 @@ Route::get('/auth/google/callback', function () {
 
 /*
 |--------------------------------------------------------------------------
-| customer ROUTES
+| CUSTOMER ROUTES
 |--------------------------------------------------------------------------
 */
-//customer Dashboard/Home route
-Route::get('/', function () {
-    return view('dashboard');
-})->name('dashboard');
 
-// Simple placeholders to avoid 404 during dev
+/**Dashboard & Home*/
+Route::get('/', fn () => view('customer.dashboard'))->name('dashboard');
+Route::get('/dashboard', fn () => view('customer.dashboard'))->name('customer.dashboard');
 Route::get('/search', function (\Illuminate\Http\Request $request) {
     return 'Search for: ' . e($request->query('query', ''));
 })->name('search');
 
-// Dashboard page (works for both guest & logged in users)
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->name('customer.dashboard');
-
-// Guest routes (register / login)
+/** Auth (Register/Login/Logout) */
 Route::get('/customer/register', [CustomerAuthController::class, 'showRegister'])->name('customer.register.form');
 Route::post('/customer/register', [CustomerAuthController::class, 'register'])->name('customer.register');
-
 Route::get('/customer/login', [CustomerAuthController::class, 'showLogin'])->name('customer.login.form');
 Route::post('/customer/login', [CustomerAuthController::class, 'login'])->name('customer.login');
-
-Route::get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');
 Route::post('/customer/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
+Route::get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');
 
-// Customer Profile pages
-Route::middleware(['auth:customer'])->group(function () {
+/**Customer Profile Pages*/
+Route::prefix('customerprofile')->group(function () {
     // Addresses
-    Route::get('/customerprofile/addresses', [AddressController::class, 'index'])->name('customerprofile.addresses');
-    Route::post('/customerprofile/addresses', [AddressController::class, 'store'])->name('customerprofile.addresses.store');
-    Route::post('/customerprofile/addresses/{address}/delete', [AddressController::class, 'destroy'])->name('customerprofile.addresses.destroy');
-    Route::post('/customerprofile/addresses/{address}/update', [AddressController::class, 'update'])->name('customerprofile.addresses.update');
-    // Other customer-only pages
-    Route::get('/customer/my-orders', function () {
-        return view('customerprofile.my_purchase');
-    })->name('customer.my_purchase');
-    Route::get('/customerprofile/order', function () {
-        return view('customerprofile.orderform');
-    })->name('customerprofile.orderform');
-    Route::get('/customerprofile/settings', function () {
-        return view('customerprofile.settings');
-    })->name('customerprofile.settings');
-    
+    Route::get('/addresses', [AddressController::class, 'profile'])->name('customer.profile.addresses');
+    Route::post('/addresses', [AddressController::class, 'store'])->name('customer.profile.addresses.store');
+    Route::post('/addresses/{address}/delete', [AddressController::class, 'destroy'])->name('customer.profile.addresses.destroy');
+    Route::post('/addresses/{address}/update', [AddressController::class, 'update'])->name('customer.profile.addresses.update');
+
+    // Profile, Settings, Order Form
+    Route::get('/profile', fn () => view('customer.profile.update'))->name('customerprofile.profile');
+    Route::get('/settings', fn () => view('customer.profile.settings'))->name('customerprofile.settings');
+    Route::get('/order', fn () => view('customer.profile.orderform'))->name('customerprofile.orderform');
 });
-Route::get('/customerprofile/profile', [CustomerProfileController::class, 'edit'])->name('customerprofile.profile');
 
+// My Purchases
+Route::get('/customer/my-orders', fn () => view('customer.profile.my_purchase'))->name('customer.my_purchase');
 
+// Profile update (protected)
+Route::middleware(['auth:customer'])->group(function () {
+    Route::put('/customer/profile/update', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
+});
 
+/** Templates (Category Home & Invitations/Giveaways)*/
+Route::prefix('templates')->group(function () {
+    // Category Home
+    Route::get('/wedding', fn () => view('customer.templates.wedding'))->name('templates.wedding');
+    Route::get('/birthday', fn () => view('customer.templates.birthday'))->name('templates.birthday');
+    Route::get('/baptism', fn () => view('customer.templates.baptism'))->name('templates.baptism');
+    Route::get('/corporate', fn () => view('customer.templates.corporate'))->name('templates.corporate');
 
+    // Invitations
+    Route::get('/wedding/invitations', fn () => view('customer.Invitations.weddinginvite'))->name('templates.wedding.invitations');
+    Route::get('/birthday/invitations', fn () => view('customer.Invitations.birthdayinvite'))->name('templates.birthday.invitations');
+    Route::get('/corporate/invitations', fn () => view('customer.Invitations.corporateinvite'))->name('templates.corporate.invitations');
+    Route::get('/baptism/invitations', fn () => view('customer.Invitations.baptisminvite'))->name('templates.baptism.invitations');
 
-// customer Templatehome category pages
-Route::get('/templates/wedding', function () {
-    return view('customertemplates.wedding');
-})->name('templates.wedding');
-Route::get('/templates/birthday', function () {
-    return view('customertemplates.birthday');
-})->name('templates.birthday');
-Route::get('/templates/baptism', function () {
-    return view('customertemplates.baptism');
-})->name('templates.baptism');
-Route::get('/templates/corporate', function () {
-    return view('customertemplates.corporate');
-})->name('templates.corporate');
+    // Giveaways
+    Route::get('/wedding/giveaways', fn () => view('customer.Giveaways.weddinggive'))->name('templates.wedding.giveaways');
+    Route::get('/birthday/giveaways', fn () => view('customer.Giveaways.birthdaygive'))->name('templates.birthday.giveaways');
+});
 
+/** Product Preview & Design Editing*/
+Route::get('/product/preview', fn () => view('customer.Invitations.productpreview'))->name('productpreview');
+Route::get('/design/edit', fn () => view('customer.Invitations.editing'))->name('design.edit');
 
-//customer templates inviatations 
-Route::get('/templates/wedding/invitations', function () {
-    return view('customerInvitations.weddinginvite');
-})->name('templates.wedding.invitations');
-Route::get('/templates/birthday/invitations', function () {
-    return view('customerInvitations.birthdayinvite');
-})->name('templates.birthday.invitations');
-Route::get('/templates/corporate/invitations', function () {
-    return view('customerInvitations.corporateinvite');
-})->name('templates.corporate.invitations');
-Route::get('/templates/baptism/invitations', function () {
-    return view('customerInvitations.baptisminvite');
-})->name('templates.baptism.invitations');
-
-
-Route::get('/product/preview', function () {
-    return view('customerInvitations.productpreview');
-})->name('productpreview');
-// Design editing route
-Route::get('/design/edit', function () {
-    return view('customerInvitations.editing');
-})->name('design.edit');
-Route::get('/order/form', function () {
-    return view('customerprofile.orderform');
-})->name('order.form');
-
-//customer templates giveaways 
-Route::get('/templates/wedding/giveaways', function () {
-    return view('customerGiveaways.weddinggive');
-})->name('templates.wedding.giveaways');
-Route::get('/templates/birthday/giveaways', function () {
-    return view('customerGiveaways.birthdaygive');
-})->name('templates.birthday.giveaways');
-
-
-// customer order and design pages
-Route::get('/order/birthday', function () {
-    return view('customertemplates.birthday');  // <-- points to your blade file
-})->name('order.birthday');
-
-
-// ----------------------------
-// Temporary Google Redirect (Fix)
-// ----------------------------
-Route::get('/auth/google', function () {
-    return 'Google login placeholder until controller is ready.';
-})->name('google.redirect');
-
-// ----------------------------
-// customer ROUTES END
-// ----------------------------
-
+/**Order Forms & Pages*/
+Route::get('/order/form', fn () => view('customer.profile.orderform'))->name('order.form');
+Route::get('/order/birthday', fn () => view('customer.templates.birthday'))->name('order.birthday');
+/*
+|--------------------------------------------------------------------------|
+| CUSTOMER END                                      |
+|--------------------------------------------------------------------------|
+*/
 
 /*
 |--------------------------------------------------------------------------
@@ -319,7 +272,6 @@ Route::post('/logout', [RoleLoginController::class, 'logout'])->name('logout');
 | Owner Auth
 |--------------------------------------------------------------------------
 */
-
 
 Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/home', [HomeController::class, 'index'])->name('home');
@@ -411,3 +363,19 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
         Route::delete('/{id}', [StaffMaterialController::class, 'destroy'])->name('destroy');
     });
 });
+
+/*
+|--------------------------------------------------------------------------|
+| Google OAuth (Temporary for Dev)                                        |
+|--------------------------------------------------------------------------|
+*/
+Route::get('/auth/google/redirect', function () {
+    return Socialite::driver('google')->redirect();
+})->name('google.redirect');
+
+Route::get('/auth/google/callback', function () {
+    $user = Socialite::driver('google')->user();
+    // You can dump user info for testing
+    // dd($user);
+    return 'Google login successful (dev placeholder)';
+})->name('google.callback');

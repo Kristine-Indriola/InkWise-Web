@@ -3,6 +3,8 @@
 @section('title', 'Materials Management')
 
 @section('content')
+<!-- Add Fontisto CDN for fi icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@flaticon/flaticon-uicons/css/all/all.css">
 <div class="materials-container">
     <link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
     <h1>Materials Management</h1>
@@ -120,16 +122,42 @@
     <div class="top-actions">
 
         <div class="search-bar">
-    <form method="GET" action="{{ route('admin.materials.index') }}" style="display:flex; align-items:center; gap:8px;">
-        <span style="color:#94b9ff; font-size:18px; margin-right:4px;">
-            <i class="fa-solid fa-magnifying-glass"></i>
-        </span>
-        <input type="text" name="search" value="{{ request('search') }}" placeholder="Search materials..." class="form-control">
-        <button type="submit" class="btn btn-secondary">Search</button>
-    </form>
-</div>
+            <form method="GET" action="{{ route('admin.materials.index') }}" style="display:flex; align-items:center; gap:8px;">
+                <span style="color:#94b9ff; font-size:18px; margin-right:4px;">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </span>
+                <input type="text" name="search" value="{{ request('search') }}" placeholder="Search materials..." class="form-control">
+                <button type="submit" class="btn btn-secondary">Search</button>
+            </form>
+        </div>
 
-        <a href="{{ route('admin.materials.create') }}" class="btn btn-primary">➕ Add New Material</a>
+        <!-- Floating Action Button for Add New Material -->
+        <div class="fab-container" style="position: relative;">
+            <button id="fab-main" class="btn btn-primary" type="button" style="position: relative; z-index: 2;">
+                <i class="fi fi-br-plus-small"></i> Add New Material
+            </button>
+            <div id="fab-options" style="display: none; position: absolute; right: 0; top: 110%; z-index: 3; flex-direction: column; gap: 8px;">
+                <a href="{{ route('admin.materials.create', ['type' => 'invitation']) }}" class="btn btn-primary" style="background:#3cd5c8;">
+                    <i class="fa-solid fa-envelope"></i> Invitation
+                </a>
+                <a href="{{ route('admin.materials.create', ['type' => 'giveaway']) }}" class="btn btn-primary" style="position: relative; z-index: 2;">
+                    <i class="fa-solid fa-gift"></i> Giveaway
+                </a>
+            </div>
+        </div>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const fabMain = document.getElementById('fab-main');
+                const fabOptions = document.getElementById('fab-options');
+                fabMain.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    fabOptions.style.display = fabOptions.style.display === 'flex' ? 'none' : 'flex';
+                });
+                document.addEventListener('click', function() {
+                    fabOptions.style.display = 'none';
+                });
+            });
+        </script>
     </div>
 
     {{-- Success Message --}}
@@ -142,12 +170,11 @@
 
 
     {{-- Materials Table --}}
-    <div class="table-wrapper">
+    <div class="table-wrapper" style="background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(148,185,255,0.08); padding: 18px;">
         <table class="table">
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>SKU</th>
                     <th>Material Name</th>
                     <th>Occasion</th>
                     <th>Product Type</th>
@@ -155,20 +182,26 @@
                     <th>Size</th>
                     <th>Color</th>
                     <th>Weight (GSM)</th>
-                    <th>Volume (ml)</th>
                     <th>Unit</th>
-                    <th>Unit Cost</th>
+                    <th>Unit Price(₱)/Per(ml)</th>
                     <th>Stock Qty</th>
+                    <th>Stock Qty (ml)</th> <!-- Added column for volume_ml -->
                     <th>Reorder Point</th>
                     <th>Description</th>
+                    <th>Status</th>
                     <th class="text-center">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($materials as $material)
+                    @php
+                        $stock = $material->material_type === 'ink'
+                            ? ($material->volume_ml ?? 0)
+                            : ($material->inventory->stock_level ?? 0);
+                        $reorder = $material->inventory->reorder_level ?? 0;
+                    @endphp
                     <tr>
                         <td>{{ $material->material_id }}</td>
-                        <td>{{ $material->sku ?? '-' }}</td>
                         <td class="fw-bold">{{ $material->material_name }}</td>
                         <td>{{ ucfirst($material->occasion) }}</td>
                         <td>{{ ucfirst($material->product_type) }}</td>
@@ -178,24 +211,46 @@
                             </span>
                         </td>
                         <td>{{ $material->size ?? '-' }}</td>
-                        <td>{{ $material->color ?? '-' }}</td>
-                        <td>{{ $material->weight_gsm ?? '-' }}</td>
-                        <td>{{ $material->volume_ml ?? '-' }}</td>
-                        <td>{{ $material->unit }}</td>
-                        <td>₱{{ number_format($material->unit_cost, 2) }}</td>
                         <td>
-                            @php
-                                $stock = $material->stock_qty ?? 0;
-                                $reorder = $material->reorder_point ?? 0;
-                                $isLowStock = $stock <= $reorder;
-                            @endphp
-                            <span class="badge {{ $stock <= 0 ? 'stock-critical' : ($isLowStock ? 'stock-low' : 'stock-ok') }}"
-                                  @if($isLowStock) title="⚠️ Stock is below reorder level!" @endif>
+                            @if($material->material_type === 'ink' && $material->color)
+                                <span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:{{ $material->color }};border:1px solid #ccc;margin-right:6px;"></span>
+                            @endif
+                            {{ $material->color ?? '-' }}
+                        </td>
+                        <td>{{ $material->weight_gsm ?? '-' }}</td>
+                        <td>{{ $material->unit ?? '-' }}</td>
+                        <td>
+                            ₱{{ number_format($material->unit_cost, 2) }}
+                            @if($material->material_type === 'ink')
+                                /ml
+                            @endif
+                        </td>
+                        <td>
+                            <span class="badge {{ $stock <= 0 ? 'stock-critical' : ($stock > 0 && $stock <= $reorder ? 'stock-low' : 'stock-ok') }}">
                                 {{ $stock }}
+                                @if($material->material_type === 'ink')
+                                    ml
+                                @endif
                             </span>
                         </td>
-                        <td>{{ $material->reorder_point ?? '-' }}</td>
+                        <td>
+                            @if($material->material_type === 'ink')
+                                {{ $material->volume_ml ?? '-' }}
+                            @else
+                                -
+                            @endif
+                        </td>
+                        <td>{{ $reorder }}</td>
                         <td>{{ $material->description ?? '-' }}</td>
+                        <td>
+                            @if($stock <= 0)
+                                <span class="badge" style="color:#ff5349;">Out of Stock</span>
+                            @elseif($stock > 0 && $stock <= $reorder)
+                                <span class="badge" style="color:#ff6633;">Low Stock</span>
+                            @else
+                                <span class="badge badge-success">In Stock</span>
+                            @endif
+                        </td>
                         <td class="actions">
                             <a href="{{ route('admin.materials.edit', $material->material_id) }}" class="btn btn-sm btn-warning" title="Edit">
                                 <i class="fa-solid fa-pen-to-square"></i>

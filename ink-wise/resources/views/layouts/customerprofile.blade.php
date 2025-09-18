@@ -117,7 +117,7 @@
               Profile
             </a>
             <!-- Addresses (with link) -->
-            <a href="{{ route('customerprofile.addresses') }}"
+            <a href="{{ route('customer.profile.addresses') }}"
                class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] rounded transition">
               Addresses
             </a>

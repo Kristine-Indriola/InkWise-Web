@@ -8,6 +8,7 @@
    <link rel="stylesheet" href="{{ asset('css/customer/editing.css') }}">
    <script src="{{ asset('js/customer/editing.js') }}" defer></script>
    
+   
 <body>
     <!-- TOP BAR -->
     <div class="topbar">

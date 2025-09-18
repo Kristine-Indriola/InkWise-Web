@@ -2,7 +2,6 @@
 
 @section('title', 'Edit Profile')
 
-
 @section('content')
 <div class="card bg-white p-6 md:p-8 border border-gray-100">
   <h2 class="text-xl font-semibold mb-6">Profile Photo</h2>
