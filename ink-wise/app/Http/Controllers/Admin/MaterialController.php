@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\Controller;
+use App\Models\User;
 
 use App\Models\Material;
 use App\Models\Inventory;
 use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+use App\Notifications\StockNotification;
+use Illuminate\Support\Facades\Notification;
 
 class MaterialController extends Controller
 {
@@ -135,6 +138,11 @@ public function update(Request $request, $id)
         ]);
     }
 
+     if ($remarks === 'Low Stock' || $remarks === 'Out of Stock') {
+        $admins = User::where('role', 'admin')->get();
+        Notification::send($admins, new StockNotification($material, $remarks));
+    }
+
     return redirect()->route('admin.materials.index')
                      ->with('success', 'Material updated successfully with inventory.');
 }
@@ -147,7 +155,7 @@ public function destroy($id)
     return redirect()->route('admin.materials.index')->with('success', 'Material deleted successfully.');
 }
 
-public function notification()
+/*public function notification()
 {
     $lowStock = Material::with('inventory')
         ->whereHas('inventory', function($q) {
@@ -162,8 +170,10 @@ public function notification()
         })
         ->get();
 
+    
+
     return view('admin.materials.notification', compact('lowStock', 'outOfStock'));
-}
+}*/
 
 
 

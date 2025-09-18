@@ -2,14 +2,17 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Staff;
 use App\Models\Address;
+use Illuminate\Support\Str;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use App\Mail\EmailVerification;
+use App\Models\UserVerification;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use App\Notifications\NewStaffCreated;
 
 class UserManagementController extends Controller
 {
@@ -42,19 +45,17 @@ public function store(Request $request)
         'country'        => 'nullable|string|max:50',
     ]);
 
-    // Check for staff limit warning
     $staffWarning = null;
     if ($request->role === 'staff' && $this->roleLimitCount('staff') >= 3) {
         $staffWarning = "⚠️ Staff account limit has been reached. You are creating an extra staff account.";
     }
 
-    // Create User (include verification token)
+    // Create User
     $user = User::create([
-        'email'                     => $request->email,
-        'password'                  => Hash::make($request->password),
-        'role'                      => $request->role,
-        'status'                    => 'inactive',
-        'email_verification_token'  => \Illuminate\Support\Str::random(60),
+        'email'    => $request->email,
+        'password' => Hash::make($request->password),
+        'role'     => $request->role,
+        'status'   => 'inactive',
     ]);
 
     // Create Staff
@@ -68,23 +69,40 @@ public function store(Request $request)
         'status'         => 'pending',
     ]);
 
-    // Create Address if provided
+
+    // Create Address
     if ($request->street || $request->city || $request->province) {
         Address::create([
-            'user_id'    => $user->user_id,
-            'street'     => $request->street,
-            'barangay'   => $request->barangay,
-            'city'       => $request->city,
-            'province'   => $request->province,
-            'postal_code'=> $request->postal_code,
-            'country'    => $request->country ?? 'Philippines',
+            'user_id'     => $user->user_id,
+            'street'      => $request->street,
+            'barangay'    => $request->barangay,
+            'city'        => $request->city,
+            'province'    => $request->province,
+            'postal_code' => $request->postal_code,
+            'country'     => $request->country ?? 'Philippines',
         ]);
     }
 
-    // ✅ Send Verification Email after user creation
-    Mail::to($user->email)->send(new EmailVerification($user));
+    // ✅ Create verification record
+    $token = Str::random(64);
 
-    // Redirect with success + optional warning
+    UserVerification::create([
+        'user_id' => $user->user_id,
+        'token'   => $token,
+    ]);
+
+    $owner = User::where('role', 'owner')->first();
+if ($owner) {
+    $owner->notify(new NewStaffCreated($user)); // use the user here
+}
+
+ 
+
+
+
+    // ✅ Send verification email
+    Mail::to($user->email)->send(new EmailVerification($user, $token));
+
     $message = ucfirst($request->role) . ' account created. Please verify the email before approval.';
     if ($staffWarning) {
         return redirect()->route('admin.users.index')
@@ -92,8 +110,7 @@ public function store(Request $request)
             ->with('warning', $staffWarning);
     }
 
-    return redirect()->route('admin.users.index')
-        ->with('success', $message);
+    return redirect()->route('admin.users.index')->with('success', $message);
 }
 
 

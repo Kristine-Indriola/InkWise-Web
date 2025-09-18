@@ -3,25 +3,28 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\UserVerification;
 
 class VerificationController extends Controller
 {
     public function verify($token)
-    {
-        $user = User::where('email_verification_token', $token)->first();
+{
+    $record = UserVerification::where('token', $token)->first();
 
-        if (!$user) {
-            return redirect('/login')->with('error', 'Invalid verification link.');
-        }
-
-        if ($user->email_verified_at) {
-            return redirect('/login')->with('info', 'Your email is already verified.');
-        }
-
-        $user->email_verified_at = now();
-        $user->email_verification_token = null;
-        $user->save();
-
-        return redirect('/login')->with('success', 'Your email has been verified! Waiting for owner approval.');
+    if (!$record) {
+        return redirect('/login')->with('error', 'Invalid or expired verification link.');
     }
+
+    if ($record->verified_at) {
+        return redirect('/login')->with('info', 'Your email is already verified.');
+    }
+
+    $record->verified_at = now();
+    $record->save();
+
+    $user = $record->user;
+    // You can add "is_verified" field in users table if you want to track at user-level too
+
+    return redirect('/login')->with('success', 'Your email has been verified! Waiting for owner approval.');
+}
 }
