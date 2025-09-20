@@ -9,14 +9,14 @@ use App\Models\Address;
 class CustomerProfileController extends Controller
 {
     // --- Profile Methods ---
-    public function edit()
-    {
-        $user = Auth::user();
-        $customer = $user->customer;
-        $address = $user->address;
+   public function edit()
+{
+    $user = Auth::user();
+    $customer = $user->customer;
+    $address = $user->address;
 
-        return view('customerprofile.profile', compact('customer', 'address'));
-    }
+    return view('customer.profile.update', compact('customer', 'address'));
+}
 
     public function update(Request $request)
     {
@@ -55,7 +55,7 @@ class CustomerProfileController extends Controller
     public function addresses()
     {
         $addresses = Address::where('user_id', Auth::id())->get();
-        return view('customerprofile.addresses', compact('addresses'));
+        return view('customer.profile.addresses', compact('addresses'));
     }
 
     public function storeAddress(Request $request)
@@ -86,7 +86,7 @@ class CustomerProfileController extends Controller
             'country'     => 'Philippines',
         ]);
 
-        return redirect()->route('customerprofile.addresses')->with('success', 'Address added successfully!');
+        return redirect()->route('customer.profile.addresses')->with('success', 'Address added successfully!');
     }
 
     public function updateAddress(Request $request, Address $address)
@@ -105,12 +105,12 @@ class CustomerProfileController extends Controller
 
         $address->update($request->all());
 
-        return redirect()->route('customerprofile.addresses')->with('success', 'Address updated!');
+        return redirect()->route('customer.profile.addresses')->with('success', 'Address updated!');
     }
 
     public function destroyAddress(Address $address)
     {
         $address->delete();
-        return redirect()->route('customerprofile.addresses')->with('success', 'Address deleted!');
+        return redirect()->route('customer.profile.addresses')->with('success', 'Address deleted!');
     }
 }

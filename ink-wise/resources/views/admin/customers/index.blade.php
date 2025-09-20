@@ -22,16 +22,42 @@
             @forelse($customers as $customer)
                 <tr>
                     <td>{{ $customer->id }}</td>
+
+                    {{-- Profile Picture --}}
                     <td>
-                        <img src="{{ $customer->profile_picture ?? 'https://via.placeholder.com/50' }}" 
-                             alt="Profile" width="50">
+                        <img src="{{ $customer->customer && $customer->customer->photo
+                                    ? asset('storage/' . $customer->customer->photo)
+                                    : 'https://via.placeholder.com/50' }}"
+                             alt="Profile" width="50" height="50"
+                             style="border-radius:50%; object-fit:cover;">
                     </td>
+
+                    {{-- Full Name --}}
                     <td>
-                {{ optional($customer)->first_name }} {{ optional($customer)->middle_name }} {{ optional($customer)->last_name }}
-            </td>
-                    <td>{{ $customer->email }}</td>
-                    <td>{{ $customer->contact_number ?? '-' }}</td>
-                    <td>{{ $customer->address ?? '-' }}</td>
+                        {{ $customer->customer->first_name ?? '' }}
+                        {{ $customer->customer->middle_name ?? '' }}
+                        {{ $customer->customer->last_name ?? '' }}
+                    </td>
+
+                    {{-- Email from users table --}}
+                    <td>{{ $customer->email ?? '-' }}</td>
+
+                    {{-- Contact Number --}}
+                    <td>{{ $customer->customer->contact_number ?? '-' }}</td>
+
+                    {{-- Address --}}
+                    <td>
+                        @if($customer->address)
+                            {{ $customer->address->street }},
+                            {{ $customer->address->barangay }},
+                            {{ $customer->address->city }},
+                            {{ $customer->address->province }}
+                        @else
+                            -
+                        @endif
+                    </td>
+
+                    {{-- Registered Date --}}
                     <td>{{ $customer->created_at->format('M d, Y') }}</td>
                 </tr>
             @empty
