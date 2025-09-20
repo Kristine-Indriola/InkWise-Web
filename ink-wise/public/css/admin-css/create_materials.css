@@ -11,6 +11,7 @@
 }
 
 
+
 /* ===== Heading ===== */
 .container h2 {
     font-size: 28px;
@@ -57,14 +58,16 @@ form {
 .form-row {
     display: flex;
     gap: 20px;
-    flex-wrap: wrap;
+    align-items: flex-start;
+    flex-wrap: wrap; /* allows stacking on small screens */
 }
 
 /* Each field */
 .form-group {
-    flex: 1;
+    flex: 1 1 0;
     display: flex;
     flex-direction: column;
+    min-width: 0; /* important so children can shrink inside flex */
 }
 
 /* Labels */
@@ -97,10 +100,38 @@ form textarea:focus {
     outline: none;
 }
 
+/* Make inputs/selects use border-box so padding doesn't cause overflow */
+.form-control,
+.styled-select,
+form textarea {
+    box-sizing: border-box;
+    height: 42px; /* uniform height for inputs/selects */
+    line-height: 1.2;
+}
+
 /* Textarea */
 form textarea {
+    height: auto;
+    min-height: 100px;
     resize: vertical;
-    min-height: 70px;
+}
+
+/* Tweak the select dropdown arrow position and padding */
+.styled-select {
+    padding-right: 40px; /* space for the arrow */
+    background-position: right 12px center; /* consistent arrow position */
+}
+
+/* For multi-select (occasion) keep reasonable height */
+select[multiple].styled-select {
+    height: 120px;
+    padding-right: 12px; /* fewer padding because no arrow */
+}
+
+/* Optional: make readonly fields visually consistent */
+.form-control[readonly] {
+    background-color: #f1f5f9;
+    opacity: 1;
 }
 
 /* ===== Buttons ===== */
@@ -145,9 +176,14 @@ button:hover {
 @media (max-width: 768px) {
     .form-row {
         flex-direction: column;
+        gap: 12px;
     }
 
     button, .btn-back {
         width: 100%;
+    }
+
+    .form-control, .styled-select {
+        height: 40px;
     }
 }

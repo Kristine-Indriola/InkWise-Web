@@ -20,14 +20,8 @@ return new class extends Migration
         $table->enum('product_type', ['invitation', 'giveaway'])->after('occasion');
 
         // Sub classification
-        $table->enum('material_type', [
-    'cardstock',
-    'envelope',
-    'ink',
-    'foil',
-    'lamination',
-    'packaging'
-])->change();
+        $table->string('material_type')->nullable()->change();  // ✅ Changed to string for free text
+
 
 
         // Attributes

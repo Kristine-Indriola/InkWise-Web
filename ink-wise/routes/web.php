@@ -10,10 +10,14 @@ use App\Http\Controllers\TemplateController;
 //use App\Http\Controllers\Auth\AdminLoginController;
 //use App\Http\Controllers\StaffAuthController;
 //use App\Http\Controllers\Staff\StaffLoginController;
+
+use App\Http\Controllers\Admin\InkController;
+
 use App\Http\Controllers\Owner\HomeController;
 use App\Http\Controllers\Owner\OwnerController;
 use App\Http\Controllers\StaffProfileController;
 use App\Http\Controllers\VerificationController;
+use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\AdminCustomerController;
 use App\Http\Controllers\Admin\MaterialController;
 use App\Http\Controllers\Auth\RoleLoginController;
@@ -110,17 +114,29 @@ Route::prefix('users')->name('users.')->group(function () {
         Route::delete('/{id}', [InventoryController::class, 'destroy'])->name('destroy');
     });
 
-     Route::prefix('materials')->name('materials.')->group(function () {
+    // Materials routes
+    Route::prefix('materials')->name('materials.')->group(function () {
         Route::get('/', [MaterialController::class, 'index'])->name('index');
         Route::get('/create', [MaterialController::class, 'create'])->name('create');
         Route::post('/', [MaterialController::class, 'store'])->name('store');
         Route::get('/{id}/edit', [MaterialController::class, 'edit'])->name('edit');
         Route::put('/{id}', [MaterialController::class, 'update'])->name('update');
         Route::delete('/{id}', [MaterialController::class, 'destroy'])->name('destroy');
-        
     });
+    // ✅ Inks resource route (move here, not nested)
+    Route::resource('inks', \App\Http\Controllers\Admin\InkController::class)->except(['show']);
 
-   Route::prefix('customers')->name('customers.')->group(function () {
+    
+    // Fix: Rename the index route to 'products.index' (full name: 'admin.products.index' due to group prefix)
+    Route::get('/products', [ProductController::class, 'invitation'])->name('products.index');
+    
+    // Add: Route for creating an invitation (full name: 'admin.products.create.invitation')
+    Route::get('/products/create/invitation', [ProductController::class, 'createInvitation'])->name('products.create.invitation');
+    
+    // Add: Route for storing an invitation (full name: 'admin.products.store')
+    Route::post('/products/store', [ProductController::class, 'store'])->name('products.store');
+    
+    Route::prefix('customers')->name('customers.')->group(function () {
         Route::get('/', [AdminCustomerController::class, 'index'])->name('index'); 
         // Optional: Add more customer routes (show/edit/delete) here later
     });
@@ -212,6 +228,7 @@ Route::post('/customer/logout', [CustomerAuthController::class, 'logout'])->name
 Route::get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');
 
 
+
 /**Customer Profile Pages*/
 Route::prefix('customerprofile')->group(function () {
     // Addresses
@@ -254,32 +271,20 @@ Route::middleware(['auth:customer'])->group(function () {
 
     */
 
+/** Profile & Addresses (Protected) */
+Route::middleware(['auth:customer'])->prefix('customer/profile')->name('customer.profile.')->group(function () {
+    Route::get('/', [CustomerProfileController::class, 'update'])->name('index');
+
+
     // Addresses
-    /*Route::get('/customerprofile/addresses', [AddressController::class, 'index'])
-    ->name('customerprofile.addresses');
-    
-    Route::post('/customerprofile/addresses', [AddressController::class, 'store'])->name('customerprofile.addresses.store');
-    Route::post('/customerprofile/addresses/{address}/delete', [AddressController::class, 'destroy'])->name('customerprofile.addresses.destroy');
-    Route::post('/customerprofile/addresses/{address}/update', [AddressController::class, 'update'])->name('customerprofile.addresses.update');
-    // Other customer-only pages*/
-
-    Route::get('/customer/my-orders', function () {
-        return view('customerprofile.my_purchase');
-    })->name('customer.my_purchase');
-
-    Route::get('/customerprofile/order', function () {
-        return view('customerprofile.orderform');
-    })->name('customerprofile.orderform');
-
-    Route::get('/customerprofile/settings', function () {
-        return view('customerprofile.settings');
-    })->name('customerprofile.settings');
-    
+    Route::get('/addresses', [CustomerProfileController::class, 'addresses'])->name('addresses');
+    Route::post('/addresses/store', [CustomerProfileController::class, 'storeAddress'])->name('addresses.store');
+    Route::post('/addresses/{address}/update', [CustomerProfileController::class, 'updateAddress'])->name('addresses.update');
+    Route::delete('/addresses/{address}', [CustomerProfileController::class, 'destroyAddress'])->name('addresses.destroy');
 });
 
-Route::get('/customerprofile/profile', [CustomerProfileController::class, 'edit'])->name('customerprofile.profile');
-Route::post('/customer/profile/update', [CustomerProfileController::class, 'update'])
-        ->name('customer.profile.update');
+Route::post('/', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
+Route::get('/', [CustomerProfileController::class, 'update'])->name('index');
 
 
      Route::get('/customer/addresses', [CustomerProfileController::class, 'addresses'])
@@ -300,6 +305,8 @@ Route::post('/customer/profile/update', [CustomerProfileController::class, 'upda
 Route::middleware(['auth:customer'])->group(function () {
     Route::put('/customer/profile/update', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
 });
+
+
 
 /** Templates (Category Home & Invitations/Giveaways)*/
 Route::prefix('templates')->group(function () {
