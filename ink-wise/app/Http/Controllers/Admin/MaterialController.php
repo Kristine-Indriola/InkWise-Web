@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\Controller;
+use App\Models\User;
 
 use App\Models\Material;
 use App\Models\Inventory;
 use App\Models\Ink; // <-- Add this import
 use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+use App\Notifications\StockNotification;
+use Illuminate\Support\Facades\Notification;
 
 class MaterialController extends Controller
 {
@@ -138,6 +141,7 @@ class MaterialController extends Controller
             'date_updated'  => now(),
         ]);
 
+
         // ✅ Auto-generate remarks based on stock
         $stockLevel   = $request->stock_level;
         $reorderLevel = $request->reorder_level;
@@ -170,6 +174,16 @@ class MaterialController extends Controller
                          ->with('success', 'Material updated successfully with inventory.');
     }
 
+     if ($remarks === 'Low Stock' || $remarks === 'Out of Stock') {
+        $admins = User::where('role', 'admin')->get();
+        Notification::send($admins, new StockNotification($material, $remarks));
+    }
+
+    return redirect()->route('admin.materials.index')
+                     ->with('success', 'Material updated successfully with inventory.');
+}
+
+
     public function destroy($id)
     {
         $material = \App\Models\Material::findOrFail($id);
@@ -177,6 +191,7 @@ class MaterialController extends Controller
 
         return redirect()->route('admin.materials.index')->with('success', 'Material deleted successfully.');
     }
+
 
     public function notification()
     {
@@ -195,6 +210,27 @@ class MaterialController extends Controller
 
         return view('admin.materials.notification', compact('lowStock', 'outOfStock'));
     }
+
+/*public function notification()
+{
+    $lowStock = Material::with('inventory')
+        ->whereHas('inventory', function($q) {
+            $q->whereColumn('stock_level', '<=', 'reorder_level')
+              ->where('stock_level', '>', 0);
+        })
+        ->get();
+
+    $outOfStock = Material::with('inventory')
+        ->whereHas('inventory', function($q) {
+            $q->where('stock_level', '<=', 0);
+        })
+        ->get();
+
+    
+
+    return view('admin.materials.notification', compact('lowStock', 'outOfStock'));
+}*/
+
 
 
 

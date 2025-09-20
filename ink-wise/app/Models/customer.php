@@ -25,21 +25,11 @@ class Customer extends Model
         'contact_number',
         'address_id',
         'user_id',
-        'photo',
-        'phone',
-        'birthdate',
-        'gender',
     ];
 
-    
     // Relationships
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
-    }
-
-    public function address()
-    {
-        return $this->belongsTo(Address::class, 'address_id', 'address_id');
     }
 }

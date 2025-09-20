@@ -583,7 +583,7 @@ body.dark-mode .btn-warning {
       <div class="logo">InkWise</div>
       <div class="icons" style="display: flex; align-items: center; gap: 24px; margin-left: auto; justify-content: center;">
         <!-- Notification Bell -->
-        <a href="{{ route('admin.admin.materials.notification') }}" class="nav-link" style="display:flex; align-items:center; justify-content:center;">
+        <a href="{{ route('admin.notifications') }}" class="nav-link" style="display:flex; align-items:center; justify-content:center;">
           <i class="fi fi-ss-bell" style="color:#cdffd8; font-size:22px;"></i>
           @php
               $lowCount = \App\Models\Material::whereHas('inventory', function($q) {
