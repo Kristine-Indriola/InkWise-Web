@@ -14,19 +14,29 @@
 </head>
 <body>
     @php
-        $productType = request('type') ? ucfirst(request('type')) : old('product_type');
+        $productType = request('type') ? strtolower(request('type')) : '';
     @endphp
+
     <div class="container">
         <h2>Add New Material</h2>
 
+        {{-- Success/Error Messages --}}
         @if(session('success'))
-            <div class="success">
-                {{ session('success') }}
+            <div class="success">{{ session('success') }}</div>
+        @endif
+
+        @if($errors->any())
+            <div class="alert alert-danger">
+                <ul>
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
             </div>
         @endif
 
         <div style="display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 20px;">
-            @if($productType === 'Giveaway')
+            @if($productType === 'giveaway')
                 <a href="{{ route('admin.materials.create', ['type' => 'invitation']) }}" class="btn btn-secondary" style="background:#94b9ff; color:#fff; border:none; border-radius:5px; padding:8px 18px; font-weight:600; text-decoration:none;">
                     Switch to Invitation Form
                 </a>
@@ -37,45 +47,39 @@
             @endif
         </div>
 
-        @if($productType === 'Giveaway')
+        @if($productType === 'giveaway')
             {{-- Giveaways Form --}}
             <form action="{{ route('admin.materials.store') }}" method="POST" style="margin-bottom:32px;">
                 @csrf
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Material Type</label>
-                        <select name="giveaway_type" class="form-control styled-select" required>
-                            <option value="">-- Select Material Type --</option>
-                            <option value="Mug" {{ old('giveaway_type') == 'Mug' ? 'selected' : '' }}>Mug</option>
-                            <option value="Keychain" {{ old('giveaway_type') == 'Keychain' ? 'selected' : '' }}>Keychain</option>
-                            <option value="Hand Fan" {{ old('giveaway_type') == 'Hand Fan' ? 'selected' : '' }}>Hand Fan</option>
-                            <option value="Eco Bag" {{ old('giveaway_type') == 'Eco Bag' ? 'selected' : '' }}>Eco Bag</option>
-                            <option value="Candle" {{ old('giveaway_type') == 'Candle' ? 'selected' : '' }}>Candle</option>
-                            <option value="Mini Towel" {{ old('giveaway_type') == 'Mini Towel' ? 'selected' : '' }}>Mini Towel</option>
-                            <option value="Bottle Opener" {{ old('giveaway_type') == 'Bottle Opener' ? 'selected' : '' }}>Bottle Opener</option>
-                            <option value="Cookies (Pack)" {{ old('giveaway_type') == 'Cookies (Pack)' ? 'selected' : '' }}>Cookies (Pack)</option>
-                            <option value="Photo Frame" {{ old('giveaway_type') == 'Photo Frame' ? 'selected' : '' }}>Photo Frame</option>
-                            <option value="Ballpen" {{ old('giveaway_type') == 'Ballpen' ? 'selected' : '' }}>Ballpen</option>
-                        </select>
+                        <label>Material Name</label>
+                        <input type="text" name="material_name" class="form-control" required>
+                        @error('material_name') <small style="color:red;">{{ $message }}</small> @enderror
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label>Occasion</label>
-                        <select name="occasion" class="form-control styled-select" required>
-                            <option value="">-- Select Occasion --</option>
-                            <option value="wedding" {{ old('occasion') == 'wedding' ? 'selected' : '' }}>Wedding</option>
-                            <option value="birthday" {{ old('occasion') == 'birthday' ? 'selected' : '' }}>Birthday</option>
-                            <option value="baptism" {{ old('occasion') == 'baptism' ? 'selected' : '' }}>Baptism</option>
-                            <option value="corporate" {{ old('occasion') == 'corporate' ? 'selected' : '' }}>Corporate</option>
+                        <select name="occasion[]" required class="form-control styled-select" multiple>
+                            <option value="wedding" {{ in_array('wedding', old('occasion', [])) ? 'selected' : '' }}>Wedding</option>
+                            <option value="birthday" {{ in_array('birthday', old('occasion', [])) ? 'selected' : '' }}>Birthday</option>
+                            <option value="baptism" {{ in_array('baptism', old('occasion', [])) ? 'selected' : '' }}>Baptism</option>
+                            <option value="corporate" {{ in_array('corporate', old('occasion', [])) ? 'selected' : '' }}>Corporate</option>
                         </select>
+                        <small style="color:#94b9ff;">Hold Ctrl (Windows) or Command (Mac) to select multiple.</small>
                     </div>
                     <div class="form-group">
-                        <label>Category</label>
-                        <input type="text" name="category" class="form-control" value="Giveaway" readonly>
+                        <label>Product Type</label>
+                        <input type="text" name="product_type" class="form-control" value="giveaway" readonly>
                     </div>
                 </div>
                 <div class="form-row">
+                    <div class="form-group">
+                        <label>Material Type</label>
+                        <input type="text" name="material_type" class="form-control" placeholder="e.g. Mug, T-shirt, Keychain">  <!-- ✅ Added: Optional text input for custom types -->
+                        @error('material_type') <small style="color:red;">{{ $message }}</small> @enderror
+                    </div>
                     <div class="form-group">
                         <label>Description</label>
                         <textarea name="description" class="form-control" placeholder="Description"></textarea>
@@ -91,8 +95,8 @@
                         <input type="number" name="stock_qty" class="form-control" required>
                     </div>
                     <div class="form-group">
-                        <label>Reorder Level</label>
-                        <input type="number" name="reorder_level" class="form-control" required>
+                        <label>Reorder Point</label>
+                        <input type="number" name="reorder_point" class="form-control" required>
                     </div>
                     <div class="form-group">
                         <label>Unit Cost (₱)</label>
@@ -104,145 +108,150 @@
                     <a href="{{ route('admin.materials.index') }}" class="btn-back">Back to Materials</a>
                 </div>
             </form>
-        @else
+        @elseif($productType === 'invitation' || $productType === 'ink')
             {{-- Invitation/Other Material Form --}}
             <form id="materialForm" action="{{ route('admin.materials.store') }}" method="POST">
-                @csrf
+    @csrf
+    <div id="default-fields">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Material Name</label>
+                <input type="text" name="material_name" value="{{ old('material_name') }}" required class="form-control styled-select">
+                @error('material_name') <small style="color:red;">{{ $message }}</small> @enderror
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Occasion</label>
+                <select name="occasion[]" required class="form-control styled-select" multiple>
+                    <option value="wedding" {{ in_array('wedding', old('occasion', [])) ? 'selected' : '' }}>Wedding</option>
+                    <option value="birthday" {{ in_array('birthday', old('occasion', [])) ? 'selected' : '' }}>Birthday</option>
+                    <option value="baptism" {{ in_array('baptism', old('occasion', [])) ? 'selected' : '' }}>Baptism</option>
+                    <option value="corporate" {{ in_array('corporate', old('occasion', [])) ? 'selected' : '' }}>Corporate</option>
+                </select>
+                <small style="color:#94b9ff;">Hold Ctrl (Windows) or Command (Mac) to select multiple.</small>
+            </div>
+            <div class="form-group">
+                <label>Product Type</label>
+                <input type="text" name="product_type" class="form-control" value="invitation" readonly>
+            </div>
+            <div class="form-group">
+                <label>Material Type</label>
+                <select name="material_type" id="materialTypeSelect" required class="form-control styled-select">
+                    <option value="">-- Select Material Type --</option>
+                    <option value="cardstock" {{ old('material_type') == 'cardstock' ? 'selected' : '' }}>Cardstock</option>
+                    <option value="envelope" {{ old('material_type') == 'envelope' ? 'selected' : '' }}>Envelope</option>
+                    <option value="foil" {{ old('material_type') == 'foil' ? 'selected' : '' }}>Foil</option>
+                    <option value="lamination" {{ old('material_type') == 'lamination' ? 'selected' : '' }}>Lamination</option>
+                    <option value="packaging" {{ old('material_type') == 'packaging' ? 'selected' : '' }}>Packaging</option>
+                    <option value="ink" {{ old('material_type') == 'ink' ? 'selected' : '' }}>Ink</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row" id="other-fields">
+            <div class="form-group">
+                <label>Size</label>
+                <input type="text" name="size" value="{{ old('size') }}" required class="form-control styled-select">
+            </div>
+            <div class="form-group">
+                <label>Color</label>
+                <input type="text" name="color" value="{{ old('color') }}" required class="form-control styled-select">
+            </div>
+            <div class="form-group">
+                <label>Weight (GSM)</label>
+                <input type="number" name="weight_gsm" value="{{ old('weight_gsm') }}" required class="form-control styled-select">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Unit</label>
+                <input type="text" name="unit" value="{{ old('unit') }}" required class="form-control styled-select">
+            </div>
+            <div class="form-group">
+                <label>Unit Cost</label>
+                <input type="number" step="0.01" name="unit_cost" value="{{ old('unit_cost') }}" required class="form-control styled-select">
+            </div>
+            <div class="form-group">
+                <label>Stock Qty</label>
+                <input type="number" name="stock_qty" value="{{ old('stock_qty') }}" required class="form-control styled-select">
+            </div>
+            <div class="form-group">
+                <label>Reorder Point</label>
+                <input type="number" name="reorder_point" value="{{ old('reorder_point') }}" required class="form-control styled-select">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Description</label>
+            <textarea name="description" required class="form-control styled-select">{{ old('description') }}</textarea>
+        </div>
+    </div>
 
-                <div id="default-fields">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Material Name</label>
-                            <input type="text" name="material_name" value="{{ old('material_name') }}" required class="form-control styled-select">
-                        </div>
-                    </div>
+    <!-- Ink fields (hidden by default) -->
+    <div id="ink-fields" style="display:none;">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Material Name</label>
+                <input type="text" name="material_name" value="{{ old('material_name') }}" required class="form-control styled-select">
+            </div>
+            <div class="form-group">
+                <label>Material Type</label>
+                <input type="text" name="material_type" value="ink" readonly class="form-control styled-select" style="background-color:#e9ecef;">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Occasion</label>
+                <select name="occasion[]" required class="form-control styled-select" multiple>
+                    <option value="wedding" {{ in_array('wedding', old('occasion', [])) ? 'selected' : '' }}>Wedding</option>
+                    <option value="birthday" {{ in_array('birthday', old('occasion', [])) ? 'selected' : '' }}>Birthday</option>
+                    <option value="baptism" {{ in_array('baptism', old('occasion', [])) ? 'selected' : '' }}>Baptism</option>
+                    <option value="corporate" {{ in_array('corporate', old('occasion', [])) ? 'selected' : '' }}>Corporate</option>
+                </select>
+                <small style="color:#94b9ff;">Hold Ctrl (Windows) or Command (Mac) to select multiple.</small>
+            </div>
+            <div class="form-group">
+                <label>Product Type</label>
+                <select name="product_type" required class="form-control styled-select">
+                    <option value="invitation">Invitation</option>
+                    <option value="giveaway">Giveaway</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Ink Color</label>
+                <input type="text" name="ink_color" value="{{ old('ink_color') }}" required class="form-control styled-select">
+            </div>
+            <div class="form-group">
+                <label>Stock Qty (ml)</label>
+                <input type="number" name="stock_qty_ml" value="{{ old('stock_qty_ml') }}" required class="form-control styled-select">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Cost per ml (₱)</label>
+                <input type="number" step="0.01" name="cost_per_ml" value="{{ old('cost_per_ml') }}" required class="form-control styled-select">
+            </div>
+            <div class="form-group">
+                <label>Average Usage per Invite (ml)</label>
+                <input type="number" step="0.01" name="avg_usage_per_invite_ml" value="{{ old('avg_usage_per_invite_ml') }}" required class="form-control styled-select">
+            </div>
+            <div class="form-group">
+                <label>Cost per Invite (₱)</label>
+                <input type="number" step="0.01" name="cost_per_invite" value="{{ old('cost_per_invite') }}" class="form-control styled-select">  <!-- ✅ Added back without required -->
+            </div>
+        </div>
+    </div>
 
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Occasion</label>
-                            <select name="occasion" required class="form-control styled-select" multiple>
-                                <option value="wedding" {{ old('occasion') == 'wedding' ? 'selected' : '' }}>Wedding</option>
-                                <option value="birthday" {{ old('occasion') == 'birthday' ? 'selected' : '' }}>Birthday</option>
-                                <option value="baptism" {{ old('occasion') == 'baptism' ? 'selected' : '' }}>Baptism</option>
-                                <option value="corporate" {{ old('occasion') == 'corporate' ? 'selected' : '' }}>Corporate</option>
-                            </select>
-                            <small style="color:#94b9ff;">Hold Ctrl (Windows) or Command (Mac) to select multiple.</small>
-                        </div>
-                        <div class="form-group">
-                            <label>Product Type</label>
-                            <select name="product_type[]" id="productTypeSelect" required class="form-control styled-select" multiple>
-                                <option value="invitation" {{ old('product_type') == 'invitation' ? 'selected' : '' }}>Invitation</option>
-                                <option value="giveaway" {{ old('product_type') == 'giveaway' ? 'selected' : '' }}>Giveaway</option>
-                            </select>
-                            <small style="color:#94b9ff;">Hold Ctrl (Windows) or Command (Mac) to select multiple.</small>
-                        </div>
-                        <div class="form-group">
-                            <label>Material Type</label>
-                            <select name="material_type" id="materialTypeSelect" required class="form-control styled-select">
-                                <option value="">-- Select Material Type --</option>
-                                <option value="cardstock" {{ old('material_type') == 'cardstock' ? 'selected' : '' }}>Cardstock</option>
-                                <option value="envelope" {{ old('material_type') == 'envelope' ? 'selected' : '' }}>Envelope</option>
-                                <option value="foil" {{ old('material_type') == 'foil' ? 'selected' : '' }}>Foil</option>
-                                <option value="lamination" {{ old('material_type') == 'lamination' ? 'selected' : '' }}>Lamination</option>
-                                <option value="packaging" {{ old('material_type') == 'packaging' ? 'selected' : '' }}>Packaging</option>
-                                <option value="ink" {{ old('material_type') == 'ink' ? 'selected' : '' }}>Ink</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-row" id="other-fields">
-                        <div class="form-group">
-                            <label>Size</label>
-                            <input type="text" name="size" value="{{ old('size') }}" class="form-control styled-select">
-                        </div>
-                        <div class="form-group">
-                            <label>Color</label>
-                            <input type="text" name="color" value="{{ old('color') }}" class="form-control styled-select">
-                        </div>
-                        <div class="form-group">
-                            <label>Weight (GSM)</label>
-                            <input type="number" name="weight_gsm" value="{{ old('weight_gsm') }}" class="form-control styled-select">
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Unit</label>
-                            <input type="text" name="unit" value="{{ old('unit') }}" required class="form-control styled-select">
-                        </div>
-                        <div class="form-group">
-                            <label>Unit Cost</label>
-                            <input type="number" step="0.01" name="unit_cost" value="{{ old('unit_cost') }}" required class="form-control styled-select">
-                        </div>
-                        <div class="form-group">
-                            <label>Stock Qty</label>
-                            <input type="number" name="stock_qty" value="{{ old('stock_qty') }}" required class="form-control styled-select">
-                        </div>
-                        <div class="form-group">
-                            <label>Reorder Point</label>
-                            <input type="number" name="reorder_point" value="{{ old('reorder_point') }}" required class="form-control styled-select">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>Description</label>
-                        <textarea name="description" class="form-control styled-select">{{ old('description') }}</textarea>
-                    </div>
-                </div>
-
-                <!-- Ink fields (hidden by default) -->
-                <div id="ink-fields" style="display:none;">
-                    <div class="form-row" style="display: flex; gap: 24px;">
-                        <div class="form-group" style="flex:1;">
-                            <label>Material Name</label>
-                            <input type="text" name="material_name" value="{{ old('material_name') }}" required class="form-control styled-select">
-                        </div>
-                        <div class="form-group" style="flex:1;">
-                            <label>Material Type</label>
-                            <input type="text" name="material_type" value="ink" readonly class="form-control styled-select" style="background-color:#e9ecef;">
-                        </div>
-                    </div>
-                    <div class="form-row" style="display: flex; gap: 24px;">
-                        <div class="form-group" style="flex:1;">
-                            <label>Occasion</label>
-                            <select name="occasion" required class="form-control styled-select" multiple>
-                                <option value="wedding" {{ old('occasion') == 'wedding' ? 'selected' : '' }}>Wedding</option>
-                                <option value="birthday" {{ old('occasion') == 'birthday' ? 'selected' : '' }}>Birthday</option>
-                                <option value="baptism" {{ old('occasion') == 'baptism' ? 'selected' : '' }}>Baptism</option>
-                                <option value="corporate" {{ old('occasion') == 'corporate' ? 'selected' : '' }}>Corporate</option>
-                            </select>
-                        </div>
-                        <div class="form-group" style="flex:1;">
-                            <label>Product Type</label>
-                            <select name="product_type[]" required class="form-control styled-select" multiple>
-                                <option value="invitation" {{ old('product_type') == 'invitation' ? 'selected' : '' }}>Invitation</option>
-                                <option value="giveaway" {{ old('product_type') == 'giveaway' ? 'selected' : '' }}>Giveaway</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-row" style="display: flex; gap: 24px;">
-                        <div class="form-group" style="flex:1;">
-                            <label>Ink Color</label>
-                            <input type="text" name="color" value="{{ old('color') }}" required class="form-control styled-select">
-                        </div>
-                        <div class="form-group" style="flex:1;">
-                            <label>Stock Qty (ml)</label>
-                            <input type="number" name="stock_qty_ml" value="{{ old('stock_qty_ml') }}" required class="form-control styled-select">
-                        </div>
-                    </div>
-                    <div class="form-row" style="display: flex; gap: 24px;">
-                        <div class="form-group" style="flex:1;">
-                            <label>Cost per ml (₱)</label>
-                            <input type="number" step="0.01" name="cost_per_ml" value="{{ old('cost_per_ml') }}" required class="form-control styled-select">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="btn-group">
-                    <button type="submit">Save Material</button>
-                    <a href="{{ route('admin.materials.index') }}" class="btn-back">Back to Materials</a>
-                </div>
-            </form>
+    <div class="btn-group">
+        <button type="submit">Save Material</button>
+        <a href="{{ route('admin.materials.index') }}" class="btn-back">Back to Materials</a>
+    </div>
+</form>
+        @else
+            <p>Please select a material type.</p>
         @endif
 
-    </div>
 
     <style>
         /* Nice select box styling */
@@ -331,22 +340,47 @@
     </script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            function toggleFields() {
-                const isInk = document.getElementById('materialTypeSelect').value === 'ink';
-                // Default fields
-                document.getElementById('default-fields').style.display = isInk ? 'none' : '';
-                Array.from(document.querySelectorAll('#default-fields input, #default-fields select, #default-fields textarea')).forEach(el => {
-                    el.disabled = isInk;
-                });
-                // Ink fields
-                document.getElementById('ink-fields').style.display = isInk ? '' : 'none';
-                Array.from(document.querySelectorAll('#ink-fields input, #ink-fields select, #ink-fields textarea')).forEach(el => {
-                    el.disabled = !isInk;
-                });
+        function toggleFields() {
+            const isInk = document.getElementById('materialTypeSelect').value === 'ink';
+            // Default fields visibility
+            document.getElementById('default-fields').style.display = isInk ? 'none' : '';
+            // Disable/enable default fields but DO NOT disable CSRF hidden token
+            Array.from(document.querySelectorAll('#default-fields input, #default-fields select, #default-fields textarea')).forEach(el => {
+                // keep the CSRF token and any other hidden inputs enabled
+                if (el.name === '_token' || el.type === 'hidden') return;
+                el.disabled = isInk;
+            });
+
+            // Ink fields visibility & enablement
+            document.getElementById('ink-fields').style.display = isInk ? '' : 'none';
+            Array.from(document.querySelectorAll('#ink-fields input, #ink-fields select, #ink-fields textarea')).forEach(el => {
+                el.disabled = !isInk;
+            });
+        }
+
+        const materialTypeSelect = document.getElementById('materialTypeSelect');
+        if (materialTypeSelect) {
+            materialTypeSelect.addEventListener('change', toggleFields);
+            toggleFields(); // initial
+        }
+    });
+</script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const materialTypeSelect = document.getElementById('materialTypeSelect');
+        const form = document.getElementById('materialForm');
+        materialTypeSelect.addEventListener('change', function() {
+            if (this.value === 'ink') {
+                form.action = "{{ route('admin.inks.store') }}";
+            } else {
+                form.action = "{{ route('admin.materials.store') }}";
             }
-            document.getElementById('materialTypeSelect').addEventListener('change', toggleFields);
-            toggleFields(); // Initial call on page load
         });
-    </script>
+        // Initial set
+        if (materialTypeSelect.value === 'ink') {
+            form.action = "{{ route('admin.inks.store') }}";
+        }
+    });
+</script>
 </body>
 </html>

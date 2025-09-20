@@ -10,10 +10,14 @@ use App\Http\Controllers\TemplateController;
 //use App\Http\Controllers\Auth\AdminLoginController;
 //use App\Http\Controllers\StaffAuthController;
 //use App\Http\Controllers\Staff\StaffLoginController;
+
+use App\Http\Controllers\Admin\InkController;
+
 use App\Http\Controllers\Owner\HomeController;
 use App\Http\Controllers\Owner\OwnerController;
 use App\Http\Controllers\StaffProfileController;
 use App\Http\Controllers\VerificationController;
+use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\AdminCustomerController;
 use App\Http\Controllers\Admin\MaterialController;
 use App\Http\Controllers\Auth\RoleLoginController;
@@ -110,17 +114,29 @@ Route::prefix('users')->name('users.')->group(function () {
         Route::delete('/{id}', [InventoryController::class, 'destroy'])->name('destroy');
     });
 
-     Route::prefix('materials')->name('materials.')->group(function () {
+    // Materials routes
+    Route::prefix('materials')->name('materials.')->group(function () {
         Route::get('/', [MaterialController::class, 'index'])->name('index');
         Route::get('/create', [MaterialController::class, 'create'])->name('create');
         Route::post('/', [MaterialController::class, 'store'])->name('store');
         Route::get('/{id}/edit', [MaterialController::class, 'edit'])->name('edit');
         Route::put('/{id}', [MaterialController::class, 'update'])->name('update');
         Route::delete('/{id}', [MaterialController::class, 'destroy'])->name('destroy');
-        
     });
+    // ✅ Inks resource route (move here, not nested)
+    Route::resource('inks', \App\Http\Controllers\Admin\InkController::class)->except(['show']);
 
-   Route::prefix('customers')->name('customers.')->group(function () {
+    
+    // Fix: Rename the index route to 'products.index' (full name: 'admin.products.index' due to group prefix)
+    Route::get('/products', [ProductController::class, 'invitation'])->name('products.index');
+    
+    // Add: Route for creating an invitation (full name: 'admin.products.create.invitation')
+    Route::get('/products/create/invitation', [ProductController::class, 'createInvitation'])->name('products.create.invitation');
+    
+    // Add: Route for storing an invitation (full name: 'admin.products.store')
+    Route::post('/products/store', [ProductController::class, 'store'])->name('products.store');
+    
+    Route::prefix('customers')->name('customers.')->group(function () {
         Route::get('/', [AdminCustomerController::class, 'index'])->name('index'); 
         // Optional: Add more customer routes (show/edit/delete) here later
     });
