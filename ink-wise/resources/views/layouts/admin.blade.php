@@ -49,8 +49,9 @@
       padding: 20px 15px;
       transition: all 0.3s ease;
       flex-shrink: 0;
-      position: sticky;
+      position: fixed; /* Changed from sticky to fixed */
       top: 0;
+      left: 0;
       overflow-y: auto;
       z-index: 101;
     }
@@ -254,6 +255,7 @@
       flex: 1;
       display: flex;
       flex-direction: column;
+      margin-left: 230px; /* Add margin to account for fixed sidebar */
     }
 
     /* Dashboard Content */
@@ -351,7 +353,11 @@
     /* Responsive */
     @media (max-width: 768px) {
       .sidebar {
+        position: sticky; /* Revert to sticky on mobile for better UX */
         width: 200px;
+      }
+      .content-wrapper {
+        margin-left: 0; /* Remove margin on mobile */
       }
       .cards {
         flex-direction: column;
@@ -551,6 +557,9 @@ body.dark-mode .btn-warning {
       </li>
       <li class="{{ request()->routeIs('admin.templates.*') ? 'active' : '' }}">
         <a href="{{ route('admin.templates.index') }}"><i class="fi fi-rr-template"></i> <span class="label">Templates</span></a>
+      </li>
+      <li class="{{ request()->routeIs('admin.products.*') ? 'active' : '' }}">
+        <a href="{{ route('admin.products.index') }}"><i class="fi fi-rr-boxes"></i> <span class="label">Products</span></a>
       </li>
       <li>
         <a href="#"><i class="fi fi-rr-list-check"></i> <span class="label">Order Summaries</span></a>
