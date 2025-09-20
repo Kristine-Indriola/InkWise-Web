@@ -19,54 +19,67 @@ class CustomerProfileController extends Controller
         return view('customerprofile.profile', compact('customer', 'address'));
     }
 
-  public function update(Request $request)
-{
-    $user = Auth::user();
-    $customer = $user->customer;
+    public function update(Request $request)
+    {
+        $user = Auth::user();
+        $customer = $user->customer;
 
-    $validated = $request->validate([
-        'first_name' => 'required|string|max:255',
-        'middle_name' => 'nullable|string|max:255',
-        'last_name' => 'required|string|max:255',
-        'email' => 'required|email|max:255',
-        'phone' => 'nullable|string|max:20',
-        'birthdate' => 'nullable|date',
-        'gender' => 'nullable|string|in:male,female,other',
-        'photo' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
-        'remove_photo' => 'nullable|boolean',
-    ]);
+        $validated = $request->validate([
+            'first_name' => 'required|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'email' => 'required|email|max:255',
+            'phone' => 'nullable|string|max:20',
+            'birthdate' => 'nullable|date',
+            'gender' => 'nullable|string|in:male,female,other',
+            'photo' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'remove_photo' => 'nullable|boolean',
+        ]);
 
-    // Update main user table
-    $user->update([
-        'email' => $validated['email'],
-    ]);
+        // Update main user table
+        $user->update([
+            'email' => $validated['email'],
+        ]);
 
-    // Handle remove photo
-    if ($request->boolean('remove_photo')) {
-        if ($customer->photo) {
-            Storage::disk('public')->delete($customer->photo);
+        // Handle remove photo
+        if ($request->boolean('remove_photo')) {
+            if ($customer->photo) {
+                Storage::disk('public')->delete($customer->photo);
+            }
+            $customer->photo = null;
         }
-        $customer->photo = null;
-    }
-    // Handle upload new photo
-    elseif ($request->hasFile('photo')) {
-        if ($customer->photo) {
-            Storage::disk('public')->delete($customer->photo);
+        // Handle upload new photo
+        elseif ($request->hasFile('photo')) {
+            if ($customer->photo) {
+                Storage::disk('public')->delete($customer->photo);
+            }
+            $customer->photo = $request->file('photo')->store('photos', 'public');
         }
-        $customer->photo = $request->file('photo')->store('photos', 'public');
+
+        // Update other fields
+        $customer->first_name = $validated['first_name'];
+        $customer->middle_name = $validated['middle_name'] ?? null;
+        $customer->last_name = $validated['last_name'];
+        $customer->contact_number = $validated['phone'] ?? null;
+        $customer->date_of_birth = $validated['birthdate'] ?? null;
+        $customer->gender = $validated['gender'] ?? null;
+        $customer->save();
+
+        return back()->with('status', 'Profile updated successfully!');
     }
 
-    // Update other fields
-    $customer->first_name = $validated['first_name'];
-    $customer->middle_name = $validated['middle_name'] ?? null;
-    $customer->last_name = $validated['last_name'];
-    $customer->contact_number = $validated['phone'] ?? null;
-    $customer->date_of_birth = $validated['birthdate'] ?? null;
-    $customer->gender = $validated['gender'] ?? null;
-    $customer->save();
+    public function showUpdateForm()
+    {
+        $user = Auth::user();
+        $customer = $user->customer;
+        return view('customer.profile.index', compact('customer'));
+    }
 
-    return back()->with('status', 'Profile updated successfully!');
-}
+    public function index()
+    {
+        // Pass customer data if needed
+        return view('customer.profile.index');
+    }
 
 
     // --- Address Methods ---

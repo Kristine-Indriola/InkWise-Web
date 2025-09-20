@@ -172,7 +172,7 @@ class MaterialController extends Controller
 
         return redirect()->route('admin.materials.index')
                          ->with('success', 'Material updated successfully with inventory.');
-    }
+    
 
      if ($remarks === 'Low Stock' || $remarks === 'Out of Stock') {
         $admins = User::where('role', 'admin')->get();
@@ -181,8 +181,8 @@ class MaterialController extends Controller
 
     return redirect()->route('admin.materials.index')
                      ->with('success', 'Material updated successfully with inventory.');
-}
 
+    }
 
     public function destroy($id)
     {
@@ -210,7 +210,7 @@ class MaterialController extends Controller
 
         return view('admin.materials.notification', compact('lowStock', 'outOfStock'));
     }
-
+}
 /*public function notification()
 {
     $lowStock = Material::with('inventory')
@@ -234,4 +234,4 @@ class MaterialController extends Controller
 
 
 
-}
+
