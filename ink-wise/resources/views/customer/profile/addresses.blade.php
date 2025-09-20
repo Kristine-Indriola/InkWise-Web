@@ -51,8 +51,7 @@
                         data-address='@json($address)'>
                         Edit
                     </button>
-                    <form method="POST" action="{{ route('customerprofile.addresses.destroy', $address->address_id) }}">
-
+                    <form method="POST" action="{{ route('customer.profile.addresses.destroy', $address->address_id) }}" class="inline">
                         @csrf
                         <button type="submit" class="text-[#1976d2] hover:underline bg-transparent border-0 p-0 m-0">Delete</button>
                     </form>
@@ -68,13 +67,12 @@
         <div class="address-form-modal bg-white rounded-lg shadow-lg p-6 w-full max-w-md mx-auto relative">
             <button id="closeAddAddress" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 text-xl font-bold">✖</button>
             <h3 class="text-lg font-semibold mb-4">Add New Address</h3>
-            <form method="POST" action="{{ route('customerprofile.addresses.store') }}">
+
+            <form method="POST" action="{{ route('customer.profile.addresses.store') }}">
+
+            <form method="POST" action="{{ route('customer.profile.addresses.store') }}">
 
                 @csrf
-                <input type="hidden" name="country" value="Philippines">
-                <div class="mb-3 grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="block text-sm mb-1">Full Name</label>
                         <input type="text" name="full_name" class="w-full border rounded px-3 py-2" value="{{ auth()->user()->name }}" required>
                     </div>
                     <div>

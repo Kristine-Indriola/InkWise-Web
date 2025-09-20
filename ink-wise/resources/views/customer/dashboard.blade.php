@@ -76,6 +76,26 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
         </button>
+
+
+        <!-- Dropdown Menu -->
+        <div id="userDropdownMenu"
+             class="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-200 z-50 hidden group-hover:block">
+            <!-- Profile -->
+            <a href="{{ route('customer.profile.update') }}"
+               class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] transition-colors">
+                My Account
+            </a>
+            <!-- My Purchase (no link) -->
+            <div class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] cursor-pointer transition-colors">
+                My Purchase
+            </div>
+            <!-- My Favorites (no link) -->
+            <div class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] cursor-pointer transition-colors">
+                My Favorites
+            </div>
+            <!-- Logout -->
+            <form id="logout-form" action="{{ route('customer.logout') }}" method="POST">
         <div id="userDropdown" class="absolute left-0 top-full mt-1 w-48 bg-white rounded shadow-lg z-10 hidden">
             <a href="{{ route('customer.profile.index') }}" class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] transition-colors">My Account</a>
             <form method="POST" action="{{ route('customer.logout') }}">

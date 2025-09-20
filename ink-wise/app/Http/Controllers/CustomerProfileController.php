@@ -5,11 +5,53 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Address;
-use Illuminate\Support\Facades\Storage;
 
 class CustomerProfileController extends Controller
 {
     // --- Profile Methods ---
+
+   public function edit()
+{
+    $user = Auth::user();
+    $customer = $user->customer;
+    $address = $user->address;
+
+    return view('customer.profile.update', compact('customer', 'address'));
+}
+
+    public function update(Request $request)
+    {
+        $request->validate([
+            'first_name'  => 'required|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
+            'last_name'   => 'required|string|max:255',
+            'email'       => 'required|email|max:255',
+            'phone'       => 'nullable|string|max:255',
+            'birthdate'   => 'nullable|date',
+            'gender'      => 'nullable|in:male,female,other',
+            'photo'       => 'nullable|image|max:2048',
+        ]);
+
+        $user = Auth::user();
+        $customer = $user->customer;
+
+        $user->update(['email' => $request->email]);
+        $customer->update([
+            'first_name'     => $request->first_name,
+            'middle_name'    => $request->middle_name,
+            'last_name'      => $request->last_name,
+            'contact_number' => $request->phone,
+            'date_of_birth'  => $request->birthdate,
+            'gender'         => $request->gender,
+            'photo'          => $request->hasFile('photo')
+                                    ? $request->file('photo')->store('avatars', 'public')
+                                    : $customer->photo,
+        ]);
+
+        $user->refresh(); // makes sure Auth::user()->customer is updated
+    return back()->with('status', 'Profile updated successfully!');
+    }
+
     public function edit()
     {
         $user = Auth::user();
@@ -82,11 +124,12 @@ class CustomerProfileController extends Controller
     }
 
 
+
     // --- Address Methods ---
     public function addresses()
     {
         $addresses = Address::where('user_id', Auth::id())->get();
-        return view('customerprofile.addresses', compact('addresses'));
+        return view('customer.profile.addresses', compact('addresses'));
     }
 
     public function storeAddress(Request $request)
@@ -117,7 +160,7 @@ class CustomerProfileController extends Controller
             'country'     => 'Philippines',
         ]);
 
-        return redirect()->route('customerprofile.addresses')->with('success', 'Address added successfully!');
+        return redirect()->route('customer.profile.addresses')->with('success', 'Address added successfully!');
     }
 
     public function updateAddress(Request $request, Address $address)
@@ -136,12 +179,12 @@ class CustomerProfileController extends Controller
 
         $address->update($request->all());
 
-        return redirect()->route('customerprofile.addresses')->with('success', 'Address updated!');
+        return redirect()->route('customer.profile.addresses')->with('success', 'Address updated!');
     }
 
     public function destroyAddress(Address $address)
     {
         $address->delete();
-        return redirect()->route('customerprofile.addresses')->with('success', 'Address deleted!');
+        return redirect()->route('customer.profile.addresses')->with('success', 'Address deleted!');
     }
 }
