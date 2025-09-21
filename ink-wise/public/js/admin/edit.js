@@ -2,8 +2,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // ========================
     // Canvas & Zoom Controls
     // ========================
-    const zoomOutBtn = document.querySelector(".zoom-controls button:first-child");
-    const zoomInBtn = document.querySelector(".zoom-controls button:last-child");
+    const zoomOutBtn = document.getElementById("zoomOutBtn");
+    const zoomInBtn = document.getElementById("zoomInBtn");
     const zoomDisplay = document.querySelector(".zoom-controls span");
     const canvas = document.getElementById("templateCanvas");
     const ctx = canvas.getContext("2d");
@@ -13,7 +13,6 @@ document.addEventListener("DOMContentLoaded", () => {
         canvas.style.transform = `scale(${zoomLevel / 100})`;
         zoomDisplay.textContent = `${zoomLevel}%`;
         repositionEditor();
-        repositionMediaEditors();
         draw();
     }
     zoomOutBtn?.addEventListener("click", () => {
@@ -98,6 +97,21 @@ document.addEventListener("DOMContentLoaded", () => {
                 box.x * (zoomLevel/100) + box.w * (zoomLevel/100) - 12,
                 box.y * (zoomLevel/100) + 4
             );
+            // Draw four corner handles
+            const corners = [
+                [box.x, box.y], // top-left
+                [box.x + box.w, box.y], // top-right
+                [box.x, box.y + box.h], // bottom-left
+                [box.x + box.w, box.y + box.h] // bottom-right
+            ];
+            ctx.fillStyle = "#2563eb";
+            corners.forEach(([cx, cy]) => {
+                ctx.fillRect(
+                    cx * (zoomLevel/100) - 4,
+                    cy * (zoomLevel/100) - 4,
+                    8, 8
+                );
+            });
             ctx.restore();
         });
     }
@@ -133,12 +147,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 8, 8
             );
             // Draw lock/unlock icon (simple padlock emoji)
-            ctx.font = "20px Arial";
+            ctx.font = "18px Arial";
             ctx.textAlign = "right";
             ctx.textBaseline = "top";
+            ctx.fillStyle = "#555";
             ctx.fillText(
                 box.locked ? "🔒" : "🔓",
-                box.x * (zoomLevel/100) + box.w * (zoomLevel/100) - 10,
+                (box.x + box.w) * (zoomLevel/100) - 10,
                 box.y * (zoomLevel/100) + 2
             );
             ctx.restore();
@@ -146,27 +161,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ========================
-    // Add Text Box
-    // ========================
-    function addTextBox(text, fontSize, fontWeight) {
-        const box = {
-            text,
-            x: 100 + Math.random()*100,
-            y: 100 + Math.random()*100,
-            w: 220,
-            h: 48,
-            fontSize,
-            fontWeight,
-            fontFamily: fonts[0],
-            color: "#222"
-        };
-        textBoxes.push(box);
-        selectedBox = box;
-        draw();
-    }
-
-    // ========================
-    // Mouse Events: Drag, Resize, Select (Text)
+    // Unified Canvas Mouse Events
     // ========================
     canvas.addEventListener("mousedown", function(e) {
         if (editingTextarea) return;
@@ -174,16 +169,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const mx = (e.clientX - rect.left) * (canvas.width / rect.width) / (zoomLevel/100);
         const my = (e.clientY - rect.top) * (canvas.height / rect.height) / (zoomLevel/100);
 
-        // Check for delete (X) icon click on text boxes
+        // --- Text Box Delete ---
         for (let i = textBoxes.length - 1; i >= 0; i--) {
             const box = textBoxes[i];
             const iconX = box.x + box.w - 24;
             const iconY = box.y + 4;
-            if (
-                mx > iconX && mx < iconX + 20 &&
-                my > iconY && my < iconY + 20
-            ) {
-                
+            if (mx > iconX && mx < iconX + 20 && my > iconY && my < iconY + 20) {
+                saveState();
                 textBoxes.splice(i, 1);
                 selectedBox = null;
                 draw();
@@ -191,99 +183,65 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
 
-        selectedBox = null;
-        dragType = null;
-        dragBox = null;
-        dragging = false;
-        resizing = false;
-
-        for (let i = textBoxes.length - 1; i >= 0; i--) {
-            const box = textBoxes[i];
-            // Resize handle
-            if (mx > box.x + box.w - 8 && mx < box.x + box.w && my > box.y + box.h - 8 && my < box.y + box.h) {
-                selectedBox = box;
-                resizing = true;
-                dragBox = box;
-                dragType = "resize";
-                dragOffset = {x: mx - box.x, y: my - box.y};
-                draw();
-                return;
-            }
-            // Inside box
-            if (mx > box.x && mx < box.x + box.w && my > box.y && my < box.y + box.h) {
-                selectedBox = box;
-                dragging = true;
-                dragType = "move";
-                dragBox = box;
-                dragOffset = {x: mx - box.x, y: my - box.y};
-                draw();
-                showTextBoxControls(box);
-                return;
-            }
-        }
-        draw();
-        hideTextBoxControls();
-    });
-    canvas.addEventListener("mousemove", function(e) {
-        if (!dragging && !resizing) return;
-        const rect = canvas.getBoundingClientRect();
-        const mx = (e.clientX - rect.left) * (canvas.width / rect.width) / (zoomLevel/100);
-        const my = (e.clientY - rect.top) * (canvas.height / rect.height) / (zoomLevel/100);
-
-        if (dragging && dragType === "move" && dragBox) {
-            dragBox.x = mx - dragOffset.x;
-            dragBox.y = my - dragOffset.y;
-            draw();
-        }
-        if (resizing && dragBox) {
-            dragBox.w = Math.max(60, mx - dragBox.x);
-            dragBox.h = Math.max(28, my - dragBox.y);
-            draw();
-        }
-    });
-    document.addEventListener("mouseup", function() {
-        dragging = false;
-        resizing = false;
-        dragType = null;
-        dragBox = null;
-        draggingMedia = false;
-        resizingMedia = false;
-        dragMediaBox = null;
-    });
-
-    // ========================
-    // Mouse Events: Drag, Resize, Select (Media)
-    // ========================
-    canvas.addEventListener("mousedown", function(e) {
-        const rect = canvas.getBoundingClientRect();
-        const mx = (e.clientX - rect.left) * (canvas.width / rect.width) / (zoomLevel/100);
-        const my = (e.clientY - rect.top) * (canvas.height / rect.height) / (zoomLevel/100);
-
-        // Check for lock icon click on media boxes
+        // --- Media Lock Toggle ---
         for (let i = mediaBoxes.length - 1; i >= 0; i--) {
             const box = mediaBoxes[i];
-            const iconX = box.x + box.w - 24;
-            const iconY = box.y + 2;
-            if (
-                mx > iconX && mx < iconX + 22 &&
-                my > iconY && my < iconY + 22
-            ) {
+            const lockIconX = box.x + box.w - 24;
+            const lockIconY = box.y + 2;
+            if (mx > lockIconX && mx < lockIconX + 22 && my > lockIconY && my < lockIconY + 22) {
                 box.locked = !box.locked;
                 draw();
                 return;
             }
         }
 
-        // ...existing code for selecting/moving/resizing...
-        // Only allow drag/resize if not locked
+        // --- Text Box Drag/Resize ---
+        selectedBox = null;
+        dragType = null;
+        dragBox = null;
+        dragging = false;
+        resizing = false;
+        for (let i = textBoxes.length - 1; i >= 0; i--) {
+            const box = textBoxes[i];
+            // Corners
+            const corners = [
+                {name: "tl", x: box.x, y: box.y},
+                {name: "tr", x: box.x + box.w, y: box.y},
+                {name: "bl", x: box.x, y: box.y + box.h},
+                {name: "br", x: box.x + box.w, y: box.y + box.h}
+            ];
+            for (const corner of corners) {
+                if (mx > corner.x - 8 && mx < corner.x + 8 && my > corner.y - 8 && my < corner.y + 8) {
+                    selectedBox = box;
+                    resizing = true;
+                    dragBox = box;
+                    dragType = corner.name;
+                    dragOffset = {x: mx - box.x, y: my - box.y};
+                    draw();
+                    return;
+                }
+            }
+            // Inside box
+            if (mx > box.x && mx < box.x + box.w && my > box.y && my < box.y + box.h) {
+                saveState();
+                selectedBox = box;
+                dragging = true;
+                dragType = "move";
+                dragBox = box;
+                dragOffset = {x: mx - box.x, y: my - box.y};
+                draw();
+                return;
+            }
+        }
+
+        // --- Media Drag/Resize ---
         selectedMediaBox = null;
         draggingMedia = false;
         resizingMedia = false;
         dragMediaBox = null;
-
         for (let i = mediaBoxes.length - 1; i >= 0; i--) {
             const box = mediaBoxes[i];
-            if (box.locked) continue; // Skip locked boxes
+            if (box.locked) continue;
             // Resize handle
             if (mx > box.x + box.w - 8 && mx < box.x + box.w && my > box.y + box.h - 8 && my < box.y + box.h) {
                 selectedMediaBox = box;
@@ -301,38 +259,67 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
         }
+
+        draw();
     });
     canvas.addEventListener("mousemove", function(e) {
-        if (!draggingMedia && !resizingMedia) return;
         const rect = canvas.getBoundingClientRect();
         const mx = (e.clientX - rect.left) * (canvas.width / rect.width) / (zoomLevel/100);
         const my = (e.clientY - rect.top) * (canvas.height / rect.height) / (zoomLevel/100);
 
+        // Text Drag/Resize
+        if (dragging && dragType === "move" && dragBox) {
+            dragBox.x = mx - dragOffset.x;
+            dragBox.y = my - dragOffset.y;
+            draw();
+        }
+        if (resizing && dragBox) {
+            let newX = dragBox.x, newY = dragBox.y, newW = dragBox.w, newH = dragBox.h;
+            if (dragType === "tl") {
+                newW += newX - mx;
+                newH += newY - my;
+                newX = mx;
+                newY = my;
+            } else if (dragType === "tr") {
+                newW = mx - dragBox.x;
+                newH += newY - my;
+                newY = my;
+            } else if (dragType === "bl") {
+                newW += newX - mx;
+                newX = mx;
+                newH = my - dragBox.y;
+            } else if (dragType === "br") {
+                newW = mx - dragBox.x;
+                newH = my - dragBox.y;
+            }
+            dragBox.x = newX;
+            dragBox.y = newY;
+            dragBox.w = Math.max(40, newW);
+            dragBox.h = Math.max(28, newH);
+            draw();
+        }
+
+        // Media Drag/Resize
         if (draggingMedia && dragMediaBox) {
             dragMediaBox.x = mx - dragOffsetMedia.x;
             dragMediaBox.y = my - dragOffsetMedia.y;
-            if (dragMediaBox.type === "video" && dragMediaBox.video) {
-                const scale = zoomLevel/100;
-                dragMediaBox.video.style.left = (dragMediaBox.x * scale) + "px";
-                dragMediaBox.video.style.top = (dragMediaBox.y * scale) + "px";
-            }
             draw();
         }
         if (resizingMedia && dragMediaBox) {
             dragMediaBox.w = Math.max(40, mx - dragMediaBox.x);
             dragMediaBox.h = Math.max(30, my - dragMediaBox.y);
-            if (dragMediaBox.type === "video" && dragMediaBox.video) {
-                const scale = zoomLevel/100;
-                dragMediaBox.video.style.width = (dragMediaBox.w * scale) + "px";
-                dragMediaBox.video.style.height = (dragMediaBox.h * scale) + "px";
-            }
             draw();
         }
     });
-
-    // ========================
-    // Inline Editing (Text)
-    // ========================
+    document.addEventListener("mouseup", function() {
+        dragging = false;
+        resizing = false;
+        dragType = null;
+        dragBox = null;
+        draggingMedia = false;
+        resizingMedia = false;
+        dragMediaBox = null;
+    });
     canvas.addEventListener("dblclick", function(e) {
         if (editingTextarea) return;
         const rect = canvas.getBoundingClientRect();
@@ -341,10 +328,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         for (let i = textBoxes.length - 1; i >= 0; i--) {
             const box = textBoxes[i];
-            if (
-                mx > box.x && mx < box.x + box.w &&
-                my > box.y && my < box.y + box.h
-            ) {
+            if (mx > box.x && mx < box.x + box.w && my > box.y && my < box.y + box.h) {
                 selectedBox = box;
                 editingBox = box;
                 showInlineEditor(box);
@@ -352,70 +336,118 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
     });
-    function showInlineEditor(box) {
-        if (editingTextarea) {
-            document.body.removeChild(editingTextarea);
-            editingTextarea = null;
-        }
-        const canvasRect = canvas.getBoundingClientRect();
-        const scale = zoomLevel/100;
-        const textarea = document.createElement("textarea");
-        textarea.value = box.text;
-        textarea.style.position = "absolute";
-        textarea.style.left = (canvasRect.left + window.scrollX + box.x * scale) + "px";
-        textarea.style.top = (canvasRect.top + window.scrollY + box.y * scale) + "px";
-        textarea.style.width = (box.w * scale) + "px";
-        textarea.style.height = (box.h * scale) + "px";
-        textarea.style.fontSize = (box.fontSize * scale) + "px";
-        textarea.style.fontFamily = box.fontFamily;
-        textarea.style.fontWeight = box.fontWeight;
-        textarea.style.color = box.color;
-        textarea.style.background = "rgba(255,255,255,0.9)";
-        textarea.style.border = "2px solid #2563eb";
-        textarea.style.zIndex = 300;
-        textarea.style.resize = "none";
-        textarea.style.overflow = "hidden";
-        document.body.appendChild(textarea);
-        textarea.focus();
-        editingTextarea = textarea;
 
-        function saveEdit() {
-            box.text = textarea.value;
-            document.body.removeChild(textarea);
+    // ========================
+    // Undo/Redo Functionality
+    // ========================
+    let undoStack = [];
+    let redoStack = [];
+
+    function saveState() {
+        undoStack.push({
+            textBoxes: JSON.parse(JSON.stringify(textBoxes)),
+            mediaBoxes: JSON.parse(JSON.stringify(mediaBoxes))
+        });
+        redoStack = [];
+    }
+
+    function restoreState(state) {
+        if (!state) return;
+        textBoxes = JSON.parse(JSON.stringify(state.textBoxes));
+        mediaBoxes = JSON.parse(JSON.stringify(state.mediaBoxes));
+        draw();
+    }
+
+    document.getElementById("undoBtn")?.addEventListener("click", function() {
+        if (undoStack.length > 0) {
+            redoStack.push({
+                textBoxes: JSON.parse(JSON.stringify(textBoxes)),
+                mediaBoxes: JSON.parse(JSON.stringify(mediaBoxes))
+            });
+            const prevState = undoStack.pop();
+            restoreState(prevState);
+        }
+    });
+
+    document.getElementById("redoBtn")?.addEventListener("click", function() {
+        if (redoStack.length > 0) {
+            undoStack.push({
+                textBoxes: JSON.parse(JSON.stringify(textBoxes)),
+                mediaBoxes: JSON.parse(JSON.stringify(mediaBoxes))
+            });
+            const nextState = redoStack.pop();
+            restoreState(nextState);
+        }
+    });
+
+    // ========================
+    // Inline Editor Functions
+    // ========================
+    function showInlineEditor(box) {
+        if (editingTextarea) return;
+        editingTextarea = document.createElement("textarea");
+        editingTextarea.value = box.text;
+        editingTextarea.style.position = "absolute";
+        editingTextarea.style.left = (canvas.offsetLeft + box.x * (zoomLevel/100)) + "px";
+        editingTextarea.style.top = (canvas.offsetTop + box.y * (zoomLevel/100)) + "px";
+        editingTextarea.style.width = (box.w * (zoomLevel/100)) + "px";
+        editingTextarea.style.height = (box.h * (zoomLevel/100)) + "px";
+        editingTextarea.style.fontSize = (box.fontSize * (zoomLevel/100)) + "px";
+        editingTextarea.style.fontFamily = box.fontFamily;
+        editingTextarea.style.color = box.color;
+        editingTextarea.style.zIndex = 10;
+        editingTextarea.style.background = "rgba(255,255,255,0.95)";
+        editingTextarea.style.border = "1px solid #2563eb";
+        editingTextarea.style.resize = "none";
+        editingTextarea.style.overflow = "hidden";
+        editingTextarea.style.padding = "2px 4px";
+        editingTextarea.style.boxSizing = "border-box";
+        editingTextarea.style.outline = "none";
+        editingTextarea.style.borderRadius = "6px";
+        editingTextarea.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)";
+        editingTextarea.rows = 1;
+
+        // Append to .editor-canvas instead of body
+        const editorCanvas = canvas.parentNode;
+        editorCanvas.appendChild(editingTextarea);
+        editingTextarea.focus();
+
+        editingTextarea.addEventListener("blur", function() {
+            box.text = editingTextarea.value;
+            editorCanvas.removeChild(editingTextarea);
             editingTextarea = null;
             editingBox = null;
             draw();
-        }
+        });
+    }
 
-        textarea.addEventListener("blur", saveEdit);
-        textarea.addEventListener("keydown", function(e) {
-            if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                saveEdit();
-            }
-        });
-    }
     function repositionEditor() {
-        if (editingTextarea && editingBox) {
-            const canvasRect = canvas.getBoundingClientRect();
-            const scale = zoomLevel/100;
-            editingTextarea.style.left = (canvasRect.left + window.scrollX + editingBox.x * scale) + "px";
-            editingTextarea.style.top = (canvasRect.top + window.scrollY + editingBox.y * scale) + "px";
-            editingTextarea.style.width = (editingBox.w * scale) + "px";
-            editingTextarea.style.height = (editingBox.h * scale) + "px";
-            editingTextarea.style.fontSize = (editingBox.fontSize * scale) + "px";
-        }
+        if (!editingTextarea || !editingBox) return;
+        // Position relative to canvas container
+        editingTextarea.style.left = (canvas.offsetLeft + editingBox.x * (zoomLevel/100)) + "px";
+        editingTextarea.style.top = (canvas.offsetTop + editingBox.y * (zoomLevel/100)) + "px";
+        editingTextarea.style.width = (editingBox.w * (zoomLevel/100)) + "px";
+        editingTextarea.style.height = (editingBox.h * (zoomLevel/100)) + "px";
+        editingTextarea.style.fontSize = (editingBox.fontSize * (zoomLevel/100)) + "px";
     }
-    function repositionMediaEditors() {
-        mediaBoxes.forEach(box => {
-            if (box.type === "video" && box.video) {
-                const scale = zoomLevel/100;
-                box.video.style.left = (box.x * scale) + "px";
-                box.video.style.top = (box.y * scale) + "px";
-                box.video.style.width = (box.w * scale) + "px";
-                box.video.style.height = (box.h * scale) + "px";
-            }
+
+    // ========================
+    // Add Text Box
+    // ========================
+    function addTextBox(text = "New Text", fontSize = 20, fontWeight = "normal") {
+        saveState();
+        textBoxes.push({
+            text,
+            x: 60,
+            y: 60,
+            w: 180,
+            h: 40,
+            fontSize,
+            fontWeight,
+            fontFamily: fonts[0],
+            color: "#222"
         });
+        draw();
     }
 
     // ========================
@@ -555,6 +587,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (item.textContent.trim() === "Images") {
                     const uploadMedia = document.getElementById("uploadMedia");
                     const uploadMediaBtn = document.getElementById("uploadMediaBtn");
+                    const mediaList = document.getElementById("mediaList");
+                    let uploadedImages = [];
+
                     uploadMediaBtn.addEventListener("click", () => uploadMedia.click());
                     uploadMedia.addEventListener("change", function(e) {
                         const file = e.target.files[0];
@@ -570,32 +605,40 @@ document.addEventListener("DOMContentLoaded", () => {
                                     w: 200, h: 150,
                                     locked: false
                                 });
+                                uploadedImages.push({img, url});
                                 draw();
+                                renderMediaList();
                             };
                             img.src = url;
-                        } else if (file.type.startsWith("video/")) {
-                            const video = document.createElement("video");
-                            video.src = url;
-                            video.controls = true;
-                            video.autoplay = false;
-                            video.loop = false;
-                            video.style.position = "absolute";
-                            video.style.left = "100px";
-                            video.style.top = "100px";
-                            video.style.width = "200px";
-                            video.style.height = "150px";
-                            video.style.zIndex = 400;
-                            document.body.appendChild(video);
-                            mediaBoxes.push({
-                                type: "video",
-                                video,
-                                x: 100, y: 100,
-                                w: 200, h: 150,
-                                locked: false
-                            });
-                            draw();
                         }
                     });
+
+                    function renderMediaList() {
+                        mediaList.innerHTML = "";
+                        uploadedImages.forEach((media, idx) => {
+                            const thumb = document.createElement("img");
+                            thumb.src = media.url;
+                            thumb.style.width = "40px";
+                            thumb.style.height = "40px";
+                            thumb.style.objectFit = "cover";
+                            thumb.style.margin = "4px";
+                            thumb.style.cursor = "pointer";
+                            thumb.title = "Insert again";
+                            thumb.onclick = () => {
+                                mediaBoxes.push({
+                                    type: "image",
+                                    img: media.img,
+                                    x: 120 + Math.random()*60,
+                                    y: 120 + Math.random()*60,
+                                    w: 200,
+                                    h: 150,
+                                    locked: false
+                                });
+                                draw();
+                            };
+                            mediaList.appendChild(thumb);
+                        });
+                    }
                 }
                 // Graphics Panel
                 if (item.textContent.trim() === "Graphics") {
@@ -730,7 +773,32 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // ========================
-    // Initial draw
+    // Save & Next Button
     // ========================
-    draw();
+    document.getElementById('saveBtn')?.addEventListener('click', function() {
+        const imgData = canvas.toDataURL("image/png");
+        console.log("Saving...", window.TEMPLATE_ID, window.CSRF_TOKEN, window.TEMPLATES_INDEX_URL);
+        fetch(`/admin/templates/${window.TEMPLATE_ID}/save-canvas`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': window.CSRF_TOKEN
+            },
+            body: JSON.stringify({ canvas_image: imgData })
+        })
+        .then(res => res.json())
+        .then(data => {
+            console.log("Save response:", data);
+            if (data.success) {
+                alert('Template saved! Returning to templates list...');
+                window.location.href = window.TEMPLATES_INDEX_URL;
+            } else {
+                alert('Save failed!');
+            }
+        });
+    });
+
+    document.getElementById('nextBtn')?.addEventListener('click', function() {
+        window.location.href = window.TEMPLATES_INDEX_URL;
+    });
 });

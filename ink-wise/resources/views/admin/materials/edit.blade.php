@@ -30,6 +30,7 @@
                     <input type="text" name="material_name" value="{{ old('material_name', $material->material_name) }}" required>
                 </div>
 
+                
                 <div class="form-group">
                     <label>Material Type</label>
                     <input type="text" name="material_type" value="{{ old('material_type', $material->material_type) }}" required>

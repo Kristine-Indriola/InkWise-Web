@@ -71,16 +71,20 @@
 
         {{-- Tab Content: Actions --}}
         <div id="actions" class="tab-content">
-            <div class="profile-actions">
-                <a href="{{ route('admin.users.edit', $user->user_id) }}" class="btn btn-edit">✏ Edit</a>
-                <form method="POST" action="{{ route('admin.users.destroy', $user->user_id) }}" 
-                      onsubmit="return confirm('Are you sure you want to delete this user?');">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="btn btn-delete">🗑 Delete</button>
-                </form>
-            </div>
-        </div>
+    <div class="profile-actions">
+        @if(($user->staff)->status !== 'archived')
+            <a href="{{ route('admin.users.edit', $user->user_id) }}" class="btn btn-edit">✏ Edit</a>
+            <form method="POST" action="{{ route('admin.users.destroy', $user->user_id) }}" 
+                  onsubmit="return confirm('Are you sure you want to archive this user?');">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="btn btn-delete">📦 Archive</button>
+            </form>
+        @else
+            <span class="badge bg-secondary">📦 Archived Account</span>
+        @endif
+    </div>
+</div>
     </div>
 </div>
 

@@ -3,12 +3,14 @@
     max-width: 900px;
     margin: 40px auto;
     padding: 30px;
-    font-family: Arial, sans-serif;
+    font-family: 'Poppins', Arial, sans-serif;
     background: linear-gradient(135deg, #f8fafc, #eef2ff); /* soft gradient */
     border-radius: 12px;
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
     border: 1px solid #e5e7eb;
 }
+
+
 
 /* ===== Heading ===== */
 .container h2 {
@@ -20,6 +22,15 @@
     padding-bottom: 10px;
     border-bottom: 2px solid #3b82f6; /* blue underline */
     display: inline-block;
+    font-family: 'Poppins', Arial, sans-serif;
+}
+
+/* Make only the main heading bold, not all labels */
+form label {
+    font-weight: 500; /* Normal/medium, not bold */
+    margin-bottom: 6px;
+    color: #374151;
+    font-family: 'Poppins', Arial, sans-serif;
 }
 
 /* ===== Success message ===== */
@@ -32,6 +43,7 @@
     font-size: 14px;
     border: 1px solid #10b981;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    font-family: 'Poppins', Arial, sans-serif;
 }
 
 /* ===== Form Layout ===== */
@@ -39,27 +51,31 @@ form {
     display: flex;
     flex-direction: column;
     gap: 20px;
+    font-family: 'Poppins', Arial, sans-serif;
 }
 
 /* Form Row (2 columns) */
 .form-row {
     display: flex;
     gap: 20px;
-    flex-wrap: wrap;
+    align-items: flex-start;
+    flex-wrap: wrap; /* allows stacking on small screens */
 }
 
 /* Each field */
 .form-group {
-    flex: 1;
+    flex: 1 1 0;
     display: flex;
     flex-direction: column;
+    min-width: 0; /* important so children can shrink inside flex */
 }
 
 /* Labels */
 form label {
-    font-weight: bold;
+    font-weight: 500; /* Normal/medium, not bold */
     margin-bottom: 6px;
     color: #374151;
+    font-family: 'Poppins', Arial, sans-serif;
 }
 
 /* Inputs & Textareas */
@@ -74,6 +90,7 @@ form textarea {
     box-sizing: border-box;
     transition: 0.2s;
     background-color: #fff;
+    font-family: 'Poppins', Arial, sans-serif;
 }
 
 form input:focus,
@@ -83,10 +100,38 @@ form textarea:focus {
     outline: none;
 }
 
+/* Make inputs/selects use border-box so padding doesn't cause overflow */
+.form-control,
+.styled-select,
+form textarea {
+    box-sizing: border-box;
+    height: 42px; /* uniform height for inputs/selects */
+    line-height: 1.2;
+}
+
 /* Textarea */
 form textarea {
+    height: auto;
+    min-height: 100px;
     resize: vertical;
-    min-height: 70px;
+}
+
+/* Tweak the select dropdown arrow position and padding */
+.styled-select {
+    padding-right: 40px; /* space for the arrow */
+    background-position: right 12px center; /* consistent arrow position */
+}
+
+/* For multi-select (occasion) keep reasonable height */
+select[multiple].styled-select {
+    height: 120px;
+    padding-right: 12px; /* fewer padding because no arrow */
+}
+
+/* Optional: make readonly fields visually consistent */
+.form-control[readonly] {
+    background-color: #f1f5f9;
+    opacity: 1;
 }
 
 /* ===== Buttons ===== */
@@ -98,6 +143,7 @@ button, .btn-back {
     cursor: pointer;
     border: none;
     transition: 0.2s ease;
+    font-family: 'Poppins', Arial, sans-serif;
 }
 
 button {
@@ -130,9 +176,14 @@ button:hover {
 @media (max-width: 768px) {
     .form-row {
         flex-direction: column;
+        gap: 12px;
     }
 
     button, .btn-back {
         width: 100%;
+    }
+
+    .form-control, .styled-select {
+        height: 40px;
     }
 }

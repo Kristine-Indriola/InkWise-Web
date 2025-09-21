@@ -9,6 +9,36 @@
 
 @push('scripts')
 <script src="{{ asset('js/admin/edit.js') }}"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const saveBtn = document.getElementById('saveBtn');
+    const canvas = document.getElementById('templateCanvas');
+    saveBtn.addEventListener('click', function() {
+        // Get canvas data as base64 PNG
+        const imageData = canvas.toDataURL('image/png');
+        fetch("{{ route('admin.templates.saveCanvas', $template->id) }}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRF-TOKEN": "{{ csrf_token() }}"
+
+            },
+            body: JSON.stringify({ canvas_image: imageData })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(data.success) {
+                alert('Template saved!');
+                // Optionally, redirect or update preview
+                window.location.href = "{{ route('admin.templates.index') }}";
+            } else {
+                alert('Save failed: ' + data.message);
+            }
+        })
+        .catch(() => alert('Save failed!'));
+    });
+});
+</script>
 @endpush
 
 @section('content')
@@ -30,13 +60,13 @@
     @endif
 </div>
         <div class="actions">
-            <button class="btn">Save</button>
-            <button class="btn">↶ </button>
-            <button class="btn">↷</button>
-            <button class="btn">Size & Shape</button>
-            <button class="btn">Preview</button>
-            <button class="btn primary">Next ➝</button>
-        </div>
+    <button class="btn" id="saveBtn" title="Save Template">Save</button>
+    <button class="btn" id="undoBtn" title="Undo">↶</button>
+    <button class="btn" id="redoBtn" title="Redo">↷</button>
+    <button class="btn" id="sizeShapeBtn" title="Size & Shape">Size & Shape</button>
+    <button class="btn" id="previewBtn" title="Preview">Preview</button>
+    <button class="btn primary" id="nextBtn" title="Next">Next ➝</button>
+</div>
     </div>
 
     <!-- Body -->
@@ -72,14 +102,14 @@
     @endif
             </div>
             
-
             <div class="zoom-controls">
-                <button>-</button>
-                <span>100%</span>
-                <button>+</button>
-            </div>
+    <button type="button" id="zoomOutBtn" title="Zoom Out">-</button>
+    <span>100%</span>
+    <button type="button" id="zoomInBtn" title="Zoom In">+</button>
+</div>
         </div>
 
+        
         <!-- Right Sidebar -->
         <div class="editor-pages">
             <div class="page-thumb active">Front</div>
@@ -87,4 +117,10 @@
         </div>
     </div>
 </div>
+
+<script>
+window.TEMPLATE_ID = {{ $template->id }};
+window.CSRF_TOKEN = "{{ csrf_token() }}";
+window.TEMPLATES_INDEX_URL = "{{ route('admin.templates.index') }}";
+</script>
 @endsection

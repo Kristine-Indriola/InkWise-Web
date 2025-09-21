@@ -76,13 +76,13 @@
           </li>
 
           <li>
-            <a href="{{ route('staff.customer.profile') }}"
-               class="flex items-center p-2 rounded hover:bg-gray-100
-                      {{ request()->routeIs('staff.customer.profile') ? 'bg-gray-100 text-purple-600 font-semibold' : 'text-gray-700' }}">
-              <span class="menu-icon mr-3"><i class="fa-solid fa-users"></i></span>
-              <span>Customer Profiles</span>
-            </a>
-          </li>
+    <a href="{{ route('staff.customer_profile') }}"
+       class="flex items-center p-2 rounded hover:bg-gray-100
+              {{ request()->routeIs('staff.customer_profile') ? 'bg-gray-100 text-purple-600 font-semibold' : 'text-gray-700' }}">
+      <span class="menu-icon mr-3"><i class="fa-solid fa-users"></i></span>
+      <span>Customer Profiles</span>
+    </a>
+</li>
 
           <li>
             <a href="{{ route('staff.notify.customers') }}"
@@ -92,6 +92,10 @@
               <span>Notify Customers</span>
             </a>
           </li>
+
+          <li class="{{ request()->routeIs('staff.materials.*') ? 'active' : '' }}">
+    <a href="{{ route('staff.materials.index') }}"><i>📝</i> Materials</a>
+</li>
         </ul>
       </nav>
     </aside>
@@ -103,10 +107,25 @@
       <header class="flex justify-between items-center bg-white p-4 border-b">
         <h1 class="text-xl font-bold">Welcome, Staff!</h1>
         <div class="flex items-center space-x-4">
-          <button class="relative text-yellow-600" aria-label="Notifications">
-            <i class="fa-regular fa-bell"></i>
-            <span class="absolute -top-1 -right-2 bg-red-500 text-white text-xs px-1 rounded-full">1</span>
-          </button>
+          <a href="{{ route('staff.staff.materials.notification') }}" class="nav-link">
+    🔔
+    @php
+        $lowCount = \App\Models\Material::whereHas('inventory', function($q) {
+            $q->whereColumn('stock_level', '<=', 'reorder_level')
+              ->where('stock_level', '>', 0);
+        })->count();
+
+        $outCount = \App\Models\Material::whereHas('inventory', function($q) {
+            $q->where('stock_level', '<=', 0);
+        })->count();
+
+        $notifCount = $lowCount + $outCount;
+    @endphp
+
+    @if($notifCount > 0)
+        <span class="notif-badge">{{ $notifCount }}</span>
+    @endif
+</a>
 
           <button class="text-gray-600" aria-label="Settings">
             <i class="fa-solid fa-gear"></i>
