@@ -53,17 +53,18 @@ class CustomerAuthController extends Controller
     }
 
     public function login(Request $request)
-    {
-        $credentials = $request->only('email', 'password');
+{
+    $credentials = $request->only('email', 'password');
 
-        if (Auth::guard('customer')->attempt($credentials)) {
-            // Login successful
-            return redirect()->intended('/dashboard');  // Or wherever
-        }
+    if (Auth::attempt($credentials)) {
+        $user = Auth::user();
+        $customer = $user->customer; // eager load profile if needed
 
-        // Handle failure
-        return back()->withErrors(['email' => 'Invalid credentials']);
+        return redirect()->intended('/dashboard');
     }
+
+    return back()->withErrors(['email' => 'Invalid credentials']);
+}
 
     public function dashboard()
     {
