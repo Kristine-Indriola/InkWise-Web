@@ -412,3 +412,5 @@ Route::get('/auth/google/callback', function () {
     return 'Google login successful (dev placeholder)';
 })->name('google.callback');
 
+});
+
