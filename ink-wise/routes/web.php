@@ -228,83 +228,31 @@ Route::post('/customer/logout', [CustomerAuthController::class, 'logout'])->name
 Route::get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');
 
 
-
-/**Customer Profile Pages*/
-Route::prefix('customerprofile')->group(function () {
-    // Addresses
-    Route::get('/addresses', [AddressController::class, 'profile'])->name('customer.profile.addresses');
-    Route::post('/addresses', [AddressController::class, 'store'])->name('customer.profile.addresses.store');
-    Route::post('/addresses/{address}/delete', [AddressController::class, 'destroy'])->name('customer.profile.addresses.destroy');
-    Route::post('/addresses/{address}/update', [AddressController::class, 'update'])->name('customer.profile.addresses.update');
-
-    // Profile, Settings, Order Form
-    Route::get('/profile', fn () => view('customer.profile.update'))->name('customerprofile.profile');
-    Route::get('/settings', fn () => view('customer.profile.settings'))->name('customerprofile.settings');
-    Route::get('/order', fn () => view('customer.profile.orderform'))->name('customerprofile.orderform');
-});
-
 // My Purchases
-Route::get('/customer/my-orders', fn () => view('customer.profile.my_purchase'))->name('customer.my_purchase');
-
-// Customer Profile pages
-Route::middleware(['auth:customer'])->group(function () {
 
 
+Route::prefix('customer/profile')->name('customer.profile.')->group(function () {
+    // Profile routes
+    Route::get('/', [CustomerProfileController::class, 'index'])->name('index'); 
+    Route::get('/edit', [CustomerProfileController::class, 'edit'])->name('edit'); 
+    Route::get('/update', [CustomerProfileController::class, 'update'])->name('update');
 
-    /*  Route::get('/customer/profile', [CustomerProfileController::class, 'edit'])
-        ->name('customer.profile.edit');
-
-    // Update profile
-    Route::post('/customer/profile/update', [CustomerProfileController::class, 'update'])
-        ->name('customer.profile.update');
-
-
-     Route::get('/customer/addresses', [CustomerProfileController::class, 'addresses'])
-        ->name('customerprofile.addresses');
-    
-    Route::post('/customer/addresses/store', [CustomerProfileController::class, 'storeAddress'])
-        ->name('customerprofile.addresses.store');
-    Route::post('/customer/addresses/{address}/update', [CustomerProfileController::class, 'updateAddress'])
-        ->name('customerprofile.addresses.update');
-    Route::delete('/customer/addresses/{address}', [CustomerProfileController::class, 'destroyAddress'])
-        ->name('customerprofile.addresses.destroy');
-
-    */
-
-/** Profile & Addresses (Protected) */
-Route::middleware(['auth:customer'])->prefix('customer/profile')->name('customer.profile.')->group(function () {
-    Route::get('/', [CustomerProfileController::class, 'update'])->name('index');
-
-
-    // Addresses
+    // Address routes
     Route::get('/addresses', [CustomerProfileController::class, 'addresses'])->name('addresses');
     Route::post('/addresses/store', [CustomerProfileController::class, 'storeAddress'])->name('addresses.store');
-    Route::post('/addresses/{address}/update', [CustomerProfileController::class, 'updateAddress'])->name('addresses.update');
     Route::delete('/addresses/{address}', [CustomerProfileController::class, 'destroyAddress'])->name('addresses.destroy');
+
+   // Route::get('/customer/my-orders', fn () => view('customer.profile.my_purchase'))->name('customer.my_purchase');
+
+    
 });
-
-Route::post('/', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
-Route::get('/', [CustomerProfileController::class, 'update'])->name('index');
-
-
-     Route::get('/customer/addresses', [CustomerProfileController::class, 'addresses'])
-        ->name('customerprofile.addresses');
-    
-    Route::post('/customer/addresses/store', [CustomerProfileController::class, 'storeAddress'])
-        ->name('customerprofile.addresses.store');
-    Route::post('/customer/addresses/{address}/update', [CustomerProfileController::class, 'updateAddress'])
-        ->name('customerprofile.addresses.update');
-    Route::delete('/customer/addresses/{address}', [CustomerProfileController::class, 'destroyAddress'])
-        ->name('customerprofile.addresses.destroy');
-
-    
     
 
 
 // Profile update (protected)
-Route::middleware(['auth:customer'])->group(function () {
+/*Route::middleware(['auth:customer'])->group(function () {
     Route::put('/customer/profile/update', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
-});
+});*/
 
 
 
