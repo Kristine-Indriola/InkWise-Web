@@ -24,47 +24,49 @@ class CustomerAuthController extends Controller
     public function register(Request $request)
     {
         $request->validate([
-            'first_name' => 'required|string|max:100',
-            'last_name' => 'required|string|max:100',
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:6|confirmed',
+            'birthdate' => 'required|date',
+            'contact_number' => 'nullable|string|max:20',
+            'middle_name' => 'nullable|string|max:255',
         ]);
 
-        //1️⃣ Create the user (login credentials)
+        // 1. Create the User (for authentication)
         $user = User::create([
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role' => 'customer',
         ]);
 
-        // 2️⃣ Create the customer profile (extra info)
+        // 2. Create the Customer profile (using Customer model)
         $customer = Customer::create([
-            'user_id' => $user->user_id, // FK to users table
+            'user_id' => $user->user_id,
             'first_name' => $request->first_name,
             'middle_name' => $request->middle_name,
             'last_name' => $request->last_name,
             'contact_number' => $request->contact_number,
+            'birthdate' => $request->birthdate, // Assuming 'birthdate' maps to 'date_of_birth' in migration
+            // Add other fields if needed (e.g., 'gender' if in form)
         ]);
 
-        // 3️⃣ Login customer
+        // 3. Log in the user
         Auth::login($user);
 
         return redirect()->route('customer.dashboard');
     }
 
     public function login(Request $request)
-{
-    $credentials = $request->only('email', 'password');
+    {
+        $credentials = $request->only('email', 'password');
 
-    if (Auth::attempt($credentials)) {
-        $user = Auth::user();
-        $customer = $user->customer; // eager load profile if needed
+        if (Auth::attempt($credentials)) {
+            return redirect()->route('customer.dashboard'); // or intended route
+        }
 
-        return redirect()->intended('/dashboard');
+        return back()->withErrors(['email' => 'Invalid credentials']);
     }
-
-    return back()->withErrors(['email' => 'Invalid credentials']);
-}
 
     public function dashboard()
     {
@@ -79,6 +81,6 @@ class CustomerAuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('customer.dashboard');
+        return redirect()->route('dashboard'); // Redirect to customer dashboard
     }
 }

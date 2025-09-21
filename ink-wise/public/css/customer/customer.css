@@ -32,6 +32,7 @@
   animation: oceanFade 6s ease-in-out infinite;
 }
 
+
 /* Dropdown Animation */
 @keyframes drop {
   from { opacity: 0; transform: translateY(-4px); }
