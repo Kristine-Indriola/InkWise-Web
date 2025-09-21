@@ -26,6 +26,7 @@ return new class extends Migration
             // $table->foreign('address_id')->references('id')->on('addresses')->onDelete('set null');
         });
     }
+    
 
     /**
      * Reverse the migrations.
@@ -35,3 +36,4 @@ return new class extends Migration
         Schema::dropIfExists('customers');
     }
 };
+

@@ -1,0 +1,126 @@
+/* Template-specific styles */
+#templates-section {
+  /* Card perspective */
+  .template-card {
+    perspective: 1000px;
+  }
+
+  /* Image wrapper (clickable/movable) */
+  .image-wrapper {
+    transition: transform 0.5s ease;
+  }
+
+  .template-image {
+    display: block;
+    cursor: grab;
+  }
+
+  .template-image:active {
+    cursor: grabbing;
+  }
+
+  /* Colorful gradients for each template type */
+  .gradient-pink {
+    background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
+  }
+
+  .gradient-yellow {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  }
+
+  .gradient-orange {
+    background: linear-gradient(135deg, #ffedd5 0%, #fdba74 100%);
+  }
+
+  .gradient-skyblue {
+    background: linear-gradient(135deg, #bae6fd 0%, #7dd3fc 100%);
+  }
+
+  /* Slide-in animation */
+  .animate-slide-in {
+    animation: slide-in 0.8s ease forwards;
+  }
+
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Bounce animation for floating decorations */
+  .animate-bounce {
+    animation: bounce 2s infinite;
+  }
+
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  /* Spin animation for floating decorations */
+  .animate-spin {
+    animation: spin 3s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  /* Floating background decorations */
+  .floating-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0; /* behind card */
+    pointer-events: none; /* allow clicks to pass */
+  }
+
+  .float-item {
+    position: absolute;
+    animation: floatAnim 10s linear infinite;
+    opacity: 0.8;
+  }
+
+  @keyframes floatAnim {
+    0% { transform: translateY(0px) rotate(0deg); }
+    25% { transform: translateY(-10px) rotate(10deg); }
+    50% { transform: translateY(5px) rotate(-10deg); }
+    75% { transform: translateY(-5px) rotate(5deg); }
+    100% { transform: translateY(0px) rotate(0deg); }
+  }
+}
+/* Wedding Dropdown */
+#weddingDropdownBtn {
+  cursor: pointer;
+  font-weight: 600;
+  color: #06b6d4; /* Cyan from palette */
+}
+
+#weddingDropdownMenu {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.2s ease, visibility 0.2s;
+  z-index: 50;
+}
+
+#weddingDropdownMenu.show {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+#weddingDropdownMenu a {
+  transition: background 0.2s;
+}
+
+#weddingDropdownMenu a:hover {
+  background: #e0f7fa; /* Light Aqua from palette */
+}
+
+.group:hover #weddingDropdownMenu,
+.group:focus-within #weddingDropdownMenu {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto;
+    transition: opacity 0.2s;
+}
