@@ -463,3 +463,5 @@ Route::get('/auth/google/callback', function () {
     // dd($user);
     return 'Google login successful (dev placeholder)';
 })->name('google.callback');
+
+});
