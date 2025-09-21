@@ -19,6 +19,7 @@
         <!-- Register Form -->
         <form method="POST" action="{{ route('customer.register') }}" class="space-y-3">
             @csrf
+            
 
             <!-- Names Row -->
             <div class="flex gap-2">

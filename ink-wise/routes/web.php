@@ -159,7 +159,7 @@ Route::prefix('users')->name('users.')->group(function () {
     // Optional: Inventory export
     Route::get('reports/inventory/export/{type}', [ReportsDashboardController::class, 'exportInventory'])
          ->name('reports.inventory.export');
-});
+
 
 
 
@@ -214,8 +214,8 @@ Route::get('/auth/google/callback', function () {
 */
 
 /**Dashboard & Home*/
-Route::get('/', fn () => view('customer.dashboard'))->name('dashboard');
-Route::get('/dashboard', fn () => view('customer.dashboard'))->name('customer.dashboard');
+Route::get('/', fn () => view('customer.dashboard'))->name('dashboard');  // Public
+Route::middleware('auth')->get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');  // Protected
 Route::get('/search', function (\Illuminate\Http\Request $request) {
     return 'Search for: ' . e($request->query('query', ''));
 })->name('search');
@@ -226,26 +226,33 @@ Route::post('/customer/register', [CustomerAuthController::class, 'register'])->
 Route::get('/customer/login', [CustomerAuthController::class, 'showLogin'])->name('customer.login.form');
 Route::post('/customer/login', [CustomerAuthController::class, 'login'])->name('customer.login');
 Route::post('/customer/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
-Route::get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');
+Route::middleware('auth')->get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');  // Protected
+
+// My Purchases
+
+Route::middleware('auth')->get('/customer/my-purchase', function () {
+    return view('customer.profile.my_purchase');
+})->name('customer.my_purchase');
+
+// Settings (with optional tab)
+Route::middleware('auth')->get('/customer/profile/settings', function (\Illuminate\Http\Request $request) {
+    $tab = $request->query('tab', 'account');
+    return view('customer.profile.settings', compact('tab'));
+})->name('customerprofile.settings');
 
 
 // My Purchases
 
-
-Route::prefix('customer/profile')->name('customer.profile.')->group(function () {
+Route::middleware('auth')->prefix('customer/profile')->name('customer.profile.')->group(function () {  // Protected group
     // Profile routes
     Route::get('/', [CustomerProfileController::class, 'index'])->name('index'); 
-    Route::get('/edit', [CustomerProfileController::class, 'edit'])->name('edit'); 
-    Route::get('/update', [CustomerProfileController::class, 'update'])->name('update');
+    Route::get('/edit', [CustomerProfileController::class, 'edit'])->name('edit');  // Matches view
+    Route::put('/update', [CustomerProfileController::class, 'update'])->name('update');  // Add if missing
 
     // Address routes
     Route::get('/addresses', [CustomerProfileController::class, 'addresses'])->name('addresses');
     Route::post('/addresses/store', [CustomerProfileController::class, 'storeAddress'])->name('addresses.store');
     Route::delete('/addresses/{address}', [CustomerProfileController::class, 'destroyAddress'])->name('addresses.destroy');
-
-   // Route::get('/customer/my-orders', fn () => view('customer.profile.my_purchase'))->name('customer.my_purchase');
-
-    
 });
     
 
@@ -412,5 +419,7 @@ Route::get('/auth/google/callback', function () {
     return 'Google login successful (dev placeholder)';
 })->name('google.callback');
 
-});
+Route::middleware('auth')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
+
+
 

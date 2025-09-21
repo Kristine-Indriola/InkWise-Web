@@ -26,7 +26,6 @@ class Customer extends Model
         'gender',
     ];
 
-    
     // Relationships
     public function user()
     {
