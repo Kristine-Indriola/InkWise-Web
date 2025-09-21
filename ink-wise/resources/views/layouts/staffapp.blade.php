@@ -26,9 +26,9 @@
    
     <!-- Sidebar -->
     <aside class="w-64 bg-white border-r flex flex-col sidebar">
-      <div class="p-4 text-2xl font-bold text-purple-700 border-b flex items-center">
+      <div class="p-4 text-2xl font-bold text-purple-500 border-b flex items-center">
         <span class="logo-script text-4xl text-purple-500">I</span>
-        <span class="logo-serif text-2xl ml-1 text-blue-600">nkwise</span>
+        <span class="logo-serif text-2xl ml-1 text-blue-500">nkwise</span>
       </div>
 <!--
       <div class="p-4 flex items-center border-b">

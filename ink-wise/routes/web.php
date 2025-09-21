@@ -91,6 +91,7 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::get('/{user_id}/edit', [UserManagementController::class, 'edit'])->name('edit'); // Edit form 
     Route::put('/{user_id}', [UserManagementController::class, 'update'])->name('update'); // Update user 
     Route::delete('/{user_id}', [UserManagementController::class, 'destroy'])->name('destroy'); // Delete user 
+});
 
     });
   Route::prefix('users')->name('users.')->group(function () {
@@ -376,7 +377,6 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
 
         
 
-
     Route::prefix('inventory')->name('inventory.')->group(function () {
         Route::get('/', [StaffInventoryController::class, 'index'])->name('index');
         Route::get('/create', [StaffInventoryController::class, 'create'])->name('create');
@@ -411,3 +411,4 @@ Route::get('/auth/google/callback', function () {
     // dd($user);
     return 'Google login successful (dev placeholder)';
 })->name('google.callback');
+
