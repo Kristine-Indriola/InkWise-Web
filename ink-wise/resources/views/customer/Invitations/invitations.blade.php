@@ -104,7 +104,7 @@
                         <!-- Dropdown Menu -->
                         <div id="userDropdownMenu"
                              class="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg hidden border border-[#e0f7fa]">
-                            <a href="{{ route('customerprofile.dashboard') }}"
+                            <a href="{{ route('customer.dashboard') }}"
                                class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa]">Profile</a>
 
                             <!-- Logout -->

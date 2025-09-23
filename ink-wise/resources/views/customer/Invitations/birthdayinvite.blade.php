@@ -42,7 +42,7 @@
                         style="background-color:darkmagenta"></button>
             </div>
             <div class="text-center mt-4">
-                <a href="{{ route('customerprofile.orderform') }}">
+                <a href="{{ route('customer.profile.orderform') }}">
                     <button class="px-5 py-2 text-sm font-medium text-black border-2 border-cyan-400 rounded-full bg-white hover:bg-cyan-50 hover:border-cyan-500 transition">
                         Choose Template
                     </button>
@@ -76,7 +76,7 @@
                         style="background-color:#1649ff"></button>
             </div>
             <div class="text-center mt-4">
-                <a href="{{ route('customerprofile.orderform') }}">
+                <a href="{{ route('customer.profile.orderform') }}">
                     <button class="px-5 py-2 text-sm font-medium text-black border-2 border-cyan-400 rounded-full bg-white hover:bg-cyan-50 hover:border-cyan-500 transition">
                         Choose Template
                     </button>
@@ -110,7 +110,7 @@
                         style="background-color:navy"></button>
             </div>
             <div class="text-center mt-4">
-                <a href="{{ route('customerprofile.orderform') }}">
+                <a href="{{ route('customer.profile.orderform') }}">
                     <button class="px-5 py-2 text-sm font-medium text-black border-2 border-cyan-400 rounded-full bg-white hover:bg-cyan-50 hover:border-cyan-500 transition">
                         Choose Template
                     </button>

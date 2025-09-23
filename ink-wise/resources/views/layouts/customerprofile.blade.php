@@ -145,12 +145,12 @@
   <svg class="w-4 h-4 ml-auto transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"></path></svg>
   <!-- Dropdown -->
   <div class="absolute left-0 top-full mt-1 w-48 bg-white rounded shadow-lg z-10 hidden group-hover:block">
-    <a href="{{ route('customerprofile.settings', ['tab' => 'account']) }}"
+    <a href="{{ route('customer.profile.settings', ['tab' => 'account']) }}"
 
        class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] rounded transition">
       Account Settings
     </a>
-    <a href="{{ route('customerprofile.settings', ['tab' => 'privacy']) }}"
+    <a href="{{ route('customer.profile.settings', ['tab' => 'privacy']) }}"
 
        class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] rounded transition">
       Privacy Settings

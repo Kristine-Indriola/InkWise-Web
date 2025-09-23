@@ -226,9 +226,42 @@ Route::post('/customer/register', [CustomerAuthController::class, 'register'])->
 Route::get('/customer/login', [CustomerAuthController::class, 'showLogin'])->name('customer.login.form');
 Route::post('/customer/login', [CustomerAuthController::class, 'login'])->name('customer.login');
 Route::post('/customer/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
+
+Route::get('/customer/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');
+
+
+
+/**Customer Profile Pages*/
+Route::prefix('customerprofile')->group(function () {
+    // Addresses
+    Route::get('/addresses', [AddressController::class, 'profile'])->name('customer.profile.addresses');
+    Route::post('/addresses', [AddressController::class, 'store'])->name('customer.profile.addresses.store');
+    Route::post('/addresses/{address}/delete', [AddressController::class, 'destroy'])->name('customer.profile.addresses.destroy');
+    Route::post('/addresses/{address}/update', [AddressController::class, 'update'])->name('customer.profile.addresses.update');
+
+    // Profile, Settings, Order Form
+   Route::get('/', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
+    Route::get('/profile', [CustomerProfileController::class, 'edit'])->name('customer.profile.edit');
+    Route::post('/profile', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
+// Other pages
+Route::get('/settings', fn () => view('customer.profile.settings'))->name('customer.profile.settings');
+Route::get('/order', fn () => view('customer.profile.orderform'))->name('custome.rprofile.orderform');
+
+});
+
 Route::middleware('auth')->get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');  // Protected
 
+
 // My Purchases
+
+
+
+
+/** Profile & Addresses (Protected) */
+/*Route::middleware(['auth:customer'])->prefix('customer/profile')->name('customer.profile.')->group(function () {
+    Route::get('/', [CustomerProfileController::class, 'update'])->name('index');
+    Route::get('/', [CustomerProfileController::class, 'edit'])
+        ->name('edit');
 
 Route::middleware('auth')->get('/customer/my-purchase', function () {
     return view('customer.profile.my_purchase');
@@ -243,6 +276,7 @@ Route::middleware('auth')->get('/customer/profile/settings', function (\Illumina
 
 // My Purchases
 
+
 Route::middleware('auth')->prefix('customer/profile')->name('customer.profile.')->group(function () {  // Protected group
     // Profile routes
     Route::get('/', [CustomerProfileController::class, 'index'])->name('index'); 
@@ -253,6 +287,10 @@ Route::middleware('auth')->prefix('customer/profile')->name('customer.profile.')
     Route::get('/addresses', [CustomerProfileController::class, 'addresses'])->name('addresses');
     Route::post('/addresses/store', [CustomerProfileController::class, 'storeAddress'])->name('addresses.store');
     Route::delete('/addresses/{address}', [CustomerProfileController::class, 'destroyAddress'])->name('addresses.destroy');
+
+});*/
+
+
 });
     
 
@@ -261,6 +299,7 @@ Route::middleware('auth')->prefix('customer/profile')->name('customer.profile.')
 /*Route::middleware(['auth:customer'])->group(function () {
     Route::put('/customer/profile/update', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
 });*/
+
 
 
 

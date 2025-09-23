@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Storage;
 
 class CustomerProfileController extends Controller
 {
+
     // --- Profile Methods ---
     public function index()
     {
@@ -17,17 +18,37 @@ class CustomerProfileController extends Controller
         return view('customer.profile.index', compact('customer'));
     }
 
+
     public function edit()
     {
         $user = Auth::user();
         $customer = $user->customer;
         $address = $user->address;
 
+
+        return view('customer.profile.index', compact('customer', 'address'));
+
         return view('customer.profile.update', compact('customer', 'address'));
+
     }
 
     public function update(Request $request)
     {
+
+        $user = Auth::user();
+        $customer = $user->customer;
+
+        $validated = $request->validate([
+            'first_name' => 'required|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'email' => 'required|email|max:255',
+            'phone' => 'nullable|string|max:20',
+            'birthdate' => 'nullable|date',
+            'gender' => 'nullable|string|in:male,female,other',
+            'photo' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'remove_photo' => 'nullable|boolean',
+        ]);
         $request->validate([
             'first_name'  => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
@@ -43,6 +64,7 @@ class CustomerProfileController extends Controller
         $customer = $user->customer;
 
         $user->update(['email' => $request->email]);
+
 
         // Handle photo removal
         if ($request->boolean('remove_photo')) {
