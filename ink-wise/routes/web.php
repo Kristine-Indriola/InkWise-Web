@@ -91,6 +91,7 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::get('/{user_id}/edit', [UserManagementController::class, 'edit'])->name('edit'); // Edit form 
     Route::put('/{user_id}', [UserManagementController::class, 'update'])->name('update'); // Update user 
     Route::delete('/{user_id}', [UserManagementController::class, 'destroy'])->name('destroy'); // Delete user 
+});
 
     });
   Route::prefix('users')->name('users.')->group(function () {
@@ -158,7 +159,7 @@ Route::prefix('users')->name('users.')->group(function () {
     // Optional: Inventory export
     Route::get('reports/inventory/export/{type}', [ReportsDashboardController::class, 'exportInventory'])
          ->name('reports.inventory.export');
-});
+
 
 
 
@@ -213,8 +214,8 @@ Route::get('/auth/google/callback', function () {
 */
 
 /**Dashboard & Home*/
-Route::get('/', fn () => view('customer.dashboard'))->name('dashboard');
-Route::get('/dashboard', fn () => view('customer.dashboard'))->name('customer.dashboard');
+Route::get('/', fn () => view('customer.dashboard'))->name('dashboard');  // Public
+Route::middleware('auth')->get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');  // Protected
 Route::get('/search', function (\Illuminate\Http\Request $request) {
     return 'Search for: ' . e($request->query('query', ''));
 })->name('search');
@@ -225,6 +226,7 @@ Route::post('/customer/register', [CustomerAuthController::class, 'register'])->
 Route::get('/customer/login', [CustomerAuthController::class, 'showLogin'])->name('customer.login.form');
 Route::post('/customer/login', [CustomerAuthController::class, 'login'])->name('customer.login');
 Route::post('/customer/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
+
 Route::get('/customer/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');
 
 
@@ -247,8 +249,11 @@ Route::get('/order', fn () => view('customer.profile.orderform'))->name('custome
 
 });
 
+Route::middleware('auth')->get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');  // Protected
+
+
 // My Purchases
-Route::get('/customer/my-orders', fn () => view('customer.profile.my_purchase'))->name('customer.my_purchase');
+
 
 
 
@@ -258,12 +263,41 @@ Route::get('/customer/my-orders', fn () => view('customer.profile.my_purchase'))
     Route::get('/', [CustomerProfileController::class, 'edit'])
         ->name('edit');
 
+Route::middleware('auth')->get('/customer/my-purchase', function () {
+    return view('customer.profile.my_purchase');
+})->name('customer.my_purchase');
 
-    // Addresses
+// Settings (with optional tab)
+Route::middleware('auth')->get('/customer/profile/settings', function (\Illuminate\Http\Request $request) {
+    $tab = $request->query('tab', 'account');
+    return view('customer.profile.settings', compact('tab'));
+})->name('customerprofile.settings');
+
+
+// My Purchases
+
+
+Route::middleware('auth')->prefix('customer/profile')->name('customer.profile.')->group(function () {  // Protected group
+    // Profile routes
+    Route::get('/', [CustomerProfileController::class, 'index'])->name('index'); 
+    Route::get('/edit', [CustomerProfileController::class, 'edit'])->name('edit');  // Matches view
+    Route::put('/update', [CustomerProfileController::class, 'update'])->name('update');  // Add if missing
+
+    // Address routes
     Route::get('/addresses', [CustomerProfileController::class, 'addresses'])->name('addresses');
     Route::post('/addresses/store', [CustomerProfileController::class, 'storeAddress'])->name('addresses.store');
-    Route::post('/addresses/{address}/update', [CustomerProfileController::class, 'updateAddress'])->name('addresses.update');
     Route::delete('/addresses/{address}', [CustomerProfileController::class, 'destroyAddress'])->name('addresses.destroy');
+
+});*/
+
+
+});
+    
+
+
+// Profile update (protected)
+/*Route::middleware(['auth:customer'])->group(function () {
+    Route::put('/customer/profile/update', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
 });*/
 
 
@@ -389,7 +423,6 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
 
         
 
-
     Route::prefix('inventory')->name('inventory.')->group(function () {
         Route::get('/', [StaffInventoryController::class, 'index'])->name('index');
         Route::get('/create', [StaffInventoryController::class, 'create'])->name('create');
@@ -424,3 +457,8 @@ Route::get('/auth/google/callback', function () {
     // dd($user);
     return 'Google login successful (dev placeholder)';
 })->name('google.callback');
+
+Route::middleware('auth')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
+
+
+

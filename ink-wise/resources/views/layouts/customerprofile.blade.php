@@ -24,6 +24,7 @@
     <!-- Alpine.js for interactivity -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.10.2/cdn.min.js" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Dancing+Script&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="{{ asset('adminimage/ink.png') }}">
     
 </head>
 
@@ -171,5 +172,115 @@
       @yield('content')
     </section>
   </main>
-</body>
-</html>
+
+  <!-- Floating Chat Button & Chat Modal -->
+<div id="chatFloatingBtn"
+     class="fixed bottom-6 right-6 z-50">
+    <button class="bg-[#94b9ff] hover:bg-[#6fa3ff] text-white rounded-full shadow-lg p-4 flex items-center justify-center transition duration-300"
+            onclick="document.getElementById('chatModal').classList.remove('hidden'); document.getElementById('chatFloatingBtn').classList.add('hidden');">
+        <!-- Chat Icon -->
+        <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+    </button>
+</div>
+
+<div id="chatModal"
+     class="fixed bottom-6 right-6 z-50 hidden">
+    <div id="chatBox"
+         class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-4 relative transition-all duration-300 resize"
+         style="max-height: 400px; min-height: 300px; min-width: 320px; width: 100%;">
+        <!-- Minimize button -->
+        <button onclick="document.getElementById('chatModal').classList.add('hidden'); document.getElementById('chatFloatingBtn').classList.remove('hidden');"
+                class="absolute top-2 right-2 text-gray-400 hover:text-[#94b9ff] transition text-base font-bold" title="Minimize">
+            &#8211;
+        </button>
+        <!-- Expand/Shrink button -->
+        <button id="toggleChatSize"
+                onclick="toggleChatSize()"
+                class="absolute top-2 right-10 text-gray-400 hover:text-[#94b9ff] transition text-base font-bold" title="Expand/Shrink">
+            <svg id="expandIcon" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M4 8V4h4M20 16v4h-4M4 16v4h4M20 8V4h-4"/>
+            </svg>
+        </button>
+        <!-- Chat Header -->
+        <div class="text-center mb-2">
+            <h3 class="text-lg font-bold text-[#94b9ff]">Message Chat</h3>
+            <p class="text-xs text-gray-500">Chat with staff for support</p>
+        </div>
+        <!-- Chat Messages (placeholder) -->
+        <div id="chatPlaceholder" class="overflow-y-auto mb-3 flex flex-col justify-center items-center"
+             style="max-height: 320px; min-height: 220px;">
+            <div class="text-lg text-gray-600 mb-2 bg-[#eaf2ff] rounded-lg px-8 py-12 w-full text-center font-semibold">
+                Staff: Hello! How can I help you?<br>
+                <span class="text-base text-gray-400">Your messages will appear here.</span>
+            </div>
+        </div>
+        <!-- Chat Input -->
+        <form class="flex gap-2">
+            <input type="text" placeholder="Type your message..." class="flex-1 border rounded-lg px-4 py-3 text-base focus:outline-none focus:ring focus:ring-[#94b9ff]">
+            <button type="submit" class="bg-[#94b9ff] text-white px-4 py-2 rounded-lg text-base font-semibold hover:bg-[#6fa3ff]">Send</button>
+        </form>
+        <!-- Drag Handle for Resizing -->
+        <div id="chatResizeHandle"
+             class="absolute bottom-2 right-2 w-5 h-5 cursor-nwse-resize z-50"
+             style="background: transparent;">
+            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M20 20L4 4"/>
+            </svg>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleChatSize() {
+    const chatBox = document.getElementById('chatBox');
+    const chatPlaceholder = document.getElementById('chatPlaceholder');
+    const expandIcon = document.getElementById('expandIcon');
+    if (chatBox.classList.contains('max-w-sm')) {
+        chatBox.classList.remove('max-w-sm');
+        chatBox.classList.add('max-w-xl');
+        chatBox.style.maxHeight = '700px';
+        chatBox.style.minHeight = '400px';
+        chatPlaceholder.style.maxHeight = '600px';
+        chatPlaceholder.style.minHeight = '320px';
+        expandIcon.style.transform = 'rotate(180deg)';
+    } else {
+        chatBox.classList.remove('max-w-xl');
+        chatBox.classList.add('max-w-sm');
+        chatBox.style.maxHeight = '400px';
+        chatBox.style.minHeight = '300px';
+        chatPlaceholder.style.maxHeight = '320px';
+        chatPlaceholder.style.minHeight = '220px';
+        expandIcon.style.transform = 'rotate(0deg)';
+    }
+}
+
+// Mouse drag to resize chat
+const chatBox = document.getElementById('chatBox');
+const chatResizeHandle = document.getElementById('chatResizeHandle');
+let isResizing = false, lastX = 0, lastY = 0, startWidth = 0, startHeight = 0;
+
+chatResizeHandle.addEventListener('mousedown', function(e) {
+    isResizing = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    startWidth = chatBox.offsetWidth;
+    startHeight = chatBox.offsetHeight;
+    document.body.style.userSelect = 'none';
+});
+
+window.addEventListener('mousemove', function(e) {
+    if (!isResizing) return;
+    let newWidth = Math.max(320, startWidth + (e.clientX - lastX));
+    let newHeight = Math.max(300, startHeight + (e.clientY - lastY));
+    chatBox.style.width = newWidth + 'px';
+    chatBox.style.maxHeight = newHeight + 'px';
+    chatBox.style.minHeight = Math.min(newHeight, 700) + 'px';
+});
+
+window.addEventListener('mouseup', function() {
+    isResizing = false;
+    document.body.style.userSelect = '';
+});
+</script>

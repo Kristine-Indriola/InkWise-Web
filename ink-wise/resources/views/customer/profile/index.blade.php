@@ -5,7 +5,11 @@
 @section('content')
 <div class="card bg-white p-6 md:p-8 border border-gray-100">
   <h2 class="text-xl font-semibold mb-6">Profile Photo</h2>
+
   <form method="POST" action="{{ route('customer.profile.update') }}" enctype="multipart/form-data">
+
+  <form method="POST" action="{{ route('customer.profile.index') }}" enctype="multipart/form-data">
+
     @csrf
     @method('PUT')
 

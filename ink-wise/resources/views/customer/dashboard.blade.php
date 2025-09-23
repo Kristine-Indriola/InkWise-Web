@@ -15,6 +15,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Custom CSS -->
+
     <link rel="stylesheet" href="{{ asset('css/customer/customer.css') }}">
     <link rel="stylesheet" href="{{ asset('css/customer/customertemplates.css') }}">
     <link rel="stylesheet" href="{{ asset('css/customer/template.css') }}">
@@ -27,6 +28,7 @@
     <!-- Alpine.js for interactivity -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.10.2/cdn.min.js" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Dancing+Script&display=swap" rel="stylesheet">
+      <link rel="icon" type="image/png" href="{{ asset('adminimage/ink.png') }}">
 </head>
 <body id="dashboard" class="antialiased bg-white">
 
@@ -50,6 +52,7 @@
         </nav>
 
         <!-- Search + Sign Up / customer Name -->
+
 <div class="flex items-center space-x-4 relative min-w-0">
     <!-- Search Form -->
     <form action="{{ url('/search') }}" method="GET" class="hidden md:flex">
@@ -104,6 +107,57 @@
                     </button>
                 </form>
             </div>
+
+        <div class="flex items-center space-x-4 relative min-w-0">
+            <!-- Search Form -->
+            <form action="{{ url('/search') }}" method="GET" class="hidden md:flex">
+                <input type="text" name="query" placeholder="Search..." 
+                       class="border rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring focus:ring-[#06b6d4]">
+            </form>
+  
+   {{-- If not logged in --}}
+@guest
+    <a href="{{ route('customer.login') }}"
+       id="openLogin"
+       class="text-white px-5 py-2 font-semibold animate-ocean rounded-full"
+       style="font-family: 'Seasons', serif;">
+       Sign in
+    </a>
+@endguest
+
+{{-- If logged in --}}
+@auth
+    <div class="relative min-w-0 group">
+        <button id="userDropdownBtn" class="flex items-center space-x-2 text-gray-700 hover:text-gray-900">
+            {{-- Display customer's name or fallback --}}
+            <span>{{ Auth::user()->customer?->first_name ?? Auth::user()->email ?? 'Customer' }}</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+        </button>
+
+        <!-- Dropdown Menu -->
+        <div id="userDropdownMenu"
+             class="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-200 z-50 hidden group-hover:block">
+            <!-- Profile -->
+            <a href="{{ route('customer.profile.index') }}"
+               class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] transition-colors">
+                My Account
+            </a>
+            <!-- My Purchase (no link) -->
+            <div class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] cursor-pointer transition-colors">
+                My Purchase
+            </div>
+            <!-- My Favorites (no link) -->
+            <div class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] cursor-pointer transition-colors">
+                My Favorites
+            </div>
+            <!-- Logout -->
+            <form method="POST" action="{{ route('customer.logout') }}">
+    @csrf
+    <button type="submit" class="block w-full text-left px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] transition-colors">Logout</button>
+</form>
+
         </div>
     @endauth
 </div>
