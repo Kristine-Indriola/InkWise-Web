@@ -47,7 +47,8 @@ class CustomerAuthController extends Controller
         ]);
 
         // 3️⃣ Login customer
-        Auth::login($user);
+        auth()->login($user);
+
 
         return redirect()->route('customer.dashboard');
     }
@@ -56,13 +57,11 @@ class CustomerAuthController extends Controller
     {
         $credentials = $request->only('email', 'password');
 
-        if (Auth::guard('customer')->attempt($credentials)) {
-            // Login successful
-            return redirect()->intended('/dashboard');  // Or wherever
+        if (Auth::attempt($credentials)) {
+            return redirect()->route('customer.dashboard');
         }
 
-        // Handle failure
-        return back()->withErrors(['email' => 'Invalid credentials']);
+        return back()->withErrors(['email' => 'Invalid email or password']);
     }
 
     public function dashboard()

@@ -16,7 +16,7 @@
         <h3 class="text-xl font-semibold mb-4" style="font-family: 'Playfair Display', serif;">Merwen Printing Services – InkWise</h3>
         <p class="mb-3"><strong>📍 Address:</strong> 123 Rue de Paris, 75001 Paris, France</p>
         <p class="mb-3"><strong>📞 Phone:</strong> +33 1 23 45 67 89</p>
-        <p class="mb-3"><strong>✉️ Email:</strong> support@inkwise-paris.com</p>
+        <p class="mb-3"><strong>✉️ Email:</strong> InkwiseSystem@gmail.com</p>
         <p><strong>🕒 Business Hours:</strong><br>Monday – Saturday: 9:00 AM – 7:00 PM</p>
       </div>
 

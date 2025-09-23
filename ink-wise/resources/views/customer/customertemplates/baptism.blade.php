@@ -68,7 +68,8 @@
         <div id="userDropdownMenu"
              class="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg hidden">
             <!-- Profile -->
-            <a href="{{ route('customerprofile.dashboard') }}"
+            <a href="{{ route('customer.dashboard') }}"
+
                class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
                 Profile
             </a>

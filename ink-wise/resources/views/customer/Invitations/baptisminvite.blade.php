@@ -51,7 +51,7 @@
 
             <!-- Button -->
             <div class="text-center mt-4">
-                <a href="{{ route('customerprofile.orderform') }}">
+                <a href="{{ route('customer.profile.orderform') }}">
                     <button class="px-5 py-2 text-sm font-medium text-[#06b6d4] border-2 border-[#06b6d4] rounded-full bg-white hover:bg-[#e0f7fa] hover:border-[#0891b2] transition">
                         Choose Template
                     </button>
@@ -92,7 +92,7 @@
 
             <!-- Button -->
             <div class="text-center mt-4">
-                <a href="{{ route('customerprofile.orderform') }}">
+                <a href="{{ route('customer.profile.orderform') }}">
                     <button class="px-5 py-2 text-sm font-medium text-[#06b6d4] border-2 border-[#06b6d4] rounded-full bg-white hover:bg-[#e0f7fa] hover:border-[#0891b2] transition">
                         Choose Template
                     </button>
@@ -133,7 +133,7 @@
 
             <!-- Button -->
             <div class="text-center mt-4">
-                <a href="{{ route('customerprofile.orderform') }}">
+                <a href="{{ route('customer.profile.orderform') }}">
                     <button class="px-5 py-2 text-sm font-medium text-[#06b6d4] border-2 border-[#06b6d4] rounded-full bg-white hover:bg-[#e0f7fa] hover:border-[#0891b2] transition">
                         Choose Template
                     </button>

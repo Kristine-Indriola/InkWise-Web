@@ -12,8 +12,6 @@
     </style>
 @endsection
 
-
-
 @section('content')
 <div class="card bg-white p-6 md:p-8 border border-gray-100">
     <div class="flex items-center justify-between mb-6">
@@ -69,16 +67,14 @@
             <h3 class="text-lg font-semibold mb-4">Add New Address</h3>
 
             <form method="POST" action="{{ route('customer.profile.addresses.store') }}">
-
-            <form method="POST" action="{{ route('customer.profile.addresses.store') }}">
-
                 @csrf
-                        <input type="text" name="full_name" class="w-full border rounded px-3 py-2" value="{{ auth()->user()->name }}" required>
-                    </div>
-                    <div>
-                        <label class="block text-sm mb-1">Phone Number</label>
-                        <input type="text" name="phone" class="w-full border rounded px-3 py-2" value="{{ auth()->user()->phone ?? '' }}" required>
-                    </div>
+                <div class="mb-3">
+                    <label class="block text-sm mb-1">Full Name</label>
+                    <input type="text" name="full_name" class="w-full border rounded px-3 py-2" value="{{ auth()->user()->name }}" required>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm mb-1">Phone Number</label>
+                    <input type="text" name="phone" class="w-full border rounded px-3 py-2" value="{{ auth()->user()->phone ?? '' }}" required>
                 </div>
                 <div class="mb-3">
                     <label class="block text-sm mb-1">Region</label>
@@ -126,115 +122,187 @@
             </form>
         </div>
     </div>
+
+    <!-- Edit Address Modal -->
+    <div id="editAddressModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 hidden">
+        <div class="address-form-modal bg-white rounded-lg shadow-lg p-6 w-full max-w-md mx-auto relative">
+            <button id="closeEditAddress" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 text-xl font-bold">✖</button>
+            <h3 class="text-lg font-semibold mb-4">Edit Address</h3>
+
+            <form method="POST" id="editAddressForm">
+                @csrf
+                <div class="mb-3">
+                    <label class="block text-sm mb-1">Full Name</label>
+                    <input type="text" name="full_name" id="edit_full_name" class="w-full border rounded px-3 py-2" required>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm mb-1">Phone Number</label>
+                    <input type="text" name="phone" id="edit_phone" class="w-full border rounded px-3 py-2" required>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm mb-1">Region</label>
+                    <input type="text" name="region" id="edit_region" class="w-full border rounded px-3 py-2" required>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm mb-1">Province</label>
+                    <input type="text" name="province" id="edit_province" class="w-full border rounded px-3 py-2" required>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm mb-1">City</label>
+                    <input type="text" name="city" id="edit_city" class="w-full border rounded px-3 py-2" required>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm mb-1">Barangay</label>
+                    <input type="text" name="barangay" id="edit_barangay" class="w-full border rounded px-3 py-2" required>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm mb-1">Postal Code</label>
+                    <input type="text" name="postal_code" id="edit_postal_code" class="w-full border rounded px-3 py-2" required>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm mb-1">Street</label>
+                    <input type="text" name="street" id="edit_street" class="w-full border rounded px-3 py-2" required>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm mb-1">Label as</label>
+                    <select name="label" id="edit_label" class="w-full border rounded px-3 py-2" required>
+                        <option value="Home">Home</option>
+                        <option value="Work">Work</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-2 mt-4">
+                    <button type="button" id="closeEditAddress2" class="px-5 py-2 rounded border border-[#a6b7ff] text-[#a6b7ff] bg-white hover:bg-[#d3b7ff]">Cancel</button>
+                    <button type="submit" class="bg-[#a6b7ff] hover:bg-[#bce6ff] text-white px-5 py-2 rounded">Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
-<!-- JS for Dynamic Region/Province/City/Barangay -->
+<!-- JS -->
 <script>
 document.addEventListener("DOMContentLoaded", function () {
+    // ---------------- Add Modal ----------------
+    const addBtn = document.getElementById("addAddressBtn");
+    const addModal = document.getElementById("addAddressModal");
+    const closeAddBtn = document.getElementById("closeAddAddress");
+    const closeAddBtn2 = document.getElementById("closeAddAddress2");
+
+    if (addBtn) addBtn.addEventListener("click", () => addModal.classList.remove("hidden"));
+    if (closeAddBtn) closeAddBtn.addEventListener("click", () => addModal.classList.add("hidden"));
+    if (closeAddBtn2) closeAddBtn2.addEventListener("click", () => addModal.classList.add("hidden"));
+
+    // ---------------- Edit Modal ----------------
+    const editModal = document.getElementById("editAddressModal");
+    const closeEditBtn = document.getElementById("closeEditAddress");
+    const closeEditBtn2 = document.getElementById("closeEditAddress2");
+    const editForm = document.getElementById("editAddressForm");
+
+    document.querySelectorAll(".edit-address-btn").forEach(button => {
+        button.addEventListener("click", () => {
+            const address = JSON.parse(button.dataset.address);
+
+            // Fill form values
+            document.getElementById("edit_full_name").value = address.full_name ?? '';
+            document.getElementById("edit_phone").value = address.phone ?? '';
+            document.getElementById("edit_region").value = address.region ?? '';
+            document.getElementById("edit_province").value = address.province ?? '';
+            document.getElementById("edit_city").value = address.city ?? '';
+            document.getElementById("edit_barangay").value = address.barangay ?? '';
+            document.getElementById("edit_postal_code").value = address.postal_code ?? '';
+            document.getElementById("edit_street").value = address.street ?? '';
+            document.getElementById("edit_label").value = address.label ?? 'Home';
+
+            // Update form action
+            editForm.action = `/customerprofile/addresses/${address.address_id}/update`;
+
+            editModal.classList.remove("hidden");
+        });
+    });
+
+    if (closeEditBtn) closeEditBtn.addEventListener("click", () => editModal.classList.add("hidden"));
+    if (closeEditBtn2) closeEditBtn2.addEventListener("click", () => editModal.classList.add("hidden"));
+
+    // ---------------- PSGC Dropdowns ----------------
     const regionSelect = document.getElementById("region");
     const provinceSelect = document.getElementById("province");
     const citySelect = document.getElementById("city");
     const barangaySelect = document.getElementById("barangay");
 
-    // Load regions
-    fetch("https://psgc.gitlab.io/api/regions/")
-        .then(res => res.json())
-        .then(data => {
-            data.forEach(region => {
-                let option = document.createElement("option");
-                option.value = region.name; // store name instead of code
-                option.textContent = region.name;
-                option.dataset.code = region.code; // keep code if needed
-                regionSelect.appendChild(option);
+    if (regionSelect) {
+        // Load regions
+        fetch("https://psgc.gitlab.io/api/regions/")
+            .then(res => res.json())
+            .then(data => {
+                data.forEach(region => {
+                    let option = document.createElement("option");
+                    option.value = region.name;
+                    option.textContent = region.name;
+                    option.dataset.code = region.code;
+                    regionSelect.appendChild(option);
+                });
             });
+
+        // Provinces
+        regionSelect.addEventListener("change", function () {
+            provinceSelect.innerHTML = '<option value="">Select Province</option>';
+            citySelect.innerHTML = '<option value="">Select City</option>';
+            barangaySelect.innerHTML = '<option value="">Select Barangay</option>';
+            let selected = regionSelect.selectedOptions[0];
+            if (selected && selected.dataset.code) {
+                fetch(`https://psgc.gitlab.io/api/regions/${selected.dataset.code}/provinces/`)
+                    .then(res => res.json())
+                    .then(data => {
+                        data.forEach(province => {
+                            let option = document.createElement("option");
+                            option.value = province.name;
+                            option.textContent = province.name;
+                            option.dataset.code = province.code;
+                            provinceSelect.appendChild(option);
+                        });
+                    });
+            }
         });
 
-    // Provinces
-    regionSelect.addEventListener("change", function () {
-        provinceSelect.innerHTML = '<option value="">Select Province</option>';
-        citySelect.innerHTML = '<option value="">Select City</option>';
-        barangaySelect.innerHTML = '<option value="">Select Barangay</option>';
-        let selected = regionSelect.selectedOptions[0];
-        if (selected && selected.dataset.code) {
-            fetch(`https://psgc.gitlab.io/api/regions/${selected.dataset.code}/provinces/`)
-                .then(res => res.json())
-                .then(data => {
-                    data.forEach(province => {
-                        let option = document.createElement("option");
-                        option.value = province.name;
-                        option.textContent = province.name;
-                        option.dataset.code = province.code;
-                        provinceSelect.appendChild(option);
+        // Cities
+        provinceSelect.addEventListener("change", function () {
+            citySelect.innerHTML = '<option value="">Select City</option>';
+            barangaySelect.innerHTML = '<option value="">Select Barangay</option>';
+            let selected = provinceSelect.selectedOptions[0];
+            if (selected && selected.dataset.code) {
+                fetch(`https://psgc.gitlab.io/api/provinces/${selected.dataset.code}/cities-municipalities/`)
+                    .then(res => res.json())
+                    .then(data => {
+                        data.forEach(city => {
+                            let option = document.createElement("option");
+                            option.value = city.name;
+                            option.textContent = city.name;
+                            option.dataset.code = city.code;
+                            citySelect.appendChild(option);
+                        });
                     });
-                });
-        }
-    });
-
-    // Cities
-    provinceSelect.addEventListener("change", function () {
-        citySelect.innerHTML = '<option value="">Select City</option>';
-        barangaySelect.innerHTML = '<option value="">Select Barangay</option>';
-        let selected = provinceSelect.selectedOptions[0];
-        if (selected && selected.dataset.code) {
-            fetch(`https://psgc.gitlab.io/api/provinces/${selected.dataset.code}/cities-municipalities/`)
-                .then(res => res.json())
-                .then(data => {
-                    data.forEach(city => {
-                        let option = document.createElement("option");
-                        option.value = city.name;
-                        option.textContent = city.name;
-                        option.dataset.code = city.code;
-                        citySelect.appendChild(option);
-                    });
-                });
-        }
-    });
-
-    // Barangays
-    citySelect.addEventListener("change", function () {
-        barangaySelect.innerHTML = '<option value="">Select Barangay</option>';
-        let selected = citySelect.selectedOptions[0];
-        if (selected && selected.dataset.code) {
-            fetch(`https://psgc.gitlab.io/api/cities-municipalities/${selected.dataset.code}/barangays/`)
-                .then(res => res.json())
-                .then(data => {
-                    data.forEach(barangay => {
-                        let option = document.createElement("option");
-                        option.value = barangay.name;
-                        option.textContent = barangay.name;
-                        barangaySelect.appendChild(option);
-                    });
-                });
-        }
-    });
-});
-
-
-document.addEventListener("DOMContentLoaded", function () {
-    // ...existing region/province/city/barangay JS...
-
-    // Modal logic for Add Address
-    const addBtn = document.getElementById("addAddressBtn");
-    const modal = document.getElementById("addAddressModal");
-    const closeBtn = document.getElementById("closeAddAddress");
-    const closeBtn2 = document.getElementById("closeAddAddress2");
-
-    if (addBtn && modal) {
-        addBtn.addEventListener("click", function () {
-            modal.classList.remove("hidden");
+            }
         });
-    }
-    if (closeBtn && modal) {
-        closeBtn.addEventListener("click", function () {
-            modal.classList.add("hidden");
-        });
-    }
-    if (closeBtn2 && modal) {
-        closeBtn2.addEventListener("click", function () {
-            modal.classList.add("hidden");
+
+        // Barangays
+        citySelect.addEventListener("change", function () {
+            barangaySelect.innerHTML = '<option value="">Select Barangay</option>';
+            let selected = citySelect.selectedOptions[0];
+            if (selected && selected.dataset.code) {
+                fetch(`https://psgc.gitlab.io/api/cities-municipalities/${selected.dataset.code}/barangays/`)
+                    .then(res => res.json())
+                    .then(data => {
+                        data.forEach(barangay => {
+                            let option = document.createElement("option");
+                            option.value = barangay.name;
+                            option.textContent = barangay.name;
+                            barangaySelect.appendChild(option);
+                        });
+                    });
+            }
         });
     }
 });
-
 </script>
+
 @endsection

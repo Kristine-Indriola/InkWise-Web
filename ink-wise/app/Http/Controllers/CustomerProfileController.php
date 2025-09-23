@@ -8,49 +8,6 @@ use App\Models\Address;
 
 class CustomerProfileController extends Controller
 {
-    // --- Profile Methods ---
-
-   public function edit()
-{
-    $user = Auth::user();
-    $customer = $user->customer;
-    $address = $user->address;
-
-    return view('customer.profile.update', compact('customer', 'address'));
-}
-
-    public function update(Request $request)
-    {
-        $request->validate([
-            'first_name'  => 'required|string|max:255',
-            'middle_name' => 'nullable|string|max:255',
-            'last_name'   => 'required|string|max:255',
-            'email'       => 'required|email|max:255',
-            'phone'       => 'nullable|string|max:255',
-            'birthdate'   => 'nullable|date',
-            'gender'      => 'nullable|in:male,female,other',
-            'photo'       => 'nullable|image|max:2048',
-        ]);
-
-        $user = Auth::user();
-        $customer = $user->customer;
-
-        $user->update(['email' => $request->email]);
-        $customer->update([
-            'first_name'     => $request->first_name,
-            'middle_name'    => $request->middle_name,
-            'last_name'      => $request->last_name,
-            'contact_number' => $request->phone,
-            'date_of_birth'  => $request->birthdate,
-            'gender'         => $request->gender,
-            'photo'          => $request->hasFile('photo')
-                                    ? $request->file('photo')->store('avatars', 'public')
-                                    : $customer->photo,
-        ]);
-
-        $user->refresh(); // makes sure Auth::user()->customer is updated
-    return back()->with('status', 'Profile updated successfully!');
-    }
 
     public function edit()
     {
@@ -58,7 +15,7 @@ class CustomerProfileController extends Controller
         $customer = $user->customer;
         $address = $user->address;
 
-        return view('customerprofile.profile', compact('customer', 'address'));
+        return view('customer.profile.index', compact('customer', 'address'));
     }
 
     public function update(Request $request)

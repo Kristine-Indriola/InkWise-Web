@@ -225,7 +225,7 @@ Route::post('/customer/register', [CustomerAuthController::class, 'register'])->
 Route::get('/customer/login', [CustomerAuthController::class, 'showLogin'])->name('customer.login.form');
 Route::post('/customer/login', [CustomerAuthController::class, 'login'])->name('customer.login');
 Route::post('/customer/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
-Route::get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');
+Route::get('/customer/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');
 
 
 
@@ -238,42 +238,25 @@ Route::prefix('customerprofile')->group(function () {
     Route::post('/addresses/{address}/update', [AddressController::class, 'update'])->name('customer.profile.addresses.update');
 
     // Profile, Settings, Order Form
-    Route::get('/profile', fn () => view('customer.profile.update'))->name('customerprofile.profile');
-    Route::get('/settings', fn () => view('customer.profile.settings'))->name('customerprofile.settings');
-    Route::get('/order', fn () => view('customer.profile.orderform'))->name('customerprofile.orderform');
+   Route::get('/', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
+    Route::get('/profile', [CustomerProfileController::class, 'edit'])->name('customer.profile.edit');
+    Route::post('/profile', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
+// Other pages
+Route::get('/settings', fn () => view('customer.profile.settings'))->name('customer.profile.settings');
+Route::get('/order', fn () => view('customer.profile.orderform'))->name('custome.rprofile.orderform');
+
 });
 
 // My Purchases
 Route::get('/customer/my-orders', fn () => view('customer.profile.my_purchase'))->name('customer.my_purchase');
 
-// Customer Profile pages
-Route::middleware(['auth:customer'])->group(function () {
 
-
-
-    /*  Route::get('/customer/profile', [CustomerProfileController::class, 'edit'])
-        ->name('customer.profile.edit');
-
-    // Update profile
-    Route::post('/customer/profile/update', [CustomerProfileController::class, 'update'])
-        ->name('customer.profile.update');
-
-
-     Route::get('/customer/addresses', [CustomerProfileController::class, 'addresses'])
-        ->name('customerprofile.addresses');
-    
-    Route::post('/customer/addresses/store', [CustomerProfileController::class, 'storeAddress'])
-        ->name('customerprofile.addresses.store');
-    Route::post('/customer/addresses/{address}/update', [CustomerProfileController::class, 'updateAddress'])
-        ->name('customerprofile.addresses.update');
-    Route::delete('/customer/addresses/{address}', [CustomerProfileController::class, 'destroyAddress'])
-        ->name('customerprofile.addresses.destroy');
-
-    */
 
 /** Profile & Addresses (Protected) */
-Route::middleware(['auth:customer'])->prefix('customer/profile')->name('customer.profile.')->group(function () {
+/*Route::middleware(['auth:customer'])->prefix('customer/profile')->name('customer.profile.')->group(function () {
     Route::get('/', [CustomerProfileController::class, 'update'])->name('index');
+    Route::get('/', [CustomerProfileController::class, 'edit'])
+        ->name('edit');
 
 
     // Addresses
@@ -281,30 +264,8 @@ Route::middleware(['auth:customer'])->prefix('customer/profile')->name('customer
     Route::post('/addresses/store', [CustomerProfileController::class, 'storeAddress'])->name('addresses.store');
     Route::post('/addresses/{address}/update', [CustomerProfileController::class, 'updateAddress'])->name('addresses.update');
     Route::delete('/addresses/{address}', [CustomerProfileController::class, 'destroyAddress'])->name('addresses.destroy');
-});
+});*/
 
-Route::post('/', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
-Route::get('/', [CustomerProfileController::class, 'update'])->name('index');
-
-
-     Route::get('/customer/addresses', [CustomerProfileController::class, 'addresses'])
-        ->name('customerprofile.addresses');
-    
-    Route::post('/customer/addresses/store', [CustomerProfileController::class, 'storeAddress'])
-        ->name('customerprofile.addresses.store');
-    Route::post('/customer/addresses/{address}/update', [CustomerProfileController::class, 'updateAddress'])
-        ->name('customerprofile.addresses.update');
-    Route::delete('/customer/addresses/{address}', [CustomerProfileController::class, 'destroyAddress'])
-        ->name('customerprofile.addresses.destroy');
-
-    
-    
-
-
-// Profile update (protected)
-Route::middleware(['auth:customer'])->group(function () {
-    Route::put('/customer/profile/update', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
-});
 
 
 
