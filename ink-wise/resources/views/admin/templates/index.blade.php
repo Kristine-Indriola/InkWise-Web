@@ -3,14 +3,9 @@
 @section('title', 'Invitation Templates')
 
 {{-- Page-specific CSS --}}
-@push('styles')
-<link rel="stylesheet" href="{{ asset('css/admin-css/template.css') }}">
-@endpush
 
-{{-- Page-specific JS --}}
-@push('scripts')
-<script src="{{ asset('js/admin/template.js') }}"></script>
-@endpush
+<link rel="stylesheet" href="{{ asset('css/admin-css/template/template.css') }}">
+<script src="{{ asset('js/admin/template/template.js') }}"></script>
 
 @section('content')
 
@@ -42,39 +37,41 @@
     @else
         <div class="templates-grid mt-gap">
             @foreach($templates as $template)
-                <div class="template-card" style="padding:0;">
-                    <div class="template-preview" style="height:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;">
+                <div class="template-card">
+                    <div class="template-preview">
                         @if($template->preview)
-                            <img src="{{ asset('storage/' . $template->preview) }}"
-                                 alt="Preview"
-                                 class="preview-thumb"
-                                 data-img="{{ asset('storage/' . $template->preview) }}"
-                                 style="max-width:100%;max-height:260px;display:block;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.08);margin-bottom:12px;">
+                            <img src="{{ asset('storage/' . $template->preview) }}" alt="Preview" style="max-width:100%;border-radius:8px;">
+                        @else
+                            <span>No preview</span>
                         @endif
-
-                        <a href="{{ route('admin.templates.editor', $template->id) }}" class="btn-edit" style="width:100%;">Edit</a>
-
-                        {{-- Upload button (links to upload page or triggers modal) --}}
-                        <a href="javascript:void(0);" class="btn" style="margin-top:8px;width:100%;">Upload</a>
-
-                        {{-- Delete button --}}
-                        <form action="{{ route('admin.templates.destroy', $template->id) }}" method="POST" style="margin-top:8px;width:100%;">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="btn btn-delete" style="width:100%;" onclick="return confirm('Delete this template?')">Delete</button>
-                        </form>
                     </div>
-
-                    <div class="template-info" style="margin-bottom:8px;">
+                    <div class="template-info">
                         <h3>{{ $template->name }}</h3>
                         <p>{{ $template->category }}</p>
                         <p>{{ $template->description }}</p>
+                        @if($template->updated_at)
+                            <small style="color:#888;">Last updated: {{ $template->updated_at->format('M d, Y H:i') }}</small>
+                        @endif
+                    </div>
+                    <div class="template-actions">
+                        <a href="{{ route('admin.templates.editor', $template->id) }}" class="btn-edit">Edit</a>
+                        <form action="{{ route('admin.templates.destroy', $template->id) }}" method="POST" style="margin:0;">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn-delete" onclick="return confirm('Delete this template?')">Delete</button>
+                        </form>
+                        <a href="{{ route('admin.products.create.invitation', ['template_id' => $template->id]) }}"
+                           class="btn"
+                           style="background:#94b9ff;color:#fff;margin-top:8px;">
+                            Upload to Product
+                        </a>
                     </div>
                 </div>
             @endforeach
         </div>
     @endif
 
+    <!-- Image Preview Modal -->
     <div id="previewModal" style="display:none;position:fixed;z-index:9999;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;">
         <span id="closePreview" style="position:absolute;top:30px;right:40px;font-size:2.5rem;color:#fff;cursor:pointer;">&times;</span>
         <img id="modalImg" src="" style="max-width:90vw;max-height:90vh;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.3);">

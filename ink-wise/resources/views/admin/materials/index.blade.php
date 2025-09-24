@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
     <h1>Materials Management</h1>
 
+    
     {{-- Stock Summary Cards --}}
     <style>
         .summary-cards {

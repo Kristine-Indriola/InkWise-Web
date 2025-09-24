@@ -19,6 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (zoomLevel > 10) {
             zoomLevel -= 10;
             updateZoom();
+            
         }
     });
     zoomInBtn?.addEventListener("click", () => {
@@ -31,11 +32,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // ========================
     // State
     // ========================
-    const fonts = [
-        "Nunito", "Playfair Display", "Montserrat", "Roboto",
-        "Great Vibes", "Poppins", "Lobster", "Dancing Script",
-        "Merriweather", "Oswald", "ITC Edwardian Script", "Eyesome Script"
-    ];
+    let fonts = []; // Removed static list, now populated from API
     let textBoxes = [];
     let mediaBoxes = [];
     let selectedBox = null;
@@ -139,23 +136,47 @@ document.addEventListener("DOMContentLoaded", () => {
                 ctx.fillStyle = "#888";
                 ctx.fillText("Video", box.x * (zoomLevel/100) + 10, box.y * (zoomLevel/100) + 24);
             }
-            // Draw resize handle
+            // Draw resize handle (Expand-arrows-alt icon placeholder)
             ctx.fillStyle = "#2563eb";
-            ctx.fillRect(
-                box.x * (zoomLevel/100) + box.w * (zoomLevel/100) - 8,
-                box.y * (zoomLevel/100) + box.h * (zoomLevel/100) - 8,
-                8, 8
+            ctx.beginPath();
+            ctx.arc(
+                box.x * (zoomLevel/100) + box.w * (zoomLevel/100) - 12,
+                box.y * (zoomLevel/100) + box.h * (zoomLevel/100) - 12,
+                12, 0, 2 * Math.PI
             );
-            // Draw lock/unlock icon (simple padlock emoji)
-            ctx.font = "18px Arial";
+            ctx.fill();
+            ctx.font = "20px Arial";
+            ctx.fillStyle = "#fff";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("⤢", box.x * (zoomLevel/100) + box.w * (zoomLevel/100) - 12, box.y * (zoomLevel/100) + box.h * (zoomLevel/100) - 12);
+
+            // Draw lock/unlock icon (Fontisto icons as placeholder)
+            ctx.font = "28px Arial";
             ctx.textAlign = "right";
             ctx.textBaseline = "top";
-            ctx.fillStyle = "#555";
-            ctx.fillText(
-                box.locked ? "🔒" : "🔓",
-                (box.x + box.w) * (zoomLevel/100) - 10,
-                box.y * (zoomLevel/100) + 2
-            );
+            ctx.fillStyle = "#2563eb";
+            if (box.locked) {
+                ctx.fillText("🔒", (box.x + box.w) * (zoomLevel/100) - 10, box.y * (zoomLevel/100) + 2);
+                // For HTML icon overlay, see below
+            } else {
+                ctx.fillText("🔓", (box.x + box.w) * (zoomLevel/100) - 10, box.y * (zoomLevel/100) + 2);
+            }
+
+            // Draw cross-circle icon (delete)
+            ctx.font = "28px Arial";
+            ctx.fillStyle = "#e11d48";
+            ctx.textAlign = "left";
+            ctx.textBaseline = "top";
+            ctx.fillText("⨯", box.x * (zoomLevel/100) + 4, box.y * (zoomLevel/100) + 4);
+
+            // Draw arrow-up-right-and-arrow-down-left-from-center icon (placeholder)
+            ctx.font = "22px Arial";
+            ctx.fillStyle = "#2563eb";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("⇲", box.x * (zoomLevel/100) + box.w * (zoomLevel/100) - 32, box.y * (zoomLevel/100) + box.h * (zoomLevel/100) - 32);
+
             ctx.restore();
         });
     }
@@ -462,7 +483,9 @@ document.addEventListener("DOMContentLoaded", () => {
             <div class="font-list" id="fontList"></div>
             <label style="display:block;margin:8px 0 4px 0;font-size:13px;">Font Size</label>
             <input type="number" id="fontSizeInput" min="8" max="120" value="20" style="width:70px;margin-bottom:10px;">
+            <label style="display:block;margin:8px 0 4px 0;font-size:13px;">Text Color</label>
             <input type="color" id="textColorPicker" value="#222" style="margin-bottom:10px;">
+            <div id="colorPalette" style="display:flex;flex-wrap:wrap;margin-bottom:10px;"></div>
             <button class="btn full" id="addTextBox">+ Add Text Box</button>
             <div style="margin-top:10px;">
                 <button class="btn full" id="addHeading">Add Heading</button>
@@ -472,9 +495,12 @@ document.addEventListener("DOMContentLoaded", () => {
         `,
         "Images": `
             <h3>Image/Video Tools</h3>
+            <input type="search" id="imageSearch" placeholder="Search images...">
+            <button class="btn full" id="searchImageBtn">Search Image</button>
             <input type="file" accept="image/*,video/*" id="uploadMedia">
             <button class="btn full" id="uploadMediaBtn">Upload Image/Video</button>
             <div class="font-list" id="mediaList"></div>
+            <div id="imageResults" style="margin-top:10px;"></div>
         `,
         "Graphics": `
             <h3>Graphics Tools</h3>
@@ -499,22 +525,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 <button>🔥</button>
                 <button>💒</button>
             </div>
-        `,
-        "Tables": `
-            <h3>Table Tools</h3>
-            <button class="btn full" id="addGuestListTable">+ Guest List Table</button>
-            <button class="btn full" id="addSeatingChart">+ Seating Chart</button>
-        `,
-        "Colors": `
-            <h3>Color Tools</h3>
-            <input type="color" id="colorPicker" value="#2563eb">
-            <button class="btn full" id="applyColor">Apply Color</button>
-            <div class="shape-grid">
-                <button style="background:#f87171"></button>
-                <button style="background:#34d399"></button>
-                <button style="background:#60a5fa"></button>
-                <button style="background:#fbbf24"></button>
-            </div>
         `
     };
 
@@ -536,6 +546,33 @@ document.addEventListener("DOMContentLoaded", () => {
                     const addBodyTextBtn = document.getElementById("addBodyText");
                     const textColorPicker = document.getElementById("textColorPicker");
                     const fontSizeInput = document.getElementById("fontSizeInput");
+                    // Add this function to fetch fonts from Google Fonts API
+                    async function fetchFonts() {
+                        // Try to load from localStorage first
+                        const cachedFonts = localStorage.getItem('googleFontsList');
+                        if (cachedFonts) {
+                            return JSON.parse(cachedFonts);
+                        }
+                        try {
+                            const response = await fetch('https://www.googleapis.com/webfonts/v1/webfonts?key=AIzaSyCSdMyA37wm0nt9gJIZSjTrxEHgXwxBMeM');
+                            const data = await response.json();
+                            const fontFamilies = data.items.map(item => item.family);
+                            // Cache for future use
+                            localStorage.setItem('googleFontsList', JSON.stringify(fontFamilies));
+                            return fontFamilies;
+                        } catch (error) {
+                            console.error('Failed to fetch fonts:', error);
+                            // Fallback list
+                            return [
+                                "Nunito", "Roboto", "Montserrat", "Poppins", "Oswald", "Playfair Display",
+                                "Great Vibes", "Lobster", "Dancing Script", "Merriweather"
+                            ];
+                        }
+                    }
+                    (async () => {
+                        fonts = await fetchFonts();
+                        renderFonts();
+                    })();
                     function renderFonts(filter = "") {
                         fontList.innerHTML = "";
                         fonts
@@ -606,7 +643,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                     locked: false
                                 });
                                 uploadedImages.push({img, url});
-                                draw();
+                                draw(); // Only draw after image is loaded
                                 renderMediaList();
                             };
                             img.src = url;
@@ -618,12 +655,15 @@ document.addEventListener("DOMContentLoaded", () => {
                         uploadedImages.forEach((media, idx) => {
                             const thumb = document.createElement("img");
                             thumb.src = media.url;
-                            thumb.style.width = "40px";
-                            thumb.style.height = "40px";
+                            thumb.alt = "Uploaded image preview";
+                            thumb.style.width = "48px";
+                            thumb.style.height = "48px";
                             thumb.style.objectFit = "cover";
-                            thumb.style.margin = "4px";
+                            thumb.style.margin = "6px";
                             thumb.style.cursor = "pointer";
                             thumb.title = "Insert again";
+                            thumb.setAttribute("tabindex", "0");
+                            thumb.setAttribute("aria-label", "Insert image");
                             thumb.onclick = () => {
                                 mediaBoxes.push({
                                     type: "image",
@@ -639,25 +679,64 @@ document.addEventListener("DOMContentLoaded", () => {
                             mediaList.appendChild(thumb);
                         });
                     }
+
+                    // --- Google Custom Search API Integration ---
+                    const imageSearch = document.getElementById("imageSearch");
+                    const searchImageBtn = document.getElementById("searchImageBtn");
+                    const imageResults = document.getElementById("imageResults");
+                    imageResults.style.maxHeight = "260px"; // Set max height for scrolling
+                    imageResults.style.overflowY = "auto";  // Enable vertical scroll
+                    const GOOGLE_API_KEY = "AIzaSyBRCDdZjTcR4brOsHV_OBsDO11We11BVi0";
+                    const GOOGLE_CX = "c5ae3ced1c423443c"; // <-- Replace with your Custom Search Engine ID
+
+                    searchImageBtn.addEventListener("click", async () => {
+                        const query = imageSearch.value.trim();
+                        if (!query) return;
+                        imageResults.innerHTML = "Searching...";
+                        try {
+                            const res = await fetch(`https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&searchType=image&q=${encodeURIComponent(query)}&num=8`);
+                            const data = await res.json();
+                            imageResults.innerHTML = "";
+                            if (data.items && data.items.length) {
+                                data.items.forEach(item => {
+                                    const img = document.createElement("img");
+                                    img.src = item.link;
+                                    img.style.width = "60px";
+                                    img.style.height = "60px";
+                                    img.style.objectFit = "cover";
+                                    img.style.margin = "4px";
+                                    img.style.cursor = "pointer";
+                                    img.title = "Insert image";
+                                    img.onclick = () => {
+                                        const canvasImg = new window.Image();
+                                        canvasImg.crossOrigin = "anonymous";
+                                        canvasImg.onload = function() {
+                                            mediaBoxes.push({
+                                                type: "image",
+                                                img: canvasImg,
+                                                x: 120 + Math.random()*60,
+                                                y: 120 + Math.random()*60,
+                                                w: 200,
+                                                h: 150,
+                                                locked: false
+                                            });
+                                            draw();
+                                        };
+                                        canvasImg.src = item.link;
+                                    };
+                                    imageResults.appendChild(img);
+                                });
+                            } else {
+                                imageResults.innerHTML = "No images found.";
+                            }
+                        } catch (err) {
+                            imageResults.innerHTML = "Error loading images.";
+                        }
+                    });
                 }
                 // Graphics Panel
                 if (item.textContent.trim() === "Graphics") {
                     // You can add logic for shapes/icons here
-                }
-                // Tables Panel
-                if (item.textContent.trim() === "Tables") {
-                    document.getElementById("addGuestListTable").onclick = () => alert("Guest List Table added (stub)");
-                    document.getElementById("addSeatingChart").onclick = () => alert("Seating Chart added (stub)");
-                }
-                // Colors Panel
-                if (item.textContent.trim() === "Colors") {
-                    const colorPicker = document.getElementById("colorPicker");
-                    document.getElementById("applyColor").onclick = () => {
-                        if (selectedBox) {
-                            selectedBox.color = colorPicker.value;
-                            draw();
-                        }
-                    };
                 }
             } else {
                 floatingPanel.style.display = "none";
@@ -669,38 +748,70 @@ document.addEventListener("DOMContentLoaded", () => {
     // ========================
     // Layer Controls (Bring Forward / Send Backward)
     // ========================
+    function highlightBox(box) {
+        // Add a temporary highlight property
+        box._highlight = true;
+        draw();
+        setTimeout(() => {
+            box._highlight = false;
+            draw();
+        }, 400);
+    }
+
     document.getElementById("bringForwardBtn").onclick = () => {
         if (selectedBox) {
             const idx = textBoxes.indexOf(selectedBox);
             if (idx < textBoxes.length - 1) {
                 [textBoxes[idx], textBoxes[idx+1]] = [textBoxes[idx+1], textBoxes[idx]];
-                draw();
+                highlightBox(selectedBox);
             }
         }
         if (selectedMediaBox) {
             const idx = mediaBoxes.indexOf(selectedMediaBox);
             if (idx < mediaBoxes.length - 1) {
                 [mediaBoxes[idx], mediaBoxes[idx+1]] = [mediaBoxes[idx+1], mediaBoxes[idx]];
-                draw();
+                highlightBox(selectedMediaBox);
             }
         }
+        draw();
     };
     document.getElementById("sendBackwardBtn").onclick = () => {
         if (selectedBox) {
             const idx = textBoxes.indexOf(selectedBox);
             if (idx > 0) {
                 [textBoxes[idx], textBoxes[idx-1]] = [textBoxes[idx-1], textBoxes[idx]];
-                draw();
+                highlightBox(selectedBox);
             }
         }
         if (selectedMediaBox) {
             const idx = mediaBoxes.indexOf(selectedMediaBox);
             if (idx > 0) {
                 [mediaBoxes[idx], mediaBoxes[idx-1]] = [mediaBoxes[idx-1], mediaBoxes[idx]];
-                draw();
+                highlightBox(selectedMediaBox);
             }
         }
+        draw();
     };
+
+    // In your draw() function, add highlight effect:
+    textBoxes.forEach(box => {
+        ctx.save();
+        if (box._highlight) {
+            ctx.shadowColor = "#8c52ff";
+            ctx.shadowBlur = 16;
+        }
+        // ...existing drawing code...
+        ctx.restore();
+    });
+    mediaBoxes.forEach(box => {
+        ctx.save();
+        if (box._highlight) {
+            ctx.shadowColor = "#8c52ff";
+            ctx.shadowBlur = 16;
+        }
+        // ...existing drawing code...
+        ctx.restore();
+    });
 
     // ========================
     // Export / Download as Image
@@ -772,33 +883,79 @@ document.addEventListener("DOMContentLoaded", () => {
         isDraggingPanel = false;
     });
 
-    // ========================
-    // Save & Next Button
-    // ========================
-    document.getElementById('saveBtn')?.addEventListener('click', function() {
-        const imgData = canvas.toDataURL("image/png");
-        console.log("Saving...", window.TEMPLATE_ID, window.CSRF_TOKEN, window.TEMPLATES_INDEX_URL);
-        fetch(`/admin/templates/${window.TEMPLATE_ID}/save-canvas`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': window.CSRF_TOKEN
-            },
-            body: JSON.stringify({ canvas_image: imgData })
-        })
-        .then(res => res.json())
-        .then(data => {
-            console.log("Save response:", data);
-            if (data.success) {
-                alert('Template saved! Returning to templates list...');
-                window.location.href = window.TEMPLATES_INDEX_URL;
-            } else {
-                alert('Save failed!');
-            }
+    function overlayMediaIcons() {
+        // Remove old icons
+        document.querySelectorAll('.canvas-icon').forEach(el => el.remove());
+        mediaBoxes.forEach((box, idx) => {
+            const scale = zoomLevel / 100;
+            const left = canvas.offsetLeft + (box.x + box.w - 32) * scale;
+            const top = canvas.offsetTop + (box.y + 8) * scale;
+
+            // Lock/Unlock icon
+            const lockIcon = document.createElement('i');
+            lockIcon.className = `canvas-icon fi ${box.locked ? 'fi-sr-lock' : 'fi-sr-unlock'}`;
+            lockIcon.style.position = 'absolute';
+            lockIcon.style.left = left + 'px';
+            lockIcon.style.top = top + 'px';
+            lockIcon.style.fontSize = '32px';
+            lockIcon.style.color = '#2563eb';
+            lockIcon.style.zIndex = 20;
+            lockIcon.style.cursor = 'pointer';
+            lockIcon.title = box.locked ? "Unlock" : "Lock";
+lockIcon.setAttribute("aria-label", box.locked ? "Unlock" : "Lock");
+
+            // Cross-circle icon (delete)
+            const crossIcon = document.createElement('i');
+            crossIcon.className = 'canvas-icon fi fi-sr-cross-circle';
+            crossIcon.style.position = 'absolute';
+            crossIcon.style.left = (canvas.offsetLeft + box.x * scale + 4) + 'px';
+            crossIcon.style.top = (canvas.offsetTop + box.y * scale + 4) + 'px';
+            crossIcon.style.fontSize = '32px';
+            crossIcon.style.color = '#e11d48';
+            crossIcon.style.zIndex = 20;
+            crossIcon.style.cursor = 'pointer';
+            crossIcon.title = "Delete";
+crossIcon.setAttribute("aria-label", "Delete");
+
+            canvas.parentNode.appendChild(lockIcon);
+            canvas.parentNode.appendChild(crossIcon);
         });
+    }
+
+    document.addEventListener("keydown", function(e) {
+        // Ctrl+Z for Undo
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+            e.preventDefault();
+            document.getElementById("undoBtn")?.click();
+        }
+        // Ctrl+Y for Redo
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+            e.preventDefault();
+            document.getElementById("redoBtn")?.click();
+        }
+    });
+    
+});
+console.log(window.TEMPLATE_ID, window.CSRF_TOKEN);
+// Add this at the top-level scope, outside DOMContentLoaded
+window.addImageToCanvas = function(img) {
+    // Default position and size for new images
+    const x = 100 + Math.random() * 80;
+    const y = 100 + Math.random() * 80;
+    const w = Math.min(img.width, 200);
+    const h = Math.min(img.height, 150);
+
+    // Add to mediaBoxes array
+    mediaBoxes.push({
+        type: "image",
+        img: img,
+        x: x,
+        y: y,
+        w: w,
+        h: h,
+        locked: false
     });
 
-    document.getElementById('nextBtn')?.addEventListener('click', function() {
-        window.location.href = window.TEMPLATES_INDEX_URL;
-    });
-});
+    draw();
+};
+

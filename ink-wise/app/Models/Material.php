@@ -33,4 +33,10 @@ class Material extends Model
     {
         return $this->hasOne(Inventory::class, 'material_id');
     }
+
+    public function products()
+    {
+        return $this->belongsToMany(Product::class, 'product_materials', 'material_id', 'product_id')
+            ->withPivot('item', 'type', 'color', 'weight', 'unit_price', 'qty', 'cost');
+    }
 }

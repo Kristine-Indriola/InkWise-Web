@@ -11,11 +11,16 @@
     <div class="summary-cards compact">
         <div class="card">
                         
+            
+            
                 <div class="card-title">All Session</div>
             <div class="card-subtitle">No Shop - 56.15%</div>
             <div class="card-number">245.15k</div>
             <div class="card-percentage text-green">+7.11%</div>
-          
+
+            <div class="card-trend">
+                <i class="fa-solid fa-arrow-up"></i>
+            </div>
         </div>
         <div class="card">
             <div class="card-title">Product Views</div>
@@ -87,11 +92,12 @@
                 <tr>
                     <th>#</th>
                     <th>Product Name</th>
-                    <th>Category</th>
-                    <th>Unit Price</th>
-                    <th>Order/Stock</th>
+                    <th>Event Type</th>
+                    <th>Product Type</th>
+                    <th>Selling Price</th>
+                    <th>Quantity Ordered</th>
                     <th>Total Value</th>
-                    <th>Status</th> <!-- New Status Column -->
+                    <th>Status</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -100,14 +106,21 @@
                     <tr>
                         <td>{{ $loop->iteration }}</td>
                         <td>
-                            <img src="{{ asset($product->image) }}" alt="{{ $product->name }}" class="product-thumb">
+                            <div>
+                                <small>{{ $product->image }}</small>
+                            </div>
+                            <img src="{{ $product->image ? asset('storage/' . $product->image) : asset('images/no-image.png') }}"
+         alt="{{ $product->name }}"
+         class="product-thumb"
+         style="max-width:40px;max-height:40px;border-radius:6px;object-fit:cover;">
                             {{ $product->name }}
                         </td>
-                        <td>{{ $product->category }}</td>
-                        <td>₱{{ number_format($product->unit_price, 2) }}</td>
-                        <td>{{ $product->stock }}</td>
-                        <td>₱{{ number_format($product->unit_price * $product->stock, 2) }}</td>
-                        <td>{{ $product->status }}</td>
+                        <td>{{ $product->event_type }}</td>
+                        <td>{{ $product->product_type }}</td>
+                        <td>₱{{ number_format($product->selling_price, 2) }}</td>
+                        <td>{{ $product->quantity_ordered }}</td>
+                        <td>₱{{ number_format($product->selling_price * $product->quantity_ordered, 2) }}</td>
+                        <td>{{ ucfirst($product->status) }}</td>
                         <td>
                             <a href="{{ route('admin.products.show', $product->id) }}" class="btn-view" title="View"><i class="fi fi-sr-eye"></i></a>
                             <a href="{{ route('admin.products.edit', $product->id) }}" class="btn-update" title="Update"><i class="fa-solid fa-pen-to-square"></i></a>
@@ -118,7 +131,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="8">No products found.</td></tr>
+                    <tr><td colspan="9">No products found.</td></tr>
                 @endforelse
             </tbody>
         </table>
@@ -134,7 +147,80 @@
             </div>
         </div>
     </div>
+
+    <!-- Materials Table -->
+    <div class="table-container">
+        <h2>All Product Materials</h2>
+        <table class="materials-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Product</th>
+                    <th>Item</th>
+                    <th>Type</th>
+                    <th>Color</th>
+                    <th>Weight</th>
+                    <th>Unit Price</th>
+                    <th>Qty</th>
+                    <th>Cost</th>
+                </tr>
+            </thead>
+            <tbody>
+                @php $matIndex = 1; @endphp
+                @foreach($products as $product)
+                    @foreach($product->materials as $mat)
+                        <tr>
+                            <td>{{ $matIndex++ }}</td>
+                            <td>{{ $product->name }}</td>
+                            <td>{{ $mat->item }}</td>
+                            <td>{{ $mat->type }}</td>
+                            <td>{{ $mat->color }}</td>
+                            <td>{{ $mat->weight }}</td>
+                            <td>₱{{ number_format($mat->unit_price, 2) }}</td>
+                            <td>{{ $mat->qty }}</td>
+                            <td>₱{{ number_format($mat->cost, 2) }}</td>
+                        </tr>
+                    @endforeach
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Inks Table -->
+    <div class="table-container">
+        <h2>All Product Inks</h2>
+        <table class="inks-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Product</th>
+                    <th>Item</th>
+                    <th>Type</th>
+                    <th>Usage</th>
+                    <th>Cost per mL</th>
+                    <th>Total Cost</th>
+                </tr>
+            </thead>
+            <tbody>
+                @php $inkIndex = 1; @endphp
+                @foreach($products as $product)
+                    @foreach($product->inks as $ink)
+                        <tr>
+                            <td>{{ $inkIndex++ }}</td>
+                            <td>{{ $product->name }}</td>
+                            <td>{{ $ink->item }}</td>
+                            <td>{{ $ink->type }}</td>
+                            <td>{{ $ink->usage }}</td>
+                            <td>₱{{ number_format($ink->cost_per_ml, 2) }}</td>
+                            <td>₱{{ number_format($ink->total_cost, 2) }}</td>
+                        </tr>
+                    @endforeach
+                @endforeach
+            </tbody>
+        </table>
+    </div>
 </div>
+
 
 <!-- CSS + JS -->
 <link rel="stylesheet" href="{{ asset('css/admin-css/product.css') }}">
@@ -143,3 +229,9 @@
 @if(session('error'))
     <div class="alert alert-error">{{ session('error') }}</div>
 @endif
+@if(session('success'))
+    <div class="alert alert-success">
+        {{ session('success') }}
+    </div>
+@endif
+

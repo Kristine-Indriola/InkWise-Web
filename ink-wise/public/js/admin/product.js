@@ -219,6 +219,36 @@ function sortTable(order = "asc") {
     sorted.forEach(row => table.appendChild(row));
     paginate();
 }
+document.addEventListener('DOMContentLoaded', function() {
+    const matBtn = document.getElementById('toggle-materials');
+    const matSection = document.getElementById('materials-section');
+    if (matBtn && matSection) {
+        matBtn.addEventListener('click', function() {
+            if (matSection.style.display === 'none') {
+                matSection.style.display = '';
+                matBtn.textContent = 'Hide Materials';
+            } else {
+                matSection.style.display = 'none';
+                matBtn.textContent = 'Show Materials';
+            }
+        });
+    }
+
+    const inkBtn = document.getElementById('toggle-inks');
+    const inkSection = document.getElementById('inks-section');
+    if (inkBtn && inkSection) {
+        inkBtn.addEventListener('click', function() {
+            if (inkSection.style.display === 'none') {
+                inkSection.style.display = '';
+                inkBtn.textContent = 'Hide Inks';
+            } else {
+                inkSection.style.display = 'none';
+                inkBtn.textContent = 'Show Inks';
+            }
+        });
+    }
+});
+
 
 // ...existing code...
 // ...existing code...

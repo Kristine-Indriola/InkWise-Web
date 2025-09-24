@@ -3,7 +3,7 @@
 @section('title', 'Create New Template')
 
 @push('styles')
-<link rel="stylesheet" href="{{ asset('css/admin-css/template.css') }}">
+<link rel="stylesheet" href="{{ asset('css/admin-css/template/template.css') }}">
 <style>
     .create-container {
         background: white;
@@ -15,6 +15,7 @@
         color: black;
         font-weight: 600;
     }
+    
     .create-form input[type="text"],
     .create-form textarea,
     .create-form select {
@@ -52,16 +53,16 @@
     <form action="{{ route('admin.templates.store') }}" method="POST" class="create-form">
         @csrf
 
-        <!-- Name + Category -->
+        <!-- Name + Event Type -->
         <div class="create-row">
             <div class="create-group flex-1">
                 <label for="name">Template Name</label>
                 <input type="text" id="name" name="name" placeholder="Enter template name" required>
             </div>
             <div class="create-group flex-1">
-                <label for="category">Category</label>
-                <select id="category" name="category">
-                    <option value="">Select category</option>
+                <label for="event_type">Event Type</label>
+                <select id="event_type" name="event_type">
+                    <option value="">Select event type</option>
                     <option value="Wedding">Wedding</option>
                     <option value="Birthday">Birthday</option>
                     <option value="Baptism">Baptism</option>
@@ -70,14 +71,25 @@
             </div>
         </div>
 
-        
+        <!-- Product Type -->
+        <div class="create-group">
+            <label for="product_type">Product Type</label>
+            <input type="text" id="product_type" name="product_type" placeholder="e.g. Card, Poster">
+        </div>
+
+        <!-- Theme Style -->
+        <div class="create-group">
+            <label for="theme_style">Theme/Style</label>
+            <input type="text" id="theme_style" name="theme_style" placeholder="e.g. Minimalist, Floral">
+        </div>
+
+
         <!-- Description -->
         <div class="create-group">
             <label for="description">Design Description</label>
             <textarea id="description" name="description" rows="4" placeholder="Describe the template design, style, and intended use..."></textarea>
         </div>
 
-        
         <!-- Actions -->
         <div class="create-actions">
             <a href="{{ route('admin.templates.index') }}" class="btn-cancel">Cancel</a>
