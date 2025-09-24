@@ -49,8 +49,10 @@
                         data-address='@json($address)'>
                         Edit
                     </button>
+
                     <form method="POST" action="{{ route('customer.profile.addresses.destroy', $address->address_id) }}" class="inline">
                         @csrf
+                        @method('DELETE')
                         <button type="submit" class="text-[#1976d2] hover:underline bg-transparent border-0 p-0 m-0">Delete</button>
                     </form>
                 </div>
@@ -67,56 +69,56 @@
             <h3 id="modalTitle" class="text-lg font-semibold mb-4">Add New Address</h3>
 
             <form id="addressForm" method="POST" action="">
-    @csrf
-    {{-- Use PUT if your route is resourceful, POST if your route is /update --}}
-    @method('POST') 
+                @csrf
+                <!-- method spoofing toggled by JS -->
+                <input type="hidden" name="_method" id="addressFormMethod" value="POST">
 
-    {{-- Region --}}
-    <label for="form_region" class="block font-medium">Region</label>
-    <select id="form_region" name="region" class="w-full border rounded p-2" required>
-        <option value="">Select Region</option>
-    </select>
+                {{-- Region --}}
+                <label for="form_region" class="block font-medium">Region</label>
+                <select id="form_region" name="region" class="w-full border rounded p-2" required>
+                    <option value="">Select Region</option>
+                </select>
 
-    {{-- Province --}}
-    <label for="form_province" class="block font-medium mt-3">Province</label>
-    <select id="form_province" name="province" class="w-full border rounded p-2" required>
-        <option value="">Select Province</option>
-    </select>
+                {{-- Province --}}
+                <label for="form_province" class="block font-medium mt-3">Province</label>
+                <select id="form_province" name="province" class="w-full border rounded p-2" required>
+                    <option value="">Select Province</option>
+                </select>
 
-    {{-- City --}}
-    <label for="form_city" class="block font-medium mt-3">City</label>
-    <select id="form_city" name="city" class="w-full border rounded p-2" required>
-        <option value="">Select City</option>
-    </select>
+                {{-- City --}}
+                <label for="form_city" class="block font-medium mt-3">City</label>
+                <select id="form_city" name="city" class="w-full border rounded p-2" required>
+                    <option value="">Select City</option>
+                </select>
 
-    {{-- Barangay --}}
-    <label for="form_barangay" class="block font-medium mt-3">Barangay</label>
-    <select id="form_barangay" name="barangay" class="w-full border rounded p-2" required>
-        <option value="">Select Barangay</option>
-    </select>
+                {{-- Barangay --}}
+                <label for="form_barangay" class="block font-medium mt-3">Barangay</label>
+                <select id="form_barangay" name="barangay" class="w-full border rounded p-2" required>
+                    <option value="">Select Barangay</option>
+                </select>
 
-    {{-- Postal Code --}}
-    <label for="form_postal_code" class="block font-medium mt-3">Postal Code</label>
-    <input type="text" id="form_postal_code" name="postal_code" class="w-full border rounded p-2" required>
+                {{-- Postal Code --}}
+                <label for="form_postal_code" class="block font-medium mt-3">Postal Code</label>
+                <input type="text" id="form_postal_code" name="postal_code" class="w-full border rounded p-2" required>
 
-    {{-- Street --}}
-    <label for="form_street" class="block font-medium mt-3">Street</label>
-    <input type="text" id="form_street" name="street" class="w-full border rounded p-2" required>
+                {{-- Street --}}
+                <label for="form_street" class="block font-medium mt-3">Street</label>
+                <input type="text" id="form_street" name="street" class="w-full border rounded p-2" required>
 
-    {{-- Label --}}
-    <label for="form_label" class="block font-medium mt-3">Address Label</label>
-    <select id="form_label" name="label" class="w-full border rounded p-2" required>
-        <option value="Home">Home</option>
-        <option value="Work">Work</option>
-        <option value="Other">Other</option>
-    </select>
+                {{-- Label --}}
+                <label for="form_label" class="block font-medium mt-3">Address Label</label>
+                <select id="form_label" name="label" class="w-full border rounded p-2" required>
+                    <option value="Home">Home</option>
+                    <option value="Work">Work</option>
+                    <option value="Other">Other</option>
+                </select>
 
-    {{-- Submit --}}
-    <div class="mt-6 flex justify-end space-x-3">
-        <button type="button" id="cancelModal" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
-        <button type="submit" id="submitBtn" class="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
-    </div>
-</form>
+                {{-- Submit --}}
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button type="button" id="cancelModal" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
+                    <button type="submit" id="submitBtn" class="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -130,6 +132,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const cancelModal = document.getElementById("cancelModal");
     const form = document.getElementById("addressForm");
     const submitBtn = document.getElementById("submitBtn");
+    const methodInput = document.getElementById('addressFormMethod');
 
     const fields = {
         region: document.getElementById("form_region"),
@@ -141,14 +144,18 @@ document.addEventListener("DOMContentLoaded", function () {
         label: document.getElementById("form_label"),
     };
 
+    // route templates
+    const storeUrl = "{{ route('customer.profile.addresses.store') }}";
+    const updateUrlTemplate = "{{ route('customer.profile.addresses.update', ['address' => '__ID__']) }}";
+
     // ---------------- Show modal for ADD ----------------
     document.getElementById("addAddressBtn").addEventListener("click", () => {
         modalTitle.textContent = "Add New Address";
         submitBtn.textContent = "Submit";
-        form.action = "{{ route('customer.profile.addresses.store') }}";
+        form.action = storeUrl;
+        methodInput.value = "POST";
 
         Object.values(fields).forEach(input => input.value = "");
-
         modal.classList.remove("hidden");
     });
 
@@ -159,7 +166,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
             modalTitle.textContent = "Edit Address";
             submitBtn.textContent = "Update";
-            form.action = `/customerprofile/addresses/${address.address_id}/update`;
+
+            // build update url by replacing placeholder
+            form.action = updateUrlTemplate.replace('__ID__', address.address_id);
+            methodInput.value = "PUT";
 
             fields.postal_code.value = address.postal_code ?? "";
             fields.street.value = address.street ?? "";
