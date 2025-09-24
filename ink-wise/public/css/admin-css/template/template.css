@@ -18,6 +18,7 @@
   margin-bottom: 25px;
 }
 
+
 .templates-header h2 {
   font-size: 20px;
   font-weight: bold;
@@ -30,7 +31,7 @@
 
 /* Create Button */
 .btn-create {
-  background: #1f2937;
+  background: #94b9ff;
   color: #fff;
   padding: 8px 14px;
   border-radius: 6px;

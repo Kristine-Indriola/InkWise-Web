@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Product;
 use App\Models\Template;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -12,7 +13,7 @@ class TemplateController extends Controller
     // Show all templates
     public function index()
     {
-        $templates = Template::all();
+        $templates = Template::paginate(12); // Show 12 per page
         return view('admin.templates.index', compact('templates'));
     }
 
@@ -25,39 +26,17 @@ class TemplateController extends Controller
     // Store new template
     public function store(Request $request)
     {
-        // 1. Validate input
-        $request->validate([
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'category' => 'nullable|string|max:100',
+            'event_type' => 'nullable|string|max:255',
+            'product_type' => 'nullable|string|max:255',
+            'theme_style' => 'nullable|string|max:255',
             'description' => 'nullable|string',
-            'primary_color' => 'nullable|string|max:20',
-            'secondary_color' => 'nullable|string|max:20',
-            'size' => 'nullable|string|max:50',
         ]);
 
-        // 2. Save template
-        $template = Template::create([
-            'name' => $request->name,
-            'design' => json_encode([
-                'category' => $request->category,
-                'description' => $request->description,
-                'primary_color' => $request->primary_color,
-                'secondary_color' => $request->secondary_color,
-                'size' => $request->size,
-                
-            ]),
-        ]);
-       // Save uploaded preview
-       if ($request->hasFile('preview')) {
-        $path = $request->file('preview')->store('templates/previews', 'public');
-        $template->preview = $path;
-        $template->save();
-    }
+        \App\Models\Template::create($validated);
 
-        // 3. Redirect to editor page with new template ID
-        return redirect()->route('admin.templates.editor', $template->id)
-                         ->with('success', 'Template created! Now start editing.');
-                         
+        return redirect()->route('admin.templates.index')->with('success', 'Template created successfully!');
     }
 
     // Show editor page for a template
@@ -105,17 +84,43 @@ public function saveCanvas(Request $request, $id)
     return response()->json(['success' => false, 'message' => 'No image data provided'], 400);
 }
 
-
 public function uploadPreview(Request $request, $id)
 {
-    $request->validate([
-        'preview' => 'required|image|max:2048'
-    ]);
     $template = Template::findOrFail($id);
-    $path = $request->file('preview')->store('templates/previews', 'public');
-    $template->preview = $path;
+    $imgData = $request->input('preview_image');
+
+    // Remove the data:image/png;base64, part
+    $imgData = preg_replace('#^data:image/\w+;base64,#i', '', $imgData);
+    $imgData = base64_decode($imgData);
+
+    // Save to storage (public disk)
+    $filename = 'templates/previews/template_' . $id . '_' . time() . '.png';
+    \Storage::disk('public')->put($filename, $imgData);
+
+    // Update preview column (store path)
+    $template->preview = $filename;
     $template->save();
 
-    return redirect()->route('admin.templates.index')->with('success', 'Preview image uploaded!');
+    return response()->json(['success' => true, 'preview' => $filename]);
+}
+
+public function uploadToProduct(Request $request, $id)
+{
+    $template = Template::findOrFail($id);
+
+    // Create product using template info
+    $product = Product::create([
+        'template_id'    => $template->id,
+        'name'           => $template->name,
+        'event_type'     => $template->category ?? null,
+        'product_type'   => 'Invitation',
+        'theme_style'    => $template->theme_style ?? '',
+        'description'    => $template->description ?? '',
+        'image'          => $template->preview ? 'storage/' . $template->preview : null,
+        'status'         => 'active',
+        // Add other fields as needed, or set defaults
+    ]);
+
+    return redirect()->route('admin.products.index')->with('success', 'Template uploaded as product!');
 }
 }

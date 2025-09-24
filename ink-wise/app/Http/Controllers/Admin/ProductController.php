@@ -3,14 +3,34 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Product;
+use App\Models\Template;
+use App\Models\Material;
+use App\Models\Ink;
 use Illuminate\Http\Request;
+use App\Models\ProductMaterial;
+use App\Models\ProductInk;
 
 class ProductController extends Controller
 {
-    public function index() {
-        // $products = Product::paginate(10); // Commented out for now
-        $products = []; // Empty array for now
-        return view('admin.products.index', compact('products'));
+    public function index()
+    {
+        $products = \App\Models\Product::with(['materials', 'inks'])->orderBy('created_at', 'desc')->paginate(10);
+
+        $totalProducts = \App\Models\Product::count();
+        $totalQuantity = \App\Models\Product::sum('quantity_ordered');
+        $totalSales = \App\Models\Product::sum(\DB::raw('selling_price * quantity_ordered'));
+        $activeProducts = \App\Models\Product::where('status', 'active')->count();
+        $inactiveProducts = \App\Models\Product::where('status', 'inactive')->count();
+
+        return view('admin.products.index', compact(
+            'products',
+            'totalProducts',
+            'totalQuantity',
+            'totalSales',
+            'activeProducts',
+            'inactiveProducts'
+        ));
     }
 
     public function invitation()
@@ -66,16 +86,92 @@ class ProductController extends Controller
     }
 
     // Add: Method to show the create invitation form
-    public function createInvitation()
+    public function createInvitation(Request $request)
     {
-        return view('admin.products.create-invitation');
+        $templates = \App\Models\Template::all();
+        $materials = \App\Models\Material::all();
+        $selectedTemplate = null;
+        if ($request->has('template_id')) {
+            $selectedTemplate = \App\Models\Template::find($request->input('template_id'));
+        }
+        $templates = \App\Models\Template::all();
+        return view('admin.products.create-invitation', compact('templates', 'materials', 'selectedTemplate'));
     }
 
     // Add: Method to handle form submission (placeholder, no DB yet)
     public function store(Request $request)
     {
-        // Placeholder: Add validation and logic here later
-        // For now, redirect back with a success message
-        return redirect()->route('admin.products.index')->with('success', 'Invitation created successfully.');
+        // Validate main product fields
+        $validated = $request->validate([
+            'template_id' => 'nullable|exists:templates,id',
+            'invitationName' => 'required|string|max:255',
+            'eventType' => 'required|string|max:255',
+            'productType' => 'required|string|max:255',
+            'themeStyle' => 'required|string|max:255',
+            // ...other fields...
+        ]);
+
+        // Save the product
+        $product = Product::create([
+            'template_id' => $validated['template_id'] ?? null,
+            'name' => $validated['invitationName'],
+            'event_type' => $validated['eventType'],
+            'product_type' => $validated['productType'],
+            'theme_style' => $validated['themeStyle'],
+            'description' => $request->input('description', ''),
+            // ...other fields...
+        ]);
+
+        // Save Materials
+        if ($request->has('materials')) {
+            foreach ($request->materials as $material) {
+                if (!empty($material['item'])) {
+                    $product->materials()->create([
+                        'item'       => $material['item'],
+                        'type'       => $material['type'] ?? null,
+                        'color'      => $material['color'] ?? null,
+                        'size'       => $material['size'] ?? null,
+                        'weight'     => $material['weight'] ?? null,
+                        'unit_price' => $material['unitPrice'] ?? null,
+                        'qty'        => $material['qty'] ?? null,
+                        'cost'       => $material['cost'] ?? null,
+                    ]);
+                }
+            }
+        }
+
+        // Save Inks
+        if ($request->has('inks')) {
+            foreach ($request->inks as $ink) {
+                if (!empty($ink['item'])) {
+                    $product->inks()->create([
+                        'item'        => $ink['item'],
+                        'type'        => $ink['type'] ?? null,
+                        'usage'       => $ink['usage'] ?? null,
+                        'cost_per_ml' => $ink['costPerMl'] ?? null,
+                        'total_cost'  => $ink['totalCost'] ?? null,
+                    ]);
+                }
+            }
+        }
+
+        return redirect()->route('admin.products.index')->with('success', 'Product created!');
+    }
+
+    public function destroy($id)
+    {
+        $product = \App\Models\Product::findOrFail($id);
+        $product->delete();
+
+        return redirect()->route('admin.products.index')->with('success', 'Product deleted successfully!');
+    }
+
+    // Edit or show method
+    public function edit($id)
+    {
+        $product = Product::with(['materials', 'inks'])->findOrFail($id);
+        $templates = Template::all();
+        $materials = Material::all();
+        return view('admin.products.create-invitation', compact('product', 'templates', 'materials'));
     }
 }

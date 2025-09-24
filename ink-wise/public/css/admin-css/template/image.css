@@ -1,0 +1,44 @@
+/* Sidebar image thumbnail hover effect and delete icon styling */
+#sidebarImageThumbs div {
+    transition: box-shadow 0.2s;
+}
+#sidebarImageThumbs div:hover {
+    box-shadow: 0 2px 8px rgba(37,99,235,0.15);
+}
+#sidebarImageThumbs img {
+    transition: transform 0.15s;
+}
+#sidebarImageThumbs img:hover {
+    transform: scale(1.08);
+    box-shadow: 0 2px 8px rgba(37,99,235,0.18);
+}
+#sidebarImageThumbs span {
+    transition: background 0.15s, color 0.15s;
+}
+#sidebarImageThumbs span:hover {
+    background: #e11d48;
+    color: #fff;
+}
+
+/* Spinner icon for image upload */
+#imageUploadSpinner i {
+    margin-right: 6px;
+    color: #2563eb;
+    font-size: 16px;
+}
+
+/* Error message styling */
+#imageUploadError {
+    font-weight: 600;
+}
+
+/* Drop zone highlight */
+#imageDropZone {
+    transition: background 0.2s, border-color 0.2s;
+}
+#imageDropZone:focus,
+#imageDropZone.dragover {
+    background: #e0e7ff;
+    border-color: #2563eb;
+}
+

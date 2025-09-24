@@ -11,7 +11,9 @@ document.addEventListener("DOMContentLoaded", function () {
             date: "25 October 2025",
         });
     });
+    
 
+    
     
     document.querySelectorAll('.preview-thumb').forEach(function(img) {
         img.addEventListener('click', function() {

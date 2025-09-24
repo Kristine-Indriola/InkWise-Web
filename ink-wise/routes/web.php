@@ -81,6 +81,11 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         // Move these two lines inside this group and fix the path:
         Route::post('{id}/save-canvas', [AdminTemplateController::class, 'saveCanvas'])->name('saveCanvas');
         Route::post('{id}/upload-preview', [AdminTemplateController::class, 'uploadPreview'])->name('uploadPreview');
+        // Add new API routes
+        Route::get('{id}/load-design', [AdminTemplateController::class, 'loadDesign'])->name('loadDesign');
+        Route::delete('{id}/delete-element', [AdminTemplateController::class, 'deleteElement'])->name('deleteElement');
+        Route::post('{id}/save-version', [AdminTemplateController::class, 'saveVersion'])->name('saveVersion');
+        Route::post('{id}/upload-to-product', [AdminTemplateController::class, 'uploadToProduct'])->name('uploadToProduct');
     }); 
     // ✅ User Management 
 
@@ -93,7 +98,7 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::delete('/{user_id}', [UserManagementController::class, 'destroy'])->name('destroy'); // Delete user 
 });
 
-    });
+   
   Route::prefix('users')->name('users.')->group(function () {
     Route::get('/', [UserManagementController::class, 'index'])->name('index');
     Route::get('/create', [UserManagementController::class, 'create'])->name('create');
@@ -127,16 +132,17 @@ Route::prefix('users')->name('users.')->group(function () {
     // ✅ Inks resource route (move here, not nested)
     Route::resource('inks', \App\Http\Controllers\Admin\InkController::class)->except(['show']);
 
-    
-    // Fix: Rename the index route to 'products.index' (full name: 'admin.products.index' due to group prefix)
-    Route::get('/products', [ProductController::class, 'invitation'])->name('products.index');
-    
-    // Add: Route for creating an invitation (full name: 'admin.products.create.invitation')
-    Route::get('/products/create/invitation', [ProductController::class, 'createInvitation'])->name('products.create.invitation');
-    
-    // Add: Route for storing an invitation (full name: 'admin.products.store')
-    Route::post('/products/store', [ProductController::class, 'store'])->name('products.store');
-    
+     Route::prefix('products')->name('products.')->group(function () {
+    Route::get('/create', [ProductController::class, 'createInvitation'])->name('create'); 
+    Route::get('/{user_id}', [UserManagementController::class, 'show'])->name('show'); 
+    Route::get('/', [ProductController::class, 'invitation'])->name('index');
+    Route::get('/', [ProductController::class, 'index'])->name('index');
+    Route::get('/create/invitation', [ProductController::class, 'createInvitation'])->name('create.invitation');
+    Route::post('/store', [ProductController::class, 'store'])->name('store');
+    Route::get('/{id}/edit', [ProductController::class, 'edit'])->name('edit'); // <-- Add this line
+    Route::delete('/{id}', [ProductController::class, 'destroy'])->name('destroy'); // <-- And this line
+     });
+
     Route::prefix('customers')->name('customers.')->group(function () {
         Route::get('/', [AdminCustomerController::class, 'index'])->name('index'); 
         // Optional: Add more customer routes (show/edit/delete) here later
@@ -160,15 +166,7 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::get('reports/inventory/export/{type}', [ReportsDashboardController::class, 'exportInventory'])
          ->name('reports.inventory.export');
 
-
-
-
-
-
-
-
-
-
+  
 
 /*Route::middleware(['auth', 'role:staff'])->group(function () {
     Route::get('/staff/dashboard', [StaffController::class, 'index'])->name('staff.dashboard');
@@ -191,6 +189,9 @@ Route::get('/verify-email/{token}', [VerificationController::class, 'verify'])
 
     return back()->with('success', 'Notification marked as read.');
 })->name('notifications.read');
+
+    });
+
 /*
 |--------------------------------------------------------------------------
 | Google OAuth
@@ -293,7 +294,6 @@ Route::middleware('auth')->prefix('customer/profile')->name('customer.profile.')
 
 });
     
-
 
 // Profile update (protected)
 /*Route::middleware(['auth:customer'])->group(function () {

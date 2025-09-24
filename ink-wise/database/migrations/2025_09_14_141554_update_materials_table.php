@@ -30,6 +30,7 @@ return new class extends Migration
         $table->integer('weight_gsm')->nullable()->after('color');      // For cardstock
         $table->decimal('volume_ml', 8, 2)->nullable()->after('weight_gsm'); // For inks only
 
+        
         // Stock management
         $table->integer('stock_qty')->default(0)->after('unit');
         $table->integer('reorder_point')->default(10)->after('stock_qty');
