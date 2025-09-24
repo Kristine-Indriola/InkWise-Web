@@ -34,14 +34,10 @@
     </div>
 
     <!-- Reply Form -->
-    <form method="POST" action="{{ route('admin.messages.send', $customer->id) }}" style="display:flex; gap:10px;">
-        @csrf
-        <textarea name="message" placeholder="Type your reply..." 
-                  style="flex:1; padding:10px; border:1px solid #ccc; border-radius:8px; resize:none;" required></textarea>
-        <button type="submit" 
-                style="padding:10px 20px; background:#6a2ebc; color:white; border:none; border-radius:8px; cursor:pointer;">
-            Send
-        </button>
+    <form method="POST" action="{{ route('admin.messages.reply', $message->id) }}">
+      @csrf
+      <textarea name="message" rows="4" class="w-full border rounded" required></textarea>
+      <button type="submit" class="mt-2 px-4 py-2 bg-blue-600 text-white rounded">Send Reply</button>
     </form>
 
     @if(session('success'))

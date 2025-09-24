@@ -536,6 +536,7 @@ body.dark-mode .btn-warning {
       }
     })();
   </script>
+  <meta name="csrf-token" content="{{ csrf_token() }}">
 </head>
 <body>
   <!-- Sidebar -->
@@ -715,5 +716,8 @@ body.dark-mode .btn-warning {
 </script>
     </div>
   </div>
+
+  {{-- make sure scripts from views are rendered here --}}
+  @yield('scripts')
 </body>
 </html>
