@@ -35,8 +35,8 @@
             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4 border-b pb-4">
                 <div>
                     <div class="flex flex-col mb-1">
-                        <span class="font-bold text-lg">{{ $address->full_name ?? auth()->user()->name }}</span>
-                        <span class="text-gray-600">{{ $address->phone ?? auth()->user()->phone ?? '' }}</span>
+                        <span class="font-bold text-lg">{{ auth()->user()->name }}</span>
+                        <span class="text-gray-600">{{ auth()->user()->phone ?? '' }}</span>
                     </div>
                     <div class="text-gray-600 mt-1">
                         {{ $address->street }}<br>
@@ -60,121 +60,63 @@
         @endforelse
     </div>
 
-    <!-- Add Address Modal -->
-    <div id="addAddressModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 hidden">
+    <!-- Add/Edit Address Modal -->
+    <div id="addressModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 hidden">
         <div class="address-form-modal bg-white rounded-lg shadow-lg p-6 w-full max-w-md mx-auto relative">
-            <button id="closeAddAddress" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 text-xl font-bold">✖</button>
-            <h3 class="text-lg font-semibold mb-4">Add New Address</h3>
+            <button id="closeAddressModal" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 text-xl font-bold">✖</button>
+            <h3 id="modalTitle" class="text-lg font-semibold mb-4">Add New Address</h3>
 
-            <form method="POST" action="{{ route('customer.profile.addresses.store') }}">
-                @csrf
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Full Name</label>
-                    <input type="text" name="full_name" class="w-full border rounded px-3 py-2" value="{{ auth()->user()->name }}" required>
-                </div>
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Phone Number</label>
-                    <input type="text" name="phone" class="w-full border rounded px-3 py-2" value="{{ auth()->user()->phone ?? '' }}" required>
-                </div>
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Region</label>
-                    <select name="region" id="region" class="w-full border rounded px-3 py-2" required>
-                        <option value="">Select Region</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Province</label>
-                    <select name="province" id="province" class="w-full border rounded px-3 py-2" required>
-                        <option value="">Select Province</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">City</label>
-                    <select name="city" id="city" class="w-full border rounded px-3 py-2" required>
-                        <option value="">Select City</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Barangay</label>
-                    <select name="barangay" id="barangay" class="w-full border rounded px-3 py-2" required>
-                        <option value="">Select Barangay</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Postal Code</label>
-                    <input type="text" name="postal_code" class="w-full border rounded px-3 py-2" required>
-                </div>
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Street</label>
-                    <input type="text" name="street" class="w-full border rounded px-3 py-2" required>
-                </div>
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Label as</label>
-                    <select name="label" class="w-full border rounded px-3 py-2" required>
-                        <option value="Home">Home</option>
-                        <option value="Work">Work</option>
-                    </select>
-                </div>
-                <div class="flex justify-end gap-2 mt-4">
-                    <button type="button" id="closeAddAddress2" class="px-5 py-2 rounded border border-[#a6b7ff] text-[#a6b7ff] bg-white hover:bg-[#d3b7ff]">Cancel</button>
-                    <button type="submit" class="bg-[#a6b7ff] hover:bg-[#bce6ff] text-white px-5 py-2 rounded">Submit</button>
-                </div>
-            </form>
-        </div>
+            <form id="addressForm" method="POST" action="">
+    @csrf
+    {{-- Use PUT if your route is resourceful, POST if your route is /update --}}
+    @method('POST') 
+
+    {{-- Region --}}
+    <label for="form_region" class="block font-medium">Region</label>
+    <select id="form_region" name="region" class="w-full border rounded p-2" required>
+        <option value="">Select Region</option>
+    </select>
+
+    {{-- Province --}}
+    <label for="form_province" class="block font-medium mt-3">Province</label>
+    <select id="form_province" name="province" class="w-full border rounded p-2" required>
+        <option value="">Select Province</option>
+    </select>
+
+    {{-- City --}}
+    <label for="form_city" class="block font-medium mt-3">City</label>
+    <select id="form_city" name="city" class="w-full border rounded p-2" required>
+        <option value="">Select City</option>
+    </select>
+
+    {{-- Barangay --}}
+    <label for="form_barangay" class="block font-medium mt-3">Barangay</label>
+    <select id="form_barangay" name="barangay" class="w-full border rounded p-2" required>
+        <option value="">Select Barangay</option>
+    </select>
+
+    {{-- Postal Code --}}
+    <label for="form_postal_code" class="block font-medium mt-3">Postal Code</label>
+    <input type="text" id="form_postal_code" name="postal_code" class="w-full border rounded p-2" required>
+
+    {{-- Street --}}
+    <label for="form_street" class="block font-medium mt-3">Street</label>
+    <input type="text" id="form_street" name="street" class="w-full border rounded p-2" required>
+
+    {{-- Label --}}
+    <label for="form_label" class="block font-medium mt-3">Address Label</label>
+    <select id="form_label" name="label" class="w-full border rounded p-2" required>
+        <option value="Home">Home</option>
+        <option value="Work">Work</option>
+        <option value="Other">Other</option>
+    </select>
+
+    {{-- Submit --}}
+    <div class="mt-6 flex justify-end space-x-3">
+        <button type="button" id="cancelModal" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
+        <button type="submit" id="submitBtn" class="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
     </div>
-
-    <!-- Edit Address Modal -->
-    <div id="editAddressModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 hidden">
-        <div class="address-form-modal bg-white rounded-lg shadow-lg p-6 w-full max-w-md mx-auto relative">
-            <button id="closeEditAddress" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 text-xl font-bold">✖</button>
-            <h3 class="text-lg font-semibold mb-4">Edit Address</h3>
-
-            <form method="POST" id="editAddressForm">
-                @csrf
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Full Name</label>
-                    <input type="text" name="full_name" id="edit_full_name" class="w-full border rounded px-3 py-2" required>
-                </div>
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Phone Number</label>
-                    <input type="text" name="phone" id="edit_phone" class="w-full border rounded px-3 py-2" required>
-                </div>
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Region</label>
-                    <input type="text" name="region" id="edit_region" class="w-full border rounded px-3 py-2" required>
-                </div>
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Province</label>
-                    <input type="text" name="province" id="edit_province" class="w-full border rounded px-3 py-2" required>
-                </div>
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">City</label>
-                    <input type="text" name="city" id="edit_city" class="w-full border rounded px-3 py-2" required>
-                </div>
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Barangay</label>
-                    <input type="text" name="barangay" id="edit_barangay" class="w-full border rounded px-3 py-2" required>
-                </div>
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Postal Code</label>
-                    <input type="text" name="postal_code" id="edit_postal_code" class="w-full border rounded px-3 py-2" required>
-                </div>
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Street</label>
-                    <input type="text" name="street" id="edit_street" class="w-full border rounded px-3 py-2" required>
-                </div>
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Label as</label>
-                    <select name="label" id="edit_label" class="w-full border rounded px-3 py-2" required>
-                        <option value="Home">Home</option>
-                        <option value="Work">Work</option>
-                    </select>
-                </div>
-                <div class="flex justify-end gap-2 mt-4">
-                    <button type="button" id="closeEditAddress2" class="px-5 py-2 rounded border border-[#a6b7ff] text-[#a6b7ff] bg-white hover:bg-[#d3b7ff]">Cancel</button>
-                    <button type="submit" class="bg-[#a6b7ff] hover:bg-[#bce6ff] text-white px-5 py-2 rounded">Update</button>
-                </div>
-            </form>
+</form>
         </div>
     </div>
 </div>
@@ -182,126 +124,148 @@
 <!-- JS -->
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    // ---------------- Add Modal ----------------
-    const addBtn = document.getElementById("addAddressBtn");
-    const addModal = document.getElementById("addAddressModal");
-    const closeAddBtn = document.getElementById("closeAddAddress");
-    const closeAddBtn2 = document.getElementById("closeAddAddress2");
+    const modal = document.getElementById("addressModal");
+    const modalTitle = document.getElementById("modalTitle");
+    const closeModal = document.getElementById("closeAddressModal");
+    const cancelModal = document.getElementById("cancelModal");
+    const form = document.getElementById("addressForm");
+    const submitBtn = document.getElementById("submitBtn");
 
-    if (addBtn) addBtn.addEventListener("click", () => addModal.classList.remove("hidden"));
-    if (closeAddBtn) closeAddBtn.addEventListener("click", () => addModal.classList.add("hidden"));
-    if (closeAddBtn2) closeAddBtn2.addEventListener("click", () => addModal.classList.add("hidden"));
+    const fields = {
+        region: document.getElementById("form_region"),
+        province: document.getElementById("form_province"),
+        city: document.getElementById("form_city"),
+        barangay: document.getElementById("form_barangay"),
+        postal_code: document.getElementById("form_postal_code"),
+        street: document.getElementById("form_street"),
+        label: document.getElementById("form_label"),
+    };
 
-    // ---------------- Edit Modal ----------------
-    const editModal = document.getElementById("editAddressModal");
-    const closeEditBtn = document.getElementById("closeEditAddress");
-    const closeEditBtn2 = document.getElementById("closeEditAddress2");
-    const editForm = document.getElementById("editAddressForm");
+    // ---------------- Show modal for ADD ----------------
+    document.getElementById("addAddressBtn").addEventListener("click", () => {
+        modalTitle.textContent = "Add New Address";
+        submitBtn.textContent = "Submit";
+        form.action = "{{ route('customer.profile.addresses.store') }}";
 
+        Object.values(fields).forEach(input => input.value = "");
+
+        modal.classList.remove("hidden");
+    });
+
+    // ---------------- Show modal for EDIT ----------------
     document.querySelectorAll(".edit-address-btn").forEach(button => {
         button.addEventListener("click", () => {
             const address = JSON.parse(button.dataset.address);
 
-            // Fill form values
-            document.getElementById("edit_full_name").value = address.full_name ?? '';
-            document.getElementById("edit_phone").value = address.phone ?? '';
-            document.getElementById("edit_region").value = address.region ?? '';
-            document.getElementById("edit_province").value = address.province ?? '';
-            document.getElementById("edit_city").value = address.city ?? '';
-            document.getElementById("edit_barangay").value = address.barangay ?? '';
-            document.getElementById("edit_postal_code").value = address.postal_code ?? '';
-            document.getElementById("edit_street").value = address.street ?? '';
-            document.getElementById("edit_label").value = address.label ?? 'Home';
+            modalTitle.textContent = "Edit Address";
+            submitBtn.textContent = "Update";
+            form.action = `/customerprofile/addresses/${address.address_id}/update`;
 
-            // Update form action
-            editForm.action = `/customerprofile/addresses/${address.address_id}/update`;
+            fields.postal_code.value = address.postal_code ?? "";
+            fields.street.value = address.street ?? "";
+            fields.label.value = address.label ?? "Home";
 
-            editModal.classList.remove("hidden");
+            // Load PSGC values dynamically
+            loadRegions().then(() => {
+                fields.region.value = address.region ?? "";
+                if (address.region) {
+                    loadProvinces(address.region).then(() => {
+                        fields.province.value = address.province ?? "";
+                        if (address.province) {
+                            loadCities(address.province).then(() => {
+                                fields.city.value = address.city ?? "";
+                                if (address.city) {
+                                    loadBarangays(address.city).then(() => {
+                                        fields.barangay.value = address.barangay ?? "";
+                                    });
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+
+            modal.classList.remove("hidden");
         });
     });
 
-    if (closeEditBtn) closeEditBtn.addEventListener("click", () => editModal.classList.add("hidden"));
-    if (closeEditBtn2) closeEditBtn2.addEventListener("click", () => editModal.classList.add("hidden"));
+    // Close modal
+    [closeModal, cancelModal].forEach(btn => btn.addEventListener("click", () => modal.classList.add("hidden")));
 
-    // ---------------- PSGC Dropdowns ----------------
-    const regionSelect = document.getElementById("region");
-    const provinceSelect = document.getElementById("province");
-    const citySelect = document.getElementById("city");
-    const barangaySelect = document.getElementById("barangay");
-
-    if (regionSelect) {
-        // Load regions
-        fetch("https://psgc.gitlab.io/api/regions/")
-            .then(res => res.json())
-            .then(data => {
-                data.forEach(region => {
-                    let option = document.createElement("option");
-                    option.value = region.name;
-                    option.textContent = region.name;
-                    option.dataset.code = region.code;
-                    regionSelect.appendChild(option);
-                });
-            });
-
-        // Provinces
-        regionSelect.addEventListener("change", function () {
-            provinceSelect.innerHTML = '<option value="">Select Province</option>';
-            citySelect.innerHTML = '<option value="">Select City</option>';
-            barangaySelect.innerHTML = '<option value="">Select Barangay</option>';
-            let selected = regionSelect.selectedOptions[0];
-            if (selected && selected.dataset.code) {
-                fetch(`https://psgc.gitlab.io/api/regions/${selected.dataset.code}/provinces/`)
-                    .then(res => res.json())
-                    .then(data => {
-                        data.forEach(province => {
-                            let option = document.createElement("option");
-                            option.value = province.name;
-                            option.textContent = province.name;
-                            option.dataset.code = province.code;
-                            provinceSelect.appendChild(option);
-                        });
-                    });
-            }
-        });
-
-        // Cities
-        provinceSelect.addEventListener("change", function () {
-            citySelect.innerHTML = '<option value="">Select City</option>';
-            barangaySelect.innerHTML = '<option value="">Select Barangay</option>';
-            let selected = provinceSelect.selectedOptions[0];
-            if (selected && selected.dataset.code) {
-                fetch(`https://psgc.gitlab.io/api/provinces/${selected.dataset.code}/cities-municipalities/`)
-                    .then(res => res.json())
-                    .then(data => {
-                        data.forEach(city => {
-                            let option = document.createElement("option");
-                            option.value = city.name;
-                            option.textContent = city.name;
-                            option.dataset.code = city.code;
-                            citySelect.appendChild(option);
-                        });
-                    });
-            }
-        });
-
-        // Barangays
-        citySelect.addEventListener("change", function () {
-            barangaySelect.innerHTML = '<option value="">Select Barangay</option>';
-            let selected = citySelect.selectedOptions[0];
-            if (selected && selected.dataset.code) {
-                fetch(`https://psgc.gitlab.io/api/cities-municipalities/${selected.dataset.code}/barangays/`)
-                    .then(res => res.json())
-                    .then(data => {
-                        data.forEach(barangay => {
-                            let option = document.createElement("option");
-                            option.value = barangay.name;
-                            option.textContent = barangay.name;
-                            barangaySelect.appendChild(option);
-                        });
-                    });
-            }
+    // ---------------- PSGC Dropdown Functions ----------------
+    async function loadRegions() {
+        fields.region.innerHTML = '<option value="">Select Region</option>';
+        let res = await fetch("https://psgc.gitlab.io/api/regions/");
+        let data = await res.json();
+        data.forEach(region => {
+            let option = document.createElement("option");
+            option.value = region.name;
+            option.textContent = region.name;
+            option.dataset.code = region.code;
+            fields.region.appendChild(option);
         });
     }
+
+    async function loadProvinces(regionName) {
+        fields.province.innerHTML = '<option value="">Select Province</option>';
+        fields.city.innerHTML = '<option value="">Select City</option>';
+        fields.barangay.innerHTML = '<option value="">Select Barangay</option>';
+
+        let selected = [...fields.region.options].find(o => o.value === regionName);
+        if (!selected) return;
+
+        let res = await fetch(`https://psgc.gitlab.io/api/regions/${selected.dataset.code}/provinces/`);
+        let data = await res.json();
+        data.forEach(province => {
+            let option = document.createElement("option");
+            option.value = province.name;
+            option.textContent = province.name;
+            option.dataset.code = province.code;
+            fields.province.appendChild(option);
+        });
+    }
+
+    async function loadCities(provinceName) {
+        fields.city.innerHTML = '<option value="">Select City</option>';
+        fields.barangay.innerHTML = '<option value="">Select Barangay</option>';
+
+        let selected = [...fields.province.options].find(o => o.value === provinceName);
+        if (!selected) return;
+
+        let res = await fetch(`https://psgc.gitlab.io/api/provinces/${selected.dataset.code}/cities-municipalities/`);
+        let data = await res.json();
+        data.forEach(city => {
+            let option = document.createElement("option");
+            option.value = city.name;
+            option.textContent = city.name;
+            option.dataset.code = city.code;
+            fields.city.appendChild(option);
+        });
+    }
+
+    async function loadBarangays(cityName) {
+        fields.barangay.innerHTML = '<option value="">Select Barangay</option>';
+
+        let selected = [...fields.city.options].find(o => o.value === cityName);
+        if (!selected) return;
+
+        let res = await fetch(`https://psgc.gitlab.io/api/cities-municipalities/${selected.dataset.code}/barangays/`);
+        let data = await res.json();
+        data.forEach(barangay => {
+            let option = document.createElement("option");
+            option.value = barangay.name;
+            option.textContent = barangay.name;
+            fields.barangay.appendChild(option);
+        });
+    }
+
+    // Initial load regions for Add form
+    loadRegions();
+
+    // Event listeners for dropdowns
+    fields.region.addEventListener("change", () => loadProvinces(fields.region.value));
+    fields.province.addEventListener("change", () => loadCities(fields.province.value));
+    fields.city.addEventListener("change", () => loadBarangays(fields.city.value));
 });
 </script>
 

@@ -1,57 +1,54 @@
 @extends('layouts.admin')
 
+@section('title', 'Chat with ' . $customer->name)
+
 @section('content')
-<div class="chat-container" style="max-width:600px; margin:auto; padding:20px;">
-    <h2>Chat with {{ $customer->name }}</h2>
+<div class="chat-container" style="max-width:900px; margin:0 auto;">
 
-    <div id="chat-messages" style="border:1px solid #ccc; padding:10px; height:300px; overflow-y:auto;">
-        @php $currentDate = null; @endphp
-        @foreach($messages as $msg)
-            @php
-                $msgDate = $msg->created_at->toDateString();
-                $today = \Carbon\Carbon::today()->toDateString();
-                $yesterday = \Carbon\Carbon::yesterday()->toDateString();
+    <h3 style="margin-bottom:20px;">Chat with {{ $customer->name }}</h3>
 
-                $displayDate = $msgDate == $today ? 'Today' : ($msgDate == $yesterday ? 'Yesterday' : $msg->created_at->format('M d, Y'));
-            @endphp
-
-            @if ($currentDate !== $msgDate)
-                <div style="text-align:center; margin:10px 0; font-size:12px; color:gray;">
-                    — {{ $displayDate }} —
-                </div>
-                @php $currentDate = $msgDate; @endphp
-            @endif
-
-            <div style="margin:10px; text-align: {{ ($msg->sender_id == $currentUser['id'] && $msg->sender_type == $currentUser['type']) ? 'right' : 'left' }};">
-                <div style="display:inline-block; max-width:80%;">
-                    <span style="background: {{ ($msg->sender_id == $currentUser['id'] && $msg->sender_type == $currentUser['type']) ? '#4caf50' : '#eee' }};
-                                 color: {{ ($msg->sender_id == $currentUser['id'] && $msg->sender_type == $currentUser['type']) ? 'white' : 'black' }};
-                                 padding:8px; border-radius:10px; display:block;">
-                        {{ $msg->message }}
-                    </span>
-                    <small style="font-size:11px; color:gray;">
-                        {{ $msg->created_at->format('h:i A') }}
-                    </small>
+    <!-- Messages -->
+    <div class="chat-box" 
+         style="border:1px solid #ddd; border-radius:10px; padding:20px; height:500px; overflow-y:auto; background:#f9f9f9; margin-bottom:20px;">
+        
+        @forelse($messages as $msg)
+            <div style="margin-bottom:15px; 
+                        display:flex; 
+                        flex-direction: {{ $msg->sender_type == 'user' ? 'row-reverse' : 'row' }};">
+                
+                <div style="max-width:70%; 
+                            padding:10px 15px; 
+                            border-radius:15px;
+                            background: {{ $msg->sender_type == 'user' ? '#6a2ebc' : '#e0e0e0' }};
+                            color: {{ $msg->sender_type == 'user' ? 'white' : 'black' }};
+                            ">
+                    {{ $msg->message }}
+                    <div style="font-size:12px; margin-top:5px; opacity:0.8;">
+                        {{ $msg->created_at->format('M d, Y h:i A') }}
+                    </div>
                 </div>
             </div>
-        @endforeach
+        @empty
+            <p style="text-align:center; color:#888;">No messages yet.</p>
+        @endforelse
     </div>
 
-    <form method="POST" action="{{ route(request()->is('admin/*') ? 'admin.messages.send' : 'staff.messages.send', $customer->id) }}" 
-          style="margin-top:10px; display:flex; gap:5px;">
+    <!-- Reply Form -->
+    <form method="POST" action="{{ route('admin.messages.send', $customer->id) }}" style="display:flex; gap:10px;">
         @csrf
-        <input type="text" name="message" placeholder="Type your message..." required
-               style="flex:1; padding:8px; border:1px solid #ccc; border-radius:5px;">
-        <button type="submit" style="padding:8px 15px; border:none; background:#4caf50; color:white; border-radius:5px;">
+        <textarea name="message" placeholder="Type your reply..." 
+                  style="flex:1; padding:10px; border:1px solid #ccc; border-radius:8px; resize:none;" required></textarea>
+        <button type="submit" 
+                style="padding:10px 20px; background:#6a2ebc; color:white; border:none; border-radius:8px; cursor:pointer;">
             Send
         </button>
     </form>
-</div>
 
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    let chatBox = document.getElementById("chat-messages");
-    chatBox.scrollTop = chatBox.scrollHeight;
-});
-</script>
+    @if(session('success'))
+        <div style="margin-top:15px; padding:10px; background:#d4edda; color:#155724; border-radius:5px;">
+            {{ session('success') }}
+        </div>
+    @endif
+
+</div>
 @endsection
