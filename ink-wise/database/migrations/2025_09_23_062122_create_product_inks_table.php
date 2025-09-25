@@ -8,7 +8,8 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('product_inks', function (Blueprint $table) {
+        if (!Schema::hasTable('product_inks')) {
+            Schema::create('product_inks', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('product_id');
             $table->unsignedBigInteger('ink_id');
@@ -23,6 +24,7 @@ return new class extends Migration
             $table->foreign('product_id')->references('id')->on('products')->onDelete('cascade');
             $table->foreign('ink_id')->references('id')->on('inks')->onDelete('cascade');
         });
+        }
     }
 
     public function down(): void

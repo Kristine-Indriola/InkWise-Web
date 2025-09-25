@@ -183,73 +183,120 @@
       }
     }
 
-    /* Topbar */
+    /* Topbar (improved) */
     .topbar {
-      background: rgba(148, 185, 255, 0.5); /* #94b9ff with 50% transparency */
-      height: 60px;
-      border-bottom: 1px solid #ddd;
+      background: linear-gradient(90deg, rgba(148,185,255,0.98), rgba(205,255,216,0.95));
+      height: 64px;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      padding: 0 20px;
+      padding: 0 18px;
       width: 100%;
       position: sticky;
       top: 0;
-      z-index: 100;
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      z-index: 90; /* sit behind sidebar (sidebar z-index:101) */
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 6px 18px rgba(16,24,40,0.06);
     }
 
     .topbar .logo {
-      font-size: 18px;
-      font-weight: 700;
-      color: #333;
+      font-size: 20px;
+      font-weight: 800;
+      color: #16325c;
+      letter-spacing: 0.6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding-left: 6px;
+      margin-left: 230px; /* visually align logo to the right of the fixed sidebar */
     }
 
     .topbar .icons {
       display: flex;
       align-items: center;
-      gap: 15px;
+      gap: 14px;
       margin-left: auto;
       position: relative;
     }
 
-    .topbar .icons a {
-      display: flex;
+    .topbar .icons a,
+    .topbar .icons button,
+    .topbar .icons .nav-link {
+      display: inline-flex;
       justify-content: center;
       align-items: center;
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
       font-size: 18px;
       text-decoration: none;
-      transition: 0.3s ease;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
       cursor: pointer;
-       font-family: 'Nunito', sans-serif;
-    font-weight: 600;
+      background: rgba(255,255,255,0.85);
+      color: #1f2937;
+      border: 1px solid rgba(0,0,0,0.04);
+      box-shadow: 0 2px 6px rgba(16,24,40,0.04);
+    }
+
+    .topbar .icons a:hover,
+    .topbar .icons button:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(16,24,40,0.08);
+      background: #fff;
     }
 
     .topbar .icons .notif-btn {
-      background: #f1f1f1;
-      color: #333;
+      background: transparent !important;
+      color: #94b9ff !important;
+      border: none !important;
+      box-shadow: none !important;
+      width: auto !important;
+      height: auto !important;
+      padding: 6px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
     }
 
     .topbar .icons .logout-btn {
-      background: #f44336;
+      background: linear-gradient(90deg,#ff6b6b,#f44336);
       color: white;
-      font-weight: bold;
-       font-family: 'Nunito', sans-serif;
-    font-weight: 600;
+      font-weight: 700;
     }
 
     .topbar .icons .settings-btn {
-      background: #6a2ebc;
+      background: linear-gradient(90deg,#6a2ebc,#3cd5c8);
       color: white;
     }
 
-    .topbar .icons a:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+    /* Notification badge */
+    .notif-badge {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #ef4444;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 999px;
+      box-shadow: 0 2px 6px rgba(16,24,40,0.12);
+    }
+
+    /* Make the nav-link container position relative so badges align */
+    .topbar .icons .nav-link { position: relative; }
+
+    /* Notif icon override to target the icon element */
+    .topbar .icons .notif-btn i,
+    .topbar .icons .notif-btn .fi {
+      color: #94b9ff !important;
+      font-size: 22px !important;
     }
 
     /* Layout container */
@@ -257,13 +304,14 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      margin-left: 230px; /* Add margin to account for fixed sidebar */
+      margin-left: 0; /* topbar sits full width behind sidebar */
     }
 
     /* Dashboard Content */
     .main {
       flex: 1;
       padding: 25px;
+      padding-left: 230px; /* offset main content so sidebar doesn't overlap */
     }
 
     /* Cards */
@@ -361,6 +409,8 @@
       .content-wrapper {
         margin-left: 0; /* Remove margin on mobile */
       }
+      .main { padding-left: 0; }
+      .topbar .logo { margin-left: 0; padding-left: 6px; }
       .cards {
         flex-direction: column;
       }
@@ -525,15 +575,53 @@ body.dark-mode .btn-warning {
   }
   </style>
   <script>
-    // Apply theme on page load (before body renders)
+    // Apply theme on page load (before body renders) - avoids flash and persists across pages
     (function() {
-      if (localStorage.getItem('theme') === 'dark') {
-        document.documentElement.classList.add('dark-mode');
-        document.body.classList.add('dark-mode');
-      } else {
-        document.documentElement.classList.remove('dark-mode');
-        document.body.classList.remove('dark-mode');
+      try {
+        var isDark = localStorage.getItem('theme') === 'dark';
+        if (isDark) {
+          document.documentElement.classList.add('dark-mode');
+        } else {
+          document.documentElement.classList.remove('dark-mode');
+        }
+        if (document.body) {
+          if (isDark) document.body.classList.add('dark-mode'); else document.body.classList.remove('dark-mode');
+        } else {
+          document.addEventListener('DOMContentLoaded', function(){ if (isDark) document.body.classList.add('dark-mode'); else document.body.classList.remove('dark-mode'); });
+        }
+      } catch (e) { console.error('Theme init error', e); }
+    })();
+  </script>
+  <!-- Lazy-loader for product slide assets: call window.__loadProductSlideAssets() to inject CSS+JS when needed -->
+  <script>
+    (function(){
+      if (window.__productSlideAssetsLoaded) return;
+      function injectStylesheet(href){
+        var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href; document.head.appendChild(l);
       }
+      function injectScript(src){
+        return new Promise(function(res, rej){
+          var s = document.createElement('script'); s.src = src; s.defer = true; s.onload = res; s.onerror = rej; document.head.appendChild(s);
+        });
+      }
+
+      window.__loadProductSlideAssets = function(){
+        if (window.__productSlideAssetsLoaded) return Promise.resolve();
+        try { injectStylesheet('{{ asset("css/admin-css/product-slide.css") }}'); } catch(e){}
+        return injectScript('{{ asset("js/admin-js/product-slide.js") }}').then(function(){ window.__productSlideAssetsLoaded = true; }).catch(function(){ window.__productSlideAssetsLoaded = true; });
+      };
+
+      // Auto-load on known products index path for convenience
+      try {
+        var path = window.location.pathname || '';
+        if (path.match(/\/admin\/products(\/.*)?$/i)) {
+          // Load lazily but don't block render
+          setTimeout(function(){ window.__loadProductSlideAssets(); }, 80);
+        }
+      } catch(e){}
+
+      // Also listen for an event to load later
+      document.addEventListener('loadProductSlideAssets', function(){ window.__loadProductSlideAssets(); }, { once: true });
     })();
   </script>
   <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -586,8 +674,8 @@ body.dark-mode .btn-warning {
       <div class="logo">InkWise</div>
       <div class="icons" style="display: flex; align-items: center; gap: 24px; margin-left: auto; justify-content: center;">
         <!-- Notification Bell -->
-        <a href="{{ route('admin.notifications') }}" class="nav-link" style="display:flex; align-items:center; justify-content:center;">
-          <i class="fi fi-ss-bell" style="color:#cdffd8; font-size:22px;"></i>
+        <a href="{{ route('admin.notifications') }}" class="nav-link notif-btn" style="display:flex; align-items:center; justify-content:center;">
+          <i class="fi fi-ss-bell" style="font-size:22px;"></i>
           @php
               $lowCount = \App\Models\Material::whereHas('inventory', function($q) {
                   $q->whereColumn('stock_level', '<=', 'reorder_level')

@@ -85,7 +85,14 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::get('{id}/load-design', [AdminTemplateController::class, 'loadDesign'])->name('loadDesign');
         Route::delete('{id}/delete-element', [AdminTemplateController::class, 'deleteElement'])->name('deleteElement');
         Route::post('{id}/save-version', [AdminTemplateController::class, 'saveVersion'])->name('saveVersion');
+        // Allow GET to redirect (avoid MethodNotAllowed when link is accidentally visited)
+        Route::get('{id}/upload-to-product', function ($id) {
+            return redirect()->route('admin.products.create.invitation', ['template_id' => $id]);
+        });
         Route::post('{id}/upload-to-product', [AdminTemplateController::class, 'uploadToProduct'])->name('uploadToProduct');
+        // Asset search API: images, videos, elements
+        Route::get('{id}/assets/search', [AdminTemplateController::class, 'searchAssets'])->name('searchAssets');
+        Route::post('{id}/canvas-settings', [AdminTemplateController::class, 'updateCanvasSettings'])->name('updateCanvasSettings');
     }); 
     // ✅ User Management 
 
@@ -132,16 +139,20 @@ Route::prefix('users')->name('users.')->group(function () {
     // ✅ Inks resource route (move here, not nested)
     Route::resource('inks', \App\Http\Controllers\Admin\InkController::class)->except(['show']);
 
-     Route::prefix('products')->name('products.')->group(function () {
-    Route::get('/create', [ProductController::class, 'createInvitation'])->name('create'); 
-    Route::get('/{user_id}', [UserManagementController::class, 'show'])->name('show'); 
-    Route::get('/', [ProductController::class, 'invitation'])->name('index');
+    Route::prefix('products')->name('products.')->group(function () {
+    Route::get('/create', [ProductController::class, 'createInvitation'])->name('create');
+    // Show single product (AJAX slide panel)
+    Route::get('/{id}', [ProductController::class, 'show'])->name('show');
+    // Index (product listing)
     Route::get('/', [ProductController::class, 'index'])->name('index');
+    // Filter pages: inks and materials
+    Route::get('/inks', [ProductController::class, 'inks'])->name('inks');
+    Route::get('/materials', [ProductController::class, 'materials'])->name('materials');
     Route::get('/create/invitation', [ProductController::class, 'createInvitation'])->name('create.invitation');
     Route::post('/store', [ProductController::class, 'store'])->name('store');
-    Route::get('/{id}/edit', [ProductController::class, 'edit'])->name('edit'); // <-- Add this line
-    Route::delete('/{id}', [ProductController::class, 'destroy'])->name('destroy'); // <-- And this line
-     });
+    Route::get('/{id}/edit', [ProductController::class, 'edit'])->name('edit');
+    Route::delete('/{id}', [ProductController::class, 'destroy'])->name('destroy');
+    });
 
     Route::prefix('customers')->name('customers.')->group(function () {
         Route::get('/', [AdminCustomerController::class, 'index'])->name('index'); 

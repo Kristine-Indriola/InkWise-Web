@@ -24,14 +24,26 @@ document.addEventListener("DOMContentLoaded", () => {
         return input.replace(/[<>\"']/g, '');
     }
 
-    searchInput.addEventListener("keyup", function () {
-        const value = sanitizeInput(this.value.toLowerCase());
-        rows.forEach(row => {
-            const text = row.textContent.toLowerCase();
-            row.style.display = text.includes(value) ? "" : "none";
+    // If the search input is part of a GET form, debounce submission to server
+    const searchForm = document.getElementById('productSearchForm');
+    let searchTimeout = null;
+    if (searchInput && searchForm) {
+        searchInput.addEventListener('input', function () {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                searchForm.submit();
+            }, 450);
         });
-        paginate(); // re-run pagination after search
-    });
+    } else if (searchInput) {
+        searchInput.addEventListener("keyup", function () {
+            const value = sanitizeInput(this.value.toLowerCase());
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(value) ? "" : "none";
+            });
+            paginate(); // re-run pagination after search
+        });
+    }
 
     // ================================
     // Sort Functions
@@ -155,15 +167,35 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     table.addEventListener('click', function(e) {
-        if (e.target.classList.contains('btn-delete')) {
-            e.preventDefault();
-            if (confirm("⚠️ Are you sure you want to delete this product?")) {
-                // Add loading state
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-                btn.disabled = true;
-                // Submit form or AJAX
-                this.closest('form').submit();
-            }
+        const delBtn = e.target.closest('.ajax-delete');
+        if (delBtn) {
+            const id = delBtn.dataset.id;
+            if (!id) return;
+            if (!confirm("⚠️ Are you sure you want to delete this product?")) return;
+            // show spinner
+            delBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            delBtn.disabled = true;
+            // perform AJAX delete
+            const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            fetch(`/admin/products/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': token || '',
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            }).then(r => {
+                if (r.ok) return r.json().catch(() => ({}));
+                throw new Error('Delete failed');
+            }).then(() => {
+                // remove row
+                const row = delBtn.closest('tr');
+                if (row) row.remove();
+            }).catch(err => {
+                alert('Could not delete the product.');
+            }).finally(() => {
+                // no-op or refresh
+            });
         }
     });
 });

@@ -13,6 +13,9 @@
     --red: #dc3545;
 }
 
+/* set a compact base font size so rem units map to 12px */
+html { font-size: 12px; }
+
 body {
     margin: 0;
     padding: 0;
@@ -28,98 +31,102 @@ body {
 }
 
 .page-title {
-    font-size: 1.8rem;
+    font-size: 1.6rem;
     font-weight: 700;
     margin-bottom: 20px;
 }
 
 /* ================================
-   SUMMARY CARDS
+   SUMMARY CARDS (improved)
+   Modern, responsive cards with icon area and percentage badge
 ================================== */
 .summary-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    align-items: stretch;
 }
 
 .summary-cards.compact {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px; /* Adjust gap between cards */
+    gap: 10px;
 }
 
 .card {
     display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    align-items: flex-start;
-    background: var(--background-light); /* Light background */
-    border: 2px solid var(--primary-color); /* Stroke color */
-    border-radius: 12px; /* Rounded corners */
-    padding: 16px; /* Inner padding */
+    align-items: center;
+    gap: 10px;
+    background: var(--background-white);
+    border-radius: 10px;
+    padding: 10px;
     box-sizing: border-box;
-    width: 220px; /* Fixed width for consistent size */
-    height: 120px; /* Fixed height */
-    box-shadow: 0 2px 6px var(--shadow-color); /* Subtle shadow */
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.summary-cards.compact .card {
-    width: 200px; /* Set a fixed width for rectangular shape */
-    height: 100px; /* Reduce height for smaller size */
-    padding: 8px; /* Reduce padding */
-    border-radius: 5px; /* Optional: slight rounding for rectangle */
-    background: #fff; /* Ensure background if needed */
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Light shadow for definition */
+    min-height: 64px;
+    box-shadow: 0 6px 14px rgba(16,24,40,0.03);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    border-left: 6px solid rgba(148,185,255,0.1);
 }
 
 .card:hover {
-    transform: translateY(-3px); /* Lift effect on hover */
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15); /* Enhanced shadow on hover */
+    transform: translateY(-4px);
+    box-shadow: 0 10px 24px rgba(16,24,40,0.06);
 }
 
-.summary-cards.compact .card:hover {
-    transform: translateY(-2px); /* Lift effect on hover for compact cards */
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15); /* Enhanced shadow on hover */
-}
-
-.card-title, .card-subtitle, .card-number, .card-percentage {
-    word-wrap: break-word;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    overflow: hidden;
-    max-width: 100%;
-}
-
-.card-title {
-    font-size: 0.9rem; /* Standardized to rem */
-    font-weight: 600;
-    margin-bottom: 4px;
-}
-
-.card-subtitle {
-    font-size: 0.75rem; /* Standardized to rem */
-    color: #6b7280;
-    margin-bottom: 8px;
-}
-
-.card-number {
-    font-size: 1.4rem; /* Standardized to rem */
+.card-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: var(--primary-color);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
     font-weight: 700;
-    margin-bottom: 4px;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+
+.card-body {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.card-title { font-size: 0.78rem; font-weight: 700; color: #0f172a; }
+.card-subtitle { font-size: 0.65rem; color: var(--text-secondary); }
+.card-number { font-size: 0.95rem; font-weight: 800; color: #0f172a; }
+
+.card-footer {
+    display:flex; align-items:center; gap:6px; margin-top:4px;
 }
 
 .card-percentage {
-    font-size: 0.8rem; /* Standardized to rem */
-    font-weight: bold;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 7px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
 }
+.card-percentage.positive { background: rgba(34,197,94,0.06); color: #16a34a; }
+.card-percentage.negative { background: rgba(239,68,68,0.05); color: #ef4444; }
 
-.text-green {
-    color: var(--green); /* Green for positive values */
-}
+.card-meta { display:flex; align-items:center; gap:12px; }
 
-.text-red {
-    color: var(--red); /* Red for negative values */
+.text-green { color: var(--green); }
+.text-red { color: var(--red); }
+
+/* compact variant */
+.summary-cards.compact .card { padding: 8px; min-height: 60px; border-radius: 8px; }
+
+@media (max-width: 520px) {
+    .card { padding: 8px; gap: 8px; }
+    .card-icon { width: 34px; height: 34px; font-size: 0.8rem; }
+    .card-number { font-size: 0.9rem; }
+    .card-title { font-size: 0.74rem; }
+    .card-subtitle { font-size: 0.62rem; }
 }
 
 /* ================================
@@ -279,12 +286,30 @@ body {
 }
 
 .product-thumb {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     border-radius: 6px;
     margin-right: 8px;
     vertical-align: middle;
     object-fit: cover;
+}
+
+/* Product meta (image + text) */
+.product-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.product-meta-text {
+    display: flex;
+    flex-direction: column;
+}
+.product-name {
+    font-size: 13px;
+}
+.product-desc {
+    color: #6b7280;
+    font-size: 11px;
 }
 
 /* Action Buttons */
@@ -381,6 +406,163 @@ body {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+
+/* ================================
+   RESPONSIVE / IMPROVEMENTS
+   Ensure the product admin layout resizes nicely
+=================================== */
+
+/* make container adapt to viewport while keeping comfortable margins */
+.dashboard-container {
+    max-width: 1200px;
+    width: calc(100% - 48px);
+    padding: 20px 24px;
+    box-sizing: border-box;
+}
+
+/* table containers should allow horizontal scroll but look good on tablet */
+.table-container {
+    padding: 18px;
+}
+.table-container table {
+    min-width: 920px; /* keeps column layout readable, triggers horizontal scroll on small screens */
+}
+
+/* compact table spacing on narrower screens */
+@media (max-width: 1024px) {
+    .dashboard-container { padding: 16px; }
+    .summary-cards { gap: 12px; }
+    .card { width: auto; height: auto; padding: 12px; }
+    .floating-buttons { min-width: 150px; }
+    .products-table th, .products-table td { padding: 10px 8px; }
+}
+
+/* Tablet and mobile improvements */
+@media (max-width: 768px) {
+    .dashboard-container { width: calc(100% - 32px); padding: 12px; }
+    .summary-cards { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+    .summary-cards.compact { flex-wrap: wrap; gap: 8px; }
+    .search-and-add { justify-content: space-between; align-items: center; }
+    .table-controls { display: flex; flex-direction: column; gap: 10px; }
+    .controls-right { display: flex; gap: 8px; align-items: center; }
+    .filter-group select { padding: 6px; }
+
+    /* reduce table min width to allow better fit but still scroll if needed */
+    .table-container table { min-width: 720px; }
+
+    /* slightly smaller avatars/text in tight spaces */
+    .product-thumb { width: 36px; height: 36px; }
+    .product-name { font-size: 13px; }
+    .product-desc { font-size: 11px; }
+
+    /* make action buttons smaller to avoid wrapping */
+    .btn-view, .btn-update, .btn-delete { padding: 6px 8px; font-size: 0.85rem; }
+}
+
+/* Small mobile: stack tables into card-like rows for readability */
+@media (max-width: 520px) {
+    .products-table, .inks-table, .materials-table { border: 0; }
+    .products-table thead, .inks-table thead, .materials-table thead { display: none; }
+    .products-table tr, .inks-table tr, .materials-table tr {
+        display: block;
+        margin-bottom: 12px;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+        padding: 10px;
+    }
+    .products-table td, .inks-table td, .materials-table td {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 4px;
+        border-bottom: none;
+    }
+    .product-meta { align-items: center; }
+    .product-meta-text { gap: 2px; }
+
+    /* make pagination compact */
+    .table-pagination { flex-direction: column; align-items: flex-start; gap: 8px; }
+}
+
+/* Accessibility: ensure focus outlines remain visible on small screens */
+.btn-add-new:focus, .page-link:focus, .filter-group select:focus { outline: 3px solid rgba(148,185,255,0.28); }
+
+/* ================================
+   FILTER BUTTONS / POPUP
+   Clean minimal styles for the filter icon and popup buttons
+=================================== */
+
+/* filter icon (the small funnel button next to search) */
+.filter-icon {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--primary-color);
+    padding: 8px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background .12s ease, box-shadow .12s ease, transform .08s ease;
+    line-height: 0;
+}
+.filter-icon:hover {
+    background: rgba(148,185,255,0.06);
+    box-shadow: 0 4px 10px rgba(16,24,40,0.04);
+    transform: translateY(-1px);
+}
+.filter-icon:focus {
+    outline: 2px solid var(--primary-hover);
+    outline-offset: 2px;
+}
+
+/* popup wrapper (override inline minimal positioning styles) */
+.filter-popup {
+    background: var(--background-white);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 8px;
+    box-shadow: 0 8px 24px rgba(16,24,40,0.06);
+    min-width: 160px;
+    display: none;
+}
+.filter-popup[aria-hidden="false"] {
+    display: block;
+}
+
+/* individual filter options inside the popup */
+.btn-filter-option {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+    padding: 8px 10px;
+    border-radius: 8px;
+    width: 100%;
+    text-align: left;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .12s, color .12s, border-color .12s;
+    display: inline-block;
+}
+.btn-filter-option + .btn-filter-option { margin-left: 6px; }
+.filter-popup .btn-filter-option:hover,
+.filter-popup .btn-filter-option:focus {
+    background: rgba(148,185,255,0.06);
+    color: var(--primary-color);
+    border-color: rgba(148,185,255,0.12);
+    outline: none;
+}
+.btn-filter-option.active {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: var(--primary-color);
+}
+
+@media (max-width: 520px) {
+    .filter-popup { right: 6px; left: 6px; top: calc(100% + 8px); min-width: auto; }
+    .btn-filter-option + .btn-filter-option { margin-left: 0; margin-top: 6px; display: block; }
+}
+
 
 /* ================================
    TABLE CONTROLS

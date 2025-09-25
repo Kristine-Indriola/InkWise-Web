@@ -62,6 +62,7 @@ document.addEventListener("DOMContentLoaded", () => {
         unitPriceInput.value = material.unit_cost || '';
         const qty = parseInt(qtyInput.value, 10) || 0;
         costInput.value = qty > 0 ? (material.unit_cost * qty).toFixed(2) : '';
+        updateTotalRawCost();
     }
 
     function showDropdown(matches) {
@@ -139,9 +140,18 @@ document.addEventListener("DOMContentLoaded", () => {
     function updateInkFields() {
         const usage = parseFloat(inkUsageInput.value) || 0;
         const costPerMl = parseFloat(inkCostPerMlInput.value) || 0;
-        const totalCost = usage * costPerMl;
+        const globalQty = parseFloat(document.getElementById('quantityOrdered').value) || 0;
+        const suggestedQty = usage * globalQty;
+        const qtyValue = (typeof inkQtyInput !== 'undefined' && inkQtyInput && inkQtyInput.value) ? parseFloat(inkQtyInput.value) : suggestedQty;
+
+        // Populate qty input with suggested value only if empty
+        if (inkQtyInput && (!inkQtyInput.value || inkQtyInput.value === '')) {
+            inkQtyInput.value = suggestedQty ? suggestedQty.toFixed(2) : '';
+        }
+
+        const totalCost = qtyValue * costPerMl;
         inkTotalCostInput.value = totalCost.toFixed(2);
-        updateTotalRawCost(); // Assuming inks contribute to total raw cost
+        updateTotalRawCost(); // Inks contribute to total raw cost
     }
 
     // Add event listeners for inks
@@ -194,18 +204,40 @@ document.addEventListener("DOMContentLoaded", () => {
         const inkUsageInput = row.querySelector('input[name*="inks"][name*="usage"]');
         const inkCostPerMlInput = row.querySelector('input[name*="inks"][name*="costPerMl"]');
         const inkTotalCostInput = row.querySelector('input[name*="inks"][name*="totalCost"]');
+        const inkQtyInput = row.querySelector('input[name*="inks"][name*="qty"]');
 
         if (inkUsageInput && inkCostPerMlInput && inkTotalCostInput) {
             function updateInkFields() {
                 const usage = parseFloat(inkUsageInput.value) || 0;
+                const globalQty = parseFloat(document.getElementById('quantityOrdered').value) || 0;
+                const suggestedQty = usage * globalQty; // ml needed based on usage
                 const costPerMl = parseFloat(inkCostPerMlInput.value) || 0;
-                const totalCost = usage * costPerMl;
+
+                // If user provided a qty, use it; otherwise use suggestedQty
+                const qtyValue = inkQtyInput && inkQtyInput.value ? parseFloat(inkQtyInput.value) : suggestedQty;
+                const totalCost = qtyValue * costPerMl;
                 inkTotalCostInput.value = totalCost.toFixed(2);
+
+                // populate qty input with suggested value if empty
+                if (inkQtyInput && (!inkQtyInput.value || inkQtyInput.value === '')) {
+                    inkQtyInput.value = suggestedQty.toFixed(2);
+                }
+
                 updateTotalRawCost();
             }
 
             inkUsageInput.addEventListener('input', updateInkFields);
             inkCostPerMlInput.addEventListener('input', updateInkFields);
+
+            // If qty is manually edited, recalc total cost from qty * costPerMl
+            if (inkQtyInput) {
+                inkQtyInput.addEventListener('input', function () {
+                    const q = parseFloat(this.value) || 0;
+                    const c = parseFloat(inkCostPerMlInput.value) || 0;
+                    inkTotalCostInput.value = (q * c).toFixed(2);
+                    updateTotalRawCost();
+                });
+            }
         }
     }
 
@@ -214,6 +246,78 @@ document.addEventListener("DOMContentLoaded", () => {
     if (firstMaterialRow) {
         addRowListeners(firstMaterialRow);
     }
+
+    // Ensure all existing material rows have listeners (in case there are multiple rows pre-rendered)
+    document.querySelectorAll('.material-row').forEach(row => addRowListeners(row));
+
+    // Initialize existing ink rows' totalCost values and ensure totals are calculated on load
+    document.querySelectorAll('.ink-row').forEach(row => {
+        const usageEl = row.querySelector('input[name$="[usage]"]');
+        const costPerMlEl = row.querySelector('input[name$="[costPerMl]"]');
+        const totalCostEl = row.querySelector('input[name$="[totalCost]"]');
+        const qtyEl = row.querySelector('input[name$="[qty]"]');
+        const globalQty = parseFloat(document.getElementById('quantityOrdered').value) || 0;
+        if (usageEl && costPerMlEl && totalCostEl) {
+            const usage = parseFloat(usageEl.value) || 0;
+            const costPerMl = parseFloat(costPerMlEl.value) || 0;
+            const suggestedQty = usage * globalQty;
+            const qtyValue = qtyEl && qtyEl.value ? parseFloat(qtyEl.value) : suggestedQty;
+            if (qtyEl && (!qtyEl.value || qtyEl.value === '')) {
+                qtyEl.value = suggestedQty ? suggestedQty.toFixed(2) : '';
+            }
+            totalCostEl.value = (qtyValue * costPerMl).toFixed(2);
+        }
+    });
+
+    // Compute totals on initial load so derived fields (costPerInvite, sellingPrice, etc.) populate
+    updateTotalRawCost();
+
+    // Add-on radio toggles: show/hide embossed and envelope fields
+    document.querySelectorAll('input[name="embossed_select"]').forEach(r => {
+        r.addEventListener('change', function() {
+            const show = this.value === 'add';
+            document.querySelectorAll('.embossed-fields').forEach(el => el.style.display = show ? 'block' : 'none');
+            // If hiding, clear values to avoid accidental inclusion
+            if (!show) {
+                ['unitPrice','qty','cost'].forEach(suffix => {
+                    const el = document.getElementById('materials_embossing_addon_' + suffix);
+                    if (el) el.value = '';
+                });
+                updateTotalRawCost();
+            }
+        });
+    });
+
+    document.querySelectorAll('input[name="envelope_select"]').forEach(r => {
+        r.addEventListener('change', function() {
+            const show = this.value === 'add';
+            document.querySelectorAll('.envelope-fields').forEach(el => el.style.display = show ? 'block' : 'none');
+            if (!show) {
+                ['unitPrice','qty','cost'].forEach(suffix => {
+                    const el = document.getElementById('materials_envelope_addon_' + suffix);
+                    if (el) el.value = '';
+                });
+                updateTotalRawCost();
+            }
+        });
+    });
+
+    // Compute addon costs when their unit price or qty change
+    ['embossing_addon', 'envelope_addon'].forEach(key => {
+        const unitEl = document.getElementById(`materials_${key}_unitPrice`);
+        const qtyEl = document.getElementById(`materials_${key}_qty`);
+        const costEl = document.getElementById(`materials_${key}_cost`);
+        if (unitEl && qtyEl && costEl) {
+            const compute = () => {
+                const u = parseFloat(unitEl.value) || 0;
+                const q = parseFloat(qtyEl.value) || 0;
+                costEl.value = (u * q).toFixed(2);
+                updateTotalRawCost();
+            };
+            unitEl.addEventListener('input', compute);
+            qtyEl.addEventListener('input', compute);
+        }
+    });
 
     document.getElementById('invitation-form').addEventListener('submit', function() {
         const btn = document.getElementById('submit-btn');
@@ -241,22 +345,31 @@ document.addEventListener("DOMContentLoaded", () => {
             method: 'POST',
             body: formData,
             headers: {
-                'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value
+                'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value,
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
             }
         })
-        .then(response => response.json())
+        .then(response => {
+            if (response.ok) {
+                return response.json().catch(() => ({ success: false, message: 'Invalid JSON response' }));
+            }
+            return response.text().then(text => ({ success: false, message: text }));
+        })
         .then(data => {
-            if (data.success) {
-                // Redirect to product index
+            if (data && data.success) {
                 window.location.href = '{{ route("admin.products.index") }}';
+                return;
+            }
+            // Show server-side validation errors if provided
+            if (data && data.errors) {
+                console.error('Validation errors:', data.errors);
             } else {
-                // Handle errors (e.g., show validation errors)
-                console.error('Errors:', data.errors);
-                // You can display errors in the UI here
+                console.error('Save failed:', data && data.message ? data.message : data);
             }
         })
         .catch(error => {
-            console.error('Error:', error);
+            console.error('Network or parse error:', error);
         })
         .finally(() => {
             // Reset button state
@@ -278,21 +391,36 @@ document.addEventListener("DOMContentLoaded", () => {
             // Calculate cost
             const cost = unitPrice * qty;
             row.querySelector('input[name$="[cost]"]').value = cost.toFixed(2);
+            updateTotalRawCost();
         }
     });
 
-    // Event delegation for ink total cost calculation
+    // Event delegation for ink total cost calculation (handles usage, costPerMl, and qty)
     document.querySelector('.ink-rows').addEventListener('input', function(e) {
         if (
             e.target.matches('input[name^="inks"][name$="[usage]"]') ||
-            e.target.matches('input[name^="inks"][name$="[costPerMl]"]')
+            e.target.matches('input[name^="inks"][name$="[costPerMl]"]') ||
+            e.target.matches('input[name^="inks"][name$="[qty]"]')
         ) {
             const row = e.target.closest('.ink-row');
             if (!row) return;
             const usage = parseFloat(row.querySelector('input[name$="[usage]"]').value) || 0;
             const costPerMl = parseFloat(row.querySelector('input[name$="[costPerMl]"]').value) || 0;
-            const totalCost = usage * costPerMl;
-            row.querySelector('input[name$="[totalCost]"]').value = totalCost.toFixed(2);
+            const qtyEl = row.querySelector('input[name$="[qty]"]');
+            const globalQty = parseFloat(document.getElementById('quantityOrdered').value) || 0;
+            const suggestedQty = usage * globalQty;
+
+            const qtyValue = qtyEl && qtyEl.value ? parseFloat(qtyEl.value) : suggestedQty;
+
+            // If qty input exists and is empty, populate suggested value (do not override manual input)
+            if (qtyEl && (!qtyEl.value || qtyEl.value === '')) {
+                qtyEl.value = suggestedQty ? suggestedQty.toFixed(2) : '';
+            }
+
+            const totalCost = qtyValue * costPerMl;
+            const totalCostEl = row.querySelector('input[name$="[totalCost]"]');
+            if (totalCostEl) totalCostEl.value = totalCost.toFixed(2);
+            updateTotalRawCost();
         }
     });
 
@@ -319,6 +447,36 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             inkRows.appendChild(newRow);
+        }
+    });
+
+    // Add new material row dynamically
+    document.querySelector('.material-rows').addEventListener('click', function(e) {
+        if (e.target.classList.contains('add-row')) {
+            e.preventDefault();
+            const rowsContainer = this;
+            const lastRow = rowsContainer.querySelector('.material-row:last-child');
+            const newIndex = rowsContainer.querySelectorAll('.material-row').length;
+            const newRow = lastRow.cloneNode(true);
+
+            // Remove any hidden id inputs when cloning a row for new entry
+            newRow.querySelectorAll('input[type="hidden"]').forEach(h => h.remove());
+
+            newRow.querySelectorAll('input, select').forEach(input => {
+                if (input.name) {
+                    input.name = input.name.replace(/\[\d+\]/, `[${newIndex}]`);
+                }
+                if (input.id) {
+                    input.id = input.id.replace(/_\d+_/, `_${newIndex}_`);
+                }
+                // clear values for cloned row
+                if (input.type === 'number' || input.tagName === 'SELECT' || input.type === 'text' || input.tagName === 'TEXTAREA') {
+                    input.value = '';
+                }
+            });
+
+            rowsContainer.appendChild(newRow);
+            addRowListeners(newRow);
         }
     });
 
@@ -350,7 +508,12 @@ document.addEventListener("DOMContentLoaded", () => {
             const previewImg = document.getElementById('template-preview-img');
             if (previewImg) {
                 if (template && template.preview) {
-                    previewImg.src = window.assetUrl + 'storage/' + template.preview;
+                    // If preview already looks like a full URL, use it; otherwise build storage URL
+                    if (/^(https?:)?\/\//i.test(template.preview)) {
+                        previewImg.src = template.preview;
+                    } else {
+                        previewImg.src = window.assetUrl + 'storage/' + template.preview;
+                    }
                     previewImg.alt = template.name + ' Preview';
                 } else {
                     previewImg.src = '';

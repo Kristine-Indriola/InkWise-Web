@@ -9,7 +9,7 @@
                 <div class="template-card" tabindex="0" role="button" data-template-id="{{ $template->id }}">
                     <div class="template-image-container">
                         @if($template->preview)
-                            <img src="{{ asset('storage/' . $template->preview) }}" alt="{{ $template->name }}" class="template-img">
+                            <img src="@imageUrl($template->preview)" alt="{{ $template->name }}" class="template-img">
                         @else
                             <span>No preview</span>
                         @endif

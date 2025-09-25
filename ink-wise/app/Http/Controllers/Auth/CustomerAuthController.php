@@ -50,7 +50,7 @@ class CustomerAuthController extends Controller
             'birthdate'      => $request->birthdate,
         ]);
 
-        // 3. Log in the customer
+
         Auth::login($user);
 
         return redirect()->route('customer.dashboard');

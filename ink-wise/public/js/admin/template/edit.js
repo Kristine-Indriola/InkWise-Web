@@ -57,10 +57,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 box.w * (zoomLevel/100),
                 box.h * (zoomLevel/100)
             );
-            ctx.font = `${box.fontWeight} ${box.fontSize * (zoomLevel/100)}px ${box.fontFamily}`;
+            // Build font including style (italic) if present
+            const fontStyle = box.fontStyle && box.fontStyle !== 'normal' ? box.fontStyle + ' ' : '';
+            const fontWeight = box.fontWeight || '400';
+            ctx.font = `${fontStyle}${fontWeight} ${box.fontSize * (zoomLevel/100)}px ${box.fontFamily}`;
             ctx.fillStyle = box.color;
             ctx.textBaseline = "top";
-            ctx.textAlign = "left";
+            ctx.textAlign = box.textAlign || "left";
             ctx.save();
             ctx.beginPath();
             ctx.rect(
@@ -70,12 +73,31 @@ document.addEventListener("DOMContentLoaded", () => {
                 (box.h - 16) * (zoomLevel/100)
             );
             ctx.clip();
+            // Respect text transform (uppercase)
+            const drawText = (box.textTransform === 'uppercase') ? (box.text || '').toUpperCase() : (box.text || '');
+            // Draw text with wrapping handled by canvas fillText width param
             ctx.fillText(
-                box.text,
+                drawText,
                 box.x * (zoomLevel/100) + 8,
                 box.y * (zoomLevel/100) + 8,
                 (box.w - 16) * (zoomLevel/100)
             );
+            // Underline support: draw a line under the last line
+            if (box.textDecoration && box.textDecoration.includes('underline')) {
+                // Approximate underline position
+                const textMetrics = ctx.measureText(drawText);
+                // compute baseline Y
+                const baselineY = box.y * (zoomLevel/100) + 8 + (box.fontSize * (zoomLevel/100));
+                ctx.beginPath();
+                ctx.strokeStyle = box.color || '#000';
+                ctx.lineWidth = Math.max(1, (box.fontSize * (zoomLevel/100)) / 12);
+                // draw across the box width
+                let startX = box.x * (zoomLevel/100) + 8;
+                let endX = box.x * (zoomLevel/100) + (box.w - 16) * (zoomLevel/100);
+                ctx.moveTo(startX, baselineY);
+                ctx.lineTo(endX, baselineY);
+                ctx.stroke();
+            }
             ctx.restore();
             // Draw resize handle
             ctx.fillStyle = "#2563eb";
@@ -199,6 +221,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 saveState();
                 textBoxes.splice(i, 1);
                 selectedBox = null;
+                hideFloatingToolbar();
                 draw();
                 return;
             }
@@ -239,6 +262,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     dragType = corner.name;
                     dragOffset = {x: mx - box.x, y: my - box.y};
                     draw();
+                    showFloatingToolbar();
                     return;
                 }
             }
@@ -251,6 +275,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 dragBox = box;
                 dragOffset = {x: mx - box.x, y: my - box.y};
                 draw();
+                showFloatingToolbar();
                 return;
             }
         }
@@ -282,6 +307,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         draw();
+        // If nothing selected, hide floating toolbar
+        if (!selectedBox) hideFloatingToolbar();
     });
     canvas.addEventListener("mousemove", function(e) {
         const rect = canvas.getBoundingClientRect();
@@ -293,6 +320,7 @@ document.addEventListener("DOMContentLoaded", () => {
             dragBox.x = mx - dragOffset.x;
             dragBox.y = my - dragOffset.y;
             draw();
+            if (selectedBox) positionFloatingToolbarForBox(selectedBox);
         }
         if (resizing && dragBox) {
             let newX = dragBox.x, newY = dragBox.y, newW = dragBox.w, newH = dragBox.h;
@@ -318,6 +346,7 @@ document.addEventListener("DOMContentLoaded", () => {
             dragBox.w = Math.max(40, newW);
             dragBox.h = Math.max(28, newH);
             draw();
+            if (selectedBox) positionFloatingToolbarForBox(selectedBox);
         }
 
         // Media Drag/Resize
@@ -353,6 +382,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 selectedBox = box;
                 editingBox = box;
                 showInlineEditor(box);
+                showFloatingToolbar();
                 return;
             }
         }
@@ -377,6 +407,7 @@ document.addEventListener("DOMContentLoaded", () => {
         textBoxes = JSON.parse(JSON.stringify(state.textBoxes));
         mediaBoxes = JSON.parse(JSON.stringify(state.mediaBoxes));
         draw();
+        hideFloatingToolbar();
     }
 
     document.getElementById("undoBtn")?.addEventListener("click", function() {
@@ -453,6 +484,62 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ========================
+    // Small Floating Toolbar Integration
+    // ========================
+    const floatingToolbar = document.querySelector('.small-floating-toolbar');
+    const toolbarFontSize = document.getElementById('fontSizeToolbar');
+    const boldToolbar = document.getElementById('boldToolbar');
+    const italicToolbar = document.getElementById('italicToolbar');
+    const underlineToolbar = document.getElementById('underlineToolbar');
+    const alignLeftToolbar = document.getElementById('alignLeftToolbar');
+    const alignCenterToolbar = document.getElementById('alignCenterToolbar');
+    const alignJustifyToolbar = document.getElementById('alignJustifyToolbar');
+    const uppercaseToolbar = document.getElementById('uppercaseToolbar');
+    const colorPickerInput = document.getElementById('colorPickerInput');
+
+    function hideFloatingToolbar() {
+        if (floatingToolbar) floatingToolbar.style.display = 'none';
+        const cp = document.getElementById('colorPickerDropdown'); if (cp) cp.style.display = 'none';
+    }
+
+    function positionFloatingToolbarForBox(box) {
+        if (!floatingToolbar || !box) return;
+        const scale = zoomLevel / 100;
+        const left = canvas.offsetLeft + (box.x * scale) + (box.w * scale) / 2;
+        const top = canvas.offsetTop + (box.y * scale) - 46; // place above box
+        floatingToolbar.style.transform = '';
+        floatingToolbar.style.left = (left - 20) + 'px';
+        floatingToolbar.style.top = Math.max(6, top) + 'px';
+        floatingToolbar.style.display = 'flex';
+    }
+
+    function showFloatingToolbar() {
+        if (!floatingToolbar) return;
+        if (!selectedBox) { hideFloatingToolbar(); return; }
+        if (toolbarFontSize) toolbarFontSize.value = selectedBox.fontSize || 20;
+        if (boldToolbar) boldToolbar.classList.toggle('active', (parseInt(selectedBox.fontWeight || '400') >= 700));
+        if (italicToolbar) italicToolbar.classList.toggle('active', (selectedBox.fontStyle === 'italic'));
+        if (underlineToolbar) underlineToolbar.classList.toggle('active', (selectedBox.textDecoration && selectedBox.textDecoration.includes('underline')));
+        // Show toolbar and position it above the selected box
+        positionFloatingToolbarForBox(selectedBox);
+    }
+
+    // Toolbar control bindings (modify selectedBox properties and redraw)
+    if (toolbarFontSize) toolbarFontSize.addEventListener('input', function(){ if (selectedBox) { selectedBox.fontSize = parseInt(this.value,10) || 12; draw(); if (editingTextarea) editingTextarea.style.fontSize = (selectedBox.fontSize * (zoomLevel/100)) + 'px'; }});
+    if (boldToolbar) boldToolbar.addEventListener('click', function(){ if (!selectedBox) return; selectedBox.fontWeight = (parseInt(selectedBox.fontWeight||'400')>=700) ? '400' : '700'; draw(); });
+    if (italicToolbar) italicToolbar.addEventListener('click', function(){ if (!selectedBox) return; selectedBox.fontStyle = (selectedBox.fontStyle === 'italic') ? 'normal' : 'italic'; draw(); });
+    if (underlineToolbar) underlineToolbar.addEventListener('click', function(){ if (!selectedBox) return; selectedBox.textDecoration = (selectedBox.textDecoration && selectedBox.textDecoration.includes('underline')) ? '' : 'underline'; draw(); });
+    if (alignLeftToolbar) alignLeftToolbar.addEventListener('click', function(){ if (selectedBox) { selectedBox.textAlign = 'left'; draw(); }});
+    if (alignCenterToolbar) alignCenterToolbar.addEventListener('click', function(){ if (selectedBox) { selectedBox.textAlign = 'center'; draw(); }});
+    if (alignJustifyToolbar) alignJustifyToolbar.addEventListener('click', function(){ if (selectedBox) { selectedBox.textAlign = 'justify'; draw(); }});
+    if (uppercaseToolbar) uppercaseToolbar.addEventListener('click', function(){ if (!selectedBox) return; selectedBox.textTransform = (selectedBox.textTransform === 'uppercase') ? 'none' : 'uppercase'; draw(); });
+    if (colorPickerInput) colorPickerInput.addEventListener('input', function(){ if (selectedBox) { selectedBox.color = this.value; draw(); if (editingTextarea) editingTextarea.style.color = this.value; }});
+    // symbol toolbar handler: append a common symbol at the end of text
+    const symbolToolbar = document.getElementById('symbolToolbar');
+    if (symbolToolbar) symbolToolbar.addEventListener('click', function(){ if (!selectedBox) return; const symbol = '★'; if (typeof selectedBox.text !== 'string') selectedBox.text = ''; selectedBox.text = selectedBox.text + symbol; if (editingTextarea && editingBox === selectedBox) editingTextarea.value = selectedBox.text; showFloatingToolbar(); draw(); });
+
+
+    // ========================
     // Add Text Box
     // ========================
     function addTextBox(text = "New Text", fontSize = 20, fontWeight = "normal") {
@@ -468,7 +555,10 @@ document.addEventListener("DOMContentLoaded", () => {
             fontFamily: fonts[0],
             color: "#222"
         });
+        // select newly added box and show toolbar
+        selectedBox = textBoxes[textBoxes.length - 1];
         draw();
+        showFloatingToolbar();
     }
 
     // ========================
@@ -601,24 +691,28 @@ document.addEventListener("DOMContentLoaded", () => {
                     renderFonts();
                     fontSearch.addEventListener("input", e => renderFonts(e.target.value));
                     setTimeout(() => fontSearch.focus(), 100);
-                    textColorPicker.addEventListener("input", e => {
-                        if (selectedBox) {
-                            selectedBox.color = e.target.value;
-                            draw();
-                            if (editingTextarea) editingTextarea.style.color = e.target.value;
-                        }
-                    });
-                    fontSizeInput.addEventListener("input", e => {
-                        if (selectedBox) {
-                            selectedBox.fontSize = parseInt(e.target.value, 10) || 20;
-                            draw();
-                            if (editingTextarea) editingTextarea.style.fontSize = (selectedBox.fontSize * (zoomLevel/100)) + "px";
-                        }
-                    });
-                    addTextBoxBtn.addEventListener("click", () => addTextBox("New Text", 20, "bold"));
-                    addHeadingBtn.addEventListener("click", () => addTextBox("Heading Text", 32, "bold"));
-                    addSubHeadingBtn.addEventListener("click", () => addTextBox("Sub Heading", 24, "600"));
-                    addBodyTextBtn.addEventListener("click", () => addTextBox("A little bit of body text...", 16, "normal"));
+                    if (textColorPicker) {
+                        textColorPicker.addEventListener("input", e => {
+                            if (selectedBox) {
+                                selectedBox.color = e.target.value;
+                                draw();
+                                if (editingTextarea) editingTextarea.style.color = e.target.value;
+                            }
+                        });
+                    }
+                    if (fontSizeInput) {
+                        fontSizeInput.addEventListener("input", e => {
+                            if (selectedBox) {
+                                selectedBox.fontSize = parseInt(e.target.value, 10) || 20;
+                                draw();
+                                if (editingTextarea) editingTextarea.style.fontSize = (selectedBox.fontSize * (zoomLevel/100)) + "px";
+                            }
+                        });
+                    }
+                    if (addTextBoxBtn) addTextBoxBtn.addEventListener("click", () => addTextBox("New Text", 20, "bold"));
+                    if (addHeadingBtn) addHeadingBtn.addEventListener("click", () => addTextBox("Heading Text", 32, "bold"));
+                    if (addSubHeadingBtn) addSubHeadingBtn.addEventListener("click", () => addTextBox("Sub Heading", 24, "600"));
+                    if (addBodyTextBtn) addBodyTextBtn.addEventListener("click", () => addTextBox("A little bit of body text...", 16, "normal"));
                 }
                 // Images Panel
                 if (item.textContent.trim() === "Images") {
@@ -744,6 +838,28 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
     sidebarItems[0]?.click();
+
+    // Quick Insert Text from sidebar quick panel
+    const insertQuickTextBtn = document.getElementById('insertQuickText');
+    if (insertQuickTextBtn) {
+        insertQuickTextBtn.addEventListener('click', function() {
+            const quickTextInput = document.getElementById('quickTextInput');
+            const quickFontSelect = document.getElementById('quickFontSelect');
+            const quickTextColor = document.getElementById('quickTextColor');
+            const text = quickTextInput ? quickTextInput.value.trim() : '';
+            const font = quickFontSelect ? quickFontSelect.value : (fonts[0] || 'Arial');
+            const color = quickTextColor ? quickTextColor.value : '#222';
+            if (!text) return;
+            addTextBox(text, 20, 'normal');
+            // apply font and color to last added box
+            const box = textBoxes[textBoxes.length - 1];
+            if (box) {
+                box.fontFamily = font;
+                box.color = color;
+            }
+            draw();
+        });
+    }
 
     // ========================
     // Layer Controls (Bring Forward / Send Backward)

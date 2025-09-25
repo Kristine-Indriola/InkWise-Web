@@ -44,103 +44,132 @@
   background: #374151;
 }
 
+
 /* Templates Grid */
 .templates-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 20px;
+  gap: 18px;
+  justify-items: center;
 }
 
 /* Template Card */
 .template-card {
   padding: 0;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
   max-width: 320px;
+  width: 100%;
   margin: 0 auto;
+  padding: 12px;
+  border: none;                    /* remove strong border */
+  background: transparent;         /* keep it airy */
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(15,23,42,0.06);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.template-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 30px rgba(15,23,42,0.08);
 }
 
 /* Preview */
 .template-preview {
-  padding: 16px;
+  background: transparent;         /* remove gray preview background */
+  padding: 0;
+  border-radius: 8px;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #f3f4f6;
-  border-radius: 10px 10px 0 0;
-  font-size: 30px;
-  color: #9ca3af;
 }
 
 .template-preview img {
-  max-width: 100%;
-  max-height: 260px;
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  margin-bottom: 12px;
+  box-shadow: 0 6px 18px rgba(2,6,23,0.06);
+  margin-bottom: 0;
 }
 
 /* Template Info */
 .template-info {
-  padding: 15px;
+  padding: 8px 6px;
+  width: 100%;
+  text-align: center;
 }
 
 .template-info h3 {
-  font-size: 16px;
-  font-weight: bold;
+  font-size: 15px;
+  font-weight: 600;
+  margin: 4px 0;
+  color: #0f172a;
 }
 
+/* subtle metadata + truncation */
 .template-info p {
   font-size: 13px;
   color: #6b7280;
-  margin-top: 4px;
+  margin: 4px 0;
 }
 
-/* Template Actions */
+/* clamp description to 2 lines for cleaner cards */
+.template-info p.description,
+.template-info p:nth-of-type(3) {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: 2.6em;
+}
+
+/* Minimal action buttons */
 .template-actions {
+  width: 100%;
   display: flex;
-  justify-content: space-between;
-  margin-top: 12px;
+  gap: 8px;
+  justify-content: center;
+  padding-top: 6px;
+  flex-wrap: wrap;
 }
 
-.btn-edit,
-.btn-use, .btn-delete {
-  padding: 6px 12px;
+.template-actions .btn-edit,
+.template-actions .btn,
+.template-actions .btn-delete {
+  border: 1px solid rgba(15,23,42,0.06);
+  background: rgba(255,255,255,0.9);
+  color: #0f172a;
+  padding: 7px 10px;
+  border-radius: 8px;
   font-size: 13px;
-  border-radius: 6px;
   text-decoration: none;
-  transition: background 0.2s;
+  cursor: pointer;
+  transition: background 120ms ease, transform 120ms ease;
 }
 
-/* Edit Button */
-.btn-edit {
-  background: #e5e7eb;
-  color: #374151;
+.template-actions .btn-delete {
+  color: #ef4444;
+  border-color: rgba(239,68,68,0.12);
+  background: rgba(239,68,68,0.03);
 }
 
-.btn-edit:hover {
-  background: #d1d5db;
+.template-actions .btn-edit:hover,
+.template-actions .btn:hover,
+.template-actions .btn-delete:hover {
+  background: rgba(2,6,23,0.04);
+  transform: translateY(-2px);
 }
 
-/* Use Button */
-.btn-use {
-  background: #1f2937;
-  color: #fff;
-}
-
-.btn-use:hover {
-  background: #374151;
-}
-/* Delete Button */
-.btn-delete {
-  background: #ef4444;
-  color: #fff;
-}
-.btn-delete:hover {
-  background: #b91c1c;
+/* reduce visual weight of timestamp */
+.template-info small {
+  color: #9aa3b2;
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
 }
 
 /* Empty State */
@@ -278,4 +307,31 @@
   border-radius: 6px;
   border: 1px solid #ccc;
   background: linear-gradient(90deg, #6a2ebc 50%, #3cd5c8 50%);
+}
+
+/* Toast for confirmations */
+.tw-toast {
+  position: fixed;
+  right: 20px;
+  bottom: 24px;
+  background: rgba(15,23,42,0.95);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(2,6,23,0.2);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 200ms ease, transform 200ms ease;
+  z-index: 99999;
+}
+.tw-toast.visible { opacity: 1; transform: translateY(0); }
+.tw-toast.error { background: rgba(220,38,38,0.95); }
+
+/* Disabled upload button */
+.btn-upload.disabled,
+.btn-upload[aria-disabled="true"] {
+  opacity: 0.6;
+  pointer-events: none;
+  filter: grayscale(10%);
 }

@@ -50,6 +50,9 @@
 
 <form method="POST" action="{{ route('admin.products.store') }}" id="invitation-form">
     @csrf
+    @if(isset($product) && $product->id)
+        <input type="hidden" id="product_id" name="product_id" value="{{ $product->id }}">
+    @endif
     <input type="hidden" id="template_id" name="template_id" value="">
 
     <div class="invitation-container">
@@ -119,10 +122,11 @@
                         @endphp
                         @foreach($materialRows as $i => $material)
                         <div class="material-row">
+                            <input type="hidden" name="materials[{{ $i }}][id]" value="{{ old('materials.'.$i.'.id', $material['id'] ?? '') }}">
                             <div class="input-row">
                                 <div class="field">
                                     <label for="materials_{{ $i }}_item">Item</label>
-                                    <input type="text" id="materials_{{ $i }}_item" name="materials[{{ $i }}][item]" value="{{ old("materials.$i.item", $material['item'] ?? '') }}">
+                                    <input type="text" id="materials_{{ $i }}_item" name="materials[{{ $i }}][item]" value="{{ old('materials.'.$i.'.item', $material['item'] ?? '') }}">
                                 </div>
                                 <div class="field">
                                     <label for="materials_{{ $i }}_type">Type</label>
@@ -148,7 +152,7 @@
                             <div class="input-row">
                                 <div class="field">
                                     <label for="materials_{{ $i }}_unitPrice">Unit Price</label>
-                                    <input type="number" id="materials_{{ $i }}_unitPrice" name="materials[{{ $i }}][unitPrice]" placeholder="Unit Price" aria-describedby="materials_{{ $i }}_unitPrice-error" value="{{ old('materials.'.$i.'.unitPrice', $material['unitPrice'] ?? '') }}">
+                                    <input type="number" id="materials_{{ $i }}_unitPrice" name="materials[{{ $i }}][unitPrice]" placeholder="Unit Price" aria-describedby="materials_{{ $i }}_unitPrice-error" value="{{ old('materials.'.$i.'.unitPrice', $material['unitPrice'] ?? $material['unit_price'] ?? '') }}">
                                     <span id="materials_{{ $i }}_unitPrice-error" class="error-message"></span>
                                 </div>
                                 <div class="field">
@@ -176,10 +180,11 @@
                         @endphp
                         @foreach($inkRows as $i => $ink)
                         <div class="ink-row">
+                            <input type="hidden" name="inks[{{ $i }}][id]" value="{{ old('inks.'.$i.'.id', $ink['id'] ?? '') }}">
                             <div class="input-row">
                                 <div class="field">
                                     <label for="inks_{{ $i }}_item">Item</label>
-                                    <input type="text" id="inks_{{ $i }}_item" name="inks[{{ $i }}][item]" value="{{ old("inks.$i.item", $ink['item'] ?? '') }}">
+                                    <input type="text" id="inks_{{ $i }}_item" name="inks[{{ $i }}][item]" value="{{ old('inks.'.$i.'.item', $ink['item'] ?? '') }}">
                                 </div>
                                 <div class="field">
                                     <label for="inks_{{ $i }}_type">Type</label>
@@ -193,14 +198,19 @@
                                 </div>
                                 <div class="field">
                                     <label for="inks_{{ $i }}_costPerMl">Cost per ml</label>
-                                    <input type="number" id="inks_{{ $i }}_costPerMl" name="inks[{{ $i }}][costPerMl]" placeholder="Cost per ml" aria-describedby="inks_{{ $i }}_costPerMl-error" value="{{ old('inks.'.$i.'.costPerMl', $ink['costPerMl'] ?? '') }}">
+                                    <input type="number" id="inks_{{ $i }}_costPerMl" name="inks[{{ $i }}][costPerMl]" placeholder="Cost per ml" aria-describedby="inks_{{ $i }}_costPerMl-error" value="{{ old('inks.'.$i.'.costPerMl', $ink['costPerMl'] ?? $ink['cost_per_ml'] ?? '') }}">
                                     <span id="inks_{{ $i }}_costPerMl-error" class="error-message"></span>
                                 </div>
                             </div>
                             <div class="input-row">
                                 <div class="field">
+                                    <label for="inks_{{ $i }}_qty">Qty (ml)</label>
+                                    <input type="number" step="0.01" id="inks_{{ $i }}_qty" name="inks[{{ $i }}][qty]" placeholder="Qty (ml)" aria-describedby="inks_{{ $i }}_qty-error" value="{{ old('inks.'.$i.'.qty', $ink['qty'] ?? '') }}">
+                                    <span id="inks_{{ $i }}_qty-error" class="error-message"></span>
+                                </div>
+                                <div class="field">
                                     <label for="inks_{{ $i }}_totalCost">Total Cost</label>
-                                    <input type="number" id="inks_{{ $i }}_totalCost" name="inks[{{ $i }}][totalCost]" readonly placeholder="Total Cost" aria-describedby="inks_{{ $i }}_totalCost-error" value="{{ old('inks.'.$i.'.totalCost', $ink['totalCost'] ?? '') }}">
+                                    <input type="number" id="inks_{{ $i }}_totalCost" name="inks[{{ $i }}][totalCost]" readonly placeholder="Total Cost" aria-describedby="inks_{{ $i }}_totalCost-error" value="{{ old('inks.'.$i.'.totalCost', $ink['totalCost'] ?? $ink['total_cost'] ?? '') }}">
                                     <span id="inks_{{ $i }}_totalCost-error" class="error-message"></span>
                                 </div>
                                 <button class="add-row" type="button" aria-label="Add another ink row">+</button>
@@ -241,13 +251,96 @@
                 <h2>Customization Options</h2>
                 <div class="responsive-grid grid-2-cols">
                     <div class="field">
-                        <label for="colorOptions">Emboissed Powder</label>
-                        <input type="text" id="colorOptions" name="colorOptions" placeholder="Emboissed Powder" aria-describedby="colorOptions-error" value="{{ old('colorOptions') }}">
+                        <label>Embossed Powder (Add-on)</label>
+                        <div class="radio-group">
+                            <label><input type="radio" name="embossed_select" value="none" checked> None</label>
+                            <label><input type="radio" name="embossed_select" value="add"> Add Embossed Powder</label>
+                        </div>
+                        <div class="addon-fields embossed-fields" style="display:none; margin-top:8px;">
+                            <div class="input-row">
+                                <div class="field">
+                                    <label for="materials_embossing_addon_item">Item</label>
+                                    <input type="text" id="materials_embossing_addon_item" name="materials[embossing_addon][item]" placeholder="Item name" value="{{ old('materials.embossing_addon.item') }}">
+                                </div>
+                                <div class="field">
+                                    <label for="materials_embossing_addon_type">Type</label>
+                                    <input type="text" id="materials_embossing_addon_type" name="materials[embossing_addon][type]" placeholder="Type" value="{{ old('materials.embossing_addon.type') }}">
+                                </div>
+                                <div class="field">
+                                    <label for="materials_embossing_addon_color">Color</label>
+                                    <input type="text" id="materials_embossing_addon_color" name="materials[embossing_addon][color]" placeholder="Color" value="{{ old('materials.embossing_addon.color') }}">
+                                </div>
+                                <div class="field">
+                                    <label for="materials_embossing_addon_size">Size</label>
+                                    <input type="text" id="materials_embossing_addon_size" name="materials[embossing_addon][size]" placeholder="Size" value="{{ old('materials.embossing_addon.size') }}">
+                                </div>
+                                <div class="field">
+                                    <label for="materials_embossing_addon_weight">Weight (GSM)</label>
+                                    <input type="number" id="materials_embossing_addon_weight" name="materials[embossing_addon][weight]" placeholder="Weight" value="{{ old('materials.embossing_addon.weight') }}">
+                                </div>
+                            </div>
+                            <div class="input-row">
+                                <div class="field">
+                                    <label for="materials_embossing_addon_unitPrice">Unit Price</label>
+                                    <input type="number" step="0.01" id="materials_embossing_addon_unitPrice" name="materials[embossing_addon][unitPrice]" placeholder="Unit Price" value="{{ old('materials.embossing_addon.unitPrice') }}">
+                                </div>
+                                <div class="field">
+                                    <label for="materials_embossing_addon_qty">Qty</label>
+                                    <input type="number" id="materials_embossing_addon_qty" name="materials[embossing_addon][qty]" placeholder="Qty" value="{{ old('materials.embossing_addon.qty') }}">
+                                </div>
+                                <div class="field">
+                                    <label for="materials_embossing_addon_cost">Cost</label>
+                                    <input type="number" id="materials_embossing_addon_cost" name="materials[embossing_addon][cost]" readonly placeholder="Cost" value="{{ old('materials.embossing_addon.cost') }}">
+                                </div>
+                            </div>
+                        </div>
                         <span id="colorOptions-error" class="error-message"></span>
                     </div>
+
                     <div class="field">
-                        <label for="envelopeOptions">Envelope Options</label>
-                        <input type="text" id="envelopeOptions" name="envelopeOptions" placeholder="Envelope Options" aria-describedby="envelopeOptions-error" value="{{ old('envelopeOptions') }}">
+                        <label>Envelope Options (Add-on)</label>
+                        <div class="radio-group">
+                            <label><input type="radio" name="envelope_select" value="none" checked> None</label>
+                            <label><input type="radio" name="envelope_select" value="add"> Add Envelope</label>
+                        </div>
+                        <div class="addon-fields envelope-fields" style="display:none; margin-top:8px;">
+                            <div class="input-row">
+                                <div class="field">
+                                    <label for="materials_envelope_addon_item">Item</label>
+                                    <input type="text" id="materials_envelope_addon_item" name="materials[envelope_addon][item]" placeholder="Item name" value="{{ old('materials.envelope_addon.item') }}">
+                                </div>
+                                <div class="field">
+                                    <label for="materials_envelope_addon_type">Type</label>
+                                    <input type="text" id="materials_envelope_addon_type" name="materials[envelope_addon][type]" placeholder="Type" value="{{ old('materials.envelope_addon.type') }}">
+                                </div>
+                                <div class="field">
+                                    <label for="materials_envelope_addon_color">Color</label>
+                                    <input type="text" id="materials_envelope_addon_color" name="materials[envelope_addon][color]" placeholder="Color" value="{{ old('materials.envelope_addon.color') }}">
+                                </div>
+                                <div class="field">
+                                    <label for="materials_envelope_addon_size">Size</label>
+                                    <input type="text" id="materials_envelope_addon_size" name="materials[envelope_addon][size]" placeholder="Size" value="{{ old('materials.envelope_addon.size') }}">
+                                </div>
+                                <div class="field">
+                                    <label for="materials_envelope_addon_weight">Weight (GSM)</label>
+                                    <input type="number" id="materials_envelope_addon_weight" name="materials[envelope_addon][weight]" placeholder="Weight" value="{{ old('materials.envelope_addon.weight') }}">
+                                </div>
+                            </div>
+                            <div class="input-row">
+                                <div class="field">
+                                    <label for="materials_envelope_addon_unitPrice">Unit Price</label>
+                                    <input type="number" step="0.01" id="materials_envelope_addon_unitPrice" name="materials[envelope_addon][unitPrice]" placeholder="Unit Price" value="{{ old('materials.envelope_addon.unitPrice') }}">
+                                </div>
+                                <div class="field">
+                                    <label for="materials_envelope_addon_qty">Qty</label>
+                                    <input type="number" id="materials_envelope_addon_qty" name="materials[envelope_addon][qty]" placeholder="Qty" value="{{ old('materials.envelope_addon.qty') }}">
+                                </div>
+                                <div class="field">
+                                    <label for="materials_envelope_addon_cost">Cost</label>
+                                    <input type="number" id="materials_envelope_addon_cost" name="materials[envelope_addon][cost]" readonly placeholder="Cost" value="{{ old('materials.envelope_addon.cost') }}">
+                                </div>
+                            </div>
+                        </div>
                         <span id="envelopeOptions-error" class="error-message"></span>
                     </div>
                     <div class="field">
@@ -267,10 +360,24 @@
                 <h2>Preview Image</h2>
                 <div class="sample-image">
                     <p>Sample Image:</p>
-                    <img id="template-preview-img"
-                         src="{{ isset($selectedTemplate) && $selectedTemplate->preview ? asset('storage/' . $selectedTemplate->preview) : '' }}"
-                         alt="Sample Invitation"
-                         aria-describedby="sample-image-desc">
+                @php
+                    $previewPath = '';
+                    if (!empty($selectedTemplate)) {
+                        $p = $selectedTemplate->preview ?? $selectedTemplate->image ?? null;
+                        if ($p) {
+                            // If already an absolute URL or starts with a slash, use as-is; otherwise ask Storage to build a URL
+                            if (preg_match('/^(https?:)?\\/\\//i', $p) || strpos($p, '/') === 0) {
+                                $previewPath = $p;
+                            } else {
+                                $previewPath = \Illuminate\Support\Facades\Storage::url($p);
+                            }
+                        }
+                    }
+                @endphp
+                <img id="template-preview-img"
+                    src="{{ $previewPath }}"
+                    alt="Sample Invitation"
+                    aria-describedby="sample-image-desc">
                     <span id="sample-image-desc" style="display: none;">This is a sample image of an invitation for reference.</span>
                 </div>
             </div>
@@ -326,6 +433,7 @@
                             <option disabled selected>Markup %</option>
                             <option value="50" {{ (old('markup') == '50') ? 'selected' : '' }}>50%</option>
                             <option value="100" {{ (old('markup') == '100') ? 'selected' : '' }}>100%</option>
+                            <option value="120" {{ (old('markup') == '120') ? 'selected' : '' }}>120%</option>
                             <option value="150" {{ (old('markup') == '150') ? 'selected' : '' }}>150%</option>
                         </select>
                         <span id="markup-error" class="error-message"></span>

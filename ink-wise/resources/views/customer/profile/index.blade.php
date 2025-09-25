@@ -18,7 +18,7 @@
       <div id="avatarWrap" class="w-24 h-24 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center">
   @if(Auth::user()->customer?->photo)
     <img id="avatarImg"
-         src="{{ asset('storage/' . Auth::user()->customer->photo) }}"
+         src="@imageUrl(Auth::user()->customer->photo)"
          alt="Profile"
          class="w-full h-full object-cover" />
   @else

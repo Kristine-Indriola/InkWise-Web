@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\DB;
 use App\Models\Product;
 use App\Models\Template;
 use App\Models\Material;
@@ -13,13 +14,45 @@ use App\Models\ProductInk;
 
 class ProductController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $products = \App\Models\Product::with(['materials', 'inks'])->orderBy('created_at', 'desc')->paginate(10);
+        $query = \App\Models\Product::with(['materials', 'inks']);
+
+        // Search
+        if ($search = $request->query('q')) {
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%")
+                  ->orWhere('event_type', 'like', "%{$search}%");
+            });
+        }
+
+        // Filter by status
+        if ($status = $request->query('status')) {
+            if ($status !== 'all') {
+                $query->where('status', $status);
+            }
+        }
+
+        // Sorting
+        $allowedSorts = ['created_at','selling_price','quantity_ordered','name'];
+        $sort = $request->query('sort', 'created_at');
+        $order = $request->query('order', 'desc');
+        if (!in_array($sort, $allowedSorts)) {
+            $sort = 'created_at';
+        }
+        $order = strtolower($order) === 'asc' ? 'asc' : 'desc';
+
+        $query->orderBy($sort, $order);
+
+        $perPage = (int) $request->query('per_page', 10);
+        $perPage = $perPage > 0 && $perPage <= 100 ? $perPage : 10;
+
+        $products = $query->paginate($perPage)->appends($request->query());
 
         $totalProducts = \App\Models\Product::count();
         $totalQuantity = \App\Models\Product::sum('quantity_ordered');
-        $totalSales = \App\Models\Product::sum(\DB::raw('selling_price * quantity_ordered'));
+    $totalSales = \App\Models\Product::sum(DB::raw('selling_price * quantity_ordered'));
         $activeProducts = \App\Models\Product::where('status', 'active')->count();
         $inactiveProducts = \App\Models\Product::where('status', 'inactive')->count();
 
@@ -85,6 +118,24 @@ class ProductController extends Controller
         return view('admin.products.index', compact('sampleOrder','materials','printing','foil','lamination', 'products'));
     }
 
+    /**
+     * Show all inks across products
+     */
+    public function inks()
+    {
+        $products = Product::with('inks')->orderBy('created_at', 'desc')->get();
+        return view('admin.products.inks', compact('products'));
+    }
+
+    /**
+     * Show all materials across products
+     */
+    public function materials()
+    {
+        $products = Product::with('materials')->orderBy('created_at', 'desc')->get();
+        return view('admin.products.materials', compact('products'));
+    }
+
     // Add: Method to show the create invitation form
     public function createInvitation(Request $request)
     {
@@ -103,59 +154,133 @@ class ProductController extends Controller
     {
         // Validate main product fields
         $validated = $request->validate([
+            'product_id' => 'nullable|exists:products,id',
             'template_id' => 'nullable|exists:templates,id',
             'invitationName' => 'required|string|max:255',
             'eventType' => 'required|string|max:255',
             'productType' => 'required|string|max:255',
             'themeStyle' => 'required|string|max:255',
-            // ...other fields...
+            'description' => 'nullable|string',
+            'materials' => 'nullable|array',
+            'materials.*.item' => 'nullable|string|max:255',
+            'materials.*.unitPrice' => 'nullable|numeric',
+            'materials.*.qty' => 'nullable|integer',
+            'materials.*.cost' => 'nullable|numeric',
+            'inks' => 'nullable|array',
+            'inks.*.item' => 'nullable|string|max:255',
+            'inks.*.usage' => 'nullable|numeric',
+            'inks.*.costPerMl' => 'nullable|numeric',
+            'inks.*.qty' => 'nullable|numeric',
+            'inks.*.totalCost' => 'nullable|numeric',
         ]);
 
-        // Save the product
-        $product = Product::create([
-            'template_id' => $validated['template_id'] ?? null,
-            'name' => $validated['invitationName'],
-            'event_type' => $validated['eventType'],
-            'product_type' => $validated['productType'],
-            'theme_style' => $validated['themeStyle'],
-            'description' => $request->input('description', ''),
-            // ...other fields...
-        ]);
+        // Create or update product
+        if (!empty($validated['product_id'])) {
+            $product = Product::findOrFail($validated['product_id']);
+            $product->update([
+                'template_id' => $validated['template_id'] ?? null,
+                'name' => $validated['invitationName'],
+                'event_type' => $validated['eventType'],
+                'product_type' => $validated['productType'],
+                'theme_style' => $validated['themeStyle'],
+                'description' => $validated['description'] ?? $request->input('description',''),
+            ]);
+        } else {
+            $product = Product::create([
+                'template_id' => $validated['template_id'] ?? null,
+                'name' => $validated['invitationName'],
+                'event_type' => $validated['eventType'],
+                'product_type' => $validated['productType'],
+                'theme_style' => $validated['themeStyle'],
+                'description' => $validated['description'] ?? $request->input('description',''),
+            ]);
+        }
 
-        // Save Materials
+        // Track existing ids to determine deletions
+        $existingMaterialIds = $product->materials()->pluck('id')->toArray();
+        $existingInkIds = $product->inks()->pluck('id')->toArray();
+
+        $receivedMaterialIds = [];
+        $receivedInkIds = [];
+
+        // Handle Materials: update existing or create new
         if ($request->has('materials')) {
-            foreach ($request->materials as $material) {
+            foreach ($request->materials as $idx => $material) {
+                // Support optional id if present for editing existing material
+                $matId = $material['id'] ?? null;
                 if (!empty($material['item'])) {
-                    $product->materials()->create([
+                    $data = [
                         'item'       => $material['item'],
                         'type'       => $material['type'] ?? null,
                         'color'      => $material['color'] ?? null,
                         'size'       => $material['size'] ?? null,
                         'weight'     => $material['weight'] ?? null,
-                        'unit_price' => $material['unitPrice'] ?? null,
+                        'unit_price' => $material['unitPrice'] ?? ($material['unit_price'] ?? null),
                         'qty'        => $material['qty'] ?? null,
                         'cost'       => $material['cost'] ?? null,
-                    ]);
+                    ];
+
+                    if ($matId) {
+                        $pm = ProductMaterial::where('product_id', $product->id)->where('id', $matId)->first();
+                        if ($pm) {
+                            $pm->update($data);
+                            $receivedMaterialIds[] = $pm->id;
+                            continue;
+                        }
+                    }
+
+                    $new = $product->materials()->create($data);
+                    if ($new) $receivedMaterialIds[] = $new->id;
                 }
             }
         }
 
-        // Save Inks
+        // Handle Inks: update existing or create new
         if ($request->has('inks')) {
-            foreach ($request->inks as $ink) {
+            foreach ($request->inks as $idx => $ink) {
+                $inkId = $ink['id'] ?? null;
                 if (!empty($ink['item'])) {
-                    $product->inks()->create([
-                        'item'        => $ink['item'],
-                        'type'        => $ink['type'] ?? null,
-                        'usage'       => $ink['usage'] ?? null,
-                        'cost_per_ml' => $ink['costPerMl'] ?? null,
-                        'total_cost'  => $ink['totalCost'] ?? null,
-                    ]);
+                    $data = [
+                        'item' => $ink['item'],
+                        'type' => $ink['type'] ?? null,
+                        'usage' => $ink['usage'] ?? null,
+                        'qty' => $ink['qty'] ?? null,
+                        'cost_per_ml' => $ink['costPerMl'] ?? ($ink['cost_per_ml'] ?? null),
+                        'total_cost' => $ink['totalCost'] ?? ($ink['total_cost'] ?? null),
+                    ];
+
+                    if ($inkId) {
+                        $pi = ProductInk::where('product_id', $product->id)->where('id', $inkId)->first();
+                        if ($pi) {
+                            $pi->update($data);
+                            $receivedInkIds[] = $pi->id;
+                            continue;
+                        }
+                    }
+
+                    $new = $product->inks()->create($data);
+                    if ($new) $receivedInkIds[] = $new->id;
                 }
             }
         }
 
-        return redirect()->route('admin.products.index')->with('success', 'Product created!');
+        // Delete removed materials/inks
+        $toDeleteMaterials = array_diff($existingMaterialIds, $receivedMaterialIds);
+        if (!empty($toDeleteMaterials)) {
+            ProductMaterial::whereIn('id', $toDeleteMaterials)->delete();
+        }
+
+        $toDeleteInks = array_diff($existingInkIds, $receivedInkIds);
+        if (!empty($toDeleteInks)) {
+            ProductInk::whereIn('id', $toDeleteInks)->delete();
+        }
+
+        // Return JSON for AJAX or redirect for normal
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json(['success' => true, 'product_id' => $product->id]);
+        }
+
+        return redirect()->route('admin.products.index')->with('success', 'Product saved!');
     }
 
     public function destroy($id)
@@ -173,5 +298,19 @@ class ProductController extends Controller
         $templates = Template::all();
         $materials = Material::all();
         return view('admin.products.create-invitation', compact('product', 'templates', 'materials'));
+    }
+
+    // Show product (used by AJAX slide panel)
+    public function show($id)
+    {
+        $product = Product::with(['materials', 'inks', 'template'])->findOrFail($id);
+
+        // If request expects JSON or is AJAX, return the partial HTML for the slide panel
+        if (request()->ajax() || request()->wantsJson() || request()->header('X-Requested-With') === 'XMLHttpRequest') {
+            return view('admin.products.view', compact('product'));
+        }
+
+        // Otherwise render a simple page with the slide panel (use layout)
+        return view('admin.products.view', compact('product'));
     }
 }

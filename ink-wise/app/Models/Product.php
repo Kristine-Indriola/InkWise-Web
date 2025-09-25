@@ -16,6 +16,7 @@ class Product extends Model
      */
     protected $fillable = [
         'template_id',
+        'image',
         'name',           // Example: Product name (e.g., "Wedding Invitation")
         'event_type',
         'product_type',
