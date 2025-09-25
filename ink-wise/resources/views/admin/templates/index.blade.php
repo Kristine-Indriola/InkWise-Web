@@ -61,7 +61,8 @@
                             <button type="submit" class="btn-delete" onclick="return confirm('Delete this template?')">Delete</button>
                         </form>
                         <a href="{{ route('admin.products.create.invitation', ['template_id' => $template->id]) }}"
-                           class="btn"
+                           class="btn btn-upload"
+                           data-template-id="{{ $template->id }}"
                            style="background:#94b9ff;color:#fff;margin-top:8px;">
                             Upload to Product
                         </a>

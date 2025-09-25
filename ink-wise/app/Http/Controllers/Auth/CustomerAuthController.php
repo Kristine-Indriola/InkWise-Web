@@ -51,10 +51,6 @@ class CustomerAuthController extends Controller
             // Add other fields if needed (e.g., 'gender' if in form)
         ]);
 
-        // 3️⃣ Login customer
-        auth()->login($user);
-
-
         // 3. Log in the user
         Auth::login($user);
 
@@ -72,12 +68,6 @@ class CustomerAuthController extends Controller
         }
 
         return back()->withErrors(['email' => 'Invalid email or password']);
-
-            return redirect()->route('customer.dashboard'); // or intended route
-        }
-
-        return back()->withErrors(['email' => 'Invalid credentials']);
-
     }
 
     public function dashboard()

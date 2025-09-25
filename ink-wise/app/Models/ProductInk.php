@@ -15,6 +15,7 @@ class ProductInk extends Model
         'item',
         'type',
         'usage',
+        'qty',
         'cost_per_ml',
         'total_cost',
     ];

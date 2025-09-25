@@ -25,9 +25,7 @@
 
                     {{-- Profile Picture --}}
                     <td>
-                        <img src="{{ $customer->customer && $customer->customer->photo
-                                    ? asset('storage/' . $customer->customer->photo)
-                                    : 'https://via.placeholder.com/50' }}"
+               <img src="{{ $customer->customer && $customer->customer->photo ? \App\Support\ImageResolver::url($customer->customer->photo) : 'https://via.placeholder.com/50' }}"
                              alt="Profile" width="50" height="50"
                              style="border-radius:50%; object-fit:cover;">
                     </td>
