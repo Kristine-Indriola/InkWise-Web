@@ -22,7 +22,7 @@ class Customer extends Model
         'user_id',
         'photo',
         'phone',
-        'birthdate',
+        'date_of_birth',
         'gender',
     ];
 

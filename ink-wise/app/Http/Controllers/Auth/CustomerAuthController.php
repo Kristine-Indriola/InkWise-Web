@@ -24,36 +24,34 @@ class CustomerAuthController extends Controller
     public function register(Request $request)
     {
         $request->validate([
-            'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|min:6|confirmed',
-            'birthdate' => 'required|date',
+            'first_name'     => 'required|string|max:255',
+            'last_name'      => 'required|string|max:255',
+            'email'          => 'required|email|unique:users,email',
+            'password'       => 'required|min:6|confirmed',
+            'birthdate'      => 'required|date',
             'contact_number' => 'nullable|string|max:20',
-            'middle_name' => 'nullable|string|max:255',
+            'middle_name'    => 'nullable|string|max:255',
         ]);
 
         // 1. Create the User (for authentication)
         $user = User::create([
-            'email' => $request->email,
+            'email'    => $request->email,
             'password' => Hash::make($request->password),
-            'role' => 'customer',
+            'role'     => 'customer',
         ]);
 
-        // 2. Create the Customer profile (using Customer model)
-        $customer = Customer::create([
-            'user_id' => $user->user_id,
-            'first_name' => $request->first_name,
-            'middle_name' => $request->middle_name,
-            'last_name' => $request->last_name,
+        // 2. Create the Customer profile
+        Customer::create([
+            'user_id'        => $user->user_id,
+            'first_name'     => $request->first_name,
+            'middle_name'    => $request->middle_name,
+            'last_name'      => $request->last_name,
             'contact_number' => $request->contact_number,
-            'birthdate' => $request->birthdate, // Assuming 'birthdate' maps to 'date_of_birth' in migration
-            // Add other fields if needed (e.g., 'gender' if in form)
+            'birthdate'      => $request->birthdate,
         ]);
 
-        // 3. Log in the user
-        Auth::login($user);
 
+        Auth::login($user);
 
         return redirect()->route('customer.dashboard');
     }
@@ -63,7 +61,6 @@ class CustomerAuthController extends Controller
         $credentials = $request->only('email', 'password');
 
         if (Auth::attempt($credentials)) {
-
             return redirect()->route('customer.dashboard');
         }
 
@@ -73,7 +70,7 @@ class CustomerAuthController extends Controller
     public function dashboard()
     {
         return view('customer.dashboard', [
-            'customer' => Auth::user()->customer // eager load profile
+            'customer' => Auth::user()?->customer, // safe access
         ]);
     }
 
@@ -83,6 +80,6 @@ class CustomerAuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('dashboard'); // Redirect to customer dashboard
+        return redirect()->route('dashboard'); // 👈 check if this route exists
     }
 }

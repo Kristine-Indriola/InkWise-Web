@@ -160,11 +160,14 @@ Route::prefix('users')->name('users.')->group(function () {
     });
 
     // Messages routes
-      Route::prefix('messages')->name('messages.')->group(function () {
-        Route::get('/', [MessageController::class, 'index'])->name('index'); // ✅ admin.messages.index
-        Route::get('/chat/{customerId}', [MessageController::class, 'chatWithCustomer'])->name('chat');
-        Route::post('/send/{customerId}', [MessageController::class, 'sendToCustomer'])->name('send');
-    });
+
+    Route::get('messages', [MessageController::class, 'index'])->name('messages.index');
+    Route::get('messages/{customer}', [MessageController::class, 'chatWithCustomer'])->name('messages.chat');
+    Route::post('messages/{customer}', [MessageController::class, 'sendToCustomer'])->name('messages.send');
+     Route::post('messages/{message}/reply', [MessageController::class, 'replyToMessage'])
+        ->name('messages.reply');
+    Route::get('messages/{message}/thread', [MessageController::class, 'thread'])
+        ->name('messages.thread');
 
      Route::get('reports', [ReportsDashboardController::class, 'index'])
          ->name('reports.reports');
@@ -241,20 +244,28 @@ Route::post('/customer/logout', [CustomerAuthController::class, 'logout'])->name
 
 Route::get('/customer/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');
 
+Route::post('/messages', [MessageController::class, 'storeFromContact'])->name('messages.store');
 
 
 /**Customer Profile Pages*/
 Route::prefix('customerprofile')->group(function () {
     // Addresses
-    Route::get('/addresses', [AddressController::class, 'profile'])->name('customer.profile.addresses');
-    Route::post('/addresses', [AddressController::class, 'store'])->name('customer.profile.addresses.store');
-    Route::post('/addresses/{address}/delete', [AddressController::class, 'destroy'])->name('customer.profile.addresses.destroy');
-    Route::post('/addresses/{address}/update', [AddressController::class, 'update'])->name('customer.profile.addresses.update');
 
-    // Profile, Settings, Order Form
+    Route::get('/addresses', [CustomerProfileController::class, 'addresses'])
+        ->name('customer.profile.addresses');
+
+    Route::post('/addresses', [CustomerProfileController::class, 'storeAddress'])
+        ->name('customer.profile.addresses.store');
+
+    Route::put('/addresses/{address}', [CustomerProfileController::class, 'updateAddress'])
+        ->name('customer.profile.addresses.update');
+
+    Route::delete('/addresses/{address}', [CustomerProfileController::class, 'destroyAddress'])
+        ->name('customer.profile.addresses.destroy');
+
    Route::get('/', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
     Route::get('/profile', [CustomerProfileController::class, 'edit'])->name('customer.profile.edit');
-    Route::post('/profile', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
+    Route::put('/profile', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
 // Other pages
 Route::get('/settings', fn () => view('customer.profile.settings'))->name('customer.profile.settings');
 Route::get('/order', fn () => view('customer.profile.orderform'))->name('custome.rprofile.orderform');
@@ -266,7 +277,7 @@ Route::middleware('auth')->get('/customerprofile/dashboard', [CustomerAuthContro
 
 // My Purchases
 
-
+Route::get('/customer/my-orders', fn () => view('customer.profile.my_purchase'))->name('customer.my_purchase');
 
 
 /** Profile & Addresses (Protected) */

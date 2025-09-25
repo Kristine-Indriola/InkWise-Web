@@ -624,6 +624,7 @@ body.dark-mode .btn-warning {
       document.addEventListener('loadProductSlideAssets', function(){ window.__loadProductSlideAssets(); }, { once: true });
     })();
   </script>
+  <meta name="csrf-token" content="{{ csrf_token() }}">
 </head>
 <body>
   <!-- Sidebar -->
@@ -803,5 +804,8 @@ body.dark-mode .btn-warning {
 </script>
     </div>
   </div>
+
+  {{-- make sure scripts from views are rendered here --}}
+  @yield('scripts')
 </body>
 </html>
