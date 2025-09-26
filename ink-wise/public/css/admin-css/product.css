@@ -26,8 +26,13 @@ body {
 
 .dashboard-container {
     padding: 20px;
+<<<<<<< HEAD
     max-width: 1200px;
     margin: 0 auto;
+=======
+    max-width: 1500px;
+    margin: auto;
+>>>>>>> origin/dashboard17
 }
 
 .page-title {
@@ -36,98 +41,7 @@ body {
     margin-bottom: 20px;
 }
 
-/* ================================
-   SUMMARY CARDS (improved)
-   Modern, responsive cards with icon area and percentage badge
-================================== */
-.summary-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 16px;
-    align-items: stretch;
-}
-
-.summary-cards.compact {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.card {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: var(--background-white);
-    border-radius: 10px;
-    padding: 10px;
-    box-sizing: border-box;
-    min-height: 64px;
-    box-shadow: 0 6px 14px rgba(16,24,40,0.03);
-    transition: transform 0.12s ease, box-shadow 0.12s ease;
-    border-left: 6px solid rgba(148,185,255,0.1);
-}
-
-.card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 10px 24px rgba(16,24,40,0.06);
-}
-
-.card-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    background: var(--primary-color);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    font-weight: 700;
-    font-size: 0.85rem;
-    flex-shrink: 0;
-}
-
-.card-body {
-    flex: 1 1 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-}
-
-.card-title { font-size: 0.78rem; font-weight: 700; color: #0f172a; }
-.card-subtitle { font-size: 0.65rem; color: var(--text-secondary); }
-.card-number { font-size: 0.95rem; font-weight: 800; color: #0f172a; }
-
-.card-footer {
-    display:flex; align-items:center; gap:6px; margin-top:4px;
-}
-
-.card-percentage {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 7px;
-    border-radius: 999px;
-    font-size: 0.72rem;
-    font-weight: 700;
-}
-.card-percentage.positive { background: rgba(34,197,94,0.06); color: #16a34a; }
-.card-percentage.negative { background: rgba(239,68,68,0.05); color: #ef4444; }
-
-.card-meta { display:flex; align-items:center; gap:12px; }
-
-.text-green { color: var(--green); }
-.text-red { color: var(--red); }
-
-/* compact variant */
-.summary-cards.compact .card { padding: 8px; min-height: 60px; border-radius: 8px; }
-
-@media (max-width: 520px) {
-    .card { padding: 8px; gap: 8px; }
-    .card-icon { width: 34px; height: 34px; font-size: 0.8rem; }
-    .card-number { font-size: 0.9rem; }
-    .card-title { font-size: 0.74rem; }
-    .card-subtitle { font-size: 0.62rem; }
-}
+/* summary-cards and table UI removed: styles intentionally omitted */
 
 /* ================================
    ADD BUTTONS
@@ -250,6 +164,7 @@ body {
     outline-offset: 2px;
 }
 
+<<<<<<< HEAD
 /* ================================
    PRODUCTS TABLE
 ================================== */
@@ -260,18 +175,33 @@ body {
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     overflow-x: auto;
 }
+=======
+/* products table styles removed (grid-only UI now) */
+>>>>>>> origin/dashboard17
 
+/* ================================
+   WHITE BACKGROUND CONTAINER
+   Wrap the grid in a subtle white card so the grid reads as a single panel
+=================================== */
+.table-container {
+    background: var(--background-white);
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: 0 8px 24px rgba(2,6,23,0.06);
+    border: 1px solid rgba(2,6,23,0.04);
+    margin-top: 12px;
+}
 .table-container h2 {
-    margin-bottom: 12px;
-    font-size: 1.2rem;
+    margin: 0 0 12px 0;
+    font-size: 1.05rem;
+    color: #111827;
     font-weight: 700;
 }
-
-.products-table {
-    width: 100%;
-    border-collapse: collapse;
+.table-container .products-grid {
+    margin-top: 0; /* grid sits inside the padded container */
 }
 
+<<<<<<< HEAD
 .products-table th,
 .products-table td {
     padding: 12px 10px;
@@ -399,6 +329,8 @@ body {
     outline: 2px solid var(--primary-hover);
     outline-offset: 2px;
 }
+=======
+>>>>>>> origin/dashboard17
 
 /* ================================
    PAGINATION
@@ -466,6 +398,7 @@ body {
    Ensure the product admin layout resizes nicely
 =================================== */
 
+<<<<<<< HEAD
 
 /* make container adapt to viewport while keeping comfortable margins */
 .dashboard-container { max-width: 1200px; width: calc(100% - 48px); padding: 20px 24px; box-sizing: border-box; }
@@ -473,35 +406,195 @@ body {
 .table-container table { min-width: 920px; }
 
 /* compact table spacing on narrower screens */
-@media (max-width: 1024px) {
-    .dashboard-container { padding: 16px; }
-    .summary-cards { gap: 12px; }
-    .card { width: auto; height: auto; padding: 12px; }
-    .floating-buttons { min-width: 150px; }
-    .products-table th, .products-table td { padding: 10px 8px; }
+=======
+/* make container adapt to viewport while keeping comfortable margins */
+.dashboard-container {
+    max-width: 1500px;
+    width: calc(100% - 48px);
+    padding: 20px 24px;
+    box-sizing: border-box;
 }
 
-/* Tablet and mobile improvements */
+/* Remove table-specific styles; keep responsive helpers for grid/cards */
+>>>>>>> origin/dashboard17
+@media (max-width: 1024px) {
+    .dashboard-container { padding: 16px; }
+    .floating-buttons { min-width: 150px; }
+}
+
 @media (max-width: 768px) {
     .dashboard-container { width: calc(100% - 32px); padding: 12px; }
-    .summary-cards { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
-    .summary-cards.compact { flex-wrap: wrap; gap: 8px; }
     .search-and-add { justify-content: space-between; align-items: center; }
-    .table-controls { display: flex; flex-direction: column; gap: 10px; }
-    .controls-right { display: flex; gap: 8px; align-items: center; }
     .filter-group select { padding: 6px; }
+<<<<<<< HEAD
     .table-container table { min-width: 720px; }
     .product-thumb { width: 36px; height: 36px; }
     .product-name { font-size: 13px; }
     .product-desc { font-size: 11px; }
     .btn-view, .btn-update, .btn-delete { padding: 6px 8px; font-size: 0.85rem; }
+=======
+>>>>>>> origin/dashboard17
 }
 
-/* Small mobile: stack tables into card-like rows for readability */
 @media (max-width: 520px) {
+<<<<<<< HEAD
     /* For small screens the grid layout is preferred; ensure spacing is compact */
+=======
+    .product-card { border-radius: 8px; }
+    .product-card-media { height: 120px; }
+>>>>>>> origin/dashboard17
     .table-pagination { flex-direction: column; align-items: flex-start; gap: 8px; }
 }
+
+/* ================================
+   PRODUCTS GRID / CARD LAYOUT
+=================================== */
+.products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+    margin-top: 12px;
+}
+.product-card {
+    display: flex;
+    flex-direction: column;
+    background: var(--background-white);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 6px 14px rgba(16,24,40,0.04);
+    transition: transform .12s ease, box-shadow .12s ease;
+}
+.product-card:hover { transform: translateY(-6px); box-shadow: 0 12px 30px rgba(16,24,40,0.08); }
+.product-card-media { width: 100%; height: 140px; background: #f3f4f6; display:flex; align-items:center; justify-content:center; }
+.product-card-thumb { width:100%; height:100%; object-fit:cover; }
+.product-card-body { padding: 12px; }
+.product-card-title { margin:0; font-size:1rem; font-weight:700; }
+.product-card-desc { margin:6px 0 0; color:var(--text-secondary); font-size:0.85rem; }
+.product-card-meta { margin-top:8px; color:var(--text-secondary); font-size:0.85rem; display:flex; gap:8px; align-items:center; }
+.product-card-footer { padding: 10px 12px; display:flex; gap:8px; align-items:center; justify-content:space-between; border-top:1px solid #eef2f6; }
+.card-actions { display:flex; gap:6px; align-items:center; }
+.btn-upload { background: var(--primary-color); color:#fff; border:none; padding:6px 8px; border-radius:6px; cursor:pointer; }
+.no-products { padding: 16px; color: var(--text-secondary); }
+
+/* Hide the inline status text/dot in grid cards (the modal keeps its own badge) */
+.product-card .status-wrap { display: none; }
+
+/* ================================
+   GRID CARD BUTTONS
+   Styles for view / edit / upload / delete controls inside product cards
+=================================== */
+.product-card .card-actions a,
+.product-card .card-actions button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--primary-color);
+    font-weight: 600;
+    font-size: 0.92rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.14s ease, transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.product-card .card-actions i { font-size: 1.05rem; }
+
+/* primary filled action (upload) already uses primary background; make it slightly larger */
+.product-card .card-actions .btn-upload {
+    padding: 7px 10px;
+    border-radius: 8px;
+    box-shadow: 0 6px 12px rgba(14,46,120,0.06);
+}
+
+/* edit link (neutral) */
+.product-card .card-actions .btn-update {
+    background: #fff;
+    border: 1px solid var(--border-color);
+    color: #374151; /* darker text for neutrality */
+    padding: 6px 8px;
+}
+
+/* view button: subtle primary-outline */
+.product-card .card-actions .btn-view {
+    background: transparent;
+    border: 1px solid rgba(148,185,255,0.18);
+    color: var(--primary-color);
+}
+
+/* delete button: warn style */
+.product-card .card-actions .ajax-delete,
+.product-card .card-actions .btn-delete {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--red);
+}
+
+/* Hover / focus states */
+.product-card .card-actions a:hover,
+.product-card .card-actions button:hover {
+    transform: translateY(-1px);
+}
+.product-card .card-actions a:focus,
+.product-card .card-actions button:focus {
+    outline: 3px solid rgba(148,185,255,0.18);
+    outline-offset: 2px;
+}
+
+/* delete hover - gentle red background */
+.product-card .card-actions .ajax-delete:hover,
+.product-card .card-actions .btn-delete:hover {
+    background: rgba(220,53,69,0.06);
+}
+
+/* small screens: slightly reduce padding to keep layout tight */
+@media (max-width: 520px) {
+    .product-card .card-actions a,
+    .product-card .card-actions button { padding: 6px; font-size: 0.88rem; }
+}
+
+/* ================================
+     MODAL STYLES (moved from AJAX partial)
+=================================== */
+.product-modal { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: center; justify-content: center; }
+.product-modal .modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.45); backdrop-filter: blur(2px); }
+.product-modal .modal-content { position: relative; z-index: 2; width: 92%; max-width: 1100px; max-height: 90vh; overflow: auto; background: #fff; border-radius: 12px; box-shadow: 0 18px 50px rgba(2,6,23,0.4); display: flex; flex-direction: column; transform: translateY(8px) scale(.995); opacity:0; }
+.product-modal .modal-header { display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid #eef2f6; }
+.product-modal .modal-body { padding: 16px 18px; display:flex; gap:18px; flex-wrap:wrap; }
+.product-modal .modal-image { flex: 1 1 360px; min-width:280px; max-width:460px; }
+.product-modal .modal-image img { width:100%; height:320px; object-fit:cover; border-radius:8px; background:#f3f4f6; }
+.product-modal .thumbnails { margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; }
+.product-modal .thumb { border:0; padding:0; background:transparent; cursor:pointer; }
+.product-modal .thumb img { width:64px; height:48px; object-fit:cover; border-radius:6px; border:2px solid transparent; }
+.product-modal .thumb.selected img { border-color: #94b9ff; }
+.product-modal .modal-info { flex:1 1 320px; min-width:240px; }
+.product-modal .modal-footer { display:flex; gap:8px; padding:12px 18px; border-top:1px solid #eef2f6; justify-content:flex-end; }
+.product-modal .btn-close { background:transparent; border:0; font-size:20px; cursor:pointer; }
+
+/* Enter/Exit animations for modal */
+.modal-enter { animation: modalIn .22s cubic-bezier(.2,.9,.2,1) forwards; }
+.modal-exit { animation: modalOut .18s cubic-bezier(.4,.0,.2,1) forwards; }
+@keyframes modalIn {
+    from { opacity: 0; transform: translateY(8px) scale(.995); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes modalOut {
+    from { opacity: 1; transform: translateY(0) scale(1); }
+    to   { opacity: 0; transform: translateY(6px) scale(.995); }
+}
+
+/* Card removal animation */
+.card-removing { animation: cardRemove .28s ease forwards; }
+@keyframes cardRemove {
+    0% { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-12px) scale(.98); height:0; margin:0; padding:0; }
+}
+
+/* Accessibility helper: prevent background scroll when modal open */
+body.modal-open { overflow: hidden; }
 
 /* Accessibility: ensure focus outlines remain visible on small screens */
 .btn-add-new:focus, .page-link:focus, .filter-group select:focus { outline: 3px solid rgba(148,185,255,0.28); }

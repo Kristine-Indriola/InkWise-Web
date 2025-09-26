@@ -10,6 +10,15 @@
   box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
+/* Shared admin page container: keep admin pages centered and consistent */
+.dashboard-container {
+  width: 100%;
+  max-width: 1500px;
+  margin: 20px auto;
+  padding: 0 18px;
+  box-sizing: border-box;
+}
+
 /* Header */
 .templates-header {
   display: flex;
@@ -121,6 +130,7 @@
 .template-info p:nth-of-type(3) {
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;

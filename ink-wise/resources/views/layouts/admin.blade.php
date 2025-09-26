@@ -592,6 +592,7 @@ body.dark-mode .btn-warning {
       } catch (e) { console.error('Theme init error', e); }
     })();
   </script>
+<<<<<<< HEAD
   <!-- Product slide assets loader removed: provide a safe stub to avoid 404s if other scripts call it -->
   <script>
     (function(){
@@ -601,6 +602,39 @@ body.dark-mode .btn-warning {
         window.__productSlideAssetsLoaded = true;
         return Promise.resolve();
       };
+=======
+  <!-- Lazy-loader for product modal assets: call window.__loadProductModalAssets() to inject CSS+JS when needed -->
+  <script>
+    (function(){
+      if (window.__productSlideAssetsLoaded) return;
+      function injectStylesheet(href){
+        var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href; document.head.appendChild(l);
+      }
+      function injectScript(src){
+        return new Promise(function(res, rej){
+          var s = document.createElement('script'); s.src = src; s.defer = true; s.onload = res; s.onerror = rej; document.head.appendChild(s);
+        });
+      }
+
+      // Loader for product modal assets (new consolidated files)
+      window.__loadProductModalAssets = function(){
+        if (window.__productModalAssetsLoaded) return Promise.resolve();
+        try { injectStylesheet('{{ asset("css/admin-css/product.css") }}'); } catch(e){}
+        return injectScript('{{ asset("js/admin/product.js") }}').then(function(){ window.__productModalAssetsLoaded = true; }).catch(function(){ window.__productModalAssetsLoaded = true; });
+      };
+
+      // Auto-load on known products index path for convenience
+      try {
+        var path = window.location.pathname || '';
+        if (path.match(/\/admin\/products(\/.*)?$/i)) {
+          // Load lazily but don't block render
+          setTimeout(function(){ window.__loadProductModalAssets(); }, 80);
+        }
+      } catch(e){}
+
+      // Also listen for an event to load later
+  document.addEventListener('loadProductModalAssets', function(){ window.__loadProductModalAssets(); }, { once: true });
+>>>>>>> origin/dashboard17
     })();
   </script>
   <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -671,6 +705,10 @@ body.dark-mode .btn-warning {
           @if($notifCount > 0)
               <span class="notif-badge">{{ $notifCount }}</span>
           @endif
+        </a>
+        <!-- Paper plane / Messages quick-link (transparent background, colored icon) -->
+        <a href="{{ route('admin.messages.index') }}" class="nav-link notif-btn" title="Messages" style="display:flex; align-items:center; justify-content:center;">
+          <i class="fi fi-sr-envelope" style="font-size:20px;"></i>
         </a>
         <!-- Day/Night Toggle Switch -->
         <div id="theme-toggle-switch" class="theme-toggle-switch" title="Toggle dark/light mode" style="margin:0;">

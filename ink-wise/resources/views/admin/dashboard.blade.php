@@ -4,6 +4,8 @@
 
 @section('content')
 
+  <div class="dashboard-container"><!-- added wrapper to constrain width -->
+
   {{-- ✅ Greeting Message --}}
   @if(session('success'))
       <div id="greetingMessage" 
@@ -77,6 +79,15 @@
   </div>
 
   <style>
+    /* container to center and limit dashboard width */
+    .dashboard-container {
+      width: 100%;
+      max-width: 1500px; 
+      margin: 20px auto;
+      padding: 0 18px;
+      box-sizing: border-box;
+    }
+
     .clickable-table {
       cursor: pointer;
     }
@@ -122,5 +133,7 @@
         }
     }, 4000);
   </script>
+
+  </div><!-- /.dashboard-container -->
 
 @endsection

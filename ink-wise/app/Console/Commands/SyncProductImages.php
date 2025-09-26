@@ -29,7 +29,18 @@ class SyncProductImages extends Command
                 continue;
             }
 
-            $preview = preg_replace('#^/??storage/#i', '', $template->preview);
+            // Normalize preview: accept full URLs, '/storage/..', 'storage/..' or storage-relative paths
+            $rawPreview = $template->preview;
+            $preview = '';
+            // If it's a full URL, extract the path component (e.g. /storage/templates/previews/..)
+            if (preg_match('#^https?://#i', $rawPreview)) {
+                $parsed = parse_url($rawPreview);
+                $path = $parsed['path'] ?? '';
+                // remove leading /storage/ if present
+                $preview = preg_replace('#^/??storage/#i', '', ltrim($path, '/'));
+            } else {
+                $preview = preg_replace('#^/??storage/#i', '', ltrim($rawPreview, '/'));
+            }
             try {
                 // try to resolve actual file path (handles missing extension)
                 $actual = $preview;
@@ -48,7 +59,7 @@ class SyncProductImages extends Command
                 }
 
                 // If preview exists on public disk, copy it
-                if (Storage::disk('public')->exists($actual)) {
+                if ($actual && Storage::disk('public')->exists($actual)) {
                     $ext = pathinfo($actual, PATHINFO_EXTENSION) ?: 'png';
                     $newName = 'products/product_' . $product->id . '_' . time() . '.' . $ext;
                     Storage::disk('public')->copy($actual, $newName);
@@ -65,7 +76,7 @@ class SyncProductImages extends Command
                 ];
                 $copied = false;
                 foreach ($possible as $p) {
-                    if (file_exists($p)) {
+                    if ($p && file_exists($p)) {
                         $ext = pathinfo($p, PATHINFO_EXTENSION) ?: 'png';
                         $newName = 'products/product_' . $product->id . '_' . time() . '.' . $ext;
                         $contents = file_get_contents($p);
@@ -75,6 +86,26 @@ class SyncProductImages extends Command
                         $this->info("Copied for product {$product->id} -> {$newName}");
                         $copied = true;
                         break;
+                    }
+                }
+
+                // If still not copied and original was a remote URL, attempt to download it
+                if (!$copied && preg_match('#^https?://#i', $rawPreview)) {
+                    try {
+                        $this->info("Attempting to download remote preview for template {$template->id}");
+                        $contents = @file_get_contents($rawPreview);
+                        if ($contents !== false) {
+                            // try to determine extension from headers or URL
+                            $ext = pathinfo(parse_url($rawPreview, PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'png';
+                            $newName = 'products/product_' . $product->id . '_' . time() . '.' . $ext;
+                            Storage::disk('public')->put($newName, $contents);
+                            $product->image = $newName;
+                            $product->save();
+                            $this->info("Downloaded remote preview for product {$product->id} -> {$newName}");
+                            $copied = true;
+                        }
+                    } catch (\Throwable $e) {
+                        $this->warn("Failed to download remote preview: " . $e->getMessage());
                     }
                 }
 

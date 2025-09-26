@@ -45,6 +45,13 @@
       </a>
     </li>
     <li>
+      <a href="{{ route('owner.products.index') }}">
+        <button class="sidebar-btn {{ request()->routeIs('owner.products') ? 'active' : '' }}">
+          <span class="text">Products</span><span class="ico">🛍️</span>
+        </button>
+      </a>
+    </li>
+    <li>
       <a href="{{ route('owner.transactions-view') }}">
         <button class="sidebar-btn {{ request()->routeIs('owner.transactions-view') ? 'active' : '' }}">
           <span class="text">View Transactions</span><span class="ico">💳</span>
