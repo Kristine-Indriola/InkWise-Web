@@ -234,4 +234,64 @@
     font-weight: bold;
 }
 
+/* table layout fixes for alignment */
+.materials-container .table-wrapper table {
+  width: 100%;
+  table-layout: fixed; /* ensure column widths respected */
+  border-collapse: collapse;
+}
+
+.materials-container th, 
+.materials-container td {
+  vertical-align: middle; /* align content vertically */
+  padding: 10px 12px;
+  word-wrap: break-word;
+}
+
+/* Reserve space and center Status and Actions columns */
+.materials-container th.status-col,
+.materials-container td.status-col {
+  width: 140px;
+  text-align: center;
+}
+
+.materials-container th.actions-col,
+.materials-container td.actions-col {
+  width: 150px;
+  text-align: center;
+}
+
+/* center action buttons and add small gap */
+.materials-container .actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* make buttons small so they don't wrap */
+.materials-container .actions .btn {
+  padding: 4px 8px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* optional: ellipsis for long names */
+.materials-container td.material-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* responsive: allow table to scroll horizontally on small screens */
+@media (max-width: 900px) {
+  .materials-container .table-wrapper {
+    overflow-x: auto;
+  }
+  .materials-container th.status-col,
+  .materials-container th.actions-col {
+    width: 120px;
+  }
+}
+
 

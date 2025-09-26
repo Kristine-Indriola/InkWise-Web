@@ -21,10 +21,28 @@ class MaterialController extends Controller
 
     public function store(Request $request)
     {
+        // Normalize occasion inputs to a canonical token before validation.
+        // The UI submits "ALL OCCASION" — map that to 'all' so validation rules accept it.
+        if ($request->has('occasion')) {
+            $occs = $request->input('occasion');
+            if (is_array($occs)) {
+                $occs = array_map(function($o) {
+                    if (!is_string($o)) return $o;
+                    $trim = trim($o);
+                    // Accept several variants from the front-end
+                    if (strcasecmp($trim, 'ALL OCCASION') === 0 || strcasecmp($trim, 'ALL_OCCASION') === 0 || strcasecmp($trim, 'all') === 0) {
+                        return 'all';
+                    }
+                    return $trim;
+                }, $occs);
+                $request->merge(['occasion' => $occs]);
+            }
+        }
         $validated = $request->validate([
-            'material_name' => 'required|string|max:255',
+            'material_name' => 'required|string|max:255|unique:materials,material_name',
             'occasion' => 'required|array|min:1',
-            'occasion.*' => 'string|in:wedding,birthday,baptism,corporate',
+            // allow 'all' so the front-end 'All Occasions' option validates
+            'occasion.*' => 'string|in:all,wedding,birthday,baptism,corporate',
             'product_type' => 'required|string|in:invitation,giveaway',
             'material_type' => 'nullable|string|max:50',  // ✅ Nullable, free text
             'size' => 'nullable|string|max:50',  // For invitations
@@ -38,10 +56,19 @@ class MaterialController extends Controller
             'description' => 'nullable|string|max:1000',
         ]);
 
-        foreach ($validated['occasion'] as $occasion) {
-            $material = Material::create([
-                'material_name' => $validated['material_name'],
-                'occasion' => $occasion,
+        // If 'all' selected, store all occasions as comma-separated values in the occasion column.
+        $selected = $validated['occasion'];
+        if (in_array('all', $selected)) {
+            $allOccasions = ['wedding','birthday','baptism','corporate'];
+            $occasionValue = implode(',', $allOccasions);
+        } else {
+            $occasionValue = implode(',', $selected);
+        }
+
+        // Create a single material row with the occasion column containing CSV values.
+        $material = Material::create([
+            'material_name' => $validated['material_name'],
+            'occasion' => $occasionValue,
                 'product_type' => $validated['product_type'],
                 'material_type' => $validated['material_type'],  // ✅ From form, can be null or custom
                 'size' => $validated['size'] ?? null,
@@ -55,56 +82,86 @@ class MaterialController extends Controller
                 'description' => $validated['description'] ?? null,
                 'date_updated' => now(),
             ]);
-
-            // ✅ Now $material is defined and can be used
-            $material->inventory()->create([
-                'stock_level' => $validated['stock_qty'],
-                'reorder_level' => $validated['reorder_point'],
-                'remarks' => $validated['stock_qty'] <= 0 ? 'Out of Stock' : ($validated['stock_qty'] > 0 && $validated['stock_qty'] <= $validated['reorder_point'] ? 'Low Stock' : 'In Stock'),
-            ]);
-        }
+        // ✅ Now $material is defined and can be used
+        $material->inventory()->create([
+            'stock_level' => $validated['stock_qty'],
+            'reorder_level' => $validated['reorder_point'],
+            'remarks' => $validated['stock_qty'] <= 0 ? 'Out of Stock' : ($validated['stock_qty'] > 0 && $validated['stock_qty'] <= $validated['reorder_point'] ? 'Low Stock' : 'In Stock'),
+        ]);
 
         return redirect()->route('admin.materials.index')->with('success', 'Materials added successfully!');
     }
 
     public function index(Request $request)
     {
-        $query = Material::with('inventory');
+        $materialsQuery = Material::with('inventory');
 
+        // Status filters applied to materials' inventory
         if ($request->status === 'low') {
-            $query->whereHas('inventory', function($q) {
+            $materialsQuery->whereHas('inventory', function($q) {
                 $q->whereColumn('stock_level', '<=', 'reorder_level')
                   ->where('stock_level', '>', 0);
             });
         }
 
         if ($request->status === 'out') {
-            $query->whereHas('inventory', function($q) {
+            $materialsQuery->whereHas('inventory', function($q) {
                 $q->where('stock_level', '<=', 0);
             });
         }
 
+        // Occasion filter: if occasion is provided, match CSV-stored occasions using FIND_IN_SET
+        if ($request->filled('occasion')) {
+            $occasion = $request->occasion;
+            if ($occasion !== 'all') {
+                $materialsQuery->whereRaw("FIND_IN_SET(?, occasion)", [$occasion]);
+            } else {
+                // explicit 'all' filter: find rows where occasion contains all defined options
+                $materialsQuery->where(function($q) {
+                    $q->whereRaw("FIND_IN_SET('wedding', occasion)")
+                      ->whereRaw("FIND_IN_SET('birthday', occasion)")
+                      ->whereRaw("FIND_IN_SET('baptism', occasion)")
+                      ->whereRaw("FIND_IN_SET('corporate', occasion)");
+                });
+            }
+        }
+
+        // Search filter for materials
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->where(function ($q) use ($search) {
+            $materialsQuery->where(function ($q) use ($search) {
                 $q->where('material_name', 'like', "%{$search}%")
                   ->orWhere('material_type', 'like', "%{$search}%")
                   ->orWhere('unit', 'like', "%{$search}%");
             });
         }
 
-        $materials = $query->get();
-        $inks = \App\Models\Ink::all();
+        $materials = $materialsQuery->get();
 
-        // ✅ Added: Filter inks by search
+        // Build inks query so occasion and search filters can apply consistently
+        $inksQuery = \App\Models\Ink::query();
+        if ($request->filled('occasion')) {
+            $occasion = $request->occasion;
+            if ($occasion !== 'all') {
+                $inksQuery->whereRaw("FIND_IN_SET(?, occasion)", [$occasion]);
+            } else {
+                $inksQuery->where(function($q) {
+                    $q->whereRaw("FIND_IN_SET('wedding', occasion)")
+                      ->whereRaw("FIND_IN_SET('birthday', occasion)")
+                      ->whereRaw("FIND_IN_SET('baptism', occasion)")
+                      ->whereRaw("FIND_IN_SET('corporate', occasion)");
+                });
+            }
+        }
         if ($request->filled('search')) {
             $search = $request->search;
-            $inks = $inks->filter(function($ink) use ($search) {
-                return stripos($ink->material_name, $search) !== false ||
-                       stripos($ink->ink_color, $search) !== false ||
-                       stripos($ink->material_type, $search) !== false;
+            $inksQuery->where(function($q) use ($search) {
+                $q->where('material_name', 'like', "%{$search}%")
+                  ->orWhere('ink_color', 'like', "%{$search}%")
+                  ->orWhere('material_type', 'like', "%{$search}%");
             });
         }
+        $inks = $inksQuery->get();
 
         return view('admin.materials.index', compact('materials', 'inks'));
     }
@@ -119,7 +176,7 @@ class MaterialController extends Controller
     public function update(Request $request, $id)
     {
         $request->validate([
-            'material_name' => 'required|string|max:255',
+            'material_name' => 'required|string|max:255|unique:materials,material_name,' . $id,
             'material_type' => 'nullable|string|max:50',  // ✅ Made nullable
             'unit'           => 'required|string|max:50',
             'unit_cost'      => 'required|numeric|min:0',
