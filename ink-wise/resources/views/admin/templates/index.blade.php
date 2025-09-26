@@ -40,7 +40,7 @@
                 <div class="template-card">
                     <div class="template-preview">
                         @if($template->preview)
-                            <img src="{{ asset('storage/' . $template->preview) }}" alt="Preview" style="max-width:100%;border-radius:8px;">
+                            <img src="{{ \App\Support\ImageResolver::url($template->preview) }}" alt="Preview" style="max-width:100%;border-radius:8px;">
                         @else
                             <span>No preview</span>
                         @endif

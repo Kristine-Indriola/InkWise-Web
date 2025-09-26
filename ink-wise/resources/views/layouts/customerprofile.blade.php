@@ -9,6 +9,108 @@
   <style>
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Seasons&display=swap');
         @import url('https://fonts.cdnfonts.com/css/edwardian-script-itc');
+    /* Bot avatar with gradient stroke (90deg: #5de0e6 -> #004aad) */
+    .bot-avatar-outer{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 56px;
+      height: 56px;
+      border-radius: 9999px;
+      background: linear-gradient(90deg, #5de0e6, #004aad);
+      padding: 4px; /* stroke thickness */
+      box-sizing: border-box;
+    }
+    .bot-avatar-inner{
+      width: 100%;
+      height: 100%;
+      border-radius: 9999px;
+      background-color: white;
+      overflow: hidden;
+      display: inline-block;
+    }
+    .bot-avatar-inner img{
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    /* Chat message with avatar on the left */
+    .chat-message-row{
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      width: 100%;
+    }
+    .chat-message-bubble{
+      background: #eaf2ff;
+      border-radius: 18px;
+      padding: 28px 36px; /* increased padding for bigger container */
+      font-weight: 600;
+      font-size: 18px; /* larger text for readability */
+      max-width: 860px; /* larger max width */
+      box-shadow: 0 8px 28px rgba(2,6,23,0.08);
+    }
+    /* Expanded chat state (triggered by toggle) */
+    .chat-expanded{
+      max-width: 1000px !important;
+      max-height: 900px !important;
+      min-height: 500px !important;
+      min-width: 520px !important;
+    }
+    /* Bot popover (assistant container) - enlarged for clarity */
+    .bot-popover{
+      min-width: 320px;
+      max-width: 640px;
+      background: white;
+      border-radius: 14px;
+      box-shadow: 0 14px 40px rgba(2,6,23,0.18);
+      padding: 16px 18px;
+      font-size: 15px;
+      line-height: 1.35;
+    }
+    .bot-popover .small-msg{
+      color: #374151; /* slightly darker gray for readability */
+      font-size: 15px;
+      margin-top: 4px;
+    }
+    .bot-popover .start-btn{
+      background: linear-gradient(90deg, #5de0e6, #004aad);
+      color: white;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-weight: 700;
+      border: none;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    /* Larger avatar inside the popover */
+    .bot-popover .bot-avatar-outer{
+      width: 64px;
+      height: 64px;
+      padding: 5px;
+    }
+    .bot-popover .bot-avatar-inner img{
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    /* Responsive: ensure popover fits on small screens */
+    @media (max-width: 480px){
+      .bot-popover{
+        min-width: 88vw;
+        max-width: 92vw;
+        padding: 12px;
+        font-size: 14px;
+      }
+      .bot-popover .bot-avatar-outer{
+        width: 48px;
+        height: 48px;
+        padding: 4px;
+      }
+      .bot-popover .start-btn{ padding: 8px 12px; font-size:14px }
+    }
         
     </style>
 
@@ -176,6 +278,37 @@
   <!-- Floating Chat Button & Chat Modal -->
 <div id="chatFloatingBtn"
      class="fixed bottom-6 right-6 z-50">
+
+  <div class="flex flex-col items-center space-y-3" style="background:transparent;padding:6px;border-radius:9999px;">
+    <!-- Bot popover (hidden by default) -->
+    <div id="botPopover" class="bot-popover hidden mb-2" style="transform-origin: bottom right;">
+      <div class="flex items-center gap-4">
+        <div>
+          <div class="bot-avatar-outer" aria-hidden="true">
+            <div class="bot-avatar-inner">
+              <img src="{{ asset('Customerimages/bots.png') }}" alt="Bot">
+            </div>
+          </div>
+        </div>
+        <div class="flex-1">
+          <div class="font-semibold">Need Help?</div>
+          <div class="small-msg">Hi! I can help you find templates or track orders.</div>
+        </div>
+      </div>
+      <div class="mt-3 text-right">
+        <button id="botStartBtn" class="start-btn">Start</button>
+      </div>
+    </div>
+
+    <!-- Avatar button on top (toggles the popover) -->
+    <button id="botAvatarBtn" aria-label="Open bot popup" title="Chat with bot"
+        class="rounded-full focus:outline-none">
+      <div class="bot-avatar-outer" aria-hidden="true">
+        <div class="bot-avatar-inner">
+          <img src="{{ asset('Customerimages/bots.png') }}" alt="Bot">
+        </div>
+      </div>
+
     <button id="openChatBtn" class="bg-[#94b9ff] hover:bg-[#6fa3ff] text-white rounded-full shadow-lg p-4 flex items-center justify-center transition duration-300"
             onclick="document.getElementById('chatModal').classList.remove('hidden'); document.getElementById('chatFloatingBtn').classList.add('hidden');">
         <!-- Chat Icon -->
@@ -185,13 +318,24 @@
 
         <!-- unread badge -->
         <span id="chatBadge" style="display:none; position: absolute; top: -4px; right: -2px; background:#ef4444; color:#fff; font-weight:700; font-size:12px; line-height:18px; padding:0 6px; border-radius:999px;"></span>
+
     </button>
+
+    <!-- Message icon below (opens full chat) -->
+    <button aria-label="Open chat" title="Open chat"
+        class="bg-[#94b9ff] hover:bg-[#6fa3ff] text-white rounded-full shadow-lg p-3 flex items-center justify-center transition duration-300"
+        onclick="openFullChat()">
+      <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    </button>
+  </div>
 </div>
 
 <div id="chatModal" class="fixed bottom-6 right-6 z-50 hidden">
     <div id="chatBox"
-         class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-4 relative transition-all duration-300 resize"
-         style="max-height: 400px; min-height: 300px; min-width: 320px; width: 100%;">
+      class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-4 relative transition-all duration-300 resize"
+      style="max-height: 600px; min-height: 380px; min-width: 420px; width: 100%;">
         <!-- Minimize button -->
         <button onclick="document.getElementById('chatModal').classList.add('hidden'); document.getElementById('chatFloatingBtn').classList.remove('hidden');"
                 class="absolute top-2 right-2 text-gray-400 hover:text-[#94b9ff] transition text-base font-bold" title="Minimize">
@@ -211,6 +355,22 @@
             <p class="text-xs text-gray-500">Chat with staff for support</p>
         </div>
         <!-- Chat Messages (placeholder) -->
+
+    <div id="chatPlaceholder" class="overflow-y-auto mb-3"
+       style="max-height: 320px; min-height: 220px;">
+      <div class="mb-3 flex justify-center">
+        <div class="chat-message-bubble text-center">
+          Staff: Hello! How can I help you?<br>
+          <span class="text-base text-gray-400 font-normal">Your messages will appear here.</span>
+        </div>
+      </div>
+    </div>
+        <!-- Chat Input -->
+    <form class="flex gap-3">
+      <input type="text" placeholder="Type your message..." class="flex-1 border rounded-lg px-5 py-4 text-lg focus:outline-none focus:ring focus:ring-[#94b9ff]">
+      <button type="submit" class="bg-[#94b9ff] text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-[#6fa3ff]">Send</button>
+    </form>
+
         <div id="chatPlaceholder" class="overflow-y-auto mb-3 flex flex-col" style="max-height: 320px; min-height: 220px;">
             <!-- messages injected here -->
         </div>
@@ -219,6 +379,7 @@
             <input id="customerChatInput" type="text" placeholder="Type your message..." class="flex-1 border rounded-lg px-4 py-3 text-base focus:outline-none focus:ring focus:ring-[#94b9ff]">
             <button id="customerChatSendBtn" type="button" class="bg-[#94b9ff] text-white px-4 py-2 rounded-lg text-base font-semibold hover:bg-[#6fa3ff]">Send</button>
         </form>
+
         <!-- Drag Handle for Resizing -->
         <div id="chatResizeHandle"
              class="absolute bottom-2 right-2 w-5 h-5 cursor-nwse-resize z-50"
@@ -235,23 +396,18 @@ function toggleChatSize() {
     const chatBox = document.getElementById('chatBox');
     const chatPlaceholder = document.getElementById('chatPlaceholder');
     const expandIcon = document.getElementById('expandIcon');
-    if (chatBox.classList.contains('max-w-sm')) {
-        chatBox.classList.remove('max-w-sm');
-        chatBox.classList.add('max-w-xl');
-        chatBox.style.maxHeight = '700px';
-        chatBox.style.minHeight = '400px';
-        chatPlaceholder.style.maxHeight = '600px';
-        chatPlaceholder.style.minHeight = '320px';
-        expandIcon.style.transform = 'rotate(180deg)';
-    } else {
-        chatBox.classList.remove('max-w-xl');
-        chatBox.classList.add('max-w-sm');
-        chatBox.style.maxHeight = '400px';
-        chatBox.style.minHeight = '300px';
-        chatPlaceholder.style.maxHeight = '320px';
-        chatPlaceholder.style.minHeight = '220px';
-        expandIcon.style.transform = 'rotate(0deg)';
-    }
+  // Toggle expanded class which controls larger dimensions
+  if (chatBox.classList.contains('chat-expanded')) {
+    chatBox.classList.remove('chat-expanded');
+    chatPlaceholder.style.maxHeight = '320px';
+    chatPlaceholder.style.minHeight = '220px';
+    expandIcon.style.transform = 'rotate(0deg)';
+  } else {
+    chatBox.classList.add('chat-expanded');
+    chatPlaceholder.style.maxHeight = '760px';
+    chatPlaceholder.style.minHeight = '420px';
+    expandIcon.style.transform = 'rotate(180deg)';
+  }
 }
 
 // Mouse drag to resize chat
@@ -280,6 +436,49 @@ window.addEventListener('mousemove', function(e) {
 window.addEventListener('mouseup', function() {
     isResizing = false;
     document.body.style.userSelect = '';
+});
+
+// Bot popover behavior
+document.addEventListener('DOMContentLoaded', function(){
+  const botAvatarBtn = document.getElementById('botAvatarBtn');
+  const botPopover = document.getElementById('botPopover');
+  const botStartBtn = document.getElementById('botStartBtn');
+  const chatModal = document.getElementById('chatModal');
+  const chatFloating = document.getElementById('chatFloatingBtn');
+
+  if(botAvatarBtn && botPopover){
+    botAvatarBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      botPopover.classList.toggle('hidden');
+    });
+
+    // Close popover when clicking outside
+    document.addEventListener('click', function(ev){
+      if(!botPopover.classList.contains('hidden')){
+        const target = ev.target;
+        if(!botPopover.contains(target) && !botAvatarBtn.contains(target)){
+          botPopover.classList.add('hidden');
+        }
+      }
+    });
+  }
+
+  if(botStartBtn){
+    botStartBtn.addEventListener('click', function(e){
+      e.preventDefault();
+      // Open full chat modal
+      if(chatModal) chatModal.classList.remove('hidden');
+      if(chatFloating) chatFloating.classList.add('hidden');
+      // hide popover
+      if(botPopover) botPopover.classList.add('hidden');
+    });
+  }
+  // Expose global function used by message icon
+  window.openFullChat = function(){
+    if(botPopover) botPopover.classList.add('hidden');
+    if(chatFloating) chatFloating.classList.add('hidden');
+    if(chatModal) chatModal.classList.remove('hidden');
+  };
 });
 </script>
 <script>

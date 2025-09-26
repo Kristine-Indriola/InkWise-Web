@@ -172,18 +172,36 @@ button:hover {
     margin-top: 10px;
 }
 
-/* ===== Responsive ===== */
-@media (max-width: 768px) {
-    .form-row {
-        flex-direction: column;
-        gap: 12px;
-    }
+/* Ink form: two-column alignment */
+#ink-fields .form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
 
-    button, .btn-back {
-        width: 100%;
-    }
+/* Make certain rows span both columns when needed */
+#ink-fields .form-row.full-width,
+#ink-fields .form-row .full-width {
+  grid-column: 1 / -1;
+}
 
-    .form-control, .styled-select {
-        height: 40px;
-    }
+/* Ensure inputs/selects fill their grid cell */
+#ink-fields .form-group {
+  width: 100%;
+  margin: 0;
+}
+
+/* Taller multiple-select in ink form */
+#ink-fields .styled-select[multiple] {
+  min-height: 120px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+/* Responsive: stack into one column on narrow screens */
+@media (max-width: 800px) {
+  #ink-fields .form-row {
+    grid-template-columns: 1fr;
+  }
 }

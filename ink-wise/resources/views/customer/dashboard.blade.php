@@ -29,6 +29,123 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.10.2/cdn.min.js" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Dancing+Script&display=swap" rel="stylesheet">
       <link rel="icon" type="image/png" href="{{ asset('adminimage/ink.png') }}">
+    <!-- Chat widget styles -->
+    <style>
+        /* Chat widget container (fixed bottom-right) */
+        .chat-widget { position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 60; }
+
+        /* Circular button with 90deg linear-gradient stroke (enlarged) */
+        .chat-btn {
+            width: 96px;
+            height: 96px;
+            border-radius: 9999px;
+            padding: 6px; /* thickness of the gradient ring */
+            background: linear-gradient(90deg, #5de0e6, #004aad);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 26px rgba(4, 29, 66, 0.14);
+            cursor: pointer;
+            transition: transform .15s ease;
+        }
+        .chat-btn:active { transform: scale(.98); }
+
+        /* inner circle that holds the image */
+        .chat-inner {
+            width: 100%;
+            height: 100%;
+            border-radius: 9999px;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .chat-inner img { width: 80%; height: 80%; object-fit: cover; border-radius: 9999px; }
+
+        /* chat panel (enlarged for readability) */
+        .chat-panel {
+            width: 560px;
+            max-width: calc(100vw - 3rem);
+            position: absolute;
+            right: 0;
+            bottom: 108px;
+            background: #ffffff;
+            border-radius: 14px;
+            box-shadow: 0 16px 48px rgba(4,29,66,0.18);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(0,0,0,0.04);
+        }
+        .chat-header { padding: 16px 18px; display:flex; gap:12px; align-items:center; border-bottom: 1px solid rgba(0,0,0,0.04); }
+        .chat-header h4 { margin:0; font-weight:800; font-size:16px; color:#044e86; }
+        .chat-body {
+            padding:16px;
+            padding-bottom: 18px;
+            max-height:520px;
+            overflow:auto;
+            display:flex;
+            flex-direction:column;
+            gap:14px;
+            scroll-behavior:smooth;
+            background: linear-gradient(180deg, rgba(6,182,212,0.02), transparent);
+        }
+
+        /* custom thin scrollbar */
+        .chat-body::-webkit-scrollbar { width: 10px; }
+        .chat-body::-webkit-scrollbar-track { background: transparent; }
+        .chat-body::-webkit-scrollbar-thumb { background: rgba(4,29,66,0.10); border-radius: 9999px; }
+
+        .chat-input { display:flex; gap:12px; padding:14px; border-top:1px solid rgba(0,0,0,0.04); }
+        .chat-input input[type="text"]{ flex:1; border-radius:999px; padding:12px 18px; border:1px solid rgba(0,0,0,0.08); outline:none; background:#fbfeff; font-size:15px; }
+        .chat-input button{ background:#06b6d4; color:#fff; border-radius:999px; padding:10px 16px; border:0; cursor:pointer; font-weight:700; }
+
+        /* message bubbles (larger) */
+        .msg { display:inline-flex; position:relative; max-width:86%; padding:12px 14px; border-radius:16px; font-size:15px; line-height:1.4; word-break:break-word; box-shadow: 0 8px 22px rgba(4,29,66,0.05); }
+        .msg .avatar { width:44px; height:44px; border-radius:9999px; overflow:hidden; flex-shrink:0; box-shadow:0 3px 8px rgba(4,29,66,0.06); }
+        .msg .bubble { display:flex; flex-direction:column; gap:8px; min-width:48px; }
+        .msg .text { white-space:pre-wrap; }
+        .msg .time { font-size:12px; color:#6b7280; align-self:flex-end; margin-top:6px; }
+
+        .msg.user {
+            background: linear-gradient(180deg,#e6f7fb,#c9f0f5);
+            margin-left:auto;
+            align-self:flex-end;
+            color:#022a37;
+            border-bottom-right-radius:6px;
+        }
+        .msg.bot {
+            background: linear-gradient(180deg,#f4f8ff,#eaf3ff);
+            align-self:flex-start;
+            color:#03305a;
+            border-bottom-left-radius:6px;
+            gap:12px;
+            align-items:flex-start;
+        }
+
+        /* little "tail" on bubbles */
+        .msg.bot::after, .msg.user::after {
+            content: "";
+            position: absolute;
+            top: 16px;
+            width: 14px;
+            height: 14px;
+            transform: rotate(45deg);
+            box-shadow: 0 8px 14px rgba(4,29,66,0.03);
+            border-radius: 2px;
+            z-index: 0;
+            background: inherit;
+        }
+        .msg.bot::after { left: -7px; }
+        .msg.user::after { right: -7px; }
+
+        /* responsive tweaks */
+        @media (max-width: 720px) {
+            .chat-panel { width: 92vw; right: 4%; bottom: 88px; }
+            .chat-btn { width: 80px; height: 80px; }
+        }
+    </style>
 </head>
 <body id="dashboard" class="antialiased bg-white">
 
@@ -183,5 +300,71 @@
 
 {{-- Contact Section --}}
 @include('customer.partials.contact')
+
+<!-- Chat bot AI assistance widget -->
+<div class="chat-widget" x-data="{ open: false, messages: [{from:'bot', text:'Hi! I\'m InkWise Assistant. How can I help you today?'}], input: '' }" @keydown.window.escape="open=false">
+    <!-- Toggle button -->
+    <div class="chat-btn" @click="open = !open" aria-label="Open chat">
+        <div class="chat-inner">
+            <!-- Update filename if your image is different. Currently referencing Customerimages/bot.png -->
+            <img src="{{ asset('Customerimages/bots.png') }}" alt="AI Bot">
+        </div>
+    </div>
+
+    <!-- Chat panel -->
+    <div x-show="open" x-cloak x-transition class="chat-panel" @click.away="open = false" aria-hidden="false" role="dialog" aria-label="InkWise Assistant">
+        <div class="chat-header">
+            <div style="width:40px;height:40px;border-radius:9999px;overflow:hidden;">
+                <img src="{{ asset('Customerimages/bots.png') }}" alt="Bot" style="width:100%;height:100%;object-fit:cover;">
+            </div>
+            <div>
+                <h4>InkWise Assistant</h4>
+                <div style="font-size:12px;color:#55799a;">AI help for templates & orders</div>
+            </div>
+        </div>
+        <div class="chat-body" x-ref="body">
+            <template x-for="(m, idx) in messages" :key="idx">
+                <div>
+                    <div x-show="m.from === 'bot'" class="msg bot">
+                        <div class="avatar"><img :src="'{{ asset('Customerimages/bots.png') }}'" alt="bot" style="width:100%;height:100%;object-fit:cover;"></div>
+                        <div x-text="m.text"></div>
+                    </div>
+                    <div x-show="m.from === 'user'" class="msg user" x-text="m.text"></div>
+                </div>
+            </template>
+        </div>
+        <div class="chat-input">
+            <input type="text" placeholder="Type a message..." x-model="input" @keydown.enter.prevent="
+                if(input && input.trim() !== ''){
+                    messages.push({from:'user', text: input});
+                    const userMsg = input;
+                    input = '';
+                    $nextTick(()=>{ $refs.body.scrollTop = $refs.body.scrollHeight; });
+                    // simulated bot reply (you can replace with API call)
+                    setTimeout(()=>{
+                        messages.push({from:'bot', text: 'Thanks! I received: ' + userMsg});
+                        $nextTick(()=>{ $refs.body.scrollTop = $refs.body.scrollHeight; });
+                    }, 800);
+                }
+            " />
+            <button @click.prevent="
+                if(input && input.trim() !== ''){
+                    messages.push({from:'user', text: input});
+                    const userMsg = input;
+                    input = '';
+                    $nextTick(()=>{ $refs.body.scrollTop = $refs.body.scrollHeight; });
+                    setTimeout(()=>{
+                        messages.push({from:'bot', text: 'Thanks! I received: ' + userMsg});
+                        $nextTick(()=>{ $refs.body.scrollTop = $refs.body.scrollHeight; });
+                    }, 800);
+                }
+            " class="bg-[#06b6d4] text-white px-4 py-2 rounded-full">Send</button>
+        </div>
+    </div>
+</div>
+
+<!-- Optional: If you want to replace the placeholder bot replies with a real AI API call,
+     replace the setTimeout block above with a fetch() to your server endpoint that proxies to OpenAI or another model. -->
++
 </body>
 </html>

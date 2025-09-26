@@ -62,6 +62,7 @@
                     <div class="form-group">
                         <label>Occasion</label>
                         <select name="occasion[]" required class="form-control styled-select" multiple>
+                            <option value="ALL OCCASION" {{ in_array('ALL OCCASION', old('occasion', [])) ? 'selected' : '' }}>All Occasions</option>
                             <option value="wedding" {{ in_array('wedding', old('occasion', [])) ? 'selected' : '' }}>Wedding</option>
                             <option value="birthday" {{ in_array('birthday', old('occasion', [])) ? 'selected' : '' }}>Birthday</option>
                             <option value="baptism" {{ in_array('baptism', old('occasion', [])) ? 'selected' : '' }}>Baptism</option>
@@ -79,10 +80,6 @@
                         <label>Material Type</label>
                         <input type="text" name="material_type" class="form-control" placeholder="e.g. Mug, T-shirt, Keychain">  <!-- ✅ Added: Optional text input for custom types -->
                         @error('material_type') <small style="color:red;">{{ $message }}</small> @enderror
-                    </div>
-                    <div class="form-group">
-                        <label>Description</label>
-                        <textarea name="description" class="form-control" placeholder="Description"></textarea>
                     </div>
                     <div class="form-group">
                         <label>Unit of Measure</label>
@@ -112,6 +109,38 @@
             {{-- Invitation/Other Material Form --}}
             <form id="materialForm" action="{{ route('admin.materials.store') }}" method="POST">
     @csrf
+    <div class="form-group">
+                <label>Material Type</label>
+                <select name="material_type" id="materialTypeSelect" required class="form-control styled-select">
+                    <option value="">-- Select Material Type --</option>
+                    <option value="cardstock" {{ old('material_type') == 'cardstock' ? 'selected' : '' }}>Paper</option>
+                    <option value="envelope" {{ old('material_type') == 'envelope' ? 'selected' : '' }}>Envelope</option>
+                    <option value="foil" {{ old('material_type') == 'foil' ? 'selected' : '' }}>Foil</option>
+                    <option value="lamination" {{ old('material_type') == 'lamination' ? 'selected' : '' }}>Lamination</option>
+                    <option value="packaging" {{ old('material_type') == 'packaging' ? 'selected' : '' }}>Packaging</option>
+                    <option value="ink" {{ old('material_type') == 'ink' ? 'selected' : '' }}>Ink</option>
+                </select>
+            </div>
+
+    <!-- shared controls (Occasion / Product Type) kept in default block -->
+    <div class="form-row">
+        <div class="form-group">
+            <label>Occasion</label>
+            <select name="occasion[]" required class="form-control styled-select" multiple>
+                <option value="ALL OCCASION" {{ in_array('ALL OCCASION', old('occasion', [])) ? 'selected' : '' }}>All Occasions</option>
+                <option value="wedding" {{ in_array('wedding', old('occasion', [])) ? 'selected' : '' }}>Wedding</option>
+                <option value="birthday" {{ in_array('birthday', old('occasion', [])) ? 'selected' : '' }}>Birthday</option>
+                <option value="baptism" {{ in_array('baptism', old('occasion', [])) ? 'selected' : '' }}>Baptism</option>
+                <option value="corporate" {{ in_array('corporate', old('occasion', [])) ? 'selected' : '' }}>Corporate</option>
+            </select>
+            <small style="color:#94b9ff;">Hold Ctrl (Windows) or Command (Mac) to select multiple.</small>
+        </div>
+        <div class="form-group">
+            <label>Product Type</label>
+            <input type="text" name="product_type" class="form-control" value="invitation" readonly>
+        </div>
+    </div>
+
     <div id="default-fields">
         <div class="form-row">
             <div class="form-group">
@@ -120,34 +149,7 @@
                 @error('material_name') <small style="color:red;">{{ $message }}</small> @enderror
             </div>
         </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label>Occasion</label>
-                <select name="occasion[]" required class="form-control styled-select" multiple>
-                    <option value="wedding" {{ in_array('wedding', old('occasion', [])) ? 'selected' : '' }}>Wedding</option>
-                    <option value="birthday" {{ in_array('birthday', old('occasion', [])) ? 'selected' : '' }}>Birthday</option>
-                    <option value="baptism" {{ in_array('baptism', old('occasion', [])) ? 'selected' : '' }}>Baptism</option>
-                    <option value="corporate" {{ in_array('corporate', old('occasion', [])) ? 'selected' : '' }}>Corporate</option>
-                </select>
-                <small style="color:#94b9ff;">Hold Ctrl (Windows) or Command (Mac) to select multiple.</small>
-            </div>
-            <div class="form-group">
-                <label>Product Type</label>
-                <input type="text" name="product_type" class="form-control" value="invitation" readonly>
-            </div>
-            <div class="form-group">
-                <label>Material Type</label>
-                <select name="material_type" id="materialTypeSelect" required class="form-control styled-select">
-                    <option value="">-- Select Material Type --</option>
-                    <option value="cardstock" {{ old('material_type') == 'cardstock' ? 'selected' : '' }}>Cardstock</option>
-                    <option value="envelope" {{ old('material_type') == 'envelope' ? 'selected' : '' }}>Envelope</option>
-                    <option value="foil" {{ old('material_type') == 'foil' ? 'selected' : '' }}>Foil</option>
-                    <option value="lamination" {{ old('material_type') == 'lamination' ? 'selected' : '' }}>Lamination</option>
-                    <option value="packaging" {{ old('material_type') == 'packaging' ? 'selected' : '' }}>Packaging</option>
-                    <option value="ink" {{ old('material_type') == 'ink' ? 'selected' : '' }}>Ink</option>
-                </select>
-            </div>
-        </div>
+
         <div class="form-row" id="other-fields">
             <div class="form-group">
                 <label>Size</label>
@@ -180,65 +182,59 @@
                 <input type="number" name="reorder_point" value="{{ old('reorder_point') }}" required class="form-control styled-select">
             </div>
         </div>
-        <div class="form-group">
-            <label>Description</label>
-            <textarea name="description" required class="form-control styled-select">{{ old('description') }}</textarea>
-        </div>
+        <!-- Description field removed as requested -->
     </div>
 
-    <!-- Ink fields (hidden by default) -->
+    <!-- Ink fields (hidden by default) - duplicate Occasion/Product Type removed -->
     <div id="ink-fields" style="display:none;">
         <div class="form-row">
             <div class="form-group">
                 <label>Material Name</label>
                 <input type="text" name="material_name" value="{{ old('material_name') }}" required class="form-control styled-select">
-            </div>
-            <div class="form-group">
-                <label>Material Type</label>
-                <input type="text" name="material_type" value="ink" readonly class="form-control styled-select" style="background-color:#e9ecef;">
-            </div>
-        </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label>Occasion</label>
-                <select name="occasion[]" required class="form-control styled-select" multiple>
-                    <option value="wedding" {{ in_array('wedding', old('occasion', [])) ? 'selected' : '' }}>Wedding</option>
-                    <option value="birthday" {{ in_array('birthday', old('occasion', [])) ? 'selected' : '' }}>Birthday</option>
-                    <option value="baptism" {{ in_array('baptism', old('occasion', [])) ? 'selected' : '' }}>Baptism</option>
-                    <option value="corporate" {{ in_array('corporate', old('occasion', [])) ? 'selected' : '' }}>Corporate</option>
-                </select>
-                <small style="color:#94b9ff;">Hold Ctrl (Windows) or Command (Mac) to select multiple.</small>
-            </div>
-            <div class="form-group">
-                <label>Product Type</label>
-                <select name="product_type" required class="form-control styled-select">
-                    <option value="invitation">Invitation</option>
-                    <option value="giveaway">Giveaway</option>
-                </select>
+                <small style="color:#6b7280;">Required. Example: "Premium Black Ink"</small>
+                @error('material_name') <small style="color:red;">{{ $message }}</small> @enderror
             </div>
         </div>
         <div class="form-row">
             <div class="form-group">
                 <label>Ink Color</label>
                 <input type="text" name="ink_color" value="{{ old('ink_color') }}" required class="form-control styled-select">
+                <small style="color:#6b7280;">Required. Color name or code (e.g. Black, Cyan, Magenta).</small>
+                @error('ink_color') <small style="color:red;">{{ $message }}</small> @enderror
             </div>
             <div class="form-group">
-                <label>Stock Qty (ml)</label>
-                <input type="number" name="stock_qty_ml" value="{{ old('stock_qty_ml') }}" required class="form-control styled-select">
+                <label>Unit (for cans)</label>
+                <input type="text" name="unit" value="{{ old('unit', 'can') }}" required class="form-control styled-select" placeholder="e.g. can">
+                <small style="color:#6b7280;">Required. Usually "can" for inks.</small>
+                @error('unit') <small style="color:red;">{{ $message }}</small> @enderror
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Size (ml per can)</label>
+                <input type="text" name="size" value="{{ old('size') }}" required class="form-control styled-select" placeholder="e.g. 500 or 500ml">
+                <small style="color:#6b7280;">Required. Enter a number (e.g. 500) or include unit (e.g. 500ml). Numeric values will display as "500 ml" in lists.</small>
+                @error('size') <small style="color:red;">{{ $message }}</small> @enderror
+            </div>
+            <div class="form-group">
+                <label>Stock Qty (number of cans)</label>
+                <input type="number" name="stock_qty" value="{{ old('stock_qty') }}" required class="form-control styled-select" min="0">
+                <small style="color:#6b7280;">Required. Enter how many cans you currently have (integer).</small>
+                @error('stock_qty') <small style="color:red;">{{ $message }}</small> @enderror
             </div>
         </div>
         <div class="form-row">
             <div class="form-group">
                 <label>Cost per ml (₱)</label>
                 <input type="number" step="0.01" name="cost_per_ml" value="{{ old('cost_per_ml') }}" required class="form-control styled-select">
+                <small style="color:#6b7280;">Required. Unit price per milliliter (e.g. 0.25).</small>
+                @error('cost_per_ml') <small style="color:red;">{{ $message }}</small> @enderror
             </div>
             <div class="form-group">
                 <label>Average Usage per Invite (ml)</label>
-                <input type="number" step="0.01" name="avg_usage_per_invite_ml" value="{{ old('avg_usage_per_invite_ml') }}" required class="form-control styled-select">
-            </div>
-            <div class="form-group">
-                <label>Cost per Invite (₱)</label>
-                <input type="number" step="0.01" name="cost_per_invite" value="{{ old('cost_per_invite') }}" class="form-control styled-select">  <!-- ✅ Added back without required -->
+                <input type="number" step="0.01" name="avg_usage_per_invite_ml" value="{{ old('avg_usage_per_invite_ml') }}" class="form-control styled-select">
+                <small style="color:#6b7280;">Optional. Estimated ml used per invite (for inventory planning).</small>
+                @error('avg_usage_per_invite_ml') <small style="color:red;">{{ $message }}</small> @enderror
             </div>
         </div>
     </div>
@@ -382,5 +378,36 @@
         }
     });
 </script>
+    <script>
+        // Ensure 'All Occasions' is exclusive: if selected, clear others; if any other selected, clear 'all'
+        document.addEventListener('DOMContentLoaded', function() {
+            const occasionSelects = document.querySelectorAll('select[name="occasion[]"]');
+
+            function handleChange(e) {
+                const select = e.target;
+                const options = Array.from(select.options);
+                const allOption = options.find(o => o.value === 'ALL OCCASION');
+
+                // If 'all' is selected, deselect others
+                if (allOption && allOption.selected) {
+                    options.forEach(o => { if (o.value !== 'ALL OCCASION') o.selected = false; });
+                } else {
+                    // If any other is selected, ensure 'all' is not selected
+                    if (allOption) allOption.selected = false;
+                }
+            }
+
+            occasionSelects.forEach(s => {
+                // initial enforcement (in case server returned old values)
+                const opts = Array.from(s.options);
+                const allOpt = opts.find(o => o.value === 'ALL OCCASION');
+                if (allOpt && allOpt.selected) {
+                    opts.forEach(o => { if (o.value !== 'ALL OCCASION') o.selected = false; });
+                }
+
+                s.addEventListener('change', handleChange);
+            });
+        });
+    </script>
 </body>
 </html>

@@ -165,7 +165,7 @@
 
 <!-- CSS + JS -->
 <link rel="stylesheet" href="{{ asset('css/admin-css/product.css') }}">
-<script src="{{ asset('js/admin-js/product.js') }}" defer></script>
+<script src="{{ asset('js/admin/product.js') }}" defer></script>
 @endsection
 @if(session('error'))
     <div class="alert alert-error">{{ session('error') }}</div>

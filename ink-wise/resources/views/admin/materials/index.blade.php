@@ -148,6 +148,20 @@
                     <i class="fa-solid fa-magnifying-glass"></i>
                 </span>
                 <input type="text" name="search" value="{{ request('search') }}" placeholder="Search materials or inks..." class="form-control">
+                <div class="filter-wrapper" style="position:relative;">
+                    <input type="hidden" name="occasion" id="occasionInput" value="{{ request('occasion') }}">
+                    <button type="button" id="filterToggle" class="btn btn-secondary" title="Filter occasions" style="display:flex; align-items:center; gap:6px;">
+                        <i class="fi fi-ss-filter-list"></i>
+                    </button>
+                    <div id="filterMenu" class="filter-menu" style="display:none; position:absolute; right:0; top:42px; min-width:180px; background:#fff; border:1px solid #e5e7eb; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,0.08); z-index:1200; padding:8px;">
+                        <button type="button" class="filter-option btn" data-value="" style="display:block; width:100%; text-align:left; padding:8px 10px;">All Occasions</button>
+                        <button type="button" class="filter-option btn" data-value="all" style="display:block; width:100%; text-align:left; padding:8px 10px;">All (explicit)</button>
+                        <button type="button" class="filter-option btn" data-value="wedding" style="display:block; width:100%; text-align:left; padding:8px 10px;">Wedding</button>
+                        <button type="button" class="filter-option btn" data-value="birthday" style="display:block; width:100%; text-align:left; padding:8px 10px;">Birthday</button>
+                        <button type="button" class="filter-option btn" data-value="baptism" style="display:block; width:100%; text-align:left; padding:8px 10px;">Baptism</button>
+                        <button type="button" class="filter-option btn" data-value="corporate" style="display:block; width:100%; text-align:left; padding:8px 10px;">Corporate</button>
+                    </div>
+                </div>
                 <button type="submit" class="btn btn-secondary">Search</button>
             </form>
         </div>
@@ -194,6 +208,40 @@
         });
     </script>
 
+    <script>
+        // Filter icon menu behavior
+        (function(){
+            const filterToggle = document.getElementById('filterToggle');
+            const filterMenu = document.getElementById('filterMenu');
+            const occasionInput = document.getElementById('occasionInput');
+            const searchForm = filterToggle ? filterToggle.closest('form') : null;
+
+            if (!filterToggle) return;
+
+            filterToggle.addEventListener('click', function(e){
+                e.stopPropagation();
+                filterMenu.style.display = filterMenu.style.display === 'block' ? 'none' : 'block';
+            });
+
+            document.querySelectorAll('#filterMenu .filter-option').forEach(btn => {
+                btn.addEventListener('click', function(){
+                    const val = this.getAttribute('data-value');
+                    occasionInput.value = val;
+                    // close menu then submit
+                    filterMenu.style.display = 'none';
+                    if (searchForm) searchForm.submit();
+                });
+            });
+
+            // close when clicking outside
+            document.addEventListener('click', function(e){
+                if (!filterMenu.contains(e.target) && e.target !== filterToggle) {
+                    filterMenu.style.display = 'none';
+                }
+            });
+        })();
+    </script>
+
     {{-- Success Message --}}
     @if(session('success'))
         <div class="alert alert-success">
@@ -213,17 +261,16 @@
                     <th>Occasion</th>
                     <th>Product Type</th>
                     <th>Material Type</th>
-                    <th>Size</th>
+                    <th>Size/ML</th>
                     <th>Color</th>
                     <th>Weight (GSM)</th>
                     <th>Unit</th>
                     <th>Unit Price/Per(ml)(₱)</th>
                     <th>Average Usage per Invite (ml)</th>
-                    <th>Stock Qty/(ml)</th>
+                    <th>Stock Qty</th>
                     <th>Reorder Point</th>
-                    <th>Description</th>
-                    <th>Status</th>
-                    <th class="text-center">Actions</th>
+                    <th class="status-col text-center">Status</th>
+                    <th class="actions-col text-center">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -236,11 +283,36 @@
                     <tr>
                         <td>{{ $material->material_id }}</td>
                         <td class="fw-bold">{{ $material->material_name }}</td>
-                        <td>{{ ucfirst($material->occasion) }}</td>
+                        <td>
+                            @php
+                                // Normalize stored occasion values (CSV) and detect the "all occasions" case
+                                $occasionsStored = is_string($material->occasion) ? explode(',', $material->occasion) : (array) $material->occasion;
+                                $occasionsStored = array_map('trim', $occasionsStored);
+                                $occasionsLower = array_map('strtolower', $occasionsStored);
+                                $definedOccasions = ['wedding', 'birthday', 'baptism', 'corporate'];
+                                sort($occasionsLower);
+                                $allSet = $definedOccasions;
+                                sort($allSet);
+
+                                if ($occasionsLower === $allSet) {
+                                    // Show the literal label the user requested
+                                    echo 'ALL OCCASION';
+                                } else {
+                                    $occasionsPretty = array_map(function($o) { return ucfirst($o); }, $occasionsStored);
+                                    echo implode(', ', $occasionsPretty);
+                                }
+                            @endphp
+                        </td>
                         <td>{{ ucfirst($material->product_type) }}</td>
                         <td>
-                            <span class="badge badge-type {{ strtolower($material->material_type) }}">
-                                {{ $material->material_type }}
+                            @php
+                                $mt = $material->material_type ?? '';
+                                // Normalize display: show PAPER when stored as 'cardstock'
+                                $mtDisplay = (is_string($mt) && strtolower($mt) === 'cardstock') ? 'PAPER' : $mt;
+                                $mtClass = (is_string($mt) && strtolower($mt) === 'cardstock') ? 'paper' : strtolower(str_replace(' ', '-', $mt));
+                            @endphp
+                            <span class="badge badge-type {{ $mtClass }}">
+                                {{ $mtDisplay }}
                             </span>
                         </td>
                         <td>{{ $material->size ?? '-' }}</td>
@@ -265,8 +337,7 @@
                             </span>
                         </td>
                         <td>{{ $reorder }}</td>
-                        <td>{{ $material->description ?? '-' }}</td>
-                        <td>
+                        <td class="status-col text-center">
                             @if($stock <= 0)
                                 <span class="badge" style="color: red;">Out of Stock</span>
                             @elseif($stock > 0 && $stock <= $reorder)
@@ -275,7 +346,7 @@
                                 <span class="badge" style="color: green;">In Stock</span>
                             @endif
                         </td>
-                        <td class="actions">
+                        <td class="actions-col text-center">
                             <a href="{{ route('admin.materials.edit', $material->material_id) }}" class="btn btn-sm btn-warning" title="Edit">
                                 <i class="fa-solid fa-pen-to-square"></i>
                             </a>
@@ -289,8 +360,8 @@
                         </td>
                     </tr>
                 @empty
-                    <tr>
-                        <td colspan="16" class="text-center">No materials found.</td>
+                        <tr>
+                            <td colspan="15" class="text-center">No materials found.</td>
                     </tr>
                 @endforelse
 
@@ -303,34 +374,67 @@
                     <tr>
                         <td>{{ $ink->id }}</td>
                         <td class="fw-bold">{{ $ink->material_name }}</td>
-                        <td>{{ ucfirst($ink->occasion) }}</td>
+                        <td>
+                            @php
+                                $inkOccStored = is_string($ink->occasion) ? explode(',', $ink->occasion) : (array) $ink->occasion;
+                                $inkOccStored = array_map('trim', $inkOccStored);
+                                $inkOccLower = array_map('strtolower', $inkOccStored);
+                                $definedOccasions = ['wedding', 'birthday', 'baptism', 'corporate'];
+                                sort($inkOccLower);
+                                $allSet = $definedOccasions;
+                                sort($allSet);
+
+                                if ($inkOccLower === $allSet) {
+                                    echo 'ALL OCCASION';
+                                } else {
+                                    $inkPretty = array_map(function($o) { return ucfirst($o); }, $inkOccStored);
+                                    echo implode(', ', $inkPretty);
+                                }
+                            @endphp
+                        </td>
                         <td>{{ ucfirst($ink->product_type) }}</td>
                         <td>
                             <span class="badge badge-type ink">Ink</span>
                         </td>
-                        <td>-</td>
+                        <td>
+                            @if(!empty($ink->size))
+                                @php
+                                    $sizeRaw = trim($ink->size);
+                                    // If it's just a number (integer or decimal) and doesn't already include 'ml', append ' ml'
+                                    if (preg_match('/^\d+(?:\.\d+)?$/', $sizeRaw) && !preg_match('/ml/i', $sizeRaw)) {
+                                        $sizeDisplay = $sizeRaw . ' ml';
+                                    } else {
+                                        $sizeDisplay = $sizeRaw;
+                                    }
+                                @endphp
+                                {{ $sizeDisplay }}
+                            @else
+                                -
+                            @endif
+                        </td>
                         <td>{{ $ink->ink_color }}</td>
                         <td>-</td>
-                        <td>ml</td>
+                        <td>{{ $ink->unit ?? 'can' }}</td>
                         <td>₱{{ number_format($ink->cost_per_ml, 2) }}/ml</td>
                         <td>{{ $ink->avg_usage_per_invite_ml ?? '-' }}</td>
                         <td>
-                            <span class="badge {{ $ink->stock_qty_ml <= 0 ? 'stock-critical' : ($ink->stock_qty_ml > 0 && $ink->stock_qty_ml <= $reorder ? 'stock-low' : 'stock-ok') }}">
-                                {{ $ink->stock_qty_ml }} ml
+                            @php $inkQty = $ink->stock_qty ?? $ink->stock_qty_ml ?? 0; @endphp
+                            <span class="badge {{ $inkQty <= 0 ? 'stock-critical' : ($inkQty > 0 && $inkQty <= $reorder ? 'stock-low' : 'stock-ok') }}">
+                                {{ $ink->stock_qty ?? ($ink->stock_qty_ml ? $ink->stock_qty_ml . ' ml' : 0) }}
                             </span>
                         </td>
                         <td>{{ $reorder }}</td>
-                        <td>{{ $ink->description ?? '-' }}</td>
-                        <td>
-                            @if($ink->stock_qty_ml <= 0)
-                                <span class="badge" style="color: red;">Out of Stock</span>  <!-- ✅ Red text only -->
-                            @elseif($ink->stock_qty_ml > 0 && $ink->stock_qty_ml <= $reorder)
-                                <span class="badge" style="color: orange;">Low Stock</span>  <!-- ✅ Orange text only -->
+                        <td class="status-col text-center">
+                            @php $inkStock = $ink->stock_qty ?? ($ink->stock_qty_ml ?? 0); @endphp
+                            @if($inkStock <= 0)
+                                <span class="badge" style="color: red;">Out of Stock</span>
+                            @elseif($inkStock > 0 && $inkStock <= $reorder)
+                                <span class="badge" style="color: orange;">Low Stock</span>
                             @else
-                                <span class="badge" style="color: green;">In Stock</span>  <!-- ✅ Green text only -->
+                                <span class="badge" style="color: green;">In Stock</span>
                             @endif
                         </td>
-                        <td class="actions">
+                        <td class="actions-col text-center">
                             <a href="{{ route('admin.inks.edit', $ink->id) }}" class="btn btn-sm btn-warning" title="Edit">
                                 <i class="fa-solid fa-pen-to-square"></i>
                             </a>
@@ -345,7 +449,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="16" class="text-center">No inks found.</td>
+                            <td colspan="15" class="text-center">No inks found.</td>
                     </tr>
                 @endforelse
             </tbody>
