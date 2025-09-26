@@ -27,6 +27,7 @@ use App\Http\Controllers\customerProfileController;
 use App\Http\Controllers\Owner\OwnerStaffController;
 use App\Http\Controllers\Auth\CustomerAuthController;
 use App\Http\Controllers\Customer\CustomerController;
+use App\Http\Controllers\Owner\OwnerProductsController;
 use App\Http\Controllers\Staff\StaffCustomerController;
 use App\Http\Controllers\Staff\StaffMaterialController;
 use App\Http\Controllers\Admin\UserManagementController;
@@ -405,6 +406,7 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/order/workflow', fn () => view('owner.order-workflow'))->name('order.workflow');
     Route::get('/inventory', [OwnerInventoryController::class, 'index'])->name('inventory.index');
     Route::get('/inventory/track', [OwnerInventoryController::class, 'track'])->name('inventory-track');
+    Route::get('/products', [OwnerProductsController::class, 'index'])->name('products.index');
     Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
     Route::get('/reports', fn () => view('owner.owner-reports'))->name('reports');
 
