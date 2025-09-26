@@ -247,7 +247,14 @@ Route::get('/customer/dashboard', [CustomerAuthController::class, 'dashboard'])-
 
 Route::post('/messages', [MessageController::class, 'storeFromContact'])->name('messages.store');
 
+    Route::get('customer/chat/thread', [MessageController::class, 'customerChatThread'])->name('customer.chat.thread');
+    Route::post('customer/chat/send', [MessageController::class, 'customerChatSend'])->name('customer.chat.send');
+Route::get('customer/chat/unread-count', [MessageController::class, 'customerUnreadCount'])
+        ->name('customer.chat.unread');
 
+    Route::post('customer/chat/mark-read', [MessageController::class, 'customerMarkRead'])
+        ->name('customer.chat.markread');
+        
 /**Customer Profile Pages*/
 Route::prefix('customerprofile')->group(function () {
     // Addresses

@@ -3,12 +3,12 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Message;
-use App\Models\Customer;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
-use App\Mail\AdminReplyToGuest;
+use Illuminate\Support\Facades\Schema;
+use App\Models\Message;
+use App\Models\Customer;
+use App\Models\User;
 
 class MessageController extends Controller
 {
@@ -78,17 +78,19 @@ class MessageController extends Controller
         ]);
 
         $customer = Customer::findOrFail($customerId);
+        $admin = Auth::user();
 
         Message::create([
-            'sender_id'     => Auth::id(),
+            'sender_id'     => $admin->getKey(),
             'sender_type'   => 'user',
-            'receiver_id'   => $customer->id,
+            'receiver_id'   => $customer->getKey(),
             'receiver_type' => 'customer',
             'message'       => $request->input('message'),
+            'name'          => $admin->name ?? 'Admin',
+            'email'         => $admin->email ?? null,
         ]);
 
-        // adjust route name if your route is namespaced (e.g. admin.messages.chat)
-        return redirect()->route('messages.chat', $customer->id)->with('success', 'Message sent.');
+        return redirect()->route('admin.messages.chat', $customer->getKey())->with('success', 'Message sent.');
     }
 
     // Store message from Contact Form (public side)
@@ -160,55 +162,61 @@ class MessageController extends Controller
      */
     public function replyToMessage(Request $request, $messageId)
     {
-        $request->validate([
-            'message' => 'required|string|max:2000',
-        ]);
+        $request->validate(['message' => 'required|string|max:2000']);
 
         try {
             $original = Message::findOrFail($messageId);
             $replyText = $request->input('message');
+            $admin = Auth::user();
+            $adminName = $admin->name ?? 'Admin';
+            $adminEmail = $admin->email ?? null;
 
-            // Guest: save reply as receiver_type = 'guest' (keep guest email/name for reference)
+            // Save reply only (no email)
             if (strtolower($original->sender_type ?? '') === 'guest') {
+                // reply saved as from admin (user) to guest (keep guest email on original)
                 $reply = Message::create([
-                    'sender_id'     => auth()->id(),
+                    'sender_id'     => $admin->getKey(),
                     'sender_type'   => 'user',
                     'receiver_id'   => null,
                     'receiver_type' => 'guest',
                     'message'       => $replyText,
-                    'email'         => $original->email,
-                    'name'          => $original->name,
+                    'email'         => $original->email,       // guest email (required)
+                    'name'          => $adminName,             // admin name (required)
                 ]);
 
                 return response()->json(['status' => 'ok', 'reply' => $reply], 200);
             }
 
-            // Customer: save reply to that customer's thread
             if (strtolower($original->sender_type ?? '') === 'customer' && $original->sender_id) {
                 $reply = Message::create([
-                    'sender_id'     => auth()->id(),
+                    'sender_id'     => $admin->getKey(),
                     'sender_type'   => 'user',
                     'receiver_id'   => $original->sender_id,
                     'receiver_type' => 'customer',
                     'message'       => $replyText,
+                    'name'          => $adminName,
+                    'email'         => $adminEmail,
                 ]);
 
                 return response()->json(['status' => 'ok', 'reply' => $reply], 200);
             }
 
-            // Fallback: store reply preserving original receiver_type/id if present
+            // fallback - preserve original receiver_type/id but include admin name/email
             $reply = Message::create([
-                'sender_id'     => auth()->id(),
+                'sender_id'     => $admin->getKey(),
                 'sender_type'   => 'user',
                 'receiver_id'   => $original->receiver_id,
                 'receiver_type' => $original->receiver_type,
                 'message'       => $replyText,
+                'name'          => $adminName,
+                'email'         => $adminEmail,
             ]);
 
             return response()->json(['status' => 'ok', 'reply' => $reply], 200);
+
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('replyToMessage error: '.$e->getMessage(), ['exception' => $e]);
-            return response()->json(['error' => 'Server error'], 500);
+            Log::error('replyToMessage error: '.$e->getMessage(), ['exception' => $e]);
+            return response()->json(['error' => 'Server error: see logs'], 500);
         }
     }
 
@@ -319,5 +327,121 @@ class MessageController extends Controller
         }
 
         return redirect()->route('customer.messages.thread', $messageId)->with('success', 'Reply sent.');
+    }
+
+    public function customerChatThread(Request $request)
+    {
+        $user = Auth::user();
+        $customer = $user->customer;
+        if (! $customer) {
+            return response()->json(['thread' => []]);
+        }
+
+        $custId = $customer->getKey();
+
+        $thread = Message::where(function ($q) use ($custId) {
+                $q->where(function ($q2) use ($custId) {
+                    $q2->where('sender_type', 'customer')->where('sender_id', $custId);
+                })->orWhere(function ($q3) use ($custId) {
+                    $q3->where('receiver_type', 'customer')->where('receiver_id', $custId);
+                });
+            })
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->map(function ($m) {
+                return [
+                    'id' => $m->getKey(),
+                      'sender_type' => strtolower($m->sender_type ?? ''),
+                       'name' => $m->name ?? null,
+                     'message' => $m->message,
+                     'created_at' => $m->created_at->toDateTimeString(),
+             ];
+        });
+
+        return response()->json(['thread' => $thread]);
+    }
+
+
+    public function customerChatSend(Request $request)
+    {
+        $request->validate(['message' => 'required|string|max:2000']);
+
+        $user = Auth::user();
+        $customer = $user->customer;
+        if (! $customer) {
+            return response()->json(['error' => 'Customer not found'], 403);
+        }
+
+        // change adminUserId if you have a different admin assignment
+        $adminUserId = 1;
+
+        $msg = Message::create([
+            'sender_id'     => $customer->getKey(),
+            'sender_type'   => 'customer',
+            'receiver_id'   => $adminUserId,
+            'receiver_type' => 'user',
+            'message'       => $request->input('message'),
+            'email'         => $user->email ?? null,
+            'name'          => $customer->first_name ?? $user->name ?? null,
+        ]);
+
+        return response()->json(['status' => 'ok', 'message' => [
+            'id' => $msg->getKey(),
+            'sender_type' => 'customer',
+            'name' => $msg->name,
+            'message' => $msg->message,
+            'created_at' => $msg->created_at->toDateTimeString()
+        ]], 201);
+    }
+
+    /**
+     * Return unread message count for the authenticated customer.
+     * If messages.is_read exists we use it, otherwise we fallback to recent admin messages.
+     */
+    public function customerUnreadCount(Request $request)
+    {
+        $user = Auth::user();
+        $customer = $user?->customer;
+        if (! $customer) {
+            return response()->json(['count' => 0]);
+        }
+
+        $q = Message::whereRaw('LOWER(sender_type) = ?', ['user'])
+            ->where('receiver_type', 'customer')
+            ->where('receiver_id', $customer->getKey());
+
+        if (Schema::hasColumn('messages', 'is_read')) {
+            $q->where('is_read', 0);
+        } else {
+            // fallback heuristic: count admin messages in last 7 days
+            $q->where('created_at', '>=', now()->subDays(7));
+        }
+
+        $count = $q->count();
+
+        return response()->json(['count' => $count]);
+    }
+
+    /**
+     * Mark admin->customer messages as read for the authenticated customer.
+     * Only updates if messages.is_read exists.
+     */
+    public function customerMarkRead(Request $request)
+    {
+        $user = Auth::user();
+        $customer = $user?->customer;
+        if (! $customer) {
+            return response()->json(['ok' => true]);
+        }
+
+        if (Schema::hasColumn('messages', 'is_read')) {
+            Message::whereRaw('LOWER(sender_type) = ?', ['user'])
+                ->where('receiver_type', 'customer')
+                ->where('receiver_id', $customer->getKey())
+                ->where('is_read', 0)
+                ->update(['is_read' => 1]);
+        }
+
+        return response()->json(['ok' => true]);
     }
 }
