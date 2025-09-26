@@ -27,6 +27,7 @@ use App\Http\Controllers\customerProfileController;
 use App\Http\Controllers\Owner\OwnerStaffController;
 use App\Http\Controllers\Auth\CustomerAuthController;
 use App\Http\Controllers\Customer\CustomerController;
+use App\Http\Controllers\Owner\OwnerProductsController;
 use App\Http\Controllers\Staff\StaffCustomerController;
 use App\Http\Controllers\Staff\StaffMaterialController;
 use App\Http\Controllers\Admin\UserManagementController;
@@ -246,7 +247,14 @@ Route::get('/customer/dashboard', [CustomerAuthController::class, 'dashboard'])-
 
 Route::post('/messages', [MessageController::class, 'storeFromContact'])->name('messages.store');
 
+    Route::get('customer/chat/thread', [MessageController::class, 'customerChatThread'])->name('customer.chat.thread');
+    Route::post('customer/chat/send', [MessageController::class, 'customerChatSend'])->name('customer.chat.send');
+Route::get('customer/chat/unread-count', [MessageController::class, 'customerUnreadCount'])
+        ->name('customer.chat.unread');
 
+    Route::post('customer/chat/mark-read', [MessageController::class, 'customerMarkRead'])
+        ->name('customer.chat.markread');
+        
 /**Customer Profile Pages*/
 Route::prefix('customerprofile')->group(function () {
     // Addresses
@@ -405,6 +413,7 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/order/workflow', fn () => view('owner.order-workflow'))->name('order.workflow');
     Route::get('/inventory', [OwnerInventoryController::class, 'index'])->name('inventory.index');
     Route::get('/inventory/track', [OwnerInventoryController::class, 'track'])->name('inventory-track');
+    Route::get('/products', [OwnerProductsController::class, 'index'])->name('products.index');
     Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
     Route::get('/reports', fn () => view('owner.owner-reports'))->name('reports');
 
