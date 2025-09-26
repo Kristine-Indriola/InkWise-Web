@@ -115,7 +115,7 @@
             <div class="form-section">
                 <h2>Materials</h2>
                 <div class="material-group">
-                    <h3>Materials</h3>
+
                     <div class="material-rows">
                         @php
                             $materialRows = old('materials', isset($product) ? $product->materials->toArray() : [ [] ]);
@@ -125,11 +125,11 @@
                             <input type="hidden" name="materials[{{ $i }}][id]" value="{{ old('materials.'.$i.'.id', $material['id'] ?? '') }}">
                             <div class="input-row">
                                 <div class="field">
-                                    <label for="materials_{{ $i }}_item">Item</label>
+                                    <label for="materials_{{ $i }}_item">Material Name</label>
                                     <input type="text" id="materials_{{ $i }}_item" name="materials[{{ $i }}][item]" value="{{ old('materials.'.$i.'.item', $material['item'] ?? '') }}">
                                 </div>
                                 <div class="field">
-                                    <label for="materials_{{ $i }}_type">Type</label>
+                                    <label for="materials_{{ $i }}_type">Product Type</label>
                                     <input type="text" id="materials_{{ $i }}_type" name="materials[{{ $i }}][type]" placeholder="Type" aria-describedby="materials_{{ $i }}_type-error" value="{{ old('materials.'.$i.'.type', $material['type'] ?? '') }}">
                                     <span id="materials_{{ $i }}_type-error" class="error-message"></span>
                                 </div>
@@ -156,15 +156,11 @@
                                     <span id="materials_{{ $i }}_unitPrice-error" class="error-message"></span>
                                 </div>
                                 <div class="field">
-                                    <label for="materials_{{ $i }}_qty">Qty</label>
-                                    <input type="number" id="materials_{{ $i }}_qty" name="materials[{{ $i }}][qty]" placeholder="Qty" aria-describedby="materials_{{ $i }}_qty-error" value="{{ old('materials.'.$i.'.qty', $material['qty'] ?? '') }}">
-                                    <span id="materials_{{ $i }}_qty-error" class="error-message"></span>
+                                    <label for="materials_{{ $i }}_usage">Usage per invite (ml)</label>
+                                    <input type="number" step="0.01" id="materials_{{ $i }}_usage" name="materials[{{ $i }}][usage]" placeholder="Usage per invite (ml)" aria-describedby="materials_{{ $i }}_usage-error" value="{{ old('materials.'.$i.'.usage', $material['usage'] ?? '') }}">
+                                    <span id="materials_{{ $i }}_usage-error" class="error-message"></span>
                                 </div>
-                                <div class="field">
-                                    <label for="materials_{{ $i }}_cost">Cost</label>
-                                    <input type="number" id="materials_{{ $i }}_cost" name="materials[{{ $i }}][cost]" readonly placeholder="Cost" aria-describedby="materials_{{ $i }}_cost-error" value="{{ old('materials.'.$i.'.cost', $material['cost'] ?? '') }}">
-                                    <span id="materials_{{ $i }}_cost-error" class="error-message"></span>
-                                </div>
+                                
                                 <button class="add-row" type="button" aria-label="Add another material row">+</button>
                                 <button class="remove-row" type="button" aria-label="Remove this material row">−</button>
                             </div>
@@ -172,54 +168,7 @@
                         @endforeach
                     </div>
                 </div>
-                <div class="material-group">
-                    <h3>Ink</h3>
-                    <div class="ink-rows">
-                        @php
-                            $inkRows = old('inks', isset($product) ? $product->inks->toArray() : [ [] ]);
-                        @endphp
-                        @foreach($inkRows as $i => $ink)
-                        <div class="ink-row">
-                            <input type="hidden" name="inks[{{ $i }}][id]" value="{{ old('inks.'.$i.'.id', $ink['id'] ?? '') }}">
-                            <div class="input-row">
-                                <div class="field">
-                                    <label for="inks_{{ $i }}_item">Item</label>
-                                    <input type="text" id="inks_{{ $i }}_item" name="inks[{{ $i }}][item]" value="{{ old('inks.'.$i.'.item', $ink['item'] ?? '') }}">
-                                </div>
-                                <div class="field">
-                                    <label for="inks_{{ $i }}_type">Type</label>
-                                    <input type="text" id="inks_{{ $i }}_type" name="inks[{{ $i }}][type]" placeholder="Type" aria-describedby="inks_{{ $i }}_type-error" value="{{ old('inks.'.$i.'.type', $ink['type'] ?? '') }}">
-                                    <span id="inks_{{ $i }}_type-error" class="error-message"></span>
-                                </div>
-                                <div class="field">
-                                    <label for="inks_{{ $i }}_usage">Usage per invite (ml)</label>
-                                    <input type="number" id="inks_{{ $i }}_usage" name="inks[{{ $i }}][usage]" placeholder="Usage per invite (ml)" aria-describedby="inks_{{ $i }}_usage-error" value="{{ old('inks.'.$i.'.usage', $ink['usage'] ?? '') }}">
-                                    <span id="inks_{{ $i }}_usage-error" class="error-message"></span>
-                                </div>
-                                <div class="field">
-                                    <label for="inks_{{ $i }}_costPerMl">Cost per ml</label>
-                                    <input type="number" id="inks_{{ $i }}_costPerMl" name="inks[{{ $i }}][costPerMl]" placeholder="Cost per ml" aria-describedby="inks_{{ $i }}_costPerMl-error" value="{{ old('inks.'.$i.'.costPerMl', $ink['costPerMl'] ?? $ink['cost_per_ml'] ?? '') }}">
-                                    <span id="inks_{{ $i }}_costPerMl-error" class="error-message"></span>
-                                </div>
-                            </div>
-                            <div class="input-row">
-                                <div class="field">
-                                    <label for="inks_{{ $i }}_qty">Qty (ml)</label>
-                                    <input type="number" step="0.01" id="inks_{{ $i }}_qty" name="inks[{{ $i }}][qty]" placeholder="Qty (ml)" aria-describedby="inks_{{ $i }}_qty-error" value="{{ old('inks.'.$i.'.qty', $ink['qty'] ?? '') }}">
-                                    <span id="inks_{{ $i }}_qty-error" class="error-message"></span>
-                                </div>
-                                <div class="field">
-                                    <label for="inks_{{ $i }}_totalCost">Total Cost</label>
-                                    <input type="number" id="inks_{{ $i }}_totalCost" name="inks[{{ $i }}][totalCost]" readonly placeholder="Total Cost" aria-describedby="inks_{{ $i }}_totalCost-error" value="{{ old('inks.'.$i.'.totalCost', $ink['totalCost'] ?? $ink['total_cost'] ?? '') }}">
-                                    <span id="inks_{{ $i }}_totalCost-error" class="error-message"></span>
-                                </div>
-                                <button class="add-row" type="button" aria-label="Add another ink row">+</button>
-                                <button class="remove-row" type="button" aria-label="Remove this ink row">−</button>
-                            </div>
-                        </div>
-                        @endforeach
-                    </div>
-                </div>
+                {{-- Ink inputs removed; usage moved into materials rows --}}
             </div>
 
             {{-- Description --}}
@@ -249,109 +198,53 @@
             </div>
             <div class="form-section">
                 <h2>Customization Options</h2>
-                <div class="responsive-grid grid-2-cols">
-                    <div class="field">
-                        <label>Embossed Powder (Add-on)</label>
-                        <div class="radio-group">
-                            <label><input type="radio" name="embossed_select" value="none" checked> None</label>
-                            <label><input type="radio" name="embossed_select" value="add"> Add Embossed Powder</label>
-                        </div>
-                        <div class="addon-fields embossed-fields" style="display:none; margin-top:8px;">
-                            <div class="input-row">
-                                <div class="field">
-                                    <label for="materials_embossing_addon_item">Item</label>
-                                    <input type="text" id="materials_embossing_addon_item" name="materials[embossing_addon][item]" placeholder="Item name" value="{{ old('materials.embossing_addon.item') }}">
-                                </div>
-                                <div class="field">
-                                    <label for="materials_embossing_addon_type">Type</label>
-                                    <input type="text" id="materials_embossing_addon_type" name="materials[embossing_addon][type]" placeholder="Type" value="{{ old('materials.embossing_addon.type') }}">
-                                </div>
-                                <div class="field">
-                                    <label for="materials_embossing_addon_color">Color</label>
-                                    <input type="text" id="materials_embossing_addon_color" name="materials[embossing_addon][color]" placeholder="Color" value="{{ old('materials.embossing_addon.color') }}">
-                                </div>
-                                <div class="field">
-                                    <label for="materials_embossing_addon_size">Size</label>
-                                    <input type="text" id="materials_embossing_addon_size" name="materials[embossing_addon][size]" placeholder="Size" value="{{ old('materials.embossing_addon.size') }}">
-                                </div>
-                                <div class="field">
-                                    <label for="materials_embossing_addon_weight">Weight (GSM)</label>
-                                    <input type="number" id="materials_embossing_addon_weight" name="materials[embossing_addon][weight]" placeholder="Weight" value="{{ old('materials.embossing_addon.weight') }}">
-                                </div>
-                            </div>
-                            <div class="input-row">
-                                <div class="field">
-                                    <label for="materials_embossing_addon_unitPrice">Unit Price</label>
-                                    <input type="number" step="0.01" id="materials_embossing_addon_unitPrice" name="materials[embossing_addon][unitPrice]" placeholder="Unit Price" value="{{ old('materials.embossing_addon.unitPrice') }}">
-                                </div>
-                                <div class="field">
-                                    <label for="materials_embossing_addon_qty">Qty</label>
-                                    <input type="number" id="materials_embossing_addon_qty" name="materials[embossing_addon][qty]" placeholder="Qty" value="{{ old('materials.embossing_addon.qty') }}">
-                                </div>
-                                <div class="field">
-                                    <label for="materials_embossing_addon_cost">Cost</label>
-                                    <input type="number" id="materials_embossing_addon_cost" name="materials[embossing_addon][cost]" readonly placeholder="Cost" value="{{ old('materials.embossing_addon.cost') }}">
-                                </div>
-                            </div>
-                        </div>
-                        <span id="colorOptions-error" class="error-message"></span>
-                    </div>
 
-                    <div class="field">
-                        <label>Envelope Options (Add-on)</label>
-                        <div class="radio-group">
-                            <label><input type="radio" name="envelope_select" value="none" checked> None</label>
-                            <label><input type="radio" name="envelope_select" value="add"> Add Envelope</label>
-                        </div>
-                        <div class="addon-fields envelope-fields" style="display:none; margin-top:8px;">
-                            <div class="input-row">
-                                <div class="field">
-                                    <label for="materials_envelope_addon_item">Item</label>
-                                    <input type="text" id="materials_envelope_addon_item" name="materials[envelope_addon][item]" placeholder="Item name" value="{{ old('materials.envelope_addon.item') }}">
-                                </div>
-                                <div class="field">
-                                    <label for="materials_envelope_addon_type">Type</label>
-                                    <input type="text" id="materials_envelope_addon_type" name="materials[envelope_addon][type]" placeholder="Type" value="{{ old('materials.envelope_addon.type') }}">
-                                </div>
-                                <div class="field">
-                                    <label for="materials_envelope_addon_color">Color</label>
-                                    <input type="text" id="materials_envelope_addon_color" name="materials[envelope_addon][color]" placeholder="Color" value="{{ old('materials.envelope_addon.color') }}">
-                                </div>
-                                <div class="field">
-                                    <label for="materials_envelope_addon_size">Size</label>
-                                    <input type="text" id="materials_envelope_addon_size" name="materials[envelope_addon][size]" placeholder="Size" value="{{ old('materials.envelope_addon.size') }}">
-                                </div>
-                                <div class="field">
-                                    <label for="materials_envelope_addon_weight">Weight (GSM)</label>
-                                    <input type="number" id="materials_envelope_addon_weight" name="materials[envelope_addon][weight]" placeholder="Weight" value="{{ old('materials.envelope_addon.weight') }}">
-                                </div>
-                            </div>
-                            <div class="input-row">
-                                <div class="field">
-                                    <label for="materials_envelope_addon_unitPrice">Unit Price</label>
-                                    <input type="number" step="0.01" id="materials_envelope_addon_unitPrice" name="materials[envelope_addon][unitPrice]" placeholder="Unit Price" value="{{ old('materials.envelope_addon.unitPrice') }}">
-                                </div>
-                                <div class="field">
-                                    <label for="materials_envelope_addon_qty">Qty</label>
-                                    <input type="number" id="materials_envelope_addon_qty" name="materials[envelope_addon][qty]" placeholder="Qty" value="{{ old('materials.envelope_addon.qty') }}">
-                                </div>
-                                <div class="field">
-                                    <label for="materials_envelope_addon_cost">Cost</label>
-                                    <input type="number" id="materials_envelope_addon_cost" name="materials[envelope_addon][cost]" readonly placeholder="Cost" value="{{ old('materials.envelope_addon.cost') }}">
-                                </div>
-                            </div>
-                        </div>
-                        <span id="envelopeOptions-error" class="error-message"></span>
-                    </div>
-                    <div class="field">
-                        <label for="minOrderQty">Minimum Order Quantity</label>
-                        <input type="number" id="minOrderQty" name="minOrderQty" placeholder="Minimum Order Quantity (e.g., 50 pcs)" aria-describedby="minOrderQty-error" value="{{ old('minOrderQty') }}">
-                        <span id="minOrderQty-error" class="error-message"></span>
-                    </div>
+                <div class="responsive-grid grid-2-cols">
                     <div class="field grid-span-2">
-                        <label for="bulkPricing">Bulk Pricing Tiers</label>
-                        <textarea id="bulkPricing" name="bulkPricing" placeholder="Bulk Pricing Tiers..." aria-describedby="bulkPricing-error">{{ old('bulkPricing') }}</textarea>
-                        <span id="bulkPricing-error" class="error-message"></span>
+                        <label for="minOrderQtyCustomization">Minimum Order Quantity</label>
+                        <input type="number" id="minOrderQtyCustomization" name="minOrderQtyCustomization" placeholder="Minimum Order Quantity (e.g., 50 pcs)" aria-describedby="minOrderQtyCustomization-error" value="{{ old('minOrderQtyCustomization', old('minOrderQty', '')) }}">
+                        <span id="minOrderQtyCustomization-error" class="error-message"></span>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Group Fields</h3>
+                    <div class="group-rows">
+                        @php
+                            $groupRows = old('groups', isset($product) && !empty($product->groups) ? $product->groups->toArray() : []);
+                            if (empty($groupRows)) { $groupRows = [['name'=>'','size'=>'','colors'=>'','unit'=>'','unitPrice'=>'']]; }
+                        @endphp
+                        @foreach($groupRows as $i => $g)
+                        <div class="group-row">
+                            <input type="hidden" name="groups[{{ $i }}][id]" value="{{ old('groups.'.$i.'.id', $g['id'] ?? '') }}">
+                            <div class="input-row">
+                                <div class="field">
+                                    <label for="groups_{{ $i }}_name">Material Name</label>
+                                    <input type="text" id="groups_{{ $i }}_name" name="groups[{{ $i }}][name]" value="{{ old('groups.'.$i.'.name', $g['name'] ?? '') }}">
+                                </div>
+                                <div class="field">
+                                    <label for="groups_{{ $i }}_size">Size</label>
+                                    <input type="text" id="groups_{{ $i }}_size" name="groups[{{ $i }}][size]" value="{{ old('groups.'.$i.'.size', $g['size'] ?? '') }}">
+                                </div>
+                                <div class="field">
+                                    <label for="groups_{{ $i }}_colors">Colors</label>
+                                    <input type="text" id="groups_{{ $i }}_colors" name="groups[{{ $i }}][colors]" value="{{ old('groups.'.$i.'.colors', $g['colors'] ?? '') }}">
+                                </div>
+                                <div class="field">
+                                    <label for="groups_{{ $i }}_unit">Unit</label>
+                                    <input type="text" id="groups_{{ $i }}_unit" name="groups[{{ $i }}][unit]" value="{{ old('groups.'.$i.'.unit', $g['unit'] ?? '') }}">
+                                </div>
+                                <div class="field">
+                                    <label for="groups_{{ $i }}_unitPrice">Unit Price</label>
+                                    <input type="number" step="0.01" id="groups_{{ $i }}_unitPrice" name="groups[{{ $i }}][unitPrice]" value="{{ old('groups.'.$i.'.unitPrice', $g['unitPrice'] ?? '') }}">
+                                </div>
+                            </div>
+                            <div class="input-row">
+                                <button class="add-row" type="button" aria-label="Add another group row">+</button>
+                                <button class="remove-row" type="button" aria-label="Remove this group row">−</button>
+                            </div>
+                        </div>
+                        @endforeach
                     </div>
                 </div>
             </div>
@@ -409,47 +302,7 @@
                 </div>
             </div>
 
-            <div class="form-section">
-                <h2>Costing</h2>
-                <div class="responsive-grid grid-2-cols">
-                    <div class="field">
-                        <label for="totalRawCost">Total Raw Material Cost (₱)</label>
-                        <input type="number" readonly id="totalRawCost" name="totalRawCost" placeholder="Total Raw Material Cost (₱)" aria-describedby="totalRawCost-error">
-                        <span id="totalRawCost-error" class="error-message"></span>
-                    </div>
-                    <div class="field">
-                        <label for="quantityOrdered">Quantity Ordered</label>
-                        <input type="number" id="quantityOrdered" name="quantityOrdered" value="100" placeholder="Quantity Ordered (admin sets default batch size, e.g., 100 pcs)" aria-describedby="quantityOrdered-error" value="{{ old('quantityOrdered') }}">
-                        <span id="quantityOrdered-error" class="error-message"></span>
-                    </div>
-                    <div class="field">
-                        <label for="costPerInvite">Cost per Invitation (₱)</label>
-                        <input type="number" readonly id="costPerInvite" name="costPerInvite" placeholder="Cost per Invitation (₱)" aria-describedby="costPerInvite-error">
-                        <span id="costPerInvite-error" class="error-message"></span>
-                    </div>
-                    <div class="field">
-                        <label for="markup">Markup %</label>
-                        <select id="markup" name="markup" aria-describedby="markup-error">
-                            <option disabled selected>Markup %</option>
-                            <option value="50" {{ (old('markup') == '50') ? 'selected' : '' }}>50%</option>
-                            <option value="100" {{ (old('markup') == '100') ? 'selected' : '' }}>100%</option>
-                            <option value="120" {{ (old('markup') == '120') ? 'selected' : '' }}>120%</option>
-                            <option value="150" {{ (old('markup') == '150') ? 'selected' : '' }}>150%</option>
-                        </select>
-                        <span id="markup-error" class="error-message"></span>
-                    </div>
-                    <div class="field">
-                        <label for="sellingPrice">Selling Price per Invitation (₱)</label>
-                        <input type="number" readonly id="sellingPrice" name="sellingPrice" placeholder="Selling Price per Invitation (₱)" aria-describedby="sellingPrice-error">
-                        <span id="sellingPrice-error" class="error-message"></span>
-                    </div>
-                    <div class="field">
-                        <label for="totalSellingPrice">Total Selling Price (₱)</label>
-                        <input type="number" readonly id="totalSellingPrice" name="totalSellingPrice" placeholder="Total Selling Price (₱)" aria-describedby="totalSellingPrice-error">
-                        <span id="totalSellingPrice-error" class="error-message"></span>
-                    </div>
-                </div>
-            </div>
+            {{-- Costing section removed as requested --}}
 
             <div class="form-buttons">
                 <button type="submit" class="btn-save" id="submit-btn"

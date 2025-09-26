@@ -1,286 +1,231 @@
-// ================================
-// Product Dashboard JS
-// ================================
-document.addEventListener("DOMContentLoaded", () => {
-    const searchInput = document.getElementById("productSearch");
-    const table = document.querySelector(".products-table tbody");
-    const rows = Array.from(table.querySelectorAll("tr"));
-    const btnSortUp = document.querySelector(".btn-sort-up");
-    const btnSortDown = document.querySelector(".btn-sort-down");
-    const btnDownloadAll = document.querySelector(".btn-download-all");
-    const paginationLinks = document.querySelector(".pagination-links");
-    const entriesInfo = document.querySelector(".entries-info");
+// Minimal Product Dashboard JS - focused on grid view and search
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('productSearch');
+    const searchForm = document.getElementById('productSearchForm');
+    const grid = document.querySelector('.products-grid');
+    const cards = grid ? Array.from(grid.querySelectorAll('.product-card')) : [];
+    let searchTimeout = null;
 
-    let currentPage = 1;
-    const rowsPerPage = 5;
-
-    // Cache initially
-    let visibleRows = rows;
-
-    // ================================
-    // Live Search
-    // ================================
     function sanitizeInput(input) {
-        return input.replace(/[<>\"']/g, '');
+        return (input || '').replace(/[<>\"']/g, '');
     }
 
-    // If the search input is part of a GET form, debounce submission to server
-    const searchForm = document.getElementById('productSearchForm');
-    let searchTimeout = null;
+    // If there's a server-backed search form, debounce submissions.
     if (searchInput && searchForm) {
         searchInput.addEventListener('input', function () {
             clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                searchForm.submit();
-            }, 450);
+            searchTimeout = setTimeout(() => searchForm.submit(), 450);
         });
-    } else if (searchInput) {
-        searchInput.addEventListener("keyup", function () {
-            const value = sanitizeInput(this.value.toLowerCase());
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(value) ? "" : "none";
+    }
+
+    // Otherwise provide a light client-side filter for the grid of cards
+    if (searchInput && !searchForm && cards.length) {
+        searchInput.addEventListener('input', function () {
+            const q = sanitizeInput(this.value).toLowerCase().trim();
+            let visibleCount = 0;
+            cards.forEach(card => {
+                const text = (card.textContent || '').toLowerCase();
+                const match = q === '' || text.includes(q);
+                card.style.display = match ? '' : 'none';
+                if (match) visibleCount++;
             });
-            paginate(); // re-run pagination after search
-        });
-    }
 
-    // ================================
-    // Sort Functions
-    // ================================
-    function sortTable(order = "asc") {
-        const sorted = [...rows].sort((a, b) => {
-            const nameA = a.cells[1].innerText.toLowerCase();
-            const nameB = b.cells[1].innerText.toLowerCase();
-            return order === "asc"
-                ? nameA.localeCompare(nameB)
-                : nameB.localeCompare(nameA);
-        });
-        table.innerHTML = "";
-        sorted.forEach(row => table.appendChild(row));
-        paginate();
-    }
-
-    btnSortUp.addEventListener("click", () => sortTable("asc"));
-    btnSortDown.addEventListener("click", () => sortTable("desc"));
-
-    // ================================
-    // Download Table as CSV
-    // ================================
-    btnDownloadAll.addEventListener("click", () => {
-        let csv = [];
-        const rows = document.querySelectorAll("table tr");
-        rows.forEach(row => {
-            let cols = row.querySelectorAll("td, th");
-            let rowData = [];
-            cols.forEach(col => rowData.push(col.innerText));
-            csv.push(rowData.join(","));
-        });
-        downloadCSV(csv.join("\n"), "products.csv");
-    });
-
-    function downloadCSV(csv, filename) {
-        let csvFile = new Blob([csv], { type: "text/csv" });
-        let link = document.createElement("a");
-        link.download = filename;
-        link.href = window.URL.createObjectURL(csvFile);
-        link.style.display = "none";
-        document.body.appendChild(link);
-        link.click();
-    }
-
-    // ================================
-    // Pagination
-    // ================================
-    function paginate() {
-        // Use cached visibleRows
-        const totalPages = Math.ceil(visibleRows.length / rowsPerPage);
-
-        visibleRows.forEach((row, index) => {
-            row.style.display =
-                index >= (currentPage - 1) * rowsPerPage &&
-                index < currentPage * rowsPerPage
-                    ? ""
-                    : "none";
-        });
-
-        // Update pagination UI
-        paginationLinks.innerHTML = "";
-        if (totalPages > 1) {
-            let prev = document.createElement("button");
-            prev.innerText = "«";
-            prev.className = "page-link";
-            prev.disabled = currentPage === 1;
-            prev.addEventListener("click", () => {
-                if (currentPage > 1) {
-                    currentPage--;
-                    paginate();
-                }
-            });
-            paginationLinks.appendChild(prev);
-
-            for (let i = 1; i <= totalPages; i++) {
-                let btn = document.createElement("button");
-                btn.innerText = i;
-                btn.className = "page-link" + (i === currentPage ? " active" : "");
-                btn.addEventListener("click", () => {
-                    currentPage = i;
-                    paginate();
-                });
-                paginationLinks.appendChild(btn);
+            // Update entries info if present
+            const entriesInfo = document.querySelector('.entries-info');
+            if (entriesInfo) {
+                entriesInfo.textContent = q === ''
+                    ? entriesInfo.getAttribute('data-original') || entriesInfo.textContent
+                    : `Showing ${visibleCount} of ${cards.length} entries`;
             }
-
-            let next = document.createElement("button");
-            next.innerText = "»";
-            next.className = "page-link";
-            next.disabled = currentPage === totalPages;
-            next.addEventListener("click", () => {
-                if (currentPage < totalPages) {
-                    currentPage++;
-                    paginate();
-                }
-            });
-            paginationLinks.appendChild(next);
-        }
-
-        // Update info text
-        const start = (currentPage - 1) * rowsPerPage + 1;
-        const end = Math.min(currentPage * rowsPerPage, visibleRows.length);
-        entriesInfo.innerText = `Showing ${start} to ${end} of ${visibleRows.length} entries`;
+        });
     }
 
-    paginate();
-
-    // ================================
-    // Action Buttons
-    // ================================
-    document.querySelectorAll(".btn-view").forEach(btn => {
-        btn.addEventListener("click", () =>
-            alert("📄 Viewing product details...")
-        );
+    // Toggle sections (materials/inks) if present on page
+    const togglePairs = [
+        { btnId: 'toggle-materials', sectionId: 'materials-section', showText: 'Hide Materials', hideText: 'Show Materials' },
+        { btnId: 'toggle-inks', sectionId: 'inks-section', showText: 'Hide Inks', hideText: 'Show Inks' }
+    ];
+    togglePairs.forEach(({btnId, sectionId, showText, hideText}) => {
+        const btn = document.getElementById(btnId);
+        const section = document.getElementById(sectionId);
+        if (!btn || !section) return;
+        btn.addEventListener('click', () => {
+            const isHidden = section.style.display === 'none';
+            section.style.display = isHidden ? '' : 'none';
+            btn.textContent = isHidden ? showText : hideText;
+        });
     });
 
-    document.querySelectorAll(".btn-update").forEach(btn => {
-        btn.addEventListener("click", () =>
-            alert("✏️ Update product form goes here...")
-        );
-    });
+    // Safety: if other scripts expect window.attachProductPanelHandlers or loader, leave untouched.
+});
 
-    table.addEventListener('click', function(e) {
-        const delBtn = e.target.closest('.ajax-delete');
-        if (delBtn) {
-            const id = delBtn.dataset.id;
-            if (!id) return;
-            if (!confirm("⚠️ Are you sure you want to delete this product?")) return;
-            // show spinner
-            delBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-            delBtn.disabled = true;
-            // perform AJAX delete
-            const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-            fetch(`/admin/products/${id}`, {
-                method: 'DELETE',
-                headers: {
-                    'X-CSRF-TOKEN': token || '',
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                }
-            }).then(r => {
-                if (r.ok) return r.json().catch(() => ({}));
-                throw new Error('Delete failed');
-            }).then(() => {
-                // remove row
-                const row = delBtn.closest('tr');
-                if (row) row.remove();
-            }).catch(err => {
-                alert('Could not delete the product.');
-            }).finally(() => {
-                // no-op or refresh
+    // ProductGridStore: a lightweight in-memory store and DOM renderer for the products grid.
+    // Usage: window.ProductGridStore.add(productObj) after creating a product to insert it into the UI.
+    (function () {
+        function qs(sel, ctx) { return (ctx || document).querySelector(sel); }
+        function qsa(sel, ctx) { return Array.from((ctx || document).querySelectorAll(sel)); }
+
+        function createText(tag, text, className) {
+            var el = document.createElement(tag);
+            if (className) el.className = className;
+            el.textContent = text || '';
+            return el;
+        }
+
+        function escapeHtml(str) {
+            if (str == null) return '';
+            return String(str).replace(/[&<>"']/g, function (s) {
+                return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"})[s];
             });
         }
-    });
-});
 
-// ...existing code...
-
-// ================================
-// Live Search
-// ================================
-function sanitizeInput(input) {
-    return input.replace(/[<>\"']/g, ''); // Basic sanitization to prevent XSS
-}
-
-searchInput.addEventListener("keyup", function () {
-    const query = sanitizeInput(this.value.toLowerCase());
-    const rows = Array.from(table.querySelectorAll("tr"));
-    let visibleRows = [];
-
-    rows.forEach(row => {
-        const text = row.textContent.toLowerCase();
-        if (text.includes(query)) {
-            row.style.display = "";
-            visibleRows.push(row);
-        } else {
-            row.style.display = "none";
+        function ProductGridStore(selector) {
+            this.selector = selector || '.products-grid';
+            this.grid = qs(this.selector);
+            this.entriesInfo = qs('.entries-info');
+            this.products = [];
+            this._init();
         }
-    });
 
-    // Handle case where no rows match
-    if (visibleRows.length === 0) {
-        // Optionally, show a "no results" message
-        console.log("No matching products found.");
-    }
+        ProductGridStore.prototype._init = function () {
+            if (!this.grid) return;
+            var self = this;
+            // Capture existing product cards
+            var cards = qsa('.product-card', this.grid);
+            this.products = cards.map(function (card) {
+                return self._productFromCard(card);
+            });
 
-    // Update pagination after search
-    currentPage = 1;
-    paginate(visibleRows.length > 0 ? visibleRows : rows);
-});
-// ...existing code...
+            // store original entries-info text if present
+            if (this.entriesInfo && !this.entriesInfo.getAttribute('data-original')) {
+                this.entriesInfo.setAttribute('data-original', this.entriesInfo.textContent.trim());
+            }
+        };
 
-// ================================
-// Sort Functions
-// ================================
-function sortTable(order = "asc") {
-    const sorted = [...rows].sort((a, b) => {
-        const nameA = a.cells[1].innerText.toLowerCase();
-        const nameB = b.cells[1].innerText.toLowerCase();
-        return order === "asc"
-            ? nameA.localeCompare(nameB)
-            : nameB.localeCompare(nameA);
-    });
-    // Instead of clearing innerHTML, reorder by appending sorted rows
-    sorted.forEach(row => table.appendChild(row));
-    paginate();
-}
-document.addEventListener('DOMContentLoaded', function() {
-    const matBtn = document.getElementById('toggle-materials');
-    const matSection = document.getElementById('materials-section');
-    if (matBtn && matSection) {
-        matBtn.addEventListener('click', function() {
-            if (matSection.style.display === 'none') {
-                matSection.style.display = '';
-                matBtn.textContent = 'Hide Materials';
+        ProductGridStore.prototype._productFromCard = function (card) {
+            var id = card.getAttribute('data-id') || null;
+            var title = qs('.product-card-title', card)?.textContent?.trim() || '';
+            var img = qs('img.product-card-thumb', card)?.getAttribute('src') || '';
+            var desc = qs('.product-card-desc', card)?.textContent?.trim() || '';
+            var price = qs('.price', card)?.textContent?.trim() || '';
+            var qty = qs('.qty', card)?.textContent?.trim() || '';
+            var status = qs('.status', card)?.textContent?.trim() || '';
+            return { id: id, name: title, image: img, description: desc, price: price, quantity: qty, status: status };
+        };
+
+        ProductGridStore.prototype._renderCard = function (product) {
+            var card = document.createElement('div');
+            card.className = 'product-card';
+            if (product.id) card.setAttribute('data-id', product.id);
+
+            // media
+            var media = document.createElement('div'); media.className = 'product-card-media';
+            var img = document.createElement('img'); img.className = 'product-card-thumb';
+            img.setAttribute('alt', escapeHtml(product.name || 'Product'));
+            img.setAttribute('loading', 'lazy');
+            img.src = product.image || (window.__productPlaceholder || '/images/no-image.png');
+            media.appendChild(img);
+
+            // body
+            var body = document.createElement('div'); body.className = 'product-card-body';
+            var h3 = createText('h3', product.name || '', 'product-card-title');
+            body.appendChild(h3);
+            if (product.description) {
+                var p = createText('p', product.description, 'product-card-desc');
+                body.appendChild(p);
+            }
+            var meta = document.createElement('div'); meta.className = 'product-card-meta';
+            var eType = createText('span', product.event_type || '-', 'meta-item');
+            var sep = createText('span', '•', 'meta-sep');
+            var pType = createText('span', product.product_type || '-', 'meta-item');
+            meta.appendChild(eType); meta.appendChild(sep); meta.appendChild(pType);
+            body.appendChild(meta);
+
+            // footer
+            var footer = document.createElement('div'); footer.className = 'product-card-footer';
+            var price = createText('div', product.price ? product.price : '₱0.00', 'price');
+            var qty = createText('div', product.quantity ? ('Qty: ' + product.quantity) : 'Qty: 0', 'qty');
+            var statusWrap = document.createElement('div'); statusWrap.className = 'status-wrap';
+            var statusSpan = createText('span', product.status || 'unknown', 'status');
+            statusWrap.appendChild(statusSpan);
+            footer.appendChild(price); footer.appendChild(qty); footer.appendChild(statusWrap);
+
+            // actions
+            var actions = document.createElement('div'); actions.className = 'card-actions';
+            var viewBtn = document.createElement('button');
+            viewBtn.type = 'button'; viewBtn.className = 'btn-view btn-view-ajax';
+            viewBtn.setAttribute('aria-label', 'View ' + (product.name || 'Product'));
+            viewBtn.setAttribute('data-id', product.id || '');
+            if (product.url) viewBtn.setAttribute('data-url', product.url);
+            viewBtn.innerHTML = '<i class="fi fi-sr-eye"></i>';
+            actions.appendChild(viewBtn);
+
+            var editA = document.createElement('a'); editA.className = 'btn-update'; editA.setAttribute('aria-label', 'Edit ' + (product.name || 'Product'));
+            if (product.editUrl) editA.href = product.editUrl; else editA.href = '#';
+            editA.innerHTML = '<i class="fa-solid fa-pen-to-square"></i>';
+            actions.appendChild(editA);
+
+            footer.appendChild(actions);
+
+            card.appendChild(media); card.appendChild(body); card.appendChild(footer);
+            return card;
+        };
+
+        ProductGridStore.prototype.add = function (product, prepend) {
+            if (!this.grid) return null;
+            // normalize
+            var p = Object.assign({}, product);
+            this.products.unshift(p);
+            var node = this._renderCard(p);
+            if (prepend && this.grid.firstChild) this.grid.insertBefore(node, this.grid.firstChild);
+            else this.grid.appendChild(node);
+            this._updateEntries(1);
+            // dispatch event
+            try { document.dispatchEvent(new CustomEvent('productgrid:add', { detail: p })); } catch (e) {}
+            return node;
+        };
+
+        ProductGridStore.prototype.remove = function (id) {
+            if (!this.grid) return false;
+            var idx = this.products.findIndex(function (p) { return String(p.id) === String(id); });
+            if (idx !== -1) this.products.splice(idx, 1);
+            var node = qs('.product-card[data-id="' + id + '"]', this.grid);
+            if (node) node.remove();
+            this._updateEntries(-1);
+            try { document.dispatchEvent(new CustomEvent('productgrid:remove', { detail: { id: id } })); } catch (e) {}
+            return true;
+        };
+
+        ProductGridStore.prototype.update = function (id, changes) {
+            var idx = this.products.findIndex(function (p) { return String(p.id) === String(id); });
+            if (idx === -1) return null;
+            this.products[idx] = Object.assign({}, this.products[idx], changes);
+            var oldNode = qs('.product-card[data-id="' + id + '"]', this.grid);
+            if (oldNode) {
+                var newNode = this._renderCard(this.products[idx]);
+                oldNode.parentNode.replaceChild(newNode, oldNode);
+            }
+            try { document.dispatchEvent(new CustomEvent('productgrid:update', { detail: this.products[idx] })); } catch (e) {}
+            return this.products[idx];
+        };
+
+        ProductGridStore.prototype._updateEntries = function (delta) {
+            if (!this.entriesInfo) return;
+            // try to keep it simple: if original text included totals, update numeric part.
+            var orig = this.entriesInfo.getAttribute('data-original') || this.entriesInfo.textContent;
+            // if orig is like 'Showing X to Y of Z entries' we try to increment Z
+            var m = orig.match(/of\s+(\d+)\s+entries/i);
+            if (m) {
+                var total = parseInt(m[1], 10) + delta;
+                this.entriesInfo.textContent = 'Showing 1 to ' + Math.min(20, Math.max(0, total)) + ' of ' + total + ' entries';
             } else {
-                matSection.style.display = 'none';
-                matBtn.textContent = 'Show Materials';
+                // fallback: set simple count
+                this.entriesInfo.textContent = 'Showing ' + this.products.length + ' entries';
             }
-        });
-    }
+        };
 
-    const inkBtn = document.getElementById('toggle-inks');
-    const inkSection = document.getElementById('inks-section');
-    if (inkBtn && inkSection) {
-        inkBtn.addEventListener('click', function() {
-            if (inkSection.style.display === 'none') {
-                inkSection.style.display = '';
-                inkBtn.textContent = 'Hide Inks';
-            } else {
-                inkSection.style.display = 'none';
-                inkBtn.textContent = 'Show Inks';
-            }
-        });
-    }
-});
-
-
-// ...existing code...
-// ...existing code...
+        // expose global singleton
+        try {
+            window.ProductGridStore = window.ProductGridStore || new ProductGridStore('.products-grid');
+        } catch (e) { /* ignore in non-browser contexts */ }
+    })();

@@ -592,36 +592,15 @@ body.dark-mode .btn-warning {
       } catch (e) { console.error('Theme init error', e); }
     })();
   </script>
-  <!-- Lazy-loader for product slide assets: call window.__loadProductSlideAssets() to inject CSS+JS when needed -->
+  <!-- Product slide assets loader removed: provide a safe stub to avoid 404s if other scripts call it -->
   <script>
     (function(){
-      if (window.__productSlideAssetsLoaded) return;
-      function injectStylesheet(href){
-        var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href; document.head.appendChild(l);
-      }
-      function injectScript(src){
-        return new Promise(function(res, rej){
-          var s = document.createElement('script'); s.src = src; s.defer = true; s.onload = res; s.onerror = rej; document.head.appendChild(s);
-        });
-      }
-
-      window.__loadProductSlideAssets = function(){
-        if (window.__productSlideAssetsLoaded) return Promise.resolve();
-        try { injectStylesheet('{{ asset("css/admin-css/product-slide.css") }}'); } catch(e){}
-        return injectScript('{{ asset("js/admin-js/product-slide.js") }}').then(function(){ window.__productSlideAssetsLoaded = true; }).catch(function(){ window.__productSlideAssetsLoaded = true; });
+      window.__productSlideAssetsLoaded = window.__productSlideAssetsLoaded || false;
+      // Safe stub: returns a resolved Promise and does not attempt to inject missing files
+      window.__loadProductSlideAssets = window.__loadProductSlideAssets || function(){
+        window.__productSlideAssetsLoaded = true;
+        return Promise.resolve();
       };
-
-      // Auto-load on known products index path for convenience
-      try {
-        var path = window.location.pathname || '';
-        if (path.match(/\/admin\/products(\/.*)?$/i)) {
-          // Load lazily but don't block render
-          setTimeout(function(){ window.__loadProductSlideAssets(); }, 80);
-        }
-      } catch(e){}
-
-      // Also listen for an event to load later
-      document.addEventListener('loadProductSlideAssets', function(){ window.__loadProductSlideAssets(); }, { once: true });
     })();
   </script>
   <meta name="csrf-token" content="{{ csrf_token() }}">

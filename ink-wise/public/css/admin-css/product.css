@@ -1,7 +1,7 @@
 /* ================================
    GLOBAL STYLES
 ================================== */
-:root {
+.root, :root {
     --primary-color: #94b9ff;
     --primary-hover: #7aa8e8;
     --background-light: #f9fafb;
@@ -13,13 +13,13 @@
     --red: #dc3545;
 }
 
-/* set a compact base font size so rem units map to 12px */
+/* compact base font sizing */
 html { font-size: 12px; }
 
 body {
     margin: 0;
     padding: 0;
-    font-family: 'Poppins', sans-serif; /* Update to Poppins */
+    font-family: 'Poppins', sans-serif;
     background-color: #f3f4f6;
     color: #111827;
 }
@@ -27,7 +27,7 @@ body {
 .dashboard-container {
     padding: 20px;
     max-width: 1200px;
-    margin: auto;
+    margin: 0 auto;
 }
 
 .page-title {
@@ -221,7 +221,7 @@ body {
     border-radius: 6px;
     cursor: pointer;
     transition: background 0.2s;
-    color: var(--primary-color); /* Icon and button colors */
+    color: var(--primary-color);
 }
 
 .btn-download-all:hover,
@@ -256,7 +256,7 @@ body {
 .table-container {
     background: #fff;
     border-radius: 12px;
-    padding: 20px;
+    padding: 18px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     overflow-x: auto;
 }
@@ -272,7 +272,7 @@ body {
     border-collapse: collapse;
 }
 
-.products-table th, 
+.products-table th,
 .products-table td {
     padding: 12px 10px;
     border-bottom: 1px solid #e5e7eb;
@@ -312,6 +312,70 @@ body {
     font-size: 11px;
 }
 
+/* ================================
+   PRODUCTS GRID / CARDS
+   Modern responsive grid for product cards used in the admin index
+==================================== */
+.products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+    align-items: start;
+}
+
+.product-card {
+    background: var(--background-white);
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(16,24,40,0.04);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    min-height: 150px;
+    transition: transform .12s ease, box-shadow .12s ease;
+}
+.product-card:hover { transform: translateY(-4px); box-shadow: 0 14px 30px rgba(16,24,40,0.06); }
+
+.product-card-media {
+    width: 100%;
+    height: 140px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    background: #fbfdff;
+}
+
+.product-card-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.product-card-body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 6px; }
+.product-card-title { font-size: 1rem; margin: 0; font-weight: 700; color: #0f172a; }
+.product-card-desc { color: var(--text-secondary); font-size: 0.88rem; margin: 0; }
+.product-card-meta { font-size: 0.82rem; color: var(--text-secondary); display: flex; gap: 8px; align-items: center; }
+
+.product-card-footer { display: flex; align-items: center; gap: 10px; margin-top: 10px; justify-content: space-between; }
+.product-card-footer .price { font-weight: 800; color: #0f172a; }
+.product-card-footer .qty { color: var(--text-secondary); font-size: 0.9rem; }
+.card-actions { display: flex; gap: 6px; align-items: center; margin-left: auto; }
+
+.status-wrap .status { padding: 4px 8px; border-radius: 8px; background: #f3f4f6; font-size: 0.82rem; color: #0f172a; }
+
+/* Hide Active status badges (keep other statuses visible) */
+.status.status-active { display: none !important; }
+
+/* small tweaks for compact cards */
+@media (max-width: 720px) {
+    .products-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+    .product-card-media { height: 120px; }
+}
+
+@media (max-width: 420px) {
+    .products-grid { grid-template-columns: 1fr; }
+    .product-card { padding: 10px; }
+    .product-card-media { height: 160px; }
+}
+
 /* Action Buttons */
 .btn-view, .btn-update, .btn-delete {
     padding: 6px 12px;
@@ -325,17 +389,13 @@ body {
     color: #fff;
 }
 
-.btn-view { background: var(--primary-color); } /* Update action buttons */
+.btn-view { background: var(--primary-color); }
 .btn-update { background: var(--primary-color); }
 .btn-delete { background: var(--primary-color); }
 
-.btn-view:hover { background: var(--primary-hover); }
-.btn-update:hover { background: var(--primary-hover); }
-.btn-delete:hover { background: var(--primary-hover); }
+.btn-view:hover, .btn-update:hover, .btn-delete:hover { background: var(--primary-hover); }
 
-.btn-view:focus,
-.btn-update:focus,
-.btn-delete:focus {
+.btn-view:focus, .btn-update:focus, .btn-delete:focus {
     outline: 2px solid var(--primary-hover);
     outline-offset: 2px;
 }
@@ -390,10 +450,7 @@ body {
 /* ================================
    LOADING SPINNER
 ================================== */
-.loading {
-    opacity: 0.6;
-    pointer-events: none;
-}
+.loading { opacity: 0.6; pointer-events: none; }
 .spinner {
     border: 2px solid #f3f3f3;
     border-top: 2px solid var(--primary-color);
@@ -402,31 +459,18 @@ body {
     height: 16px;
     animation: spin 1s linear infinite;
 }
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
 /* ================================
    RESPONSIVE / IMPROVEMENTS
    Ensure the product admin layout resizes nicely
 =================================== */
 
-/* make container adapt to viewport while keeping comfortable margins */
-.dashboard-container {
-    max-width: 1200px;
-    width: calc(100% - 48px);
-    padding: 20px 24px;
-    box-sizing: border-box;
-}
 
-/* table containers should allow horizontal scroll but look good on tablet */
-.table-container {
-    padding: 18px;
-}
-.table-container table {
-    min-width: 920px; /* keeps column layout readable, triggers horizontal scroll on small screens */
-}
+/* make container adapt to viewport while keeping comfortable margins */
+.dashboard-container { max-width: 1200px; width: calc(100% - 48px); padding: 20px 24px; box-sizing: border-box; }
+.table-container { padding: 18px; }
+.table-container table { min-width: 920px; }
 
 /* compact table spacing on narrower screens */
 @media (max-width: 1024px) {
@@ -446,41 +490,16 @@ body {
     .table-controls { display: flex; flex-direction: column; gap: 10px; }
     .controls-right { display: flex; gap: 8px; align-items: center; }
     .filter-group select { padding: 6px; }
-
-    /* reduce table min width to allow better fit but still scroll if needed */
     .table-container table { min-width: 720px; }
-
-    /* slightly smaller avatars/text in tight spaces */
     .product-thumb { width: 36px; height: 36px; }
     .product-name { font-size: 13px; }
     .product-desc { font-size: 11px; }
-
-    /* make action buttons smaller to avoid wrapping */
     .btn-view, .btn-update, .btn-delete { padding: 6px 8px; font-size: 0.85rem; }
 }
 
 /* Small mobile: stack tables into card-like rows for readability */
 @media (max-width: 520px) {
-    .products-table, .inks-table, .materials-table { border: 0; }
-    .products-table thead, .inks-table thead, .materials-table thead { display: none; }
-    .products-table tr, .inks-table tr, .materials-table tr {
-        display: block;
-        margin-bottom: 12px;
-        background: #fff;
-        border-radius: 8px;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.03);
-        padding: 10px;
-    }
-    .products-table td, .inks-table td, .materials-table td {
-        display: flex;
-        justify-content: space-between;
-        padding: 6px 4px;
-        border-bottom: none;
-    }
-    .product-meta { align-items: center; }
-    .product-meta-text { gap: 2px; }
-
-    /* make pagination compact */
+    /* For small screens the grid layout is preferred; ensure spacing is compact */
     .table-pagination { flex-direction: column; align-items: flex-start; gap: 8px; }
 }
 
@@ -506,57 +525,18 @@ body {
     transition: background .12s ease, box-shadow .12s ease, transform .08s ease;
     line-height: 0;
 }
-.filter-icon:hover {
-    background: rgba(148,185,255,0.06);
-    box-shadow: 0 4px 10px rgba(16,24,40,0.04);
-    transform: translateY(-1px);
-}
-.filter-icon:focus {
-    outline: 2px solid var(--primary-hover);
-    outline-offset: 2px;
-}
+.filter-icon:hover { background: rgba(148,185,255,0.06); box-shadow: 0 4px 10px rgba(16,24,40,0.04); transform: translateY(-1px); }
+.filter-icon:focus { outline: 2px solid var(--primary-hover); outline-offset: 2px; }
 
 /* popup wrapper (override inline minimal positioning styles) */
-.filter-popup {
-    background: var(--background-white);
-    border: 1px solid var(--border-color);
-    border-radius: 10px;
-    padding: 8px;
-    box-shadow: 0 8px 24px rgba(16,24,40,0.06);
-    min-width: 160px;
-    display: none;
-}
-.filter-popup[aria-hidden="false"] {
-    display: block;
-}
+.filter-popup { background: var(--background-white); border: 1px solid var(--border-color); border-radius: 10px; padding: 8px; box-shadow: 0 8px 24px rgba(16,24,40,0.06); min-width: 160px; display: none; }
+.filter-popup[aria-hidden="false"] { display: block; }
 
 /* individual filter options inside the popup */
-.btn-filter-option {
-    background: transparent;
-    border: 1px solid transparent;
-    color: var(--text-secondary);
-    padding: 8px 10px;
-    border-radius: 8px;
-    width: 100%;
-    text-align: left;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background .12s, color .12s, border-color .12s;
-    display: inline-block;
-}
+.btn-filter-option { background: transparent; border: 1px solid transparent; color: var(--text-secondary); padding: 8px 10px; border-radius: 8px; width: 100%; text-align: left; font-weight: 600; cursor: pointer; transition: background .12s, color .12s, border-color .12s; display: inline-block; }
 .btn-filter-option + .btn-filter-option { margin-left: 6px; }
-.filter-popup .btn-filter-option:hover,
-.filter-popup .btn-filter-option:focus {
-    background: rgba(148,185,255,0.06);
-    color: var(--primary-color);
-    border-color: rgba(148,185,255,0.12);
-    outline: none;
-}
-.btn-filter-option.active {
-    background: var(--primary-color);
-    color: #fff;
-    border-color: var(--primary-color);
-}
+.filter-popup .btn-filter-option:hover, .filter-popup .btn-filter-option:focus { background: rgba(148,185,255,0.06); color: var(--primary-color); border-color: rgba(148,185,255,0.12); outline: none; }
+.btn-filter-option.active { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
 
 @media (max-width: 520px) {
     .filter-popup { right: 6px; left: 6px; top: calc(100% + 8px); min-width: auto; }
@@ -567,16 +547,7 @@ body {
 /* ================================
    TABLE CONTROLS
 ================================== */
-.table-controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-    flex-wrap: wrap;
-    gap: 12px;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border-color);
-}
+.table-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-color); }
 
 .controls-left {
     display: flex;
@@ -644,21 +615,9 @@ body {
 /* ================================
    MATERIALS AND INKS TABLE
 ================================== */
-.materials-table, .inks-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 2rem;
-    font-size: 14px;
-}
-.materials-table th, .materials-table td,
-.inks-table th, .inks-table td {
-    border: 1px solid #e0e7ef;
-    padding: 8px 10px;
-    text-align: left;
-}
-.materials-table th, .inks-table th {
-    background: #f5f7fa;
-}
+.materials-table, .inks-table { width: 100%; border-collapse: collapse; margin-top: 2rem; font-size: 14px; }
+.materials-table th, .materials-table td, .inks-table th, .inks-table td { border: 1px solid #e0e7ef; padding: 8px 10px; text-align: left; }
+.materials-table th, .inks-table th { background: #f5f7fa; }
 
 /* ================================
    RESPONSIVENESS
