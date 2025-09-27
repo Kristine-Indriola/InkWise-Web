@@ -1,11 +1,11 @@
 @extends('layouts.admin')
 
-@section('title', 'Stock Notifications')
+@section('title', 'Notifications')
 
 @section('content')
 <div class="notifications-container">
      <link rel="stylesheet" href="{{ asset('css/admin-css/notifications.css') }}">
-    <h1>🔔 Stock Notifications</h1>
+    <h1>🔔 System Notifications</h1>
 
     {{-- Low Stock Section --}}
     <div class="notif-section low">
@@ -70,6 +70,25 @@
             </table>
         @else
             <p class="empty">✅ No out of stock materials.</p>
+        @endif
+    </div>
+
+    {{-- General Notifications (Staff approvals, etc.) --}}
+    <div class="notif-section general">
+        <h2>📢 General Notifications</h2>
+        @if(auth()->user()->unreadNotifications->count())
+            <ul class="general-list">
+                @foreach(auth()->user()->unreadNotifications as $notification)
+                    <li>
+                        <span class="notif-message">
+                            {{ $notification->data['message'] ?? 'New notification' }}
+                        </span>
+                        <small class="notif-time">{{ $notification->created_at->diffForHumans() }}</small>
+                    </li>
+                @endforeach
+            </ul>
+        @else
+            <p class="empty">✅ No new system notifications.</p>
         @endif
     </div>
 </div>

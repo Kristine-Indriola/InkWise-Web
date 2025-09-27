@@ -64,3 +64,34 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 });
+
+// For each card, handle swatch hover
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.video-swatches').forEach(function(swatchGroup) {
+        const card = swatchGroup.closest('.bg-white');
+        const img = card.querySelector('.template-image');
+        const video = card.querySelector('.template-video');
+
+        swatchGroup.querySelectorAll('.swatch-btn').forEach(function(btn) {
+            btn.addEventListener('mouseenter', function() {
+                // Switch image
+                if (btn.dataset.image) {
+                    img.src = btn.dataset.image;
+                    img.classList.remove('hidden');
+                    video.classList.add('hidden');
+                }
+                // Switch video
+                if (btn.dataset.video) {
+                    video.querySelector('source').src = btn.dataset.video;
+                    video.load();
+                    video.classList.remove('hidden');
+                    img.classList.add('hidden');
+                }
+                // Remove active border from all, add to hovered
+                swatchGroup.querySelectorAll('.swatch-btn').forEach(b => b.classList.remove('ring-2', 'ring-[#06b6d4]'));
+                btn.classList.add('ring-2', 'ring-[#06b6d4]');
+            });
+        });
+    });
+});
+

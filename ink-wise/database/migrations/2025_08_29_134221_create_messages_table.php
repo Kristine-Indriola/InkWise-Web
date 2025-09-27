@@ -13,18 +13,23 @@ return new class extends Migration
     {
         Schema::create('messages', function (Blueprint $table) {
     $table->id();
-    
-    // Sender
-    $table->unsignedBigInteger('sender_id');
-    $table->string('sender_type'); // "user" or "customer"
-    
-    // Receiver
-    $table->unsignedBigInteger('receiver_id');
-    $table->string('receiver_type'); // "user" or "customer"
-    
+
+    // Sender (optional if you later add authentication)
+    $table->unsignedBigInteger('sender_id')->nullable();
+    $table->string('sender_type')->nullable();
+
+    // Receiver (optional, e.g. admin ID)
+    $table->unsignedBigInteger('receiver_id')->nullable();
+    $table->string('receiver_type')->nullable();
+
+    // From form
+    $table->string('name');
+    $table->string('email');
     $table->text('message');
+
     $table->timestamps();
 });
+
     }
 
     /**

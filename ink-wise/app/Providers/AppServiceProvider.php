@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Blade;
+use App\Support\ImageResolver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -19,6 +21,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Blade helper to resolve image URLs: @imageUrl($path)
+        Blade::directive('imageUrl', function ($expression) {
+            return "<?php echo \App\\Support\\ImageResolver::url({$expression}); ?>";
+        });
     }
 }

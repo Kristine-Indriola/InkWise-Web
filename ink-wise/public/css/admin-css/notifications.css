@@ -48,3 +48,33 @@
     background: #f9fafb;
     font-weight: 600;
 }
+
+.notif-section.general h2 { color: #2563eb; } /* blue for general */
+
+.general-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.general-list li {
+    padding: 10px 12px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.general-list li:last-child {
+    border-bottom: none;
+}
+
+.notif-message {
+    font-size: 15px;
+    color: #1e293b;
+}
+
+.notif-time {
+    font-size: 12px;
+    color: #6b7280;
+}

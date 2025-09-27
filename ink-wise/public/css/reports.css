@@ -1,0 +1,164 @@
+/* -----------------------
+   Reports Dashboard CSS
+------------------------ */
+
+/* Main container */
+.main-content {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+    background-color: #ffffff;
+    border-radius: 1rem;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+    font-family: 'Inter', sans-serif;
+}
+
+/* Topbar */
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.topbar h2 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+/* Tab buttons */
+.tab-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.tab-buttons button {
+    padding: 0.6rem 1.2rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    background-color: #e5e7eb;
+    color: #374151;
+    transition: all 0.2s ease-in-out;
+}
+
+.tab-buttons button:hover {
+    background-color: #d1d5db;
+}
+
+.tab-buttons button.active {
+    background-color: #4F46E5;
+    color: #fff;
+    box-shadow: 0 4px 10px rgba(79,70,229,0.3);
+}
+
+/* Tab content */
+.tab-content {
+    display: none;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Tables */
+.inventory-report-table,
+.sales-report-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    font-size: 0.95rem;
+    color: #1f2937;
+}
+
+.inventory-report-table th,
+.inventory-report-table td,
+.sales-report-table th,
+.sales-report-table td {
+    border: 1px solid #d1d5db;
+    padding: 0.6rem 0.8rem;
+    text-align: left;
+}
+
+.inventory-report-table th,
+.sales-report-table th {
+    background-color: #f3f4f6;
+    font-weight: 600;
+}
+
+/* Table row hover */
+.inventory-report-table tbody tr:hover,
+.sales-report-table tbody tr:hover {
+    background-color: #f9fafb;
+}
+
+/* Status badges */
+.inventory-report-table td span.status {
+    display: inline-block;
+    padding: 0.25rem 0.6rem;
+    border-radius: 0.35rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.status.In\ Stock {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.status.Low {
+    background-color: #fef3c7;
+    color: #b45309;
+}
+
+.status.Out {
+    background-color: #fee2e2;
+    color: #b91c1c;
+}
+
+/* Charts */
+canvas {
+    width: 100% !important;
+    max-width: 100%;
+    height: auto !important;
+    margin-top: 1rem;
+}
+
+/* Responsive */
+@media screen and (max-width: 768px) {
+    .tab-buttons {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .inventory-report-table th,
+    .inventory-report-table td,
+    .sales-report-table th,
+    .sales-report-table td {
+        font-size: 0.85rem;
+        padding: 0.4rem 0.5rem;
+    }
+}
+
+.tab-buttons { display: flex; gap: 1rem; margin-bottom: 1rem; }
+.tab-buttons button { padding: 0.5rem 1rem; border: none; border-radius: 0.5rem; cursor: pointer; }
+.tab-buttons button.active { background-color: #4F46E5; color: #fff; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.inventory-report-table, .sales-report-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+.inventory-report-table th, .inventory-report-table td,
+.sales-report-table th, .sales-report-table td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; }
+.export-btn { background: #4F46E5; color: #fff; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; margin-bottom: 10px; }
+.export-btn:hover { background: #3730A3; }

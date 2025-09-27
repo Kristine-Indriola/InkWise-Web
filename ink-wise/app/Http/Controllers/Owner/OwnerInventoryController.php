@@ -23,19 +23,33 @@ class OwnerInventoryController extends Controller
         // Blade path: resources/views/owner/inventory-track.blade.php
     }
 
-  public function track(Request $request)
-{
-    $query = \App\Models\Material::with('inventory');
+    public function track(Request $request)
+    {
+        $status = $request->input('status'); // Get status from query parameter
+        $search = $request->input('search');
 
-    if ($search = $request->input('search')) {
-        $query->where(function($q) use ($search) {
-            $q->where('material_name', 'like', "%{$search}%")
-              ->orWhere('material_type', 'like', "%{$search}%");
-        });
+        $query = Material::with('inventory');
+
+        // Filter by Low Stock if status=low
+        if ($status === 'low') {
+            $query->whereHas('inventory', function ($q) {
+                $q->whereColumn('stock_level', '<=', 'reorder_level')
+                ->where('stock_level', '>', 0);
+            });
+        }
+
+        // Apply search if any
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('material_name', 'like', "%{$search}%")
+                ->orWhere('material_type', 'like', "%{$search}%");
+            });
+        }
+
+        $materials = $query->get();
+
+        return view('owner.inventory-track', compact('materials', 'status', 'search'));
     }
 
-    $materials = $query->get();
 
-    return view('owner.inventory-track', compact('materials'));
-}
 }

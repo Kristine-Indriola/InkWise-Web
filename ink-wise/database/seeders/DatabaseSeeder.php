@@ -42,12 +42,6 @@ class DatabaseSeeder extends Seeder
             'status'   => 'active',
         ]);
 
-        $staff2 = User::create([
-            'email'    => 'staff2@test.com',
-            'password' => Hash::make('staff123'),
-            'role'     => 'staff',
-            'status'   => 'inactive',
-        ]);
 
         // --------------------
         // Staff & Admin details (using Eloquent so staff_id is auto-generated)
@@ -82,16 +76,7 @@ class DatabaseSeeder extends Seeder
             'status'         => 'approved',
         ]);
 
-        Staff::create([
-            'user_id'        => $staff2->user_id,
-            'role'           => 'staff',
-            'first_name'     => 'Jane',
-            'middle_name'    => null,
-            'last_name'      => 'Smith',
-            'contact_number' => '0917-222-2222',
-            'status'         => 'pending',
-        ]);
-
+       
         // --------------------
         // Staff Addresses
         // --------------------
@@ -103,17 +88,6 @@ class DatabaseSeeder extends Seeder
                 'city'       => 'Quezon City',
                 'province'   => 'Metro Manila',
                 'postal_code'=> '1100',
-                'country'    => 'Philippines',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'user_id'    => $staff2->user_id,
-                'street'     => '456 Sampaguita Ave',
-                'barangay'   => 'Quezon',
-                'city'       => 'Makati',
-                'province'   => 'Metro Manila',
-                'postal_code'=> '1200',
                 'country'    => 'Philippines',
                 'created_at' => now(),
                 'updated_at' => now(),

@@ -11,6 +11,15 @@ class Template extends Model
 
     protected $fillable = [
         'name',
-        'design',
+        'event_type',
+        'product_type',
+        'theme_style',
+        'description',
     ];
+
+    public function products()
+    {
+        return $this->hasMany(Product::class, 'template_id');
+    }
 }
+

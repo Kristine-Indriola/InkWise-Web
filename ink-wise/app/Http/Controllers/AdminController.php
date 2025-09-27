@@ -89,7 +89,17 @@ class AdminController extends Controller
             ]);
         }
 
+        
+
         return redirect()->route('admin.profile.show')
                          ->with('success', 'Profile updated successfully.');
     }
+
+    public function notifications()
+{
+    $notifications = auth()->user()->notifications; 
+    return view('admin.notifications.index', compact('notifications'));
+}
+
+    
 }

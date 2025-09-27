@@ -7,8 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 class Message extends Model
 {
     protected $fillable = [
-        'sender_id', 'sender_type',
-        'receiver_id', 'receiver_type',
+        'sender_id',
+        'sender_type',
+        'receiver_id',
+        'receiver_type',
+        'name',
+        'email',
         'message',
     ];
 

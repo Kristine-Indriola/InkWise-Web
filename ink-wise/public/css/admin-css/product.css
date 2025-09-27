@@ -1,0 +1,624 @@
+/* ================================
+   GLOBAL STYLES
+================================== */
+:root {
+    --primary-color: #94b9ff;
+    --primary-hover: #7aa8e8;
+    --background-light: #f9fafb;
+    --text-secondary: #6b7280;
+    --border-color: #d1d5db;
+    --background-white: #fff;
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --green: #28a745;
+    --red: #dc3545;
+}
+
+/* set a compact base font size so rem units map to 12px */
+html { font-size: 12px; }
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Poppins', sans-serif; /* Update to Poppins */
+    background-color: #f3f4f6;
+    color: #111827;
+}
+
+.dashboard-container {
+    padding: 20px;
+    max-width: 1500px;
+    margin: auto;
+}
+
+.page-title {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+}
+
+/* summary-cards and table UI removed: styles intentionally omitted */
+
+/* ================================
+   ADD BUTTONS
+================================== */
+.search-and-add {
+    display: flex;
+    justify-content: flex-end;
+    margin: 20px 0;
+    position: relative;
+}
+
+.add-buttons {
+    position: relative;
+}
+
+.btn-add-new {
+    background: var(--primary-color);
+    color: #fff;
+    border: none;
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    position: relative;
+}
+
+.btn-add-new:hover {
+    background: var(--primary-hover);
+}
+
+.btn-add-new:focus {
+    outline: 2px solid var(--primary-hover);
+    outline-offset: 2px;
+}
+
+.btn-add-new::after {
+    content: "▼";
+    margin-left: 8px;
+    font-size: 0.8rem;
+}
+
+.floating-buttons {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: var(--background-white);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+    min-width: 180px;
+    flex-direction: column;
+    gap: 0;
+}
+
+.add-buttons:hover .floating-buttons {
+    display: flex;
+}
+
+.floating-buttons .btn-floating {
+    background: none;
+    border: none;
+    padding: 12px 16px;
+    border-radius: 0;
+    cursor: pointer;
+    color: var(--primary-color);
+    font-weight: 600;
+    transition: background 0.2s;
+    text-align: left;
+    width: 100%;
+    box-shadow: none;
+}
+
+.floating-buttons .btn-floating:hover {
+    background: var(--background-light);
+}
+
+.floating-buttons .btn-floating:focus {
+    outline: 2px solid var(--primary-hover);
+    outline-offset: -2px;
+}
+
+.btn-download-all,
+.btn-sort-up,
+.btn-sort-down {
+    background: var(--background-white);
+    border: 1px solid var(--border-color);
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+    color: var(--primary-color); /* Icon and button colors */
+}
+
+.btn-download-all:hover,
+.btn-sort-up:hover,
+.btn-sort-down:hover {
+    background: #f3f4f6;
+}
+
+.btn-download-all:focus,
+.btn-sort-up:focus,
+.btn-sort-down:focus {
+    outline: 2px solid var(--primary-hover);
+    outline-offset: 2px;
+}
+
+.filter-group select {
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    color: var(--primary-color); /* Select text color */
+    border-color: var(--primary-color); /* Select border */
+}
+
+.filter-group select:focus {
+    outline: 2px solid var(--primary-hover);
+    outline-offset: 2px;
+}
+
+/* products table styles removed (grid-only UI now) */
+
+/* ================================
+   WHITE BACKGROUND CONTAINER
+   Wrap the grid in a subtle white card so the grid reads as a single panel
+=================================== */
+.table-container {
+    background: var(--background-white);
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: 0 8px 24px rgba(2,6,23,0.06);
+    border: 1px solid rgba(2,6,23,0.04);
+    margin-top: 12px;
+}
+.table-container h2 {
+    margin: 0 0 12px 0;
+    font-size: 1.05rem;
+    color: #111827;
+    font-weight: 700;
+}
+.table-container .products-grid {
+    margin-top: 0; /* grid sits inside the padded container */
+}
+
+
+/* ================================
+   PAGINATION
+================================== */
+.table-pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.entries-info {
+    font-size: 0.9rem;
+    color: #6b7280;
+}
+
+.pagination-links {
+    display: flex;
+    gap: 6px;
+}
+
+.page-link {
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+
+.page-link:hover {
+    background: #f3f4f6;
+}
+
+.page-link:focus {
+    outline: 2px solid var(--primary-hover);
+    outline-offset: 2px;
+}
+
+.page-link.active {
+    background: var(--primary-color); /* Update active pagination */
+    color: #fff;
+    border-color: var(--primary-color);
+}
+
+/* ================================
+   LOADING SPINNER
+================================== */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+.spinner {
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid var(--primary-color);
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ================================
+   RESPONSIVE / IMPROVEMENTS
+   Ensure the product admin layout resizes nicely
+=================================== */
+
+/* make container adapt to viewport while keeping comfortable margins */
+.dashboard-container {
+    max-width: 1500px;
+    width: calc(100% - 48px);
+    padding: 20px 24px;
+    box-sizing: border-box;
+}
+
+/* Remove table-specific styles; keep responsive helpers for grid/cards */
+@media (max-width: 1024px) {
+    .dashboard-container { padding: 16px; }
+    .floating-buttons { min-width: 150px; }
+}
+
+@media (max-width: 768px) {
+    .dashboard-container { width: calc(100% - 32px); padding: 12px; }
+    .search-and-add { justify-content: space-between; align-items: center; }
+    .filter-group select { padding: 6px; }
+}
+
+@media (max-width: 520px) {
+    .product-card { border-radius: 8px; }
+    .product-card-media { height: 120px; }
+    .table-pagination { flex-direction: column; align-items: flex-start; gap: 8px; }
+}
+
+/* ================================
+   PRODUCTS GRID / CARD LAYOUT
+=================================== */
+.products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+    margin-top: 12px;
+}
+.product-card {
+    display: flex;
+    flex-direction: column;
+    background: var(--background-white);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 6px 14px rgba(16,24,40,0.04);
+    transition: transform .12s ease, box-shadow .12s ease;
+}
+.product-card:hover { transform: translateY(-6px); box-shadow: 0 12px 30px rgba(16,24,40,0.08); }
+.product-card-media { width: 100%; height: 140px; background: #f3f4f6; display:flex; align-items:center; justify-content:center; }
+.product-card-thumb { width:100%; height:100%; object-fit:cover; }
+.product-card-body { padding: 12px; }
+.product-card-title { margin:0; font-size:1rem; font-weight:700; }
+.product-card-desc { margin:6px 0 0; color:var(--text-secondary); font-size:0.85rem; }
+.product-card-meta { margin-top:8px; color:var(--text-secondary); font-size:0.85rem; display:flex; gap:8px; align-items:center; }
+.product-card-footer { padding: 10px 12px; display:flex; gap:8px; align-items:center; justify-content:space-between; border-top:1px solid #eef2f6; }
+.card-actions { display:flex; gap:6px; align-items:center; }
+.btn-upload { background: var(--primary-color); color:#fff; border:none; padding:6px 8px; border-radius:6px; cursor:pointer; }
+.no-products { padding: 16px; color: var(--text-secondary); }
+
+/* Hide the inline status text/dot in grid cards (the modal keeps its own badge) */
+.product-card .status-wrap { display: none; }
+
+/* ================================
+   GRID CARD BUTTONS
+   Styles for view / edit / upload / delete controls inside product cards
+=================================== */
+.product-card .card-actions a,
+.product-card .card-actions button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--primary-color);
+    font-weight: 600;
+    font-size: 0.92rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.14s ease, transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.product-card .card-actions i { font-size: 1.05rem; }
+
+/* primary filled action (upload) already uses primary background; make it slightly larger */
+.product-card .card-actions .btn-upload {
+    padding: 7px 10px;
+    border-radius: 8px;
+    box-shadow: 0 6px 12px rgba(14,46,120,0.06);
+}
+
+/* edit link (neutral) */
+.product-card .card-actions .btn-update {
+    background: #fff;
+    border: 1px solid var(--border-color);
+    color: #374151; /* darker text for neutrality */
+    padding: 6px 8px;
+}
+
+/* view button: subtle primary-outline */
+.product-card .card-actions .btn-view {
+    background: transparent;
+    border: 1px solid rgba(148,185,255,0.18);
+    color: var(--primary-color);
+}
+
+/* delete button: warn style */
+.product-card .card-actions .ajax-delete,
+.product-card .card-actions .btn-delete {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--red);
+}
+
+/* Hover / focus states */
+.product-card .card-actions a:hover,
+.product-card .card-actions button:hover {
+    transform: translateY(-1px);
+}
+.product-card .card-actions a:focus,
+.product-card .card-actions button:focus {
+    outline: 3px solid rgba(148,185,255,0.18);
+    outline-offset: 2px;
+}
+
+/* delete hover - gentle red background */
+.product-card .card-actions .ajax-delete:hover,
+.product-card .card-actions .btn-delete:hover {
+    background: rgba(220,53,69,0.06);
+}
+
+/* small screens: slightly reduce padding to keep layout tight */
+@media (max-width: 520px) {
+    .product-card .card-actions a,
+    .product-card .card-actions button { padding: 6px; font-size: 0.88rem; }
+}
+
+/* ================================
+     MODAL STYLES (moved from AJAX partial)
+=================================== */
+.product-modal { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: center; justify-content: center; }
+.product-modal .modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.45); backdrop-filter: blur(2px); }
+.product-modal .modal-content { position: relative; z-index: 2; width: 92%; max-width: 1100px; max-height: 90vh; overflow: auto; background: #fff; border-radius: 12px; box-shadow: 0 18px 50px rgba(2,6,23,0.4); display: flex; flex-direction: column; transform: translateY(8px) scale(.995); opacity:0; }
+.product-modal .modal-header { display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid #eef2f6; }
+.product-modal .modal-body { padding: 16px 18px; display:flex; gap:18px; flex-wrap:wrap; }
+.product-modal .modal-image { flex: 1 1 360px; min-width:280px; max-width:460px; }
+.product-modal .modal-image img { width:100%; height:320px; object-fit:cover; border-radius:8px; background:#f3f4f6; }
+.product-modal .thumbnails { margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; }
+.product-modal .thumb { border:0; padding:0; background:transparent; cursor:pointer; }
+.product-modal .thumb img { width:64px; height:48px; object-fit:cover; border-radius:6px; border:2px solid transparent; }
+.product-modal .thumb.selected img { border-color: #94b9ff; }
+.product-modal .modal-info { flex:1 1 320px; min-width:240px; }
+.product-modal .modal-footer { display:flex; gap:8px; padding:12px 18px; border-top:1px solid #eef2f6; justify-content:flex-end; }
+.product-modal .btn-close { background:transparent; border:0; font-size:20px; cursor:pointer; }
+
+/* Enter/Exit animations for modal */
+.modal-enter { animation: modalIn .22s cubic-bezier(.2,.9,.2,1) forwards; }
+.modal-exit { animation: modalOut .18s cubic-bezier(.4,.0,.2,1) forwards; }
+@keyframes modalIn {
+    from { opacity: 0; transform: translateY(8px) scale(.995); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes modalOut {
+    from { opacity: 1; transform: translateY(0) scale(1); }
+    to   { opacity: 0; transform: translateY(6px) scale(.995); }
+}
+
+/* Card removal animation */
+.card-removing { animation: cardRemove .28s ease forwards; }
+@keyframes cardRemove {
+    0% { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-12px) scale(.98); height:0; margin:0; padding:0; }
+}
+
+/* Accessibility helper: prevent background scroll when modal open */
+body.modal-open { overflow: hidden; }
+
+/* Accessibility: ensure focus outlines remain visible on small screens */
+.btn-add-new:focus, .page-link:focus, .filter-group select:focus { outline: 3px solid rgba(148,185,255,0.28); }
+
+/* ================================
+   FILTER BUTTONS / POPUP
+   Clean minimal styles for the filter icon and popup buttons
+=================================== */
+
+/* filter icon (the small funnel button next to search) */
+.filter-icon {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--primary-color);
+    padding: 8px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background .12s ease, box-shadow .12s ease, transform .08s ease;
+    line-height: 0;
+}
+.filter-icon:hover {
+    background: rgba(148,185,255,0.06);
+    box-shadow: 0 4px 10px rgba(16,24,40,0.04);
+    transform: translateY(-1px);
+}
+.filter-icon:focus {
+    outline: 2px solid var(--primary-hover);
+    outline-offset: 2px;
+}
+
+/* popup wrapper (override inline minimal positioning styles) */
+.filter-popup {
+    background: var(--background-white);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 8px;
+    box-shadow: 0 8px 24px rgba(16,24,40,0.06);
+    min-width: 160px;
+    display: none;
+}
+.filter-popup[aria-hidden="false"] {
+    display: block;
+}
+
+/* individual filter options inside the popup */
+.btn-filter-option {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+    padding: 8px 10px;
+    border-radius: 8px;
+    width: 100%;
+    text-align: left;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .12s, color .12s, border-color .12s;
+    display: inline-block;
+}
+.btn-filter-option + .btn-filter-option { margin-left: 6px; }
+.filter-popup .btn-filter-option:hover,
+.filter-popup .btn-filter-option:focus {
+    background: rgba(148,185,255,0.06);
+    color: var(--primary-color);
+    border-color: rgba(148,185,255,0.12);
+    outline: none;
+}
+.btn-filter-option.active {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: var(--primary-color);
+}
+
+@media (max-width: 520px) {
+    .filter-popup { right: 6px; left: 6px; top: calc(100% + 8px); min-width: auto; }
+    .btn-filter-option + .btn-filter-option { margin-left: 0; margin-top: 6px; display: block; }
+}
+
+
+/* ================================
+   TABLE CONTROLS
+================================== */
+.table-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.controls-left {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 200px;
+}
+
+.controls-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.search-bar-wrapper {
+    width: 100%;
+    max-width: 300px;
+}
+
+.search-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.search-input {
+    width: 100%;
+    padding: 8px 35px 8px 35px; /* Space for icons */
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    color: var(--primary-color);
+}
+
+.search-icon {
+    position: absolute;
+    left: 10px;
+    color: var(--primary-color);
+}
+
+.filter-icon {
+    position: absolute;
+    right: 10px;
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    cursor: pointer;
+}
+
+.sort-group {
+    display: flex;
+    gap: 4px;
+}
+
+.filter-group select {
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    color: var(--primary-color);
+    background: var(--background-white);
+}
+
+/* ================================
+   MATERIALS AND INKS TABLE
+================================== */
+.materials-table, .inks-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 2rem;
+    font-size: 14px;
+}
+.materials-table th, .materials-table td,
+.inks-table th, .inks-table td {
+    border: 1px solid #e0e7ef;
+    padding: 8px 10px;
+    text-align: left;
+}
+.materials-table th, .inks-table th {
+    background: #f5f7fa;
+}
+
+/* ================================
+   RESPONSIVENESS
+================================== */
+@media (max-width: 768px) {
+    .summary-cards {
+        grid-template-columns: 1fr;
+    }
+    .table-container {
+        overflow-x: auto; /* Allow horizontal scroll for table */
+    }
+}
+
+
+

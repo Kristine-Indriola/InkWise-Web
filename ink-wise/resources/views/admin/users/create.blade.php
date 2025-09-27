@@ -8,11 +8,15 @@
         <link rel="stylesheet" href="{{ asset('css/edit-users.css') }}">
         <h2 class="form-title">➕ Create Staff Account</h2>
 
-        {{-- Success Message --}}
+        {{-- Alerts --}}
         @if(session('success'))
-            <div class="alert success">
-                {{ session('success') }}
-            </div>
+            <div class="alert success">✅ {{ session('success') }}</div>
+        @endif
+        @if(session('error'))
+            <div class="alert error">🚫 {{ session('error') }}</div>
+        @endif
+        @if(session('warning'))
+            <div class="alert warning">⚠️ {{ session('warning') }}</div>
         @endif
 
         {{-- Validation Errors --}}
@@ -26,23 +30,29 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('admin.users.store') }}">
+        <form method="POST" action="{{ route('admin.users.store') }}" onsubmit="return confirmStaffLimit()">
             @csrf
 
-            <!-- Name Section -->
-            <h3 class="section-title">👤 Personal Information</h3>
+            <!-- Role -->
             <div class="form-row">
-
                 <div class="form-group">
-                    <label>Role</label>
-                    <select name="role" required>
-                        <option value="" disabled selected>-- Select Role --</option>
-                        <option value="staff" {{ old('role') == 'staff' ? 'selected' : '' }}>Staff</option>
-                        <option value="admin" {{ old('role') == 'admin' ? 'selected' : '' }}>admin</option>
-                        <option value="owner" {{ old('role') == 'owner' ? 'selected' : '' }}>Owner</option>
+                    <label for="role">Role</label>
+                    <select name="role" id="role" class="form-control" required>
+                        <option value="">-- Select Role --</option>
+                        <option value="owner" {{ $ownerCount >= 1 ? 'disabled' : '' }}>
+                            Owner {{ $ownerCount >= 1 ? '(Already Exists)' : '' }}
+                        </option>
+                        <option value="admin" {{ $adminCount >= 1 ? 'disabled' : '' }}>
+                            Admin {{ $adminCount >= 1 ? '(Already Exists)' : '' }}
+                        </option>
+                        <option value="staff">Staff</option>
                     </select>
                 </div>
+            </div>
 
+            <!-- Personal Information -->
+            <h3 class="section-title">👤 Personal Information</h3>
+            <div class="form-row">
                 <div class="form-group">
                     <label>First Name</label>
                     <input type="text" name="first_name" value="{{ old('first_name') }}" required>
@@ -57,21 +67,30 @@
                 </div>
             </div>
 
-            <!-- Contact -->
-            <div class="form-group">
-                <label>Contact Number</label>
-                <input type="text" name="contact_number" value="{{ old('contact_number') }}" required>
-            </div>
-
-            <!-- Email + Password -->
+            <!-- Contact Number + Email -->
             <div class="form-row">
+                <div class="form-group">
+                    <label>Contact Number</label>
+                    <input type="text" name="contact_number" value="{{ old('contact_number') }}" required>
+                </div>
                 <div class="form-group">
                     <label>Email</label>
                     <input type="email" name="email" value="{{ old('email') }}" required>
+                    @error('email')
+                     <span class="field-error">{{ $message }}</span>
+                        @enderror
                 </div>
+            </div>
+
+            <!-- Password + Confirm Password -->
+            <div class="form-row">
                 <div class="form-group">
                     <label>Password</label>
                     <input type="password" name="password" required>
+                </div>
+                <div class="form-group">
+                    <label>Confirm Password</label>
+                    <input type="password" name="password_confirmation" required>
                 </div>
             </div>
 
@@ -104,11 +123,11 @@
                 </div>
                 <div class="form-group">
                     <label>Country</label>
-                    <input type="text" name="country" value="{{ old('country') }}">
+                    <input type="text" name="country" value="{{ old('country', 'Philippines') }}">
                 </div>
             </div>
 
-            <!-- Hidden Fields -->
+            <!-- Hidden Status Field -->
             <input type="hidden" name="status" value="pending">
 
             <!-- Buttons -->
@@ -119,4 +138,25 @@
         </form>
     </div>
 </div>
+
+{{-- JavaScript Confirmation for Staff Limit --}}
+<script>
+function confirmStaffLimit() {
+    const role = document.getElementById('role').value;
+    const staffCount = @json($staffCount);
+
+    // Password confirmation check
+    const password = document.querySelector('input[name="password"]').value;
+    const confirmPassword = document.querySelector('input[name="password_confirmation"]').value;
+    if (password !== confirmPassword) {
+        alert("❌ Password and Confirm Password do not match.");
+        return false;
+    }
+
+    if(role === 'staff' && staffCount >= 3) {
+        return confirm("⚠️ Staff account limit of 3 has been reached. Do you still want to create another staff account?");
+    }
+    return true;
+}
+</script>
 @endsection

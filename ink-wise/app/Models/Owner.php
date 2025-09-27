@@ -29,4 +29,6 @@ class Owner extends Authenticatable
         'password',
         'remember_token',
     ];
+
+    
 }

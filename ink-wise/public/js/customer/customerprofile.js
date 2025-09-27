@@ -10,6 +10,7 @@ document.querySelectorAll('.nav-item').forEach((el) => {
 
 
 
+
 // Help bubble close
 document.getElementById('helpClose')?.addEventListener('click', () => {
     document.getElementById('help').style.display = 'none';
