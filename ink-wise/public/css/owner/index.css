@@ -228,18 +228,25 @@ body {
 
 /* Stat cards + icons */
 .cards {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 20px;
   margin-top: 20px;
+  align-items: stretch; /* ensure children stretch to same height */
 }
 
 .card {
-  background: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 140px; /* adjust to taste */
   padding: 18px;
+  box-sizing: border-box;
+  background: #fff;
   border-radius: 12px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.08);
   text-align: center;
-  flex: 1;
+  border: 1px solid #e6e8ef;
 }
 
 .stat-icon {
@@ -251,8 +258,10 @@ body {
   place-items: center;
   background: #f1f5ff;
   border: 1px solid #e5e7eb;
+  flex-shrink: 0;
 }
 
+/* keep card icons unchanged & consistent */
 .stat-icon svg {
   width: 24px;
   height: 24px;
@@ -260,24 +269,23 @@ body {
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+  /* use currentColor so .icon-* CSS can set the color */
+  stroke: currentColor;
+  color: inherit;
 }
 
-.icon-sales svg {
-  stroke: #6366f1;
-}
+/* preserve the existing color mappings (re-declare to be sure) */
+.icon-orders svg { color: #6366f1;stroke: #6366f1;  }
+.icon-sales svg  { color: #6366f1; stroke: #6366f1; }
+.icon-stock svg  { color: #10b981; stroke: #10b981; }
+.icon-pending svg{ color: #f59e0b; stroke: #f59e0b; }
+.icon-bell svg   { color: #ef4444; stroke: #ef4444; }
 
-.icon-stock svg {
-  stroke: #10b981;
-}
+/* optional classes for the two new cards if you want explicit colors */
+.icon-revenue svg { color: #f59e0b; stroke: #f59e0b; }
+.icon-newcustomer svg { color: #3b82f6; stroke: #3b82f6; }
 
-.icon-pending svg {
-  stroke: #f59e0b;
-}
-
-.icon-bell svg {
-  stroke: #ef4444;
-}
-
+/* headings & text sizing */
 .card h3 {
   margin: 6px 0 6px;
   font-size: 16px;
@@ -287,6 +295,8 @@ body {
   margin: 0;
   color: #64748b;
   font-size: 14px;
+  line-height: 1.25;
+  word-break: break-word;
 }
 
 /* Charts area */
