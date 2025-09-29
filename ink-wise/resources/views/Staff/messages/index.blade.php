@@ -1,11 +1,11 @@
-@extends($layout ?? 'layouts.admin')
+@extends($layout ?? 'layouts.staffapp')
 
 @section('title', 'Messages')
 
 @section('content')
 @php
-    $threadRouteName = $threadRouteName ?? 'admin.messages.thread';
-    $replyRouteName = $replyRouteName ?? 'admin.messages.reply';
+    $threadRouteName = $threadRouteName ?? 'staff.messages.thread';
+    $replyRouteName = $replyRouteName ?? 'staff.messages.reply';
 @endphp
 <div class="inbox-container" 
     style="display:flex; height:85vh; border:1px solid #ddd; border-radius:12px; overflow:hidden; font-family:'Segoe UI', sans-serif; background:white;">
@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function escapeHtml(text) {
         return (text || '').replace(/[&<>"']/g, m => (
-            {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]
+            {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#039;'}[m]
         ));
     }
 

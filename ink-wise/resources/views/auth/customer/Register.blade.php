@@ -82,20 +82,7 @@
             </button>
         </form>
 
-        <!-- Divider -->
-        <div class="flex items-center my-3">
-            <hr class="flex-1 border-gray-300">
-            <span class="px-2 text-[10px] text-gray-500">or</span>
-            <hr class="flex-1 border-gray-300">
-        </div>
-
-        <!-- Google Login -->
-        <a href="{{ route('google.redirect') }}"
-           class="w-full h-8 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-50 transition text-xs shadow-sm">
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-                 class="w-3.5 h-3.5 mr-1">
-            Continue with Google
-        </a>
+        {{-- Third-party login coming soon --}}
 
         <!-- Terms and Privacy Message -->
         <p class="text-[11px] text-gray-500 text-center mt-2 mb-1">

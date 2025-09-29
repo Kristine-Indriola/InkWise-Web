@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>Staff Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
 
@@ -67,6 +68,15 @@
           </li>
 
           <li>
+            <a href="{{ route('staff.messages.index') }}"
+               class="flex items-center p-2 rounded hover:bg-gray-100
+                      {{ request()->routeIs('staff.messages.*') ? 'bg-gray-100 text-purple-600 font-semibold' : 'text-gray-700' }}">
+              <span class="menu-icon mr-3"><i class="fa-solid fa-envelope"></i></span>
+              <span>Messages</span>
+            </a>
+          </li>
+
+          <li>
             <a href="{{ route('staff.order.list') }}"
                class="flex items-center p-2 rounded hover:bg-gray-100
                       {{ request()->routeIs('staff.order.list') ? 'bg-gray-100 text-purple-600 font-semibold' : 'text-gray-700' }}">
@@ -107,6 +117,9 @@
       <header class="flex justify-between items-center bg-white p-4 border-b">
         <h1 class="text-xl font-bold">Welcome, Staff!</h1>
         <div class="flex items-center space-x-4">
+          <a href="{{ route('staff.messages.index') }}" class="text-gray-600" aria-label="Messages">
+            <i class="fa-solid fa-envelope"></i>
+          </a>
           <a href="{{ route('staff.staff.materials.notification') }}" class="nav-link">
     🔔
     @php
@@ -145,5 +158,7 @@
     </main>
   </div>
 
+  @yield('scripts')
+  @stack('scripts')
 </body>
 </html>

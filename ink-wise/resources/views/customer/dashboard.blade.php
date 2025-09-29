@@ -58,49 +58,54 @@
         .chat-widget { position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 60; }
 
         /* Circular button with 90deg linear-gradient stroke (enlarged) */
-        .chat-btn {
-            width: 96px;
-            height: 96px;
-            border-radius: 9999px;
-            padding: 6px; /* thickness of the gradient ring */
-            background: linear-gradient(90deg, #5de0e6, #004aad);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 10px 26px rgba(4, 29, 66, 0.14);
-            cursor: pointer;
-            transition: transform .15s ease;
-        }
+       .chat-btn {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    padding: 6px;
+    background: linear-gradient(90deg, #5de0e6, #004aad);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 26px rgba(4, 29, 66, 0.14);
+    cursor: pointer;
+    transition: transform .15s ease;
+}
         .chat-btn:active { transform: scale(.98); }
 
         /* inner circle that holds the image */
-        .chat-inner {
-            width: 100%;
-            height: 100%;
-            border-radius: 9999px;
-            background: #ffffff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
-        .chat-inner img { width: 80%; height: 80%; object-fit: cover; border-radius: 9999px; }
+       .chat-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+       .chat-inner img {
+    width: 45px;   /* fixed size */
+    height: 45px;
+    object-fit: cover;
+    border-radius: 50%;
+}
 
         /* chat panel (enlarged for readability) */
-        .chat-panel {
-            width: 560px;
-            max-width: calc(100vw - 3rem);
-            position: absolute;
-            right: 0;
-            bottom: 108px;
-            background: #ffffff;
-            border-radius: 14px;
-            box-shadow: 0 16px 48px rgba(4,29,66,0.18);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            border: 1px solid rgba(0,0,0,0.04);
-        }
+      .chat-panel {
+    width: 560px;
+    max-width: calc(100vw - 3rem);
+    position: absolute;
+    right: 0;
+    bottom: 100px;
+    background: #ffffff;
+    border-radius: 14px;
+    box-shadow: 0 16px 48px rgba(4,29,66,0.18);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid rgba(0,0,0,0.04);
+}
         .chat-header { padding: 16px 18px; display:flex; gap:12px; align-items:center; border-bottom: 1px solid rgba(0,0,0,0.04); }
         .chat-header h4 { margin:0; font-weight:800; font-size:16px; color:#044e86; }
         .chat-body {
@@ -114,6 +119,23 @@
             scroll-behavior:smooth;
             background: linear-gradient(180deg, rgba(6,182,212,0.02), transparent);
         }
+
+        .chat-avatar {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    overflow: hidden;
+}
+.chat-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+
+
+
 
         /* custom thin scrollbar */
         .chat-body::-webkit-scrollbar { width: 10px; }
@@ -164,6 +186,13 @@
         .msg.user::after { right: -7px; }
 
         /* responsive tweaks */
+
+       @media (max-width: 720px) {
+    .chat-panel { width: 92vw; right: 4%; bottom: 88px; }
+    .chat-btn { width: 70px; height: 70px; }
+    .chat-inner img, .chat-avatar { width: 38px; height: 38px; }
+}
+
         @media (max-width: 720px) {
             .chat-panel { width: 92vw; right: 4%; bottom: 88px; }
             .chat-btn { width: 80px; height: 80px; }
@@ -182,6 +211,7 @@
         #bgCanvas { display:block; background: linear-gradient(180deg, #ffffff, #fbfdff); }
         /* gentle overlay to make text pop */
         .hero-wrapper::after { content: ''; position: absolute; inset:0; background: linear-gradient(180deg, rgba(255,255,255,0.0), rgba(255,255,255,0.4)); pointer-events: none; z-index:5; }
+
     </style>
 </head>
 <body id="dashboard" class="antialiased bg-white">
@@ -355,67 +385,7 @@
 @include('customer.partials.contact')
 
 <!-- Chat bot AI assistance widget -->
-<div class="chat-widget" x-data="{ open: false, messages: [{from:'bot', text:'Hi! I\'m InkWise Assistant. How can I help you today?'}], input: '' }" @keydown.window.escape="open=false">
-    <!-- Toggle button -->
-    <div class="chat-btn" @click="open = !open" aria-label="Open chat">
-        <div class="chat-inner">
-            <!-- Update filename if your image is different. Currently referencing Customerimages/bot.png -->
-            <img src="{{ asset('Customerimages/bots.png') }}" alt="AI Bot">
-        </div>
-    </div>
-
-    <!-- Chat panel -->
-    <div x-show="open" x-cloak x-transition class="chat-panel" @click.away="open = false" aria-hidden="false" role="dialog" aria-label="InkWise Assistant">
-        <div class="chat-header">
-            <div style="width:40px;height:40px;border-radius:9999px;overflow:hidden;">
-                <img src="{{ asset('Customerimages/bots.png') }}" alt="Bot" style="width:100%;height:100%;object-fit:cover;">
-            </div>
-            <div>
-                <h4>InkWise Assistant</h4>
-                <div style="font-size:12px;color:#55799a;">AI help for templates & orders</div>
-            </div>
-        </div>
-        <div class="chat-body" x-ref="body">
-            <template x-for="(m, idx) in messages" :key="idx">
-                <div>
-                    <div x-show="m.from === 'bot'" class="msg bot">
-                        <div class="avatar"><img :src="'{{ asset('Customerimages/bots.png') }}'" alt="bot" style="width:100%;height:100%;object-fit:cover;"></div>
-                        <div x-text="m.text"></div>
-                    </div>
-                    <div x-show="m.from === 'user'" class="msg user" x-text="m.text"></div>
-                </div>
-            </template>
-        </div>
-        <div class="chat-input">
-            <input type="text" placeholder="Type a message..." x-model="input" @keydown.enter.prevent="
-                if(input && input.trim() !== ''){
-                    messages.push({from:'user', text: input});
-                    const userMsg = input;
-                    input = '';
-                    $nextTick(()=>{ $refs.body.scrollTop = $refs.body.scrollHeight; });
-                    // simulated bot reply (you can replace with API call)
-                    setTimeout(()=>{
-                        messages.push({from:'bot', text: 'Thanks! I received: ' + userMsg});
-                        $nextTick(()=>{ $refs.body.scrollTop = $refs.body.scrollHeight; });
-                    }, 800);
-                }
-            " />
-            <button @click.prevent="
-                if(input && input.trim() !== ''){
-                    messages.push({from:'user', text: input});
-                    const userMsg = input;
-                    input = '';
-                    $nextTick(()=>{ $refs.body.scrollTop = $refs.body.scrollHeight; });
-                    setTimeout(()=>{
-                        messages.push({from:'bot', text: 'Thanks! I received: ' + userMsg});
-                        $nextTick(()=>{ $refs.body.scrollTop = $refs.body.scrollHeight; });
-                    }, 800);
-                }
-            " class="bg-[#06b6d4] text-white px-4 py-2 rounded-full">Send</button>
-        </div>
-    </div>
-</div>
-
+@include('customer.partials.chatbot')
 <!-- Optional: If you want to replace the placeholder bot replies with a real AI API call,
      replace the setTimeout block above with a fetch() to your server endpoint that proxies to OpenAI or another model. -->
 
