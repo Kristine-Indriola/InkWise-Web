@@ -2,210 +2,124 @@
 
 @section('title', 'Materials Management')
 
-@section('content')
-<!-- Add Fontisto CDN for fi icons -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@flaticon/flaticon-uicons/css/all/all.css">
-<div class="materials-container">
+@push('styles')
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@flaticon/flaticon-uicons/css/all/all.css">
     <link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
-    <h1>Materials Management</h1>
+@endpush
 
-    
-    {{-- Stock Summary Cards --}}
-    <style>
-        .summary-cards {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-        .summary-cards .card {
-            flex: 1;
-            min-width: 180px;
-            padding: 20px;
-            border-radius: 12px;
-            color: #222;
-            font-weight: 600;
-            text-align: center;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.06);
-            background: #fafafa;
-            border: 2px solid #94b9ff;
-            transition: transform 0.2s, border 0.2s;
-            text-decoration: none;
-        }
-        .summary-cards .card:hover {
-            transform: translateY(-4px);
-            border-color: #3cd5c8;
-        }
-        .summary-cards .card h3 {
-            font-size: 14px;
-            margin-bottom: 10px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #3a4d5c;
-        }
-        .summary-cards .card p {
-            font-size: 22px;
-            margin: 0;
-            color: #23b26d;
-            font-weight: bold;
-        }
-        /* Make the "Total Stock Qty" card have #94b9ff text */
-        .summary-cards .card.qty p {
-            color: #94b9ff;
-        }
-        /* Add New Material Button */
-        .btn-primary {
-            background: #94b9ff !important;
-            color: #fff !important;
-            border: none;
-            border-radius: 8px;
-            padding: 8px 18px;
-            font-weight: 700;
-            font-family: 'Nunito', sans-serif;
-            transition: background 0.2s, color 0.2s;
-            box-shadow: 0 2px 8px rgba(148,185,255,0.10);
-        }
-        .btn-primary:hover {
-            background: #6a9be7 !important;
-            color: #fff !important;
-        }
-        /* Search Button */
-        .btn-secondary, .search-bar button {
-            background: #94b9ff !important;
-            color: #fff !important;
-            border: none;
-            border-radius: 8px;
-            padding: 8px 14px;
-            font-weight: 600;
-            font-family: 'Nunito', sans-serif;
-            margin-left: 8px;
-            transition: background 0.2s, color 0.2s;
-        }
-        .btn-secondary:hover, .search-bar button:hover {
-            background: #6a9be7 !important;
-            color: #fff !important;
-        }
-    </style>
-    <div class="summary-cards">
-        <a href="{{ route('admin.materials.index', ['status' => 'all']) }}" class="card total">
-            <h3>Total Materials</h3>
-            <p>{{ $materials->count() + $inks->count() }}</p>
+@section('content')
+<main class="materials-page admin-page-shell materials-container" role="main">
+    <header class="page-header">
+        <div>
+            <h1 class="page-title">Materials Management</h1>
+            <p class="page-subtitle">Track stock levels, availability, and reorder health.</p>
+        </div>
+    </header>
+    <section class="summary-grid" aria-label="Inventory summary">
+        <a href="{{ route('admin.materials.index', ['status' => 'all']) }}" class="summary-card" aria-label="View all materials">
+            <div class="summary-card-header">
+                <span class="summary-card-label">Total Materials</span>
+                <span class="summary-card-chip accent">Catalog</span>
+            </div>
+            <span class="summary-card-value">{{ number_format($summary['total_items']) }}</span>
+            <span class="summary-card-meta">Overall items on record</span>
         </a>
-        <a href="{{ route('admin.materials.index', ['status' => 'low']) }}" class="card low">
-            <h3>Low Stock</h3>
-            <p>
-                {{
-                    $materials->filter(function($m) {
-                        $stock = $m->inventory->stock_level ?? $m->stock_qty ?? 0;
-                        $reorder = $m->inventory->reorder_level ?? $m->reorder_point ?? 0;
-                        return $stock > 0 && $stock <= $reorder;
-                    })->count()
-                    +
-                    $inks->filter(function($ink) {
-                        $stock = $ink->stock_qty_ml ?? 0;
-                        $reorder = $ink->reorder_point_ml ?? 10;
-                        return $stock > 0 && $stock <= $reorder;
-                    })->count()
-                }}
-            </p>
+        <a href="{{ route('admin.materials.index', ['status' => 'low']) }}" class="summary-card summary-card--low" aria-label="Filter low stock materials">
+            <div class="summary-card-header">
+                <span class="summary-card-label">Low Stock</span>
+                <span class="summary-card-chip warning">Action Needed</span>
+            </div>
+            <span class="summary-card-value">{{ number_format($summary['low_stock']) }}</span>
+            <span class="summary-card-meta">At or near reorder level</span>
         </a>
-        <a href="{{ route('admin.materials.index', ['status' => 'out']) }}" class="card out">
-            <h3>Out of Stock</h3>
-            <p>
-                {{
-                    $materials->filter(function($m) {
-                        $stock = $m->inventory->stock_level ?? $m->stock_qty ?? 0;
-                        return $stock <= 0;
-                    })->count()
-                    +
-                    $inks->filter(function($ink) {
-                        return ($ink->stock_qty_ml ?? 0) <= 0;
-                    })->count()
-                }}
-            </p>
+        <a href="{{ route('admin.materials.index', ['status' => 'out']) }}" class="summary-card summary-card--out" aria-label="Filter out of stock materials">
+            <div class="summary-card-header">
+                <span class="summary-card-label">Out of Stock</span>
+                <span class="summary-card-chip danger">Unavailable</span>
+            </div>
+            <span class="summary-card-value">{{ number_format($summary['out_stock']) }}</span>
+            <span class="summary-card-meta">Requires immediate replenishment</span>
         </a>
-        <a href="{{ route('admin.materials.index', ['status' => 'qty']) }}" class="card qty">
-            <h3>Total Stock Qty</h3>
-            <p>
-                {{
-                    $materials->sum(function($m) {
-                        return $m->inventory->stock_level ?? $m->stock_qty ?? 0;
-                    })
-                    +
-                    $inks->sum(function($ink) {
-                        return $ink->stock_qty_ml ?? 0;
-                    })
-                }}
-            </p>
+        <a href="{{ route('admin.materials.index', ['status' => 'qty']) }}" class="summary-card summary-card--qty" aria-label="View total stock quantity">
+            <div class="summary-card-header">
+                <span class="summary-card-label">Total Stock Qty</span>
+                <span class="summary-card-chip accent">Units</span>
+            </div>
+            <span class="summary-card-value">{{ number_format($summary['total_stock_qty']) }}</span>
+            <span class="summary-card-meta">Combined across all materials</span>
         </a>
-    </div>
+    </section>
 
-    {{-- Add Material Button --}}
-    <div class="top-actions">
-        <div class="search-bar">
-            <form method="GET" action="{{ route('admin.materials.index') }}" style="display:flex; align-items:center; gap:8px;">
-                <span style="color:#94b9ff; font-size:18px; margin-right:4px;">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                </span>
-                <input type="text" name="search" value="{{ request('search') }}" placeholder="Search materials or inks..." class="form-control">
-                <div class="filter-wrapper" style="position:relative;">
+    <section class="materials-toolbar" aria-label="Material filters and actions">
+        <div class="materials-toolbar__search">
+            <form method="GET" action="{{ route('admin.materials.index') }}">
+                <div class="search-input">
+                    <span class="search-icon">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </span>
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Search materials or inks..." class="form-control">
+                </div>
+                <div class="filter-wrapper">
                     <input type="hidden" name="occasion" id="occasionInput" value="{{ request('occasion') }}">
-                    <button type="button" id="filterToggle" class="btn btn-secondary" title="Filter occasions" style="display:flex; align-items:center; gap:6px;">
+                    <button type="button" id="filterToggle" class="btn btn-secondary filter-toggle" title="Filter occasions" aria-haspopup="true" aria-expanded="false">
                         <i class="fi fi-ss-filter-list"></i>
                     </button>
-                    <div id="filterMenu" class="filter-menu" style="display:none; position:absolute; right:0; top:42px; min-width:180px; background:#fff; border:1px solid #e5e7eb; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,0.08); z-index:1200; padding:8px;">
-                        <button type="button" class="filter-option btn" data-value="" style="display:block; width:100%; text-align:left; padding:8px 10px;">All Occasions</button>
-                        <button type="button" class="filter-option btn" data-value="all" style="display:block; width:100%; text-align:left; padding:8px 10px;">All (explicit)</button>
-                        <button type="button" class="filter-option btn" data-value="wedding" style="display:block; width:100%; text-align:left; padding:8px 10px;">Wedding</button>
-                        <button type="button" class="filter-option btn" data-value="birthday" style="display:block; width:100%; text-align:left; padding:8px 10px;">Birthday</button>
-                        <button type="button" class="filter-option btn" data-value="baptism" style="display:block; width:100%; text-align:left; padding:8px 10px;">Baptism</button>
-                        <button type="button" class="filter-option btn" data-value="corporate" style="display:block; width:100%; text-align:left; padding:8px 10px;">Corporate</button>
+                    <div id="filterMenu" class="filter-menu" role="menu" aria-hidden="true">
+                        <button type="button" class="filter-option-btn" data-value="" role="menuitem">All Occasions</button>
+                        <button type="button" class="filter-option-btn" data-value="all" role="menuitem">All (explicit)</button>
+                        <button type="button" class="filter-option-btn" data-value="wedding" role="menuitem">Wedding</button>
+                        <button type="button" class="filter-option-btn" data-value="birthday" role="menuitem">Birthday</button>
+                        <button type="button" class="filter-option-btn" data-value="baptism" role="menuitem">Baptism</button>
+                        <button type="button" class="filter-option-btn" data-value="corporate" role="menuitem">Corporate</button>
                     </div>
                 </div>
                 <button type="submit" class="btn btn-secondary">Search</button>
             </form>
         </div>
-        <div style="display:flex; gap:10px; position:relative;">
-            <button id="addMaterialBtn" class="btn btn-primary" style="position:relative;">
+        <div class="materials-toolbar__actions">
+            <button id="addMaterialBtn" class="btn btn-primary btn-add" aria-haspopup="true" aria-expanded="false">
                 <i class="fi fi-br-plus-small"></i> Add New Material
             </button>
-            <!-- Floating options -->
-            <div id="floatingOptions" style="display:none; position:absolute; top:45px; left:0; z-index:1000;">
-                <a href="{{ route('admin.materials.create', ['type' => 'invitation']) }}" class="btn btn-primary" style="margin-bottom:8px; width:180px;">
-                    <i class="fa-solid fa-envelope"></i> Invitation
+            <div id="floatingOptions" class="floating-options" role="menu" aria-hidden="true">
+                <a href="{{ route('admin.materials.create', ['type' => 'invitation']) }}" class="floating-link" role="menuitem">
+                    <span class="floating-icon"><i class="fa-solid fa-envelope"></i></span>
+                    <span>Invitation</span>
                 </a>
-                <a href="{{ route('admin.materials.create', ['type' => 'giveaway']) }}" class="btn btn-primary" style="background:#23b26d; width:180px;">
-                    <i class="fa-solid fa-gift"></i> Giveaways
+                <a href="{{ route('admin.materials.create', ['type' => 'giveaway']) }}" class="floating-link" role="menuitem">
+                    <span class="floating-icon"><i class="fa-solid fa-gift"></i></span>
+                    <span>Giveaways</span>
                 </a>
             </div>
         </div>
-    </div>
+    </section>
 
     <script>
         const addBtn = document.getElementById('addMaterialBtn');
         const floating = document.getElementById('floatingOptions');
 
-        // Show floating options on mouseover
-        addBtn.addEventListener('mouseenter', function() {
+        const showFloating = () => {
             floating.style.display = 'block';
-        });
+            floating.setAttribute('aria-hidden', 'false');
+            addBtn.setAttribute('aria-expanded', 'true');
+        };
 
-        // Hide floating options when mouse leaves both button and floatingOptions
-        addBtn.addEventListener('mouseleave', function(e) {
+        const hideFloating = () => {
+            floating.style.display = 'none';
+            floating.setAttribute('aria-hidden', 'true');
+            addBtn.setAttribute('aria-expanded', 'false');
+        };
+
+        addBtn.addEventListener('mouseenter', showFloating);
+        addBtn.addEventListener('mouseleave', () => {
             setTimeout(() => {
                 if (!floating.matches(':hover')) {
-                    floating.style.display = 'none';
+                    hideFloating();
                 }
             }, 100);
         });
-        floating.addEventListener('mouseleave', function() {
-            floating.style.display = 'none';
-        });
 
-        // Prevent hiding when hovering over floatingOptions
-        floating.addEventListener('mouseenter', function() {
-            floating.style.display = 'block';
-        });
+        floating.addEventListener('mouseenter', showFloating);
+        floating.addEventListener('mouseleave', hideFloating);
     </script>
 
     <script>
@@ -216,19 +130,35 @@
             const occasionInput = document.getElementById('occasionInput');
             const searchForm = filterToggle ? filterToggle.closest('form') : null;
 
-            if (!filterToggle) return;
+            if (!filterToggle || !filterMenu) return;
+
+            const openMenu = () => {
+                filterMenu.style.display = 'block';
+                filterMenu.setAttribute('aria-hidden', 'false');
+                filterToggle.setAttribute('aria-expanded', 'true');
+            };
+
+            const closeMenu = () => {
+                filterMenu.style.display = 'none';
+                filterMenu.setAttribute('aria-hidden', 'true');
+                filterToggle.setAttribute('aria-expanded', 'false');
+            };
 
             filterToggle.addEventListener('click', function(e){
                 e.stopPropagation();
-                filterMenu.style.display = filterMenu.style.display === 'block' ? 'none' : 'block';
+                const isOpen = filterMenu.style.display === 'block';
+                if (isOpen) {
+                    closeMenu();
+                } else {
+                    openMenu();
+                }
             });
 
-            document.querySelectorAll('#filterMenu .filter-option').forEach(btn => {
+            document.querySelectorAll('#filterMenu .filter-option-btn').forEach(btn => {
                 btn.addEventListener('click', function(){
                     const val = this.getAttribute('data-value');
                     occasionInput.value = val;
-                    // close menu then submit
-                    filterMenu.style.display = 'none';
+                    closeMenu();
                     if (searchForm) searchForm.submit();
                 });
             });
@@ -236,7 +166,7 @@
             // close when clicking outside
             document.addEventListener('click', function(e){
                 if (!filterMenu.contains(e.target) && e.target !== filterToggle) {
-                    filterMenu.style.display = 'none';
+                    closeMenu();
                 }
             });
         })();
@@ -248,7 +178,6 @@
             ✅ {{ session('success') }}
         </div>
     @endif
-        {{-- Search Bar --}}
 
 
     {{-- Materials Table --}}
@@ -265,7 +194,7 @@
                     <th>Color</th>
                     <th>Weight (GSM)</th>
                     <th>Unit</th>
-                    <th>Unit Price/Per(ml)(₱)</th>
+                    <th>Unit Price (₱)</th>
                     <th>Average Usage per Invite (ml)</th>
                     <th>Stock Qty</th>
                     <th>Reorder Point</th>
@@ -273,14 +202,16 @@
                     <th class="actions-col text-center">Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            @php $rowIndex = 0; @endphp
+            <tbody class="materials-table-body">
                 {{-- Materials --}}
                 @forelse($materials as $material)
                     @php
                         $stock = $material->inventory->stock_level ?? $material->stock_qty ?? 0;
                         $reorder = $material->inventory->reorder_level ?? $material->reorder_point ?? 0;
+                        $rowIndex++;
                     @endphp
-                    <tr>
+                    <tr data-entry-index="{{ $rowIndex }}">
                         <td>{{ $material->material_id }}</td>
                         <td class="fw-bold">{{ $material->material_name }}</td>
                         <td>
@@ -337,20 +268,18 @@
                             </span>
                         </td>
                         <td>{{ $reorder }}</td>
+                        @php
+                            $materialStatusClass = $stock <= 0 ? 'out' : ($stock <= $reorder ? 'low' : 'ok');
+                            $materialStatusLabel = $stock <= 0 ? 'Out of Stock' : ($stock <= $reorder ? 'Low Stock' : 'In Stock');
+                        @endphp
                         <td class="status-col text-center">
-                            @if($stock <= 0)
-                                <span class="badge" style="color: red;">Out of Stock</span>
-                            @elseif($stock > 0 && $stock <= $reorder)
-                                <span class="badge" style="color: orange;">Low Stock</span>
-                            @else
-                                <span class="badge" style="color: green;">In Stock</span>
-                            @endif
+                            <span class="status-label {{ $materialStatusClass }}">{{ $materialStatusLabel }}</span>
                         </td>
                         <td class="actions-col text-center">
                             <a href="{{ route('admin.materials.edit', $material->material_id) }}" class="btn btn-sm btn-warning" title="Edit">
                                 <i class="fa-solid fa-pen-to-square"></i>
                             </a>
-                            <form action="{{ route('admin.materials.destroy', $material->material_id) }}" method="POST" style="display:inline;">
+                            <form action="{{ route('admin.materials.destroy', $material->material_id) }}" method="POST" class="inline-form">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this material?');" title="Delete">
@@ -368,10 +297,14 @@
                 {{-- Inks --}}
                 @forelse($inks as $ink)
                     @php
-                        // ✅ Updated: Use dynamic reorder_point_ml with fallback
-                        $reorder = $ink->reorder_point_ml ?? 10;
+                        $inventory = $ink->inventory;
+                        $stockLevel = $inventory->stock_level ?? $ink->stock_qty ?? $ink->stock_qty_ml ?? 0;
+                        $reorder = $inventory->reorder_level ?? 10;
+                        $statusRemark = $inventory->remarks ?? ($stockLevel <= 0 ? 'Out of Stock' : ($stockLevel <= $reorder ? 'Low Stock' : 'In Stock'));
+                        $statusBadgeClass = $stockLevel <= 0 ? 'stock-critical' : ($stockLevel <= $reorder ? 'stock-low' : 'stock-ok');
+                        $rowIndex++;
                     @endphp
-                    <tr>
+                    <tr data-entry-index="{{ $rowIndex }}">
                         <td>{{ $ink->id }}</td>
                         <td class="fw-bold">{{ $ink->material_name }}</td>
                         <td>
@@ -418,27 +351,25 @@
                         <td>₱{{ number_format($ink->cost_per_ml, 2) }}/ml</td>
                         <td>{{ $ink->avg_usage_per_invite_ml ?? '-' }}</td>
                         <td>
-                            @php $inkQty = $ink->stock_qty ?? $ink->stock_qty_ml ?? 0; @endphp
-                            <span class="badge {{ $inkQty <= 0 ? 'stock-critical' : ($inkQty > 0 && $inkQty <= $reorder ? 'stock-low' : 'stock-ok') }}">
-                                {{ $ink->stock_qty ?? ($ink->stock_qty_ml ? $ink->stock_qty_ml . ' ml' : 0) }}
+                            <span class="badge {{ $statusBadgeClass }}">
+                                {{ $stockLevel }} {{ $ink->unit ?? 'units' }}
                             </span>
-                        </td>
-                        <td>{{ $reorder }}</td>
-                        <td class="status-col text-center">
-                            @php $inkStock = $ink->stock_qty ?? ($ink->stock_qty_ml ?? 0); @endphp
-                            @if($inkStock <= 0)
-                                <span class="badge" style="color: red;">Out of Stock</span>
-                            @elseif($inkStock > 0 && $inkStock <= $reorder)
-                                <span class="badge" style="color: orange;">Low Stock</span>
-                            @else
-                                <span class="badge" style="color: green;">In Stock</span>
+                            @if(!empty($ink->stock_qty_ml))
+                                <div class="approx-note">≈ {{ number_format($ink->stock_qty_ml, 0) }} ml</div>
                             @endif
+                        </td>
+                        <td>{{ $reorder }} {{ $ink->unit ?? 'units' }}</td>
+                        @php
+                            $inkStatusClass = $statusRemark === 'Out of Stock' ? 'out' : ($statusRemark === 'Low Stock' ? 'low' : 'ok');
+                        @endphp
+                        <td class="status-col text-center">
+                            <span class="status-label {{ $inkStatusClass }}">{{ $statusRemark }}</span>
                         </td>
                         <td class="actions-col text-center">
                             <a href="{{ route('admin.inks.edit', $ink->id) }}" class="btn btn-sm btn-warning" title="Edit">
                                 <i class="fa-solid fa-pen-to-square"></i>
                             </a>
-                            <form action="{{ route('admin.inks.destroy', $ink->id) }}" method="POST" style="display:inline;">
+                            <form action="{{ route('admin.inks.destroy', $ink->id) }}" method="POST" class="inline-form">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this ink?');" title="Delete">
@@ -455,5 +386,79 @@
             </tbody>
         </table>
     </div>
-</div>
+
+    @php
+        $totalEntries = $summary['total_items'] ?? 0;
+        $startEntry = $totalEntries > 0 ? 1 : 0;
+        $endEntry = $totalEntries;
+    @endphp
+    <div class="table-footer" aria-live="polite">
+        <span class="table-footer__info" data-entry-info>
+            Showing {{ $startEntry }} to {{ $endEntry }} of {{ $totalEntries }} {{ \Illuminate\Support\Str::plural('entry', $totalEntries) }}
+        </span>
+        <div class="table-footer__nav" role="navigation" aria-label="Entries navigation">
+            <button type="button" class="entries-btn" id="entriesPrev" disabled>Previous</button>
+            <button type="button" class="entries-btn" id="entriesNext" disabled>Next</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const rows = Array.from(document.querySelectorAll('.materials-table-body tr[data-entry-index]'));
+            const infoEl = document.querySelector('[data-entry-info]');
+            const prevBtn = document.getElementById('entriesPrev');
+            const nextBtn = document.getElementById('entriesNext');
+            const totalEntries = rows.length;
+            const pageSize = 10;
+            let currentPage = 1;
+
+            if (!rows.length) {
+                if (infoEl) {
+                    infoEl.textContent = 'Showing 0 to 0 of 0 entries';
+                }
+                return;
+            }
+
+            const updateView = () => {
+                const totalPages = Math.max(1, Math.ceil(totalEntries / pageSize));
+                currentPage = Math.min(Math.max(1, currentPage), totalPages);
+                const startIndex = (currentPage - 1) * pageSize;
+                const endIndex = Math.min(startIndex + pageSize, totalEntries);
+
+                rows.forEach((row, idx) => {
+                    row.style.display = (idx >= startIndex && idx < endIndex) ? 'table-row' : 'none';
+                });
+
+                if (infoEl) {
+                    const entryLabel = (totalEntries === 1) ? 'entry' : 'entries';
+                    infoEl.textContent = `Showing ${startIndex + 1} to ${endIndex} of ${totalEntries} ${entryLabel}`;
+                }
+
+                if (prevBtn) prevBtn.disabled = currentPage <= 1;
+                if (nextBtn) nextBtn.disabled = currentPage >= totalPages;
+            };
+
+            if (prevBtn) {
+                prevBtn.addEventListener('click', () => {
+                    if (currentPage > 1) {
+                        currentPage--;
+                        updateView();
+                    }
+                });
+            }
+
+            if (nextBtn) {
+                nextBtn.addEventListener('click', () => {
+                    const totalPages = Math.max(1, Math.ceil(totalEntries / pageSize));
+                    if (currentPage < totalPages) {
+                        currentPage++;
+                        updateView();
+                    }
+                });
+            }
+
+            updateView();
+        });
+    </script>
+</main>
 @endsection

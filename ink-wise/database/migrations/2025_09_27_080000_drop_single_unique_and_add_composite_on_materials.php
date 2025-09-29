@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -11,15 +12,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('materials', function (Blueprint $table) {
-            // Add composite unique index on (material_name, material_type) so the
-            // same material name can exist under different material types.
-            try {
-                $table->unique(['material_name', 'material_type'], 'materials_name_type_unique');
-            } catch (\Throwable $e) {
-                // ignore if index already exists or DB driver limitations
-            }
-        });
+        // The composite unique index was already added in a previous migration
+        // No need to drop anything or add again
     }
 
     /**
@@ -30,6 +24,13 @@ return new class extends Migration
         Schema::table('materials', function (Blueprint $table) {
             try {
                 $table->dropUnique('materials_name_type_unique');
+            } catch (\Throwable $e) {
+                // ignore
+            }
+
+            try {
+                // restore the original single-column unique (if desired)
+                $table->unique('material_name', 'materials_material_name_unique');
             } catch (\Throwable $e) {
                 // ignore
             }

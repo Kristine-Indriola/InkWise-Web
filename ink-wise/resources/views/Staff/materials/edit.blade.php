@@ -32,7 +32,14 @@
 
                 <div class="form-group">
                     <label>Material Type</label>
-                    <input type="text" name="material_type" value="{{ old('material_type', $material->material_type) }}" required>
+                    <select name="material_type" required>
+                        <option value="">-- Select Material Type --</option>
+                        <option value="paper" {{ old('material_type', $material->material_type) == 'paper' ? 'selected' : '' }}>PAPER</option>
+                        <option value="ink" {{ old('material_type', $material->material_type) == 'ink' ? 'selected' : '' }}>INK</option>
+                        <option value="envelopes" {{ old('material_type', $material->material_type) == 'envelopes' ? 'selected' : '' }}>ENVELOPES</option>
+                        <option value="ribbon" {{ old('material_type', $material->material_type) == 'ribbon' ? 'selected' : '' }}>RIBBON</option>
+                        <option value="powder" {{ old('material_type', $material->material_type) == 'powder' ? 'selected' : '' }}>POWDER</option>
+                    </select>
                 </div>
             </div>
 

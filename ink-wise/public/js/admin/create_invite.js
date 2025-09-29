@@ -1,748 +1,445 @@
-document.addEventListener("DOMContentLoaded", () => {
-    // Initialize all modules
-    Calculations.init();
-    Validation.init();
-    Navigation.init();
-    DynamicRows.init();
-    Editor.init();
-    FileUpload.init();
-    Accessibility.init();
-    Performance.init();
+document.addEventListener('DOMContentLoaded', () => {
+    const templates = Array.isArray(window.templatesData) ? window.templatesData : [];
+    const materials = Array.isArray(window.materialsData) ? window.materialsData : [];
+    const assetBase = ((window.assetUrl || '').replace(/\/$/, '')) || '';
 
-    // Global data
-    window.templatesData = window.templatesData || [];
-    window.materialsData = window.materialsData || [];
+    function normalize(value) {
+        return value === undefined || value === null ? '' : String(value).trim().toLowerCase();
+    }
 
-    // Template selection and autofill
-    document.querySelectorAll('.continue-btn[data-template-id]').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const templateId = this.getAttribute('data-template-id');
-            const template = window.templatesData.find(t => t.id == templateId);
-            if (template) {
-                document.getElementById('template_id').value = template.id;
-                document.getElementById('invitationName').value = template.name || '';
-                document.getElementById('eventType').value = template.event_type || '';
-                document.getElementById('productType').value = template.product_type || '';
-                document.getElementById('themeStyle').value = template.theme_style || '';
-                document.getElementById('description').value = template.description || '';
-                document.getElementById('description-editor').innerHTML = template.description || '';
-                // Set preview image from template's preview_image column
-                const imagePath = template.preview_image || template.image || '';
-                document.getElementById('template-preview-img').src = imagePath ? window.assetUrl + imagePath : '';
+    function uniqueMaterialTypes() {
+        const seen = new Set();
+        materials.forEach(material => {
+            if (!material || !material.material_type) return;
+            const type = material.material_type.toString().trim();
+            if (!type) return;
+            seen.add(type);
+        });
+        return Array.from(seen).sort((a, b) => a.localeCompare(b));
+    }
+
+    function materialOptionsForType(type) {
+        const normalized = normalize(type);
+        return materials
+            .filter(material => {
+                if (!material) return false;
+                if (!material.material_name) return false;
+                if (!normalized) return true;
+                return normalize(material.material_type) === normalized;
+            })
+            .map(material => material.material_name.toString().trim())
+            .filter(Boolean)
+            .sort((a, b) => a.localeCompare(b));
+    }
+
+    function findMaterialRecord(type, name) {
+        const typeNorm = normalize(type);
+        const nameNorm = normalize(name);
+        return materials.find(material => {
+            if (!material) return false;
+            const matchesType = typeNorm ? normalize(material.material_type) === typeNorm : true;
+            const matchesName = nameNorm ? normalize(material.material_name) === nameNorm : true;
+            return matchesType && matchesName;
+        }) || null;
+    }
+
+    function populateMaterialTypeSelect(row) {
+        const select = row.querySelector('select[name*="[type]"]');
+        if (!select) return;
+        const current = select.getAttribute('data-current') || select.value || '';
+        const placeholder = select.getAttribute('data-placeholder') || 'Select material type';
+        const options = uniqueMaterialTypes();
+
+        select.innerHTML = '';
+        const placeholderOption = document.createElement('option');
+        placeholderOption.value = '';
+        placeholderOption.textContent = placeholder;
+        placeholderOption.disabled = true;
+        select.appendChild(placeholderOption);
+
+        options.forEach(value => {
+            const opt = document.createElement('option');
+            opt.value = value;
+            opt.textContent = value;
+            select.appendChild(opt);
+        });
+
+        if (current) {
+            const match = Array.from(select.options).find(opt => normalize(opt.value) === normalize(current));
+            if (match) {
+                select.value = match.value;
+            } else {
+                const dynamicOption = new Option(current, current, true, true);
+                select.add(dynamicOption);
+                select.value = dynamicOption.value;
             }
-            Navigation.showPage(1);
+        } else {
+            select.value = '';
+            placeholderOption.selected = true;
+        }
+
+        select.dataset.current = '';
+    }
+
+    function populateMaterialNameSelect(row) {
+        const nameSelect = row.querySelector('select[name*="[item]"]');
+        const typeSelect = row.querySelector('select[name*="[type]"]');
+        if (!nameSelect) return;
+        const current = nameSelect.getAttribute('data-current') || nameSelect.value || '';
+        const placeholder = nameSelect.getAttribute('data-placeholder') || 'Select material';
+        const options = materialOptionsForType(typeSelect ? typeSelect.value : '');
+
+        nameSelect.innerHTML = '';
+        const placeholderOption = document.createElement('option');
+        placeholderOption.value = '';
+        placeholderOption.textContent = placeholder;
+        placeholderOption.disabled = true;
+        nameSelect.appendChild(placeholderOption);
+
+        options.forEach(value => {
+            const opt = document.createElement('option');
+            opt.value = value;
+            opt.textContent = value;
+            nameSelect.appendChild(opt);
+        });
+
+        if (current) {
+            const match = Array.from(nameSelect.options).find(opt => normalize(opt.value) === normalize(current));
+            if (match) {
+                nameSelect.value = match.value;
+            } else {
+                const dynamicOption = new Option(current, current, true, true);
+                nameSelect.add(dynamicOption);
+                nameSelect.value = dynamicOption.value;
+            }
+        } else {
+            nameSelect.value = '';
+            placeholderOption.selected = true;
+        }
+
+        nameSelect.dataset.current = '';
+    }
+
+    function applyMaterialRecord(row, record) {
+        const fieldMap = {
+            color: record ? record.color : '',
+            size: record ? record.size : '',
+            weight: record ? record.weight_gsm : '',
+            unit: record ? record.unit : '',
+            unitPrice: record && record.unit_cost !== undefined ? record.unit_cost : ''
+        };
+
+        Object.entries(fieldMap).forEach(([key, value]) => {
+            const input = row.querySelector(`input[name*="[${key}]"]`);
+            if (!input) return;
+            if (value === undefined || value === null) {
+                input.value = '';
+            } else if (typeof value === 'number') {
+                input.value = value.toString();
+            } else {
+                input.value = value;
+            }
+        });
+
+        const idInput = row.querySelector('input[name*="[id]"]');
+        if (idInput) {
+            idInput.value = record && record.material_id !== undefined ? record.material_id : '';
+        }
+    }
+
+    function refreshMaterialRow(row) {
+        populateMaterialTypeSelect(row);
+        populateMaterialNameSelect(row);
+        const typeSelect = row.querySelector('select[name*="[type]"]');
+        const nameSelect = row.querySelector('select[name*="[item]"]');
+        const record = findMaterialRecord(typeSelect ? typeSelect.value : '', nameSelect ? nameSelect.value : '');
+        applyMaterialRecord(row, record);
+    }
+
+    function attachMaterialListeners(row) {
+        const typeSelect = row.querySelector('select[name*="[type]"]');
+        const nameSelect = row.querySelector('select[name*="[item]"]');
+
+        if (typeSelect) {
+            typeSelect.addEventListener('change', () => {
+                populateMaterialNameSelect(row);
+                const record = findMaterialRecord(typeSelect.value, row.querySelector('select[name*="[item]"]')?.value || '');
+                applyMaterialRecord(row, record);
+            });
+        }
+
+        if (nameSelect) {
+            nameSelect.addEventListener('change', () => {
+                const record = findMaterialRecord(row.querySelector('select[name*="[type]"]')?.value || '', nameSelect.value);
+                applyMaterialRecord(row, record);
+            });
+        }
+    }
+
+    document.querySelectorAll('.material-row').forEach(row => {
+        refreshMaterialRow(row);
+        attachMaterialListeners(row);
+    });
+
+    document.querySelectorAll('.material-rows').forEach(container => {
+        container.addEventListener('click', event => {
+            if (event.target.classList.contains('add-row')) {
+                event.preventDefault();
+                const rows = container.querySelectorAll('.material-row');
+                if (!rows.length) return;
+                const lastRow = rows[rows.length - 1];
+                const newRow = lastRow.cloneNode(true);
+                const newIndex = rows.length;
+
+                newRow.querySelectorAll('[name]').forEach(element => {
+                    element.name = element.name.replace(/\[\d+\]/, `[${newIndex}]`);
+                });
+
+                newRow.querySelectorAll('[id]').forEach(element => {
+                    element.id = element.id.replace(/_(\d+)(?=_[^_]+$)/, `_${newIndex}`);
+                    element.id = element.id.replace(/_(\d+)$/, `_${newIndex}`);
+                });
+
+                newRow.querySelectorAll('input').forEach(input => {
+                    if (input.type === 'hidden') {
+                        input.value = '';
+                    } else {
+                        input.value = '';
+                    }
+                    if (input.hasAttribute('data-current')) {
+                        input.setAttribute('data-current', '');
+                    }
+                });
+
+                newRow.querySelectorAll('select').forEach(select => {
+                    select.value = '';
+                    if (select.hasAttribute('data-current')) {
+                        select.setAttribute('data-current', '');
+                    }
+                });
+
+                container.appendChild(newRow);
+                refreshMaterialRow(newRow);
+                attachMaterialListeners(newRow);
+            }
+
+            if (event.target.classList.contains('remove-row')) {
+                event.preventDefault();
+                const rows = container.querySelectorAll('.material-row');
+                if (rows.length <= 1) return;
+                const row = event.target.closest('.material-row');
+                if (row) row.remove();
+            }
         });
     });
 
-    // Materials autofill
-    const itemInput = document.getElementById('materials_0_item');
-    const typeInput = document.getElementById('materials_0_type');
-    const colorInput = document.getElementById('materials_0_color');
-    const weightInput = document.getElementById('materials_0_weight');
-    const unitPriceInput = document.getElementById('materials_0_unitPrice');
-    const qtyInput = document.getElementById('materials_0_qty');
-    const costInput = document.getElementById('materials_0_cost');
+    const Navigation = (() => {
+        const pages = Array.from(document.querySelectorAll('.page'));
+        const steps = Array.from(document.querySelectorAll('.breadcrumb-step'));
+        const progressFill = document.getElementById('progress-fill');
+        const pageTitle = document.getElementById('page-title');
+        const titles = ['Templates', 'Basic Info', 'Production'];
+        let currentIndex = 0;
 
-    let dropdown = document.createElement('div');
-    dropdown.className = 'material-dropdown';
-    dropdown.style.position = 'absolute';
-    dropdown.style.background = '#fff';
-    dropdown.style.border = '1px solid #ccc';
-    dropdown.style.zIndex = '1000';
-    dropdown.style.display = 'none';
-    dropdown.style.maxHeight = '200px';
-    dropdown.style.overflowY = 'auto';
-    itemInput.parentNode.appendChild(dropdown);
+        function showPage(index) {
+            if (!pages.length || index < 0 || index >= pages.length) return;
+            pages.forEach((page, idx) => {
+                const active = idx === index;
+                page.style.display = active ? 'block' : 'none';
+                page.setAttribute('aria-hidden', active ? 'false' : 'true');
+                page.classList.toggle('active-page', active);
+            });
+            steps.forEach((step, idx) => step.classList.toggle('active', idx === index));
+            if (pageTitle) pageTitle.textContent = titles[index] || pageTitle.textContent;
+            if (progressFill) progressFill.style.width = `${((index + 1) / pages.length) * 100}%`;
+            currentIndex = index;
+        }
 
-    function fillMaterialFields(material) {
-        itemInput.value = material.material_name || '';
-        typeInput.value = material.material_type || '';
-        colorInput.value = material.color || '';
-        weightInput.value = material.weight_gsm || '';
-        unitPriceInput.value = material.unit_cost || '';
-        const qty = parseInt(qtyInput.value, 10) || 0;
-        costInput.value = qty > 0 ? (material.unit_cost * qty).toFixed(2) : '';
-        updateTotalRawCost();
+        function showNextPage() {
+            if (currentIndex < pages.length - 1) {
+                showPage(currentIndex + 1);
+            }
+        }
+
+        steps.forEach((button, idx) => {
+            button.addEventListener('click', () => showPage(idx));
+        });
+
+    function validatePage(pageIndex) {
+        if (pageIndex === 1) { // Page 2 validation
+            const errors = [];
+            const invitationName = document.getElementById('invitationName');
+            if (!invitationName || !invitationName.value.trim()) {
+                errors.push({field: 'invitationName', message: 'Invitation Name is required.'});
+            }
+            const eventType = document.getElementById('eventType');
+            if (!eventType || !eventType.value) {
+                errors.push({field: 'eventType', message: 'Event Type is required.'});
+            }
+            const productType = document.getElementById('productType');
+            if (!productType || !productType.value) {
+                errors.push({field: 'productType', message: 'Product Type is required.'});
+            }
+            const themeStyle = document.getElementById('themeStyle');
+            if (!themeStyle || !themeStyle.value.trim()) {
+                errors.push({field: 'themeStyle', message: 'Theme / Style is required.'});
+            }
+            // Show errors
+            const errorSummary = document.querySelector('.page2 .error-summary');
+            const errorList = document.querySelector('.page2 #error-list-page2');
+            if (errors.length > 0) {
+                errorList.innerHTML = '';
+                errors.forEach(error => {
+                    const li = document.createElement('li');
+                    li.textContent = error.message;
+                    errorList.appendChild(li);
+                    const errorSpan = document.getElementById(error.field + '-error');
+                    if (errorSpan) {
+                        errorSpan.textContent = error.message;
+                        errorSpan.style.display = 'block';
+                    }
+                });
+                errorSummary.style.display = 'block';
+                return false;
+            } else {
+                errorSummary.style.display = 'none';
+                ['invitationName', 'eventType', 'productType', 'themeStyle'].forEach(field => {
+                    const errorSpan = document.getElementById(field + '-error');
+                    if (errorSpan) {
+                        errorSpan.textContent = '';
+                        errorSpan.style.display = 'none';
+                    }
+                });
+                return true;
+            }
+        }
+        return true;
     }
 
-    function showDropdown(matches) {
-        dropdown.innerHTML = '';
-        if (matches.length === 0) {
-            dropdown.style.display = 'none';
+    document.querySelectorAll('.continue-btn').forEach(button => {
+        if (button.dataset.templateId) return;
+        button.addEventListener('click', (e) => {
+            const currentPage = Navigation.currentPage;
+            if (validatePage(currentPage)) {
+                Navigation.showNextPage();
+            }
+        });
+    });        showPage(0);
+
+        return {
+            showPage,
+            showNextPage,
+            get currentPage() {
+                return currentIndex;
+            }
+        };
+    })();
+
+    window.Navigation = Navigation;
+
+    function ensureOption(select, value) {
+        if (!select) return;
+        if (!value) {
+            select.value = '';
             return;
         }
-        matches.forEach(material => {
-            const option = document.createElement('div');
-            option.className = 'material-option';
-            option.style.padding = '4px 8px';
-            option.style.cursor = 'pointer';
-            option.textContent = `${material.material_name} (${material.material_type})`;
-            option.onclick = () => {
-                fillMaterialFields(material);
-                dropdown.style.display = 'none';
-            };
-            dropdown.appendChild(option);
-        });
-        dropdown.style.display = 'block';
-        dropdown.style.left = '0px';
-        dropdown.style.top = itemInput.offsetHeight + 'px';
-        dropdown.style.width = itemInput.offsetWidth + 'px';
-    }
-
-    function updateMaterialFields() {
-        const item = itemInput.value.trim().toLowerCase();
-        const type = typeInput.value.trim().toLowerCase();
-        const matches = window.materialsData.filter(m =>
-            m.material_name && m.material_name.toLowerCase().includes(item) &&
-            m.material_type && m.material_type.toLowerCase().includes(type)
-        );
-        if (matches.length === 1) {
-            fillMaterialFields(matches[0]);
-            dropdown.style.display = 'none';
-        } else if (matches.length > 1) {
-            showDropdown(matches);
+        const match = Array.from(select.options).find(opt => normalize(opt.value) === normalize(value));
+        if (match) {
+            select.value = match.value;
         } else {
-            colorInput.value = '';
-            weightInput.value = '';
-            unitPriceInput.value = '';
-            costInput.value = '';
-            dropdown.style.display = 'none';
+            const option = new Option(value, value, true, true);
+            select.add(option);
+            select.value = option.value;
         }
     }
 
-    itemInput.addEventListener('input', updateMaterialFields);
-    typeInput.addEventListener('input', updateMaterialFields);
-    qtyInput.addEventListener('input', updateMaterialFields);
-
-    document.addEventListener('click', e => {
-        if (!dropdown.contains(e.target) && e.target !== itemInput) {
-            dropdown.style.display = 'none';
-        }
-    });
-
-    // Add function to update total raw cost
-    function updateTotalRawCost() {
-        let total = 0;
-        document.querySelectorAll('input[name*="materials"][name*="cost"]').forEach(input => {
-            total += parseFloat(input.value) || 0;
-        });
-        document.getElementById('totalRawCost').value = total.toFixed(2);
-        Calculations.debounceCalculate(); // Trigger other calculations
+    function resolvePreviewPath(path) {
+        if (!path) return '';
+        if (/^(https?:)?\/\//i.test(path)) return path;
+        if (path.startsWith('/')) return path;
+        const base = assetBase ? `${assetBase}/storage/` : '/storage/';
+        return `${base}${path}`.replace(/\/+/g, '/');
     }
 
-    // For inks
-    const inkItemInput = document.getElementById('inks_0_item');
-    const inkTypeInput = document.getElementById('inks_0_type');
-    const inkUsageInput = document.getElementById('inks_0_usage');
-    const inkCostPerMlInput = document.getElementById('inks_0_costPerMl');
-    const inkTotalCostInput = document.getElementById('inks_0_totalCost');
-
-    function updateInkFields() {
-        const usage = parseFloat(inkUsageInput.value) || 0;
-        const costPerMl = parseFloat(inkCostPerMlInput.value) || 0;
-        const globalQty = parseFloat(document.getElementById('quantityOrdered').value) || 0;
-        const suggestedQty = usage * globalQty;
-        const qtyValue = (typeof inkQtyInput !== 'undefined' && inkQtyInput && inkQtyInput.value) ? parseFloat(inkQtyInput.value) : suggestedQty;
-
-        // Populate qty input with suggested value only if empty
-        if (inkQtyInput && (!inkQtyInput.value || inkQtyInput.value === '')) {
-            inkQtyInput.value = suggestedQty ? suggestedQty.toFixed(2) : '';
-        }
-
-        const totalCost = qtyValue * costPerMl;
-        inkTotalCostInput.value = totalCost.toFixed(2);
-        updateTotalRawCost(); // Inks contribute to total raw cost
-    }
-
-    // Add event listeners for inks
-    inkUsageInput.addEventListener('input', updateInkFields);
-    inkCostPerMlInput.addEventListener('input', updateInkFields);
-
-    // Autofill for inks if data available, but since inks are select, perhaps on change
-    inkItemInput.addEventListener('change', () => {
-        // Assuming window.inksData or similar, but not defined, so skip or add if needed
-    });
-
-    // Add function to add listeners for a material row
-    function addRowListeners(row) {
-        // Existing for materials
-        const itemInput = row.querySelector('input[name*="materials"][name*="item"]');
-        const typeInput = row.querySelector('input[name*="materials"][name*="type"]');
-        const qtyInput = row.querySelector('input[name*="materials"][name*="qty"]');
-        const unitPriceInput = row.querySelector('input[name*="materials"][name*="unitPrice"]');
-        const costInput = row.querySelector('input[name*="materials"][name*="cost"]');
-
-        if (itemInput && typeInput && qtyInput && unitPriceInput && costInput) {
-            // Materials logic
-            function updateMaterialFields() {
-                const item = itemInput.value.trim().toLowerCase();
-                const type = typeInput.value.trim().toLowerCase();
-                const qty = parseInt(qtyInput.value, 10) || 0;
-                const matches = window.materialsData.filter(m =>
-                    m.material_name && m.material_name.toLowerCase().includes(item) &&
-                    m.material_type && m.material_type.toLowerCase().includes(type)
-                );
-                if (matches.length === 1 && !unitPriceInput.value) {
-                    unitPriceInput.value = matches[0].unit_cost || '';
-                }
-                costInput.value = qty > 0 && unitPriceInput.value ? (parseFloat(unitPriceInput.value) * qty).toFixed(2) : '';
-                updateTotalRawCost();
-            }
-
-            itemInput.addEventListener('input', updateMaterialFields);
-            typeInput.addEventListener('input', updateMaterialFields);
-            qtyInput.addEventListener('input', updateMaterialFields);
-            unitPriceInput.addEventListener('input', () => {
-                const qty = parseInt(qtyInput.value, 10) || 0;
-                costInput.value = qty > 0 && unitPriceInput.value ? (parseFloat(unitPriceInput.value) * qty).toFixed(2) : '';
-                updateTotalRawCost();
-            });
-        }
-
-        // For inks
-        const inkItemInput = row.querySelector('select[name*="inks"][name*="item"]');
-        const inkUsageInput = row.querySelector('input[name*="inks"][name*="usage"]');
-        const inkCostPerMlInput = row.querySelector('input[name*="inks"][name*="costPerMl"]');
-        const inkTotalCostInput = row.querySelector('input[name*="inks"][name*="totalCost"]');
-        const inkQtyInput = row.querySelector('input[name*="inks"][name*="qty"]');
-
-        if (inkUsageInput && inkCostPerMlInput && inkTotalCostInput) {
-            function updateInkFields() {
-                const usage = parseFloat(inkUsageInput.value) || 0;
-                const globalQty = parseFloat(document.getElementById('quantityOrdered').value) || 0;
-                const suggestedQty = usage * globalQty; // ml needed based on usage
-                const costPerMl = parseFloat(inkCostPerMlInput.value) || 0;
-
-                // If user provided a qty, use it; otherwise use suggestedQty
-                const qtyValue = inkQtyInput && inkQtyInput.value ? parseFloat(inkQtyInput.value) : suggestedQty;
-                const totalCost = qtyValue * costPerMl;
-                inkTotalCostInput.value = totalCost.toFixed(2);
-
-                // populate qty input with suggested value if empty
-                if (inkQtyInput && (!inkQtyInput.value || inkQtyInput.value === '')) {
-                    inkQtyInput.value = suggestedQty.toFixed(2);
-                }
-
-                updateTotalRawCost();
-            }
-
-            inkUsageInput.addEventListener('input', updateInkFields);
-            inkCostPerMlInput.addEventListener('input', updateInkFields);
-
-            // If qty is manually edited, recalc total cost from qty * costPerMl
-            if (inkQtyInput) {
-                inkQtyInput.addEventListener('input', function () {
-                    const q = parseFloat(this.value) || 0;
-                    const c = parseFloat(inkCostPerMlInput.value) || 0;
-                    inkTotalCostInput.value = (q * c).toFixed(2);
-                    updateTotalRawCost();
-                });
-            }
-        }
-    }
-
-    // In the initial setup, add listeners to the first row
-    const firstMaterialRow = document.querySelector('.material-row');
-    if (firstMaterialRow) {
-        addRowListeners(firstMaterialRow);
-    }
-
-    // Ensure all existing material rows have listeners (in case there are multiple rows pre-rendered)
-    document.querySelectorAll('.material-row').forEach(row => addRowListeners(row));
-
-    // Initialize existing ink rows' totalCost values and ensure totals are calculated on load
-    document.querySelectorAll('.ink-row').forEach(row => {
-        const usageEl = row.querySelector('input[name$="[usage]"]');
-        const costPerMlEl = row.querySelector('input[name$="[costPerMl]"]');
-        const totalCostEl = row.querySelector('input[name$="[totalCost]"]');
-        const qtyEl = row.querySelector('input[name$="[qty]"]');
-        const globalQty = parseFloat(document.getElementById('quantityOrdered').value) || 0;
-        if (usageEl && costPerMlEl && totalCostEl) {
-            const usage = parseFloat(usageEl.value) || 0;
-            const costPerMl = parseFloat(costPerMlEl.value) || 0;
-            const suggestedQty = usage * globalQty;
-            const qtyValue = qtyEl && qtyEl.value ? parseFloat(qtyEl.value) : suggestedQty;
-            if (qtyEl && (!qtyEl.value || qtyEl.value === '')) {
-                qtyEl.value = suggestedQty ? suggestedQty.toFixed(2) : '';
-            }
-            totalCostEl.value = (qtyValue * costPerMl).toFixed(2);
-        }
-    });
-
-    // Compute totals on initial load so derived fields (costPerInvite, sellingPrice, etc.) populate
-    updateTotalRawCost();
-
-    // Add-on radio toggles: show/hide embossed and envelope fields
-    document.querySelectorAll('input[name="embossed_select"]').forEach(r => {
-        r.addEventListener('change', function() {
-            const show = this.value === 'add';
-            document.querySelectorAll('.embossed-fields').forEach(el => el.style.display = show ? 'block' : 'none');
-            // If hiding, clear values to avoid accidental inclusion
-            if (!show) {
-                ['unitPrice','qty','cost'].forEach(suffix => {
-                    const el = document.getElementById('materials_embossing_addon_' + suffix);
-                    if (el) el.value = '';
-                });
-                updateTotalRawCost();
-            }
-        });
-    });
-
-    document.querySelectorAll('input[name="envelope_select"]').forEach(r => {
-        r.addEventListener('change', function() {
-            const show = this.value === 'add';
-            document.querySelectorAll('.envelope-fields').forEach(el => el.style.display = show ? 'block' : 'none');
-            if (!show) {
-                ['unitPrice','qty','cost'].forEach(suffix => {
-                    const el = document.getElementById('materials_envelope_addon_' + suffix);
-                    if (el) el.value = '';
-                });
-                updateTotalRawCost();
-            }
-        });
-    });
-
-    // Compute addon costs when their unit price or qty change
-    ['embossing_addon', 'envelope_addon'].forEach(key => {
-        const unitEl = document.getElementById(`materials_${key}_unitPrice`);
-        const qtyEl = document.getElementById(`materials_${key}_qty`);
-        const costEl = document.getElementById(`materials_${key}_cost`);
-        if (unitEl && qtyEl && costEl) {
-            const compute = () => {
-                const u = parseFloat(unitEl.value) || 0;
-                const q = parseFloat(qtyEl.value) || 0;
-                costEl.value = (u * q).toFixed(2);
-                updateTotalRawCost();
-            };
-            unitEl.addEventListener('input', compute);
-            qtyEl.addEventListener('input', compute);
-        }
-    });
-
-    document.getElementById('invitation-form').addEventListener('submit', function() {
-        const btn = document.getElementById('submit-btn');
-        btn.disabled = true;
-        document.querySelector('#submit-btn .btn-text').style.display = 'none';
-        document.querySelector('#submit-btn .loading-spinner').style.display = 'inline-block';
-    });
-
-    document.getElementById('invitation-form').addEventListener('submit', function(e) {
-        e.preventDefault(); // Prevent default form submission
-
-        const formData = new FormData(this);
-        const submitBtn = document.getElementById('submit-btn');
-        const btnText = submitBtn.querySelector('.btn-text');
-        const loadingSpinner = submitBtn.querySelector('.loading-spinner');
-
-        // Show loading state
-        btnText.style.display = 'none';
-        loadingSpinner.style.display = 'inline';
-        submitBtn.disabled = true;
-        submitBtn.setAttribute('aria-busy', 'true');
-
-        // Send AJAX request
-        fetch(this.action, {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value,
-                'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        })
-        .then(response => {
-            if (response.ok) {
-                return response.json().catch(() => ({ success: false, message: 'Invalid JSON response' }));
-            }
-            return response.text().then(text => ({ success: false, message: text }));
-        })
-        .then(data => {
-            if (data && data.success) {
-                window.location.href = '{{ route("admin.products.index") }}';
+    document.querySelectorAll('.continue-btn[data-template-id]').forEach(button => {
+        button.addEventListener('click', () => {
+            const templateId = button.dataset.templateId;
+            const template = templates.find(t => String(t.id) === String(templateId));
+            if (!template) {
+                Navigation.showPage(1);
                 return;
             }
-            // Show server-side validation errors if provided
-            if (data && data.errors) {
-                console.error('Validation errors:', data.errors);
-            } else {
-                console.error('Save failed:', data && data.message ? data.message : data);
-            }
-        })
-        .catch(error => {
-            console.error('Network or parse error:', error);
-        })
-        .finally(() => {
-            // Reset button state
-            btnText.style.display = 'inline';
-            loadingSpinner.style.display = 'none';
-            submitBtn.disabled = false;
-            submitBtn.removeAttribute('aria-busy');
-        });
-    });
 
-    // Attach event listener to the container, not individual inputs
-    document.querySelector('.material-rows').addEventListener('input', function(e) {
-        if (e.target.matches('input[name^="materials"]')) {
-            // Find the row
-            const row = e.target.closest('.material-row');
-            // Get values
-            const unitPrice = parseFloat(row.querySelector('input[name$="[unitPrice]"]').value) || 0;
-            const qty = parseFloat(row.querySelector('input[name$="[qty]"]').value) || 0;
-            // Calculate cost
-            const cost = unitPrice * qty;
-            row.querySelector('input[name$="[cost]"]').value = cost.toFixed(2);
-            updateTotalRawCost();
-        }
-    });
+            const templateField = document.getElementById('template_id');
+            if (templateField) templateField.value = template.id;
 
-    // Event delegation for ink total cost calculation (handles usage, costPerMl, and qty)
-    document.querySelector('.ink-rows').addEventListener('input', function(e) {
-        if (
-            e.target.matches('input[name^="inks"][name$="[usage]"]') ||
-            e.target.matches('input[name^="inks"][name$="[costPerMl]"]') ||
-            e.target.matches('input[name^="inks"][name$="[qty]"]')
-        ) {
-            const row = e.target.closest('.ink-row');
-            if (!row) return;
-            const usage = parseFloat(row.querySelector('input[name$="[usage]"]').value) || 0;
-            const costPerMl = parseFloat(row.querySelector('input[name$="[costPerMl]"]').value) || 0;
-            const qtyEl = row.querySelector('input[name$="[qty]"]');
-            const globalQty = parseFloat(document.getElementById('quantityOrdered').value) || 0;
-            const suggestedQty = usage * globalQty;
+            const nameInput = document.getElementById('invitationName');
+            if (nameInput) nameInput.value = template.name || '';
 
-            const qtyValue = qtyEl && qtyEl.value ? parseFloat(qtyEl.value) : suggestedQty;
+            ensureOption(document.getElementById('eventType'), template.event_type || template.eventType || '');
+            ensureOption(document.getElementById('productType'), template.product_type || template.productType || '');
 
-            // If qty input exists and is empty, populate suggested value (do not override manual input)
-            if (qtyEl && (!qtyEl.value || qtyEl.value === '')) {
-                qtyEl.value = suggestedQty ? suggestedQty.toFixed(2) : '';
-            }
+            const themeStyleInput = document.getElementById('themeStyle');
+            if (themeStyleInput) themeStyleInput.value = template.theme_style || template.themeStyle || '';
 
-            const totalCost = qtyValue * costPerMl;
-            const totalCostEl = row.querySelector('input[name$="[totalCost]"]');
-            if (totalCostEl) totalCostEl.value = totalCost.toFixed(2);
-            updateTotalRawCost();
-        }
-    });
+            const descriptionTextarea = document.getElementById('description');
+            const descriptionEditor = document.getElementById('description-editor');
+            const description = template.description || '';
+            if (descriptionTextarea) descriptionTextarea.value = description;
+            if (descriptionEditor) descriptionEditor.innerHTML = description;
 
-    // Add new ink row dynamically
-    document.querySelector('.ink-rows').addEventListener('click', function(e) {
-        if (e.target.classList.contains('add-row')) {
-            e.preventDefault();
-            const inkRows = document.querySelector('.ink-rows');
-            const lastRow = inkRows.querySelector('.ink-row:last-child');
-            const newIndex = inkRows.querySelectorAll('.ink-row').length;
-            const newRow = lastRow.cloneNode(true);
-
-            // Update input names and ids for the new row
-            newRow.querySelectorAll('input, select').forEach(input => {
-                if (input.name) {
-                    input.name = input.name.replace(/\[\d+\]/, `[${newIndex}]`);
-                }
-                if (input.id) {
-                    input.id = input.id.replace(/_\d+_/, `_${newIndex}_`);
-                }
-                if (input.type === 'number' || input.tagName === 'SELECT' || input.tagName === 'INPUT') {
-                    input.value = '';
-                }
-            });
-
-            inkRows.appendChild(newRow);
-        }
-    });
-
-    // Add new material row dynamically
-    document.querySelector('.material-rows').addEventListener('click', function(e) {
-        if (e.target.classList.contains('add-row')) {
-            e.preventDefault();
-            const rowsContainer = this;
-            const lastRow = rowsContainer.querySelector('.material-row:last-child');
-            const newIndex = rowsContainer.querySelectorAll('.material-row').length;
-            const newRow = lastRow.cloneNode(true);
-
-            // Remove any hidden id inputs when cloning a row for new entry
-            newRow.querySelectorAll('input[type="hidden"]').forEach(h => h.remove());
-
-            newRow.querySelectorAll('input, select').forEach(input => {
-                if (input.name) {
-                    input.name = input.name.replace(/\[\d+\]/, `[${newIndex}]`);
-                }
-                if (input.id) {
-                    input.id = input.id.replace(/_\d+_/, `_${newIndex}_`);
-                }
-                // clear values for cloned row
-                if (input.type === 'number' || input.tagName === 'SELECT' || input.type === 'text' || input.tagName === 'TEXTAREA') {
-                    input.value = '';
-                }
-            });
-
-            rowsContainer.appendChild(newRow);
-            addRowListeners(newRow);
-        }
-    });
-
-    // For material rows
-    document.querySelector('.material-rows').addEventListener('click', function(e) {
-        if (e.target.classList.contains('remove-row')) {
-            const rows = this.querySelectorAll('.material-row');
-            if (rows.length > 1) {
-                e.target.closest('.material-row').remove();
-            }
-        }
-    });
-
-    // For ink rows
-    document.querySelector('.ink-rows').addEventListener('click', function(e) {
-        if (e.target.classList.contains('remove-row')) {
-            const rows = this.querySelectorAll('.ink-row');
-            if (rows.length > 1) {
-                e.target.closest('.ink-row').remove();
-            }
-        }
-    });
-
-    // Set preview image when a template is selected
-    document.querySelectorAll('.continue-btn[data-template-id]').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const templateId = this.getAttribute('data-template-id');
-            const template = window.templatesData.find(t => t.id == templateId);
             const previewImg = document.getElementById('template-preview-img');
             if (previewImg) {
-                if (template && template.preview) {
-                    // If preview already looks like a full URL, use it; otherwise build storage URL
-                    if (/^(https?:)?\/\//i.test(template.preview)) {
-                        previewImg.src = template.preview;
-                    } else {
-                        previewImg.src = window.assetUrl + 'storage/' + template.preview;
-                    }
-                    previewImg.alt = template.name + ' Preview';
+                const previewCandidates = [
+                    template.preview_url,
+                    template.preview,
+                    template.preview_image,
+                    template.image_url,
+                    template.image
+                ];
+                const previewPath = previewCandidates.find(Boolean) || '';
+                const resolved = previewPath ? resolvePreviewPath(previewPath) : '';
+                if (resolved) {
+                    previewImg.src = resolved;
+                    previewImg.style.display = 'block';
+                    previewImg.alt = `${template.name || 'Selected'} Preview`;
                 } else {
                     previewImg.src = '';
+                    previewImg.style.display = 'none';
                     previewImg.alt = 'No preview available';
                 }
             }
+
+            Navigation.showPage(1);
+            if (nameInput) nameInput.focus();
         });
     });
-});
 
-// Module: Calculations
-const Calculations = {
-    lastValues: { quantity: null, markup: null, totalRawCost: null },
-    calculateAll() {
-        const quantity = parseFloat(document.getElementById("quantityOrdered").value) || 0;
-        const markup = parseFloat(document.getElementById("markup").value) || 0;
-        const totalRawCost = parseFloat(document.getElementById("totalRawCost").value) || 0;
-        if (this.lastValues.quantity === quantity && this.lastValues.markup === markup && this.lastValues.totalRawCost === totalRawCost) return;
-        this.lastValues = { quantity, markup, totalRawCost };
-        if (quantity === 0) {
-            document.getElementById("costPerInvite").value = '0.00';
-            document.getElementById("sellingPrice").value = '0.00';
-            document.getElementById("totalSellingPrice").value = '0.00';
-            return;
-        }
-        const costPerInvite = totalRawCost / quantity;
-        const sellingPrice = costPerInvite * (1 + markup / 100);
-        const totalSellingPrice = sellingPrice * quantity;
-        document.getElementById("costPerInvite").value = costPerInvite.toFixed(2);
-        document.getElementById("sellingPrice").value = sellingPrice.toFixed(2);
-        document.getElementById("totalSellingPrice").value = totalSellingPrice.toFixed(2);
-    },
-    debounceCalculate() {
-        clearTimeout(this.calculationTimeout);
-        this.calculationTimeout = setTimeout(this.calculateAll.bind(this), 300);
-    },
-    calculationTimeout: null,
-    init() {
-        document.getElementById("quantityOrdered").addEventListener("input", () => this.debounceCalculate());
-        document.getElementById("markup").addEventListener("change", () => this.debounceCalculate());
-        document.getElementById("totalRawCost").addEventListener("input", () => this.debounceCalculate());
-        this.calculateAll();
-    }
-};
-
-// Module: Validation
-const Validation = {
-    validatePage(page) {
-        let isValid = true;
-        const requiredFields = document.querySelectorAll(`.page${page} [required]`);
-        const errorList = document.getElementById(`error-list-page${page}`);
-        if (errorList) errorList.innerHTML = '';
-        requiredFields.forEach(field => {
-            if (!field.value.trim()) {
-                isValid = false;
-                this.showError(field, 'This field is required.');
-                if (errorList) {
-                    const li = document.createElement('li');
-                    li.textContent = `${field.previousElementSibling.textContent} is required.`;
-                    errorList.appendChild(li);
+    const editorToolbar = document.querySelector('.editor-toolbar');
+    if (editorToolbar) {
+        editorToolbar.addEventListener('click', event => {
+            const button = event.target.closest('.editor-btn');
+            if (!button) return;
+            event.preventDefault();
+            const command = button.dataset.command;
+            if (command) {
+                document.execCommand(command, false, null);
+                const descriptionEditor = document.getElementById('description-editor');
+                const descriptionTextarea = document.getElementById('description');
+                if (descriptionEditor && descriptionTextarea) {
+                    descriptionTextarea.value = descriptionEditor.innerHTML;
                 }
-            } else {
-                this.clearError(field);
-            }
-        });
-        const errorSummary = document.querySelector(`.page${page} .error-summary`);
-        if (errorSummary) errorSummary.style.display = isValid ? 'none' : 'block';
-        return isValid;
-    },
-    showError(field, message) {
-        field.classList.add('error');
-        const errorSpan = document.getElementById(field.id + '-error');
-        if (errorSpan) {
-            errorSpan.textContent = message;
-            errorSpan.style.display = 'block';
-        }
-    },
-    clearError(field) {
-        field.classList.remove('error');
-        const errorSpan = document.getElementById(field.id + '-error');
-        if (errorSpan) errorSpan.style.display = 'none';
-    },
-    sanitizeInput(input) {
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = input;
-        const scripts = tempDiv.querySelectorAll('script');
-        scripts.forEach(script => script.remove());
-        const allowedTags = ['b', 'i', 'u', 'br', 'p', 'div'];
-        const allElements = tempDiv.querySelectorAll('*');
-        allElements.forEach(el => {
-            if (!allowedTags.includes(el.tagName.toLowerCase())) el.remove();
-        });
-        return tempDiv.innerHTML;
-    },
-    init() {
-        // Sync editor
-        const editor = document.getElementById('description-editor');
-        const textarea = document.getElementById('description');
-        if (editor && textarea) {
-            editor.addEventListener('input', () => {
-                textarea.value = this.sanitizeInput(editor.innerHTML);
-            });
-        }
-    }
-};
-
-// Module: Navigation
-const Navigation = {
-    currentPage: 1,
-    totalPages: 4,
-    showPage(pageIndex) {
-        document.querySelectorAll('.page').forEach((page, idx) => {
-            page.style.display = idx === pageIndex ? 'block' : 'none';
-        });
-        this.currentPage = pageIndex + 1;
-        const steps = document.querySelectorAll('.breadcrumb-step');
-        steps.forEach((step, idx) => {
-            step.classList.toggle('active', idx === pageIndex);
-        });
-        const titles = ['Templates', 'Basic Info', 'Customization', 'Production'];
-        const pageTitle = document.getElementById('page-title');
-        if (pageTitle) pageTitle.textContent = titles[pageIndex] || '';
-        document.getElementById('progress-fill').style.width = ((pageIndex + 1) / this.totalPages * 100) + '%';
-    },
-    showNextPage() {
-        if (this.currentPage < this.totalPages) {
-            this.currentPage++;
-            this.showPage(this.currentPage - 1);
-        }
-    },
-    init() {
-        document.querySelectorAll('.continue-btn').forEach(btn => {
-            btn.addEventListener('click', () => this.showNextPage());
-        });
-        document.querySelectorAll('.breadcrumb-step').forEach((btn, idx) => {
-            btn.addEventListener('click', () => this.showPage(idx));
-        });
-        this.showPage(0);
-    }
-};
-
-// Module: Dynamic Rows
-const DynamicRows = {
-    init() {
-        document.addEventListener('click', e => {
-            if (e.target.classList.contains('add-row')) this.addRow(e.target);
-            if (e.target.classList.contains('remove-row')) this.removeRow(e.target);
-        });
-    },
-    addRow(button) {
-        const materialRow = button.closest('.material-row');
-        const newRow = materialRow.cloneNode(true);
-        const rowsContainer = materialRow.parentElement;
-        const inputs = newRow.querySelectorAll('input, select');
-        const rowIndex = rowsContainer.children.length;
-        inputs.forEach(input => {
-            const baseId = input.id.replace(/_\d+$/, '');
-            input.id = `${baseId}_${rowIndex}`;
-            if (input.name) input.name = input.name.replace(/\[\d+\]/, `[${rowIndex}]`);
-            input.value = '';
-        });
-        rowsContainer.appendChild(newRow);
-        addRowListeners(newRow); // Add listeners to the new row
-        Calculations.debounceCalculate();
-    },
-    removeRow(button) {
-        const materialRow = button.closest('.material-row');
-        const rowsContainer = materialRow.parentElement;
-        if (rowsContainer.children.length > 1) {
-            materialRow.remove();
-            Calculations.debounceCalculate();
-        }
-    }
-};
-
-// Module: Editor
-const Editor = {
-    init() {
-        document.addEventListener('click', e => {
-            if (e.target.classList.contains('editor-btn')) {
-                document.execCommand(e.target.getAttribute('data-command'), false, null);
-                document.getElementById('description-editor').focus();
             }
         });
     }
-};
 
-// Module: File Upload
-const FileUpload = {
-    init() {
-        const imageInput = document.getElementById('images');
-        const customImageInput = document.getElementById('customImage');
-        if (imageInput) {
-            imageInput.addEventListener('change', e => this.validateFiles(e.target, 5 * 1024 * 1024, ['image/jpeg', 'image/png', 'image/gif']));
-        }
-        if (customImageInput) {
-            customImageInput.addEventListener('change', e => this.validateFiles(e.target, 2 * 1024 * 1024, ['image/jpeg', 'image/png']));
-        }
-    },
-    validateFiles(input, maxSize, allowedTypes) {
-        const files = input.files;
-        for (let file of files) {
-            if (!allowedTypes.includes(file.type)) {
-                alert(`Invalid file type: ${file.name}`);
-                input.value = '';
-                return;
+    const descriptionEditor = document.getElementById('description-editor');
+    if (descriptionEditor) {
+        descriptionEditor.addEventListener('input', () => {
+            const descriptionTextarea = document.getElementById('description');
+            if (descriptionTextarea) {
+                descriptionTextarea.value = descriptionEditor.innerHTML;
             }
-            if (file.size > maxSize) {
-                alert(`File too large: ${file.name}`);
-                input.value = '';
-                return;
-            }
-        }
-    }
-};
-
-// Module: Accessibility
-const Accessibility = {
-    init() {
-        document.querySelectorAll('.continue-btn, .btn-save, .add-row, .editor-btn').forEach(btn => {
-            btn.setAttribute('aria-label', btn.textContent || btn.getAttribute('data-command'));
-            btn.setAttribute('aria-busy', 'true');
         });
     }
-};
-
-// Module: Performance
-const Performance = {
-    init() {
-        // Placeholder for optimizations
-    }
-};
+});

@@ -31,6 +31,29 @@
       <link rel="icon" type="image/png" href="{{ asset('adminimage/ink.png') }}">
     <!-- Chat widget styles -->
     <style>
+        /* Responsive tweaks for dashboard */
+        .logo-i { line-height: 1; }
+    .page-title { font-size: 1.1rem; }
+
+        /* Flip card responsive sizing */
+        .flip-card .flip-card-inner { perspective: 1000px; }
+        .flip-card-front, .flip-card-back { min-height: 14rem; }
+        @media (min-width: 768px) {
+            .flip-card-front, .flip-card-back { min-height: 22rem; }
+        }
+
+    /* Ensure video & image scale nicely */
+    .template-image, .flip-card-front video, .flip-card-back img { width: 100%; height: 100%; object-fit: cover; }
+
+    /* Hero spacing tweaks */
+    .flip-card { margin-top: 0; }
+    .space-y-6 { gap: .75rem; }
+    .text-5xl { font-size: 2.25rem; }
+    .text-lg { font-size: 0.95rem; }
+
+        /* Accessible focus styles */
+        .focus-ring:focus { outline: 3px solid rgba(6,182,212,0.25); outline-offset: 2px; }
+
         /* Chat widget container (fixed bottom-right) */
         .chat-widget { position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 60; }
 
@@ -163,11 +186,32 @@
         .msg.user::after { right: -7px; }
 
         /* responsive tweaks */
+
        @media (max-width: 720px) {
     .chat-panel { width: 92vw; right: 4%; bottom: 88px; }
     .chat-btn { width: 70px; height: 70px; }
     .chat-inner img, .chat-avatar { width: 38px; height: 38px; }
 }
+
+        @media (max-width: 720px) {
+            .chat-panel { width: 92vw; right: 4%; bottom: 88px; }
+            .chat-btn { width: 80px; height: 80px; }
+        }
+
+        /* Mobile navigation panel */
+        #mainNav.mobile-open { display: block !important; }
+        #mainNav { z-index: 40; }
+        @media (max-width: 767px) {
+            #mainNav { display: none; position: absolute; left: 0; right: 0; top: 100%; background: white; padding: 1rem; box-shadow: 0 8px 30px rgba(2,6,23,0.08); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
+            #mainNav a { display: block; padding: .5rem 0; }
+        }
+
+        /* Hero background canvas */
+        .hero-wrapper { min-height: 420px; }
+        #bgCanvas { display:block; background: linear-gradient(180deg, #ffffff, #fbfdff); }
+        /* gentle overlay to make text pop */
+        .hero-wrapper::after { content: ''; position: absolute; inset:0; background: linear-gradient(180deg, rgba(255,255,255,0.0), rgba(255,255,255,0.4)); pointer-events: none; z-index:5; }
+
     </style>
 </head>
 <body id="dashboard" class="antialiased bg-white">
@@ -183,13 +227,27 @@
         </div>
 
         <!-- Navigation Links -->
-        <nav class="hidden md:flex flex-wrap space-x-6">
+        <button id="mobileNavBtn" class="md:hidden p-2 rounded-md focus-ring mr-2" aria-label="Toggle navigation" aria-controls="mainNav" aria-expanded="false">
+            <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        <!-- Mobile search toggle -->
+        <button id="mobileSearchBtn" class="md:hidden p-2 rounded-md focus-ring mr-2" aria-label="Toggle search" title="Search">
+            <svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
+        </button>
+        <nav id="mainNav" class="hidden md:flex flex-wrap space-x-6" role="navigation">
             <a href="#dashboard" class="text-gray-700 hover:text-[#06b6d4]">Home</a>
             <a href="#categories" class="text-gray-700 hover:text-[#06b6d4]">Categories</a>
             <a href="#templates" class="text-gray-700 hover:text-[#06b6d4]">Templates</a>
             <a href="#about" class="text-gray-700 hover:text-[#06b6d4]">About</a>
             <a href="#contact" class="text-gray-700 hover:text-[#06b6d4]">Contact</a>
         </nav>
+
+        <!-- Mobile search input (hidden on desktop) -->
+        <div id="mobileSearch" class="hidden md:hidden w-full px-4 mt-2">
+            <form action="{{ url('/search') }}" method="GET">
+                <input type="text" name="query" placeholder="Search..." class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-[#06b6d4]" />
+            </form>
+        </div>
 
       
         <div class="flex items-center space-x-4 relative min-w-0">
@@ -248,13 +306,14 @@
 </header>
 
 
-<main class="py-6 px-4">
+<div class="py-2 px-4">
         @yield('content')
-    </main>
+    </div>
 
-<!-- Main Content -->
-<main class="py-12 bg-white min-h-screen">
-    <div class="max-w-6xl mx-auto px-6 grid md:grid-cols-2 gap-8 items-center">
+    <!-- Main Content -->
+<main class="py-8 bg-white" style="min-height:60vh;">
+    <div class="hero-wrapper relative overflow-hidden">
+        <div class="max-w-6xl mx-auto px-6 grid md:grid-cols-2 gap-8 items-center relative z-10">
         
         <!-- Left Content -->
         <div class="space-y-6 animate-fade-in-left">
@@ -293,16 +352,17 @@
             <div class="flip-card-inner">
                 <!-- Front (Video) -->
                 <div class="flip-card-front bg-white shadow-lg rounded-4x3 overflow-hidden flex items-center justify-center">
-                    <video class="w-full h-96 object-cover rounded-2xl" autoplay loop muted>
+                    <video class="w-full h-64 md:h-96 object-cover rounded-2xl" autoplay loop muted>
                         <source src="{{ asset('customerVideo/Video/invitation.mp4') }}" type="video/mp4">
                         Your browser does not support the video tag.
                     </video>
                 </div>
                 <!-- Back (Image) -->
                 <div class="flip-card-back bg-white shadow-lg rounded-2xl overflow-hidden">
-                    <img src="{{ asset('customerimages/image/invitation.png') }}" alt="Invitation Design" class="w-full h-96 object-cover">
+                    <img src="{{ asset('customerimages/image/invitation.png') }}" alt="Invitation Design" class="w-full h-64 md:h-96 object-cover">
                 </div>
             </div>
+        </div>
         </div>
     </div>
 </main>
@@ -328,6 +388,88 @@
 @include('customer.partials.chatbot')
 <!-- Optional: If you want to replace the placeholder bot replies with a real AI API call,
      replace the setTimeout block above with a fetch() to your server endpoint that proxies to OpenAI or another model. -->
-+
+
+
+    // Mobile nav & search toggle
+    (function () {
+        var btn = document.getElementById('mobileNavBtn');
+        var nav = document.getElementById('mainNav');
+        var searchBtn = document.getElementById('mobileSearchBtn');
+        var searchPanel = document.getElementById('mobileSearch');
+
+        function openNav() {
+            nav.classList.remove('hidden');
+            nav.classList.add('mobile-open');
+            btn.setAttribute('aria-expanded', 'true');
+        }
+
+        function closeNav() {
+            nav.classList.add('hidden');
+            nav.classList.remove('mobile-open');
+            btn.setAttribute('aria-expanded', 'false');
+        }
+
+        if (btn && nav) {
+            btn.addEventListener('click', function () {
+                if (nav.classList.contains('hidden')) {
+                    openNav();
+                } else {
+                    closeNav();
+                }
+            });
+        }
+
+        if (searchBtn && searchPanel) {
+            searchBtn.addEventListener('click', function () {
+                if (searchPanel.classList.contains('hidden')) {
+                    searchPanel.classList.remove('hidden');
+                    searchPanel.classList.add('block');
+                } else {
+                    searchPanel.classList.remove('block');
+                    searchPanel.classList.add('hidden');
+                }
+            });
+        }
+
+        // Close nav when resizing to desktop
+        window.addEventListener('resize', function () {
+            if (window.innerWidth >= 768) {
+                nav.classList.remove('hidden');
+                nav.classList.remove('mobile-open');
+                btn.setAttribute('aria-expanded', 'false');
+                if (searchPanel) {
+                    searchPanel.classList.add('hidden');
+                }
+            } else {
+                nav.classList.add('hidden');
+            }
+        });
+    })();
+
+    // Add keyboard-visible focus ring for better accessibility
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Tab') {
+            document.body.classList.add('user-is-tabbing');
+        }
+    });
+    document.addEventListener('mousedown', function () {
+        document.body.classList.remove('user-is-tabbing');
+    });
+
+    // Optional: close mobile nav when clicking a link (improves UX)
+    (function () {
+        var nav = document.getElementById('mainNav');
+        if (!nav) return;
+        nav.addEventListener('click', function (e) {
+            var target = e.target.closest('a');
+            if (!target) return;
+            if (window.innerWidth < 768) {
+                nav.classList.remove('block');
+                nav.classList.add('hidden');
+            }
+        });
+    })();
+</script>
+
 </body>
 </html>
