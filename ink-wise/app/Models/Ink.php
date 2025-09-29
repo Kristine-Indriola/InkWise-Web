@@ -24,4 +24,9 @@ class Ink extends Model
         'cost_per_invite',
         'description',
     ];
+
+    public function inventory()
+    {
+        return $this->hasOne(Inventory::class, 'ink_id');
+    }
 }

@@ -78,12 +78,19 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>Material Type</label>
-                        <input type="text" name="material_type" class="form-control" placeholder="e.g. Mug, T-shirt, Keychain">  <!-- ✅ Added: Optional text input for custom types -->
+                        {{-- store canonical lowercase value but show uppercase to the user --}}
+                        <input type="hidden" name="material_type" value="souvenirs">
+                        <input type="text" class="form-control styled-select" value="SOUVENIRS" readonly>
                         @error('material_type') <small style="color:red;">{{ $message }}</small> @enderror
                     </div>
                     <div class="form-group">
                         <label>Unit of Measure</label>
                         <input type="text" name="unit" class="form-control" placeholder="e.g. pcs, pack" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Color</label>
+                        <input type="text" name="color" class="form-control" placeholder="e.g. Red, Navy, Gold">
+                        @error('color') <small style="color:red;">{{ $message }}</small> @enderror
                     </div>
                 </div>
                 <div class="form-row">
@@ -109,16 +116,15 @@
             {{-- Invitation/Other Material Form --}}
             <form id="materialForm" action="{{ route('admin.materials.store') }}" method="POST">
     @csrf
-    <div class="form-group">
+                <div class="form-group">
                 <label>Material Type</label>
                 <select name="material_type" id="materialTypeSelect" required class="form-control styled-select">
                     <option value="">-- Select Material Type --</option>
-                    <option value="cardstock" {{ old('material_type') == 'cardstock' ? 'selected' : '' }}>Paper</option>
-                    <option value="envelope" {{ old('material_type') == 'envelope' ? 'selected' : '' }}>Envelope</option>
-                    <option value="foil" {{ old('material_type') == 'foil' ? 'selected' : '' }}>Foil</option>
-                    <option value="lamination" {{ old('material_type') == 'lamination' ? 'selected' : '' }}>Lamination</option>
-                    <option value="packaging" {{ old('material_type') == 'packaging' ? 'selected' : '' }}>Packaging</option>
-                    <option value="ink" {{ old('material_type') == 'ink' ? 'selected' : '' }}>Ink</option>
+                    <option value="paper" {{ old('material_type') == 'paper' ? 'selected' : '' }}>PAPER</option>
+                    <option value="ink" {{ old('material_type') == 'ink' ? 'selected' : '' }}>INK</option>
+                    <option value="envelopes" {{ old('material_type') == 'envelopes' ? 'selected' : '' }}>ENVELOPES</option>
+                    <option value="ribbon" {{ old('material_type') == 'ribbon' ? 'selected' : '' }}>RIBBON</option>
+                    <option value="powder" {{ old('material_type') == 'powder' ? 'selected' : '' }}>POWDER</option>
                 </select>
             </div>
 
@@ -221,6 +227,12 @@
                 <input type="number" name="stock_qty" value="{{ old('stock_qty') }}" required class="form-control styled-select" min="0">
                 <small style="color:#6b7280;">Required. Enter how many cans you currently have (integer).</small>
                 @error('stock_qty') <small style="color:red;">{{ $message }}</small> @enderror
+            </div>
+            <div class="form-group">
+                <label>Reorder Point (cans)</label>
+                <input type="number" name="reorder_level" value="{{ old('reorder_level', 10) }}" required class="form-control styled-select" min="0">
+                <small style="color:#6b7280;">Required. When stock falls at or below this number, the system marks the ink as Low Stock.</small>
+                @error('reorder_level') <small style="color:red;">{{ $message }}</small> @enderror
             </div>
         </div>
         <div class="form-row">

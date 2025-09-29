@@ -51,16 +51,33 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('login.submit') }}" aria-labelledby="login-heading">
+        <form method="POST" action="{{ route('login.submit') }}" aria-labelledby="login-heading" class="login-form" novalidate>
             @csrf
             <h1 id="login-heading" style="display: none;">Login to InkWise System</h1>
-            <input type="email" name="email" placeholder="Enter Email" required autocomplete="username" aria-label="Email address">
-            <input type="password" name="password" placeholder="Enter Password" required id="passwordField" class="password-field" autocomplete="current-password" aria-label="Password">
-            <div class="show-password">
-                <input type="checkbox" id="togglePassword" aria-label="Show password">
-                <label for="togglePassword">Show Password</label>
+            <div class="form-field">
+                <label for="emailField" class="field-label">Email</label>
+                <div class="input-wrapper">
+                    <input id="emailField" type="email" name="email" placeholder="name@example.com" required autocomplete="username" aria-label="Email address">
+                </div>
             </div>
-        
+
+            <div class="form-field">
+                <label for="passwordField" class="field-label">Password</label>
+                <div class="input-wrapper">
+                    <input type="password" name="password" placeholder="Enter Password" required id="passwordField" class="password-field" autocomplete="current-password" aria-label="Password">
+                </div>
+                <div class="password-meta">
+                    <div class="show-password">
+                        <input type="checkbox" id="togglePassword" aria-label="Show password">
+                        <label for="togglePassword">Show Password</label>
+                    </div>
+                    <div id="password-strength" class="password-strength" aria-live="polite" aria-hidden="true">
+                        <span class="password-strength__bar" role="presentation"></span>
+                        <span class="password-strength__label">Strength</span>
+                    </div>
+                </div>
+            </div>
+
             <button type="submit" aria-describedby="login-button-desc">Login</button>
             <div id="login-button-desc" style="display: none;">Submit your email and password to log in</div>
         </form>

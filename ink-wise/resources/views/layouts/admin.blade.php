@@ -671,6 +671,7 @@ body.dark-mode .btn-warning {
   <!-- Content Wrapper -->
   <div class="content-wrapper">
     <!-- Topbar -->
+    
     <div class="topbar">
       <div class="logo">InkWise</div>
       <div class="icons" style="display: flex; align-items: center; gap: 24px; margin-left: auto; justify-content: center;">

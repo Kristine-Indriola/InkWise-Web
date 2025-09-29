@@ -4,15 +4,28 @@ document.addEventListener('DOMContentLoaded', function() {
     const passwordInput = document.querySelector('input[name="password"]');
     const submitButton = document.querySelector('button[type="submit"]');
     const strengthIndicator = document.getElementById('password-strength');
+    const strengthBar = strengthIndicator ? strengthIndicator.querySelector('.password-strength__bar') : null;
+    const strengthLabel = strengthIndicator ? strengthIndicator.querySelector('.password-strength__label') : null;
     const togglePassword = document.getElementById('togglePassword');
     const loginContainer = document.getElementById('loginContainer');
     const errorContainer = document.createElement('div');
     errorContainer.id = 'inline-errors';
     errorContainer.setAttribute('aria-live', 'assertive');
     errorContainer.style.display = 'none';
+    errorContainer.setAttribute('role', 'alert');
+    errorContainer.setAttribute('aria-hidden', 'true');
+    if (!form) {
+        return;
+    }
+
     form.insertBefore(errorContainer, form.firstChild);
 
     let inputThrottleTimer;
+    let inlineErrorTimeout;
+
+    if (!emailInput || !passwordInput || !submitButton) {
+        return;
+    }
 
     // Email validation function
     function validateEmail(email) {
@@ -33,9 +46,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Update strength indicator
     function updateStrengthIndicator(password) {
+        if (!strengthIndicator || !strengthBar || !strengthLabel) {
+            return;
+        }
         const strength = checkPasswordStrength(password);
-        let className = '';
-        let text = '';
+        let className;
+        let text;
         if (strength <= 1) {
             className = 'weak';
             text = 'Weak';
@@ -46,16 +62,44 @@ document.addEventListener('DOMContentLoaded', function() {
             className = 'strong';
             text = 'Strong';
         }
-        strengthIndicator.className = `password-strength ${className}`;
-        strengthIndicator.textContent = text;
-        strengthIndicator.style.width = `${(strength / 5) * 100}%`;
+
+        strengthIndicator.classList.remove('weak', 'medium', 'strong');
+        strengthIndicator.classList.add(className, 'is-active');
+        strengthIndicator.setAttribute('aria-hidden', 'false');
+        strengthLabel.textContent = text;
+
+        const progress = Math.min(Math.max(strength / 5, 0.2), 1);
+        strengthBar.style.setProperty('--strength-progress', progress.toFixed(2));
+    }
+
+    function resetStrengthIndicator() {
+        if (!strengthIndicator) {
+            return;
+        }
+        strengthIndicator.classList.remove('is-active', 'weak', 'medium', 'strong');
+        strengthIndicator.setAttribute('aria-hidden', 'true');
+        if (strengthLabel) {
+            strengthLabel.textContent = 'Strength';
+        }
+        if (strengthBar) {
+            strengthBar.style.setProperty('--strength-progress', '0');
+        }
     }
 
     // Show inline errors
     function showInlineErrors(messages) {
-        errorContainer.innerHTML = messages.map(msg => `<p style="color: #ff6a88; margin: 0;">${msg}</p>`).join('');
-        errorContainer.style.display = 'block';
-        setTimeout(() => errorContainer.style.display = 'none', 5000); // Hide after 5 seconds
+        clearTimeout(inlineErrorTimeout);
+        errorContainer.innerHTML = messages.map(msg => `<p>${msg}</p>`).join('');
+        errorContainer.classList.add('is-visible');
+        errorContainer.style.display = '';
+        errorContainer.setAttribute('aria-hidden', 'false');
+        inlineErrorTimeout = setTimeout(() => {
+            errorContainer.classList.remove('is-visible');
+            errorContainer.style.display = 'none';
+            errorContainer.innerHTML = '';
+            errorContainer.setAttribute('aria-hidden', 'true');
+            inlineErrorTimeout = null;
+        }, 5000);
     }
 
     // Form validation on submit
@@ -88,30 +132,30 @@ document.addEventListener('DOMContentLoaded', function() {
         submitButton.disabled = true;
         submitButton.innerHTML = '<span class="spinner"></span> Logging in...';
         submitButton.style.cursor = 'not-allowed';
+        submitButton.classList.add('is-loading');
     });
 
     // Password strength on input with throttling
     passwordInput.addEventListener('input', function() {
         clearTimeout(inputThrottleTimer);
         inputThrottleTimer = setTimeout(() => {
+            if (!strengthIndicator) {
+                return;
+            }
             if (this.value) {
                 updateStrengthIndicator(this.value);
-                strengthIndicator.style.display = 'block';
             } else {
-                strengthIndicator.style.display = 'none';
+                resetStrengthIndicator();
             }
-        }, 300); // Throttle to 300ms
+        }, 300);
     });
 
     passwordInput.addEventListener('blur', function() {
         if (!this.value.trim()) {
             this.style.borderColor = '#ff6a88';
+            resetStrengthIndicator();
         } else {
-            this.style.borderColor = '#9dc2ec';
-        }
-        // Hide indicator on blur if empty
-        if (!this.value) {
-            strengthIndicator.style.display = 'none';
+            this.style.borderColor = 'rgba(157, 194, 236, 0.65)';
         }
     });
 
@@ -124,17 +168,22 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (!validateEmail(this.value.trim())) {
                 this.style.borderColor = '#ff6a88';
             } else {
-                this.style.borderColor = '#9dc2ec';
+                this.style.borderColor = 'rgba(157, 194, 236, 0.65)';
             }
         }, 300);
     });
 
     // Form reset to clear indicator
     form.addEventListener('reset', function() {
-        strengthIndicator.style.display = 'none';
-        strengthIndicator.className = 'password-strength';
-        strengthIndicator.style.width = '0%';
+        clearTimeout(inputThrottleTimer);
+        clearTimeout(inlineErrorTimeout);
+        inputThrottleTimer = null;
+        inlineErrorTimeout = null;
+        resetStrengthIndicator();
+        errorContainer.classList.remove('is-visible');
         errorContainer.style.display = 'none';
+        errorContainer.innerHTML = '';
+        errorContainer.setAttribute('aria-hidden', 'true');
     });
 
     // Keyboard navigation: Enter to submit
@@ -146,7 +195,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Hide logo-final until animation ends
-    document.getElementById('logoFinal').style.opacity = 0;
+    const logoFinal = document.getElementById('logoFinal');
+    const logoAnimContainer = document.getElementById('logoAnimContainer');
+    const logoImage = document.querySelector('.logo-final img');
+    if (logoFinal) {
+        logoFinal.style.opacity = 0;
+    }
 
     // Animate octagons to morph and move to center
     setTimeout(function() {
@@ -157,29 +211,36 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Fade out octagons and fade in logo image
     setTimeout(function() {
-        document.getElementById('logoAnimContainer').style.display = 'none';
-        document.getElementById('logoFinal').style.opacity = 1;
-        // Fade in logo image
-        document.querySelector('.logo-final img').classList.add('show-logo');
+        if (logoAnimContainer) {
+            logoAnimContainer.style.display = 'none';
+        }
+        if (logoFinal) {
+            logoFinal.style.opacity = 1;
+        }
+        if (logoImage) {
+            logoImage.classList.add('show-logo');
+        }
     }, 2900); // after all animation
 
     // Toggle password visibility
-    togglePassword.addEventListener('change', function() {
-        const passwordField = document.getElementById('passwordField');
-        if (this.checked) {
-            passwordField.type = 'text';
-        } else {
-            passwordField.type = 'password';
-        }
-    });
+    if (togglePassword) {
+        togglePassword.addEventListener('change', function() {
+            const passwordField = document.getElementById('passwordField');
+            if (passwordField) {
+                passwordField.type = this.checked ? 'text' : 'password';
+            }
+        });
+    }
 
     // Toggle (scale) the form only when mouse is over the form, no movement
-    loginContainer.addEventListener('mouseenter', function() {
-        loginContainer.style.transform = 'scale(1.03)';
-    });
-    loginContainer.addEventListener('mouseleave', function() {
-        loginContainer.style.transform = '';
-    });
+    if (loginContainer) {
+        loginContainer.addEventListener('mouseenter', function() {
+            loginContainer.style.transform = 'scale(1.03)';
+        });
+        loginContainer.addEventListener('mouseleave', function() {
+            loginContainer.style.transform = '';
+        });
+    }
 
     // Cleanup on page unload
     window.addEventListener('beforeunload', function() {

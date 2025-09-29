@@ -38,6 +38,7 @@ class InkController extends Controller
             'occasion.*' => 'string|in:all,wedding,birthday,baptism,corporate',
             'product_type' => 'required|string|in:invitation,giveaway',
             'ink_color' => 'required|string|max:50',
+            'material_type' => 'nullable|string|max:50',
             'stock_qty_ml' => 'nullable|integer|min:0',
             'stock_qty' => 'required|integer|min:0', // number of cans (required for inks)
             'unit' => 'required|string|max:20', // e.g. can (required for inks)
@@ -46,15 +47,17 @@ class InkController extends Controller
             'avg_usage_per_invite_ml' => 'nullable|numeric|min:0',
             'cost_per_invite' => 'nullable|numeric|min:0',
             'description' => 'nullable|string|max:1000',
+            'reorder_level' => 'required|integer|min:0',
         ]);
 
         // Prepare data payload for creating ink (one record per material_name)
         $selected = $validated['occasion'];
+        $reorderLevel = $validated['reorder_level'];
         $base = [
             'material_name' => $validated['material_name'],
             'product_type' => $validated['product_type'],
             'ink_color' => $validated['ink_color'],
-            'material_type' => $validated['material_type'] ?? null,
+            'material_type' => $validated['material_type'] ?? 'ink',
             'stock_qty_ml' => $validated['stock_qty_ml'] ?? null,
             'stock_qty' => $validated['stock_qty'] ?? 0,
             'unit' => $validated['unit'] ?? null,
@@ -77,14 +80,20 @@ class InkController extends Controller
             }
         }
 
-        Ink::create($base);
+        $ink = Ink::create($base);
+
+        $ink->inventory()->create([
+            'stock_level' => $base['stock_qty'] ?? 0,
+            'reorder_level' => $reorderLevel,
+        ]);
 
         return redirect()->route('admin.materials.index')->with('success', 'Inks added successfully.');
     }
 
     public function edit(Ink $ink)
     {
-        return view('admin.inks.edit', compact('ink'));
+        $ink->loadMissing('inventory');
+        return view('admin.materials.edit_inks', compact('ink'));
     }
 
     public function update(Request $request, Ink $ink)
@@ -111,6 +120,7 @@ class InkController extends Controller
             'occasion.*' => 'string|in:all,wedding,birthday,baptism,corporate',
             'product_type' => 'required|string|in:invitation,giveaway',
             'ink_color' => 'required|string|max:50',
+            'material_type' => 'nullable|string|max:50',
             'stock_qty_ml' => 'nullable|integer|min:0',
             'stock_qty' => 'nullable|integer|min:0',
             'unit' => 'required|string|max:20',
@@ -119,16 +129,19 @@ class InkController extends Controller
             'avg_usage_per_invite_ml' => 'nullable|numeric|min:0',
             'cost_per_invite' => 'nullable|numeric|min:0',
             'description' => 'nullable|string|max:1000',
+            'reorder_level' => 'required|integer|min:0',
         ]);
 
         // Prepare update payload
+        $stockLevel = $validated['stock_qty'] ?? $ink->stock_qty ?? 0;
+        $reorderLevel = $validated['reorder_level'];
         $payload = [
             'material_name' => $validated['material_name'],
             'product_type' => $validated['product_type'],
             'ink_color' => $validated['ink_color'],
-            'material_type' => $validated['material_type'] ?? $ink->material_type,
+            'material_type' => $validated['material_type'] ?? $ink->material_type ?? 'ink',
             'stock_qty_ml' => $validated['stock_qty_ml'] ?? $ink->stock_qty_ml,
-            'stock_qty' => $validated['stock_qty'] ?? $ink->stock_qty ?? 0,
+            'stock_qty' => $stockLevel,
             'unit' => $validated['unit'] ?? $ink->unit,
             'size' => $validated['size'] ?? $ink->size,
             'cost_per_ml' => $validated['cost_per_ml'],
@@ -151,6 +164,18 @@ class InkController extends Controller
                 $payload['occasion'] = $selected;
             }
             $ink->update($payload);
+        }
+
+        if ($ink->inventory) {
+            $ink->inventory->update([
+                'stock_level' => $stockLevel,
+                'reorder_level' => $reorderLevel,
+            ]);
+        } else {
+            $ink->inventory()->create([
+                'stock_level' => $stockLevel,
+                'reorder_level' => $reorderLevel,
+            ]);
         }
 
         return redirect()->route('admin.materials.index')->with('success', 'Ink updated successfully.');

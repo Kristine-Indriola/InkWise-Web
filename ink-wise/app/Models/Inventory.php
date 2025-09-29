@@ -15,6 +15,7 @@ class Inventory extends Model
 
     protected $fillable = [
         'material_id',
+        'ink_id',
         'stock_level',
         'reorder_level',
         'remarks',
@@ -38,5 +39,10 @@ class Inventory extends Model
     public function material()
     {
         return $this->belongsTo(Material::class, 'material_id');
+    }
+
+    public function ink()
+    {
+        return $this->belongsTo(Ink::class, 'ink_id');
     }
 }

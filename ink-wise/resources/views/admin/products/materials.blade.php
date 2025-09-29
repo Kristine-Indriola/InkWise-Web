@@ -3,7 +3,7 @@
 @section('title', 'Products Dashboard')
 
 @section('content')
-<div class="dashboard-container">
+<div class="dashboard-container admin-page-shell">
     <h1 class="page-title">Products</h1>
 
     <!-- Summary Cards -->

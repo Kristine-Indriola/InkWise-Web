@@ -82,4 +82,23 @@ class CustomerAuthController extends Controller
 
         return redirect()->route('dashboard'); // 👈 check if this route exists
     }
+
+    public function uploadDesign(Request $request)
+    {
+        $request->validate([
+            'design_file' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048', // 2MB max
+        ]);
+
+        if ($request->hasFile('design_file')) {
+            $file = $request->file('design_file');
+            $filename = time() . '_' . $file->getClientOriginalName();
+            $path = $file->storeAs('customer_uploads', $filename, 'public');
+
+            // You can save to database or session for later use
+            // For now, redirect to design edit page with the uploaded image
+            return redirect()->route('design.edit')->with('uploaded_image', $path);
+        }
+
+        return back()->withErrors(['design_file' => 'Upload failed.']);
+    }
 }
