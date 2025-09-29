@@ -4,15 +4,16 @@ use Illuminate\Support\Facades\Route;
 use Laravel\Socialite\Facades\Socialite;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AddressController;
+use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\MessageController;
-use App\Http\Controllers\TemplateController;
 //use App\Http\Controllers\OwnerLoginController;
 //use App\Http\Controllers\Auth\AdminLoginController;
 //use App\Http\Controllers\StaffAuthController;
 //use App\Http\Controllers\Staff\StaffLoginController;
 
-use App\Http\Controllers\Admin\InkController;
+use App\Http\Controllers\TemplateController;
 
+use App\Http\Controllers\Admin\InkController;
 use App\Http\Controllers\Owner\HomeController;
 use App\Http\Controllers\Owner\OwnerController;
 use App\Http\Controllers\StaffProfileController;
@@ -160,6 +161,14 @@ Route::prefix('users')->name('users.')->group(function () {
         // Optional: Add more customer routes (show/edit/delete) here later
     });
 
+    // Chatbot management routes
+    Route::prefix('chatbot')->name('chatbot.')->group(function () {
+        Route::get('/', [ChatbotController::class, 'index'])->name('index');
+        Route::post('/', [ChatbotController::class, 'store'])->name('store');
+        Route::put('/{qa}', [ChatbotController::class, 'update'])->name('update');
+        Route::delete('/{qa}', [ChatbotController::class, 'destroy'])->name('destroy');
+    });
+
     // Messages routes
 
     Route::get('messages', [MessageController::class, 'index'])->name('messages.index');
@@ -254,6 +263,13 @@ Route::get('customer/chat/unread-count', [MessageController::class, 'customerUnr
 
     Route::post('customer/chat/mark-read', [MessageController::class, 'customerMarkRead'])
         ->name('customer.chat.markread');
+
+
+Route::get('/chatbot/qas', [ChatbotController::class, 'getQAs'])->name('chatbot.qas');
+ Route::view('/chatbot', 'customer.chatbot')->name('chatbot');
+ Route::post('/chatbot/reply', [App\Http\Controllers\ChatbotController::class, 'reply'])
+    ->name('chatbot.reply');
+
         
 /**Customer Profile Pages*/
 Route::prefix('customerprofile')->group(function () {
@@ -445,6 +461,12 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
     Route::get('/profile/edit', [StaffProfileController::class, 'edit'])->name('profile.edit');
     Route::post('/profile/update', [StaffProfileController::class, 'update'])->name('profile.update');
 
+    Route::prefix('messages')->name('messages.')->group(function () {
+        Route::get('/', [MessageController::class, 'staffIndex'])->name('index');
+        Route::get('/{message}/thread', [MessageController::class, 'thread'])->name('thread');
+        Route::post('/{message}/reply', [MessageController::class, 'replyToMessage'])->name('reply');
+    });
+
     // ✅ fixed: remove the extra "staff" in URL and name
     Route::get('/customers', [StaffCustomerController::class, 'index'])
         ->name('customer_profile'); 
@@ -478,16 +500,18 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
 | Google OAuth (Temporary for Dev)                                        |
 |--------------------------------------------------------------------------|
 */
-Route::get('/auth/google/redirect', function () {
-    return Socialite::driver('google')->redirect();
-})->name('google.redirect');
+if (interface_exists('Laravel\\Socialite\\Contracts\\Factory')) {
+    Route::get('/auth/google/redirect', function () {
+        return app('Laravel\\Socialite\\Contracts\\Factory')->driver('google')->redirect();
+    })->name('google.redirect');
 
-Route::get('/auth/google/callback', function () {
-    $user = Socialite::driver('google')->user();
-    // You can dump user info for testing
-    // dd($user);
-    return 'Google login successful (dev placeholder)';
-})->name('google.callback');
+    Route::get('/auth/google/callback', function () {
+        $user = app('Laravel\\Socialite\\Contracts\\Factory')->driver('google')->user();
+        // You can dump user info for testing
+        // dd($user);
+        return 'Google login successful (dev placeholder)';
+    })->name('google.callback');
+}
 
 Route::middleware('auth')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
 

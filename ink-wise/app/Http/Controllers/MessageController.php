@@ -9,28 +9,60 @@ use Illuminate\Support\Facades\Schema;
 use App\Models\Message;
 use App\Models\Customer;
 use App\Models\User;
+use App\Models\Staff;
 
 class MessageController extends Controller
 {
-    // List all messages (show newest first) with sender/receiver lookup
-    public function index()
+    protected function resolveMessageActor(): ?array
+    {
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+        if ($user) {
+            return [
+                'id' => $user->getKey(),
+                'type' => 'user',
+                'name' => $user->name ?? 'Team',
+                'email' => $user->email ?? null,
+            ];
+        }
+
+        /** @var \App\Models\Staff|null $staff */
+        $staff = Auth::guard('staff')->user();
+        if ($staff) {
+            $fullName = trim(collect([$staff->first_name, $staff->last_name])->filter()->implode(' '));
+            $staffUser = $staff->relationLoaded('user') ? $staff->user : $staff->user()->first();
+            return [
+                'id' => $staff->getKey(),
+                'type' => 'staff',
+                'name' => $fullName ?: 'Staff',
+                'email' => optional($staffUser)->email,
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * Prepare data required to render the threaded message list for admin/staff inbox views.
+     */
+    protected function messageListingData(): array
     {
         // get messages (newest first)
         $messages = Message::orderBy('created_at', 'desc')->get();
 
         // collect customer and user ids referenced in messages
-        $customerIds = $messages->filter(function($m){
+        $customerIds = $messages->filter(function ($m) {
             return strtolower($m->sender_type) === 'customer' || strtolower($m->receiver_type) === 'customer';
-        })->flatMap(function($m){
+        })->flatMap(function ($m) {
             return [
                 strtolower($m->sender_type) === 'customer' ? $m->sender_id : null,
                 strtolower($m->receiver_type) === 'customer' ? $m->receiver_id : null,
             ];
         })->filter()->unique()->values()->all();
 
-        $userIds = $messages->filter(function($m){
+        $userIds = $messages->filter(function ($m) {
             return strtolower($m->sender_type) === 'user' || strtolower($m->receiver_type) === 'user';
-        })->flatMap(function($m){
+        })->flatMap(function ($m) {
             return [
                 strtolower($m->sender_type) === 'user' ? $m->sender_id : null,
                 strtolower($m->receiver_type) === 'user' ? $m->receiver_id : null,
@@ -50,7 +82,32 @@ class MessageController extends Controller
             ->get()
             ->keyBy($userKey);
 
-        return view('admin.messages.index', compact('messages', 'customers', 'users'));
+        return compact('messages', 'customers', 'users');
+    }
+
+    protected function renderMessageIndex(string $view, array $data = [])
+    {
+        return view($view, $data + $this->messageListingData());
+    }
+
+    // List all messages (show newest first) with sender/receiver lookup
+    public function index()
+    {
+        return $this->renderMessageIndex('admin.messages.index', [
+            'layout' => 'layouts.admin',
+            'threadRouteName' => 'admin.messages.thread',
+            'replyRouteName' => 'admin.messages.reply',
+        ]);
+    }
+
+    // Staff view of messages shares the same data but different layout/view path
+    public function staffIndex()
+    {
+        return $this->renderMessageIndex('staff.messages.index', [
+            'layout' => 'layouts.staffapp',
+            'threadRouteName' => 'staff.messages.thread',
+            'replyRouteName' => 'staff.messages.reply',
+        ]);
     }
 
     // Show chat with a specific customer
@@ -78,16 +135,17 @@ class MessageController extends Controller
         ]);
 
         $customer = Customer::findOrFail($customerId);
-        $admin = Auth::user();
+        $actor = $this->resolveMessageActor();
+        abort_unless($actor, 403);
 
         Message::create([
-            'sender_id'     => $admin->getKey(),
-            'sender_type'   => 'user',
+            'sender_id'     => $actor['id'],
+            'sender_type'   => $actor['type'],
             'receiver_id'   => $customer->getKey(),
             'receiver_type' => 'customer',
             'message'       => $request->input('message'),
-            'name'          => $admin->name ?? 'Admin',
-            'email'         => $admin->email ?? null,
+            'name'          => $actor['name'],
+            'email'         => $actor['email'],
         ]);
 
         return redirect()->route('admin.messages.chat', $customer->getKey())->with('success', 'Message sent.');
@@ -167,21 +225,20 @@ class MessageController extends Controller
         try {
             $original = Message::findOrFail($messageId);
             $replyText = $request->input('message');
-            $admin = Auth::user();
-            $adminName = $admin->name ?? 'Admin';
-            $adminEmail = $admin->email ?? null;
+            $actor = $this->resolveMessageActor();
+            abort_unless($actor, 403);
 
             // Save reply only (no email)
             if (strtolower($original->sender_type ?? '') === 'guest') {
                 // reply saved as from admin (user) to guest (keep guest email on original)
                 $reply = Message::create([
-                    'sender_id'     => $admin->getKey(),
-                    'sender_type'   => 'user',
+                    'sender_id'     => $actor['id'],
+                    'sender_type'   => $actor['type'],
                     'receiver_id'   => null,
                     'receiver_type' => 'guest',
                     'message'       => $replyText,
                     'email'         => $original->email,       // guest email (required)
-                    'name'          => $adminName,             // admin name (required)
+                    'name'          => $actor['name'],
                 ]);
 
                 return response()->json(['status' => 'ok', 'reply' => $reply], 200);
@@ -189,13 +246,13 @@ class MessageController extends Controller
 
             if (strtolower($original->sender_type ?? '') === 'customer' && $original->sender_id) {
                 $reply = Message::create([
-                    'sender_id'     => $admin->getKey(),
-                    'sender_type'   => 'user',
+                    'sender_id'     => $actor['id'],
+                    'sender_type'   => $actor['type'],
                     'receiver_id'   => $original->sender_id,
                     'receiver_type' => 'customer',
                     'message'       => $replyText,
-                    'name'          => $adminName,
-                    'email'         => $adminEmail,
+                    'name'          => $actor['name'],
+                    'email'         => $actor['email'],
                 ]);
 
                 return response()->json(['status' => 'ok', 'reply' => $reply], 200);
@@ -203,13 +260,13 @@ class MessageController extends Controller
 
             // fallback - preserve original receiver_type/id but include admin name/email
             $reply = Message::create([
-                'sender_id'     => $admin->getKey(),
-                'sender_type'   => 'user',
+                'sender_id'     => $actor['id'],
+                'sender_type'   => $actor['type'],
                 'receiver_id'   => $original->receiver_id,
                 'receiver_type' => $original->receiver_type,
                 'message'       => $replyText,
-                'name'          => $adminName,
-                'email'         => $adminEmail,
+                'name'          => $actor['name'],
+                'email'         => $actor['email'],
             ]);
 
             return response()->json(['status' => 'ok', 'reply' => $reply], 200);

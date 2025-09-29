@@ -51,19 +51,7 @@
             </button>
         </form>
 
-        <!-- Divider -->
-        <div class="flex items-center my-4">
-            <hr class="flex-1 border-gray-300">
-            <span class="px-2 text-sm text-gray-500">or</span>
-            <hr class="flex-1 border-gray-300">
-        </div>
-
-        <!-- Google Login -->
-        <a href="{{ route('google.redirect') }}"
-           class="w-full flex items-center justify-center border border-gray-300 rounded-lg py-2 hover:bg-gray-50 transition">
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5 h-5 mr-2">
-            Continue with Google
-        </a>
+        {{-- Third-party login coming soon --}}
 
         <!-- Switch to Register -->
         <p class="text-center text-sm text-gray-600 mt-4">

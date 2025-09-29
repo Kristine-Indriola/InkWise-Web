@@ -656,15 +656,23 @@ body.dark-mode .btn-warning {
       <li>
         <a href="#"><i class="fi fi-rr-list-check"></i> <span class="label">Order Summaries</span></a>
       </li>
-      <li class="{{ request()->routeIs('admin.messages.*') ? 'active' : '' }}">
+      {{--<li class="{{ request()->routeIs('admin.messages.*') ? 'active' : '' }}">
         <a href="{{ route('admin.messages.index') }}"><i class="fi fi-rr-comment-dots"></i> <span class="label">Messages</span></a>
-      </li>
+      </li> --}}
       <li class="{{ request()->routeIs('admin.materials.*') ? 'active' : '' }}">
         <a href="{{ route('admin.materials.index') }}"><i class="fi fi-rr-blog-pencil"></i> <span class="label">Materials</span></a>
       </li>
       <li>
         <a href="#"><i class="fi fi-rr-document"></i> <span class="label">Reports</span></a>
       </li>
+
+          <li class="{{ request()->routeIs('admin.chatbot.index') ? 'active' : '' }}">
+  <a href="{{ route('admin.chatbot.index') }}">
+    <i class="fi fi-rr-comment-dots"></i>
+    <span class="label">Chatbot</span>
+  </a>
+</li>
+
     </ul>
   </div>
 
