@@ -7,16 +7,14 @@ use Illuminate\Support\Facades\DB;
 use App\Models\Product;
 use App\Models\Template;
 use App\Models\Material;
-use App\Models\Ink;
+use App\Models\ProductUpload;
 use Illuminate\Http\Request;
-use App\Models\ProductMaterial;
-use App\Models\ProductInk;
 
 class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $query = \App\Models\Product::with(['materials', 'inks']);
+        $query = \App\Models\Product::query();
 
         // Search
         if ($search = $request->query('q')) {
@@ -27,15 +25,10 @@ class ProductController extends Controller
             });
         }
 
-        // Filter by status
-        if ($status = $request->query('status')) {
-            if ($status !== 'all') {
-                $query->where('status', $status);
-            }
-        }
+        // Status filtering removed - status column no longer exists
 
         // Sorting
-        $allowedSorts = ['created_at','selling_price','quantity_ordered','name'];
+        $allowedSorts = ['created_at','name'];
         $sort = $request->query('sort', 'created_at');
         $order = $request->query('order', 'desc');
         if (!in_array($sort, $allowedSorts)) {
@@ -51,14 +44,20 @@ class ProductController extends Controller
         $products = $query->paginate($perPage)->appends($request->query());
 
         $totalProducts = \App\Models\Product::count();
-        $totalQuantity = \App\Models\Product::sum('quantity_ordered');
-    $totalSales = \App\Models\Product::sum(DB::raw('selling_price * quantity_ordered'));
-        $activeProducts = \App\Models\Product::where('status', 'active')->count();
-        $inactiveProducts = \App\Models\Product::where('status', 'inactive')->count();
+        $invitationCount = \App\Models\Product::where('product_type', 'Invitation')->count();
+        $giveawayCount = \App\Models\Product::where('product_type', 'Giveaway')->count();
+        $totalUploads = \App\Models\ProductUpload::count();
+        $totalQuantity = 0; // Column removed from table
+        $totalSales = 0; // Column removed from table
+        $activeProducts = 0; // Status column removed from table
+        $inactiveProducts = 0; // Status column removed from table
 
         return view('admin.products.index', compact(
             'products',
             'totalProducts',
+            'invitationCount',
+            'giveawayCount',
+            'totalUploads',
             'totalQuantity',
             'totalSales',
             'activeProducts',
@@ -114,8 +113,17 @@ class ProductController extends Controller
         // $products = Product::paginate(10); // Commented out for now
         $products = []; // Empty array for now
 
+        // Provide counts so the index view's summary cards render correctly even in this sample action
+        $totalProducts = \App\Models\Product::count();
+        $invitationCount = \App\Models\Product::where('product_type', 'Invitation')->count();
+        $giveawayCount = \App\Models\Product::where('product_type', 'Giveaway')->count();
+        $totalUploads = \App\Models\ProductUpload::count();
+
         // RETURN the admin.products.index view (was view('products.index'))
-        return view('admin.products.index', compact('sampleOrder','materials','printing','foil','lamination', 'products'));
+        return view('admin.products.index', compact(
+            'sampleOrder','materials','printing','foil','lamination', 'products',
+            'totalProducts','invitationCount','giveawayCount','totalUploads'
+        ));
     }
 
     /**
@@ -161,30 +169,74 @@ class ProductController extends Controller
             'productType' => 'required|string|max:255',
             'themeStyle' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'minOrderQtyCustomization' => 'nullable|integer|min:1',
+            'leadTime' => 'nullable|string|max:255',
+            'stockAvailability' => 'nullable|string|max:255',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
             'materials' => 'nullable|array',
+            'materials.*.type' => 'nullable|string|max:255',
             'materials.*.item' => 'nullable|string|max:255',
+            'materials.*.color' => 'nullable|string|max:255',
+            'materials.*.size' => 'nullable|string|max:255',
+            'materials.*.weight' => 'nullable|integer',
             'materials.*.unitPrice' => 'nullable|numeric',
-            'materials.*.qty' => 'nullable|integer',
-            'materials.*.cost' => 'nullable|numeric',
-            'inks' => 'nullable|array',
-            'inks.*.item' => 'nullable|string|max:255',
-            'inks.*.usage' => 'nullable|numeric',
-            'inks.*.costPerMl' => 'nullable|numeric',
-            'inks.*.qty' => 'nullable|numeric',
-            'inks.*.totalCost' => 'nullable|numeric',
         ]);
+
+        // Get the first material (if any) to store directly in products table
+        $material = $request->input('materials.0', []);
+
+        // Handle image upload
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            // Custom image uploaded
+            $imagePath = $request->file('image')->store('products', 'public');
+        } elseif ($request->input('template_id')) {
+            // No custom image, use template image
+            $template = \App\Models\Template::find($request->input('template_id'));
+            if ($template && $template->preview) {
+                // Copy template image to products directory
+                $templatePath = $template->preview;
+                if (!preg_match('/^(https?:)?\/\//i', $templatePath) && !str_starts_with($templatePath, '/')) {
+                    // It's a relative path in storage
+                    $sourcePath = storage_path('app/public/' . $templatePath);
+                    if (file_exists($sourcePath)) {
+                        $filename = 'products/template_' . $template->id . '_' . time() . '.' . pathinfo($sourcePath, PATHINFO_EXTENSION);
+                        $destinationPath = storage_path('app/public/' . $filename);
+                        if (copy($sourcePath, $destinationPath)) {
+                            $imagePath = $filename;
+                        }
+                    }
+                }
+            }
+        }
 
         // Create or update product
         if (!empty($validated['product_id'])) {
             $product = Product::findOrFail($validated['product_id']);
-            $product->update([
+            $updateData = [
                 'template_id' => $validated['template_id'] ?? null,
                 'name' => $validated['invitationName'],
                 'event_type' => $validated['eventType'],
                 'product_type' => $validated['productType'],
                 'theme_style' => $validated['themeStyle'],
                 'description' => $validated['description'] ?? $request->input('description',''),
-            ]);
+                'min_order_qty' => $validated['minOrderQtyCustomization'] ?? null,
+                'lead_time' => $validated['leadTime'] ?? null,
+                'stock_availability' => $validated['stockAvailability'] ?? null,
+                'type' => $material['type'] ?? null,
+                'item' => $material['item'] ?? null,
+                'color' => $material['color'] ?? null,
+                'size' => $material['size'] ?? null,
+                'weight' => $material['weight'] ?? null,
+                'unit_price' => $material['unitPrice'] ?? null,
+            ];
+            
+            // Only update image if a new one was uploaded
+            if ($imagePath) {
+                $updateData['image'] = $imagePath;
+            }
+            
+            $product->update($updateData);
         } else {
             $product = Product::create([
                 'template_id' => $validated['template_id'] ?? null,
@@ -193,86 +245,17 @@ class ProductController extends Controller
                 'product_type' => $validated['productType'],
                 'theme_style' => $validated['themeStyle'],
                 'description' => $validated['description'] ?? $request->input('description',''),
+                'image' => $imagePath,
+                'min_order_qty' => $validated['minOrderQtyCustomization'] ?? null,
+                'lead_time' => $validated['leadTime'] ?? null,
+                'stock_availability' => $validated['stockAvailability'] ?? null,
+                'type' => $material['type'] ?? null,
+                'item' => $material['item'] ?? null,
+                'color' => $material['color'] ?? null,
+                'size' => $material['size'] ?? null,
+                'weight' => $material['weight'] ?? null,
+                'unit_price' => $material['unitPrice'] ?? null,
             ]);
-        }
-
-        // Track existing ids to determine deletions
-        $existingMaterialIds = $product->materials()->pluck('id')->toArray();
-        $existingInkIds = $product->inks()->pluck('id')->toArray();
-
-        $receivedMaterialIds = [];
-        $receivedInkIds = [];
-
-        // Handle Materials: update existing or create new
-        if ($request->has('materials')) {
-            foreach ($request->materials as $idx => $material) {
-                // Support optional id if present for editing existing material
-                $matId = $material['id'] ?? null;
-                if (!empty($material['item'])) {
-                    $data = [
-                        'item'       => $material['item'],
-                        'type'       => $material['type'] ?? null,
-                        'color'      => $material['color'] ?? null,
-                        'size'       => $material['size'] ?? null,
-                        'weight'     => $material['weight'] ?? null,
-                        'unit_price' => $material['unitPrice'] ?? ($material['unit_price'] ?? null),
-                        'qty'        => $material['qty'] ?? null,
-                        'cost'       => $material['cost'] ?? null,
-                    ];
-
-                    if ($matId) {
-                        $pm = ProductMaterial::where('product_id', $product->id)->where('id', $matId)->first();
-                        if ($pm) {
-                            $pm->update($data);
-                            $receivedMaterialIds[] = $pm->id;
-                            continue;
-                        }
-                    }
-
-                    $new = $product->materials()->create($data);
-                    if ($new) $receivedMaterialIds[] = $new->id;
-                }
-            }
-        }
-
-        // Handle Inks: update existing or create new
-        if ($request->has('inks')) {
-            foreach ($request->inks as $idx => $ink) {
-                $inkId = $ink['id'] ?? null;
-                if (!empty($ink['item'])) {
-                    $data = [
-                        'item' => $ink['item'],
-                        'type' => $ink['type'] ?? null,
-                        'usage' => $ink['usage'] ?? null,
-                        'qty' => $ink['qty'] ?? null,
-                        'cost_per_ml' => $ink['costPerMl'] ?? ($ink['cost_per_ml'] ?? null),
-                        'total_cost' => $ink['totalCost'] ?? ($ink['total_cost'] ?? null),
-                    ];
-
-                    if ($inkId) {
-                        $pi = ProductInk::where('product_id', $product->id)->where('id', $inkId)->first();
-                        if ($pi) {
-                            $pi->update($data);
-                            $receivedInkIds[] = $pi->id;
-                            continue;
-                        }
-                    }
-
-                    $new = $product->inks()->create($data);
-                    if ($new) $receivedInkIds[] = $new->id;
-                }
-            }
-        }
-
-        // Delete removed materials/inks
-        $toDeleteMaterials = array_diff($existingMaterialIds, $receivedMaterialIds);
-        if (!empty($toDeleteMaterials)) {
-            ProductMaterial::whereIn('id', $toDeleteMaterials)->delete();
-        }
-
-        $toDeleteInks = array_diff($existingInkIds, $receivedInkIds);
-        if (!empty($toDeleteInks)) {
-            ProductInk::whereIn('id', $toDeleteInks)->delete();
         }
 
         // Return JSON for AJAX or redirect for normal
@@ -294,16 +277,16 @@ class ProductController extends Controller
     // Edit or show method
     public function edit($id)
     {
-        $product = Product::with(['materials', 'inks'])->findOrFail($id);
+        $product = Product::findOrFail($id);
         $templates = Template::all();
         $materials = Material::all();
         return view('admin.products.create-invitation', compact('product', 'templates', 'materials'));
     }
 
     // Show product (used by AJAX slide panel)
-    public function show($id)
+    public function view($id)
     {
-        $product = Product::with(['materials', 'inks', 'template'])->findOrFail($id);
+        $product = Product::with(['template'])->findOrFail($id);
 
         // If request expects JSON or is AJAX, return the partial HTML for the slide panel
         if (request()->ajax() || request()->wantsJson() || request()->header('X-Requested-With') === 'XMLHttpRequest') {
@@ -312,5 +295,45 @@ class ProductController extends Controller
 
         // Otherwise render a simple page with the slide panel (use layout)
         return view('admin.products.view', compact('product'));
+    }
+
+    public function upload(Request $request, $id)
+    {
+        $product = Product::findOrFail($id);
+
+        $request->validate([
+            'file' => 'required|file|mimes:jpg,jpeg,png,gif,pdf|max:10240', // 10MB max
+        ]);
+
+        if ($request->hasFile('file')) {
+            $file = $request->file('file');
+            $filename = time() . '_' . $file->getClientOriginalName();
+            $path = $file->storeAs('uploads/products/' . $id, $filename, 'public');
+
+            // Save to database
+            $upload = ProductUpload::create([
+                'product_id' => $product->id,
+                'filename' => $filename,
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getMimeType(),
+                'size' => $file->getSize(),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'File uploaded successfully.',
+                'upload' => $upload
+            ]);
+        }
+
+        return response()->json(['success' => false, 'message' => 'No file uploaded.'], 400);
+    }
+
+    public function weddinginvite($id)
+    {
+        $product = Product::with('uploads')->findOrFail($id);
+        // Reuse the customer-facing wedding invite template and supply a products collection
+        $products = collect([$product]);
+        return view('customer.Invitations.weddinginvite', compact('products'));
     }
 }

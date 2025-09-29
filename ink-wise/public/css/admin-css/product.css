@@ -2,15 +2,31 @@
    GLOBAL STYLES
 ================================== */
 .root, :root {
-    --primary-color: #94b9ff;
-    --primary-hover: #7aa8e8;
-    --background-light: #f9fafb;
-    --text-secondary: #6b7280;
-    --border-color: #d1d5db;
-    --background-white: #fff;
-    --shadow-color: rgba(0, 0, 0, 0.1);
-    --green: #28a745;
-    --red: #dc3545;
+    --admin-font: 'Poppins', 'Nunito', sans-serif;
+    --admin-accent: #94b9ff;
+    --admin-accent-strong: #5a8de0;
+    --admin-accent-soft: rgba(148, 185, 255, 0.18);
+    --admin-text-primary: #0f172a;
+    --admin-text-secondary: #6b7280;
+    --admin-gradient-bg: linear-gradient(135deg, #f3f6ff 0%, #f7fff6 100%);
+    --admin-surface: #ffffff;
+    --admin-surface-muted: #f9fafb;
+    --admin-border: rgba(148, 185, 255, 0.28);
+    --admin-shadow-soft: 0 18px 36px rgba(15, 23, 42, 0.08);
+    --admin-shadow-hover: 0 24px 48px rgba(15, 23, 42, 0.12);
+    --admin-success: #23b26d;
+    --admin-danger: #ef4444;
+
+    /* legacy aliases */
+    --primary-color: var(--admin-accent);
+    --primary-hover: var(--admin-accent-strong);
+    --background-light: var(--admin-surface-muted);
+    --text-secondary: var(--admin-text-secondary);
+    --border-color: var(--admin-border);
+    --background-white: var(--admin-surface);
+    --shadow-color: rgba(15, 23, 42, 0.08);
+    --green: var(--admin-success);
+    --red: var(--admin-danger);
 }
 
 /* compact base font sizing */
@@ -19,26 +35,96 @@ html { font-size: 12px; }
 body {
     margin: 0;
     padding: 0;
-    font-family: 'Poppins', sans-serif;
-    background-color: #f3f4f6;
-    color: #111827;
+    font-family: var(--admin-font);
+    background: var(--admin-surface-muted);
+    color: var(--admin-text-primary);
 }
 
 .dashboard-container {
     padding: 20px;
-<<<<<<< HEAD
-    max-width: 1200px;
-    margin: 0 auto;
-=======
-    max-width: 1500px;
-    margin: auto;
->>>>>>> origin/dashboard17
+    font-family: var(--admin-font);
+    color: var(--admin-text-primary);
+}
+
+.admin-page-shell {
+    padding: 28px;
+    font-family: var(--admin-font);
+    background: var(--admin-gradient-bg);
+    border-radius: 24px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    min-height: calc(100vh - 112px);
+    box-sizing: border-box;
 }
 
 .page-title {
     font-size: 1.6rem;
     font-weight: 700;
     margin-bottom: 20px;
+}
+
+/* ================================
+   SUMMARY CARDS
+================================== */
+.summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin: 20px 0;
+}
+
+.summary-card {
+    background: var(--background-white);
+    border-radius: 18px;
+    padding: 20px 22px;
+    border: 1px solid var(--admin-border);
+    box-shadow: var(--admin-shadow-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    position: relative;
+    overflow: hidden;
+}
+
+.summary-card::after {
+    content: "";
+    position: absolute;
+    left: 20px;
+    right: 20px;
+    bottom: 12px;
+    height: 4px;
+    border-radius: 99px;
+    background: linear-gradient(90deg, rgba(148,185,255,0.42), rgba(122,168,232,0.6));
+}
+
+.summary-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.summary-card-label {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.summary-card-chip {
+    background: var(--admin-accent-soft);
+    color: var(--admin-accent-strong);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.summary-card-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #0f172a;
 }
 
 /* summary-cards and table UI removed: styles intentionally omitted */
@@ -48,9 +134,44 @@ body {
 ================================== */
 .search-and-add {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
+    align-items: center;
     margin: 20px 0;
     position: relative;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.filter-buttons {
+    display: inline-flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.filter-btn {
+    background: transparent;
+    border: 1px solid var(--admin-border);
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-weight: 600;
+    color: var(--admin-accent-strong);
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.filter-btn:hover,
+.filter-btn:focus {
+    background: var(--admin-accent-soft);
+    box-shadow: 0 10px 20px rgba(15,23,42,0.1);
+    outline: none;
+}
+
+.filter-btn.active {
+    background: var(--admin-accent);
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 14px 26px rgba(14,46,120,0.18);
 }
 
 .add-buttons {
@@ -58,30 +179,26 @@ body {
 }
 
 .btn-add-new {
-    background: var(--primary-color);
+    background: var(--admin-accent);
     color: #fff;
     border: none;
     padding: 12px 18px;
-    border-radius: 8px;
+    border-radius: 12px;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
     position: relative;
+    box-shadow: 0 12px 24px rgba(148, 185, 255, 0.32);
 }
 
 .btn-add-new:hover {
-    background: var(--primary-hover);
+    background: var(--admin-accent-strong);
+    transform: translateY(-2px);
 }
 
 .btn-add-new:focus {
-    outline: 2px solid var(--primary-hover);
+    outline: 2px solid var(--admin-accent-strong);
     outline-offset: 2px;
-}
-
-.btn-add-new::after {
-    content: "▼";
-    margin-left: 8px;
-    font-size: 0.8rem;
 }
 
 .floating-buttons {
@@ -164,220 +281,35 @@ body {
     outline-offset: 2px;
 }
 
-<<<<<<< HEAD
-/* ================================
-   PRODUCTS TABLE
-================================== */
-.table-container {
-    background: #fff;
-    border-radius: 12px;
-    padding: 18px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    overflow-x: auto;
-}
-=======
 /* products table styles removed (grid-only UI now) */
->>>>>>> origin/dashboard17
 
 /* ================================
-   WHITE BACKGROUND CONTAINER
-   Wrap the grid in a subtle white card so the grid reads as a single panel
+   WHITE BACKGROUND / PAGINATION
+   Table-specific UI removed: keep grid container and pagination layout minimal.
+   The detailed table and modal styles were moved into the AJAX partials
+   (if any) or intentionally removed to avoid duplication.
 =================================== */
+
+/* Keep a lightweight container for the products grid */
 .table-container {
     background: var(--background-white);
-    border-radius: 12px;
-    padding: 18px;
-    box-shadow: 0 8px 24px rgba(2,6,23,0.06);
-    border: 1px solid rgba(2,6,23,0.04);
+    border-radius: 20px;
+    padding: 22px;
+    box-shadow: var(--admin-shadow-soft);
+    border: 1px solid var(--admin-border);
     margin-top: 12px;
 }
-.table-container h2 {
-    margin: 0 0 12px 0;
-    font-size: 1.05rem;
-    color: #111827;
-    font-weight: 700;
-}
-.table-container .products-grid {
-    margin-top: 0; /* grid sits inside the padded container */
-}
+.table-container h2 { margin: 0 0 12px 0; font-size: 1.05rem; color: var(--admin-text-primary); font-weight: 700; }
+.table-container .products-grid { margin-top: 0; }
 
-<<<<<<< HEAD
-.products-table th,
-.products-table td {
-    padding: 12px 10px;
-    border-bottom: 1px solid #e5e7eb;
-    text-align: left;
-}
-
-.products-table th {
-    background: #f9fafb;
-    font-weight: 600;
-    font-size: 0.95rem;
-}
-
-.product-thumb {
-    width: 36px;
-    height: 36px;
-    border-radius: 6px;
-    margin-right: 8px;
-    vertical-align: middle;
-    object-fit: cover;
-}
-
-/* Product meta (image + text) */
-.product-meta {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-.product-meta-text {
-    display: flex;
-    flex-direction: column;
-}
-.product-name {
-    font-size: 13px;
-}
-.product-desc {
-    color: #6b7280;
-    font-size: 11px;
-}
-
-/* ================================
-   PRODUCTS GRID / CARDS
-   Modern responsive grid for product cards used in the admin index
-==================================== */
-.products-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 16px;
-    align-items: start;
-}
-
-.product-card {
-    background: var(--background-white);
-    border-radius: 12px;
-    box-shadow: 0 6px 18px rgba(16,24,40,0.04);
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    min-height: 150px;
-    transition: transform .12s ease, box-shadow .12s ease;
-}
-.product-card:hover { transform: translateY(-4px); box-shadow: 0 14px 30px rgba(16,24,40,0.06); }
-
-.product-card-media {
-    width: 100%;
-    height: 140px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    border-radius: 8px;
-    margin-bottom: 10px;
-    background: #fbfdff;
-}
-
-.product-card-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
-
-.product-card-body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 6px; }
-.product-card-title { font-size: 1rem; margin: 0; font-weight: 700; color: #0f172a; }
-.product-card-desc { color: var(--text-secondary); font-size: 0.88rem; margin: 0; }
-.product-card-meta { font-size: 0.82rem; color: var(--text-secondary); display: flex; gap: 8px; align-items: center; }
-
-.product-card-footer { display: flex; align-items: center; gap: 10px; margin-top: 10px; justify-content: space-between; }
-.product-card-footer .price { font-weight: 800; color: #0f172a; }
-.product-card-footer .qty { color: var(--text-secondary); font-size: 0.9rem; }
-.card-actions { display: flex; gap: 6px; align-items: center; margin-left: auto; }
-
-.status-wrap .status { padding: 4px 8px; border-radius: 8px; background: #f3f4f6; font-size: 0.82rem; color: #0f172a; }
-
-/* Hide Active status badges (keep other statuses visible) */
-.status.status-active { display: none !important; }
-
-/* small tweaks for compact cards */
-@media (max-width: 720px) {
-    .products-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
-    .product-card-media { height: 120px; }
-}
-
-@media (max-width: 420px) {
-    .products-grid { grid-template-columns: 1fr; }
-    .product-card { padding: 10px; }
-    .product-card-media { height: 160px; }
-}
-
-/* Action Buttons */
-.btn-view, .btn-update, .btn-delete {
-    padding: 6px 12px;
-    border: none;
-    border-radius: 6px;
-    margin-right: 4px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    font-weight: 600;
-    transition: background 0.2s;
-    color: #fff;
-}
-
-.btn-view { background: var(--primary-color); }
-.btn-update { background: var(--primary-color); }
-.btn-delete { background: var(--primary-color); }
-
-.btn-view:hover, .btn-update:hover, .btn-delete:hover { background: var(--primary-hover); }
-
-.btn-view:focus, .btn-update:focus, .btn-delete:focus {
-    outline: 2px solid var(--primary-hover);
-    outline-offset: 2px;
-}
-=======
->>>>>>> origin/dashboard17
-
-/* ================================
-   PAGINATION
-================================== */
-.table-pagination {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 16px;
-    flex-wrap: wrap;
-    gap: 12px;
-}
-
-.entries-info {
-    font-size: 0.9rem;
-    color: #6b7280;
-}
-
-.pagination-links {
-    display: flex;
-    gap: 6px;
-}
-
-.page-link {
-    padding: 6px 10px;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    background: #fff;
-    cursor: pointer;
-    font-size: 0.9rem;
-    transition: background 0.2s;
-}
-
-.page-link:hover {
-    background: #f3f4f6;
-}
-
-.page-link:focus {
-    outline: 2px solid var(--primary-hover);
-    outline-offset: 2px;
-}
-
-.page-link.active {
-    background: var(--primary-color); /* Update active pagination */
-    color: #fff;
-    border-color: var(--primary-color);
-}
+/* Simple pagination layout (keeps responsive behaviour) */
+.table-pagination { display:flex; justify-content:space-between; align-items:center; margin-top:16px; flex-wrap:wrap; gap:12px; }
+.entries-info { font-size:0.9rem; color:#6b7280; }
+.pagination-links { display:flex; gap:6px; }
+.page-link { padding:6px 10px; border:1px solid #d1d5db; border-radius:6px; background:#fff; cursor:pointer; font-size:0.9rem; transition: background .2s; }
+.page-link:hover { background:#f3f4f6; }
+.page-link:focus { outline:2px solid var(--primary-hover); outline-offset:2px; }
+.page-link.active { background:var(--primary-color); color:#fff; border-color:var(--primary-color); }
 
 /* ================================
    LOADING SPINNER
@@ -398,15 +330,6 @@ body {
    Ensure the product admin layout resizes nicely
 =================================== */
 
-<<<<<<< HEAD
-
-/* make container adapt to viewport while keeping comfortable margins */
-.dashboard-container { max-width: 1200px; width: calc(100% - 48px); padding: 20px 24px; box-sizing: border-box; }
-.table-container { padding: 18px; }
-.table-container table { min-width: 920px; }
-
-/* compact table spacing on narrower screens */
-=======
 /* make container adapt to viewport while keeping comfortable margins */
 .dashboard-container {
     max-width: 1500px;
@@ -416,34 +339,28 @@ body {
 }
 
 /* Remove table-specific styles; keep responsive helpers for grid/cards */
->>>>>>> origin/dashboard17
 @media (max-width: 1024px) {
     .dashboard-container { padding: 16px; }
+    .admin-page-shell { padding: 24px; }
     .floating-buttons { min-width: 150px; }
 }
 
 @media (max-width: 768px) {
     .dashboard-container { width: calc(100% - 32px); padding: 12px; }
+    .admin-page-shell { padding: 20px; width: calc(100% - 36px); }
     .search-and-add { justify-content: space-between; align-items: center; }
     .filter-group select { padding: 6px; }
-<<<<<<< HEAD
-    .table-container table { min-width: 720px; }
-    .product-thumb { width: 36px; height: 36px; }
-    .product-name { font-size: 13px; }
-    .product-desc { font-size: 11px; }
-    .btn-view, .btn-update, .btn-delete { padding: 6px 8px; font-size: 0.85rem; }
-=======
->>>>>>> origin/dashboard17
+    .summary-card { padding: 16px 18px; }
+    .giveaways-container { padding: 18px; }
 }
 
 @media (max-width: 520px) {
-<<<<<<< HEAD
-    /* For small screens the grid layout is preferred; ensure spacing is compact */
-=======
     .product-card { border-radius: 8px; }
     .product-card-media { height: 120px; }
->>>>>>> origin/dashboard17
     .table-pagination { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .filter-buttons { width: 100%; }
+    .filter-btn { flex: 1 1 auto; text-align: center; }
+    .admin-page-shell { padding: 18px; width: 100%; }
 }
 
 /* ================================
@@ -454,6 +371,41 @@ body {
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     gap: 16px;
     margin-top: 12px;
+}
+
+.giveaways-container {
+    margin-top: 28px;
+    background: var(--background-white);
+    border-radius: 14px;
+    padding: 22px;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(2,6,23,0.05);
+}
+
+.giveaways-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 18px;
+}
+
+.giveaways-header h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.giveaways-subtitle {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.giveaways-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
 }
 .product-card {
     display: flex;
@@ -556,23 +508,8 @@ body {
     .product-card .card-actions button { padding: 6px; font-size: 0.88rem; }
 }
 
-/* ================================
-     MODAL STYLES (moved from AJAX partial)
-=================================== */
-.product-modal { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: center; justify-content: center; }
-.product-modal .modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.45); backdrop-filter: blur(2px); }
-.product-modal .modal-content { position: relative; z-index: 2; width: 92%; max-width: 1100px; max-height: 90vh; overflow: auto; background: #fff; border-radius: 12px; box-shadow: 0 18px 50px rgba(2,6,23,0.4); display: flex; flex-direction: column; transform: translateY(8px) scale(.995); opacity:0; }
-.product-modal .modal-header { display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid #eef2f6; }
-.product-modal .modal-body { padding: 16px 18px; display:flex; gap:18px; flex-wrap:wrap; }
-.product-modal .modal-image { flex: 1 1 360px; min-width:280px; max-width:460px; }
-.product-modal .modal-image img { width:100%; height:320px; object-fit:cover; border-radius:8px; background:#f3f4f6; }
-.product-modal .thumbnails { margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; }
-.product-modal .thumb { border:0; padding:0; background:transparent; cursor:pointer; }
-.product-modal .thumb img { width:64px; height:48px; object-fit:cover; border-radius:6px; border:2px solid transparent; }
-.product-modal .thumb.selected img { border-color: #94b9ff; }
-.product-modal .modal-info { flex:1 1 320px; min-width:240px; }
-.product-modal .modal-footer { display:flex; gap:8px; padding:12px 18px; border-top:1px solid #eef2f6; justify-content:flex-end; }
-.product-modal .btn-close { background:transparent; border:0; font-size:20px; cursor:pointer; }
+/* NOTE: Modal styles are kept in the AJAX partials (e.g. view.blade.php) where needed
+    to avoid duplication and ensure the injected panel carries its own styling. */
 
 /* Enter/Exit animations for modal */
 .modal-enter { animation: modalIn .22s cubic-bezier(.2,.9,.2,1) forwards; }

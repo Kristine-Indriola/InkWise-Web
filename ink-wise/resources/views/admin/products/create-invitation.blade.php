@@ -33,22 +33,18 @@
         </li>
         <li class="breadcrumb-item">
             <button type="button" id="breadcrumb-step3" class="breadcrumb-step" aria-live="polite" onclick="Navigation.showPage(2)">
-                Customization
+                Production
             </button>
             <span class="breadcrumb-separator" aria-hidden="true">›</span>
         </li>
-        <li class="breadcrumb-item">
-            <button type="button" id="breadcrumb-step4" class="breadcrumb-step" aria-live="polite" onclick="Navigation.showPage(3)">
-                Production
-            </button>
-        </li>
+        
     </ol>
 </nav>
 
 {{-- Page Title --}}
 <h1 id="page-title">Templates</h1>
 
-<form method="POST" action="{{ route('admin.products.store') }}" id="invitation-form">
+<form method="POST" action="{{ route('admin.products.store') }}" id="invitation-form" enctype="multipart/form-data">
     @csrf
     @if(isset($product) && $product->id)
         <input type="hidden" id="product_id" name="product_id" value="{{ $product->id }}">
@@ -64,8 +60,8 @@
         {{-- Page 1: Templates --}}
         @include('admin.products.templates')
 
-        {{-- Page 2: Basic Info --}}
-        <div class="page page2" data-page="2" style="display: none;">
+    {{-- Page 2: Basic Info --}}
+    <div class="page page2" data-page="1" style="display: none;">
             <div class="error-summary" style="display: none;" role="alert" aria-live="polite">
                 <h3>Please correct the following errors:</h3>
                 <ul id="error-list-page2"></ul>
@@ -111,6 +107,8 @@
                 </div>
             </div>
 
+            {{-- Description (moved below Materials) --}}
+
             {{-- Materials --}}
             <div class="form-section">
                 <h2>Materials</h2>
@@ -121,46 +119,45 @@
                             $materialRows = old('materials', isset($product) ? $product->materials->toArray() : [ [] ]);
                         @endphp
                         @foreach($materialRows as $i => $material)
-                        <div class="material-row">
+                        <div class="material-row" data-row-index="{{ $i }}">
                             <input type="hidden" name="materials[{{ $i }}][id]" value="{{ old('materials.'.$i.'.id', $material['id'] ?? '') }}">
                             <div class="input-row">
                                 <div class="field">
-                                    <label for="materials_{{ $i }}_item">Material Name</label>
-                                    <input type="text" id="materials_{{ $i }}_item" name="materials[{{ $i }}][item]" value="{{ old('materials.'.$i.'.item', $material['item'] ?? '') }}">
-                                </div>
-                                <div class="field">
-                                    <label for="materials_{{ $i }}_type">Product Type</label>
-                                    <input type="text" id="materials_{{ $i }}_type" name="materials[{{ $i }}][type]" placeholder="Type" aria-describedby="materials_{{ $i }}_type-error" value="{{ old('materials.'.$i.'.type', $material['type'] ?? '') }}">
+                                    <label for="materials_{{ $i }}_type">Material Type</label>
+                                    <select id="materials_{{ $i }}_type" name="materials[{{ $i }}][type]" data-current="{{ old('materials.'.$i.'.type', $material['type'] ?? '') }}" aria-describedby="materials_{{ $i }}_type-error"></select>
                                     <span id="materials_{{ $i }}_type-error" class="error-message"></span>
                                 </div>
                                 <div class="field">
+                                    <label for="materials_{{ $i }}_item">Material Name</label>
+                                    <select id="materials_{{ $i }}_item" name="materials[{{ $i }}][item]" data-current="{{ old('materials.'.$i.'.item', $material['item'] ?? '') }}" aria-describedby="materials_{{ $i }}_item-error"></select>
+                                    <span id="materials_{{ $i }}_item-error" class="error-message"></span>
+                                </div>
+                                <div class="field">
                                     <label for="materials_{{ $i }}_color">Color</label>
-                                    <input type="text" id="materials_{{ $i }}_color" name="materials[{{ $i }}][color]" placeholder="Color" aria-describedby="materials_{{ $i }}_color-error" value="{{ old('materials.'.$i.'.color', $material['color'] ?? '') }}">
+                                    <input type="text" id="materials_{{ $i }}_color" name="materials[{{ $i }}][color]" value="{{ old('materials.'.$i.'.color', $material['color'] ?? '') }}" readonly aria-describedby="materials_{{ $i }}_color-error">
                                     <span id="materials_{{ $i }}_color-error" class="error-message"></span>
                                 </div>
                                 <div class="field">
                                     <label for="materials_{{ $i }}_size">Size</label>
-                                    <input type="text" id="materials_{{ $i }}_size" name="materials[{{ $i }}][size]" placeholder="Size" aria-describedby="materials_{{ $i }}_size-error" value="{{ old('materials.'.$i.'.size', $material['size'] ?? '') }}">
+                                    <input type="text" id="materials_{{ $i }}_size" name="materials[{{ $i }}][size]" value="{{ old('materials.'.$i.'.size', $material['size'] ?? '') }}" aria-describedby="materials_{{ $i }}_size-error" placeholder="e.g., 5x7 in">
                                     <span id="materials_{{ $i }}_size-error" class="error-message"></span>
                                 </div>
                                 <div class="field">
                                     <label for="materials_{{ $i }}_weight">Weight (GSM)</label>
-                                    <input type="number" id="materials_{{ $i }}_weight" name="materials[{{ $i }}][weight]" placeholder="Weight (GSM)" aria-describedby="materials_{{ $i }}_weight-error" value="{{ old('materials.'.$i.'.weight', $material['weight'] ?? '') }}">
+                                    <input type="text" id="materials_{{ $i }}_weight" name="materials[{{ $i }}][weight]" value="{{ old('materials.'.$i.'.weight', $material['weight'] ?? '') }}" readonly aria-describedby="materials_{{ $i }}_weight-error">
                                     <span id="materials_{{ $i }}_weight-error" class="error-message"></span>
                                 </div>
                             </div>
                             <div class="input-row">
                                 <div class="field">
-                                    <label for="materials_{{ $i }}_unitPrice">Unit Price</label>
-                                    <input type="number" id="materials_{{ $i }}_unitPrice" name="materials[{{ $i }}][unitPrice]" placeholder="Unit Price" aria-describedby="materials_{{ $i }}_unitPrice-error" value="{{ old('materials.'.$i.'.unitPrice', $material['unitPrice'] ?? $material['unit_price'] ?? '') }}">
-                                    <span id="materials_{{ $i }}_unitPrice-error" class="error-message"></span>
+                                    <label for="materials_{{ $i }}_unit">Unit</label>
+                                    <input type="text" id="materials_{{ $i }}_unit" name="materials[{{ $i }}][unit]" value="{{ old('materials.'.$i.'.unit', $material['unit'] ?? '') }}" readonly>
                                 </div>
                                 <div class="field">
-                                    <label for="materials_{{ $i }}_usage">Usage per invite (ml)</label>
-                                    <input type="number" step="0.01" id="materials_{{ $i }}_usage" name="materials[{{ $i }}][usage]" placeholder="Usage per invite (ml)" aria-describedby="materials_{{ $i }}_usage-error" value="{{ old('materials.'.$i.'.usage', $material['usage'] ?? '') }}">
-                                    <span id="materials_{{ $i }}_usage-error" class="error-message"></span>
+                                    <label for="materials_{{ $i }}_unitPrice">Unit Price</label>
+                                    <input type="number" step="0.01" id="materials_{{ $i }}_unitPrice" name="materials[{{ $i }}][unitPrice]" value="{{ old('materials.'.$i.'.unitPrice', $material['unitPrice'] ?? '') }}" readonly aria-describedby="materials_{{ $i }}_unitPrice-error">
+                                    <span id="materials_{{ $i }}_unitPrice-error" class="error-message"></span>
                                 </div>
-                                
                                 <button class="add-row" type="button" aria-label="Add another material row">+</button>
                                 <button class="remove-row" type="button" aria-label="Remove this material row">−</button>
                             </div>
@@ -168,10 +165,10 @@
                         @endforeach
                     </div>
                 </div>
-                {{-- Ink inputs removed; usage moved into materials rows --}}
+               
             </div>
 
-            {{-- Description --}}
+            {{-- Description (moved below Materials) --}}
             <div class="form-section">
                 <h2>Description</h2>
                 <div class="editor-toolbar">
@@ -181,7 +178,7 @@
                     <button type="button" class="editor-btn" data-command="redo" aria-label="Redo"><i class="fas fa-redo"></i></button>
                 </div>
                 <textarea id="description" name="description" style="display:none;" aria-describedby="description-error">{{ old('description', $selectedTemplate->description ?? '') }}</textarea>
-                <div contenteditable="true" class="editor-content" id="description-editor" aria-label="Description editor" aria-describedby="description-error"></div>
+                <div contenteditable="true" class="editor-content" id="description-editor" aria-label="Description editor" aria-describedby="description-error">{{ old('description', $selectedTemplate->description ?? '') }}</div>
                 <span id="description-error" class="error-message"></span>
             </div>
 
@@ -190,14 +187,16 @@
             </div>
         </div>
 
-        {{-- Page 3: Customization --}}
-        <div class="page page3" data-page="3" style="display: none;">
+    {{-- Page 3: Production --}}
+    <div class="page page3" data-page="2" style="display: none;">
+
             <div class="error-summary" style="display: none;" role="alert" aria-live="polite">
                 <h3>Please correct the following errors:</h3>
                 <ul id="error-list-page3"></ul>
             </div>
+            {{-- Production Details moved from Page 4 to Page 3 --}}
             <div class="form-section">
-                <h2>Customization Options</h2>
+                <h2>Production Details</h2>
 
                 <div class="responsive-grid grid-2-cols">
                     <div class="field grid-span-2">
@@ -207,87 +206,6 @@
                     </div>
                 </div>
 
-                <div class="form-section">
-                    <h3>Group Fields</h3>
-                    <div class="group-rows">
-                        @php
-                            $groupRows = old('groups', isset($product) && !empty($product->groups) ? $product->groups->toArray() : []);
-                            if (empty($groupRows)) { $groupRows = [['name'=>'','size'=>'','colors'=>'','unit'=>'','unitPrice'=>'']]; }
-                        @endphp
-                        @foreach($groupRows as $i => $g)
-                        <div class="group-row">
-                            <input type="hidden" name="groups[{{ $i }}][id]" value="{{ old('groups.'.$i.'.id', $g['id'] ?? '') }}">
-                            <div class="input-row">
-                                <div class="field">
-                                    <label for="groups_{{ $i }}_name">Material Name</label>
-                                    <input type="text" id="groups_{{ $i }}_name" name="groups[{{ $i }}][name]" value="{{ old('groups.'.$i.'.name', $g['name'] ?? '') }}">
-                                </div>
-                                <div class="field">
-                                    <label for="groups_{{ $i }}_size">Size</label>
-                                    <input type="text" id="groups_{{ $i }}_size" name="groups[{{ $i }}][size]" value="{{ old('groups.'.$i.'.size', $g['size'] ?? '') }}">
-                                </div>
-                                <div class="field">
-                                    <label for="groups_{{ $i }}_colors">Colors</label>
-                                    <input type="text" id="groups_{{ $i }}_colors" name="groups[{{ $i }}][colors]" value="{{ old('groups.'.$i.'.colors', $g['colors'] ?? '') }}">
-                                </div>
-                                <div class="field">
-                                    <label for="groups_{{ $i }}_unit">Unit</label>
-                                    <input type="text" id="groups_{{ $i }}_unit" name="groups[{{ $i }}][unit]" value="{{ old('groups.'.$i.'.unit', $g['unit'] ?? '') }}">
-                                </div>
-                                <div class="field">
-                                    <label for="groups_{{ $i }}_unitPrice">Unit Price</label>
-                                    <input type="number" step="0.01" id="groups_{{ $i }}_unitPrice" name="groups[{{ $i }}][unitPrice]" value="{{ old('groups.'.$i.'.unitPrice', $g['unitPrice'] ?? '') }}">
-                                </div>
-                            </div>
-                            <div class="input-row">
-                                <button class="add-row" type="button" aria-label="Add another group row">+</button>
-                                <button class="remove-row" type="button" aria-label="Remove this group row">−</button>
-                            </div>
-                        </div>
-                        @endforeach
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-section">
-                <h2>Preview Image</h2>
-                <div class="sample-image">
-                    <p>Sample Image:</p>
-                @php
-                    $previewPath = '';
-                    if (!empty($selectedTemplate)) {
-                        $p = $selectedTemplate->preview ?? $selectedTemplate->image ?? null;
-                        if ($p) {
-                            // If already an absolute URL or starts with a slash, use as-is; otherwise ask Storage to build a URL
-                            if (preg_match('/^(https?:)?\\/\\//i', $p) || strpos($p, '/') === 0) {
-                                $previewPath = $p;
-                            } else {
-                                $previewPath = \Illuminate\Support\Facades\Storage::url($p);
-                            }
-                        }
-                    }
-                @endphp
-                <img id="template-preview-img"
-                    src="{{ $previewPath }}"
-                    alt="Sample Invitation"
-                    aria-describedby="sample-image-desc">
-                    <span id="sample-image-desc" style="display: none;">This is a sample image of an invitation for reference.</span>
-                </div>
-            </div>
-
-            <div class="form-buttons">
-                <button type="button" class="continue-btn">Continue</button>
-            </div>
-        </div>
-
-        {{-- Page 4: Production --}}
-        <div class="page page4" data-page="4" style="display: none;">
-            <div class="error-summary" style="display: none;" role="alert" aria-live="polite">
-                <h3>Please correct the following errors:</h3>
-                <ul id="error-list-page4"></ul>
-            </div>
-            <div class="form-section">
-                <h2>Production Details</h2>
                 <div class="responsive-grid grid-2-cols">
                     <div class="field">
                         <label for="leadTime">Lead Time / Production Days</label>
@@ -302,11 +220,37 @@
                 </div>
             </div>
 
-            {{-- Costing section removed as requested --}}
+            {{-- Preview Image moved from Page 4 to Page 3 --}}
+            <div class="form-section">
+                <h2>Preview Image</h2>
+                <div class="sample-image">
+                    <p>Sample Image:</p>
+                    @php
+                        $previewPath = '';
+                        // First check if editing an existing product with an image
+                        if (isset($product) && $product->image) {
+                            $previewPath = \App\Support\ImageResolver::url($product->image);
+                        } elseif (!empty($selectedTemplate)) {
+                            $p = $selectedTemplate->preview ?? $selectedTemplate->image ?? null;
+                            if ($p) {
+                                if (preg_match('/^(https?:)?\/\//i', $p) || strpos($p, '/') === 0) {
+                                    $previewPath = $p;
+                                } else {
+                                    $previewPath = \Illuminate\Support\Facades\Storage::url($p);
+                                }
+                            }
+                        }
+                    @endphp
+                    <img id="template-preview-img"
+                        src="{{ $previewPath }}"
+                        alt="Sample Invitation"
+                        aria-describedby="sample-image-desc">
+                    <span id="sample-image-desc" style="display: none;">This is a sample image of an invitation for reference.</span>
+                </div>
+            </div>
 
             <div class="form-buttons">
-                <button type="submit" class="btn-save" id="submit-btn"
-                    onclick="this.disabled=true; this.form.submit(); setTimeout(function(){ window.location='{{ route('admin.products.index') }}'; }, 2000);">
+                <button type="submit" class="btn-save" id="submit-btn">
                     <span class="btn-text">Upload</span>
                     <span class="loading-spinner" style="display: none;"><i class="fas fa-spinner fa-spin"></i> Saving...</span>
                 </button>
@@ -315,8 +259,20 @@
     </div>
 </form>
 
+
+@php
+    $templatePayload = collect($templates ?? [])->map(function ($template) {
+        $data = is_array($template) ? $template : $template->toArray();
+        $previewSource = $data['preview'] ?? $data['preview_image'] ?? $data['image'] ?? null;
+        $imageSource = $data['image'] ?? $data['preview'] ?? null;
+        $data['preview_url'] = \App\Support\ImageResolver::url($previewSource);
+        $data['image_url'] = \App\Support\ImageResolver::url($imageSource);
+        return $data;
+    })->values();
+@endphp
+
 <script>
-    window.templatesData = @json($templates);
+    window.templatesData = @json($templatePayload);
     window.materialsData = @json($materials);
     window.assetUrl = '{{ asset("") }}';
     
@@ -324,7 +280,3 @@
 
 @endsection
 
-{{-- IGNORE --}}
-{{-- The following code is from ink-wise/resources/views/admin/products/index.blade.php for comparison --}}
-
-{{-- filepath: c:\xampp\htdocs\InkWise-Web\ink-wise\resources\views\admin\products\index.blade.php --}}

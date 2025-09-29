@@ -39,7 +39,10 @@
             <div class="canvas">
                 <div class="safety-area">Safety Area</div>
                 <div class="bleed-line">Bleed</div>
-                <img id="cardFront" src="{{ asset('customerimages/invite/wedding3.jpg') }}" class="card active" alt="Front Design">
+                @php
+                    $frontImage = session('uploaded_image') ? asset('storage/' . session('uploaded_image')) : asset('customerimages/invite/wedding3.jpg');
+                @endphp
+                <img id="cardFront" src="{{ $frontImage }}" class="card active" alt="Front Design">
                 <img id="cardBack" src="{{ asset('customerimages/invite/wed1.png') }}" class="card" alt="Back Design">
             </div>
             <div class="zoom-controls">

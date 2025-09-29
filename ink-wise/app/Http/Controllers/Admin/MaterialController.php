@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Notifications\StockNotification;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Validation\Rule;
 
 class MaterialController extends Controller
 {
@@ -39,7 +40,13 @@ class MaterialController extends Controller
             }
         }
         $validated = $request->validate([
-            'material_name' => 'required|string|max:255|unique:materials,material_name',
+            'material_name' => [
+                'required','string','max:255',
+                // Unique scoped to material_type so same name can exist under different types
+                Rule::unique('materials')->where(function ($query) use ($request) {
+                    return $query->where('material_type', $request->input('material_type'));
+                }),
+            ],
             'occasion' => 'required|array|min:1',
             // allow 'all' so the front-end 'All Occasions' option validates
             'occasion.*' => 'string|in:all,wedding,birthday,baptism,corporate',
@@ -139,7 +146,21 @@ class MaterialController extends Controller
         $materials = $materialsQuery->get();
 
         // Build inks query so occasion and search filters can apply consistently
-        $inksQuery = \App\Models\Ink::query();
+        $inksQuery = Ink::with('inventory');
+
+        if ($request->status === 'low') {
+            $inksQuery->whereHas('inventory', function($q) {
+                $q->whereColumn('stock_level', '<=', 'reorder_level')
+                  ->where('stock_level', '>', 0);
+            });
+        }
+
+        if ($request->status === 'out') {
+            $inksQuery->whereHas('inventory', function($q) {
+                $q->where('stock_level', '<=', 0);
+            });
+        }
+
         if ($request->filled('occasion')) {
             $occasion = $request->occasion;
             if ($occasion !== 'all') {
@@ -163,7 +184,48 @@ class MaterialController extends Controller
         }
         $inks = $inksQuery->get();
 
-        return view('admin.materials.index', compact('materials', 'inks'));
+        $materialLowCount = $materials->filter(function($material) {
+            $stock = optional($material->inventory)->stock_level ?? $material->stock_qty ?? 0;
+            $reorder = optional($material->inventory)->reorder_level ?? $material->reorder_point ?? 0;
+            return $stock > 0 && $stock <= $reorder;
+        })->count();
+
+        $inkLowCount = $inks->filter(function($ink) {
+            $stock = optional($ink->inventory)->stock_level ?? $ink->stock_qty ?? $ink->stock_qty_ml ?? 0;
+            $reorder = optional($ink->inventory)->reorder_level ?? 10;
+            return $stock > 0 && $stock <= $reorder;
+        })->count();
+
+        $materialOutCount = $materials->filter(function($material) {
+            $stock = optional($material->inventory)->stock_level ?? $material->stock_qty ?? 0;
+            return $stock <= 0;
+        })->count();
+
+        $inkOutCount = $inks->filter(function($ink) {
+            $stock = optional($ink->inventory)->stock_level ?? $ink->stock_qty ?? $ink->stock_qty_ml ?? 0;
+            return $stock <= 0;
+        })->count();
+
+        $materialStockQty = $materials->sum(function($material) {
+            return optional($material->inventory)->stock_level ?? $material->stock_qty ?? 0;
+        });
+
+        $inkStockQty = $inks->sum(function($ink) {
+            $stock = optional($ink->inventory)->stock_level;
+            if ($stock !== null) {
+                return $stock;
+            }
+            return $ink->stock_qty ?? $ink->stock_qty_ml ?? 0;
+        });
+
+        $summary = [
+            'total_items' => $materials->count() + $inks->count(),
+            'low_stock' => $materialLowCount + $inkLowCount,
+            'out_stock' => $materialOutCount + $inkOutCount,
+            'total_stock_qty' => $materialStockQty + $inkStockQty,
+        ];
+
+        return view('admin.materials.index', compact('materials', 'inks', 'summary'));
     }
 
 
@@ -176,7 +238,13 @@ class MaterialController extends Controller
     public function update(Request $request, $id)
     {
         $request->validate([
-            'material_name' => 'required|string|max:255|unique:materials,material_name,' . $id,
+            'material_name' => [
+                'required','string','max:255',
+                // Ignore current id and scope uniqueness to material_type
+                Rule::unique('materials')->where(function ($query) use ($request) {
+                    return $query->where('material_type', $request->input('material_type'));
+                })->ignore($id),
+            ],
             'material_type' => 'nullable|string|max:50',  // ✅ Made nullable
             'unit'           => 'required|string|max:50',
             'unit_cost'      => 'required|numeric|min:0',

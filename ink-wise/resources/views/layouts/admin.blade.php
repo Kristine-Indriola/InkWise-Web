@@ -592,17 +592,6 @@ body.dark-mode .btn-warning {
       } catch (e) { console.error('Theme init error', e); }
     })();
   </script>
-<<<<<<< HEAD
-  <!-- Product slide assets loader removed: provide a safe stub to avoid 404s if other scripts call it -->
-  <script>
-    (function(){
-      window.__productSlideAssetsLoaded = window.__productSlideAssetsLoaded || false;
-      // Safe stub: returns a resolved Promise and does not attempt to inject missing files
-      window.__loadProductSlideAssets = window.__loadProductSlideAssets || function(){
-        window.__productSlideAssetsLoaded = true;
-        return Promise.resolve();
-      };
-=======
   <!-- Lazy-loader for product modal assets: call window.__loadProductModalAssets() to inject CSS+JS when needed -->
   <script>
     (function(){
@@ -634,7 +623,6 @@ body.dark-mode .btn-warning {
 
       // Also listen for an event to load later
   document.addEventListener('loadProductModalAssets', function(){ window.__loadProductModalAssets(); }, { once: true });
->>>>>>> origin/dashboard17
     })();
   </script>
   <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -683,6 +671,7 @@ body.dark-mode .btn-warning {
   <!-- Content Wrapper -->
   <div class="content-wrapper">
     <!-- Topbar -->
+    
     <div class="topbar">
       <div class="logo">InkWise</div>
       <div class="icons" style="display: flex; align-items: center; gap: 24px; margin-left: auto; justify-content: center;">
