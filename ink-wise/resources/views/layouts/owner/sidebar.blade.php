@@ -118,9 +118,10 @@
 <section class="main-content">
   <!-- Topbar -->
   <div class="topbar">
-    <div class="welcome-text"><strong>Welcome, Owner!</strong></div>
+    <div class="topbar-left">
+      <div class="welcome-text"><strong>Welcome, Owner!</strong></div>
+    </div>
     <div class="topbar-actions">
-      
       <!-- Notifications Button with Dropdown -->
       <div class="notification-wrapper" style="position: relative;">
         <button type="button" class="icon-btn" aria-label="Notifications" onclick="toggleNotifications()" style="position: relative;">
