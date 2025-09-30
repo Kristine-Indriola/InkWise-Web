@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Laravel\Socialite\Facades\Socialite;
 use App\Http\Controllers\AdminController;
@@ -27,7 +28,7 @@ use App\Http\Controllers\Admin\MaterialsController;
 use App\Http\Controllers\customerProfileController;
 use App\Http\Controllers\Owner\OwnerStaffController;
 use App\Http\Controllers\Auth\CustomerAuthController;
-use App\Http\Controllers\Customer\InvitationController;
+use App\Http\Controllers\Customer\CustomerController;
 use App\Http\Controllers\Owner\OwnerProductsController;
 use App\Http\Controllers\Staff\StaffCustomerController;
 use App\Http\Controllers\Staff\StaffMaterialController;
@@ -144,7 +145,7 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::prefix('products')->name('products.')->group(function () {
     Route::get('/create', [ProductController::class, 'createInvitation'])->name('create');
     // Show single product (AJAX slide panel)
-    Route::get('/{id}', [ProductController::class, 'view'])->name('view');
+    Route::get('/{id}', [ProductController::class, 'show'])->name('show');
     // Index (product listing)
     Route::get('/', [ProductController::class, 'index'])->name('index');
     // Filter pages: inks and materials
@@ -153,8 +154,6 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::get('/create/invitation', [ProductController::class, 'createInvitation'])->name('create.invitation');
     Route::post('/store', [ProductController::class, 'store'])->name('store');
     Route::get('/{id}/edit', [ProductController::class, 'edit'])->name('edit');
-    Route::post('/{id}/upload', [ProductController::class, 'upload'])->name('upload');
-    Route::get('/{id}/weddinginvite', [ProductController::class, 'weddinginvite'])->name('weddinginvite');
     Route::delete('/{id}', [ProductController::class, 'destroy'])->name('destroy');
     });
 
@@ -206,17 +205,19 @@ Route::get('/unauthorized', function () {
     return view('errors.unauthorized');
 })->name('unauthorized');
 
-Route::get('/verify-email/{token}', [VerificationController::class, 'verify'])
-    ->name('verify.email');
-
     Route::patch('/notifications/{id}/read', function ($id) {
-    $notification = auth()->user()->notifications()->findOrFail($id);
+    /** @var \App\Models\User $user */
+    $user = Auth::user();
+    $notification = $user->notifications()->findOrFail($id);
     $notification->markAsRead();
 
     return back()->with('success', 'Notification marked as read.');
 })->name('notifications.read');
 
     });
+
+Route::get('/verify-email/{token}', [VerificationController::class, 'verify'])
+    ->name('verify.email');
 
 /*
 |--------------------------------------------------------------------------
@@ -242,7 +243,7 @@ Route::get('/auth/google/callback', function () {
 
 /**Dashboard & Home*/
 Route::get('/', fn () => view('customer.dashboard'))->name('dashboard');  // Public
-Route::middleware('auth')->get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.auth.dashboard');  // Protected
+Route::middleware('auth')->get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');  // Protected
 Route::get('/search', function (\Illuminate\Http\Request $request) {
     return 'Search for: ' . e($request->query('query', ''));
 })->name('search');
@@ -360,7 +361,7 @@ Route::prefix('templates')->group(function () {
     Route::get('/corporate', fn () => view('customer.templates.corporate'))->name('templates.corporate');
 
     // Invitations
-    Route::get('/wedding/invitations', [InvitationController::class, 'weddingInvitations'])->name('templates.wedding.invitations');
+    Route::get('/wedding/invitations', fn () => view('customer.Invitations.weddinginvite'))->name('templates.wedding.invitations');
     Route::get('/birthday/invitations', fn () => view('customer.Invitations.birthdayinvite'))->name('templates.birthday.invitations');
     Route::get('/corporate/invitations', fn () => view('customer.Invitations.corporateinvite'))->name('templates.corporate.invitations');
     Route::get('/baptism/invitations', fn () => view('customer.Invitations.baptisminvite'))->name('templates.baptism.invitations');
@@ -377,9 +378,6 @@ Route::get('/design/edit', fn () => view('customer.Invitations.editing'))->name(
 /**Order Forms & Pages*/
 Route::get('/order/form', fn () => view('customer.profile.orderform'))->name('order.form');
 Route::get('/order/birthday', fn () => view('customer.templates.birthday'))->name('order.birthday');
-
-/**Customer Upload Route*/
-Route::middleware('auth')->post('/customer/upload/design', [CustomerAuthController::class, 'uploadDesign'])->name('customer.upload.design');
 /*
 |--------------------------------------------------------------------------|
 | CUSTOMER END                                      |
@@ -517,6 +515,8 @@ if (interface_exists('Laravel\\Socialite\\Contracts\\Factory')) {
         return 'Google login successful (dev placeholder)';
     })->name('google.callback');
 }
+
+Route::middleware('auth')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
 
 
 
