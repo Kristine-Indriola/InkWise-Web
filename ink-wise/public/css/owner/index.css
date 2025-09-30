@@ -34,6 +34,21 @@ body {
 .sidebar > * {
   position: relative;
   z-index: 1;
+  transition: opacity 0.24s ease;
+}
+
+body.sidebar-collapsed .sidebar {
+  transform: translateX(-100%);
+  box-shadow: none;
+  pointer-events: none;
+}
+
+body.sidebar-collapsed .sidebar::after {
+  opacity: 0;
+}
+
+body.sidebar-collapsed .sidebar > * {
+  opacity: 0;
 }
 
 .sidebar h2 {
@@ -226,6 +241,11 @@ body {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  transition: left 0.3s ease;
+}
+
+body.sidebar-collapsed .main-content {
+  left: 0;
 }
 
 .page-inner {
@@ -259,6 +279,11 @@ body {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   z-index: 999;
+  transition: left 0.3s ease;
+}
+
+body.sidebar-collapsed .topbar {
+  left: 0;
 }
 
 .topbar::after {
@@ -268,6 +293,12 @@ body {
   pointer-events: none;
   background: radial-gradient(120% 120% at 0% 0%, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 60%);
   opacity: 0.45; /* dialed down so the blue gradient shows */
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .topbar > * {
@@ -466,28 +497,4 @@ canvas {
 
 .search-btn:hover {
   background-color: rgb(0, 0, 153);
-}
-
-@media (max-width: 1100px) {
-  .cards {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .charts {
-    flex-direction: column;
-  }
-
-  .chart-container {
-    height: 380px;
-  }
-}
-
-@media (max-width: 640px) {
-  .cards {
-    grid-template-columns: 1fr;
-  }
-
-  .sidebar {
-    width: 210px;
-  }
 }
