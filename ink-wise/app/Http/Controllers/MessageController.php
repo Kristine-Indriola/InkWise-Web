@@ -6,10 +6,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
-use App\Models\Message;
 use App\Models\Customer;
-use App\Models\User;
+use App\Models\Message;
 use App\Models\Staff;
+use App\Models\User;
+use App\Support\MessageMetrics;
 
 class MessageController extends Controller
 {
@@ -178,7 +179,7 @@ class MessageController extends Controller
     {
         $original = Message::findOrFail($messageId);
 
-        if (strtolower($original->sender_type ?? '') === 'guest') {
+                if (strtolower($original->sender_type ?? '') === 'guest') {
             // thread identified by guest email
             $email = $original->email;
             $thread = Message::where(function ($q) use ($email) {
@@ -199,6 +200,8 @@ class MessageController extends Controller
             })->orderBy('created_at', 'asc')->get();
         }
 
+        MessageMetrics::markThreadSeenForAdmin($original);
+
         // map to simple payload
         $payload = $thread->map(function ($m) {
             return [
@@ -211,7 +214,12 @@ class MessageController extends Controller
             ];
         });
 
-        return response()->json(['thread' => $payload]);
+        $unread = MessageMetrics::adminUnreadCount();
+
+        return response()->json([
+            'thread' => $payload,
+            'unread_count' => $unread,
+        ]);
     }
 
     /**
@@ -500,5 +508,12 @@ class MessageController extends Controller
         }
 
         return response()->json(['ok' => true]);
+    }
+
+    public function adminUnreadCount(Request $request)
+    {
+        $count = MessageMetrics::adminUnreadCount();
+
+        return response()->json(['count' => $count]);
     }
 }

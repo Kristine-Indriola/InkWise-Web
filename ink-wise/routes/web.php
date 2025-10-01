@@ -179,6 +179,8 @@ Route::prefix('users')->name('users.')->group(function () {
         ->name('messages.reply');
     Route::get('messages/{message}/thread', [MessageController::class, 'thread'])
         ->name('messages.thread');
+    Route::get('messages/unread-count', [MessageController::class, 'adminUnreadCount'])
+        ->name('messages.unread-count');
 
      Route::get('reports', [ReportsDashboardController::class, 'index'])
          ->name('reports.reports');
@@ -205,16 +207,18 @@ Route::get('/unauthorized', function () {
     return view('errors.unauthorized');
 })->name('unauthorized');
 
-    Route::patch('/notifications/{id}/read', function ($id) {
-    /** @var \App\Models\User $user */
+});
+
+Route::middleware('auth')->patch('/notifications/{id}/read', function ($id) {
     $user = Auth::user();
+
+    abort_unless($user, 403);
+
     $notification = $user->notifications()->findOrFail($id);
     $notification->markAsRead();
 
     return back()->with('success', 'Notification marked as read.');
 })->name('notifications.read');
-
-    });
 
 Route::get('/verify-email/{token}', [VerificationController::class, 'verify'])
     ->name('verify.email');
