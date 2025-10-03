@@ -5,132 +5,141 @@
 @section('content')
 @include('layouts.owner.sidebar')
 
+@php
+    $owner   = $owner ?? auth('owner')->user();
+    $staff   = optional($owner?->staff);
+    $address = optional($owner?->address);
+    $fullName = trim(($staff->first_name ?? '') . ' ' . ($staff->last_name ?? ''));
+    $avatarLabel = $fullName !== '' ? $fullName : ($owner->email ?? 'Owner');
+    $memberSince = optional($owner?->created_at)->format('F d, Y');
+@endphp
+
 <section class="main-content">
-<div class="topbar">
-  <div class="welcome-text"><strong>Welcome, Owner!</strong></div>
-  <div class="topbar-actions">
-    <button type="button" class="icon-btn" aria-label="Notifications">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
-           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M15 17H9a4 4 0 0 1-4-4V9a7 7 0 1 1 14 0v4a4 4 0 0 1-4 4z"/>
-        <path d="M10 21a2 2 0 0 0 4 0"/>
-      </svg>
-      <span class="badge">2</span> 
-    </button>
+  <link rel="stylesheet" href="{{ asset('css/owner/owner-profile.css') }}">
 
-    <form method="POST" action="{{ route('logout') }}">
-      @csrf
-      <button type="submit" class="logout-btn">
-        Logout
-      </button>
-    </form>
-  </div>
-</div>
+  <div class="profile-page">
+    <!-- Hero -->
+    <div class="profile-hero">
+      <div class="profile-hero__main">
+        <div class="profile-hero__avatar-wrap">
+          <img
+            src="https://ui-avatars.com/api/?name={{ urlencode($avatarLabel) }}&background=A5D8FF&color=0F172A&bold=true"
+            alt="Owner Avatar"
+            class="profile-hero__avatar">
+        </div>
+        <div>
+          <h1 class="profile-hero__title">{{ $fullName !== '' ? $fullName : 'Owner' }}</h1>
+          <p class="profile-hero__subtitle">{{ ucfirst($owner->role ?? 'owner') }}</p>
 
-<link rel="stylesheet" href="{{ asset('css/owner/owner-profile.css') }}">
-
-<div class="profile-container">
-    <div class="flex flex-col items-center text-center">
-        <img src="https://ui-avatars.com/api/?name={{ urlencode(optional($owner->staff)->first_name . ' ' . optional($owner->staff)->last_name ?? $owner->email) }}&background=4F46E5&color=fff&bold=true" 
-             alt="Owner Avatar" 
-             class="profile-avatar">
-
-        <h2 class="mt-4 text-2xl font-bold text-gray-800">
-            {{ optional($owner->staff)->first_name ?? '' }} {{ optional($owner->staff)->last_name ?? '' }}
-        </h2>
-        <p class="text-gray-500 capitalize">{{ $owner->role }}</p>
+          <div class="profile-meta">
+            <span class="profile-meta__chip">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4h16v16H4z" />
+                <path d="M4 10h16" />
+                <path d="M10 4v16" />
+              </svg>
+              {{ $owner->email }}
+            </span>
+            @if($memberSince)
+              <span class="profile-meta__chip">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <path d="M16 2v4" />
+                  <path d="M8 2v4" />
+                  <path d="M3 10h18" />
+                </svg>
+                Member since {{ $memberSince }}
+              </span>
+            @endif
+          </div>
+        </div>
+      </div>
     </div>
 
-    <hr class="my-8 border-gray-300">
+    <!-- Body Cards -->
+    <div class="profile-grid">
+      <section class="profile-card">
+        <h3 class="profile-card__title">Account Information</h3>
+        <div class="info-list">
+          <div class="info-item">
+            <span class="info-label">Email</span>
+            <span class="info-value">{{ $owner->email }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Role</span>
+            <span class="info-value">{{ ucfirst($owner->role ?? 'Owner') }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Account Status</span>
+            <span class="info-value info-value--badge">Active</span>
+          </div>
+        </div>
+      </section>
 
-    <div class="space-y-10">
-        <div>
-            <h3 class="section-title">Account Information</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <label class="profile-label">Email</label>
-                    <p class="profile-info">{{ $owner->email }}</p>
-                </div>
+      <section class="profile-card">
+        <h3 class="profile-card__title">Personal Information</h3>
+        @if($staff->exists())
+          <div class="info-list info-list--grid">
+            <div class="info-item">
+              <span class="info-label">First Name</span>
+              <span class="info-value">{{ $staff->first_name }}</span>
             </div>
-        </div>
+            <div class="info-item">
+              <span class="info-label">Middle Name</span>
+              <span class="info-value">{{ $staff->middle_name ?? '—' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Last Name</span>
+              <span class="info-value">{{ $staff->last_name }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Contact Number</span>
+              <span class="info-value">{{ $staff->contact_number ?? '—' }}</span>
+            </div>
+          </div>
+        @else
+          <div class="profile-card__empty">
+            <span>⚠ We couldn’t find additional personal details for this owner.</span>
+          </div>
+        @endif
+      </section>
 
-        {{-- Staff Info --}}
-        <div>
-            <h3 class="section-title">Personal Information</h3>
-            @if($owner->staff)
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label class="profile-label">First Name</label>
-                        <p class="profile-info">{{ $owner->staff->first_name }}</p>
-                    </div>
-
-                    <div>
-                        <label class="profile-label">Middle Name</label>
-                        <p class="profile-info">{{ $owner->staff->middle_name ?? '-' }}</p>
-                    </div>
-
-                    <div>
-                        <label class="profile-label">Last Name</label>
-                        <p class="profile-info">{{ $owner->staff->last_name }}</p>
-                    </div>
-
-                    <div>
-                        <label class="profile-label">Contact Number</label>
-                        <p class="profile-info">{{ $owner->staff->contact_number }}</p>
-                    </div>
-                </div>
-            @else
-                <p class="text-red-600 font-medium">⚠ No staff profile found for this owner.</p>
-            @endif
-        </div>
-
-        {{-- Address Info --}}
-        <div>
-            <h3 class="section-title">📍Address Information</h3>
-            @if($owner->address)
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label class="profile-label">Street</label>
-                        <p class="profile-info">{{ $owner->address->street ?? '-' }}</p>
-                    </div>
-
-                    <div>
-                        <label class="profile-label">Barangay</label>
-                        <p class="profile-info">{{ $owner->address->barangay ?? '-' }}</p>
-                    </div>
-
-                    <div>
-                        <label class="profile-label">City</label>
-                        <p class="profile-info">{{ $owner->address->city ?? '-' }}</p>
-                    </div>
-
-                    <div>
-                        <label class="profile-label">Province</label>
-                        <p class="profile-info">{{ $owner->address->province ?? '-' }}</p>
-                    </div>
-
-                    <div>
-                        <label class="profile-label">Postal Code</label>
-                        <p class="profile-info">{{ $owner->address->postal_code ?? '-' }}</p>
-                    </div>
-
-                    <div>
-                        <label class="profile-label">Country</label>
-                        <p class="profile-info">{{ $owner->address->country ?? '-' }}</p>
-                    </div>
-                </div>
-            @else
-                <p class="text-red-600 font-medium">⚠ No address found for this owner.</p>
-            @endif
-        </div>
+      <section class="profile-card">
+        <h3 class="profile-card__title">Address Information</h3>
+        @if($address->exists())
+          <div class="info-list info-list--grid">
+            <div class="info-item">
+              <span class="info-label">Street</span>
+              <span class="info-value">{{ $address->street ?? '—' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Barangay</span>
+              <span class="info-value">{{ $address->barangay ?? '—' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">City</span>
+              <span class="info-value">{{ $address->city ?? '—' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Province</span>
+              <span class="info-value">{{ $address->province ?? '—' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Postal Code</span>
+              <span class="info-value">{{ $address->postal_code ?? '—' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Country</span>
+              <span class="info-value">{{ $address->country ?? '—' }}</span>
+            </div>
+          </div>
+        @else
+          <div class="profile-card__empty">
+            <span>⚠ No address information has been added yet.</span>
+          </div>
+        @endif
+      </section>
     </div>
-
-    {{-- Edit Button --}}
-    <div class="flex justify-end mt-10">
-        <a href="{{ route('owner.profile.edit') }}" class="profile-btn">
-            ✏ Edit Profile
-        </a>
-    </div>
-</div>
+  </div>
 </section>
 @endsection
