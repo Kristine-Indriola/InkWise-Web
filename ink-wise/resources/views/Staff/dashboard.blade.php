@@ -1,21 +1,18 @@
-
 @extends('layouts.Staffapp')
 
 @section('content')
-<div class="flex justify-center items-center min-h-[60vh]">
-    <div class="grid grid-cols-2 gap-10 max-w-xl">
-        <div class="border-2 rounded-lg p-8 text-center" style="border-color: #a78bfa;">
-            <div class="text-4xl font-bold mb-2">12</div>
-            <div class="text-lg">Total Orders</div>
-        </div>
-        <div class="border-2 rounded-lg p-8 text-center" style="border-color: #5eead4;">
-            <div class="text-4xl font-bold mb-2">5</div>
-            <div class="text-lg">Assigned Orders</div>
-        </div>
-        <div class="border-2 rounded-lg p-8 text-center col-span-2 mx-auto" style="border-color: #818cf8; width: 50%;">
-            <div class="text-4xl font-bold mb-2">8</div>
-            <div class="text-lg">Customers</div>
-        </div>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-11">
+    <div class="p-9 min-w-[220px] min-h-[160px] rounded-lg shadow text-center border border-purple-500 bg-purple-100">
+        <p class="text-3xl font-bold text-purple-900">{{ $totalOrders ?? '' }}</p>
+        <p class="text-purple-900">Total Orders</p>
+    </div>
+    <div class="p-9 min-w-[220px] min-h-[160px] rounded-lg shadow text-center border border-teal-500 bg-teal-100">
+        <p class="text-3xl font-bold text-teal-900">{{ $assignedOrders ?? '' }}</p>
+        <p class="text-teal-900">Assigned Orders</p>
+    </div>
+    <div class="p-9 min-w-[220px] min-h-[160px] rounded-lg shadow text-center border border-indigo-500 bg-indigo-100">
+        <p class="text-3xl font-bold text-indigo-900">{{ $customers ?? '' }}</p>
+        <p class="text-indigo-900">Customers</p>
     </div>
 </div>
 @endsection

@@ -10,6 +10,7 @@ use App\Http\Controllers\Owner\HomeController;
 //use App\Http\Controllers\Auth\AdminLoginController;
 //use App\Http\Controllers\StaffAuthController;
 //use App\Http\Controllers\Staff\StaffLoginController;
+use App\Http\Controllers\StaffAssignedController;
 use App\Http\Controllers\Owner\OwnerController;
 use App\Http\Controllers\StaffProfileController;
 use App\Http\Controllers\VerificationController;
@@ -379,8 +380,15 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
     Route::get('/notify-customers', fn () => view('staff.notify_customers'))->name('notify.customers');
     Route::get('/profile/edit', [StaffProfileController::class, 'edit'])->name('profile.edit');
     Route::post('/profile/update', [StaffProfileController::class, 'update'])->name('profile.update');
+    //Route::post('/profile/update', [StaffProfileController::class, 'update'])->name('profile.update');
 
     // ✅ fixed: remove the extra "staff" in URL and name
+
+    Route::prefix('staff')->middleware(['auth'])->group(function () {
+    Route::get('assigned-orders', [StaffAssignedController::class, 'index'])->name('staff.assigned-orders');
+    Route::post('orders/{id}/confirm', [StaffAssignedController::class, 'confirm'])->name('staff.orders.confirm');
+    Route::post('orders/{id}/update-status', [StaffAssignedController::class, 'updateStatus'])->name('staff.orders.updateStatus');
+});
     Route::get('/customers', [StaffCustomerController::class, 'index'])
         ->name('customer_profile'); 
 
