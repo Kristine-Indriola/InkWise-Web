@@ -8,10 +8,10 @@ use Illuminate\Support\Facades\Auth;
 
 class AddressController extends Controller
 {
-    public function index()
+    public function profile()
     {
         $addresses = \App\Models\Address::where('user_id', auth()->id())->get();
-        return view('customerprofile.addresses', compact('addresses'));
+        return view('customer.profile.addresses', compact('addresses'));
     }
 
     public function store(Request $request)
@@ -36,7 +36,7 @@ class AddressController extends Controller
             'country'     => 'Philippines',
         ]);
 
-        return redirect()->route('customerprofile.addresses')->with('success', 'Address added successfully!');
+        return redirect()->route('customer.profile.addresses')->with('success', 'Address added successfully!');
     }
 
     public function update(Request $request, Address $address)
@@ -53,12 +53,12 @@ class AddressController extends Controller
             'label' => 'required|string|max:50',
         ]);
         $address->update($request->all());
-        return redirect()->route('customerprofile.addresses')->with('success', 'Address updated!');
+        return redirect()->route('customer.profile.addresses')->with('success', 'Address updated!');
     }
 
     public function destroy(Address $address)
     {
         $address->delete();
-        return redirect()->route('customerprofile.addresses')->with('success', 'Address deleted!');
+        return redirect()->route('customer.profile.addresses')->with('success', 'Address deleted!');
     }
 }

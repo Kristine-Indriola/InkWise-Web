@@ -24,29 +24,33 @@ class CustomerAuthController extends Controller
     public function register(Request $request)
     {
         $request->validate([
-            'first_name' => 'required|string|max:100',
-            'last_name' => 'required|string|max:100',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|min:6|confirmed',
+            'first_name'     => 'required|string|max:255',
+            'last_name'      => 'required|string|max:255',
+            'email'          => 'required|email|unique:users,email',
+            'password'       => 'required|min:6|confirmed',
+            'birthdate'      => 'required|date',
+            'contact_number' => 'nullable|string|max:20',
+            'middle_name'    => 'nullable|string|max:255',
         ]);
 
-        //1️⃣ Create the user (login credentials)
+        // 1. Create the User (for authentication)
         $user = User::create([
-            'email' => $request->email,
+            'email'    => $request->email,
             'password' => Hash::make($request->password),
-            'role' => 'customer',
+            'role'     => 'customer',
         ]);
 
-        // 2️⃣ Create the customer profile (extra info)
-        $customer = Customer::create([
-            'user_id' => $user->user_id, // FK to users table
-            'first_name' => $request->first_name,
-            'middle_name' => $request->middle_name,
-            'last_name' => $request->last_name,
+        // 2. Create the Customer profile
+        Customer::create([
+            'user_id'        => $user->user_id,
+            'first_name'     => $request->first_name,
+            'middle_name'    => $request->middle_name,
+            'last_name'      => $request->last_name,
             'contact_number' => $request->contact_number,
+            'birthdate'      => $request->birthdate,
         ]);
 
-        // 3️⃣ Login customer
+
         Auth::login($user);
 
         return redirect()->route('customer.dashboard');
@@ -66,7 +70,7 @@ class CustomerAuthController extends Controller
     public function dashboard()
     {
         return view('customer.dashboard', [
-            'customer' => Auth::user()->customer // eager load profile
+            'customer' => Auth::user()?->customer, // safe access
         ]);
     }
 
@@ -76,6 +80,25 @@ class CustomerAuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('customer.dashboard');
+        return redirect()->route('dashboard'); // 👈 check if this route exists
+    }
+
+    public function uploadDesign(Request $request)
+    {
+        $request->validate([
+            'design_file' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048', // 2MB max
+        ]);
+
+        if ($request->hasFile('design_file')) {
+            $file = $request->file('design_file');
+            $filename = time() . '_' . $file->getClientOriginalName();
+            $path = $file->storeAs('customer_uploads', $filename, 'public');
+
+            // You can save to database or session for later use
+            // For now, redirect to design edit page with the uploaded image
+            return redirect()->route('design.edit')->with('uploaded_image', $path);
+        }
+
+        return back()->withErrors(['design_file' => 'Upload failed.']);
     }
 }

@@ -1,9 +1,7 @@
 <?php
-
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 
@@ -11,26 +9,24 @@ class EmailVerification extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public $user; // Pass the user into the email
+    public $user;
+    public $token; // ✅ add this
 
-    /**
-     * Create a new message instance.
-     */
-    public function __construct($user)
+    public function __construct($user, $token)
     {
         $this->user = $user;
+        $this->token = $token;
     }
 
-    /**
-     * Build the message.
-     */
     public function build()
     {
+        $verificationUrl = route('verify.email', ['token' => $this->token]);
+
         return $this->subject('Verify Your Email Address')
-                    ->markdown('emails.verify')
-                    ->with([
-                        'user' => $this->user,
-                        'verificationUrl' => url('/verify-email/'.$this->user->email_verification_token),
-                    ]);
+            ->markdown('emails.verify-email')
+            ->with([
+                'user' => $this->user,
+                'verificationUrl' => $verificationUrl,
+            ]);
     }
 }

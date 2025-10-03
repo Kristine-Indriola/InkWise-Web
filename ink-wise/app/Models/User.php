@@ -41,4 +41,10 @@ class User extends Authenticatable
     {
         return $this->hasOne(Address::class, 'user_id', 'user_id');
     }
+
+   public function verification()
+{
+    return $this->hasOne(UserVerification::class, 'user_id');
+}
+
 }

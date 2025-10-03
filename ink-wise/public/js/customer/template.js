@@ -95,3 +95,16 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
+// Upload Form Handling
+document.addEventListener('DOMContentLoaded', function () {
+    const uploadForm = document.getElementById('upload-form');
+    if (uploadForm) {
+        uploadForm.addEventListener('submit', function (e) {
+            // Optional: Add loading state
+            const submitBtn = uploadForm.querySelector('button[type="submit"]');
+            submitBtn.textContent = 'Uploading...';
+            submitBtn.disabled = true;
+        });
+    }
+});
+

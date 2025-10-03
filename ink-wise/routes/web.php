@@ -1,19 +1,28 @@
 <?php
 
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Laravel\Socialite\Facades\Socialite;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AddressController;
+use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\MessageController;
-use App\Http\Controllers\TemplateController;
-use App\Http\Controllers\Owner\HomeController;
 //use App\Http\Controllers\OwnerLoginController;
 //use App\Http\Controllers\Auth\AdminLoginController;
 //use App\Http\Controllers\StaffAuthController;
 //use App\Http\Controllers\Staff\StaffLoginController;
+
 use App\Http\Controllers\StaffAssignedController;
+
+use App\Http\Controllers\TemplateController;
+
+use App\Http\Controllers\Admin\InkController;
+use App\Http\Controllers\Owner\HomeController;
+
 use App\Http\Controllers\Owner\OwnerController;
 use App\Http\Controllers\StaffProfileController;
 use App\Http\Controllers\VerificationController;
+use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\AdminCustomerController;
 use App\Http\Controllers\Admin\MaterialController;
 use App\Http\Controllers\Auth\RoleLoginController;
@@ -23,6 +32,7 @@ use App\Http\Controllers\customerProfileController;
 use App\Http\Controllers\Owner\OwnerStaffController;
 use App\Http\Controllers\Auth\CustomerAuthController;
 use App\Http\Controllers\Customer\CustomerController;
+use App\Http\Controllers\Owner\OwnerProductsController;
 use App\Http\Controllers\Staff\StaffCustomerController;
 use App\Http\Controllers\Staff\StaffMaterialController;
 use App\Http\Controllers\Admin\UserManagementController;
@@ -30,7 +40,9 @@ use App\Http\Controllers\Owner\OwnerInventoryController;
 use App\Http\Controllers\Staff\StaffInventoryController;
 use App\Http\Controllers\Admin\ReportsDashboardController;
 use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
-use App\Http\Controllers\AddressController;
+use App\Http\Controllers\Admin\UserPasswordResetController;
+use App\Models\User as AppUser;
+use Illuminate\Notifications\DatabaseNotification;
 
 
 
@@ -58,8 +70,13 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
 
      Route::get('/materials/notification', [MaterialController::class, 'notification'])
      ->name('admin.materials.notification');
+
+     Route::get('/notifications', [AdminController::class, 'notifications'])
+        ->name('notifications');
  
-     
+     Route::get('/admin/notifications', [AdminController::class, 'notifications'])
+    ->name('admin.notifications')
+    ->middleware('auth');
     
 
 
@@ -73,6 +90,18 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         // Move these two lines inside this group and fix the path:
         Route::post('{id}/save-canvas', [AdminTemplateController::class, 'saveCanvas'])->name('saveCanvas');
         Route::post('{id}/upload-preview', [AdminTemplateController::class, 'uploadPreview'])->name('uploadPreview');
+        // Add new API routes
+        Route::get('{id}/load-design', [AdminTemplateController::class, 'loadDesign'])->name('loadDesign');
+        Route::delete('{id}/delete-element', [AdminTemplateController::class, 'deleteElement'])->name('deleteElement');
+        Route::post('{id}/save-version', [AdminTemplateController::class, 'saveVersion'])->name('saveVersion');
+        // Allow GET to redirect (avoid MethodNotAllowed when link is accidentally visited)
+        Route::get('{id}/upload-to-product', function ($id) {
+            return redirect()->route('admin.products.create.invitation', ['template_id' => $id]);
+        });
+        Route::post('{id}/upload-to-product', [AdminTemplateController::class, 'uploadToProduct'])->name('uploadToProduct');
+        // Asset search API: images, videos, elements
+        Route::get('{id}/assets/search', [AdminTemplateController::class, 'searchAssets'])->name('searchAssets');
+        Route::post('{id}/canvas-settings', [AdminTemplateController::class, 'updateCanvasSettings'])->name('updateCanvasSettings');
     }); 
     // ✅ User Management 
 
@@ -83,8 +112,16 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::get('/{user_id}/edit', [UserManagementController::class, 'edit'])->name('edit'); // Edit form 
     Route::put('/{user_id}', [UserManagementController::class, 'update'])->name('update'); // Update user 
     Route::delete('/{user_id}', [UserManagementController::class, 'destroy'])->name('destroy'); // Delete user 
+});
 
+    Route::prefix('users/passwords')->name('users.passwords.')->group(function () {
+        Route::get('/', [UserPasswordResetController::class, 'index'])->name('index');
+        Route::post('/unlock', [UserPasswordResetController::class, 'unlock'])->name('unlock');
+        Route::post('/lock', [UserPasswordResetController::class, 'lock'])->name('lock');
+        Route::post('/{user}/send', [UserPasswordResetController::class, 'send'])->name('send');
     });
+
+   
   Route::prefix('users')->name('users.')->group(function () {
     Route::get('/', [UserManagementController::class, 'index'])->name('index');
     Route::get('/create', [UserManagementController::class, 'create'])->name('create');
@@ -106,7 +143,8 @@ Route::prefix('users')->name('users.')->group(function () {
         Route::delete('/{id}', [InventoryController::class, 'destroy'])->name('destroy');
     });
 
-     Route::prefix('materials')->name('materials.')->group(function () {
+    // Materials routes
+    Route::prefix('materials')->name('materials.')->group(function () {
         Route::get('/', [MaterialController::class, 'index'])->name('index');
         Route::get('/create', [MaterialController::class, 'create'])->name('create');
         Route::post('/', [MaterialController::class, 'store'])->name('store');
@@ -114,18 +152,48 @@ Route::prefix('users')->name('users.')->group(function () {
         Route::put('/{id}', [MaterialController::class, 'update'])->name('update');
         Route::delete('/{id}', [MaterialController::class, 'destroy'])->name('destroy');
     });
+    // ✅ Inks resource route (move here, not nested)
+    Route::resource('inks', \App\Http\Controllers\Admin\InkController::class)->except(['show']);
 
-   Route::prefix('customers')->name('customers.')->group(function () {
+    Route::prefix('products')->name('products.')->group(function () {
+    Route::get('/create', [ProductController::class, 'createInvitation'])->name('create');
+    // Show single product (AJAX slide panel)
+    Route::get('/{id}', [ProductController::class, 'show'])->name('show');
+    // Index (product listing)
+    Route::get('/', [ProductController::class, 'index'])->name('index');
+    // Filter pages: inks and materials
+    Route::get('/inks', [ProductController::class, 'inks'])->name('inks');
+    Route::get('/materials', [ProductController::class, 'materials'])->name('materials');
+    Route::get('/create/invitation', [ProductController::class, 'createInvitation'])->name('create.invitation');
+    Route::post('/store', [ProductController::class, 'store'])->name('store');
+    Route::get('/{id}/edit', [ProductController::class, 'edit'])->name('edit');
+    Route::delete('/{id}', [ProductController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::prefix('customers')->name('customers.')->group(function () {
         Route::get('/', [AdminCustomerController::class, 'index'])->name('index'); 
         // Optional: Add more customer routes (show/edit/delete) here later
     });
 
-    // Messages routes
-      Route::prefix('messages')->name('messages.')->group(function () {
-        Route::get('/', [MessageController::class, 'index'])->name('index'); // ✅ admin.messages.index
-        Route::get('/chat/{customerId}', [MessageController::class, 'chatWithCustomer'])->name('chat');
-        Route::post('/send/{customerId}', [MessageController::class, 'sendToCustomer'])->name('send');
+    // Chatbot management routes
+    Route::prefix('chatbot')->name('chatbot.')->group(function () {
+        Route::get('/', [ChatbotController::class, 'index'])->name('index');
+        Route::post('/', [ChatbotController::class, 'store'])->name('store');
+        Route::put('/{qa}', [ChatbotController::class, 'update'])->name('update');
+        Route::delete('/{qa}', [ChatbotController::class, 'destroy'])->name('destroy');
     });
+
+    // Messages routes
+
+    Route::get('messages', [MessageController::class, 'index'])->name('messages.index');
+    Route::get('messages/{customer}', [MessageController::class, 'chatWithCustomer'])->name('messages.chat');
+    Route::post('messages/{customer}', [MessageController::class, 'sendToCustomer'])->name('messages.send');
+     Route::post('messages/{message}/reply', [MessageController::class, 'replyToMessage'])
+        ->name('messages.reply');
+    Route::get('messages/{message}/thread', [MessageController::class, 'thread'])
+        ->name('messages.thread');
+    Route::get('messages/unread-count', [MessageController::class, 'adminUnreadCount'])
+        ->name('messages.unread-count');
 
      Route::get('reports', [ReportsDashboardController::class, 'index'])
          ->name('reports.reports');
@@ -137,16 +205,8 @@ Route::prefix('users')->name('users.')->group(function () {
     // Optional: Inventory export
     Route::get('reports/inventory/export/{type}', [ReportsDashboardController::class, 'exportInventory'])
          ->name('reports.inventory.export');
-});
 
-
-
-
-
-
-
-
-
+  
 
 /*Route::middleware(['auth', 'role:staff'])->group(function () {
     Route::get('/staff/dashboard', [StaffController::class, 'index'])->name('staff.dashboard');
@@ -161,7 +221,27 @@ Route::get('/unauthorized', function () {
 })->name('unauthorized');
 
 Route::get('/verify-email/{token}', [VerificationController::class, 'verify'])
-->name('verify.email');
+    ->name('verify.email');
+
+    Route::patch('/notifications/{id}/read', function ($id) {
+        $user = Auth::user();
+
+        abort_unless($user instanceof AppUser, 403);
+
+        /** @var AppUser $adminUser */
+        $adminUser = $user;
+
+        $notification = DatabaseNotification::query()
+            ->where('notifiable_id', $adminUser->getKey())
+            ->where('notifiable_type', $adminUser->getMorphClass())
+            ->findOrFail($id);
+        $notification->markAsRead();
+
+        return back()->with('success', 'Notification marked as read.');
+    })->name('notifications.read');
+
+    });
+
 /*
 |--------------------------------------------------------------------------
 | Google OAuth
@@ -180,126 +260,152 @@ Route::get('/auth/google/callback', function () {
 
 /*
 |--------------------------------------------------------------------------
-| customer ROUTES
+| CUSTOMER ROUTES
 |--------------------------------------------------------------------------
 */
-//customer Dashboard/Home route
-Route::get('/', function () {
-    return view('dashboard');
-})->name('dashboard');
 
-// Simple placeholders to avoid 404 during dev
+/**Dashboard & Home*/
+Route::get('/', fn () => view('customer.dashboard'))->name('dashboard');  // Public
+Route::middleware('auth')->get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');  // Protected
 Route::get('/search', function (\Illuminate\Http\Request $request) {
     return 'Search for: ' . e($request->query('query', ''));
 })->name('search');
 
-// Dashboard page (works for both guest & logged in users)
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->name('customer.dashboard');
-
-// Guest routes (register / login)
+/** Auth (Register/Login/Logout) */
 Route::get('/customer/register', [CustomerAuthController::class, 'showRegister'])->name('customer.register.form');
 Route::post('/customer/register', [CustomerAuthController::class, 'register'])->name('customer.register');
-
 Route::get('/customer/login', [CustomerAuthController::class, 'showLogin'])->name('customer.login.form');
 Route::post('/customer/login', [CustomerAuthController::class, 'login'])->name('customer.login');
-
-Route::get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');
 Route::post('/customer/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
 
-// Customer Profile pages
-Route::middleware(['auth:customer'])->group(function () {
+Route::get('/customer/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');
+
+Route::post('/messages', [MessageController::class, 'storeFromContact'])->name('messages.store');
+
+    Route::get('customer/chat/thread', [MessageController::class, 'customerChatThread'])->name('customer.chat.thread');
+    Route::post('customer/chat/send', [MessageController::class, 'customerChatSend'])->name('customer.chat.send');
+Route::get('customer/chat/unread-count', [MessageController::class, 'customerUnreadCount'])
+        ->name('customer.chat.unread');
+
+    Route::post('customer/chat/mark-read', [MessageController::class, 'customerMarkRead'])
+        ->name('customer.chat.markread');
+
+
+Route::get('/chatbot/qas', [ChatbotController::class, 'getQAs'])->name('chatbot.qas');
+ Route::view('/chatbot', 'customer.chatbot')->name('chatbot');
+ Route::post('/chatbot/reply', [App\Http\Controllers\ChatbotController::class, 'reply'])
+    ->name('chatbot.reply');
+
+        
+/**Customer Profile Pages*/
+Route::prefix('customerprofile')->group(function () {
     // Addresses
-    Route::get('/customerprofile/addresses', [AddressController::class, 'index'])->name('customerprofile.addresses');
-    Route::post('/customerprofile/addresses', [AddressController::class, 'store'])->name('customerprofile.addresses.store');
-    Route::post('/customerprofile/addresses/{address}/delete', [AddressController::class, 'destroy'])->name('customerprofile.addresses.destroy');
-    Route::post('/customerprofile/addresses/{address}/update', [AddressController::class, 'update'])->name('customerprofile.addresses.update');
-    // Other customer-only pages
-    Route::get('/customer/my-orders', function () {
-        return view('customerprofile.my_purchase');
-    })->name('customer.my_purchase');
-    Route::get('/customerprofile/order', function () {
-        return view('customerprofile.orderform');
-    })->name('customerprofile.orderform');
-    Route::get('/customerprofile/settings', function () {
-        return view('customerprofile.settings');
-    })->name('customerprofile.settings');
-    
+
+    Route::get('/addresses', [CustomerProfileController::class, 'addresses'])
+        ->name('customer.profile.addresses');
+
+    Route::post('/addresses', [CustomerProfileController::class, 'storeAddress'])
+        ->name('customer.profile.addresses.store');
+
+    Route::put('/addresses/{address}', [CustomerProfileController::class, 'updateAddress'])
+        ->name('customer.profile.addresses.update');
+
+    Route::delete('/addresses/{address}', [CustomerProfileController::class, 'destroyAddress'])
+        ->name('customer.profile.addresses.destroy');
+
+   Route::get('/', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
+    Route::get('/profile', [CustomerProfileController::class, 'edit'])->name('customer.profile.edit');
+    Route::put('/profile', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
+// Other pages
+Route::get('/settings', fn () => view('customer.profile.settings'))->name('customer.profile.settings');
+Route::get('/order', fn () => view('customer.profile.orderform'))->name('custome.rprofile.orderform');
+
 });
-Route::get('/customerprofile/profile', [CustomerProfileController::class, 'edit'])->name('customerprofile.profile');
+
+Route::middleware('auth')->get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');  // Protected
+
+
+// My Purchases
+
+Route::get('/customer/my-orders', fn () => view('customer.profile.my_purchase'))->name('customer.my_purchase');
+
+
+/** Profile & Addresses (Protected) */
+/*Route::middleware(['auth:customer'])->prefix('customer/profile')->name('customer.profile.')->group(function () {
+    Route::get('/', [CustomerProfileController::class, 'update'])->name('index');
+    Route::get('/', [CustomerProfileController::class, 'edit'])
+        ->name('edit');
+
+Route::middleware('auth')->get('/customer/my-purchase', function () {
+    return view('customer.profile.my_purchase');
+})->name('customer.my_purchase');
+
+// Settings (with optional tab)
+Route::middleware('auth')->get('/customer/profile/settings', function (\Illuminate\Http\Request $request) {
+    $tab = $request->query('tab', 'account');
+    return view('customer.profile.settings', compact('tab'));
+})->name('customerprofile.settings');
+
+
+// My Purchases
+
+
+Route::middleware('auth')->prefix('customer/profile')->name('customer.profile.')->group(function () {  // Protected group
+    // Profile routes
+    Route::get('/', [CustomerProfileController::class, 'index'])->name('index'); 
+    Route::get('/edit', [CustomerProfileController::class, 'edit'])->name('edit');  // Matches view
+    Route::put('/update', [CustomerProfileController::class, 'update'])->name('update');  // Add if missing
+
+    // Address routes
+    Route::get('/addresses', [CustomerProfileController::class, 'addresses'])->name('addresses');
+    Route::post('/addresses/store', [CustomerProfileController::class, 'storeAddress'])->name('addresses.store');
+    Route::delete('/addresses/{address}', [CustomerProfileController::class, 'destroyAddress'])->name('addresses.destroy');
+
+});*/
+
+
+
+    
+
+// Profile update (protected)
+/*Route::middleware(['auth:customer'])->group(function () {
+    Route::put('/customer/profile/update', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
+});*/
 
 
 
 
+/** Templates (Category Home & Invitations/Giveaways)*/
+Route::prefix('templates')->group(function () {
+    // Category Home
+    Route::get('/wedding', fn () => view('customer.templates.wedding'))->name('templates.wedding');
+    Route::get('/birthday', fn () => view('customer.templates.birthday'))->name('templates.birthday');
+    Route::get('/baptism', fn () => view('customer.templates.baptism'))->name('templates.baptism');
+    Route::get('/corporate', fn () => view('customer.templates.corporate'))->name('templates.corporate');
 
-// customer Templatehome category pages
-Route::get('/templates/wedding', function () {
-    return view('customertemplates.wedding');
-})->name('templates.wedding');
-Route::get('/templates/birthday', function () {
-    return view('customertemplates.birthday');
-})->name('templates.birthday');
-Route::get('/templates/baptism', function () {
-    return view('customertemplates.baptism');
-})->name('templates.baptism');
-Route::get('/templates/corporate', function () {
-    return view('customertemplates.corporate');
-})->name('templates.corporate');
+    // Invitations
+    Route::get('/wedding/invitations', fn () => view('customer.Invitations.weddinginvite'))->name('templates.wedding.invitations');
+    Route::get('/birthday/invitations', fn () => view('customer.Invitations.birthdayinvite'))->name('templates.birthday.invitations');
+    Route::get('/corporate/invitations', fn () => view('customer.Invitations.corporateinvite'))->name('templates.corporate.invitations');
+    Route::get('/baptism/invitations', fn () => view('customer.Invitations.baptisminvite'))->name('templates.baptism.invitations');
 
+    // Giveaways
+    Route::get('/wedding/giveaways', fn () => view('customer.Giveaways.weddinggive'))->name('templates.wedding.giveaways');
+    Route::get('/birthday/giveaways', fn () => view('customer.Giveaways.birthdaygive'))->name('templates.birthday.giveaways');
+});
 
-//customer templates inviatations 
-Route::get('/templates/wedding/invitations', function () {
-    return view('customerInvitations.weddinginvite');
-})->name('templates.wedding.invitations');
-Route::get('/templates/birthday/invitations', function () {
-    return view('customerInvitations.birthdayinvite');
-})->name('templates.birthday.invitations');
-Route::get('/templates/corporate/invitations', function () {
-    return view('customerInvitations.corporateinvite');
-})->name('templates.corporate.invitations');
-Route::get('/templates/baptism/invitations', function () {
-    return view('customerInvitations.baptisminvite');
-})->name('templates.baptism.invitations');
+/** Product Preview & Design Editing*/
+Route::get('/product/preview', fn () => view('customer.Invitations.productpreview'))->name('productpreview');
+Route::get('/design/edit', fn () => view('customer.Invitations.editing'))->name('design.edit');
 
-
-Route::get('/product/preview', function () {
-    return view('customerInvitations.productpreview');
-})->name('productpreview');
-// Design editing route
-Route::get('/design/edit', function () {
-    return view('customerInvitations.editing');
-})->name('design.edit');
-Route::get('/order/form', function () {
-    return view('customerprofile.orderform');
-})->name('order.form');
-
-//customer templates giveaways 
-Route::get('/templates/wedding/giveaways', function () {
-    return view('customerGiveaways.weddinggive');
-})->name('templates.wedding.giveaways');
-Route::get('/templates/birthday/giveaways', function () {
-    return view('customerGiveaways.birthdaygive');
-})->name('templates.birthday.giveaways');
-
-
-// customer order and design pages
-Route::get('/order/birthday', function () {
-    return view('customertemplates.birthday');  // <-- points to your blade file
-})->name('order.birthday');
-
-
-// ----------------------------
-// Temporary Google Redirect (Fix)
-// ----------------------------
-Route::get('/auth/google', function () {
-    return 'Google login placeholder until controller is ready.';
-})->name('google.redirect');
-
-// ----------------------------
-// customer ROUTES END
-// ----------------------------
-
+/**Order Forms & Pages*/
+Route::get('/order/form', fn () => view('customer.profile.orderform'))->name('order.form');
+Route::get('/order/birthday', fn () => view('customer.templates.birthday'))->name('order.birthday');
+/*
+|--------------------------------------------------------------------------|
+| CUSTOMER END                                      |
+|--------------------------------------------------------------------------|
+*/
 
 /*
 |--------------------------------------------------------------------------
@@ -317,7 +423,6 @@ Route::post('/logout', [RoleLoginController::class, 'logout'])->name('logout');
 | Owner Auth
 |--------------------------------------------------------------------------
 */
-
 
 Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/home', [HomeController::class, 'index'])->name('home');
@@ -350,6 +455,7 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/order/workflow', fn () => view('owner.order-workflow'))->name('order.workflow');
     Route::get('/inventory', [OwnerInventoryController::class, 'index'])->name('inventory.index');
     Route::get('/inventory/track', [OwnerInventoryController::class, 'track'])->name('inventory-track');
+    Route::get('/products', [OwnerProductsController::class, 'index'])->name('products.index');
     Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
     Route::get('/reports', fn () => view('owner.owner-reports'))->name('reports');
 
@@ -382,6 +488,13 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
     Route::post('/profile/update', [StaffProfileController::class, 'update'])->name('profile.update');
     //Route::post('/profile/update', [StaffProfileController::class, 'update'])->name('profile.update');
 
+    Route::prefix('messages')->name('messages.')->group(function () {
+        Route::get('/', [MessageController::class, 'staffIndex'])->name('index');
+        Route::get('unread-count', [MessageController::class, 'staffUnreadCount'])->name('unread-count');
+        Route::get('/{message}/thread', [MessageController::class, 'thread'])->name('thread');
+        Route::post('/{message}/reply', [MessageController::class, 'replyToMessage'])->name('reply');
+    });
+
     // ✅ fixed: remove the extra "staff" in URL and name
 
     Route::prefix('staff')->middleware(['auth'])->group(function () {
@@ -396,7 +509,6 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
      ->name('staff.materials.notification');
 
         
-
 
     Route::prefix('inventory')->name('inventory.')->group(function () {
         Route::get('/', [StaffInventoryController::class, 'index'])->name('index');
@@ -416,3 +528,28 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
         Route::delete('/{id}', [StaffMaterialController::class, 'destroy'])->name('destroy');
     });
 });
+
+/*
+|--------------------------------------------------------------------------|
+| Google OAuth (Temporary for Dev)                                        |
+|--------------------------------------------------------------------------|
+*/
+if (interface_exists('Laravel\\Socialite\\Contracts\\Factory')) {
+    Route::get('/auth/google/redirect', function () {
+        return app('Laravel\\Socialite\\Contracts\\Factory')->driver('google')->redirect();
+    })->name('google.redirect');
+
+    Route::get('/auth/google/callback', function () {
+        $user = app('Laravel\\Socialite\\Contracts\\Factory')->driver('google')->user();
+        // You can dump user info for testing
+        // dd($user);
+        return 'Google login successful (dev placeholder)';
+    })->name('google.callback');
+}
+
+Route::middleware('auth')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
+
+require __DIR__.'/auth.php';
+
+
+

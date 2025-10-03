@@ -108,9 +108,20 @@
 }
 
 /* Material Type Colors */
-.badge-type.paper { background-color: #2563eb; }     
-.badge-type.card { background-color: #f59e0b; }     
-.badge-type { background-color: #c1b42d; }    
+/* PAPER (blue) */
+.badge-type.paper { background-color: #2563eb; }
+/* INK (green) */
+.badge-type.ink { background-color: #16a34a; }
+/* ENVELOPES (brown) - support both 'envelope' and 'envelopes' */
+.badge-type.envelope, .badge-type.envelopes { background-color: #8b5e3c; }
+/* RIBBON (red) */
+.badge-type.ribbon { background-color: #dc2626; }
+/* POWDER (orange) */
+.badge-type.powder { background-color: #f97316; }
+/* SOUVENIRS (pink) */
+.badge-type.souvenirs { background-color: #ec4899; }
+/* Fallback */
+.badge-type { background-color: #6b7280; }
 
 /* Stock Level Colors */
 .stock-ok { background-color: #16a34a; }

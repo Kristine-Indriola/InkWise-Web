@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>Staff Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/alpinejs" defer></script>
@@ -31,6 +32,7 @@
 
 <div class="flex h-screen" x-data="{ open: true }">
    
+
   <!-- Sidebar -->
   <aside :class="open ? 'w-48' : 'w-16'" 
        class="relative border-r flex flex-col sidebar transition-all duration-300 text-sm"
@@ -111,6 +113,89 @@
                    <span x-show="open" x-transition>Materials</span>
                 </a>
             </li>
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r flex flex-col sidebar">
+      <div class="p-4 text-2xl font-bold text-purple-500 border-b flex items-center">
+        <span class="logo-script text-4xl text-purple-500">I</span>
+        <span class="logo-serif text-2xl ml-1 text-blue-500">nkwise</span>
+      </div>
+<!--
+      <div class="p-4 flex items-center border-b">
+        <img src="https://via.placeholder.com/40" alt="avatar" class="rounded-full mr-3">
+        <div>
+          <p class="font-semibold">Staff Profile</p>
+          <span class="text-green-500 text-sm">● Online</span>
+        </div>
+      </div>
+-->
+      <nav class="flex-1 p-4">
+        <ul class="space-y-2">
+    <li>
+        <a href="{{ route('staff.profile.edit') }}" class="flex items-center p-2 text-gray-700 hover:bg-purple-200 rounded-lg">
+  <i class="fa-solid fa-user-circle mr-2"></i> Profile
+</a>
+
+    </li>
+    <!-- Existing menu items below -->
+          <li>
+            <a href="{{ route('staff.dashboard') }}"
+               class="flex items-center p-2 rounded hover:bg-gray-100
+                      {{ request()->routeIs('staff.dashboard') ? 'bg-gray-100 text-purple-600 font-semibold' : 'text-gray-700' }}">
+              <span class="menu-icon mr-3"><i class="fa-solid fa-gauge-high"></i></span>
+              <span>Dashboard</span>
+            </a>
+          </li>
+
+          <li>
+            <a href="{{ route('staff.assigned.orders') }}"
+               class="flex items-center p-2 rounded hover:bg-gray-100
+                      {{ request()->routeIs('staff.assigned.orders') ? 'bg-gray-100 text-purple-600 font-semibold' : 'text-gray-700' }}">
+              <span class="menu-icon mr-3"><i class="fa-solid fa-clipboard-list"></i></span>
+              <span>Assigned Orders</span>
+            </a>
+          </li>
+
+          <li>
+            <a href="{{ route('staff.messages.index') }}"
+               class="flex items-center p-2 rounded hover:bg-gray-100
+                      {{ request()->routeIs('staff.messages.*') ? 'bg-gray-100 text-purple-600 font-semibold' : 'text-gray-700' }}">
+              <span class="menu-icon mr-3"><i class="fa-solid fa-envelope"></i></span>
+              <span>Messages</span>
+            </a>
+          </li>
+
+          <li>
+            <a href="{{ route('staff.order.list') }}"
+               class="flex items-center p-2 rounded hover:bg-gray-100
+                      {{ request()->routeIs('staff.order.list') ? 'bg-gray-100 text-purple-600 font-semibold' : 'text-gray-700' }}">
+              <span class="menu-icon mr-3"><i class="fa-solid fa-list"></i></span>
+              <span>Order List</span>
+            </a>
+          </li>
+
+          <li>
+    <a href="{{ route('staff.customer_profile') }}"
+       class="flex items-center p-2 rounded hover:bg-gray-100
+              {{ request()->routeIs('staff.customer_profile') ? 'bg-gray-100 text-purple-600 font-semibold' : 'text-gray-700' }}">
+      <span class="menu-icon mr-3"><i class="fa-solid fa-users"></i></span>
+      <span>Customer Profiles</span>
+    </a>
+</li>
+
+          <li>
+            <a href="{{ route('staff.notify.customers') }}"
+               class="flex items-center p-2 rounded hover:bg-gray-100
+                      {{ request()->routeIs('staff.notify.customers') ? 'bg-gray-100 text-purple-600 font-semibold' : 'text-gray-700' }}">
+              <span class="menu-icon mr-3"><i class="fa-solid fa-bell"></i></span>
+              <span>Notify Customers</span>
+            </a>
+          </li>
+
+          <li class="{{ request()->routeIs('staff.materials.*') ? 'active' : '' }}">
+    <a href="{{ route('staff.materials.index') }}"><i>📝</i> Materials</a>
+</li>
+
         </ul>
     </nav>
 
@@ -129,6 +214,9 @@
       style="background: linear-gradient(135deg, #acd9b5, #6f94d6);">
         <h1 class="text-xl font-bold">Welcome, Staff!</h1>
         <div class="flex items-center space-x-4">
+          <a href="{{ route('staff.messages.index') }}" class="text-gray-600" aria-label="Messages">
+            <i class="fa-solid fa-envelope"></i>
+          </a>
           <a href="{{ route('staff.staff.materials.notification') }}" class="nav-link">
             🔔
             @php
@@ -167,5 +255,7 @@
   </main>
 </div>
 
+  @yield('scripts')
+  @stack('scripts')
 </body>
 </html>
