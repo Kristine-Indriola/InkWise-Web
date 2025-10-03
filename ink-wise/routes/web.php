@@ -173,6 +173,8 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::prefix('products')->name('products.')->group(function () {
     Route::get('/create', [ProductController::class, 'createInvitation'])->name('create');
     // Show single product (AJAX slide panel)
+    Route::get('/{id}/view', [ProductController::class, 'view'])->name('view');
+    Route::post('/{id}/upload', [ProductController::class, 'upload'])->name('upload');
     Route::get('/{id}', [ProductController::class, 'show'])->name('show');
     // Index (product listing)
     Route::get('/', [ProductController::class, 'index'])->name('index');
@@ -401,7 +403,7 @@ Route::prefix('templates')->group(function () {
     Route::get('/corporate', fn () => view('customer.templates.corporate'))->name('templates.corporate');
 
     // Invitations
-    Route::get('/wedding/invitations', fn () => view('customer.Invitations.weddinginvite'))->name('templates.wedding.invitations');
+    Route::get('/wedding/invitations', [InvitationController::class, 'weddingInvitations'])->name('templates.wedding.invitations');
     Route::get('/birthday/invitations', fn () => view('customer.Invitations.birthdayinvite'))->name('templates.birthday.invitations');
     Route::get('/corporate/invitations', fn () => view('customer.Invitations.corporateinvite'))->name('templates.corporate.invitations');
     Route::get('/baptism/invitations', fn () => view('customer.Invitations.baptisminvite'))->name('templates.baptism.invitations');
