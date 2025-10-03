@@ -279,8 +279,13 @@
           </section>
         @endif
       </div>
-
-  <a href="{{ route('design.edit', ['product' => $product->id]) }}" class="edit-btn" target="_parent">Edit my design</a>
+  <a href="{{ route('design.edit', ['product' => $product->id]) }}" class="edit-btn" data-edit-link target="_parent">
+    <span>Edit my design</span>
+    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M17 7L7 17"></path>
+      <path d="M8 7h9v9"></path>
+    </svg>
+  </a>
       <div id="addonToast" class="selection-toast" role="status" aria-live="polite"></div>
     </div>
   </div>

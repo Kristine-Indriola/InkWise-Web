@@ -75,7 +75,7 @@
 <body class="antialiased bg-white">
 
     <!-- Top Navigation Bar -->
-    <header class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#c7d2fe] shadow-sm">
+    <header class="fixed top-0 z-40 bg-white/95 backdrop-blur border-b border-[#c7d2fe] shadow-sm w-full">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
                 <!-- Logo -->

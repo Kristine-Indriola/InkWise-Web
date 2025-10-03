@@ -529,6 +529,11 @@ class ProductController extends Controller
         return view('admin.products.edit', compact('product', 'templates', 'materials'));
     }
 
+    public function show($id)
+    {
+        return $this->view($id);
+    }
+
     // Show product (used by AJAX slide panel)
     public function view($id)
     {

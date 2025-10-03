@@ -708,6 +708,9 @@
         /* gentle overlay to make text pop */
         .hero-wrapper::after { content: ''; position: absolute; inset:0; background: linear-gradient(180deg, rgba(255,255,255,0.0), rgba(255,255,255,0.4)); pointer-events: none; z-index:5; }
 
+        header { position: fixed; top: 0; width: 100%; z-index: 50; }
+        body { padding-top: 64px; }
+
     </style>
 </head>
 <body id="dashboard" class="antialiased bg-white">
