@@ -44,7 +44,7 @@
     /* Sidebar */
     .sidebar {
       width: 230px;
-      background: linear-gradient(90deg, #cdffd8, #94b9ff); /* updated gradient */
+      background: linear-gradient(135deg, #acd9b5, #6f94d6); /* darker take on original gradient */
       border-right: 1px solid #e0e0e0;
       height: 100vh;
       padding: 20px 15px;
@@ -55,6 +55,7 @@
       left: 0;
       overflow-y: auto;
       z-index: 101;
+      color: #f1f5f9;
     }
 
 
@@ -185,7 +186,7 @@
 
     /* Topbar (improved) */
     .topbar {
-      background: linear-gradient(90deg, rgba(148,185,255,0.98), rgba(205,255,216,0.95));
+      background: linear-gradient(135deg, rgba(172,217,181,0.95), rgba(111,148,214,0.92));
       height: 64px;
       border-bottom: 1px solid rgba(0,0,0,0.06);
       display: flex;
@@ -653,8 +654,8 @@ body.dark-mode .btn-warning {
       <li class="{{ request()->routeIs('admin.products.*') ? 'active' : '' }}">
         <a href="{{ route('admin.products.index') }}"><i class="fi fi-rr-boxes"></i> <span class="label">Products</span></a>
       </li>
-      <li>
-        <a href="#"><i class="fi fi-rr-list-check"></i> <span class="label">Order Summaries</span></a>
+      <li class="{{ request()->routeIs('admin.ordersummary.*') ? 'active' : '' }}">
+        <a href="{{ route('admin.ordersummary.index') }}"><i class="fi fi-rr-list-check"></i> <span class="label">Order Summaries</span></a>
       </li>
       {{--<li class="{{ request()->routeIs('admin.messages.*') ? 'active' : '' }}">
         <a href="{{ route('admin.messages.index') }}"><i class="fi fi-rr-comment-dots"></i> <span class="label">Messages</span></a>
@@ -662,8 +663,8 @@ body.dark-mode .btn-warning {
       <li class="{{ request()->routeIs('admin.materials.*') ? 'active' : '' }}">
         <a href="{{ route('admin.materials.index') }}"><i class="fi fi-rr-blog-pencil"></i> <span class="label">Materials</span></a>
       </li>
-      <li>
-        <a href="#"><i class="fi fi-rr-document"></i> <span class="label">Reports</span></a>
+      <li class="{{ request()->routeIs('admin.reports.*') ? 'active' : '' }}">
+        <a href="{{ route('admin.reports.index') }}"><i class="fi fi-rr-document"></i> <span class="label">Reports</span></a>
       </li>
 
           <li class="{{ request()->routeIs('admin.chatbot.index') ? 'active' : '' }}">

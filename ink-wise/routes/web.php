@@ -31,7 +31,12 @@ use App\Http\Controllers\Admin\MaterialsController;
 use App\Http\Controllers\customerProfileController;
 use App\Http\Controllers\Owner\OwnerStaffController;
 use App\Http\Controllers\Auth\CustomerAuthController;
+
+use App\Http\Controllers\Customer\InvitationController;
+use App\Http\Controllers\Customer\OrderFlowController;
+
 use App\Http\Controllers\Customer\CustomerController;
+
 use App\Http\Controllers\Owner\OwnerProductsController;
 use App\Http\Controllers\Staff\StaffCustomerController;
 use App\Http\Controllers\Staff\StaffMaterialController;
@@ -40,6 +45,10 @@ use App\Http\Controllers\Owner\OwnerInventoryController;
 use App\Http\Controllers\Staff\StaffInventoryController;
 use App\Http\Controllers\Admin\ReportsDashboardController;
 use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
+
+use App\Http\Controllers\Admin\OrderSummaryController;
+use App\Models\Product;
+
 use App\Http\Controllers\Admin\UserPasswordResetController;
 use App\Models\User as AppUser;
 use Illuminate\Notifications\DatabaseNotification;
@@ -79,6 +88,10 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     ->middleware('auth');
     
 
+    Route::get('/ordersummary/{order:order_number?}', [OrderSummaryController::class, 'show'])
+        ->name('ordersummary.index');
+
+
 
     // Templates 
     Route::prefix('templates')->name('templates.')->group(function () { 
@@ -99,6 +112,8 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
             return redirect()->route('admin.products.create.invitation', ['template_id' => $id]);
         });
         Route::post('{id}/upload-to-product', [AdminTemplateController::class, 'uploadToProduct'])->name('uploadToProduct');
+    // Custom upload via the templates UI (front/back images)
+    Route::post('custom-upload', [AdminTemplateController::class, 'customUpload'])->name('customUpload');
         // Asset search API: images, videos, elements
         Route::get('{id}/assets/search', [AdminTemplateController::class, 'searchAssets'])->name('searchAssets');
         Route::post('{id}/canvas-settings', [AdminTemplateController::class, 'updateCanvasSettings'])->name('updateCanvasSettings');
@@ -165,6 +180,8 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::get('/inks', [ProductController::class, 'inks'])->name('inks');
     Route::get('/materials', [ProductController::class, 'materials'])->name('materials');
     Route::get('/create/invitation', [ProductController::class, 'createInvitation'])->name('create.invitation');
+    Route::get('/create/giveaway', [ProductController::class, 'createGiveaway'])->name('create.giveaway');
+    Route::get('/create/envelope', [ProductController::class, 'createEnvelope'])->name('create.envelope');
     Route::post('/store', [ProductController::class, 'store'])->name('store');
     Route::get('/{id}/edit', [ProductController::class, 'edit'])->name('edit');
     Route::delete('/{id}', [ProductController::class, 'destroy'])->name('destroy');
@@ -196,7 +213,7 @@ Route::prefix('users')->name('users.')->group(function () {
         ->name('messages.unread-count');
 
      Route::get('reports', [ReportsDashboardController::class, 'index'])
-         ->name('reports.reports');
+         ->name('reports.index');
 
     // Optional: Sales export
     Route::get('reports/sales/export/{type}', [ReportsDashboardController::class, 'exportSales'])
@@ -390,17 +407,44 @@ Route::prefix('templates')->group(function () {
     Route::get('/baptism/invitations', fn () => view('customer.Invitations.baptisminvite'))->name('templates.baptism.invitations');
 
     // Giveaways
-    Route::get('/wedding/giveaways', fn () => view('customer.Giveaways.weddinggive'))->name('templates.wedding.giveaways');
+    Route::get('/wedding/giveaways', [InvitationController::class, 'weddingGiveaways'])->name('templates.wedding.giveaways');
     Route::get('/birthday/giveaways', fn () => view('customer.Giveaways.birthdaygive'))->name('templates.birthday.giveaways');
 });
 
 /** Product Preview & Design Editing*/
-Route::get('/product/preview', fn () => view('customer.Invitations.productpreview'))->name('productpreview');
-Route::get('/design/edit', fn () => view('customer.Invitations.editing'))->name('design.edit');
+Route::get('/product/preview/{product}', function (Product $product) {
+    $product->load([
+        'template',
+        'uploads',
+        'images',
+        'paperStocks',
+        'addons',
+        'colors',
+        'bulkOrders',
+        'materials'
+    ]);
+
+    return view('customer.Invitations.productpreview', compact('product'));
+})->name('product.preview');
+Route::get('/design/edit/{product?}', [OrderFlowController::class, 'edit'])->name('design.edit');
+Route::post('/order/cart/items', [OrderFlowController::class, 'storeDesignSelection'])->name('order.cart.add');
 
 /**Order Forms & Pages*/
-Route::get('/order/form', fn () => view('customer.profile.orderform'))->name('order.form');
+Route::get('/order/review', [OrderFlowController::class, 'review'])->name('order.review');
+Route::get('/order/finalstep', [OrderFlowController::class, 'finalStep'])->name('order.finalstep');
+Route::get('/order/envelope', [OrderFlowController::class, 'envelope'])->name('order.envelope');
+Route::get('/order/summary', [OrderFlowController::class, 'summary'])->name('order.summary');
+Route::get('/order/giveaways', [OrderFlowController::class, 'giveaways'])->name('order.giveaways');
+Route::get('/api/envelopes', [ProductController::class, 'getEnvelopes'])->name('api.envelopes');
 Route::get('/order/birthday', fn () => view('customer.templates.birthday'))->name('order.birthday');
+
+Route::get('/checkout', [OrderFlowController::class, 'checkout'])->name('customer.checkout');
+Route::post('/checkout/complete', [OrderFlowController::class, 'completeCheckout'])->name('checkout.complete');
+Route::post('/checkout/cancel', [OrderFlowController::class, 'cancelCheckout'])->name('checkout.cancel');
+
+/**Customer Upload Route*/
+Route::middleware('auth')->post('/customer/upload/design', [CustomerAuthController::class, 'uploadDesign'])->name('customer.upload.design');
+
 /*
 |--------------------------------------------------------------------------|
 | CUSTOMER END                                      |

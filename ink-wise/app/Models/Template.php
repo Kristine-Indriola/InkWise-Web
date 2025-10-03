@@ -15,6 +15,8 @@ class Template extends Model
         'product_type',
         'theme_style',
         'description',
+        'front_image',
+        'back_image',
     ];
 
     public function products()

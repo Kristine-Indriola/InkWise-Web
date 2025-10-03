@@ -9,6 +9,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         DB::statement('SET FOREIGN_KEY_CHECKS=0');
         try {
             DB::statement('ALTER TABLE `product_materials` DROP FOREIGN KEY `product_materials_material_id_foreign`');
@@ -34,6 +38,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         DB::statement('SET FOREIGN_KEY_CHECKS=0');
         try {
             DB::statement('ALTER TABLE `product_materials` DROP FOREIGN KEY `product_materials_material_id_foreign`');

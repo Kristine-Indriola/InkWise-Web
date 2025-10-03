@@ -12,6 +12,10 @@ return new class extends Migration
         // Add a unique index on material_name to prevent duplicate ink entries
         if (!Schema::hasTable('inks')) return;
 
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         // Detect duplicate material_name entries and automatically merge them.
         // Strategy per duplicate material_name:
         //  - keep the row with the smallest id (keep_id)
@@ -78,6 +82,7 @@ return new class extends Migration
     public function down(): void
     {
         if (!Schema::hasTable('inks')) return;
+
         Schema::table('inks', function (Blueprint $table) {
             try {
                 $table->dropUnique('material_name_unique');

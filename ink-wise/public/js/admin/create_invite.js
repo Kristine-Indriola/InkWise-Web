@@ -1,233 +1,102 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const materialSource = window.materialsData || [];
+    const rawMaterials = Array.isArray(materialSource) ? materialSource : Object.values(materialSource);
     const templates = Array.isArray(window.templatesData) ? window.templatesData : [];
-    const materials = Array.isArray(window.materialsData) ? window.materialsData : [];
+    const materials = rawMaterials
+        .map(item => ({
+            id: String(item.material_id ?? item.id ?? ''),
+            name: item.material_name ?? item.name ?? '',
+            type: item.material_type ?? item.type ?? '',
+            unitCost: (() => {
+                const value = item.unit_cost ?? item.unitPrice ?? item.unit_price ?? item.price;
+                const parsed = value !== undefined && value !== null ? parseFloat(value) : null;
+                return Number.isFinite(parsed) ? parsed : null;
+            })(),
+        }))
+        .filter(item => item.id || item.name);
     const assetBase = ((window.assetUrl || '').replace(/\/$/, '')) || '';
+
+    const materialById = new Map(materials.map(mat => [mat.id, mat]));
+    const materialByName = new Map(materials.map(mat => [mat.name.trim().toLowerCase(), mat]));
+
+    function findMaterialById(id) {
+        if (!id) return null;
+        return materialById.get(String(id)) || null;
+    }
+
+    function findMaterialByName(name) {
+        if (!name) return null;
+        return materialByName.get(String(name).trim().toLowerCase()) || null;
+    }
 
     function normalize(value) {
         return value === undefined || value === null ? '' : String(value).trim().toLowerCase();
     }
 
-    function uniqueMaterialTypes() {
-        const seen = new Set();
-        materials.forEach(material => {
-            if (!material || !material.material_type) return;
-            const type = material.material_type.toString().trim();
-            if (!type) return;
-            seen.add(type);
-        });
-        return Array.from(seen).sort((a, b) => a.localeCompare(b));
-    }
-
-    function materialOptionsForType(type) {
-        const normalized = normalize(type);
-        return materials
-            .filter(material => {
-                if (!material) return false;
-                if (!material.material_name) return false;
-                if (!normalized) return true;
-                return normalize(material.material_type) === normalized;
-            })
-            .map(material => material.material_name.toString().trim())
-            .filter(Boolean)
-            .sort((a, b) => a.localeCompare(b));
-    }
-
-    function findMaterialRecord(type, name) {
-        const typeNorm = normalize(type);
-        const nameNorm = normalize(name);
-        return materials.find(material => {
-            if (!material) return false;
-            const matchesType = typeNorm ? normalize(material.material_type) === typeNorm : true;
-            const matchesName = nameNorm ? normalize(material.material_name) === nameNorm : true;
-            return matchesType && matchesName;
-        }) || null;
-    }
-
-    function populateMaterialTypeSelect(row) {
-        const select = row.querySelector('select[name*="[type]"]');
-        if (!select) return;
-        const current = select.getAttribute('data-current') || select.value || '';
-        const placeholder = select.getAttribute('data-placeholder') || 'Select material type';
-        const options = uniqueMaterialTypes();
-
-        select.innerHTML = '';
-        const placeholderOption = document.createElement('option');
-        placeholderOption.value = '';
-        placeholderOption.textContent = placeholder;
-        placeholderOption.disabled = true;
-        select.appendChild(placeholderOption);
-
-        options.forEach(value => {
-            const opt = document.createElement('option');
-            opt.value = value;
-            opt.textContent = value;
-            select.appendChild(opt);
-        });
-
-        if (current) {
-            const match = Array.from(select.options).find(opt => normalize(opt.value) === normalize(current));
-            if (match) {
-                select.value = match.value;
-            } else {
-                const dynamicOption = new Option(current, current, true, true);
-                select.add(dynamicOption);
-                select.value = dynamicOption.value;
-            }
-        } else {
-            select.value = '';
-            placeholderOption.selected = true;
-        }
-
-        select.dataset.current = '';
-    }
-
-    function populateMaterialNameSelect(row) {
-        const nameSelect = row.querySelector('select[name*="[item]"]');
-        const typeSelect = row.querySelector('select[name*="[type]"]');
-        if (!nameSelect) return;
-        const current = nameSelect.getAttribute('data-current') || nameSelect.value || '';
-        const placeholder = nameSelect.getAttribute('data-placeholder') || 'Select material';
-        const options = materialOptionsForType(typeSelect ? typeSelect.value : '');
-
-        nameSelect.innerHTML = '';
-        const placeholderOption = document.createElement('option');
-        placeholderOption.value = '';
-        placeholderOption.textContent = placeholder;
-        placeholderOption.disabled = true;
-        nameSelect.appendChild(placeholderOption);
-
-        options.forEach(value => {
-            const opt = document.createElement('option');
-            opt.value = value;
-            opt.textContent = value;
-            nameSelect.appendChild(opt);
-        });
-
-        if (current) {
-            const match = Array.from(nameSelect.options).find(opt => normalize(opt.value) === normalize(current));
-            if (match) {
-                nameSelect.value = match.value;
-            } else {
-                const dynamicOption = new Option(current, current, true, true);
-                nameSelect.add(dynamicOption);
-                nameSelect.value = dynamicOption.value;
-            }
-        } else {
-            nameSelect.value = '';
-            placeholderOption.selected = true;
-        }
-
-        nameSelect.dataset.current = '';
-    }
-
-    function applyMaterialRecord(row, record) {
-        const fieldMap = {
-            color: record ? record.color : '',
-            size: record ? record.size : '',
-            weight: record ? record.weight_gsm : '',
-            unit: record ? record.unit : '',
-            unitPrice: record && record.unit_cost !== undefined ? record.unit_cost : ''
-        };
-
-        Object.entries(fieldMap).forEach(([key, value]) => {
-            const input = row.querySelector(`input[name*="[${key}]"]`);
-            if (!input) return;
-            if (value === undefined || value === null) {
-                input.value = '';
-            } else if (typeof value === 'number') {
-                input.value = value.toString();
-            } else {
-                input.value = value;
-            }
-        });
-
-        const idInput = row.querySelector('input[name*="[id]"]');
-        if (idInput) {
-            idInput.value = record && record.material_id !== undefined ? record.material_id : '';
-        }
-    }
-
-    function refreshMaterialRow(row) {
-        populateMaterialTypeSelect(row);
-        populateMaterialNameSelect(row);
-        const typeSelect = row.querySelector('select[name*="[type]"]');
-        const nameSelect = row.querySelector('select[name*="[item]"]');
-        const record = findMaterialRecord(typeSelect ? typeSelect.value : '', nameSelect ? nameSelect.value : '');
-        applyMaterialRecord(row, record);
-    }
-
-    function attachMaterialListeners(row) {
-        const typeSelect = row.querySelector('select[name*="[type]"]');
-        const nameSelect = row.querySelector('select[name*="[item]"]');
-
-        if (typeSelect) {
-            typeSelect.addEventListener('change', () => {
-                populateMaterialNameSelect(row);
-                const record = findMaterialRecord(typeSelect.value, row.querySelector('select[name*="[item]"]')?.value || '');
-                applyMaterialRecord(row, record);
-            });
-        }
-
-        if (nameSelect) {
-            nameSelect.addEventListener('change', () => {
-                const record = findMaterialRecord(row.querySelector('select[name*="[type]"]')?.value || '', nameSelect.value);
-                applyMaterialRecord(row, record);
-            });
-        }
-    }
-
-    document.querySelectorAll('.material-row').forEach(row => {
-        refreshMaterialRow(row);
-        attachMaterialListeners(row);
-    });
-
-    document.querySelectorAll('.material-rows').forEach(container => {
+    // Generic add/remove handlers for other repeatable rows (paper stocks, addons, colors, bulk orders)
+    document.querySelectorAll('.paper-stock-rows, .addon-rows, .color-rows, .bulk-order-rows').forEach(container => {
         container.addEventListener('click', event => {
             if (event.target.classList.contains('add-row')) {
                 event.preventDefault();
-                const rows = container.querySelectorAll('.material-row');
+                const rows = container.querySelectorAll(':scope > div');
                 if (!rows.length) return;
                 const lastRow = rows[rows.length - 1];
                 const newRow = lastRow.cloneNode(true);
                 const newIndex = rows.length;
 
+                // Update names and ids
                 newRow.querySelectorAll('[name]').forEach(element => {
                     element.name = element.name.replace(/\[\d+\]/, `[${newIndex}]`);
                 });
-
                 newRow.querySelectorAll('[id]').forEach(element => {
                     element.id = element.id.replace(/_(\d+)(?=_[^_]+$)/, `_${newIndex}`);
                     element.id = element.id.replace(/_(\d+)$/, `_${newIndex}`);
                 });
 
-                newRow.querySelectorAll('input').forEach(input => {
-                    if (input.type === 'hidden') {
-                        input.value = '';
+                // Clear input values
+                newRow.querySelectorAll('input, textarea, select').forEach(input => {
+                    if (input.type === 'file') {
+                        // Clear file inputs by replacing element
+                        const clone = input.cloneNode();
+                        clone.value = '';
+                        input.parentNode.replaceChild(clone, input);
+                    } else if (input.type === 'checkbox' || input.type === 'radio') {
+                        input.checked = false;
+                    } else if (input.tagName === 'SELECT') {
+                        input.selectedIndex = 0;
                     } else {
                         input.value = '';
                     }
-                    if (input.hasAttribute('data-current')) {
-                        input.setAttribute('data-current', '');
-                    }
+                    if (input.dataset) delete input.dataset.autofill;
                 });
 
-                newRow.querySelectorAll('select').forEach(select => {
-                    select.value = '';
-                    if (select.hasAttribute('data-current')) {
-                        select.setAttribute('data-current', '');
-                    }
-                });
+                newRow.querySelectorAll('.existing-file').forEach(el => el.remove());
 
                 container.appendChild(newRow);
-                refreshMaterialRow(newRow);
-                attachMaterialListeners(newRow);
+
+                if (container.classList.contains('paper-stock-rows')) {
+                    const select = newRow.querySelector('.paper-stock-name-select');
+                    if (select) {
+                        select.value = '';
+                    }
+                    const hidden = newRow.querySelector('.paper-stock-material-id');
+                    if (hidden) hidden.value = '';
+                    syncPaperStockRow(newRow);
+                }
+
+                if (container.classList.contains('addon-rows')) {
+                    const hidden = newRow.querySelector('.addon-material-id');
+                    if (hidden) hidden.value = '';
+                    toggleAddonInputs(newRow);
+                    syncAddonRow(newRow);
+                }
             }
 
             if (event.target.classList.contains('remove-row')) {
                 event.preventDefault();
-                const rows = container.querySelectorAll('.material-row');
+                const rows = container.querySelectorAll(':scope > div');
                 if (rows.length <= 1) return;
-                const row = event.target.closest('.material-row');
+                const row = event.target.closest(':scope > div');
                 if (row) row.remove();
             }
         });
@@ -265,66 +134,69 @@ document.addEventListener('DOMContentLoaded', () => {
             button.addEventListener('click', () => showPage(idx));
         });
 
-    function validatePage(pageIndex) {
-        if (pageIndex === 1) { // Page 2 validation
-            const errors = [];
-            const invitationName = document.getElementById('invitationName');
-            if (!invitationName || !invitationName.value.trim()) {
-                errors.push({field: 'invitationName', message: 'Invitation Name is required.'});
-            }
-            const eventType = document.getElementById('eventType');
-            if (!eventType || !eventType.value) {
-                errors.push({field: 'eventType', message: 'Event Type is required.'});
-            }
-            const productType = document.getElementById('productType');
-            if (!productType || !productType.value) {
-                errors.push({field: 'productType', message: 'Product Type is required.'});
-            }
-            const themeStyle = document.getElementById('themeStyle');
-            if (!themeStyle || !themeStyle.value.trim()) {
-                errors.push({field: 'themeStyle', message: 'Theme / Style is required.'});
-            }
-            // Show errors
-            const errorSummary = document.querySelector('.page2 .error-summary');
-            const errorList = document.querySelector('.page2 #error-list-page2');
-            if (errors.length > 0) {
-                errorList.innerHTML = '';
-                errors.forEach(error => {
-                    const li = document.createElement('li');
-                    li.textContent = error.message;
-                    errorList.appendChild(li);
-                    const errorSpan = document.getElementById(error.field + '-error');
-                    if (errorSpan) {
-                        errorSpan.textContent = error.message;
-                        errorSpan.style.display = 'block';
+        function validatePage(pageIndex) {
+            if (pageIndex === 1) {
+                const errors = [];
+                const invitationName = document.getElementById('invitationName');
+                if (!invitationName || !invitationName.value.trim()) {
+                    errors.push({ field: 'invitationName', message: 'Invitation Name is required.' });
+                }
+                const eventType = document.getElementById('eventType');
+                if (!eventType || !eventType.value) {
+                    errors.push({ field: 'eventType', message: 'Event Type is required.' });
+                }
+                const productType = document.getElementById('productType');
+                if (!productType || !productType.value) {
+                    errors.push({ field: 'productType', message: 'Product Type is required.' });
+                }
+                const themeStyle = document.getElementById('themeStyle');
+                if (!themeStyle || !themeStyle.value.trim()) {
+                    errors.push({ field: 'themeStyle', message: 'Theme / Style is required.' });
+                }
+
+                const errorSummary = document.querySelector('.page2 .error-summary');
+                const errorList = document.querySelector('.page2 #error-list-page2');
+                if (errors.length > 0) {
+                    if (errorList) {
+                        errorList.innerHTML = '';
+                        errors.forEach(error => {
+                            const li = document.createElement('li');
+                            li.textContent = error.message;
+                            errorList.appendChild(li);
+                            const errorSpan = document.getElementById(`${error.field}-error`);
+                            if (errorSpan) {
+                                errorSpan.textContent = error.message;
+                                errorSpan.style.display = 'block';
+                            }
+                        });
                     }
-                });
-                errorSummary.style.display = 'block';
-                return false;
-            } else {
-                errorSummary.style.display = 'none';
+                    if (errorSummary) errorSummary.style.display = 'block';
+                    return false;
+                }
+
+                if (errorSummary) errorSummary.style.display = 'none';
                 ['invitationName', 'eventType', 'productType', 'themeStyle'].forEach(field => {
-                    const errorSpan = document.getElementById(field + '-error');
+                    const errorSpan = document.getElementById(`${field}-error`);
                     if (errorSpan) {
                         errorSpan.textContent = '';
                         errorSpan.style.display = 'none';
                     }
                 });
-                return true;
             }
+            return true;
         }
-        return true;
-    }
 
-    document.querySelectorAll('.continue-btn').forEach(button => {
-        if (button.dataset.templateId) return;
-        button.addEventListener('click', (e) => {
-            const currentPage = Navigation.currentPage;
-            if (validatePage(currentPage)) {
-                Navigation.showNextPage();
-            }
+        document.querySelectorAll('.continue-btn').forEach(button => {
+            if (button.dataset.templateId) return;
+            button.addEventListener('click', () => {
+                const currentPage = Navigation.currentPage;
+                if (validatePage(currentPage)) {
+                    showNextPage();
+                }
+            });
         });
-    });        showPage(0);
+
+        showPage(0);
 
         return {
             showPage,
@@ -361,56 +233,77 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${base}${path}`.replace(/\/+/g, '/');
     }
 
+    function applyTemplateToForm(template) {
+        if (!template) return;
+
+        const templateField = document.getElementById('template_id');
+        if (templateField) templateField.value = template.id || '';
+
+        const nameInput = document.getElementById('invitationName');
+        if (nameInput) {
+            nameInput.value = template.name || '';
+            nameInput.dataset.templateValue = template.name || '';
+        }
+
+        const eventSelect = document.getElementById('eventType');
+        const eventValue = template.event_type || template.eventType || '';
+        if (eventSelect) {
+            ensureOption(eventSelect, eventValue);
+            eventSelect.dataset.templateValue = eventValue;
+        }
+
+        const productSelect = document.getElementById('productType');
+        const productValue = template.product_type || template.productType || '';
+        if (productSelect) {
+            ensureOption(productSelect, productValue);
+            productSelect.dataset.templateValue = productValue;
+        }
+
+        const themeStyleInput = document.getElementById('themeStyle');
+        const themeValue = template.theme_style || template.themeStyle || '';
+        if (themeStyleInput) {
+            themeStyleInput.value = themeValue;
+            themeStyleInput.dataset.templateValue = themeValue;
+        }
+
+        const descriptionTextarea = document.getElementById('description');
+        const descriptionEditor = document.getElementById('description-editor');
+        const description = template.description || '';
+        if (descriptionTextarea) descriptionTextarea.value = description;
+        if (descriptionEditor) descriptionEditor.innerHTML = description;
+
+        const previewImg = document.getElementById('template-preview-img');
+        if (previewImg) {
+            const previewCandidates = [
+                template.preview_url,
+                template.preview,
+                template.preview_image,
+                template.image_url,
+                template.image
+            ];
+            const previewPath = previewCandidates.find(Boolean) || '';
+            const resolved = previewPath ? resolvePreviewPath(previewPath) : '';
+            if (resolved) {
+                previewImg.src = resolved;
+                previewImg.style.display = 'block';
+                previewImg.alt = `${template.name || 'Selected'} Preview`;
+            } else {
+                previewImg.src = '';
+                previewImg.style.display = 'none';
+                previewImg.alt = 'No preview available';
+            }
+        }
+    }
+
     document.querySelectorAll('.continue-btn[data-template-id]').forEach(button => {
         button.addEventListener('click', () => {
             const templateId = button.dataset.templateId;
             const template = templates.find(t => String(t.id) === String(templateId));
-            if (!template) {
-                Navigation.showPage(1);
-                return;
+            if (template) {
+                applyTemplateToForm(template);
             }
-
-            const templateField = document.getElementById('template_id');
-            if (templateField) templateField.value = template.id;
-
-            const nameInput = document.getElementById('invitationName');
-            if (nameInput) nameInput.value = template.name || '';
-
-            ensureOption(document.getElementById('eventType'), template.event_type || template.eventType || '');
-            ensureOption(document.getElementById('productType'), template.product_type || template.productType || '');
-
-            const themeStyleInput = document.getElementById('themeStyle');
-            if (themeStyleInput) themeStyleInput.value = template.theme_style || template.themeStyle || '';
-
-            const descriptionTextarea = document.getElementById('description');
-            const descriptionEditor = document.getElementById('description-editor');
-            const description = template.description || '';
-            if (descriptionTextarea) descriptionTextarea.value = description;
-            if (descriptionEditor) descriptionEditor.innerHTML = description;
-
-            const previewImg = document.getElementById('template-preview-img');
-            if (previewImg) {
-                const previewCandidates = [
-                    template.preview_url,
-                    template.preview,
-                    template.preview_image,
-                    template.image_url,
-                    template.image
-                ];
-                const previewPath = previewCandidates.find(Boolean) || '';
-                const resolved = previewPath ? resolvePreviewPath(previewPath) : '';
-                if (resolved) {
-                    previewImg.src = resolved;
-                    previewImg.style.display = 'block';
-                    previewImg.alt = `${template.name || 'Selected'} Preview`;
-                } else {
-                    previewImg.src = '';
-                    previewImg.style.display = 'none';
-                    previewImg.alt = 'No preview available';
-                }
-            }
-
             Navigation.showPage(1);
+            const nameInput = document.getElementById('invitationName');
             if (nameInput) nameInput.focus();
         });
     });
@@ -442,4 +335,236 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    const templateField = document.getElementById('template_id');
+    const presetTemplateId = templateField ? templateField.value : '';
+    if (presetTemplateId) {
+        const presetTemplate = templates.find(t => String(t.id) === String(presetTemplateId));
+        if (presetTemplate) {
+            applyTemplateToForm(presetTemplate);
+        }
+    }
+
+    function bestPaperMaterialMatch(row) {
+        if (!row) return null;
+        const hidden = row.querySelector('.paper-stock-material-id');
+        if (hidden && hidden.value) {
+            const material = findMaterialById(hidden.value);
+            if (material) return material;
+        }
+        const select = row.querySelector('.paper-stock-name-select');
+        if (select) {
+            if (select.value) {
+                const byName = findMaterialByName(select.value);
+                if (byName) return byName;
+            }
+            const fallbackName = select.dataset.selectedName || select.getAttribute('data-selected-name');
+            if (fallbackName) {
+                const byFallback = findMaterialByName(fallbackName);
+                if (byFallback) return byFallback;
+            }
+            const selectedOption = select.selectedOptions[0];
+            if (selectedOption && selectedOption.dataset.materialId) {
+                const byOptionId = findMaterialById(selectedOption.dataset.materialId);
+                if (byOptionId) return byOptionId;
+            }
+        }
+        return null;
+    }
+
+    function syncPaperStockRow(row) {
+        if (!row) return;
+        const select = row.querySelector('.paper-stock-name-select');
+        const hidden = row.querySelector('.paper-stock-material-id');
+        const priceInput = row.querySelector('input[name$="[price]"]');
+
+        if (!select || !hidden) return;
+        const selectedOption = select.selectedOptions[0];
+        const materialId = selectedOption ? (selectedOption.dataset.materialId || selectedOption.value) : '';
+        let material = materialId ? findMaterialById(materialId) : null;
+        if (!material) material = bestPaperMaterialMatch(row);
+
+        if (material) {
+            hidden.value = material.id || '';
+            if (!select.value) {
+                const match = Array.from(select.options).find(opt => normalize(opt.dataset.materialId) === normalize(material.id));
+                if (match) select.value = match.value;
+            }
+            if (priceInput && (!priceInput.value || priceInput.dataset.autofill === 'true')) {
+                if (material.unitCost != null) {
+                    priceInput.value = material.unitCost;
+                    priceInput.dataset.autofill = 'true';
+                }
+            }
+        } else if (!selectedOption || !selectedOption.value) {
+            hidden.value = '';
+        }
+    }
+
+    function resolveAddonMaterial(row) {
+        if (!row) return null;
+        const hidden = row.querySelector('.addon-material-id');
+        if (hidden && hidden.value) {
+            const byId = findMaterialById(hidden.value);
+            if (byId) return byId;
+        }
+        const select = row.querySelector('.addon-name-select');
+        if (select) {
+            const selectedOption = select.selectedOptions[0];
+            if (selectedOption) {
+                const byId = findMaterialById(selectedOption.value);
+                if (byId) return byId;
+                const byName = findMaterialByName(selectedOption.dataset.name || selectedOption.textContent);
+                if (byName) return byName;
+            }
+        }
+        const input = row.querySelector('.addon-name-input');
+        if (input && input.value) {
+            const byName = findMaterialByName(input.value);
+            if (byName) return byName;
+        }
+        return null;
+    }
+
+    function syncAddonRow(row) {
+        if (!row) return;
+        const select = row.querySelector('.addon-name-select');
+        const hidden = row.querySelector('.addon-material-id');
+        const textInput = row.querySelector('.addon-name-input');
+        const priceInput = row.querySelector('input[name$="[price]"]');
+
+        const material = resolveAddonMaterial(row);
+        if (material) {
+            if (hidden) hidden.value = material.id || '';
+            if (select) {
+                const matchingOption = Array.from(select.options).find(opt => normalize(opt.value) === normalize(material.id) || normalize(opt.value) === normalize(material.name));
+                if (matchingOption) {
+                    select.value = matchingOption.value;
+                }
+            }
+            if (textInput && !textInput.value) {
+                textInput.value = material.name || '';
+            }
+            if (priceInput && (!priceInput.value || priceInput.dataset.autofill === 'true')) {
+                if (material.unitCost != null) {
+                    priceInput.value = material.unitCost;
+                    priceInput.dataset.autofill = 'true';
+                }
+            }
+        } else {
+            if (hidden) hidden.value = '';
+        }
+    }
+
+    function toggleAddonInputs(row) {
+        if (!row) return;
+        const typeSelect = row.querySelector('select[name$="[addon_type]"]');
+        const select = row.querySelector('.addon-name-select');
+        const input = row.querySelector('.addon-name-input');
+        const type = typeSelect ? typeSelect.value.toLowerCase() : '';
+        const shouldUseSelect = type === 'embossed';
+
+        if (select) {
+            select.style.display = shouldUseSelect ? '' : 'none';
+            select.disabled = !shouldUseSelect;
+        }
+        if (input) {
+            input.style.display = shouldUseSelect ? 'none' : '';
+        }
+
+        if (shouldUseSelect) {
+            syncAddonRow(row);
+        }
+    }
+
+    document.querySelectorAll('.paper-stock-row').forEach(syncPaperStockRow);
+    document.querySelectorAll('.addon-row').forEach(row => {
+        toggleAddonInputs(row);
+        syncAddonRow(row);
+    });
+
+    document.addEventListener('change', event => {
+        if (event.target.matches('.paper-stock-name-select')) {
+            const select = event.target;
+            const row = select.closest('.paper-stock-row');
+            if (!row) return;
+
+            const hidden = row.querySelector('.paper-stock-material-id');
+            const priceInput = row.querySelector('input[name$="[price]"]');
+            const selectedOption = select.selectedOptions[0];
+            const materialId = selectedOption ? (selectedOption.dataset.materialId || selectedOption.value) : '';
+
+            if (hidden) hidden.value = materialId || '';
+
+            if (priceInput) {
+                const material = findMaterialById(materialId) || findMaterialByName(select.value);
+                if (material && material.unitCost != null && (!priceInput.value || priceInput.dataset.autofill === 'true')) {
+                    priceInput.value = material.unitCost;
+                    priceInput.dataset.autofill = 'true';
+                } else if (!material) {
+                    priceInput.dataset.autofill = 'false';
+                }
+            }
+        }
+
+        if (event.target.matches('.addon-name-select')) {
+            const select = event.target;
+            const row = select.closest('.addon-row');
+            if (!row) return;
+
+            const hidden = row.querySelector('.addon-material-id');
+            const textInput = row.querySelector('.addon-name-input');
+            const priceInput = row.querySelector('input[name$="[price]"]');
+            const selectedOption = select.selectedOptions[0];
+            const materialId = selectedOption ? selectedOption.value : '';
+            const materialName = selectedOption ? (selectedOption.dataset.name || selectedOption.textContent.trim()) : '';
+
+            if (hidden) hidden.value = materialId || '';
+            if (textInput && materialName) textInput.value = materialName;
+
+            if (priceInput) {
+                const material = findMaterialById(materialId);
+                if (material && material.unitCost != null && (!priceInput.value || priceInput.dataset.autofill === 'true')) {
+                    priceInput.value = material.unitCost;
+                    priceInput.dataset.autofill = 'true';
+                }
+            }
+        }
+
+        if (event.target.matches('select[name$="[addon_type]"]')) {
+            const select = event.target;
+            const row = select.closest('.addon-row');
+            toggleAddonInputs(row);
+            syncAddonRow(row);
+        }
+    });
+
+    document.addEventListener('input', event => {
+        if (event.target.matches('.addon-name-input')) {
+            const input = event.target;
+            const row = input.closest('.addon-row');
+            if (!row) return;
+
+            const hidden = row.querySelector('.addon-material-id');
+            const priceInput = row.querySelector('input[name$="[price]"]');
+            const material = findMaterialByName(input.value);
+
+            if (material) {
+                if (hidden) hidden.value = material.id;
+                if (priceInput && (!priceInput.value || priceInput.dataset.autofill === 'true')) {
+                    if (material.unitCost != null) {
+                        priceInput.value = material.unitCost;
+                        priceInput.dataset.autofill = 'true';
+                    }
+                }
+            } else {
+                if (hidden) hidden.value = '';
+                if (priceInput) priceInput.dataset.autofill = 'false';
+            }
+        }
+
+        if (event.target.matches('.paper-stock-row input[name$="[price]"]') || event.target.matches('.addon-row input[name$="[price]"]')) {
+            event.target.dataset.autofill = 'false';
+        }
+    });
 });

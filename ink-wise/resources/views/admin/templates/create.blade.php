@@ -18,7 +18,7 @@
             <p class="create-subtitle">Fill in the details to craft a new invitation template</p>
         </div>
 
-        <form action="{{ route('admin.templates.store') }}" method="POST" class="create-form">
+        <form action="{{ route('admin.templates.store') }}" method="POST" class="create-form" enctype="multipart/form-data">
             @csrf
 
             <input type="hidden" name="design" id="design" value="{}">
@@ -43,7 +43,11 @@
             <div class="create-row">
                 <div class="create-group flex-1">
                     <label for="product_type">Product Type</label>
-                    <input type="text" id="product_type" name="product_type" placeholder="e.g. Card, Poster">
+                    <select id="product_type" name="product_type" required>
+                        <option value="">Select product type</option>
+                        <option value="Invitation">Invitation</option>
+                        <option value="Giveaway">Giveaway</option>
+                    </select>
                 </div>
                 <div class="create-group flex-1">
                     <label for="theme_style">Theme/Style</label>
@@ -56,6 +60,17 @@
                 <textarea id="description" name="description" rows="4" placeholder="Describe the template design, style, and intended use..."></textarea>
             </div>
 
+            <div class="create-row">
+                <div class="create-group flex-1">
+                    <label for="custom_front_image">Front Image *</label>
+                    <input type="file" id="custom_front_image" name="front_image" accept="image/*" required>
+                </div>
+                <div class="create-group flex-1">
+                    <label for="custom_back_image">Back Image *</label>
+                    <input type="file" id="custom_back_image" name="back_image" accept="image/*" required>
+                </div>
+            </div>
+
             <div class="create-actions">
                 <a href="{{ route('admin.templates.index') }}" class="btn-cancel">Cancel</a>
                 <button type="submit" class="btn-submit">Create &amp; Edit Template</button>
@@ -64,4 +79,58 @@
     </section>
 </main>
 @endsection
+
+        @push('scripts')
+        <script>
+            // Helper to read CSRF token from meta or hidden input
+            function getCsrfToken() {
+                const meta = document.querySelector('meta[name="csrf-token"]');
+                if (meta && meta.getAttribute) {
+                    const v = meta.getAttribute('content');
+                    if (v) return v;
+                }
+                const hidden = document.querySelector('input[name="_token"]');
+                return hidden ? hidden.value : '';
+            }
+
+            document.querySelector('.create-form').addEventListener('submit', function(e) {
+                // Use default submit only if JS disabled; otherwise handle via fetch
+                e.preventDefault();
+
+                const form = e.target;
+                const formData = new FormData(form);
+
+                // Basic validation
+                if (!formData.get('name') || !formData.get('front_image') || !formData.get('back_image')) {
+                    alert('Please provide a name and both front/back images.');
+                    return;
+                }
+
+                fetch(form.getAttribute('action'), {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': getCsrfToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: formData
+                }).then(async res => {
+                    if (!res.ok) {
+                        const txt = await res.text();
+                        throw new Error(txt || 'Upload failed');
+                    }
+                    return res.json();
+                }).then(json => {
+                    if (json && json.success) {
+                        alert('Template uploaded successfully. Redirecting to templates list.');
+                        window.location = '{{ route('admin.templates.index') }}';
+                    } else {
+                        alert('Upload succeeded but server response unexpected.');
+                    }
+                }).catch(err => {
+                    console.error(err);
+                    alert('Upload failed: ' + (err.message || 'Unknown'));
+                });
+            });
+        </script>
+        @endpush
 

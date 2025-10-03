@@ -188,6 +188,7 @@
                 <button class="btn" id="sizeShapeBtn" title="Size & Shape">Size & Shape</button>
                 <button class="btn" id="previewBtn" title="Preview">Preview</button>
                 <button class="btn primary" id="uploadBtn" title="upload">upload</button>
+                <button class="btn" id="canvaBtn" title="Edit in Canva">Edit in Canva</button>
             </div>
         </div>
 
@@ -616,5 +617,41 @@ document.addEventListener("DOMContentLoaded", function() {
 +        if (e.key === 'Escape') closeModal();
 +    });
 +})();
+</script>
+
+<script>
+// Canva integration
+document.addEventListener("DOMContentLoaded", function() {
+    const canvaBtn = document.getElementById('canvaBtn');
+    if (canvaBtn && window.Canva) {
+        const canvaButton = new Canva.DesignButton({
+            apiKey: 'YOUR_CANVA_API_KEY', // Replace with your Canva Design Button API key from https://www.canva.com/developers/
+            design: {
+                type: 'Poster',
+                dimensions: {
+                    width: 500,
+                    height: 700,
+                },
+            },
+            onDesignPublish: (opts) => {
+                // Handle the published design
+                console.log('Design published:', opts);
+                // You can save the design or update the canvas here
+                // For example, if opts.exportUrl has an image URL, load it into the canvas
+                if (opts.exportUrl) {
+                    const img = new Image();
+                    img.onload = function() {
+                        // Draw on canvas or something
+                        const canvas = document.getElementById('templateCanvas');
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    };
+                    img.src = opts.exportUrl;
+                }
+            },
+        });
+        canvaButton.attach(canvaBtn);
+    }
+});
 </script>
 

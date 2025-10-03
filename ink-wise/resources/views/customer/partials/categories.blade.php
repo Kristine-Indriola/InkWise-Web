@@ -1,7 +1,7 @@
 <!-- Categories Section -->
 <section id="categories" class="categories-section py-16">
-    <hr class="section-divider">
-    <div class="max-w-7xl mx-auto px-6 text-center">
+    <div class="layout-container text-center">
+        <hr class="section-divider">
         <h2 class="text-3xl font-bold mb-6">Categories</h2>
         <p class="text-lg text-gray-600 text-center mx-auto max-w-2xl">
   See what's hot! Browse our most popular invitation and giveaways categories to find the perfect design for your event. Discover trendy themes and create invitations everyone will love.
