@@ -5,7 +5,6 @@
   @stack('styles')
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>@yield('title', 'InkWise Dashboard')</title>
   @stack('styles')
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -705,17 +704,8 @@ body.dark-mode .btn-warning {
           @endif
         </a>
         <!-- Paper plane / Messages quick-link (transparent background, colored icon) -->
-        <a href="{{ route('admin.messages.index') }}"
-           class="nav-link notif-btn"
-           title="Messages"
-           data-messages-toggle="true"
-           data-initial-unread="{{ $adminUnreadMessageCount ?? 0 }}"
-           data-unread-endpoint="{{ route('admin.messages.unread-count') }}"
-           style="display:flex; align-items:center; justify-content:center;">
+        <a href="{{ route('admin.messages.index') }}" class="nav-link notif-btn" title="Messages" style="display:flex; align-items:center; justify-content:center;">
           <i class="fi fi-sr-envelope" style="font-size:20px;"></i>
-          @if(($adminUnreadMessageCount ?? 0) > 0)
-            <span class="notif-badge" data-role="messages-unread-count">{{ $adminUnreadMessageCount }}</span>
-          @endif
         </a>
         <!-- Day/Night Toggle Switch -->
         <div id="theme-toggle-switch" class="theme-toggle-switch" title="Toggle dark/light mode" style="margin:0;">
@@ -825,69 +815,6 @@ body.dark-mode .btn-warning {
       profileMenu.style.display = 'none';
     });
   }
-
-  (function(){
-    const link = document.querySelector('[data-messages-toggle="true"]');
-    if (!link) {
-      return;
-    }
-
-    const isMessengerView = document.body.classList.contains('messages-view');
-    const endpoint = link.dataset.unreadEndpoint || '';
-
-    const applyBadge = (value) => {
-      const count = Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0;
-      let badge = link.querySelector('[data-role="messages-unread-count"]');
-
-      if (count > 0) {
-        if (!badge) {
-          badge = document.createElement('span');
-          badge.className = 'notif-badge';
-          badge.dataset.role = 'messages-unread-count';
-          link.appendChild(badge);
-        }
-        badge.textContent = String(count);
-      } else if (badge) {
-        badge.remove();
-      }
-
-      link.dataset.initialUnread = String(count);
-    };
-
-    const initialCount = Number(link.dataset.initialUnread || 0);
-    applyBadge(initialCount);
-
-    if (!endpoint || isMessengerView) {
-      return; // messenger page handles its own polling
-    }
-
-    let ticker = null;
-
-    const pullUnread = async () => {
-      try {
-        const res = await fetch(endpoint, { headers: { 'Accept': 'application/json' } });
-        if (!res.ok) {
-          return;
-        }
-
-        const json = await res.json().catch(() => null);
-        if (json && typeof json.count === 'number') {
-          applyBadge(json.count);
-        }
-      } catch (error) {
-        // ignore transient errors
-      }
-    };
-
-    pullUnread();
-    ticker = setInterval(pullUnread, 20000);
-
-    window.addEventListener('beforeunload', () => {
-      if (ticker) {
-        clearInterval(ticker);
-      }
-    });
-  })();
 </script>
     </div>
   </div>
