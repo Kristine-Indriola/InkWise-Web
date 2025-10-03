@@ -13,6 +13,61 @@
     if (!$backUrl || \Illuminate\Support\Str::contains($backUrl, $messagesIndexUrl)) {
         $backUrl = route('admin.dashboard');
     }
+
+    $hasSeenAtColumn = \Illuminate\Support\Facades\Schema::hasColumn('messages', 'seen_at');
+    $hasIsReadColumn = ! $hasSeenAtColumn && \Illuminate\Support\Facades\Schema::hasColumn('messages', 'is_read');
+    $threadUnreadStates = [];
+
+    if ($hasSeenAtColumn || $hasIsReadColumn) {
+        foreach ($messages as $rawMessage) {
+            $senderType = strtolower($rawMessage->sender_type ?? '');
+            $receiverType = strtolower($rawMessage->receiver_type ?? '');
+            $threadKey = null;
+
+            if ($senderType === 'customer' || $receiverType === 'customer') {
+                $customerId = $senderType === 'customer' ? $rawMessage->sender_id : $rawMessage->receiver_id;
+                if ($customerId) {
+                    $threadKey = 'customer:' . $customerId;
+                }
+            } else {
+                $emailKey = strtolower($rawMessage->email ?? '');
+                if ($emailKey) {
+                    $threadKey = 'guest:' . $emailKey;
+                }
+            }
+
+            if (! $threadKey) {
+                continue;
+            }
+
+            $isIncoming = in_array($senderType, ['customer', 'guest'], true);
+            $isUnread = false;
+
+            if ($isIncoming) {
+                if ($hasSeenAtColumn) {
+                    $isUnread = is_null($rawMessage->seen_at);
+                } else {
+                    $isUnread = (int) ($rawMessage->is_read ?? 0) === 0;
+                }
+            }
+
+            if ($isUnread) {
+                $threadUnreadStates[$threadKey] = true;
+            } elseif (! array_key_exists($threadKey, $threadUnreadStates)) {
+                $threadUnreadStates[$threadKey] = false;
+            }
+        }
+    }
+
+    $customerAvatars = [];
+    if (isset($customers) && $customers instanceof \Illuminate\Support\Collection) {
+        foreach ($customers as $customerId => $customer) {
+            $photo = $customer->photo ?? null;
+            if (! empty($photo)) {
+                $customerAvatars[$customerId] = \App\Support\ImageResolver::url($photo);
+            }
+        }
+    }
 @endphp
 
 <style>
@@ -122,6 +177,55 @@
         border-right-color: var(--messenger-primary);
     }
 
+    .conversation-item.is-unread {
+        background: linear-gradient(90deg, rgba(106, 46, 188, 0.12) 0%, rgba(56, 189, 248, 0.08) 100%);
+        border-right-color: var(--messenger-accent);
+        position: relative;
+    }
+
+    .conversation-item.is-unread:hover {
+        background: linear-gradient(90deg, rgba(106, 46, 188, 0.16) 0%, rgba(56, 189, 248, 0.13) 100%);
+    }
+
+    .conversation-item.is-unread .conversation-name {
+        color: var(--messenger-primary);
+        font-weight: 700;
+    }
+
+    .conversation-item.is-unread .conversation-snippet {
+        color: var(--messenger-text-dark);
+        font-weight: 500;
+    }
+
+    .conversation-item.is-unread .conversation-time {
+        color: var(--messenger-primary);
+        font-weight: 600;
+    }
+
+    .conversation-side {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 6px;
+        min-width: 72px;
+    }
+
+    .conversation-status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--messenger-accent);
+        box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.18);
+        opacity: 0;
+        transform: scale(0.5);
+        transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+
+    .conversation-item.is-unread .conversation-status-dot {
+        opacity: 1;
+        transform: scale(1);
+    }
+
     .conversation-avatar {
         position: relative;
         width: 44px;
@@ -135,6 +239,25 @@
         font-size: 16px;
         text-transform: uppercase;
         box-shadow: 0 8px 16px -10px rgba(79, 70, 229, 0.6);
+        overflow: hidden;
+    }
+
+    .conversation-avatar span {
+        display: block;
+    }
+
+    .conversation-avatar--photo {
+        background: #fff;
+        box-shadow: 0 6px 14px -8px rgba(15, 23, 42, 0.35);
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        color: transparent;
+    }
+
+    .conversation-avatar--photo img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
     }
 
     .conversation-meta {
@@ -221,6 +344,21 @@
         place-items: center;
         font-weight: 700;
         font-size: 18px;
+        overflow: hidden;
+        box-shadow: 0 10px 22px -18px rgba(79, 70, 229, 0.75);
+    }
+
+    .thread-participant .avatar.avatar--photo {
+        background: #fff;
+        border: 1px solid rgba(148, 163, 184, 0.45);
+        color: transparent;
+    }
+
+    .thread-participant .avatar.avatar--photo img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
     }
 
     .thread-participant .details {
@@ -303,6 +441,48 @@
         color: #fff;
     }
 
+    .message-attachment {
+        margin-top: 6px;
+        border-radius: 14px;
+        overflow: hidden;
+        background: rgba(148, 163, 184, 0.12);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+    }
+
+    .message-row.is-internal .message-attachment {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .message-attachment img {
+        display: block;
+        max-width: 100%;
+        height: auto;
+    }
+
+    .message-attachment__meta {
+        padding: 8px 12px;
+        font-size: 12px;
+        color: inherit;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .message-attachment__meta span {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .message-attachment__meta a {
+        color: inherit;
+        text-decoration: underline;
+        font-weight: 600;
+    }
+
     .message-author {
         font-size: 12px;
         font-weight: 600;
@@ -337,8 +517,55 @@
         gap: 14px;
     }
 
-    .thread-compose textarea {
+    .thread-compose .compose-attach {
+        width: 46px;
+        height: 46px;
+        border-radius: 14px;
+        border: 1px dashed rgba(106, 46, 188, 0.4);
+        background: rgba(106, 46, 188, 0.1);
+        color: var(--messenger-primary);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .thread-compose .compose-attach svg {
+        width: 22px;
+        height: 22px;
+        stroke: currentColor;
+        fill: none;
+        display: block;
+    }
+
+    .thread-compose .compose-attach svg path {
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        fill: none;
+    }
+
+    .thread-compose .compose-attach:hover {
+        background: rgba(106, 46, 188, 0.2);
+        border-color: rgba(106, 46, 188, 0.6);
+    }
+
+    .thread-compose .compose-attach:focus-visible {
+        outline: 3px solid rgba(106, 46, 188, 0.4);
+        outline-offset: 2px;
+    }
+
+    .thread-compose .compose-field {
         flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .thread-compose textarea {
+        width: 100%;
         resize: none;
         min-height: 48px;
         max-height: 120px;
@@ -382,6 +609,45 @@
         box-shadow: none;
     }
 
+    .attachment-preview {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: rgba(56, 189, 248, 0.14);
+        color: var(--messenger-text-mid);
+        font-size: 12px;
+    }
+
+    .attachment-preview.is-visible {
+        display: flex;
+    }
+
+    .attachment-preview .attachment-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 600;
+    }
+
+    .attachment-clear {
+        border: none;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+    }
+
+    .attachment-clear svg {
+        width: 16px;
+        height: 16px;
+    }
+
     @media (max-width: 1024px) {
         .messenger-shell {
             grid-template-columns: 320px 1fr;
@@ -422,25 +688,80 @@
 
         <div id="conversationList" class="conversation-scroll">
             @forelse($customerThreads as $message)
-             <div class="conversation-item"
+             @php
+                 $previewText = $message->message ?? 'No message preview available yet.';
+                 $attachmentName = $message->attachment_path ? basename($message->attachment_path) : null;
+                 if (trim($previewText) === '[image attachment]' && $attachmentName) {
+                     $previewText = '📎 ' . $attachmentName;
+                 }
+                 $senderType = strtolower((string) ($message->sender_type ?? ''));
+                 $receiverType = strtolower((string) ($message->receiver_type ?? ''));
+                 $threadKey = null;
+                 $customerId = null;
+
+                 if ($senderType === 'customer' && $message->sender_id) {
+                     $customerId = $message->sender_id;
+                     $threadKey = 'customer:' . $message->sender_id;
+                 } elseif ($receiverType === 'customer' && $message->receiver_id) {
+                     $customerId = $message->receiver_id;
+                     $threadKey = 'customer:' . $message->receiver_id;
+                 } else {
+                     $emailKey = strtolower((string) ($message->email ?? ''));
+                     if ($emailKey !== '') {
+                         $threadKey = 'guest:' . $emailKey;
+                     }
+                 }
+
+                 $isUnread = $threadKey ? ($threadUnreadStates[$threadKey] ?? false) : false;
+                 $itemClasses = 'conversation-item' . ($isUnread ? ' is-unread' : '');
+                 $avatarUrl = ($customerId !== null && isset($customerAvatars[$customerId])) ? $customerAvatars[$customerId] : null;
+
+                 $customerName = null;
+                 if ($customerId !== null && isset($customers[$customerId])) {
+                     $customerModel = $customers[$customerId];
+                     $nameParts = array_filter([
+                         trim((string) ($customerModel->first_name ?? '')),
+                         trim((string) ($customerModel->middle_name ?? '')),
+                         trim((string) ($customerModel->last_name ?? '')),
+                     ], fn ($part) => $part !== '');
+
+                     if (! empty($nameParts)) {
+                         $customerName = implode(' ', $nameParts);
+                     }
+                 }
+
+                 $displayLabel = $customerName ?: ($message->name ?? ($message->email ?? 'Guest'));
+                 $avatarInitial = strtoupper(substr($displayLabel, 0, 1));
+             @endphp
+             <div class="{{ $itemClasses }}"
                  data-message-id="{{ $message->getKey() }}"
                  data-sender-type="{{ strtolower($message->sender_type ?? '') }}"
                  data-email="{{ $message->email ?? '' }}"
-                 data-name="{{ $message->name ?? 'Guest' }}"
+                 data-name="{{ $displayLabel }}"
+                 data-thread-key="{{ $threadKey ?? '' }}"
+                 data-avatar-url="{{ $avatarUrl ?? '' }}"
+                 data-unread="{{ $isUnread ? '1' : '0' }}"
                  data-last-message-at="{{ optional($message->created_at)->toIso8601String() }}">
-                    <div class="conversation-avatar">
-                        {{ strtoupper(substr($message->name ?? ($message->email ?? 'G'), 0, 1)) }}
+                    <div class="conversation-avatar{{ $avatarUrl ? ' conversation-avatar--photo' : '' }}">
+                        @if($avatarUrl)
+                            <img src="{{ $avatarUrl }}" alt="{{ $displayLabel }} profile photo">
+                        @else
+                            <span aria-hidden="true">{{ $avatarInitial }}</span>
+                        @endif
                     </div>
                     <div class="conversation-meta">
                         <div class="conversation-name">
-                            {{ $message->name ?? 'Guest' }}
+                            <span>{{ $displayLabel }}</span>
                         </div>
                         <div class="conversation-snippet">
-                            {{ \Illuminate\Support\Str::limit($message->message ?? 'No message preview available yet.', 80) }}
+                            {{ \Illuminate\Support\Str::limit($previewText, 80) }}
                         </div>
                     </div>
-                    <div class="conversation-time">
-                        {{ optional($message->created_at)->timezone(config('app.timezone'))->format('M d, Y h:i A') ?? '' }}
+                    <div class="conversation-side">
+                        <div class="conversation-time">
+                            {{ optional($message->created_at)->timezone(config('app.timezone'))->format('M d, Y h:i A') ?? '' }}
+                        </div>
+                        <span class="conversation-status-dot" role="status" aria-label="Unread conversation"></span>
                     </div>
                 </div>
             @empty
@@ -463,9 +784,25 @@
             </div>
         </div>
 
-        <form id="replyForm" class="thread-compose">
+        <form id="replyForm" class="thread-compose" enctype="multipart/form-data">
             @csrf
-            <textarea id="replyMessage" name="message" rows="2" placeholder="Type a reply and press enter to send"></textarea>
+            <input type="file" id="replyAttachment" name="attachment" accept="image/*" hidden>
+            <label for="replyAttachment" class="compose-attach" id="attachmentButton" role="button" tabindex="0" aria-label="Attach image">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" role="img">
+                    <path d="M21.44 11.05l-9.19 9.19a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.5 3.5 0 0 1 5 5L8.12 19.31"></path>
+                </svg>
+            </label>
+            <div class="compose-field">
+                <textarea id="replyMessage" name="message" rows="2" placeholder="Type a reply and press enter to send"></textarea>
+                <div class="attachment-preview" id="attachmentPreview" aria-live="polite">
+                    <span class="attachment-name" id="attachmentName"></span>
+                    <button type="button" class="attachment-clear" id="attachmentRemove" aria-label="Remove attachment">
+                        <svg viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 8.586l4.95-4.95a1 1 0 1 1 1.414 1.414L11.414 10l4.95 4.95a1 1 0 0 1-1.414 1.414L10 11.414l-4.95 4.95a1 1 0 0 1-1.414-1.414L8.586 10l-4.95-4.95A1 1 0 1 1 5.05 3.636L10 8.586z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
             <button type="submit" disabled>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="22" y1="2" x2="11" y2="13" />
@@ -495,6 +832,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const conversationSearch = document.getElementById('conversationSearch');
     const conversationEmptyState = document.getElementById('conversationEmptyState');
     const sendButton = replyForm.querySelector('button[type="submit"]');
+    const replyAttachment = document.getElementById('replyAttachment');
+    const attachmentButton = document.getElementById('attachmentButton');
+    const attachmentPreview = document.getElementById('attachmentPreview');
+    const attachmentNameEl = document.getElementById('attachmentName');
+    const attachmentRemove = document.getElementById('attachmentRemove');
     const inboxToggleLink = document.querySelector('[data-messages-toggle="true"]');
     const backUrl = @json($backUrl);
     let currentMessageId = null;
@@ -586,6 +928,47 @@ document.addEventListener('DOMContentLoaded', function () {
         return (text || '').replace(/[&<>"']/g, m => (
             {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#039;'}[m]
         ));
+    }
+
+    function hasSelectedAttachment() {
+        return !!(replyAttachment && replyAttachment.files && replyAttachment.files.length > 0);
+    }
+
+    function updateAttachmentPreview() {
+        if (!attachmentPreview || !replyAttachment) {
+            return;
+        }
+
+        const file = replyAttachment.files && replyAttachment.files[0];
+        if (file) {
+            if (attachmentNameEl) {
+                attachmentNameEl.textContent = file.name;
+            }
+            attachmentPreview.classList.add('is-visible');
+        } else {
+            attachmentPreview.classList.remove('is-visible');
+            if (attachmentNameEl) {
+                attachmentNameEl.textContent = '';
+            }
+        }
+    }
+
+    function clearAttachmentPreview() {
+        if (replyAttachment) {
+            replyAttachment.value = '';
+        }
+        if (attachmentPreview) {
+            attachmentPreview.classList.remove('is-visible');
+        }
+        if (attachmentNameEl) {
+            attachmentNameEl.textContent = '';
+        }
+    }
+
+    function updateSendButtonState() {
+        const hasMessage = replyMessage.value.trim().length > 0;
+        const hasFile = hasSelectedAttachment();
+        sendButton.disabled = !currentMessageId || (!hasMessage && !hasFile);
     }
 
     const TIMEZONE = 'Asia/Manila';
@@ -740,9 +1123,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
         threadHeader.classList.remove('thread-header--empty');
         const initial = (meta.name || meta.email || 'G').trim().charAt(0).toUpperCase();
+        const avatarUrl = (meta.avatarUrl || '').trim();
+        const safeAvatar = escapeHtml(avatarUrl);
+        const avatarHtml = avatarUrl
+            ? `<div class="avatar avatar--photo"><img src="${safeAvatar}" alt="${escapeHtml(meta.name || 'Guest')} profile photo"></div>`
+            : `<div class="avatar">${escapeHtml(initial)}</div>`;
+
         threadHeader.innerHTML = `
             <div class="thread-participant">
-                <div class="avatar">${escapeHtml(initial)}</div>
+                ${avatarHtml}
                 <div class="details">
                     <strong>${escapeHtml(meta.name || 'Guest')}</strong>
                     <span>${escapeHtml(meta.email || 'No email provided')}</span>
@@ -785,11 +1174,33 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const bubble = document.createElement('div');
             bubble.className = 'message-bubble';
-            bubble.innerHTML = `
-                <div class="message-author">${escapeHtml(it.name ?? (isInternal ? 'Team' : 'Guest'))}</div>
-                <div class="message-text">${escapeHtml(it.message)}</div>
-                <div class="message-time">${formatClock(createdAt)}</div>
-            `;
+            const displayName = escapeHtml(it.name ?? (isInternal ? 'Team' : 'Guest'));
+            const messageText = (it.message ?? '').toString();
+            const trimmedMessage = messageText.trim();
+            const hasAttachment = Boolean(it.attachment_url);
+            const attachmentMime = (it.attachment_mime || '').toString().toLowerCase();
+            const isImageAttachment = hasAttachment && attachmentMime.startsWith('image/');
+            const attachmentUrl = hasAttachment ? escapeHtml(it.attachment_url) : '';
+            const attachmentName = hasAttachment ? escapeHtml(it.attachment_name || 'Attachment') : '';
+            const shouldRenderText = trimmedMessage !== '' && !(hasAttachment && trimmedMessage === '[image attachment]');
+
+            let bubbleHtml = `<div class="message-author">${displayName}</div>`;
+
+            if (shouldRenderText) {
+                bubbleHtml += `<div class="message-text">${escapeHtml(messageText)}</div>`;
+            }
+
+            if (hasAttachment) {
+                bubbleHtml += '<div class="message-attachment">';
+                if (isImageAttachment) {
+                    bubbleHtml += `<a href="${attachmentUrl}" target="_blank" rel="noopener noreferrer"><img src="${attachmentUrl}" alt="${attachmentName}"></a>`;
+                }
+                bubbleHtml += `<div class="message-attachment__meta"><span>${attachmentName}</span><a href="${attachmentUrl}" target="_blank" rel="noopener noreferrer">View</a></div>`;
+                bubbleHtml += '</div>';
+            }
+
+            bubbleHtml += `<div class="message-time">${formatClock(createdAt)}</div>`;
+            bubble.innerHTML = bubbleHtml;
 
             row.appendChild(bubble);
             threadMessages.appendChild(row);
@@ -807,7 +1218,8 @@ document.addEventListener('DOMContentLoaded', function () {
             textContent: 'Conversations you open will appear here.',
         }));
         replyMessage.value = '';
-        sendButton.disabled = true;
+        clearAttachmentPreview();
+        updateSendButtonState();
         clearPoll();
     }
 
@@ -819,12 +1231,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
         currentMessageId = messageId;
         updateThreadHeader(meta);
-        sendButton.disabled = replyMessage.value.trim().length === 0;
+        updateSendButtonState();
+
+        const activeItem = document.querySelector(`.conversation-item[data-message-id="${messageId}"]`);
+        if (activeItem) {
+            activeItem.classList.remove('is-unread');
+            activeItem.dataset.unread = '0';
+        }
 
         const { items } = await fetchThread(messageId);
         renderThread(items);
 
-        const activeItem = document.querySelector(`.conversation-item[data-message-id="${messageId}"]`);
         if (activeItem && items.length) {
             const latest = items[items.length - 1];
             const latestIso = latest?.created_at || latest?.createdAt || null;
@@ -850,6 +1267,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const meta = {
             name: item.getAttribute('data-name'),
             email: item.getAttribute('data-email'),
+            avatarUrl: item.getAttribute('data-avatar-url') || '',
         };
         setActiveConversation(item);
         openThread(messageId, meta);
@@ -880,10 +1298,36 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    replyMessage.addEventListener('input', () => {
-        const hasMessage = replyMessage.value.trim().length > 0;
-        sendButton.disabled = !currentMessageId || !hasMessage;
-    });
+    replyMessage.addEventListener('input', updateSendButtonState);
+
+    if (attachmentButton && replyAttachment) {
+        attachmentButton.addEventListener('click', event => {
+            event.preventDefault();
+            replyAttachment.click();
+        });
+
+        attachmentButton.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                replyAttachment.click();
+            }
+        });
+    }
+
+    if (replyAttachment) {
+        replyAttachment.addEventListener('change', () => {
+            updateAttachmentPreview();
+            updateSendButtonState();
+        });
+    }
+
+    if (attachmentRemove) {
+        attachmentRemove.addEventListener('click', () => {
+            clearAttachmentPreview();
+            updateSendButtonState();
+            replyMessage.focus();
+        });
+    }
 
     replyForm.addEventListener('submit', async e => {
         e.preventDefault();
@@ -893,7 +1337,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const messageText = replyMessage.value.trim();
-        if (!messageText) {
+        const hasFile = hasSelectedAttachment();
+
+        if (!messageText && !hasFile) {
             replyMessage.focus();
             return;
         }
@@ -903,6 +1349,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const body = new FormData();
         body.append('_token', token);
         body.append('message', messageText);
+        if (hasFile && replyAttachment && replyAttachment.files[0]) {
+            body.append('attachment', replyAttachment.files[0]);
+        }
 
         sendButton.disabled = true;
 
@@ -914,14 +1363,33 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (res.ok) {
             replyMessage.value = '';
+            clearAttachmentPreview();
             const { items } = await fetchThread(currentMessageId);
             renderThread(items);
         } else {
-            const txt = await res.text();
-            alert(txt || 'Failed to send reply');
+            let message = 'Failed to send reply';
+            try {
+                const data = await res.clone().json();
+                if (data && typeof data.error === 'string') {
+                    message = data.error;
+                } else if (data && typeof data.message === 'string') {
+                    message = data.message;
+                } else if (data && data.errors) {
+                    const first = Object.values(data.errors)[0];
+                    if (Array.isArray(first) && first.length) {
+                        message = first[0];
+                    }
+                }
+            } catch (jsonError) {
+                const txt = await res.text();
+                if (txt) {
+                    message = txt;
+                }
+            }
+            alert(message);
         }
 
-        sendButton.disabled = replyMessage.value.trim().length === 0;
+        updateSendButtonState();
     });
 
     // Auto-open the first conversation if available

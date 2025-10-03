@@ -38,5 +38,15 @@ class AppServiceProvider extends ServiceProvider
 
             $view->with('adminUnreadMessageCount', $count);
         });
+
+        View::composer('layouts.staffapp', function ($view) {
+            $count = 0;
+
+            if (Auth::check() || Auth::guard('staff')->check()) {
+                $count = MessageMetrics::adminUnreadCount();
+            }
+
+            $view->with('staffUnreadMessageCount', $count);
+        });
     }
 }

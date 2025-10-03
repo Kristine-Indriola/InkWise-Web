@@ -173,7 +173,7 @@
     </section>
   </main>
 
-  <!-- Floating Chat Button & Chat Modal -->
+<!-- Floating Chat Button & Chat Modal -->
 <div id="chatFloatingBtn"
      class="fixed bottom-6 right-6 z-50">
     <button id="openChatBtn" class="bg-[#94b9ff] hover:bg-[#6fa3ff] text-white rounded-full shadow-lg p-4 flex items-center justify-center transition duration-300"
@@ -182,7 +182,6 @@
         <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
-
         <!-- unread badge -->
         <span id="chatBadge" style="display:none; position: absolute; top: -4px; right: -2px; background:#ef4444; color:#fff; font-weight:700; font-size:12px; line-height:18px; padding:0 6px; border-radius:999px;"></span>
     </button>
@@ -210,15 +209,31 @@
             <h3 class="text-lg font-bold text-[#94b9ff]">Message Chat</h3>
             <p class="text-xs text-gray-500">Chat with staff for support</p>
         </div>
-        <!-- Chat Messages (placeholder) -->
+        <!-- Chat Messages -->
         <div id="chatPlaceholder" class="overflow-y-auto mb-3 flex flex-col" style="max-height: 320px; min-height: 220px;">
             <!-- messages injected here -->
         </div>
-        <!-- Chat Input — add ids to elements -->
-        <form id="customerChatForm" class="flex gap-2" onsubmit="return false;">
-            <input id="customerChatInput" type="text" placeholder="Type your message..." class="flex-1 border rounded-lg px-4 py-3 text-base focus:outline-none focus:ring focus:ring-[#94b9ff]">
-            <button id="customerChatSendBtn" type="button" class="bg-[#94b9ff] text-white px-4 py-2 rounded-lg text-base font-semibold hover:bg-[#6fa3ff]">Send</button>
+        <!-- Chat Input + Image Upload -->
+        <form id="customerChatForm" class="flex gap-2 items-center" enctype="multipart/form-data" onsubmit="return false;">
+            <input id="customerChatInput" type="text" placeholder="Type your message..."
+                   class="flex-1 border rounded-lg px-4 py-3 text-base focus:outline-none focus:ring focus:ring-[#94b9ff]">
+            
+            <!-- Hidden file input -->
+            <input id="customerChatFile" type="file" accept="image/*" class="hidden">
+
+            <!-- Button to open file picker -->
+            <button type="button" onclick="document.getElementById('customerChatFile').click()"
+                    class="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded-lg">
+                📷
+            </button>
+
+            <!-- Send button -->
+            <button id="customerChatSendBtn" type="button"
+                    class="bg-[#94b9ff] text-white px-4 py-2 rounded-lg text-base font-semibold hover:bg-[#6fa3ff]">
+                Send
+            </button>
         </form>
+
         <!-- Drag Handle for Resizing -->
         <div id="chatResizeHandle"
              class="absolute bottom-2 right-2 w-5 h-5 cursor-nwse-resize z-50"
@@ -254,11 +269,10 @@ function toggleChatSize() {
     }
 }
 
-// Mouse drag to resize chat
+// Drag resize
 const chatBox = document.getElementById('chatBox');
 const chatResizeHandle = document.getElementById('chatResizeHandle');
 let isResizing = false, lastX = 0, lastY = 0, startWidth = 0, startHeight = 0;
-
 chatResizeHandle.addEventListener('mousedown', function(e) {
     isResizing = true;
     lastX = e.clientX;
@@ -267,7 +281,6 @@ chatResizeHandle.addEventListener('mousedown', function(e) {
     startHeight = chatBox.offsetHeight;
     document.body.style.userSelect = 'none';
 });
-
 window.addEventListener('mousemove', function(e) {
     if (!isResizing) return;
     let newWidth = Math.max(320, startWidth + (e.clientX - lastX));
@@ -276,18 +289,19 @@ window.addEventListener('mousemove', function(e) {
     chatBox.style.maxHeight = newHeight + 'px';
     chatBox.style.minHeight = Math.min(newHeight, 700) + 'px';
 });
-
 window.addEventListener('mouseup', function() {
     isResizing = false;
     document.body.style.userSelect = '';
 });
 </script>
+
 <script>
 (function () {
     const threadUrl = "{{ route('customer.chat.thread') }}";
     const sendUrl   = "{{ route('customer.chat.send') }}";
     const placeholder = document.getElementById('chatPlaceholder');
     const input = document.getElementById('customerChatInput');
+    const fileInput = document.getElementById('customerChatFile');
     const sendBtn = document.getElementById('customerChatSendBtn');
 
     function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])); }
@@ -310,13 +324,44 @@ window.addEventListener('mouseup', function() {
         const wrapper = document.createElement('div');
         wrapper.style.display = 'flex';
         wrapper.style.justifyContent = isAdmin ? 'flex-start' : 'flex-end';
+
         const bubble = document.createElement('div');
         bubble.style.maxWidth = '85%';
         bubble.style.padding = '8px 10px';
         bubble.style.borderRadius = '10px';
         bubble.style.background = isAdmin ? '#eef7ff' : '#94b9ff';
         bubble.style.color = isAdmin ? '#111' : '#fff';
-        bubble.innerHTML = '<div style="font-size:12px;color:#666;margin-bottom:6px;"><strong>' + escapeHtml(it.name || (isAdmin ? 'Staff' : 'You')) + '</strong> <span style="font-size:11px;color:#999"> • ' + new Date(it.created_at).toLocaleString() + '</span></div>' + '<div style="white-space:pre-wrap;">' + escapeHtml(it.message) + '</div>';
+
+        const contentParts = [];
+
+        if (it.attachment_url) {
+          const isImage = (it.attachment_mime || '').startsWith('image/');
+          if (isImage) {
+            contentParts.push(
+              `<a href="${it.attachment_url}" target="_blank" rel="noopener">
+                 <img src="${it.attachment_url}" alt="${escapeHtml(it.attachment_name || 'Attachment')}"
+                      style="max-width: 100%; border-radius: 8px; margin-bottom: 6px;">
+               </a>`
+            );
+          } else {
+            contentParts.push(
+              `<a href="${it.attachment_url}" target="_blank" rel="noopener"
+                  style="display:inline-block;color:inherit;text-decoration:underline;margin-bottom:6px;">
+                 ${escapeHtml(it.attachment_name || 'Download attachment')}
+               </a>`
+            );
+          }
+        }
+
+        if (it.message && it.message.trim() && it.message.trim() !== '[image attachment]') {
+          contentParts.push(`<p style="margin:0;white-space:pre-wrap;">${escapeHtml(it.message)}</p>`);
+        }
+
+        if (!contentParts.length) {
+          contentParts.push(`<p style="margin:0;white-space:pre-wrap;">${escapeHtml(it.message || '')}</p>`);
+        }
+
+        bubble.innerHTML = contentParts.join('');
         wrapper.appendChild(bubble);
         placeholder.appendChild(wrapper);
       });
@@ -325,10 +370,14 @@ window.addEventListener('mouseup', function() {
 
     async function sendMessage(){
       const msg = input.value.trim();
-      if (!msg) return;
+      const file = fileInput.files[0];
+      if (!msg && !file) return;
+
       const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
       const fd = new FormData();
-      fd.append('message', msg);
+      if (msg) fd.append('message', msg);
+      if (file) fd.append('file', file);
+
       const res = await fetch(sendUrl, {
         method: 'POST',
         headers: { 'X-CSRF-TOKEN': token, 'Accept': 'application/json' },
@@ -340,16 +389,17 @@ window.addEventListener('mouseup', function() {
         return;
       }
       input.value = '';
+      fileInput.value = ''; // reset file input
       await loadChatThread();
     }
 
     sendBtn.addEventListener('click', sendMessage);
     input.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); sendMessage(); } });
 
-    // when modal opens (floating button onclick already removes 'hidden'), load conversation
+    // when modal opens, load messages
     window.loadChatThread = loadChatThread;
 
-    // optional: poll for new messages while modal open
+    // auto-refresh while modal open
     let pollInterval = null;
     const chatModal = document.getElementById('chatModal');
     const startPolling = () => {
@@ -357,14 +407,13 @@ window.addEventListener('mouseup', function() {
       pollInterval = setInterval(()=>{ if (!chatModal.classList.contains('hidden')) loadChatThread(); }, 5000);
     };
     const stopPolling = () => { clearInterval(pollInterval); pollInterval = null; };
-    // start/stop on show/hide
     const observer = new MutationObserver(()=> {
       if (!chatModal.classList.contains('hidden')) { loadChatThread(); startPolling(); } else { stopPolling(); }
     });
     observer.observe(chatModal, { attributes: true, attributeFilter: ['class'] });
-
 })();
 </script>
+
 <script>
 (function () {
     const unreadUrl = "{{ route('customer.chat.unread') }}";
@@ -389,39 +438,31 @@ window.addEventListener('mouseup', function() {
         }
     }
 
-   async function markMessagesRead() {
-    try {
-        const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-        await fetch(markReadUrl, {
-            method: 'POST',
-            headers: { 'X-CSRF-TOKEN': token, 'Accept': 'application/json' }
-        });
-        
-        // Immediately clear badge when read
-        badge.style.display = 'none';
-        badge.textContent = '';
-    } catch (e) {
-        console.error('mark read error', e);
+    async function markMessagesRead() {
+        try {
+            const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            await fetch(markReadUrl, {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': token, 'Accept': 'application/json' }
+            });
+            badge.style.display = 'none';
+            badge.textContent = '';
+        } catch (e) {
+            console.error('mark read error', e);
+        }
     }
-}
 
-
-    // poll every 8 seconds
     fetchUnreadCount();
     const pollInterval = setInterval(fetchUnreadCount, 8000);
-
-    // when modal opens, call mark-read (if available) and refresh
     const observer = new MutationObserver(() => {
         if (!chatModal.classList.contains('hidden')) {
-            // chat opened
             markMessagesRead();
         }
     });
     observer.observe(chatModal, { attributes: true, attributeFilter: ['class'] });
-
-    // clean up on page unload
     window.addEventListener('beforeunload', () => clearInterval(pollInterval));
 })();
 </script>
+
 </body>
 </html>

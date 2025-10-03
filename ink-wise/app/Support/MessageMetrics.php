@@ -46,6 +46,44 @@ class MessageMetrics
     }
 
     /**
+     * Count unread messages for staff inbox consumers.
+     * Currently mirrors the admin calculation but scoped to recipients that include staff.
+     */
+    public static function staffUnreadCount(): int
+    {
+        if (! Schema::hasTable('messages')) {
+            return 0;
+        }
+
+        try {
+            $query = Message::query()
+                ->where(function ($q) {
+                    $q->whereRaw('LOWER(sender_type) = ?', ['customer'])
+                      ->orWhereRaw('LOWER(sender_type) = ?', ['guest']);
+                })
+                ->where(function ($q) {
+                    $q->whereNull('receiver_type')
+                      ->orWhereRaw('LOWER(receiver_type) = ?', ['staff'])
+                      ->orWhereRaw('LOWER(receiver_type) = ?', ['user'])
+                      ->orWhereRaw('LOWER(receiver_type) = ?', ['admin']);
+                });
+
+            if (Schema::hasColumn('messages', 'seen_at')) {
+                $query->whereNull('seen_at');
+            } elseif (Schema::hasColumn('messages', 'is_read')) {
+                $query->where('is_read', 0);
+            } else {
+                $query->where('created_at', '>=', now()->subDays(7));
+            }
+
+            return (int) $query->count();
+        } catch (	hrowable $e) {
+            Log::debug('Failed to compute staff unread count: '.$e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
      * Mark a customer or guest thread as seen by admin.
      */
     public static function markThreadSeenForAdmin(Message $original): void

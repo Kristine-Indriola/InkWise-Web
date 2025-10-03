@@ -37,6 +37,9 @@ use App\Http\Controllers\Owner\OwnerInventoryController;
 use App\Http\Controllers\Staff\StaffInventoryController;
 use App\Http\Controllers\Admin\ReportsDashboardController;
 use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
+use App\Http\Controllers\Admin\UserPasswordResetController;
+use App\Models\User as AppUser;
+use Illuminate\Notifications\DatabaseNotification;
 
 
 
@@ -107,6 +110,13 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::put('/{user_id}', [UserManagementController::class, 'update'])->name('update'); // Update user 
     Route::delete('/{user_id}', [UserManagementController::class, 'destroy'])->name('destroy'); // Delete user 
 });
+
+    Route::prefix('users/passwords')->name('users.passwords.')->group(function () {
+        Route::get('/', [UserPasswordResetController::class, 'index'])->name('index');
+        Route::post('/unlock', [UserPasswordResetController::class, 'unlock'])->name('unlock');
+        Route::post('/lock', [UserPasswordResetController::class, 'lock'])->name('lock');
+        Route::post('/{user}/send', [UserPasswordResetController::class, 'send'])->name('send');
+    });
 
    
   Route::prefix('users')->name('users.')->group(function () {
@@ -207,21 +217,27 @@ Route::get('/unauthorized', function () {
     return view('errors.unauthorized');
 })->name('unauthorized');
 
-});
-
-Route::middleware('auth')->patch('/notifications/{id}/read', function ($id) {
-    $user = Auth::user();
-
-    abort_unless($user, 403);
-
-    $notification = $user->notifications()->findOrFail($id);
-    $notification->markAsRead();
-
-    return back()->with('success', 'Notification marked as read.');
-})->name('notifications.read');
-
 Route::get('/verify-email/{token}', [VerificationController::class, 'verify'])
     ->name('verify.email');
+
+    Route::patch('/notifications/{id}/read', function ($id) {
+        $user = Auth::user();
+
+        abort_unless($user instanceof AppUser, 403);
+
+        /** @var AppUser $adminUser */
+        $adminUser = $user;
+
+        $notification = DatabaseNotification::query()
+            ->where('notifiable_id', $adminUser->getKey())
+            ->where('notifiable_type', $adminUser->getMorphClass())
+            ->findOrFail($id);
+        $notification->markAsRead();
+
+        return back()->with('success', 'Notification marked as read.');
+    })->name('notifications.read');
+
+    });
 
 /*
 |--------------------------------------------------------------------------
@@ -470,6 +486,7 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
 
     Route::prefix('messages')->name('messages.')->group(function () {
         Route::get('/', [MessageController::class, 'staffIndex'])->name('index');
+        Route::get('unread-count', [MessageController::class, 'staffUnreadCount'])->name('unread-count');
         Route::get('/{message}/thread', [MessageController::class, 'thread'])->name('thread');
         Route::post('/{message}/reply', [MessageController::class, 'replyToMessage'])->name('reply');
     });
@@ -521,6 +538,8 @@ if (interface_exists('Laravel\\Socialite\\Contracts\\Factory')) {
 }
 
 Route::middleware('auth')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
+
+require __DIR__.'/auth.php';
 
 
 

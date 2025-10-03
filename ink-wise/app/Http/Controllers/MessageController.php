@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use App\Models\Customer;
 use App\Models\Message;
 use App\Models\Staff;
@@ -14,6 +16,57 @@ use App\Support\MessageMetrics;
 
 class MessageController extends Controller
 {
+    protected function serializeMessage(Message $message): array
+    {
+        $attachmentPath = $message->attachment_path ?: null;
+        $attachmentUrl = null;
+        $attachmentName = null;
+        $attachmentMime = null;
+
+        if ($attachmentPath) {
+            $attachmentUrl = method_exists($message, 'getAttachmentUrl')
+                ? $message->getAttachmentUrl()
+                : Storage::disk('public')->url($attachmentPath);
+
+            $attachmentName = basename($attachmentPath);
+
+            try {
+                $attachmentMime = Storage::disk('public')->mimeType($attachmentPath);
+            } catch (\Throwable $e) {
+                $attachmentMime = null;
+            }
+        }
+
+        return [
+            'id'            => $message->getKey(),
+            'message'       => $message->message,
+            'sender_type'   => $message->sender_type,
+            'receiver_type' => $message->receiver_type,
+            'name'          => $message->name,
+            'email'         => $message->email,
+            'created_at'    => optional($message->created_at)->toIso8601String(),
+            'createdAt'     => optional($message->created_at)->toIso8601String(),
+            'seen_at'       => optional($message->seen_at)->toIso8601String(),
+            'is_read'       => $message->is_read,
+            'attachment_url'  => $attachmentUrl,
+            'attachment_name' => $attachmentName,
+            'attachment_mime' => $attachmentMime,
+        ];
+    }
+
+    protected function uploadAttachment(?UploadedFile $file): array
+    {
+        if (! $file) {
+            return [];
+        }
+
+        $path = $file->store('messages', 'public');
+
+        return [
+            'attachment_path' => $path,
+        ];
+    }
+
     protected function resolveMessageActor(): ?array
     {
         /** @var \App\Models\User|null $user */
@@ -203,16 +256,7 @@ class MessageController extends Controller
         MessageMetrics::markThreadSeenForAdmin($original);
 
         // map to simple payload
-        $payload = $thread->map(function ($m) {
-            return [
-                'id' => $m->getKey(),
-                'sender_type' => strtolower($m->sender_type ?? ''),
-                'name' => $m->name ?? null,
-                'email' => $m->email ?? null,
-                'message' => $m->message,
-                'created_at' => $m->created_at->toDateTimeString(),
-            ];
-        });
+        $payload = $thread->map(fn (Message $m) => $this->serializeMessage($m));
 
         $unread = MessageMetrics::adminUnreadCount();
 
@@ -228,18 +272,29 @@ class MessageController extends Controller
      */
     public function replyToMessage(Request $request, $messageId)
     {
-        $request->validate(['message' => 'required|string|max:2000']);
+        $validated = $request->validate([
+            'message' => 'nullable|string|max:2000',
+            'attachment' => 'nullable|file|image|max:5120',
+        ]);
+
+        $hasText = isset($validated['message']) && trim($validated['message']) !== '';
+        $hasAttachment = $request->hasFile('attachment');
+
+        if (! $hasText && ! $hasAttachment) {
+            return response()->json(['error' => 'Message or attachment is required'], 422);
+        }
 
         try {
             $original = Message::findOrFail($messageId);
-            $replyText = $request->input('message');
+            $replyText = $hasText ? $request->input('message') : '[image attachment]';
+            $attachmentData = $this->uploadAttachment($request->file('attachment'));
             $actor = $this->resolveMessageActor();
             abort_unless($actor, 403);
 
             // Save reply only (no email)
             if (strtolower($original->sender_type ?? '') === 'guest') {
                 // reply saved as from admin (user) to guest (keep guest email on original)
-                $reply = Message::create([
+                $reply = Message::create(array_merge([
                     'sender_id'     => $actor['id'],
                     'sender_type'   => $actor['type'],
                     'receiver_id'   => null,
@@ -247,13 +302,13 @@ class MessageController extends Controller
                     'message'       => $replyText,
                     'email'         => $original->email,       // guest email (required)
                     'name'          => $actor['name'],
-                ]);
+                ], $attachmentData));
 
-                return response()->json(['status' => 'ok', 'reply' => $reply], 200);
+                return response()->json(['status' => 'ok', 'reply' => $this->serializeMessage($reply)], 200);
             }
 
             if (strtolower($original->sender_type ?? '') === 'customer' && $original->sender_id) {
-                $reply = Message::create([
+                $reply = Message::create(array_merge([
                     'sender_id'     => $actor['id'],
                     'sender_type'   => $actor['type'],
                     'receiver_id'   => $original->sender_id,
@@ -261,13 +316,13 @@ class MessageController extends Controller
                     'message'       => $replyText,
                     'name'          => $actor['name'],
                     'email'         => $actor['email'],
-                ]);
+                ], $attachmentData));
 
-                return response()->json(['status' => 'ok', 'reply' => $reply], 200);
+                return response()->json(['status' => 'ok', 'reply' => $this->serializeMessage($reply)], 200);
             }
 
             // fallback - preserve original receiver_type/id but include admin name/email
-            $reply = Message::create([
+            $reply = Message::create(array_merge([
                 'sender_id'     => $actor['id'],
                 'sender_type'   => $actor['type'],
                 'receiver_id'   => $original->receiver_id,
@@ -275,9 +330,9 @@ class MessageController extends Controller
                 'message'       => $replyText,
                 'name'          => $actor['name'],
                 'email'         => $actor['email'],
-            ]);
+            ], $attachmentData));
 
-            return response()->json(['status' => 'ok', 'reply' => $reply], 200);
+            return response()->json(['status' => 'ok', 'reply' => $this->serializeMessage($reply)], 200);
 
         } catch (\Throwable $e) {
             Log::error('replyToMessage error: '.$e->getMessage(), ['exception' => $e]);
@@ -412,16 +467,8 @@ class MessageController extends Controller
                 });
             })
             ->orderBy('created_at', 'asc')
-            ->get()
-            ->map(function ($m) {
-                return [
-                    'id' => $m->getKey(),
-                      'sender_type' => strtolower($m->sender_type ?? ''),
-                       'name' => $m->name ?? null,
-                     'message' => $m->message,
-                     'created_at' => $m->created_at->toDateTimeString(),
-             ];
-        });
+                        ->get()
+                        ->map(fn (Message $m) => $this->serializeMessage($m));
 
         return response()->json(['thread' => $thread]);
     }
@@ -450,13 +497,10 @@ class MessageController extends Controller
             'name'          => $customer->first_name ?? $user->name ?? null,
         ]);
 
-        return response()->json(['status' => 'ok', 'message' => [
-            'id' => $msg->getKey(),
-            'sender_type' => 'customer',
-            'name' => $msg->name,
-            'message' => $msg->message,
-            'created_at' => $msg->created_at->toDateTimeString()
-        ]], 201);
+        return response()->json([
+            'status' => 'ok',
+            'message' => $this->serializeMessage($msg),
+        ], 201);
     }
 
     /**
@@ -472,10 +516,12 @@ class MessageController extends Controller
         }
 
         $q = Message::whereRaw('LOWER(sender_type) = ?', ['user'])
-            ->where('receiver_type', 'customer')
+            ->whereRaw('LOWER(receiver_type) = ?', ['customer'])
             ->where('receiver_id', $customer->getKey());
 
-        if (Schema::hasColumn('messages', 'is_read')) {
+        if (Schema::hasColumn('messages', 'seen_at')) {
+            $q->whereNull('seen_at');
+        } elseif (Schema::hasColumn('messages', 'is_read')) {
             $q->where('is_read', 0);
         } else {
             // fallback heuristic: count admin messages in last 7 days
@@ -499,15 +545,24 @@ class MessageController extends Controller
             return response()->json(['ok' => true]);
         }
 
-        if (Schema::hasColumn('messages', 'is_read')) {
-            Message::whereRaw('LOWER(sender_type) = ?', ['user'])
-                ->where('receiver_type', 'customer')
-                ->where('receiver_id', $customer->getKey())
-                ->where('is_read', 0)
-                ->update(['is_read' => 1]);
+        $query = Message::whereRaw('LOWER(sender_type) = ?', ['user'])
+            ->whereRaw('LOWER(receiver_type) = ?', ['customer'])
+            ->where('receiver_id', $customer->getKey());
+
+        if (Schema::hasColumn('messages', 'seen_at')) {
+            $query->whereNull('seen_at')->update(['seen_at' => now()]);
+        } elseif (Schema::hasColumn('messages', 'is_read')) {
+            $query->where('is_read', 0)->update(['is_read' => 1]);
         }
 
         return response()->json(['ok' => true]);
+    }
+
+    public function staffUnreadCount(Request $request)
+    {
+        $count = MessageMetrics::staffUnreadCount();
+
+        return response()->json(['count' => $count]);
     }
 
     public function adminUnreadCount(Request $request)
