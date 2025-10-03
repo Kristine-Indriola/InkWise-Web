@@ -19,6 +19,10 @@ class RedirectIfAuthenticated
 
     public function handle(Request $request, Closure $next, ...$guards)
     {
+        if ($request->routeIs('password.reset', 'password.store')) {
+            return $next($request);
+        }
+
         foreach ($guards as $guard) {
             if (Auth::guard($guard)->check()) {
                 $user = Auth::user();
