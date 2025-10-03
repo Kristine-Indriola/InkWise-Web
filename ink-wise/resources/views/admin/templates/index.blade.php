@@ -40,10 +40,17 @@
                 @foreach($templates as $template)
                     <article class="template-card" role="listitem">
                         <div class="template-preview">
-                            @if($template->preview)
-                                <img src="{{ \App\Support\ImageResolver::url($template->preview) }}" alt="Preview of {{ $template->name }}">
+                            @php
+                                $front = $template->front_image ?? $template->preview;
+                                $back = $template->back_image ?? null;
+                            @endphp
+                            @if($front)
+                                <img src="{{ \App\Support\ImageResolver::url($front) }}" alt="Preview of {{ $template->name }}">
                             @else
                                 <span>No preview</span>
+                            @endif
+                            @if($back)
+                                <img src="{{ \App\Support\ImageResolver::url($back) }}" alt="Back of {{ $template->name }}" class="back-thumb">
                             @endif
                         </div>
                         <div class="template-info">

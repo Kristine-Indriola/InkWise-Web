@@ -2,138 +2,132 @@
 
 @section('title', 'Dashboard')
 
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/admin-css/dashboard.css') }}">
+@endpush
+
 @section('content')
+<main class="admin-page-shell dashboard-page" role="main">
+    {{-- ✅ Greeting Message --}}
+    @if(session('success'))
+        <div id="greetingMessage" class="dashboard-alert" role="alert" aria-live="polite">
+            {{ session('success') }}
+        </div>
+    @endif
 
-  <div class="dashboard-container"><!-- added wrapper to constrain width -->
+    <header class="page-header">
+        <div>
+            <h1 class="page-title">Dashboard Overview</h1>
+            <p class="page-subtitle">Quick look at orders and stock health.</p>
+        </div>
+    </header>
 
-  {{-- ✅ Greeting Message --}}
-  @if(session('success'))
-      <div id="greetingMessage" 
-           style="background: #dff0d8; color: #3c763d; padding: 12px; border-radius: 6px; margin-bottom: 20px; transition: opacity 1s ease;">
-          {{ session('success') }}
-      </div>
-  @endif
+    <section class="summary-grid" aria-label="Key performance highlights">
+        <div class="summary-card">
+            <div class="summary-card-header">
+                <span class="summary-card-label">Orders</span>
+                <span class="summary-card-chip accent">This Week</span>
+            </div>
+            <div class="summary-card-body">
+                <span class="summary-card-value">20</span>
+                <span class="summary-card-icon" aria-hidden="true">🛒</span>
+            </div>
+            <span class="summary-card-meta">Orders processed</span>
+        </div>
+        <div class="summary-card">
+            <div class="summary-card-header">
+                <span class="summary-card-label">Pending</span>
+                <span class="summary-card-chip warning">Action Needed</span>
+            </div>
+            <div class="summary-card-body">
+                <span class="summary-card-value">35</span>
+                <span class="summary-card-icon" aria-hidden="true">⏳</span>
+            </div>
+            <span class="summary-card-meta">Awaiting fulfillment</span>
+        </div>
+        <div class="summary-card">
+            <div class="summary-card-header">
+                <span class="summary-card-label">Rating</span>
+                <span class="summary-card-chip accent">Customer</span>
+            </div>
+            <div class="summary-card-body">
+                <span class="summary-card-value">4.0</span>
+                <span class="summary-card-icon" aria-hidden="true">⭐</span>
+            </div>
+            <span class="summary-card-meta">Average feedback</span>
+        </div>
+    </section>
 
-  <div class="cards">
-    <div class="card">
-      <div>🛒</div>
-      <h3>Orders</h3>
-      <p>20</p>
-    </div>
-    <div class="card">
-      <div>⏳</div>
-      <h3>Pending</h3>
-      <p>35</p>
-    </div>
-    <div class="card">
-      <div>⭐</div>
-      <h3>Rating</h3>
-      <p>4.0</p>
-    </div>
-  </div>
+    <section class="dashboard-stock" aria-label="Inventory snapshot">
+        <header class="section-header">
+            <div>
+                <h2 class="section-title">Stock Levels</h2>
+                <p class="section-subtitle">Click anywhere on the table to jump to full materials management.</p>
+            </div>
+            <a href="{{ route('admin.materials.index') }}" class="pill-link" aria-label="Open full materials dashboard">View Materials</a>
+        </header>
 
-  <div class="stock">
-    <h3>Stock Level</h3>
+        <div class="table-wrapper">
+            <table class="table clickable-table" onclick="window.location='{{ route('admin.materials.index') }}'" role="grid">
+                <thead>
+                    <tr>
+                        <th scope="col">Material</th>
+                        <th scope="col">Type</th>
+                        <th scope="col">Unit</th>
+                        <th scope="col">Stock</th>
+                        <th scope="col" class="status-col text-center">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($materials as $material)
+                        @php
+                            $stock = $material->inventory->stock_level ?? 0;
+                            $reorder = $material->inventory->reorder_level ?? 0;
+                            $statusClass = 'ok';
+                            $statusLabel = 'In Stock';
+                            $badgeClass = 'stock-ok';
 
-    <table class="clickable-table" onclick="window.location='{{ route('admin.materials.index') }}'">
-      <thead>
-        <tr>
-          <th>Materials</th>
-          <th>Type</th>
-          <th>Unit</th>
-          <th>Stock Level</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        @forelse($materials as $material)
-          @php
-              $stock = $material->inventory->stock_level ?? 0;
-              $reorder = $material->inventory->reorder_level ?? 0;
-              $status = 'in';
-              $statusLabel = 'In Stock';
+                            if ($stock <= 0) {
+                                $statusClass = 'out';
+                                $statusLabel = 'Out of Stock';
+                                $badgeClass = 'stock-critical';
+                            } elseif ($stock <= $reorder) {
+                                $statusClass = 'low';
+                                $statusLabel = 'Low Stock';
+                                $badgeClass = 'stock-low';
+                            }
+                        @endphp
+                        <tr>
+                            <td class="fw-bold">{{ $material->material_name }}</td>
+                            <td>{{ $material->material_type }}</td>
+                            <td>{{ $material->unit }}</td>
+                            <td>
+                                <span class="badge {{ $badgeClass }}">{{ $stock }}</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="status-label {{ $statusClass }}">{{ $statusLabel }}</span>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="5" class="text-center">No materials available.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </section>
 
-              if ($stock <= 0) {
-                  $status = 'critical';
-                  $statusLabel = 'Out of Stock';
-              } elseif ($stock <= $reorder) {
-                  $status = 'low';
-                  $statusLabel = 'Low Stock';
-              }
-          @endphp
-
-          <tr>
-            <td>{{ $material->material_name }}</td>
-            <td>{{ $material->material_type }}</td>
-            <td>{{ $material->unit }}</td>
-            <td>{{ $stock }}</td>
-            <td><span class="status {{ $status }}">{{ $statusLabel }}</span></td>
-          </tr>
-        @empty
-          <tr>
-            <td colspan="5" class="text-center">No materials available.</td>
-          </tr>
-        @endforelse
-      </tbody>
-    </table>
-  </div>
-
-  <style>
-    /* container to center and limit dashboard width */
-    .dashboard-container {
-      width: 100%;
-      max-width: 1500px; 
-      margin: 20px auto;
-      padding: 0 18px;
-      box-sizing: border-box;
-    }
-
-    .clickable-table {
-      cursor: pointer;
-    }
-    .clickable-table tbody tr:hover {
-      background-color: #f1f1f1;
-    }
-
-    .cards .card {
-      border: 2px solid #94b9ff !important;
-      background: #fff;
-      color: #94b9ff !important;
-      box-shadow: 0 4px 8px rgba(148, 185, 255, 0.15);
-    }
-    .cards .card h3,
-    .cards .card p,
-    .cards .card div {
-      color: #94b9ff !important;
-    }
-    .cards .card:hover {
-      box-shadow: 0 6px 18px rgba(148, 185, 255, 0.25);
-      background: #f0f6ff;
-      border-color: #94b9ff;
-    }
-    .stock h3 {
-      background: #94b9ff !important;
-      color: #fff !important;
-      padding: 12px 18px;
-      border-radius: 10px 10px 0 0;
-      margin: 0 -20px 15px -20px;
-      font-weight: 700;
-      font-size: 18px;
-      letter-spacing: 1px;
-    }
-  </style>
-
-  <script>
-    // Auto-hide greeting after 4 seconds
-    setTimeout(() => {
-        const greeting = document.getElementById('greetingMessage');
-        if (greeting) {
-            greeting.style.opacity = '0'; // fade out
-            setTimeout(() => greeting.remove(), 1000); // remove after fade
-        }
-    }, 4000);
-  </script>
-
-  </div><!-- /.dashboard-container -->
-
+    <script>
+        // Auto-hide greeting after 4 seconds
+        setTimeout(() => {
+            const greeting = document.getElementById('greetingMessage');
+            if (greeting) {
+                greeting.style.opacity = '0';
+                setTimeout(() => greeting.remove(), 1000);
+            }
+        }, 4000);
+    </script>
+</main>
 @endsection

@@ -1,0 +1,204 @@
+/*
+ |--------------------------------------------------------------------------
+ | Staff Form Styling
+ | Applies shared layout for staff create/edit pages using materials tokens
+ |--------------------------------------------------------------------------
+ */
+
+.staff-form-page {
+    gap: 32px;
+}
+
+.staff-form-card {
+    width: min(920px, 100%);
+    margin: 0 auto 24px;
+    padding: 32px;
+    background: var(--admin-surface, #ffffff);
+    border-radius: 22px;
+    border: 1px solid rgba(148, 185, 255, 0.22);
+    box-shadow: 0 22px 44px rgba(15, 23, 42, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+}
+
+.form-section {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    border-bottom: 1px solid rgba(148, 185, 255, 0.18);
+    padding-bottom: 22px;
+}
+
+.form-section:last-of-type {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.form-section__title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--admin-text-primary, #0f172a);
+}
+
+.form-section__title i {
+    font-size: 1.1rem;
+    color: var(--admin-accent-strong, #5a8de0);
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+}
+
+.form-grid.form-grid--single {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-field label {
+    font-weight: 700;
+    font-size: 0.92rem;
+    color: var(--admin-text-primary, #0f172a);
+}
+
+.form-field input,
+.form-field select {
+    width: 100%;
+    border-radius: 12px;
+    border: 1px solid rgba(148, 185, 255, 0.35);
+    padding: 12px 14px;
+    font-size: 0.95rem;
+    font-family: var(--admin-font, 'Nunito', 'Poppins', sans-serif);
+    color: var(--admin-text-primary, #0f172a);
+    background: rgba(148, 185, 255, 0.08);
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.form-field input:focus,
+.form-field select:focus {
+    outline: none;
+    border-color: rgba(90, 141, 224, 0.8);
+    box-shadow: 0 0 0 3px rgba(148, 185, 255, 0.24);
+}
+
+.optional {
+    font-weight: 600;
+    color: var(--admin-text-secondary, #6b7280);
+    font-size: 0.8rem;
+}
+
+.field-error {
+    font-size: 0.8rem;
+    color: var(--admin-danger, #ef4444);
+    font-weight: 600;
+}
+
+.form-alert {
+    width: min(920px, 100%);
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 185, 255, 0.35);
+    background: rgba(148, 185, 255, 0.08);
+    color: var(--admin-text-primary, #0f172a);
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+}
+
+.form-alert i {
+    font-size: 1.1rem;
+    color: inherit;
+}
+
+.form-alert--success {
+    border-color: rgba(35, 178, 109, 0.35);
+    background: rgba(35, 178, 109, 0.12);
+    color: var(--admin-success, #23b26d);
+}
+
+.form-alert--error {
+    border-color: rgba(239, 68, 68, 0.28);
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--admin-danger, #ef4444);
+}
+
+.form-alert--warning {
+    border-color: rgba(249, 115, 22, 0.28);
+    background: rgba(249, 115, 22, 0.12);
+    color: var(--admin-warning, #f97316);
+}
+
+.form-alert__title {
+    margin: 0 0 6px;
+    font-weight: 700;
+}
+
+.form-alert__list {
+    margin: 0;
+    padding-left: 18px;
+    display: grid;
+    gap: 4px;
+    font-size: 0.9rem;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 12px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(148, 185, 255, 0.18);
+}
+
+.form-actions .btn-primary,
+.form-actions .btn-secondary {
+    min-width: 160px;
+}
+
+.form-actions i {
+    font-size: 0.9rem;
+}
+
+@media (max-width: 1024px) {
+    .form-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .staff-form-card,
+    .form-alert {
+        width: 100%;
+    }
+
+    .staff-form-card {
+        padding: 24px;
+        border-radius: 18px;
+    }
+
+    .form-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .form-actions {
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+
+    .form-actions .btn-primary,
+    .form-actions .btn-secondary {
+        width: 100%;
+    }
+}

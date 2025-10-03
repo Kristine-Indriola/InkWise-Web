@@ -13,19 +13,16 @@ class ReportsDashboardController extends Controller
         // --- Inventory Data ---
         $materials = Material::with('inventory')->get();
 
-        // Labels for chart
         $materialLabels = $materials->pluck('material_name');
+        $materialStockLevels = $materials->map(fn ($material) => optional($material->inventory)->stock_level ?? 0);
+        $materialReorderLevels = $materials->map(fn ($material) => optional($material->inventory)->reorder_level ?? 0);
 
-        // Stock and reorder levels for chart
-        $materialStockLevels = $materials->map(fn($m) => $m->inventory->stock_level ?? 0);
-        $materialReorderLevels = $materials->map(fn($m) => $m->inventory->reorder_level ?? 0);
+        // TODO: replace placeholders with real sales aggregation once orders are available
+        $sales = collect();
+        $monthlyLabels = [];
+        $monthlyTotals = [];
 
-        // Pass empty sales-related variables to prevent blade errors
-        $sales = collect();             // empty collection
-        $monthlyLabels = [];            // empty array
-        $monthlyTotals = [];            // empty array
-
-        return view('admin.reports.reports', compact(
+        return view('admin.reports.index', compact(
             'materials',
             'materialLabels',
             'materialStockLevels',

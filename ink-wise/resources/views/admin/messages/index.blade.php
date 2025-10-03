@@ -2,81 +2,77 @@
 
 @section('title', 'Messages')
 
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/admin-css/messages.css') }}">
+@endpush
+
 @section('content')
 @php
     $threadRouteName = $threadRouteName ?? 'admin.messages.thread';
     $replyRouteName = $replyRouteName ?? 'admin.messages.reply';
 @endphp
-<div class="inbox-container" 
-    style="display:flex; height:85vh; border:1px solid #ddd; border-radius:12px; overflow:hidden; font-family:'Segoe UI', sans-serif; background:white;">
-
-    <!-- Left Sidebar -->
-    <div class="inbox-sidebar" 
-        style="width:280px; border-right:1px solid #ddd; background:#fff; display:flex; flex-direction:column;">
-        
-        <div style="padding:16px; font-weight:600; font-size:18px; background:#6a2ebc; color:white;">
-            Inbox
+<main class="admin-page-shell messages-page" role="main">
+    <header class="page-header">
+        <div>
+            <h1 class="page-title">Inbox & Messages</h1>
+            <p class="page-subtitle">Review customer conversations and follow up directly from the admin workspace.</p>
         </div>
+    </header>
 
-        <div id="conversationList" style="flex:1; overflow-y:auto;">
-            @php
-                $customerThreads = $messages->where('sender_type', '!=', 'user')->unique('email');
-            @endphp
+    <section class="messages-layout" aria-label="Messages">
+        <aside class="messages-sidebar" aria-label="Conversation list">
+            <div class="messages-sidebar__header">
+                <i class="fa-solid fa-envelope-open-text" aria-hidden="true"></i>
+                <span>Inbox</span>
+            </div>
 
-            @forelse($customerThreads as $message)
-                <div class="conversation-item"
-                    data-message-id="{{ $message->getKey() }}"
-                    data-sender-type="{{ strtolower($message->sender_type ?? '') }}"
-                    data-email="{{ $message->email ?? '' }}"
-                    style="padding:14px 16px; cursor:pointer; border-bottom:1px solid #f0f0f0; display:flex; align-items:center; gap:12px;">
-                    
-                    <div style="width:40px; height:40px; background:#6a2ebc; color:white; display:flex; align-items:center; justify-content:center; border-radius:50%; font-weight:bold;">
-                        {{ strtoupper(substr($message->name ?? 'G',0,1)) }}
-                    </div>
-                    <div>
-                        <div style="font-weight:600; font-size:15px; color:#333;">
-                            {{ $message->name ?? 'Guest' }}
+            <div id="conversationList" class="conversation-list">
+                @php
+                    $customerThreads = $messages->where('sender_type', '!=', 'user')->unique('email');
+                @endphp
+
+                @forelse($customerThreads as $message)
+                    <article class="conversation-item"
+                        data-message-id="{{ $message->getKey() }}"
+                        data-sender-type="{{ strtolower($message->sender_type ?? '') }}"
+                        data-email="{{ $message->email ?? '' }}"
+                        role="button" tabindex="0" aria-pressed="false">
+                        <div class="conversation-item__avatar" aria-hidden="true">
+                            {{ strtoupper(substr($message->name ?? 'G',0,1)) }}
                         </div>
-                        <div style="font-size:12px; color:#777; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px;">
-                            {{ $message->message ?? '' }}
+                        <div class="conversation-item__meta">
+                            <p class="conversation-item__name">{{ $message->name ?? 'Guest' }}</p>
+                            <p class="conversation-item__preview">{{ $message->message ?? '' }}</p>
                         </div>
-                    </div>
-                </div>
-            @empty
-                <div style="padding:14px; color:#999; text-align:center;">No conversations</div>
-            @endforelse
-        </div>
-    </div>
+                    </article>
+                @empty
+                    <p class="conversation-empty">No conversations yet.</p>
+                @endforelse
+            </div>
+        </aside>
 
-    <!-- Right Panel -->
-    <div class="inbox-thread" style="flex:1; display:flex; flex-direction:column;">
-        
-        <!-- Header -->
-        <div id="threadHeader" 
-            style="padding:14px 16px; border-bottom:1px solid #eee; font-weight:600; font-size:16px; background:#fafafa;">
-            Select a conversation
-        </div>
+        <section class="messages-thread" aria-live="polite">
+            <header id="threadHeader" class="messages-thread__header">
+                Select a conversation
+            </header>
 
-        <!-- Messages -->
-        <div id="threadMessages" 
-            style="flex:1; overflow-y:auto; padding:20px; background:#f5f6f8; display:flex; flex-direction:column; gap:12px;">
-            <!-- messages load here -->
-        </div>
+            <div id="threadMessages" class="thread-messages" data-empty="Select a conversation to view its messages.">
+                <!-- messages load here -->
+            </div>
 
-        <!-- Reply Form -->
-        <form id="replyForm" 
-            style="padding:14px; border-top:1px solid #eee; display:flex; gap:10px; background:#fff;">
-            @csrf
-            <textarea id="replyMessage" name="message" rows="2" 
-                placeholder="Type a message..."
-                style="flex:1; resize:none; padding:10px 12px; border:1px solid #ddd; border-radius:20px; outline:none; font-size:14px;"></textarea>
-            <button type="submit" 
-                style="padding:0 18px; background:#6a2ebc; color:#fff; border:0; border-radius:20px; font-weight:500; cursor:pointer;">
-                Send
-            </button>
-        </form>
-    </div>
-</div>
+            <form id="replyForm" class="reply-form" novalidate>
+                @csrf
+                <label for="replyMessage" class="visually-hidden">Reply message</label>
+                <textarea id="replyMessage" name="message" rows="2" class="reply-form__input" placeholder="Type a message..." disabled></textarea>
+                <button type="submit" class="btn btn-primary reply-form__button" disabled>
+                    <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
+                    <span>Send</span>
+                </button>
+            </form>
+        </section>
+    </section>
+</main>
 @endsection
 
 @section('scripts')
@@ -85,12 +81,15 @@ document.addEventListener('DOMContentLoaded', function () {
     const threadUrlTemplate = "{{ route($threadRouteName, ['message' => '__ID__']) }}";
     const replyUrlTemplate  = "{{ route($replyRouteName, ['message' => '__ID__']) }}";
 
+    const conversationList = document.getElementById('conversationList');
     const threadMessages = document.getElementById('threadMessages');
     const threadHeader   = document.getElementById('threadHeader');
     const replyForm      = document.getElementById('replyForm');
     const replyMessage   = document.getElementById('replyMessage');
+    const replyButton    = replyForm.querySelector('button[type="submit"]');
     let currentMessageId = null;
     let pollInterval = null;
+    let activeConversation = null;
 
     function getCsrf() {
         const m = document.querySelector('meta[name="csrf-token"]');
@@ -113,34 +112,54 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function renderThread(items) {
         threadMessages.innerHTML = '';
+
+        if (!items.length) {
+            const emptyState = document.createElement('p');
+            emptyState.classList.add('thread-empty');
+            emptyState.textContent = threadMessages.dataset.empty;
+            threadMessages.appendChild(emptyState);
+            return;
+        }
+
         items.forEach(it => {
             const senderType = (it.sender_type || '').toLowerCase();
             const isInternal = ['user', 'staff', 'admin'].includes(senderType);
             const wrapper = document.createElement('div');
-            wrapper.style.display = 'flex';
-            wrapper.style.justifyContent = isInternal ? 'flex-end' : 'flex-start';
+            wrapper.classList.add('message-row');
+            if (isInternal) wrapper.classList.add('message-row--internal');
 
-            const bubble = document.createElement('div');
-            bubble.style.maxWidth = '65%';
-            bubble.style.padding = '10px 14px';
-            bubble.style.borderRadius = '18px';
-            bubble.style.background = isInternal ? '#6a2ebc' : '#fff';
-            bubble.style.color = isInternal ? '#fff' : '#222';
-            bubble.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-            bubble.style.fontSize = '14px';
-            bubble.style.lineHeight = '1.4';
+            const bubble = document.createElement('article');
+            bubble.classList.add('message-bubble');
+            if (isInternal) bubble.classList.add('message-bubble--internal');
 
-            bubble.innerHTML = `
-                <div style="font-size:11px; margin-bottom:4px; color:${isInternal ? '#e0d5f9' : '#888'}">
-                    ${escapeHtml(it.name ?? (isInternal ? 'Team' : 'Guest'))}
-                    <span style="margin-left:6px; font-size:10px; color:#bbb;">${new Date(it.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
-                </div>
-                <div style="white-space:pre-wrap;">${escapeHtml(it.message)}</div>
-            `;
+            const meta = document.createElement('div');
+            meta.classList.add('message-meta');
 
+            const nameEl = document.createElement('span');
+            nameEl.classList.add('message-sender');
+            nameEl.textContent = it.name ?? (isInternal ? 'Team' : 'Guest');
+
+            const timeEl = document.createElement('time');
+            const createdAt = new Date(it.created_at);
+            timeEl.classList.add('message-time');
+            if (!Number.isNaN(createdAt.getTime())) {
+                timeEl.dateTime = createdAt.toISOString();
+                timeEl.textContent = createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+
+            meta.appendChild(nameEl);
+            meta.appendChild(timeEl);
+
+            const body = document.createElement('p');
+            body.classList.add('message-text');
+            body.textContent = it.message ?? '';
+
+            bubble.appendChild(meta);
+            bubble.appendChild(body);
             wrapper.appendChild(bubble);
             threadMessages.appendChild(wrapper);
         });
+
         threadMessages.scrollTop = threadMessages.scrollHeight;
     }
 
@@ -149,6 +168,9 @@ document.addEventListener('DOMContentLoaded', function () {
         threadHeader.textContent = title;
         const items = await fetchThread(messageId);
         renderThread(items);
+
+        replyMessage.disabled = false;
+        replyButton.disabled = false;
 
         clearInterval(pollInterval);
         pollInterval = setInterval(async () => {
@@ -159,11 +181,35 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 3000);
     }
 
-    document.addEventListener('click', e => {
+    function setActiveConversation(item) {
+        if (activeConversation) {
+            activeConversation.classList.remove('is-active');
+            activeConversation.setAttribute('aria-pressed', 'false');
+        }
+        activeConversation = item;
+        if (activeConversation) {
+            activeConversation.classList.add('is-active');
+            activeConversation.setAttribute('aria-pressed', 'true');
+        }
+    }
+
+    conversationList?.addEventListener('click', e => {
         const item = e.target.closest('.conversation-item');
         if (!item) return;
         const messageId = item.getAttribute('data-message-id');
-        const senderName = item.querySelector('div:nth-child(2) > div:first-child')?.textContent.trim() ?? 'Conversation';
+        const senderName = item.querySelector('.conversation-item__name')?.textContent.trim() ?? 'Conversation';
+        setActiveConversation(item);
+        openThread(messageId, senderName);
+    });
+
+    conversationList?.addEventListener('keydown', e => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const item = e.target.closest('.conversation-item');
+        if (!item) return;
+        e.preventDefault();
+        const messageId = item.getAttribute('data-message-id');
+        const senderName = item.querySelector('.conversation-item__name')?.textContent.trim() ?? 'Conversation';
+        setActiveConversation(item);
         openThread(messageId, senderName);
     });
 

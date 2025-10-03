@@ -330,6 +330,19 @@
     margin: 0;
 }
 
+/* two-column row used for Colors and Bulk Orders */
+.two-column-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
+
+@media (max-width: 768px) {
+    .two-column-row {
+        grid-template-columns: 1fr;
+    }
+}
+
 @media (max-width: 1024px) {
     .product-content-grid {
         grid-template-columns: 1fr;

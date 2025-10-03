@@ -40,6 +40,41 @@
         </div>
     </header>
 
+    @php
+        $basePriceSummaryValue = '—';
+        $basePrice = $product->base_price ?? $product->unit_price;
+        if (!is_null($basePrice)) {
+            $basePriceSummaryValue = '₱' . number_format($basePrice, 2);
+        }
+
+        $dateAvailableRaw = $product->getAttribute('date_available') ?? $product->getAttribute('date_Available');
+        $dateAvailableDisplay = '—';
+        if (!empty($dateAvailableRaw)) {
+            try {
+                $dateAvailableDisplay = \Illuminate\Support\Carbon::parse($dateAvailableRaw)->format('M d, Y');
+            } catch (\Throwable $e) {
+                $dateAvailableDisplay = is_string($dateAvailableRaw) ? $dateAvailableRaw : '—';
+            }
+        }
+
+        $bulkOrdersSummary = collect($product->product_bulk_orders ?? $product->bulk_orders ?? []);
+        $bulkOrdersSummaryValue = '—';
+        if ($bulkOrdersSummary->isNotEmpty()) {
+            $minQty = $bulkOrdersSummary->whereNotNull('min_qty')->min('min_qty');
+            $maxQty = $bulkOrdersSummary->whereNotNull('max_qty')->max('max_qty');
+            if (!is_null($minQty) && !is_null($maxQty)) {
+                $bulkOrdersSummaryValue = number_format($minQty) . ' – ' . number_format($maxQty) . ' pcs';
+            } elseif (!is_null($minQty)) {
+                $bulkOrdersSummaryValue = 'Min ' . number_format($minQty) . ' pcs';
+            } elseif (!is_null($maxQty)) {
+                $bulkOrdersSummaryValue = 'Up to ' . number_format($maxQty) . ' pcs';
+            } else {
+                $tierCount = $bulkOrdersSummary->count();
+                $bulkOrdersSummaryValue = $tierCount . ' tier' . ($tierCount === 1 ? '' : 's');
+            }
+        }
+    @endphp
+
     <section class="product-summary" aria-label="Key product metrics">
         <article class="summary-card">
             <span class="summary-label">Event Type</span>
@@ -50,12 +85,12 @@
             <span class="summary-value">{{ $product->product_type ?? '—' }}</span>
         </article>
         <article class="summary-card">
-            <span class="summary-label">Unit Price</span>
-            <span class="summary-value">{{ $product->unit_price !== null ? '₱' . number_format($product->unit_price, 2) : '—' }}</span>
+            <span class="summary-label">Base Price</span>
+            <span class="summary-value">{{ $basePriceSummaryValue }}</span>
         </article>
         <article class="summary-card">
-            <span class="summary-label">Min Order</span>
-            <span class="summary-value">{{ $product->min_order_qty ?? '—' }}</span>
+            <span class="summary-label">Bulk Orders</span>
+            <span class="summary-value">{{ $bulkOrdersSummaryValue }}</span>
         </article>
     </section>
 
@@ -63,7 +98,41 @@
         <aside class="product-side-panel">
             <div class="product-card media-card">
                 <div class="media-card__image">
-                    <img src="{{ \App\Support\ImageResolver::url($product->image) }}" alt="{{ $product->name }} preview">
+                    @php
+                        $sideFront = '';
+                        $sideBack = '';
+                        $imgRecord = $product->images ?? $product->product_images ?? null;
+                        if ($imgRecord) {
+                            $sideFront = \App\Support\ImageResolver::url($imgRecord->front ?? null);
+                            $sideBack = \App\Support\ImageResolver::url($imgRecord->back ?? null);
+                        }
+                        $templateRef = $product->template ?? null;
+                        if ((!$sideFront || !$sideBack) && $templateRef) {
+                            $tFront = $templateRef->front_image ?? $templateRef->preview_front ?? null;
+                            $tBack = $templateRef->back_image ?? $templateRef->preview_back ?? null;
+                            if (!$sideFront && $tFront) {
+                                $sideFront = preg_match('/^(https?:)?\/\//i', $tFront) || strpos($tFront, '/') === 0
+                                    ? $tFront
+                                    : \Illuminate\Support\Facades\Storage::url($tFront);
+                            }
+                            if (!$sideBack && $tBack) {
+                                $sideBack = preg_match('/^(https?:)?\/\//i', $tBack) || strpos($tBack, '/') === 0
+                                    ? $tBack
+                                    : \Illuminate\Support\Facades\Storage::url($tBack);
+                            }
+                        }
+                    @endphp
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        @if($sideFront)
+                            <img src="{{ $sideFront }}" alt="{{ $product->name }} front preview" style="max-width:48%; max-height:140px; height:auto; object-fit:contain;">
+                        @endif
+                        @if($sideBack)
+                            <img src="{{ $sideBack }}" alt="{{ $product->name }} back preview" style="max-width:48%; max-height:140px; height:auto; object-fit:contain;">
+                        @endif
+                        @if(!$sideFront && !$sideBack)
+                            <img src="{{ \App\Support\ImageResolver::url($product->image) }}" alt="{{ $product->name }} preview" style="max-width:100%; max-height:140px; height:auto; object-fit:contain;">
+                        @endif
+                    </div>
                 </div>
                 <div class="media-card__meta">
                     <span class="meta-pill">Stock: {{ $product->stock_availability ?? '—' }}</span>
@@ -82,7 +151,7 @@
                     </div>
                     <p class="template-name">{{ $product->template->name }}</p>
                     <ul class="meta-list">
-                        <li><span>Category</span><strong>{{ $product->template->category ?? '—' }}</strong></li>
+                        <li><span>Event Type</span><strong>{{ $product->template->event_type ?? '—' }}</strong></li>
                         <li><span>Theme</span><strong>{{ $product->template->theme_style ?? '—' }}</strong></li>
                         <li><span>Updated</span><strong>{{ optional($product->template->updated_at)->format('M d, Y') ?? '—' }}</strong></li>
                     </ul>
@@ -122,6 +191,8 @@
                     <div><dt>Theme / Style</dt><dd>{{ $product->theme_style ?? '—' }}</dd></div>
                     <div><dt>Event Type</dt><dd>{{ $product->event_type ?? '—' }}</dd></div>
                     <div><dt>Product Type</dt><dd>{{ $product->product_type ?? '—' }}</dd></div>
+                    <div><dt>Base Price</dt><dd>{{ $product->base_price !== null ? '₱' . number_format($product->base_price, 2) : ($product->unit_price !== null ? '₱' . number_format($product->unit_price, 2) : '—') }}</dd></div>
+                    <div><dt>Date Available</dt><dd>{{ $dateAvailableDisplay }}</dd></div>
                 </dl>
             </div>
 
@@ -132,40 +203,99 @@
                 </div>
             </div>
 
+
+            
+
+            {{-- Paper Stocks --}}
             <div class="product-card">
-                <h2>Materials</h2>
-                @php $materialRecords = $product->materials ?? collect(); @endphp
-                @if($materialRecords->count())
+                <h2>Paper Stocks</h2>
+                @php $paperStocks = $product->paper_stocks ?? $product->paperStocks ?? collect(); @endphp
+                @if($paperStocks && $paperStocks->count())
                     <ul class="meta-list">
-                        @foreach($materialRecords as $material)
+                        @foreach($paperStocks as $ps)
                             <li>
-                                <span>{{ $material->item ?? 'Material' }}</span>
+                                <span>{{ $ps->name ?? 'Paper Stock' }}</span>
                                 <strong>
-                                    {{ collect([$material->type, $material->color, $material->size])->filter()->implode(' • ') }}
-                                    @if($material->weight) · {{ $material->weight }} GSM @endif
+                                    {{ isset($ps->price) ? '₱' . number_format($ps->price, 2) : '—' }}
+                                    @if(!empty($ps->image_path) || !empty($ps->image))
+                                        <img src="{{ \App\Support\ImageResolver::url($ps->image_path ?? $ps->image) }}" alt="{{ $ps->name ?? 'paper' }}" style="width:48px; height:48px; object-fit:contain; margin-left:8px; vertical-align:middle; border:1px solid #eee; background:#fff; padding:4px;">
+                                    @endif
                                 </strong>
                             </li>
                         @endforeach
                     </ul>
                 @else
-                    <dl class="info-grid">
-                        <div><dt>Item</dt><dd>{{ $product->item ?? '—' }}</dd></div>
-                        <div><dt>Type</dt><dd>{{ $product->type ?? '—' }}</dd></div>
-                        <div><dt>Color</dt><dd>{{ $product->color ?? '—' }}</dd></div>
-                        <div><dt>Size</dt><dd>{{ $product->size ?? '—' }}</dd></div>
-                        <div><dt>Weight</dt><dd>{{ $product->weight ? $product->weight . ' GSM' : '—' }}</dd></div>
-                    </dl>
+                    <p class="muted">No paper stocks defined.</p>
                 @endif
             </div>
 
+            {{-- Addons --}}
             <div class="product-card">
-                <h2>Production & Pricing</h2>
-                <dl class="info-grid">
-                    <div><dt>Minimum Order Quantity</dt><dd>{{ $product->min_order_qty ?? '—' }}</dd></div>
-                    <div><dt>Lead Time</dt><dd>{{ $product->lead_time ?? '—' }}</dd></div>
-                    <div><dt>Stock Availability</dt><dd>{{ $product->stock_availability ?? '—' }}</dd></div>
-                    <div><dt>Unit Price</dt><dd>{{ $product->unit_price !== null ? '₱' . number_format($product->unit_price, 2) : '—' }}</dd></div>
-                </dl>
+                <h2>Addons</h2>
+                @php $addons = $product->addons ?? $product->product_addons ?? $product->addOns ?? collect(); @endphp
+                @if($addons && $addons->count())
+                    <ul class="meta-list">
+                        @foreach($addons as $ad)
+                                <li style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        @if(!empty($ad->image_path) || !empty($ad->image))
+                                            <img src="{{ \App\Support\ImageResolver::url($ad->image_path ?? $ad->image) }}" alt="{{ $ad->name ?? 'addon' }}" style="width:48px; height:48px; object-fit:contain; border:1px solid #eee; background:#fff; padding:4px;">
+                                        @endif
+                                        <span>{{ $ad->name ?? $ad->addon_type ?? 'Addon' }}</span>
+                                    </div>
+                                    <strong>{{ isset($ad->price) ? '₱' . number_format($ad->price, 2) : '—' }}</strong>
+                                </li>
+                        @endforeach
+                    </ul>
+                @else
+                    <p class="muted">No addons defined.</p>
+                @endif
+            </div>
+
+            {{-- Colors --}}
+            <div class="two-column-row">
+            <div class="product-card">
+                <h2>Colors</h2>
+                @php $colors = $product->colors ?? $product->product_colors ?? collect(); @endphp
+                @if($colors && $colors->count())
+                    <ul class="meta-list">
+                        @foreach($colors as $c)
+                            <li style="display:flex; align-items:center; gap:8px;">
+                                <span>{{ $c->name ?? 'Color' }}</span>
+                                <strong style="display:flex; align-items:center; gap:8px;">
+                                    @if(!empty($c->color_code))
+                                        <span style="width:20px; height:20px; display:inline-block; background:{{ $c->color_code }}; border:1px solid #ccc;"></span>
+                                        <span>{{ $c->color_code }}</span>
+                                    @else
+                                        —
+                                    @endif
+                                </strong>
+                            </li>
+                        @endforeach
+                    </ul>
+                @else
+                    <p class="muted">No colors defined.</p>
+                @endif
+            </div>
+
+            {{-- Bulk Orders --}}
+            <div class="product-card">
+                <h2>Bulk Orders</h2>
+                @php $bulkOrders = $product->bulk_orders ?? $product->product_bulk_orders ?? collect(); @endphp
+                @if($bulkOrders && $bulkOrders->count())
+                    <ul class="meta-list">
+                        @foreach($bulkOrders as $b)
+                            <li>
+                                <div><strong>Min Qty:</strong> {{ $b->min_qty ?? '—' }}</div>
+                                <div><strong>Max Qty:</strong> {{ $b->max_qty ?? '—' }}</div>
+                                <div><strong>Price per Unit:</strong> {{ $b->price_per_unit ?? '—' }}</div>
+                            </li>
+                        @endforeach
+                    </ul>
+                @else
+                    <p class="muted">No bulk order tiers defined.</p>
+                @endif
+            </div>
             </div>
         </section>
     </div>

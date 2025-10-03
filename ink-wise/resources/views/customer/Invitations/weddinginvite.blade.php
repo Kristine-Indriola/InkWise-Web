@@ -1,42 +1,502 @@
-@php($invitationType = 'Wedding')
+@php $invitationType = 'Wedding'; @endphp
 @extends('customer.Invitations.invitations')
 
 @section('title', 'Wedding Invitations')
-<link rel="stylesheet" href="{{ asset('css/customer/template.css') }}">
-<script src="{{ asset('js/customer/template.js') }}" defer></script>
-@section('content')
-<main class="py-12 px-6 text-center">
-    <h1 class="page-title">
-        <span class="cursive">W</span>edding 
-        <span class="cursive">I</span>nvitations
-    </h1>
-    <p class="page-subtitle mb-10">Choose from our curated selection of elegant invitation designs.</p>
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('css/customer/preview-modal.css') }}">
+    <style>
+        :root {
+            --invite-accent: #a6b7ff;
+            --invite-accent-dark: #8f9dff;
+            --invite-surface: #ffffff;
+            --invite-muted: #6b7280;
+            --invite-shadow: 0 24px 48px rgba(70, 89, 182, 0.18);
+        }
 
-    
-    <!-- Individual Card Grids -->
-    <div class="mx-auto max-w-7xl flex flex-wrap gap-6 justify-center">
-        @foreach($products as $product)
-        <div class="bg-white rounded-2xl shadow-lg transition-all duration-300 hover:shadow-2xl hover:-translate-y-2 border border-gray-100 p-4 flex flex-col items-center w-full max-w-xs">
-            <div class="w-full h-[260px] flex items-center justify-center relative">
-                <!-- Heart Icon -->
-                <button class="absolute top-3 right-3 z-10 bg-white/80 rounded-full p-1 shadow hover:bg-[#a6b7ff] group transition">
-                    <svg class="w-6 h-6 text-[#a6b7ff] group-hover:text-white transition" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path d="M12 21C12 21 4 13.5 4 8.5C4 5.42 6.42 3 9.5 3C11.24 3 12.91 3.81 14 5.08C15.09 3.81 16.76 3 18.5 3C21.58 3 24 5.42 24 8.5C24 13.5 16 21 16 21H12Z" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-                <img src="{{ $product->image ? \App\Support\ImageResolver::url($product->image) : asset('images/placeholder.png') }}" 
-                     alt="{{ $product->name }}" 
-                     class="w-full h-full object-contain template-image preview-trigger"
-                     data-template="{{ $product->name }}"
-                >
-            </div>
-            <div class="font-semibold text-base text-gray-800 mt-3">{{ $product->name }}</div>
-            <div class="mt-1 text-sm text-gray-500">{{ $product->theme_style }}</div>
-            <div class="text-green-600 font-bold text-base">Starting at ₱{{ $product->unit_price ?? 'TBD' }}</div>
+        .wedding-page {
+            display: flex;
+            flex-direction: column;
+            gap: clamp(2.25rem, 5vw, 3.5rem);
+            padding-inline: clamp(1rem, 4vw, 3rem);
+        }
+
+        .wedding-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: 32px;
+            padding: clamp(1.75rem, 5vw, 3.25rem);
+            background:
+                radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.9), rgba(166, 183, 255, 0.65)),
+                linear-gradient(135deg, #f5f0ff, #edf2ff 55%, #f9f7ff);
+            box-shadow: 0 28px 55px rgba(79, 70, 229, 0.18);
+            color: #111827;
+            isolation: isolate;
+        }
+
+        .wedding-hero::before,
+        .wedding-hero::after {
+            content: "";
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(0);
+            opacity: 0.55;
+            transform: translate3d(0,0,0);
+        }
+
+        .wedding-hero::before {
+            width: clamp(180px, 28vw, 320px);
+            height: clamp(180px, 28vw, 320px);
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.85), rgba(166, 183, 255, 0));
+            top: -12%;
+            right: 12%;
+        }
+
+        .wedding-hero::after {
+            width: clamp(220px, 32vw, 380px);
+            height: clamp(220px, 32vw, 380px);
+            background: radial-gradient(circle, rgba(140, 154, 255, 0.4), rgba(255, 255, 255, 0));
+            bottom: -18%;
+            left: 8%;
+        }
+
+        .wedding-hero__content {
+            position: relative;
+            max-width: 680px;
+            margin-inline: auto;
+            text-align: center;
+            z-index: 1;
+        }
+
+        .wedding-hero__eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.9rem;
+            border-radius: 999px;
+            background: rgba(166, 183, 255, 0.18);
+            color: #4338ca;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+
+        .wedding-hero__title {
+            margin-top: 1rem;
+            font-size: clamp(2rem, 5vw, 2.8rem);
+            font-family: 'Playfair Display', serif;
+            font-weight: 700;
+            line-height: 1.1;
+        }
+
+        .wedding-hero__title span {
+            display: inline-block;
+        }
+
+        .wedding-hero__title .highlight-primary {
+            color: var(--invite-accent-dark);
+        }
+
+        .wedding-hero__title .highlight-secondary {
+            color: #4338ca;
+        }
+
+        .wedding-hero__subtitle {
+            margin-top: 0.85rem;
+            font-size: clamp(0.95rem, 2vw, 1.1rem);
+            color: var(--invite-muted);
+        }
+
+        .invitation-gallery {
+            position: relative;
+        }
+
+        .invitation-gallery::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(166, 183, 255, 0.08), transparent 35%, transparent 65%, rgba(166, 183, 255, 0.05));
+            pointer-events: none;
+        }
+
+        .invitation-gallery .layout-container {
+            position: relative;
+            z-index: 1;
+        }
+
+        .invitation-grid {
+            display: grid;
+            gap: clamp(1.75rem, 3.5vw, 2.5rem);
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        }
+
+        .invitation-card {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            background: var(--invite-surface);
+            border-radius: 24px;
+            padding: 1.25rem;
+            box-shadow: 0 18px 40px rgba(79, 70, 229, 0.12);
+            border: 1px solid rgba(166, 183, 255, 0.18);
+            transition: transform 0.35s ease, box-shadow 0.35s ease;
+            opacity: 0;
+            transform: translateY(28px) scale(0.98);
+        }
+
+        .invitation-card.is-visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        .invitation-card:hover {
+            transform: translateY(-8px) scale(1.01);
+            box-shadow: var(--invite-shadow);
+        }
+
+        .invitation-card__preview {
+            position: relative;
+            border-radius: 18px;
+            overflow: hidden;
+            aspect-ratio: 3 / 4;
+            background: linear-gradient(135deg, rgba(166, 183, 255, 0.15), rgba(166, 183, 255, 0.05));
+        }
+
+        .invitation-card__image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            mix-blend-mode: multiply;
+            transition: transform 0.35s ease;
+        }
+
+        .invitation-card:hover .invitation-card__image {
+            transform: scale(1.04);
+        }
+
+        .favorite-toggle {
+            position: absolute;
+            top: 0.9rem;
+            right: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 14px 26px rgba(166, 183, 255, 0.28);
+            color: var(--invite-accent);
+            transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+        }
+
+        .favorite-toggle:hover {
+            transform: translateY(-2px) scale(1.03);
+            background: var(--invite-accent);
+            color: #ffffff;
+        }
+
+        .favorite-toggle svg {
+            width: 1.25rem;
+            height: 1.25rem;
+            fill: currentColor;
+            stroke: currentColor;
+        }
+
+        .favorite-toggle.is-active {
+            background: var(--invite-accent);
+            color: #ffffff;
+            box-shadow: 0 18px 32px rgba(166, 183, 255, 0.4);
+        }
+
+        .invitation-card__body {
+            margin-top: 1.15rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            text-align: left;
+        }
+
+        .invitation-card__title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #111827;
+        }
+
+        .invitation-card__subtitle {
+            color: var(--invite-muted);
+            font-size: 0.9rem;
+        }
+
+        .invitation-card__badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 999px;
+            background: rgba(166, 183, 255, 0.18);
+            color: #4338ca;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .invitation-card__price {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #059669;
+        }
+
+        .invitation-card__muted {
+            color: var(--invite-muted);
+            font-size: 0.85rem;
+        }
+
+        .invitation-card__actions {
+            margin-top: auto;
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .invitation-card__action {
+            flex: 1 1 auto;
+            border-radius: 999px;
+            border: 1px solid rgba(166, 183, 255, 0.5);
+            padding: 0.6rem 1rem;
+            background: rgba(166, 183, 255, 0.12);
+            color: #4338ca;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+        }
+
+        .invitation-card__action:hover {
+            background: linear-gradient(135deg, var(--invite-accent), var(--invite-accent-dark));
+            color: #ffffff;
+            transform: translateY(-2px);
+        }
+
+        .invitation-empty {
+            text-align: center;
+            border-radius: 24px;
+            padding: clamp(2.5rem, 6vw, 4rem);
+            background: rgba(166, 183, 255, 0.08);
+            border: 1px dashed rgba(166, 183, 255, 0.45);
+            color: #4338ca;
+        }
+
+        .invitation-empty p {
+            margin-top: 0.75rem;
+            color: var(--invite-muted);
+        }
+
+        @media (max-width: 640px) {
+            .wedding-hero {
+                border-radius: 24px;
+            }
+
+            .invitation-card {
+                padding: 1.1rem;
+                border-radius: 20px;
+            }
+
+            .favorite-toggle {
+                width: 2.25rem;
+                height: 2.25rem;
+            }
+
+            .invitation-card__actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+@endpush
+
+@push('scripts')
+    <script src="{{ asset('js/customer/preview-modal.js') }}" defer></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const FAVORITES_KEY = 'inkwise:wedding:favorites';
+            let favorites;
+            try {
+                const stored = JSON.parse(window.localStorage.getItem(FAVORITES_KEY) || '[]');
+                favorites = new Set(stored);
+            } catch (error) {
+                console.warn('Unable to parse wedding favorites from storage.', error);
+                favorites = new Set();
+            }
+
+            const updateStorage = () => {
+                if (!window.localStorage) return;
+                window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(Array.from(favorites)));
+            };
+
+            const setFavoriteState = (button, active) => {
+                button.classList.toggle('is-active', active);
+                button.setAttribute('aria-pressed', active ? 'true' : 'false');
+                const baseLabel = button.getAttribute('data-label') || 'Save to favorites';
+                button.setAttribute('title', active ? 'Remove from favorites' : baseLabel);
+            };
+
+            document.querySelectorAll('.favorite-toggle').forEach((button) => {
+                const productId = button.getAttribute('data-product-id');
+                if (!productId) return;
+
+                button.dataset.label = button.dataset.label || button.getAttribute('aria-label') || 'Save to favorites';
+
+                if (favorites.has(productId)) {
+                    setFavoriteState(button, true);
+                }
+
+                button.addEventListener('click', () => {
+                    const isActive = favorites.has(productId);
+                    if (isActive) {
+                        favorites.delete(productId);
+                    } else {
+                        favorites.add(productId);
+                    }
+                    setFavoriteState(button, !isActive);
+                    updateStorage();
+                });
+            });
+
+            if ('IntersectionObserver' in window) {
+                const observer = new IntersectionObserver((entries, obs) => {
+                    entries.forEach((entry) => {
+                        if (entry.isIntersecting) {
+                            entry.target.classList.add('is-visible');
+                            obs.unobserve(entry.target);
+                        }
+                    });
+                }, {
+                    rootMargin: '0px 0px -5%',
+                    threshold: 0.15,
+                });
+
+                document.querySelectorAll('.invitation-card').forEach((card) => observer.observe(card));
+            } else {
+                document.querySelectorAll('.invitation-card').forEach((card) => card.classList.add('is-visible'));
+            }
+        });
+    </script>
+@endpush
+@section('content')
+<main class="wedding-page">
+    <section class="wedding-hero">
+        <div class="wedding-hero__content">
+            <span class="wedding-hero__eyebrow">Hand-crafted moments</span>
+            <h1 class="wedding-hero__title">
+                <span class="highlight-primary">Wedding invitations</span>
+                <span class="highlight-secondary">for your story</span>
+            </h1>
+            <p class="wedding-hero__subtitle">
+                Discover romantic templates with luxe finishes, layered textures, and typography that captures the magic of your celebration.
+            </p>
         </div>
-        @endforeach
-    </div>
+    </section>
+
+    <section class="invitation-gallery">
+        <div class="layout-container">
+            <div class="invitation-grid" role="list">
+                @forelse($products as $product)
+                    @php
+                        $uploads = $product->uploads ?? collect();
+                        $firstUpload = $uploads->first();
+                        $images = $product->product_images ?? $product->images ?? null;
+                        $templateRef = $product->template ?? null;
+
+                        $previewSrc = null;
+                        if ($firstUpload && str_starts_with($firstUpload->mime_type ?? '', 'image/')) {
+                            $previewSrc = asset('storage/uploads/products/' . $product->id . '/' . $firstUpload->filename);
+                        } elseif ($images && ($images->front || $images->preview)) {
+                            $candidate = $images->front ?: $images->preview;
+                            $previewSrc = \App\Support\ImageResolver::url($candidate);
+                        } elseif (!empty($product->image)) {
+                            $previewSrc = \App\Support\ImageResolver::url($product->image);
+                        } elseif ($templateRef) {
+                            $templatePreview = $templateRef->preview_front ?? $templateRef->front_image ?? $templateRef->preview ?? $templateRef->image ?? null;
+                            if ($templatePreview) {
+                                $previewSrc = preg_match('/^(https?:)?\/\//i', $templatePreview) || str_starts_with($templatePreview, '/')
+                                    ? $templatePreview
+                                    : \Illuminate\Support\Facades\Storage::url($templatePreview);
+                            }
+                        }
+
+                        if (!$previewSrc) {
+                            $previewSrc = asset('images/placeholder.png');
+                        }
+
+                        $priceValue = $product->base_price ?? $product->unit_price ?? optional($templateRef)->base_price ?? optional($templateRef)->unit_price;
+                        $eventLabel = $product->event_type ?? 'Invitation';
+                        $themeLabel = $product->theme_style ?? 'Custom theme';
+                        $previewUrl = route('product.preview', $product->id);
+                    @endphp
+                    <article class="invitation-card" role="listitem" data-product-id="{{ $product->id }}">
+                        <div class="invitation-card__preview">
+                            <button type="button"
+                                    class="favorite-toggle"
+                                    data-product-id="{{ $product->id }}"
+                                    aria-label="Save {{ $product->name }} to favorites"
+                                    aria-pressed="false">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M12 21s-6.5-4.35-9-8.5C1.33 9.5 2.15 6 5 4.8 7.38 3.77 9.55 4.89 12 7.4c2.45-2.51 4.62-3.63 7-2.6 2.85 1.2 3.68 4.7 2 7.7-2.5 4.15-9 8.5-9 8.5Z"/>
+                                </svg>
+                            </button>
+                            <img src="{{ $previewSrc }}"
+                                 alt="{{ $product->name }} invitation design"
+                                 class="invitation-card__image preview-trigger"
+                                 loading="lazy"
+                                 data-product-id="{{ $product->id }}"
+                                 data-preview-url="{{ $previewUrl }}"
+                                 data-template="{{ $product->name }}">
+                        </div>
+                        <div class="invitation-card__body">
+                            <h2 class="invitation-card__title">{{ $product->name }}</h2>
+                            <p class="invitation-card__subtitle">{{ $themeLabel }}</p>
+                            <span class="invitation-card__badge">{{ $eventLabel }}</span>
+                            @if(!is_null($priceValue))
+                                <p class="invitation-card__price">Starting at ₱{{ number_format($priceValue, 2) }}</p>
+                            @else
+                                <p class="invitation-card__muted">Pricing available on request</p>
+                            @endif
+                            <div class="invitation-card__actions">
+                                <button type="button"
+                                        class="invitation-card__action preview-trigger"
+                                        data-preview-url="{{ $previewUrl }}">
+                                    Quick preview
+                                </button>
+                            </div>
+                        </div>
+                    </article>
+                @empty
+                    <div class="invitation-empty">
+                        <h3>No wedding invitations yet</h3>
+                        <p>We’re curating new designs for you. Please check back soon or contact us for a bespoke concept.</p>
+                    </div>
+                @endforelse
+            </div>
+        </div>
+    </section>
 </main>
+
+<div id="productPreviewOverlay" class="preview-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="preview-frame-wrapper">
+        <div class="preview-frame-header">
+            <button type="button" class="preview-close-btn" id="productPreviewClose" aria-label="Close preview">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+                Close
+            </button>
+        </div>
+        <div class="preview-frame-body">
+            <iframe id="productPreviewFrame" title="Product preview"></iframe>
+        </div>
+    </div>
+</div>
 @endsection
 
 

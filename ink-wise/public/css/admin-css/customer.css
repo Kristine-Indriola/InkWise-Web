@@ -1,0 +1,57 @@
+:root {
+    --customer-avatar-size: 54px;
+}
+
+.customer-page {
+    gap: 28px;
+}
+
+.customers-table .table thead th {
+    text-align: left;
+}
+
+.customer-avatar {
+    display: inline-flex;
+    width: var(--customer-avatar-size);
+    height: var(--customer-avatar-size);
+    border-radius: 50%;
+    overflow: hidden;
+    box-shadow: 0 8px 16px rgba(15, 23, 42, 0.12);
+    border: 2px solid rgba(148, 185, 255, 0.4);
+}
+
+.customer-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.address-block {
+    display: inline-block;
+    max-width: 320px;
+    color: var(--admin-text-secondary);
+}
+
+.text-emphasis {
+    font-weight: 600;
+    color: var(--admin-text-primary);
+}
+
+.text-muted {
+    color: var(--admin-text-secondary);
+}
+
+.summary-card-icon {
+    font-size: 2.4rem;
+    color: var(--admin-accent-strong);
+}
+
+.table tbody tr:hover {
+    background: rgba(148, 185, 255, 0.08);
+}
+
+@media (max-width: 900px) {
+    .customers-table .table-wrapper {
+        overflow-x: auto;
+    }
+}
