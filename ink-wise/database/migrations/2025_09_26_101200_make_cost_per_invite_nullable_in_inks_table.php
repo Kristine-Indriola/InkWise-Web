@@ -14,6 +14,10 @@ class MakeCostPerInviteNullableInInksTable extends Migration
     public function up()
     {
         // Use raw SQL to avoid requiring doctrine/dbal for simple MODIFY.
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         DB::statement("ALTER TABLE `inks` MODIFY `cost_per_invite` DECIMAL(8,2) NULL");
     }
 
@@ -25,6 +29,10 @@ class MakeCostPerInviteNullableInInksTable extends Migration
     public function down()
     {
         // Revert to NOT NULL (note: this will fail if NULL values exist).
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         DB::statement("ALTER TABLE `inks` MODIFY `cost_per_invite` DECIMAL(8,2) NOT NULL");
     }
 }

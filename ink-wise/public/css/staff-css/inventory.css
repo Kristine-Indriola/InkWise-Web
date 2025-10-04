@@ -1,0 +1,177 @@
+/*
+ |--------------------------------------------------------------------------
+ | Staff Inventory Overrides
+ |--------------------------------------------------------------------------
+ */
+
+.staff-inventory-page {
+    position: relative;
+}
+
+.staff-inventory-page .page-header {
+    align-items: center;
+}
+
+.staff-inventory-alert {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 18px;
+    border-radius: 12px;
+    background: rgba(34, 197, 94, 0.08);
+    color: #0f5132;
+    font-weight: 600;
+    box-shadow: 0 18px 32px rgba(16, 185, 129, 0.18);
+    border: 1px solid rgba(34, 197, 94, 0.18);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.staff-inventory-alert.is-dismissing {
+    opacity: 0;
+    transform: translateY(-8px);
+}
+
+.inventory-table .table-wrapper {
+    border-radius: 18px;
+    overflow: hidden;
+    border: 1px solid rgba(148, 185, 255, 0.15);
+    box-shadow: var(--shadow-soft);
+}
+
+.inventory-table .table tr:hover {
+    background: rgba(148, 185, 255, 0.08);
+}
+
+.inventory-table .status-col {
+    min-width: 140px;
+}
+
+.inventory-table .actions-col {
+    min-width: 140px;
+}
+
+.inventory-actions {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+}
+
+.inventory-actions .btn {
+    box-shadow: none;
+}
+
+.inventory-actions .btn-warning {
+    background: rgba(234, 179, 8, 0.18);
+    color: #92400e;
+}
+
+.inventory-actions .btn-primary {
+    background: rgba(148, 185, 255, 0.2);
+    color: var(--accent-strong);
+}
+
+.inventory-actions .btn:hover {
+    transform: translateY(-1px);
+}
+
+.material-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.status-label {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.72rem;
+}
+
+.status-label.out { color: #b91c1c; }
+.status-label.low { color: #b45309; }
+.status-label.ok { color: #15803d; }
+
+.table-empty {
+    text-align: center;
+    padding: 42px 16px;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+@media (max-width: 960px) {
+    .materials-page {
+        padding: 22px;
+    }
+}
+
+.staff-inventory-show-page .page-header {
+    align-items: flex-start;
+    gap: 24px;
+}
+
+.inventory-details {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 400px;
+}
+
+.details-wrapper {
+    width: 100%;
+    max-width: 800px;
+}
+
+.details-card {
+    background: var(--surface);
+    border-radius: 18px;
+    border: 1px solid rgba(148, 185, 255, 0.15);
+    box-shadow: var(--shadow-soft);
+    padding: 32px;
+}
+
+.details-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 24px;
+}
+
+.details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.detail-item.full-width {
+    grid-column: 1 / -1;
+}
+
+.detail-label {
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.detail-value {
+    font-size: 1rem;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.detail-value.stock-level.low {
+    color: #b45309;
+    font-weight: 700;
+}
+
+.detail-value.stock-level.ok {
+    color: #15803d;
+    font-weight: 700;
+}

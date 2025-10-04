@@ -1,0 +1,283 @@
+/*
+ |--------------------------------------------------------------------------
+ | Staff Dashboard Styling
+ | Mirrors the admin materials aesthetic for consistency across roles.
+ |--------------------------------------------------------------------------
+ */
+
+.staff-dashboard-page {
+    gap: 28px;
+}
+
+.staff-dashboard-page .dashboard-alert {
+    margin-bottom: 8px;
+}
+
+.staff-dashboard-section {
+    background: var(--surface);
+    border-radius: 20px;
+    border: 1px solid rgba(148, 185, 255, 0.2);
+    box-shadow: var(--shadow-soft);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.staff-quick-links {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+}
+
+.staff-quick-link {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 20px;
+    border-radius: 16px;
+    background: rgba(148, 185, 255, 0.08);
+    border: 1px solid rgba(148, 185, 255, 0.16);
+    text-decoration: none;
+    color: var(--admin-text-primary);
+    font-weight: 600;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.staff-quick-link.is-hovered,
+.staff-quick-link:hover {
+    transform: translateY(-3px);
+    background: rgba(148, 185, 255, 0.16);
+    box-shadow: var(--shadow-hover);
+}
+
+.staff-quick-link__icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    background: rgba(148, 185, 255, 0.18);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    color: var(--accent-strong);
+}
+
+.staff-quick-link__copy h3 {
+    margin: 0 0 6px;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--admin-text-primary);
+}
+
+.staff-quick-link__copy p {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--admin-text-secondary);
+}
+
+.staff-quick-link__cta {
+    font-size: 1.25rem;
+    color: var(--accent-strong);
+}
+
+.staff-reminders {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 14px;
+}
+
+.staff-reminders li {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 16px;
+    padding: 16px 18px;
+    border-radius: 16px;
+    background: rgba(148, 185, 255, 0.1);
+    border: 1px solid rgba(148, 185, 255, 0.18);
+}
+
+.staff-reminders__icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: rgba(148, 185, 255, 0.18);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    color: var(--accent-strong);
+}
+
+.staff-reminders li h3 {
+    margin: 0 0 4px;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--admin-text-primary);
+}
+
+.staff-reminders li p {
+    margin: 0;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--admin-text-secondary);
+}
+
+.staff-dashboard-updates__content {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 18px;
+}
+
+.staff-dashboard-updates__copy {
+    flex: 1 1 260px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+}
+
+.staff-dashboard-updates__copy h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--admin-text-primary);
+}
+
+.staff-dashboard-updates__copy p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--admin-text-secondary);
+    font-weight: 500;
+}
+
+.staff-dashboard-updates__cta {
+    flex: 1 1 240px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+    border-radius: 18px;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    background: rgba(239, 68, 68, 0.08);
+    text-decoration: none;
+    color: var(--admin-text-primary);
+    font-weight: 600;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.staff-dashboard-updates__cta.is-hovered,
+.staff-dashboard-updates__cta:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 18px 32px rgba(239, 68, 68, 0.22);
+}
+
+.staff-dashboard-updates__icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+    background: rgba(239, 68, 68, 0.15);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: #dc2626;
+}
+
+.staff-dashboard-updates__text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.staff-dashboard-updates__text strong {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--admin-text-primary);
+}
+
+.staff-dashboard-updates__text span {
+    font-size: 0.85rem;
+    color: var(--admin-text-secondary);
+    font-weight: 500;
+}
+
+.staff-dashboard-updates__arrow {
+    font-size: 1.3rem;
+    color: #dc2626;
+}
+
+/* Summary cards tweak for staff context */
+.staff-dashboard-page .summary-card {
+    min-height: 190px;
+}
+
+.staff-dashboard-page .summary-card:nth-of-type(2) .summary-card-icon {
+    color: #f97316;
+}
+
+.staff-dashboard-page .summary-card:nth-of-type(3) .summary-card-icon {
+    color: #22b573;
+}
+
+.staff-dashboard-page .summary-card:nth-of-type(4) .summary-card-icon {
+    color: #ef4444;
+}
+
+@media (max-width: 992px) {
+    .staff-dashboard-updates__content {
+        flex-direction: column;
+    }
+
+    .staff-dashboard-updates__cta {
+        width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .staff-dashboard-section {
+        padding: 20px;
+    }
+
+    .staff-quick-links {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+
+    .staff-quick-link {
+        padding: 16px 18px;
+    }
+
+    .staff-reminders li {
+        padding: 14px 16px;
+    }
+}
+
+@media (max-width: 560px) {
+    .staff-quick-links {
+        grid-template-columns: 1fr;
+    }
+
+    .staff-reminders li {
+        grid-template-columns: 1fr;
+    }
+
+    .staff-reminders__icon {
+        justify-self: flex-start;
+    }
+
+    .staff-dashboard-updates__cta {
+        grid-template-columns: 1fr;
+        text-align: center;
+    }
+
+    .staff-dashboard-updates__icon,
+    .staff-dashboard-updates__arrow {
+        justify-self: center;
+    }
+}

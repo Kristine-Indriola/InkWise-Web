@@ -33,7 +33,21 @@ class TemplateController extends Controller
             'product_type' => 'nullable|string|max:255',
             'theme_style' => 'nullable|string|max:255',
             'description' => 'nullable|string',
+            'front_image' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:5120',
+            'back_image' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:5120',
         ]);
+
+        // Handle front image upload
+        if ($request->hasFile('front_image')) {
+            $frontImagePath = $request->file('front_image')->store('templates', 'public');
+            $validated['front_image'] = $frontImagePath;
+        }
+
+        // Handle back image upload
+        if ($request->hasFile('back_image')) {
+            $backImagePath = $request->file('back_image')->store('templates', 'public');
+            $validated['back_image'] = $backImagePath;
+        }
 
         \App\Models\Template::create($validated);
 
@@ -96,7 +110,7 @@ public function uploadPreview(Request $request, $id)
 
     // Save to storage (public disk)
     $filename = 'templates/previews/template_' . $id . '_' . time() . '.png';
-    \Storage::disk('public')->put($filename, $imgData);
+    Storage::disk('public')->put($filename, $imgData);
 
     // Update preview column (store path)
     $template->preview = $filename;
@@ -104,6 +118,58 @@ public function uploadPreview(Request $request, $id)
 
     return response()->json(['success' => true, 'preview' => $filename]);
 }
+
+    // Handle custom front/back template upload from the Templates UI
+    public function customUpload(Request $request)
+    {
+        $validated = $request->validate([
+            'front_image' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:10240',
+            'back_image' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:10240',
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+        ]);
+
+    // Store images on the dedicated invitation_templates disk (container)
+    $frontPath = $request->file('front_image')->store('', 'invitation_templates');
+    $backPath = $request->file('back_image')->store('', 'invitation_templates');
+
+    // sanitize paths: remove newlines/tabs and trim whitespace
+    $frontPath = str_replace(["\r", "\n", "\t"], '', trim($frontPath));
+    $backPath = str_replace(["\r", "\n", "\t"], '', trim($backPath));
+
+        // Create Template record and store front/back image paths on template
+        $template = Template::create([
+            'name' => $validated['name'],
+            'description' => $validated['description'] ?? null,
+            'product_type' => 'Invitation',
+            'preview' => 'invitation_templates/' . ltrim($frontPath, '/'), // keep front as preview
+            'front_image' => 'invitation_templates/' . ltrim($frontPath, '/'),
+            'back_image' => 'invitation_templates/' . ltrim($backPath, '/'),
+        ]);
+
+        // Create product from template (no separate product_images table usage)
+        $product = Product::create([
+            'template_id' => $template->id,
+            'name' => $template->name,
+            'event_type' => null,
+            'product_type' => 'Invitation',
+            'theme_style' => null,
+            'description' => $template->description,
+            // store the disk-qualified path for easy resolver later
+            'image' => 'invitation_templates/' . ltrim($frontPath, '/'),
+        ]);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'template' => $template,
+                'product' => $product,
+                'preview_url' => \App\Support\ImageResolver::url($frontPath),
+            ]);
+        }
+
+        return redirect()->route('admin.templates.index')->with('success', 'Custom template uploaded.');
+    }
 
 public function uploadToProduct(Request $request, $id)
 {

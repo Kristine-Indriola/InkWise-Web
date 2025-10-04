@@ -1,35 +1,219 @@
-@extends('layouts.Staffapp')
+@extends('layouts.staffapp')
+
+@push('styles')
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@flaticon/flaticon-uicons/css/all/all.css">
+    <link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/staff-css/dashboard.css') }}">
+@endpush
 
 @section('content')
+@php
+    $staff = auth()->user();
+    $staffName = $staff?->name ?? __('Staff Member');
+@endphp
 
-<div class="grid grid-cols-1 md:grid-cols-4 gap-11">
-    <div class="p-9 min-w-[220px] min-h-[160px] rounded-lg shadow text-center border border-purple-500 bg-purple-100">
-        <p class="text-3xl font-bold text-purple-900">{{ $totalOrders ?? '' }}</p>
-        <p class="text-purple-900">Total Orders</p>
-    </div>
-    <div class="p-9 min-w-[220px] min-h-[160px] rounded-lg shadow text-center border border-teal-500 bg-teal-100">
-        <p class="text-3xl font-bold text-teal-900">{{ $assignedOrders ?? '' }}</p>
-        <p class="text-teal-900">Assigned Orders</p>
-    </div>
-    <div class="p-9 min-w-[220px] min-h-[160px] rounded-lg shadow text-center border border-indigo-500 bg-indigo-100">
-        <p class="text-3xl font-bold text-indigo-900">{{ $customers ?? '' }}</p>
-        <p class="text-indigo-900">Customers</p>
+<main class="materials-page admin-page-shell staff-dashboard-page" role="main">
+    @if(session('success'))
+        <div class="dashboard-alert" role="alert" aria-live="polite">
+            {{ session('success') }}
+        </div>
+    @endif
 
-<div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-    <div class="bg-white p-6 rounded-lg shadow text-center border border-purple-400">
-        <p class="text-3xl font-bold">12</p>
-        <p class="text-gray-500">Total Orders</p>
-    </div>
-    <div class="bg-white p-6 rounded-lg shadow text-center border border-purple-400">
-        <p class="text-3xl font-bold">5</p>
-        <p class="text-gray-500">Assigned Orders</p>
+    <header class="page-header">
+        <div>
+            <h1 class="page-title">Welcome back, {{ $staffName }}</h1>
+            <p class="page-subtitle">Here’s your personalized overview to keep orders, messages, and materials on track.</p>
+        </div>
+        <div class="page-header__quick-actions">
+            <a href="{{ route('staff.profile.edit') }}" class="pill-link" aria-label="Update profile"><i class="fi fi-rr-user-pen"></i>&nbsp;Profile</a>
+            <a href="{{ route('staff.materials.index') }}" class="pill-link is-active" aria-label="Open materials dashboard"><i class="fi fi-rr-box-open"></i>&nbsp;Materials</a>
+        </div>
+    </header>
 
-    </div>
-    <div class="bg-white p-6 rounded-lg shadow text-center border border-purple-400">
-        <p class="text-3xl font-bold">8</p>
-        <p class="text-gray-500">Customers</p>
-    </div>
-    <!-- Messages Card -->
+    <section class="summary-grid" aria-label="Key performance highlights">
+        <article class="summary-card">
+            <div class="summary-card-header">
+                <span class="summary-card-label">Total Orders</span>
+                <span class="summary-card-chip accent">All time</span>
+            </div>
+            <div class="summary-card-body">
+                <span class="summary-card-value">{{ number_format($totalOrders ?? 0) }}</span>
+                <span class="summary-card-icon" aria-hidden="true">🛒</span>
+            </div>
+            <span class="summary-card-meta">Orders currently tracked across your assignments.</span>
+        </article>
+        <article class="summary-card">
+            <div class="summary-card-header">
+                <span class="summary-card-label">Assigned Orders</span>
+                <span class="summary-card-chip warning">Action needed</span>
+            </div>
+            <div class="summary-card-body">
+                <span class="summary-card-value">{{ number_format($assignedOrders ?? 0) }}</span>
+                <span class="summary-card-icon" aria-hidden="true">📋</span>
+            </div>
+            <span class="summary-card-meta">Tasks waiting for your updates and confirmations.</span>
+        </article>
+        <article class="summary-card">
+            <div class="summary-card-header">
+                <span class="summary-card-label">Customers</span>
+                <span class="summary-card-chip accent">Active</span>
+            </div>
+            <div class="summary-card-body">
+                <span class="summary-card-value">{{ number_format($customers ?? 0) }}</span>
+                <span class="summary-card-icon" aria-hidden="true">🤝</span>
+            </div>
+            <span class="summary-card-meta">Contacts you’re currently supporting.</span>
+        </article>
+        <article class="summary-card">
+            <div class="summary-card-header">
+                <span class="summary-card-label">Unread Messages</span>
+                <span class="summary-card-chip danger">Follow up</span>
+            </div>
+            <div class="summary-card-body">
+                <span class="summary-card-value">{{ number_format($unreadMessages ?? 0) }}</span>
+                <span class="summary-card-icon" aria-hidden="true">💬</span>
+            </div>
+            <span class="summary-card-meta">Reach out quickly to keep momentum.</span>
+        </article>
+    </section>
 
-</div>
+    <section class="staff-dashboard-section" aria-label="Quick links">
+        <header class="section-header">
+            <div>
+                <h2 class="section-title">Quick Links</h2>
+                <p class="section-subtitle">Jump straight to the tools you use most.</p>
+            </div>
+        </header>
+        <div class="staff-quick-links">
+            <a href="{{ route('staff.assigned.orders') }}" class="staff-quick-link" data-link-card>
+                <span class="staff-quick-link__icon" aria-hidden="true"><i class="fi fi-rr-tasks-alt"></i></span>
+                <div class="staff-quick-link__copy">
+                    <h3>Assigned Orders</h3>
+                    <p>Review what’s next and keep production flowing.</p>
+                </div>
+                <span class="staff-quick-link__cta" aria-hidden="true"><i class="fi fi-rr-arrow-right"></i></span>
+            </a>
+            <a href="{{ route('staff.messages.index') }}" class="staff-quick-link" data-link-card>
+                <span class="staff-quick-link__icon" aria-hidden="true"><i class="fi fi-rr-comments"></i></span>
+                <div class="staff-quick-link__copy">
+                    <h3>Messages</h3>
+                    <p>Respond quickly to keep clients in the loop.</p>
+                </div>
+                <span class="staff-quick-link__cta" aria-hidden="true"><i class="fi fi-rr-arrow-right"></i></span>
+            </a>
+            <a href="{{ route('staff.inventory.index') }}" class="staff-quick-link" data-link-card>
+                <span class="staff-quick-link__icon" aria-hidden="true"><i class="fi fi-rr-warehouse"></i></span>
+                <div class="staff-quick-link__copy">
+                    <h3>Inventory Tracker</h3>
+                    <p>Log stock adjustments right after receiving updates.</p>
+                </div>
+                <span class="staff-quick-link__cta" aria-hidden="true"><i class="fi fi-rr-arrow-right"></i></span>
+            </a>
+            <a href="{{ route('staff.materials.notification') }}" class="staff-quick-link" data-link-card>
+                <span class="staff-quick-link__icon" aria-hidden="true"><i class="fi fi-rr-bell"></i></span>
+                <div class="staff-quick-link__copy">
+                    <h3>Low Stock Alerts</h3>
+                    <p>See which materials are nearing reorder levels.</p>
+                </div>
+                <span class="staff-quick-link__cta" aria-hidden="true"><i class="fi fi-rr-arrow-right"></i></span>
+            </a>
+        </div>
+    </section>
+
+    <section class="staff-dashboard-section" aria-label="Today’s reminders">
+        <header class="section-header">
+            <div>
+                <h2 class="section-title">Today’s Reminders</h2>
+                <p class="section-subtitle">Keep a pulse on the essentials for your shift.</p>
+            </div>
+        </header>
+        <ul class="staff-reminders">
+            <li>
+                <span class="staff-reminders__icon" aria-hidden="true">✅</span>
+                <div>
+                    <h3>Confirm new assignments</h3>
+                    <p>Double-check timelines and material requirements before noon.</p>
+                </div>
+            </li>
+            <li>
+                <span class="staff-reminders__icon" aria-hidden="true">📞</span>
+                <div>
+                    <h3>Customer follow-ups</h3>
+                    <p>Touch base with clients waiting for design approvals.</p>
+                </div>
+            </li>
+            <li>
+                <span class="staff-reminders__icon" aria-hidden="true">📦</span>
+                <div>
+                    <h3>Inventory updates</h3>
+                    <p>Record any stock adjustments in the tracker after each production run.</p>
+                </div>
+            </li>
+            <li>
+                <span class="staff-reminders__icon" aria-hidden="true">📝</span>
+                <div>
+                    <h3>Daily hand-off</h3>
+                    <p>Send a quick status recap to the admin team before the end of your shift.</p>
+                </div>
+            </li>
+        </ul>
+    </section>
+
+    <section class="staff-dashboard-section staff-dashboard-updates" aria-label="Materials health">
+        <header class="section-header">
+            <div>
+                <h2 class="section-title">Materials Health</h2>
+                <p class="section-subtitle">Stay proactive with upcoming replenishment needs.</p>
+            </div>
+            <div class="section-actions">
+                <a href="{{ route('staff.materials.index') }}" class="pill-link"><i class="fi fi-rr-box"></i>&nbsp;View full catalog</a>
+            </div>
+        </header>
+        <div class="staff-dashboard-updates__content">
+            <div class="staff-dashboard-updates__copy">
+                <h3>Watch your low-stock queue</h3>
+                <p>Check low stock alerts regularly so you can flag the admin team before supplies run out.</p>
+            </div>
+            <a href="{{ route('staff.materials.notification') }}" class="staff-dashboard-updates__cta" data-link-card>
+                <span class="staff-dashboard-updates__icon" aria-hidden="true"><i class="fi fi-rr-triangle-warning"></i></span>
+                <div class="staff-dashboard-updates__text">
+                    <strong>Open notifications</strong>
+                    <span>Review materials flagged for replenishment.</span>
+                </div>
+                <span class="staff-dashboard-updates__arrow" aria-hidden="true"><i class="fi fi-rr-arrow-right"></i></span>
+            </a>
+        </div>
+    </section>
+</main>
 @endsection
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('[data-link-card]').forEach(function (card) {
+                card.addEventListener('mouseenter', function () {
+                    card.classList.add('is-hovered');
+                });
+                card.addEventListener('mouseleave', function () {
+                    card.classList.remove('is-hovered');
+                });
+                card.addEventListener('focus', function () {
+                    card.classList.add('is-hovered');
+                });
+                card.addEventListener('blur', function () {
+                    card.classList.remove('is-hovered');
+                });
+            });
+
+            const alertBanner = document.querySelector('.dashboard-alert');
+            if (alertBanner) {
+                setTimeout(function () {
+                    alertBanner.style.opacity = '0';
+                    setTimeout(function () {
+                        alertBanner.remove();
+                    }, 600);
+                }, 4000);
+            }
+        });
+    </script>
+@endpush

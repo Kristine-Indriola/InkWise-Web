@@ -9,6 +9,10 @@
 @section('content')
 @include('layouts.owner.sidebar')
 
+@php
+$highlightStaffId = request()->query('highlight');
+@endphp
+
 <style>
 [hidden]{display:none !important;}
 .btn-success, .btn-danger {
@@ -31,6 +35,34 @@
     border-color: #15803d !important;
     box-shadow: 0 2px 8px rgba(22,163,74,0.12);
     transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+.highlight-row {
+  background-color: #fef3c7;
+  position: relative;
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.45);
+}
+
+.highlight-row::after {
+  content: 'Recently approved';
+  position: absolute;
+  top: -10px;
+  right: 12px;
+  background: #f59e0b;
+  color: #1f2937;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+@keyframes highlightPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.0); }
+  50% { box-shadow: 0 0 0 8px rgba(251, 191, 36, 0.35); }
+}
+
+.highlight-row {
+  animation: highlightPulse 2.4s ease-in-out 0.4s 2;
 }
 </style>
 
@@ -87,7 +119,10 @@
             </thead>
             <tbody>
               @forelse($approvedStaff as $staff)
-                <tr>
+                @php
+                    $isHighlighted = $highlightStaffId && (string)$highlightStaffId === (string)$staff->staff_id;
+                @endphp
+                <tr {{ $isHighlighted ? 'id=highlighted-staff' : '' }} class="{{ $isHighlighted ? 'highlight-row' : '' }}">
                   <td>{{ $staff->user->user_id }}</td>
                   <td>{{ $staff->first_name }} {{ $staff->middle_name ?? '' }} {{ $staff->last_name }}</td>
                   <td>{{ $staff->user->email }}</td>
@@ -223,6 +258,14 @@ window.addEventListener('DOMContentLoaded', function() {
       errorToast.style.opacity = '0';
       setTimeout(() => errorToast.style.display = 'none', 500);
     }, 2000);
+  }
+
+  const highlightedRow = document.getElementById('highlighted-staff');
+  if (highlightedRow) {
+    highlightedRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    highlightedRow.setAttribute('tabindex', '-1');
+    highlightedRow.focus({ preventScroll: true });
+    setTimeout(() => highlightedRow.removeAttribute('tabindex'), 2000);
   }
 });
 </script>

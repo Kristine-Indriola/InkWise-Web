@@ -1,5 +1,11 @@
 @extends($layout ?? 'layouts.staffapp')
 
+@push('styles')
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@flaticon/flaticon-uicons/css/all/all.css">
+    <link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/staff-css/messages.css') }}">
+@endpush
+
 @section('title', 'Messages')
 
 @section('content')
@@ -74,6 +80,7 @@
         : null;
 @endphp
 
+{{--
 <style>
     :root {
         --messenger-bg: #f3f4f6;
@@ -676,7 +683,9 @@
         }
     }
 </style>
+--}}
 
+<main class="materials-page admin-page-shell staff-messages-page" role="main">
 <div class="messenger-shell">
     <aside class="messenger-sidebar">
         <div class="sidebar-header">
@@ -817,9 +826,10 @@
         </form>
     </section>
 </div>
+        </main>
 @endsection
 
-@section('scripts')
+        @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     document.body.classList.add('messages-view');
@@ -1413,4 +1423,4 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
-@endsection
+@endpush

@@ -33,12 +33,14 @@
 <section id="templates" class="py-12 relative overflow-hidden">
   <!-- animated themed background canvas (wedding, baptism, birthday) -->
   <canvas id="templatesCanvas" class="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true"></canvas>
-  <hr class="section-divider">
-  <h2 class="text-center text-3xl font-bold text-indigo-700 mb-10" style="font-family: 'Seasons', serif;">
-    Find your perfect match
-  </h2>
 
-  <div class="flex flex-col gap-12 items-center">
+  <div class="layout-container relative z-10">
+    <hr class="section-divider">
+    <h2 class="text-center text-3xl font-bold text-indigo-700 mb-10" style="font-family: 'Seasons', serif;">
+      Find your perfect match
+    </h2>
+
+    <div class="flex flex-col gap-12 items-center">
 
     <!-- Birthday (Image left) -->
     <div class="relative flex items-center gap-8 gradient-pink p-6 rounded-3xl">
@@ -109,6 +111,7 @@
       </div>
     </div>
 
+    </div>
   </div>
 </section>
 <script>

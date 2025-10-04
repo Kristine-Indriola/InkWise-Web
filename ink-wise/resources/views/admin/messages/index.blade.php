@@ -2,11 +2,16 @@
 
 @section('title', 'Messages')
 
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/admin-css/messages.css') }}">
+@endpush
+
 @section('content')
 @php
     $threadRouteName = $threadRouteName ?? 'admin.messages.thread';
     $replyRouteName = $replyRouteName ?? 'admin.messages.reply';
-    $customerThreads = $messages->where('sender_type', '!=', 'user')->unique('email');
+    $legacyThreads = $messages->where('sender_type', '!=', 'user')->unique('email');
     $backUrl = url()->previous();
     $messagesIndexUrl = route('admin.messages.index');
 
@@ -68,7 +73,93 @@
             }
         }
     }
+
+    $incomingMessages = $messages->where('sender_type', '!=', 'user')->sortByDesc('created_at');
+    $preparedThreads = [];
+
+    foreach ($incomingMessages as $message) {
+        $senderType = strtolower((string) ($message->sender_type ?? ''));
+        $receiverType = strtolower((string) ($message->receiver_type ?? ''));
+        $threadKey = null;
+        $customerId = null;
+
+        if ($senderType === 'customer' && $message->sender_id) {
+            $customerId = $message->sender_id;
+            $threadKey = 'customer:' . $message->sender_id;
+        } elseif ($receiverType === 'customer' && $message->receiver_id) {
+            $customerId = $message->receiver_id;
+            $threadKey = 'customer:' . $message->receiver_id;
+        } else {
+            $emailKey = strtolower((string) ($message->email ?? ''));
+            if ($emailKey !== '') {
+                $threadKey = 'guest:' . $emailKey;
+            }
+        }
+
+        if (! $threadKey || isset($preparedThreads[$threadKey])) {
+            continue;
+        }
+
+        $previewText = $message->message ?? 'No message preview available yet.';
+        $attachmentName = $message->attachment_path ? basename($message->attachment_path) : null;
+
+        if (trim($previewText) === '[image attachment]' && $attachmentName) {
+            $previewText = '📎 ' . $attachmentName;
+        }
+
+        $avatarUrl = ($customerId !== null && isset($customerAvatars[$customerId])) ? $customerAvatars[$customerId] : null;
+
+        $customerName = null;
+        if ($customerId !== null && isset($customers[$customerId])) {
+            $customerModel = $customers[$customerId];
+            $nameParts = array_filter([
+                trim((string) ($customerModel->first_name ?? '')),
+                trim((string) ($customerModel->middle_name ?? '')),
+                trim((string) ($customerModel->last_name ?? '')),
+            ], fn ($part) => $part !== '');
+
+            if (! empty($nameParts)) {
+                $customerName = implode(' ', $nameParts);
+            }
+        }
+
+        $displayLabel = $customerName ?: ($message->name ?? ($message->email ?? 'Guest'));
+        $avatarInitial = strtoupper(substr($displayLabel, 0, 1));
+        $threadType = \Illuminate\Support\Str::startsWith($threadKey, 'customer:') ? 'customer' : 'guest';
+        $createdAtDisplay = '';
+        $lastMessageAt = '';
+
+        if ($message->created_at) {
+            $createdAtDisplay = $message->created_at->copy()->timezone(config('app.timezone'))->format('M d, Y h:i A');
+            $lastMessageAt = $message->created_at->toIso8601String();
+        }
+
+        $preparedThreads[$threadKey] = [
+            'id' => $message->getKey(),
+            'thread_key' => $threadKey,
+            'thread_type' => $threadType,
+            'sender_type' => $senderType,
+            'email' => $message->email ?? '',
+            'name' => $displayLabel,
+            'preview' => \Illuminate\Support\Str::limit($previewText, 80),
+            'avatar_url' => $avatarUrl,
+            'avatar_initial' => $avatarInitial,
+            'is_unread' => $threadUnreadStates[$threadKey] ?? false,
+            'last_message_at' => $lastMessageAt,
+            'created_at_display' => $createdAtDisplay,
+            'status_label' => $threadType === 'customer' ? 'Customer' : 'Guest',
+        ];
+    }
+
+    $customerThreadItems = collect($preparedThreads)
+        ->filter(fn ($thread) => $thread['thread_type'] === 'customer')
+        ->values();
+
+    $guestThreadItems = collect($preparedThreads)
+        ->filter(fn ($thread) => $thread['thread_type'] === 'guest')
+        ->values();
 @endphp
+
 
 <style>
     :root {
@@ -149,13 +240,38 @@
         padding: 8px 0 12px;
     }
 
-    .conversation-scroll::-webkit-scrollbar {
-        width: 8px;
+    .conversation-section {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding-bottom: 12px;
     }
 
-    .conversation-scroll::-webkit-scrollbar-thumb {
-        background: rgba(148, 163, 184, 0.4);
-        border-radius: 999px;
+    .conversation-section + .conversation-section {
+        border-top: 1px dashed rgba(148, 163, 184, 0.35);
+        padding-top: 14px;
+        margin-top: 6px;
+    }
+
+    .conversation-section__title {
+        padding: 0 24px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        color: var(--messenger-text-light);
+    }
+
+    .conversation-section__body {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .conversation-section__empty {
+        display: none;
+        padding: 10px 24px 0;
+        font-size: 12px;
+        color: var(--messenger-text-light);
     }
 
     .conversation-item {
@@ -687,86 +803,119 @@
         </div>
 
         <div id="conversationList" class="conversation-scroll">
-            @forelse($customerThreads as $message)
-             @php
-                 $previewText = $message->message ?? 'No message preview available yet.';
-                 $attachmentName = $message->attachment_path ? basename($message->attachment_path) : null;
-                 if (trim($previewText) === '[image attachment]' && $attachmentName) {
-                     $previewText = '📎 ' . $attachmentName;
-                 }
-                 $senderType = strtolower((string) ($message->sender_type ?? ''));
-                 $receiverType = strtolower((string) ($message->receiver_type ?? ''));
-                 $threadKey = null;
-                 $customerId = null;
+            <div class="conversation-section" data-thread-type="customer">
+                <div class="conversation-section__title">Customers</div>
+                <div class="conversation-section__body" data-role="conversation-list" data-thread-type="customer">
+                    @forelse($customerThreadItems as $thread)
+                        <div class="conversation-item{{ $thread['is_unread'] ? ' is-unread' : '' }}"
 
-                 if ($senderType === 'customer' && $message->sender_id) {
-                     $customerId = $message->sender_id;
-                     $threadKey = 'customer:' . $message->sender_id;
-                 } elseif ($receiverType === 'customer' && $message->receiver_id) {
-                     $customerId = $message->receiver_id;
-                     $threadKey = 'customer:' . $message->receiver_id;
-                 } else {
-                     $emailKey = strtolower((string) ($message->email ?? ''));
-                     if ($emailKey !== '') {
-                         $threadKey = 'guest:' . $emailKey;
-                     }
-                 }
+                            data-message-id="{{ $thread['id'] }}"
 
-                 $isUnread = $threadKey ? ($threadUnreadStates[$threadKey] ?? false) : false;
-                 $itemClasses = 'conversation-item' . ($isUnread ? ' is-unread' : '');
-                 $avatarUrl = ($customerId !== null && isset($customerAvatars[$customerId])) ? $customerAvatars[$customerId] : null;
+                            data-sender-type="{{ $thread['sender_type'] }}"
 
-                 $customerName = null;
-                 if ($customerId !== null && isset($customers[$customerId])) {
-                     $customerModel = $customers[$customerId];
-                     $nameParts = array_filter([
-                         trim((string) ($customerModel->first_name ?? '')),
-                         trim((string) ($customerModel->middle_name ?? '')),
-                         trim((string) ($customerModel->last_name ?? '')),
-                     ], fn ($part) => $part !== '');
+                            data-email="{{ $thread['email'] }}"
 
-                     if (! empty($nameParts)) {
-                         $customerName = implode(' ', $nameParts);
-                     }
-                 }
+                            data-name="{{ $thread['name'] }}"
 
-                 $displayLabel = $customerName ?: ($message->name ?? ($message->email ?? 'Guest'));
-                 $avatarInitial = strtoupper(substr($displayLabel, 0, 1));
-             @endphp
-             <div class="{{ $itemClasses }}"
-                 data-message-id="{{ $message->getKey() }}"
-                 data-sender-type="{{ strtolower($message->sender_type ?? '') }}"
-                 data-email="{{ $message->email ?? '' }}"
-                 data-name="{{ $displayLabel }}"
-                 data-thread-key="{{ $threadKey ?? '' }}"
-                 data-avatar-url="{{ $avatarUrl ?? '' }}"
-                 data-unread="{{ $isUnread ? '1' : '0' }}"
-                 data-last-message-at="{{ optional($message->created_at)->toIso8601String() }}">
-                    <div class="conversation-avatar{{ $avatarUrl ? ' conversation-avatar--photo' : '' }}">
-                        @if($avatarUrl)
-                            <img src="{{ $avatarUrl }}" alt="{{ $displayLabel }} profile photo">
-                        @else
-                            <span aria-hidden="true">{{ $avatarInitial }}</span>
-                        @endif
-                    </div>
-                    <div class="conversation-meta">
-                        <div class="conversation-name">
-                            <span>{{ $displayLabel }}</span>
+                            data-thread-key="{{ $thread['thread_key'] }}"
+
+                            data-thread-type="{{ $thread['thread_type'] }}"
+
+                            data-status="{{ $thread['status_label'] }}"
+
+                            data-avatar-url="{{ $thread['avatar_url'] ?? '' }}"
+
+                            data-unread="{{ $thread['is_unread'] ? '1' : '0' }}"
+
+                            data-last-message-at="{{ $thread['last_message_at'] ?? '' }}"
+
+                            role="button" tabindex="0" aria-pressed="false">
+                            <div class="conversation-avatar{{ $thread['avatar_url'] ? ' conversation-avatar--photo' : '' }}">
+                                @if($thread['avatar_url'])
+                                    <img src="{{ $thread['avatar_url'] }}" alt="{{ $thread['name'] }} profile photo">
+                                @else
+                                    <span aria-hidden="true">{{ $thread['avatar_initial'] }}</span>
+                                @endif
+                            </div>
+                            <div class="conversation-meta">
+                                <div class="conversation-name">
+                                    <span>{{ $thread['name'] }}</span>
+                                </div>
+                                <div class="conversation-snippet">
+                                    {{ $thread['preview'] }}
+                                </div>
+                            </div>
+                            <div class="conversation-side">
+                                <div class="conversation-time">
+                                    {{ $thread['created_at_display'] }}
+                                </div>
+                                <span class="conversation-status-dot" role="status" aria-label="Unread conversation"></span>
+                            </div>
                         </div>
-                        <div class="conversation-snippet">
-                            {{ \Illuminate\Support\Str::limit($previewText, 80) }}
-                        </div>
-                    </div>
-                    <div class="conversation-side">
-                        <div class="conversation-time">
-                            {{ optional($message->created_at)->timezone(config('app.timezone'))->format('M d, Y h:i A') ?? '' }}
-                        </div>
-                        <span class="conversation-status-dot" role="status" aria-label="Unread conversation"></span>
-                    </div>
+                    @empty
+                    @endforelse
                 </div>
-            @empty
-                <div class="sidebar-empty">No conversations yet. Messages will appear here once customers reach out.</div>
-            @endforelse
+                <div class="conversation-section__empty" data-role="section-empty" data-thread-type="customer" style="display: {{ $customerThreadItems->isEmpty() ? 'block' : 'none' }};">
+                    No customer conversations yet.
+                </div>
+            </div>
+
+            <div class="conversation-section" data-thread-type="guest">
+                <div class="conversation-section__title">Guests</div>
+                <div class="conversation-section__body" data-role="conversation-list" data-thread-type="guest">
+                    @forelse($guestThreadItems as $thread)
+                        <div class="conversation-item{{ $thread['is_unread'] ? ' is-unread' : '' }}"
+
+                            data-message-id="{{ $thread['id'] }}"
+
+                            data-sender-type="{{ $thread['sender_type'] }}"
+
+                            data-email="{{ $thread['email'] }}"
+
+                            data-name="{{ $thread['name'] }}"
+
+                            data-thread-key="{{ $thread['thread_key'] }}"
+
+                            data-thread-type="{{ $thread['thread_type'] }}"
+
+                            data-status="{{ $thread['status_label'] }}"
+
+                            data-avatar-url="{{ $thread['avatar_url'] ?? '' }}"
+
+                            data-unread="{{ $thread['is_unread'] ? '1' : '0' }}"
+
+                            data-last-message-at="{{ $thread['last_message_at'] ?? '' }}"
+
+                            role="button" tabindex="0" aria-pressed="false">
+                            <div class="conversation-avatar{{ $thread['avatar_url'] ? ' conversation-avatar--photo' : '' }}">
+                                @if($thread['avatar_url'])
+                                    <img src="{{ $thread['avatar_url'] }}" alt="{{ $thread['name'] }} profile photo">
+                                @else
+                                    <span aria-hidden="true">{{ $thread['avatar_initial'] }}</span>
+                                @endif
+                            </div>
+                            <div class="conversation-meta">
+                                <div class="conversation-name">
+                                    <span>{{ $thread['name'] }}</span>
+                                </div>
+                                <div class="conversation-snippet">
+                                    {{ $thread['preview'] }}
+                                </div>
+                            </div>
+                            <div class="conversation-side">
+                                <div class="conversation-time">
+                                    {{ $thread['created_at_display'] }}
+                                </div>
+                                <span class="conversation-status-dot" role="status" aria-label="Unread conversation"></span>
+                            </div>
+                        </div>
+                    @empty
+                    @endforelse
+                </div>
+                <div class="conversation-section__empty" data-role="section-empty" data-thread-type="guest" style="display: {{ $guestThreadItems->isEmpty() ? 'block' : 'none' }};">
+                    No guest conversations yet.
+                </div>
+            </div>
         </div>
         <div id="conversationEmptyState" class="sidebar-empty" style="display:none;">
             No conversations match your search.
@@ -813,25 +962,26 @@
         </form>
     </section>
 </div>
+
 @endsection
 
 @section('scripts')
 <script>
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.add('messages-view');
 
     const threadUrlTemplate = "{{ route($threadRouteName, ['message' => '__ID__']) }}";
     const replyUrlTemplate  = "{{ route($replyRouteName, ['message' => '__ID__']) }}";
     const unreadCountUrl    = "{{ route('admin.messages.unread-count') }}";
 
-    const threadMessages = document.getElementById('threadMessages');
-    const threadHeader   = document.getElementById('threadHeader');
-    const replyForm      = document.getElementById('replyForm');
-    const replyMessage   = document.getElementById('replyMessage');
-    const conversationList = document.getElementById('conversationList');
+    const conversationLists = Array.from(document.querySelectorAll('.messenger-sidebar [data-role="conversation-list"]'));
     const conversationSearch = document.getElementById('conversationSearch');
     const conversationEmptyState = document.getElementById('conversationEmptyState');
-    const sendButton = replyForm.querySelector('button[type="submit"]');
+    const threadMessages = document.querySelector('.messenger-thread #threadMessages');
+    const threadHeader = document.querySelector('.messenger-thread #threadHeader');
+    const replyForm = document.querySelector('.messenger-thread #replyForm');
+    const replyMessage = document.querySelector('.messenger-thread #replyMessage');
+    const replyButton = replyForm?.querySelector('button[type="submit"]') ?? null;
     const replyAttachment = document.getElementById('replyAttachment');
     const attachmentButton = document.getElementById('attachmentButton');
     const attachmentPreview = document.getElementById('attachmentPreview');
@@ -839,14 +989,28 @@ document.addEventListener('DOMContentLoaded', function () {
     const attachmentRemove = document.getElementById('attachmentRemove');
     const inboxToggleLink = document.querySelector('[data-messages-toggle="true"]');
     const backUrl = @json($backUrl);
+
     let currentMessageId = null;
     let pollInterval = null;
     let unreadPollInterval = null;
+    let activeConversation = null;
+
+    if (replyMessage) {
+        replyMessage.disabled = true;
+    }
+    if (replyButton) {
+        replyButton.disabled = true;
+    }
+
+    function clearPoll() {
+        if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+        }
+    }
 
     function setUnreadCount(value) {
-        if (!inboxToggleLink) {
-            return;
-        }
+        if (!inboxToggleLink) return;
 
         const count = Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0;
         let badge = inboxToggleLink.querySelector('[data-role="messages-unread-count"]');
@@ -867,22 +1031,16 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function refreshUnreadCount() {
-        if (!unreadCountUrl) {
-            return;
-        }
-
+        if (!unreadCountUrl) return;
         try {
-            const res = await fetch(unreadCountUrl, { headers: { 'Accept': 'application/json' } });
-            if (!res.ok) {
-                return;
-            }
-
+            const res = await fetch(unreadCountUrl, { headers: { Accept: 'application/json' } });
+            if (!res.ok) return;
             const json = await res.json().catch(() => null);
             if (json && typeof json.count === 'number') {
                 setUnreadCount(json.count);
             }
-        } catch (error) {
-            // no-op: network hiccups should not break the inbox
+        } catch (_) {
+            /* no-op */
         }
     }
 
@@ -890,7 +1048,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (unreadPollInterval) {
             clearInterval(unreadPollInterval);
         }
-
         unreadPollInterval = setInterval(refreshUnreadCount, 15000);
     }
 
@@ -898,77 +1055,64 @@ document.addEventListener('DOMContentLoaded', function () {
         const initialUnread = Number(inboxToggleLink.dataset.initialUnread || 0);
         setUnreadCount(initialUnread);
         inboxToggleLink.setAttribute('aria-label', 'Close inbox and return');
-
         inboxToggleLink.addEventListener('click', event => {
             event.preventDefault();
-
             if (backUrl) {
                 window.location.href = backUrl;
                 return;
             }
-
             if (window.history.length > 1) {
                 window.history.back();
                 return;
             }
-
             window.location.href = inboxToggleLink.href;
         });
-
         refreshUnreadCount();
         startUnreadPolling();
     }
 
     function getCsrf() {
-        const m = document.querySelector('meta[name="csrf-token"]');
-        return m ? m.getAttribute('content') : '';
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        return meta ? meta.getAttribute('content') : '';
     }
 
     function escapeHtml(text) {
-        return (text || '').replace(/[&<>"']/g, m => (
-            {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#039;'}[m]
-        ));
+        return (text || '').replace(/[&<>"']/g, char => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            '\'': '&#039;',
+        })[char]);
     }
 
     function hasSelectedAttachment() {
-        return !!(replyAttachment && replyAttachment.files && replyAttachment.files.length > 0);
+        return Boolean(replyAttachment && replyAttachment.files && replyAttachment.files.length > 0);
     }
 
     function updateAttachmentPreview() {
-        if (!attachmentPreview || !replyAttachment) {
-            return;
-        }
-
+        if (!attachmentPreview || !replyAttachment) return;
         const file = replyAttachment.files && replyAttachment.files[0];
         if (file) {
-            if (attachmentNameEl) {
-                attachmentNameEl.textContent = file.name;
-            }
+            if (attachmentNameEl) attachmentNameEl.textContent = file.name;
             attachmentPreview.classList.add('is-visible');
         } else {
             attachmentPreview.classList.remove('is-visible');
-            if (attachmentNameEl) {
-                attachmentNameEl.textContent = '';
-            }
+            if (attachmentNameEl) attachmentNameEl.textContent = '';
         }
     }
 
     function clearAttachmentPreview() {
-        if (replyAttachment) {
-            replyAttachment.value = '';
-        }
-        if (attachmentPreview) {
-            attachmentPreview.classList.remove('is-visible');
-        }
-        if (attachmentNameEl) {
-            attachmentNameEl.textContent = '';
-        }
+        if (replyAttachment) replyAttachment.value = '';
+        if (attachmentPreview) attachmentPreview.classList.remove('is-visible');
+        if (attachmentNameEl) attachmentNameEl.textContent = '';
     }
 
     function updateSendButtonState() {
-        const hasMessage = replyMessage.value.trim().length > 0;
+        if (!replyButton) return;
+        const hasMessage = replyMessage && replyMessage.value.trim().length > 0;
         const hasFile = hasSelectedAttachment();
-        sendButton.disabled = !currentMessageId || (!hasMessage && !hasFile);
+        replyButton.disabled = !currentMessageId || (!hasMessage && !hasFile);
     }
 
     const TIMEZONE = 'Asia/Manila';
@@ -978,14 +1122,12 @@ document.addEventListener('DOMContentLoaded', function () {
         hour12: true,
         timeZone: TIMEZONE,
     });
-
     const DATE_LABEL_FORMATTER = new Intl.DateTimeFormat('en-PH', {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
         timeZone: TIMEZONE,
     });
-
     const TOOLTIP_FORMATTER = new Intl.DateTimeFormat('en-PH', {
         month: 'long',
         day: 'numeric',
@@ -996,64 +1138,47 @@ document.addEventListener('DOMContentLoaded', function () {
         hour12: true,
         timeZone: TIMEZONE,
     });
+    const relativeTimeFormatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
 
     function toDate(value) {
         if (!value) return null;
-        const d = new Date(value);
-        return Number.isNaN(d.getTime()) ? null : d;
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? null : date;
     }
 
     function formatClock(value) {
-        const d = toDate(value);
-        if (!d) return '';
-        return TIME_FORMATTER.format(d);
+        const date = toDate(value);
+        return date ? TIME_FORMATTER.format(date) : '';
     }
 
     function formatDateLabel(value) {
-        const d = toDate(value);
-        if (!d) return '';
-        return DATE_LABEL_FORMATTER.format(d);
+        const date = toDate(value);
+        return date ? DATE_LABEL_FORMATTER.format(date) : '';
     }
-
-    const relativeTimeFormatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
 
     function formatRelativeTime(value) {
         const date = toDate(value);
         if (!date) return '';
-
         const diffMs = date.getTime() - Date.now();
         const diffMinutes = Math.round(diffMs / 60000);
-
-        if (Math.abs(diffMinutes) < 1) {
-            return 'Just now';
-        }
-
+        if (Math.abs(diffMinutes) < 1) return 'Just now';
         const diffHours = Math.round(diffMinutes / 60);
         const diffDays = Math.round(diffHours / 24);
         const diffWeeks = Math.round(diffDays / 7);
         const diffMonths = Math.round(diffDays / 30);
         const diffYears = Math.round(diffDays / 365);
 
-        if (Math.abs(diffMinutes) < 60) {
-            return relativeTimeFormatter.format(diffMinutes, 'minute');
-        }
-        if (Math.abs(diffHours) < 24) {
-            return relativeTimeFormatter.format(diffHours, 'hour');
-        }
-        if (Math.abs(diffDays) < 7) {
-            return relativeTimeFormatter.format(diffDays, 'day');
-        }
-        if (Math.abs(diffWeeks) < 5) {
-            return relativeTimeFormatter.format(diffWeeks, 'week');
-        }
-        if (Math.abs(diffMonths) < 12) {
-            return relativeTimeFormatter.format(diffMonths, 'month');
-        }
+        if (Math.abs(diffMinutes) < 60) return relativeTimeFormatter.format(diffMinutes, 'minute');
+        if (Math.abs(diffHours) < 24) return relativeTimeFormatter.format(diffHours, 'hour');
+        if (Math.abs(diffDays) < 7) return relativeTimeFormatter.format(diffDays, 'day');
+        if (Math.abs(diffWeeks) < 5) return relativeTimeFormatter.format(diffWeeks, 'week');
+        if (Math.abs(diffMonths) < 12) return relativeTimeFormatter.format(diffMonths, 'month');
         return relativeTimeFormatter.format(diffYears, 'year');
     }
 
     function updateConversationTime(item, isoString) {
-        const timeEl = item?.querySelector('.conversation-time');
+        if (!item) return;
+        const timeEl = item.querySelector('.conversation-time');
         if (!timeEl) return;
 
         if (!isoString) {
@@ -1071,50 +1196,58 @@ document.addEventListener('DOMContentLoaded', function () {
 
         item.dataset.lastMessageAt = date.toISOString();
         timeEl.textContent = formatRelativeTime(date);
-    timeEl.title = TOOLTIP_FORMATTER.format(date);
+        timeEl.title = TOOLTIP_FORMATTER.format(date);
     }
 
     function refreshConversationTimestamps() {
-        document.querySelectorAll('.conversation-item').forEach(item => {
-            updateConversationTime(item, item.dataset.lastMessageAt);
+        conversationLists.forEach(list => {
+            list.querySelectorAll('.conversation-item').forEach(item => {
+                updateConversationTime(item, item.dataset.lastMessageAt);
+            });
+        });
+    }
+
+    function syncSectionEmptyStates() {
+        conversationLists.forEach(list => {
+            const section = list.closest('.conversation-section');
+            if (!section) return;
+            const emptyState = section.querySelector('[data-role="section-empty"]');
+            if (!emptyState) return;
+            const visibleItems = Array.from(list.querySelectorAll('.conversation-item')).filter(item => item.style.display !== 'none');
+            emptyState.style.display = visibleItems.length === 0 ? 'block' : 'none';
         });
     }
 
     async function fetchThread(messageId) {
-        const url = threadUrlTemplate.replace('__ID__', messageId);
-        const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-        if (!res.ok) {
+        if (!messageId) return { items: [], unread: null };
+        try {
+            const url = threadUrlTemplate.replace('__ID__', messageId);
+            const res = await fetch(url, { headers: { Accept: 'application/json' } });
+            if (!res.ok) return { items: [], unread: null };
+            const json = await res.json().catch(() => null);
+            const items = Array.isArray(json?.thread) ? json.thread : [];
+            const unread = typeof json?.unread_count === 'number' ? json.unread_count : null;
+            if (typeof unread === 'number') setUnreadCount(unread);
+            return { items, unread };
+        } catch (_) {
             return { items: [], unread: null };
         }
-
-        const json = await res.json().catch(() => null);
-        const items = Array.isArray(json?.thread) ? json.thread : [];
-        const unread = typeof json?.unread_count === 'number' ? json.unread_count : null;
-
-        if (typeof unread === 'number') {
-            setUnreadCount(unread);
-        }
-
-        return { items, unread };
     }
 
-    function clearPoll() {
-        if (pollInterval) {
-            clearInterval(pollInterval);
-            pollInterval = null;
+    function setActiveConversation(item) {
+        if (activeConversation) {
+            activeConversation.classList.remove('active');
+            activeConversation.setAttribute('aria-pressed', 'false');
+        }
+        activeConversation = item || null;
+        if (activeConversation) {
+            activeConversation.classList.add('active');
+            activeConversation.setAttribute('aria-pressed', 'true');
         }
     }
 
-    function setActiveConversation(element) {
-        document.querySelectorAll('.conversation-item.active').forEach(item => {
-            item.classList.remove('active');
-        });
-        if (element) {
-            element.classList.add('active');
-        }
-    }
-
-    function updateThreadHeader(meta = null) {
+    function updateThreadHeader(meta) {
+        if (!threadHeader) return;
         if (!meta) {
             threadHeader.classList.add('thread-header--empty');
             threadHeader.innerHTML = 'Select a conversation to start messaging';
@@ -1122,105 +1255,167 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         threadHeader.classList.remove('thread-header--empty');
-        const initial = (meta.name || meta.email || 'G').trim().charAt(0).toUpperCase();
+        const name = meta.name || 'Guest';
+        const email = meta.email || 'No email provided';
         const avatarUrl = (meta.avatarUrl || '').trim();
-        const safeAvatar = escapeHtml(avatarUrl);
+        const initial = name.trim().charAt(0).toUpperCase() || 'G';
         const avatarHtml = avatarUrl
-            ? `<div class="avatar avatar--photo"><img src="${safeAvatar}" alt="${escapeHtml(meta.name || 'Guest')} profile photo"></div>`
+            ? `<div class="avatar avatar--photo"><img src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(name)} profile photo"></div>`
             : `<div class="avatar">${escapeHtml(initial)}</div>`;
 
         threadHeader.innerHTML = `
             <div class="thread-participant">
                 ${avatarHtml}
                 <div class="details">
-                    <strong>${escapeHtml(meta.name || 'Guest')}</strong>
-                    <span>${escapeHtml(meta.email || 'No email provided')}</span>
+                    <strong>${escapeHtml(name)}</strong>
+                    <span>${escapeHtml(email)}</span>
                 </div>
             </div>
-            <div class="thread-status">${meta.status || ''}</div>
+            <div class="thread-status">${escapeHtml(meta.status || '')}</div>
         `;
     }
 
     function renderThread(items) {
+        if (!threadMessages) return;
+
         threadMessages.innerHTML = '';
 
-        if (!items.length) {
-            threadMessages.appendChild(Object.assign(document.createElement('div'), {
-                className: 'thread-empty',
-                textContent: 'No messages yet. Start the conversation below.',
-            }));
+        if (!Array.isArray(items) || items.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'thread-empty';
+            empty.textContent = threadMessages.dataset.empty || 'Conversations you open will appear here.';
+            threadMessages.appendChild(empty);
+            updateSendButtonState();
             return;
         }
 
         let lastDateKey = null;
-        items.forEach(it => {
-            const createdAt = it.created_at || it.createdAt;
-            const dateObj = toDate(createdAt);
+
+        items.forEach(item => {
+            const timestamp = item.created_at || item.createdAt || null;
+            const dateObj = toDate(timestamp);
             const dateKey = dateObj ? dateObj.toDateString() : null;
 
             if (dateKey && dateKey !== lastDateKey) {
                 lastDateKey = dateKey;
                 const divider = document.createElement('div');
                 divider.className = 'message-divider';
-                divider.textContent = formatDateLabel(createdAt) || 'Recent';
+                divider.textContent = formatDateLabel(timestamp) || 'Recent';
                 threadMessages.appendChild(divider);
             }
 
-            const senderType = (it.sender_type || '').toLowerCase();
+            const senderType = (item.sender_type || '').toLowerCase();
             const isInternal = ['user', 'staff', 'admin'].includes(senderType);
 
             const row = document.createElement('div');
-            row.className = `message-row${isInternal ? ' is-internal' : ''}`;
+            row.className = 'message-row';
+            if (isInternal) row.classList.add('is-internal');
 
             const bubble = document.createElement('div');
             bubble.className = 'message-bubble';
-            const displayName = escapeHtml(it.name ?? (isInternal ? 'Team' : 'Guest'));
-            const messageText = (it.message ?? '').toString();
-            const trimmedMessage = messageText.trim();
-            const hasAttachment = Boolean(it.attachment_url);
-            const attachmentMime = (it.attachment_mime || '').toString().toLowerCase();
-            const isImageAttachment = hasAttachment && attachmentMime.startsWith('image/');
-            const attachmentUrl = hasAttachment ? escapeHtml(it.attachment_url) : '';
-            const attachmentName = hasAttachment ? escapeHtml(it.attachment_name || 'Attachment') : '';
-            const shouldRenderText = trimmedMessage !== '' && !(hasAttachment && trimmedMessage === '[image attachment]');
 
-            let bubbleHtml = `<div class="message-author">${displayName}</div>`;
+            const author = document.createElement('div');
+            author.className = 'message-author';
+            author.textContent = item.name ?? (isInternal ? 'Team' : 'Guest');
+            bubble.appendChild(author);
 
-            if (shouldRenderText) {
-                bubbleHtml += `<div class="message-text">${escapeHtml(messageText)}</div>`;
+            const messageText = (item.message ?? '').toString();
+            const trimmed = messageText.trim();
+            const attachmentUrl = item.attachment_url || '';
+            const hasAttachment = Boolean(attachmentUrl);
+            const attachmentMime = (item.attachment_mime || '').toString().toLowerCase();
+            const isImage = hasAttachment && attachmentMime.startsWith('image/');
+
+            if (!(hasAttachment && trimmed === '[image attachment]') && trimmed !== '') {
+                const body = document.createElement('div');
+                body.className = 'message-text';
+                body.textContent = messageText;
+                bubble.appendChild(body);
             }
 
             if (hasAttachment) {
-                bubbleHtml += '<div class="message-attachment">';
-                if (isImageAttachment) {
-                    bubbleHtml += `<a href="${attachmentUrl}" target="_blank" rel="noopener noreferrer"><img src="${attachmentUrl}" alt="${attachmentName}"></a>`;
+                const attachment = document.createElement('div');
+                attachment.className = 'message-attachment';
+
+                if (isImage) {
+                    const link = document.createElement('a');
+                    link.href = attachmentUrl;
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+
+                    const img = document.createElement('img');
+                    img.src = attachmentUrl;
+                    img.alt = item.attachment_name || 'Attachment';
+
+                    link.appendChild(img);
+                    attachment.appendChild(link);
                 }
-                bubbleHtml += `<div class="message-attachment__meta"><span>${attachmentName}</span><a href="${attachmentUrl}" target="_blank" rel="noopener noreferrer">View</a></div>`;
-                bubbleHtml += '</div>';
+
+                const attachmentMeta = document.createElement('div');
+                attachmentMeta.className = 'message-attachment__meta';
+
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = item.attachment_name || 'Attachment';
+
+                const viewLink = document.createElement('a');
+                viewLink.href = attachmentUrl;
+                viewLink.target = '_blank';
+                viewLink.rel = 'noopener noreferrer';
+                viewLink.textContent = 'View';
+
+                attachmentMeta.appendChild(nameSpan);
+                attachmentMeta.appendChild(viewLink);
+                attachment.appendChild(attachmentMeta);
+                bubble.appendChild(attachment);
             }
 
-            bubbleHtml += `<div class="message-time">${formatClock(createdAt)}</div>`;
-            bubble.innerHTML = bubbleHtml;
+            const timeEl = document.createElement('div');
+            timeEl.className = 'message-time';
+            timeEl.textContent = formatClock(timestamp);
+            if (dateObj) {
+                timeEl.title = TOOLTIP_FORMATTER.format(dateObj);
+            }
+            bubble.appendChild(timeEl);
 
             row.appendChild(bubble);
             threadMessages.appendChild(row);
         });
 
         threadMessages.scrollTop = threadMessages.scrollHeight;
+        updateSendButtonState();
     }
 
     function setEmptyThread() {
         currentMessageId = null;
-        updateThreadHeader();
-        threadMessages.innerHTML = '';
-        threadMessages.appendChild(Object.assign(document.createElement('div'), {
-            className: 'thread-empty',
-            textContent: 'Conversations you open will appear here.',
-        }));
-        replyMessage.value = '';
+        updateThreadHeader(null);
+        if (threadMessages) {
+            threadMessages.innerHTML = '';
+            const empty = document.createElement('div');
+            empty.className = 'thread-empty';
+            empty.textContent = 'Conversations you open will appear here.';
+            threadMessages.appendChild(empty);
+        }
+        if (replyMessage) {
+            replyMessage.value = '';
+            replyMessage.disabled = true;
+        }
         clearAttachmentPreview();
         updateSendButtonState();
         clearPoll();
+    }
+
+    function handleConversationClick(item) {
+        if (!item) return;
+        const messageId = item.dataset.messageId;
+        if (!messageId) return;
+        const meta = {
+            name: item.dataset.name || item.querySelector('.conversation-name span')?.textContent.trim(),
+            email: item.dataset.email || '',
+            avatarUrl: item.dataset.avatarUrl || '',
+            status: item.dataset.status || '',
+        };
+        setActiveConversation(item);
+        openThread(messageId, meta);
     }
 
     async function openThread(messageId, meta) {
@@ -1231,9 +1426,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
         currentMessageId = messageId;
         updateThreadHeader(meta);
+
+        if (replyMessage) {
+            replyMessage.disabled = false;
+            replyMessage.value = '';
+        }
+        clearAttachmentPreview();
         updateSendButtonState();
 
-        const activeItem = document.querySelector(`.conversation-item[data-message-id="${messageId}"]`);
+        const activeItem = document.querySelector(`.conversation-item[data-message-id="${CSS.escape(messageId)}"]`);
         if (activeItem) {
             activeItem.classList.remove('is-unread');
             activeItem.dataset.unread = '0';
@@ -1244,68 +1445,69 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (activeItem && items.length) {
             const latest = items[items.length - 1];
-            const latestIso = latest?.created_at || latest?.createdAt || null;
-            if (latestIso) {
-                updateConversationTime(activeItem, latestIso);
-            }
+            const timestamp = latest?.created_at || latest?.createdAt || null;
+            if (timestamp) updateConversationTime(activeItem, timestamp);
         }
-
-        replyMessage.focus();
 
         clearPoll();
         pollInterval = setInterval(async () => {
-            if (currentMessageId) {
-                const { items: refreshedItems } = await fetchThread(currentMessageId);
-                renderThread(refreshedItems);
-            }
+            if (!currentMessageId) return;
+            const { items: refreshed } = await fetchThread(currentMessageId);
+            renderThread(refreshed);
         }, 3000);
+
+        if (replyMessage) replyMessage.focus();
     }
 
-    function handleConversationClick(item) {
-        if (!item) return;
-        const messageId = item.getAttribute('data-message-id');
-        const meta = {
-            name: item.getAttribute('data-name'),
-            email: item.getAttribute('data-email'),
-            avatarUrl: item.getAttribute('data-avatar-url') || '',
-        };
-        setActiveConversation(item);
-        openThread(messageId, meta);
-    }
+    conversationLists.forEach(list => {
+        list.addEventListener('click', event => {
+            const item = event.target.closest('.conversation-item');
+            if (!item) return;
+            handleConversationClick(item);
+        });
 
-    conversationList?.addEventListener('click', e => {
-        const item = e.target.closest('.conversation-item');
-        if (!item) return;
-        handleConversationClick(item);
+        list.addEventListener('keydown', event => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            const item = event.target.closest('.conversation-item');
+            if (!item) return;
+            event.preventDefault();
+            handleConversationClick(item);
+        });
     });
 
-    if (conversationSearch) {
-        conversationSearch.addEventListener('input', e => {
-            const term = e.target.value.trim().toLowerCase();
-            let visibleCount = 0;
+    if (conversationSearch && conversationLists.length) {
+        conversationSearch.addEventListener('input', event => {
+            const term = event.target.value.trim().toLowerCase();
+            let totalVisible = 0;
 
-            conversationList.querySelectorAll('.conversation-item').forEach(item => {
-                const name = (item.getAttribute('data-name') || '').toLowerCase();
-                const email = (item.getAttribute('data-email') || '').toLowerCase();
-                const matches = !term || name.includes(term) || email.includes(term);
-                item.style.display = matches ? '' : 'none';
-                if (matches) visibleCount += 1;
+            conversationLists.forEach(list => {
+                let visible = 0;
+                list.querySelectorAll('.conversation-item').forEach(item => {
+                    const name = (item.dataset.name || '').toLowerCase();
+                    const email = (item.dataset.email || '').toLowerCase();
+                    const matches = !term || name.includes(term) || email.includes(term);
+                    item.style.display = matches ? '' : 'none';
+                    if (matches) visible += 1;
+                });
+                totalVisible += visible;
             });
 
+            syncSectionEmptyStates();
+
             if (conversationEmptyState) {
-                conversationEmptyState.style.display = visibleCount === 0 ? 'block' : 'none';
+                const shouldShow = term !== '' && totalVisible === 0;
+                conversationEmptyState.style.display = shouldShow ? 'block' : 'none';
             }
         });
     }
 
-    replyMessage.addEventListener('input', updateSendButtonState);
+    replyMessage?.addEventListener('input', updateSendButtonState);
 
     if (attachmentButton && replyAttachment) {
         attachmentButton.addEventListener('click', event => {
             event.preventDefault();
             replyAttachment.click();
         });
-
         attachmentButton.addEventListener('keydown', event => {
             if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
@@ -1314,90 +1516,108 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    if (replyAttachment) {
-        replyAttachment.addEventListener('change', () => {
-            updateAttachmentPreview();
-            updateSendButtonState();
-        });
-    }
+    replyAttachment?.addEventListener('change', () => {
+        updateAttachmentPreview();
+        updateSendButtonState();
+    });
 
-    if (attachmentRemove) {
-        attachmentRemove.addEventListener('click', () => {
-            clearAttachmentPreview();
-            updateSendButtonState();
-            replyMessage.focus();
-        });
-    }
+    attachmentRemove?.addEventListener('click', () => {
+        clearAttachmentPreview();
+        updateSendButtonState();
+        replyMessage?.focus();
+    });
 
-    replyForm.addEventListener('submit', async e => {
-        e.preventDefault();
+    replyForm?.addEventListener('submit', async event => {
+        event.preventDefault();
         if (!currentMessageId) {
             alert('Select a conversation first');
             return;
         }
 
-        const messageText = replyMessage.value.trim();
+        const messageText = replyMessage ? replyMessage.value.trim() : '';
         const hasFile = hasSelectedAttachment();
-
         if (!messageText && !hasFile) {
-            replyMessage.focus();
+            replyMessage?.focus();
             return;
         }
 
         const url = replyUrlTemplate.replace('__ID__', currentMessageId);
         const token = getCsrf();
-        const body = new FormData();
-        body.append('_token', token);
-        body.append('message', messageText);
-        if (hasFile && replyAttachment && replyAttachment.files[0]) {
-            body.append('attachment', replyAttachment.files[0]);
+        const formData = new FormData();
+        formData.append('_token', token);
+        formData.append('message', messageText);
+        const selectedFile = hasFile ? replyAttachment.files[0] : null;
+        if (selectedFile) {
+            formData.append('attachment', selectedFile);
         }
 
-        sendButton.disabled = true;
+        if (replyButton) replyButton.disabled = true;
 
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'X-CSRF-TOKEN': token, 'Accept': 'application/json' },
-            body
-        });
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': token, Accept: 'application/json' },
+                body: formData,
+            });
 
-        if (res.ok) {
-            replyMessage.value = '';
-            clearAttachmentPreview();
-            const { items } = await fetchThread(currentMessageId);
-            renderThread(items);
-        } else {
-            let message = 'Failed to send reply';
-            try {
-                const data = await res.clone().json();
-                if (data && typeof data.error === 'string') {
-                    message = data.error;
-                } else if (data && typeof data.message === 'string') {
-                    message = data.message;
-                } else if (data && data.errors) {
-                    const first = Object.values(data.errors)[0];
-                    if (Array.isArray(first) && first.length) {
-                        message = first[0];
+            if (!res.ok) {
+                let message = 'Failed to send reply';
+                try {
+                    const data = await res.clone().json();
+                    if (data) {
+                        if (typeof data.error === 'string') {
+                            message = data.error;
+                        } else if (typeof data.message === 'string') {
+                            message = data.message;
+                        } else if (data.errors) {
+                            const first = Object.values(data.errors)[0];
+                            if (Array.isArray(first) && first.length) {
+                                message = String(first[0]);
+                            }
+                        }
                     }
+                } catch (_) {
+                    const text = await res.text();
+                    if (text) message = text;
                 }
-            } catch (jsonError) {
-                const txt = await res.text();
-                if (txt) {
-                    message = txt;
+                alert(message);
+            } else {
+                if (replyMessage) replyMessage.value = '';
+                clearAttachmentPreview();
+
+                const { items } = await fetchThread(currentMessageId);
+                renderThread(items);
+
+                if (activeConversation && items.length) {
+                    const latest = items.at(-1) ?? null;
+                    const snippet = activeConversation.querySelector('.conversation-snippet');
+                    if (snippet) {
+                        const preview = (latest?.message ?? '').trim();
+                        snippet.textContent = preview || 'Sent an attachment';
+                    }
+                    const lastTimestamp = latest?.created_at || latest?.createdAt || new Date().toISOString();
+                    updateConversationTime(activeConversation, lastTimestamp);
                 }
             }
-            alert(message);
+        } catch (_) {
+            alert('Failed to send reply');
+        } finally {
+            if (replyButton) replyButton.disabled = false;
+            updateSendButtonState();
         }
-
-        updateSendButtonState();
     });
 
-    // Auto-open the first conversation if available
-    const firstConversation = conversationList?.querySelector('.conversation-item');
+    const firstConversation = conversationLists
+        .map(list => list.querySelector('.conversation-item'))
+        .find(item => item !== null);
+
     if (firstConversation) {
         handleConversationClick(firstConversation);
+    } else {
+        setEmptyThread();
     }
 
+    syncSectionEmptyStates();
     refreshConversationTimestamps();
     setInterval(refreshConversationTimestamps, 60000);
 
@@ -1410,4 +1630,3 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
-@endsection

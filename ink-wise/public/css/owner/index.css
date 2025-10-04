@@ -12,13 +12,13 @@ body {
   border-right: 1px solid rgba(148, 163, 184, 0.18);
   box-shadow: 6px 0 24px rgba(15, 23, 42, 0.05);
   height: 100vh;
-  padding: 22px 0 28px;
+  padding: 10px 0 18px;     /* extra buffer stops top clipping */
   position: fixed;
   flex-shrink: 0;
   top: 0;
   left: 0;
   z-index: 1000;
-  overflow: hidden;
+  overflow: hidden;         /* restores clean collapse/resize behaviour */
 }
 
 .sidebar::after {
@@ -60,16 +60,28 @@ body.sidebar-collapsed .sidebar > * {
   text-align: center;
 }
 
+.sidebar-logo {
+  display: block;
+  max-width: 120px;
+  width: 70%;
+  height: auto;
+  margin: 0 auto 30px;   /* more space before the first button */
+  padding: 0 12px;
+  border-radius: 18px;
+  background: transparent;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
 .profile {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin: 0 18px 20px;
-  padding: 16px 18px;
+  gap: 10px;
+  margin: 2px 18px 16px;    /* no negative margin, still snug */
+  padding: 12px 16px;
   border-radius: 14px;
   background: linear-gradient(135deg, rgba(118, 216, 223, 0.96) 0%, rgba(236, 248, 255, 0.9) 100%);
   border: 1px solid rgba(148, 163, 184, 0.25);
-  box-shadow: 0 10px 22px rgba(148, 163, 184, 0.12);
+  box-shadow: 0 16px 28px -12px rgba(148, 163, 184, 0.35); /* falls only downward */
 }
 
 .avatar {
@@ -77,12 +89,12 @@ body.sidebar-collapsed .sidebar > * {
   width: 48px;
   height: 48px;
   border-radius: 16px;
-  background: linear-gradient(135deg, #4f46e5 0%, #38bdf8 100%);
+  background: linear-gradient(135deg, #d9f9ff 0%, #9ee8ff 100%);
   display: grid;
   place-items: center;
   font-weight: 800;
   color: #fff;
-  box-shadow: 0 10px 22px rgba(59, 130, 246, 0.25);
+  box-shadow: 0 10px 22px rgba(158, 232, 255, 0.25);
 }
 
 .avatar::after {
@@ -117,11 +129,11 @@ body.sidebar-collapsed .sidebar > * {
 /* Sidebar nav */
 .navlist {
   list-style: none;
-  padding: 4px 14px 0;
+  padding: 0 14px 0;
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 25px;
 }
 
 .navlist li {
@@ -143,7 +155,7 @@ body.sidebar-collapsed .sidebar > * {
   cursor: pointer;
   text-align: left;
   font-size: 14px;
-  color: #1f2937;
+  color: #ffffff;
   text-decoration: none;
   white-space: nowrap;
   transition: transform 0.2s ease, box-shadow 0.24s ease, background 0.24s ease, color 0.2s ease, border-color 0.24s ease;
@@ -164,7 +176,7 @@ body.sidebar-collapsed .sidebar > * {
 .sidebar-btn:hover,
 .sidebar-btn:focus {
   transform: translateX(3px);
-  color: #1e1b4b;
+  color: #0f172a;
   background: rgba(248, 250, 255, 0.92);
   border-color: rgba(99, 102, 241, 0.28);
   box-shadow: 0 14px 28px rgba(79, 70, 229, 0.18);
@@ -181,18 +193,13 @@ body.sidebar-collapsed .sidebar > * {
 .sidebar-btn:active {
   transform: translateX(1px);
   background: #ffffff;
-  color: #1e1b4b;
+  color: #0f172a;
   border-color: rgba(99, 102, 241, 0.35);
   box-shadow: 0 12px 22px rgba(79, 70, 229, 0.18);
 }
 
-.sidebar-btn:active .ico {
-  background: rgba(255, 255, 255, 0.85);
-  color: #2563eb;
-}
-
 .sidebar-btn.active {
-  color: #1e1b4b;
+  color: #0f172a;
   background: #ffffff;
   border-color: rgba(79, 70, 229, 0.38);
   box-shadow: 0 6px 18px rgba(79, 70, 229, 0.16);
@@ -226,20 +233,20 @@ body.sidebar-collapsed .sidebar > * {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(99, 102, 241, 0.12);
+  background: rgba(255, 255, 255, 0.18);
   border-radius: 12px;
   margin: 0;
   font-size: 17px;
   line-height: 1;
-  color: #4338ca;
+  color: #ffffff;
   transition: background 0.2s ease, color 0.2s ease;
 }
 
 .sidebar-btn:hover .ico,
 .sidebar-btn:focus .ico,
 .sidebar-btn.active .ico {
-  background: rgba(99, 102, 241, 0.18);
-  color: #312e81;
+  background: rgba(255, 255, 255, 0.85);
+  color: #0f172a;
 }
 
 .navlist a {
@@ -506,4 +513,24 @@ canvas {
 
 .search-btn:hover {
   background-color: rgb(0, 0, 153);
+}
+
+.profile-icon-btn {
+  background: #ffffff;
+  border-color: rgba(111, 148, 214, 0.25);
+  color: #2563eb;
+}
+
+.profile-icon-btn:hover,
+.profile-icon-btn:focus {
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(246, 249, 255, 0.92) 100%);
+  border-color: rgba(189, 206, 227, 0.45);
+  box-shadow: 0 8px 18px rgba(111, 148, 214, 0.12);
+  outline: none;
+}
+
+.profile-icon-btn svg {
+  width: 20px;
+  height: 20px;
 }

@@ -31,6 +31,7 @@ class NewStaffCreated extends Notification
             'last_name'    => $this->user->staff->last_name,
             'role'         => $this->user->role,
             'email'   => $this->user->email,
+            'url' => route('owner.staff.index', ['highlight' => $this->user->staff->staff_id ?? null]),
         ];
     }
 }

@@ -19,6 +19,7 @@
         $filterBaseRoute = route('admin.products.index', $filterQuery);
         $invitationRoute = route('admin.products.index', array_merge($filterQuery, ['type' => 'Invitation']));
         $giveawayRoute = route('admin.products.index', array_merge($filterQuery, ['type' => 'Giveaway']));
+        $envelopeRoute = route('admin.products.index', array_merge($filterQuery, ['type' => 'Envelope']));
         $activeFilter = $currentFilter ?? 'All';
     @endphp
 
@@ -37,6 +38,13 @@
                 <span class="summary-card-chip">Products</span>
             </div>
             <span class="summary-card-value">{{ number_format($giveawayCount ?? 0) }}</span>
+        </article>
+        <article class="summary-card">
+            <div class="summary-card-header">
+                <span class="summary-card-label">Envelopes</span>
+                <span class="summary-card-chip">Products</span>
+            </div>
+            <span class="summary-card-value">{{ number_format($envelopeCount ?? 0) }}</span>
         </article>
         <article class="summary-card">
             <div class="summary-card-header">
@@ -60,9 +68,12 @@
             <a href="{{ $filterBaseRoute }}" class="filter-btn {{ $activeFilter === 'All' ? 'active' : '' }}" @if($activeFilter === 'All') aria-current="page" @endif>All</a>
             <a href="{{ $invitationRoute }}" class="filter-btn {{ $activeFilter === 'Invitation' ? 'active' : '' }}" @if($activeFilter === 'Invitation') aria-current="page" @endif>Invitations</a>
             <a href="{{ $giveawayRoute }}" class="filter-btn {{ $activeFilter === 'Giveaway' ? 'active' : '' }}" @if($activeFilter === 'Giveaway') aria-current="page" @endif>Giveaways</a>
+            <a href="{{ $envelopeRoute }}" class="filter-btn {{ $activeFilter === 'Envelope' ? 'active' : '' }}" @if($activeFilter === 'Envelope') aria-current="page" @endif>Envelopes</a>
         </div>
         <div class="add-buttons">
             <a href="{{ route('admin.products.create.invitation') }}" class="btn-add-new" aria-label="Upload new product"><i class="fi fi-rr-cloud-upload"></i> Create New Product</a>
+            <a href="{{ route('admin.products.create.giveaway') }}" class="btn-add-new" aria-label="Create new giveaway"><i class="fi fi-rr-gift"></i> Create Giveaway</a>
+            <a href="{{ route('admin.products.create.envelope') }}" class="btn-add-new" aria-label="Create new envelope"><i class="fi fi-sr-envelope"></i> Create Envelope</a>
         </div>
     </div>
 
@@ -93,21 +104,7 @@
         </div>
     </div>
 
-    @if(isset($recentGiveaways) && $recentGiveaways->count())
-        <section class="giveaways-container" aria-labelledby="giveaways-heading">
-            <div class="giveaways-header">
-                <h2 id="giveaways-heading">Giveaways</h2>
-                <p class="giveaways-subtitle">Latest giveaway concepts ready for review.</p>
-            </div>
-            <div class="products-grid giveaways-grid" role="list">
-                @foreach($recentGiveaways as $product)
-                    @include('admin.products.partials.card', ['product' => $product])
-                @endforeach
-            </div>
-        </section>
-    @endif
-
-        {{-- CSS + JS assets pushed to stacks so layout can place them appropriately --}}
+    {{-- CSS + JS assets pushed to stacks so layout can place them appropriately --}}
     @push('styles')
         <link rel="stylesheet" href="{{ asset('css/admin-css/product.css') }}">
 
@@ -341,26 +338,197 @@
                 });
             });
 
-            // Upload button handler: open the final invitation template (customer view) for the product
+            const uploadModal = document.getElementById('upload-modal');
+            const uploadForm = document.getElementById('upload-form');
+            const uploadInput = document.getElementById('upload-file');
+            const cancelUpload = document.getElementById('cancel-upload');
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            let currentUploadUrl = null;
+            let currentProductId = null;
+            let currentCard = null;
+            let submitBtnOriginalLabel = '';
+
+            function closeUploadModal() {
+                if (!uploadModal) return;
+                uploadModal.classList.remove('show');
+                uploadModal.setAttribute('aria-hidden', 'true');
+                currentUploadUrl = null;
+                currentProductId = null;
+                currentCard = null;
+                if (uploadInput) uploadInput.value = '';
+            }
+
+            function showNotice(message, type = 'success', options = {}) {
+                const notice = document.createElement('div');
+                notice.className = `ajax-notice ajax-${type}`;
+                notice.style.position = 'fixed';
+                notice.style.right = '20px';
+                notice.style.top = '20px';
+                notice.style.zIndex = '9999';
+                notice.style.background = type === 'success' ? '#16a34a' : '#dc2626';
+                notice.style.color = '#fff';
+                notice.style.padding = '8px 12px';
+                notice.style.borderRadius = '6px';
+                notice.textContent = '';
+                notice.appendChild(document.createTextNode(message));
+                if (options?.link?.href) {
+                    const spacer = document.createTextNode(' ');
+                    const link = document.createElement('a');
+                    link.href = options.link.href;
+                    link.target = options.link.target || '_blank';
+                    link.rel = options.link.rel || 'noopener';
+                    link.textContent = options.link.text || 'View';
+                    link.style.color = '#fff';
+                    link.style.textDecoration = 'underline';
+                    notice.appendChild(spacer);
+                    notice.appendChild(link);
+                }
+                document.body.appendChild(notice);
+                setTimeout(() => { try { notice.remove(); } catch (e) {} }, 3500);
+            }
+
             document.addEventListener('click', function (e) {
-                if (!e.target.closest('.btn-upload')) return;
+                const btn = e.target.closest('.btn-upload');
+                if (!btn) return;
 
                 e.preventDefault();
+                if (!uploadModal || !uploadForm) return;
 
-                const btn = e.target.closest('.btn-upload');
-                const productId = btn.getAttribute('data-id');
-                if (!productId) return;
+                currentUploadUrl = btn.getAttribute('data-upload-url');
+                currentProductId = btn.getAttribute('data-id');
+                currentCard = btn.closest('.product-card');
 
-                // Open the wedding invite view in a new tab so admin can preview the final template
-                // Route: /admin/products/{id}/weddinginvite
-                const url = `/admin/products/${productId}/weddinginvite`;
-                window.open(url, '_blank');
+                if (!currentUploadUrl || !csrfToken) {
+                    showNotice('Upload configuration missing.', 'error');
+                    return;
+                }
+
+                // Update modal title and file accept attribute based on product type
+                const productType = currentCard ? currentCard.getAttribute('data-product-type') : '';
+                const modalTitle = uploadModal.querySelector('h3');
+                if (modalTitle) {
+                    modalTitle.textContent = productType === 'Envelope' ? 'Upload Envelope Image' : 'Upload Template';
+                }
+
+                // Update file input accept attribute
+                if (uploadInput) {
+                    uploadInput.accept = productType === 'Envelope' ? '.jpg,.jpeg,.png,.gif' : '.jpg,.jpeg,.png,.gif,.pdf';
+                }
+
+                uploadModal.classList.add('show');
+                uploadModal.setAttribute('aria-hidden', 'false');
+                if (uploadInput) {
+                    uploadInput.value = '';
+                    try {
+                        uploadInput.focus({ preventScroll: true });
+                    } catch (err) {
+                        uploadInput.focus();
+                    }
+                }
             });
 
-            // Note: the upload modal remains in the markup for backward compatibility, but
-            // the admin upload button now opens the final invitation preview in a new tab.
+            if (cancelUpload) {
+                cancelUpload.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    closeUploadModal();
+                });
+            }
 
-                        // AJAX slide-panel removed: viewing product details via slide panel is disabled.
+            if (uploadModal) {
+                uploadModal.addEventListener('click', function (e) {
+                    if (e.target === uploadModal) {
+                        closeUploadModal();
+                    }
+                });
+            }
+
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && uploadModal?.classList.contains('show')) {
+                    closeUploadModal();
+                }
+            });
+
+            if (uploadForm) {
+                uploadForm.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    if (!currentUploadUrl) {
+                        showNotice('Select a product before uploading.', 'error');
+                        return;
+                    }
+                    if (!uploadInput || !uploadInput.files.length) {
+                        showNotice('Choose a file to upload.', 'error');
+                        return;
+                    }
+
+                    const formData = new FormData();
+                    formData.append('file', uploadInput.files[0]);
+                    formData.append('_token', csrfToken);
+
+                    const submitBtn = uploadForm.querySelector('.btn-upload-submit');
+                    if (submitBtn) {
+                        submitBtnOriginalLabel = submitBtn.innerHTML;
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Uploading...';
+                    }
+
+                    fetch(currentUploadUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        },
+                        body: formData
+                    }).then(function (resp) {
+                        if (resp.ok) {
+                            return resp.json();
+                        }
+                        return resp.json().catch(() => ({})).then(data => Promise.reject(data));
+                    }).then(function (data) {
+                        const linkOptions = currentProductId ? { link: { href: `/admin/products/${currentProductId}/weddinginvite`, text: 'View preview' } } : {};
+                        showNotice('File uploaded successfully.', 'success', linkOptions);
+
+                        if (data?.upload && currentCard) {
+                            // Handle envelope products differently
+                            if (data.is_envelope && data.envelope_image_url) {
+                                // Update envelope image in the card
+                                const thumb = currentCard.querySelector('.product-card-thumb');
+                                if (thumb) {
+                                    thumb.src = data.envelope_image_url + '?v=' + Date.now();
+                                }
+
+                                // Update data attributes for consistency
+                                currentCard.setAttribute('data-image', data.envelope_image_url);
+                            } else if (data.upload.mime_type && data.upload.mime_type.startsWith('image/')) {
+                                // Regular product image update
+                                const thumb = currentCard.querySelector('.product-card-thumb');
+                                if (thumb && currentProductId) {
+                                    thumb.src = `/storage/uploads/products/${currentProductId}/${data.upload.filename}?v=${Date.now()}`;
+                                }
+
+                                const viewLink = currentCard.querySelector('.btn-view');
+                                if (viewLink) {
+                                    const url = viewLink.getAttribute('href');
+                                    if (url && url.includes('/admin/products/')) {
+                                        currentCard.setAttribute('data-image', thumb ? thumb.src : currentCard.getAttribute('data-image'));
+                                    }
+                                }
+                            }
+                        }
+
+                        closeUploadModal();
+                    }).catch(function (error) {
+                        const message = (typeof error === 'string' && error) || error?.message || error?.errors?.file?.[0] || 'Upload failed. Please try again.';
+                        showNotice(message, 'error');
+                    }).finally(function () {
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = submitBtnOriginalLabel || 'Upload';
+                        }
+                    });
+                });
+            }
+
+            // AJAX slide-panel removed: viewing product details via slide panel is disabled.
             // Use the product view route or implement a new modal if desired.
         </script>
     @endpush

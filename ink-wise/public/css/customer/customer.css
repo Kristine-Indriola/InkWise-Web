@@ -43,7 +43,7 @@
 /* Global Styles */
 /* ---------------------------------- */
 html { scroll-behavior: smooth; }
-body { background: #fff; }
+body { background: #fff; padding-top: 64px; }
 
 /* Gradient Background Utility */
 .bg-inkwise-gradient {
@@ -192,10 +192,11 @@ body { background: #fff; }
 
 /* Fixed navbar */
 header {
-  position: sticky;
+  position: fixed;
   top: 0;
   z-index: 50;
   background: white;
+  width: 100%;
 }
 
 /* ----------------------------- */

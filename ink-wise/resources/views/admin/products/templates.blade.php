@@ -2,10 +2,15 @@
 {{-- Page 1: Templates --}}
 @php
     $templatesCollection = $templates instanceof \Illuminate\Support\Collection ? $templates : collect($templates);
-    $invitationTemplates = $templatesCollection->where('product_type', 'Invitation');
-    $giveawayTemplates = $templatesCollection->where('product_type', 'Giveaway');
+    $invitationTemplates = $templatesCollection->filter(function($template) {
+        return strtolower($template->product_type ?? '') === 'invitation';
+    });
+    $giveawayTemplates = $templatesCollection->filter(function($template) {
+        return strtolower($template->product_type ?? '') === 'giveaway';
+    });
     $otherTemplates = $templatesCollection->filter(function($template) {
-        return !in_array($template->product_type, ['Invitation', 'Giveaway']);
+        $type = strtolower($template->product_type ?? '');
+        return $type !== 'invitation' && $type !== 'giveaway';
     });
 @endphp
 
@@ -31,10 +36,17 @@
                     @foreach($invitationTemplates as $template)
                         <div class="template-card" tabindex="0" role="button" data-template-id="{{ $template->id }}">
                             <div class="template-image-container">
-                                @if($template->preview)
-                                    <img src="@imageUrl($template->preview)" alt="{{ $template->name }}" class="template-img">
+                                @php
+                                    $frontImg = $template->front_image ?? $template->preview;
+                                    $backImg = $template->back_image ?? null;
+                                @endphp
+                                @if($frontImg)
+                                    <img src="@imageUrl($frontImg)" alt="{{ $template->name }}" class="template-img">
                                 @else
                                     <span>No preview</span>
+                                @endif
+                                @if($backImg)
+                                    <img src="@imageUrl($backImg)" alt="Back of {{ $template->name }}" class="back-thumb">
                                 @endif
                             </div>
                             <div class="card-overlay">
@@ -55,6 +67,12 @@
                                         data-template-preview="{{ $template->preview }}"
                                     >Use template</button>
                                     <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->name }}">Delete</button>
+                                    @if(!empty($template->front_image))
+                                        <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
+                                    @endif
+                                    @if(!empty($template->back_image))
+                                        <button type="button" class="btn view-back-btn" data-back-url="{{ \App\Support\ImageResolver::url($template->back_image) }}">View Back</button>
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -80,10 +98,17 @@
                     @foreach($giveawayTemplates as $template)
                         <div class="template-card" tabindex="0" role="button" data-template-id="{{ $template->id }}">
                             <div class="template-image-container">
-                                @if($template->preview)
-                                    <img src="@imageUrl($template->preview)" alt="{{ $template->name }}" class="template-img">
+                                @php
+                                    $frontImg = $template->front_image ?? $template->preview;
+                                    $backImg = $template->back_image ?? null;
+                                @endphp
+                                @if($frontImg)
+                                    <img src="@imageUrl($frontImg)" alt="{{ $template->name }}" class="template-img">
                                 @else
                                     <span>No preview</span>
+                                @endif
+                                @if($backImg)
+                                    <img src="@imageUrl($backImg)" alt="Back of {{ $template->name }}" class="back-thumb">
                                 @endif
                             </div>
                             <div class="card-overlay">
@@ -104,6 +129,12 @@
                                         data-template-preview="{{ $template->preview }}"
                                     >Use template</button>
                                     <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->name }}">Delete</button>
+                                    @if(!empty($template->front_image))
+                                        <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
+                                    @endif
+                                    @if(!empty($template->back_image))
+                                        <button type="button" class="btn view-back-btn" data-back-url="{{ \App\Support\ImageResolver::url($template->back_image) }}">View Back</button>
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -129,10 +160,17 @@
                     @foreach($otherTemplates as $template)
                         <div class="template-card" tabindex="0" role="button" data-template-id="{{ $template->id }}">
                             <div class="template-image-container">
-                                @if($template->preview)
-                                    <img src="@imageUrl($template->preview)" alt="{{ $template->name }}" class="template-img">
+                                @php
+                                    $frontImg = $template->front_image ?? $template->preview;
+                                    $backImg = $template->back_image ?? null;
+                                @endphp
+                                @if($frontImg)
+                                    <img src="@imageUrl($frontImg)" alt="{{ $template->name }}" class="template-img">
                                 @else
                                     <span>No preview</span>
+                                @endif
+                                @if($backImg)
+                                    <img src="@imageUrl($backImg)" alt="Back of {{ $template->name }}" class="back-thumb">
                                 @endif
                             </div>
                             <div class="card-overlay">
@@ -153,6 +191,12 @@
                                         data-template-preview="{{ $template->preview }}"
                                     >Use template</button>
                                     <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->name }}">Delete</button>
+                                    @if(!empty($template->front_image))
+                                        <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
+                                    @endif
+                                    @if(!empty($template->back_image))
+                                        <button type="button" class="btn view-back-btn" data-back-url="{{ \App\Support\ImageResolver::url($template->back_image) }}">View Back</button>
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -160,6 +204,7 @@
                 </div>
             </section>
         @endif
+
     </div>
 </div>
 
@@ -187,36 +232,86 @@
         }
     };
 
+    // View front/back handlers
+    document.querySelectorAll('.view-front-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const url = btn.dataset.frontUrl;
+            if (!url) return alert('No front image available');
+            document.getElementById('modalImage').src = url;
+            document.getElementById('imageModal').style.display = 'flex';
+        });
+    });
+
+    document.querySelectorAll('.view-back-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const url = btn.dataset.backUrl;
+            if (!url) return alert('No back image available');
+            document.getElementById('modalImage').src = url;
+            document.getElementById('imageModal').style.display = 'flex';
+        });
+    });
+
     // legacy inline form handler removed; delete actions are handled via AJAX buttons below
 
     // Handle delete via fetch for buttons (replaces the previous inline form)
+    // Helper: get CSRF token from meta tag or fallback to a form hidden input
+    function getCsrfToken() {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta && meta.getAttribute) {
+            const v = meta.getAttribute('content');
+            if (v) return v;
+        }
+        const hidden = document.querySelector('input[name="_token"]');
+        return hidden ? hidden.value : '';
+    }
+
     document.querySelectorAll('.template-delete-btn').forEach(function(btn) {
         btn.addEventListener('click', function(e) {
-            const name = btn.dataset.templateName || 'this template';
-            if (!confirm('Delete ' + name + '? This action cannot be undone.')) return;
+            try {
+                const name = btn.dataset.templateName || 'this template';
+                if (!confirm('Delete ' + name + '? This action cannot be undone.')) return;
 
-            const url = btn.dataset.deleteUrl;
-            fetch(url, {
-                method: 'DELETE',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            }).then(res => {
-                if (res.ok) {
-                    // remove the template card from DOM
-                    const card = btn.closest('.template-card');
-                    if (card) card.remove();
-                    alert('Template deleted');
-                } else {
-                    res.text().then(t => alert('Delete failed: ' + t));
-                }
-            }).catch(err => alert('Delete failed: ' + err.message));
+                const url = btn.dataset.deleteUrl;
+                fetch(url, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-TOKEN': getCsrfToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                }).then(res => {
+                    if (res.ok) {
+                        // remove the template card from DOM
+                        const card = btn.closest('.template-card');
+                        if (card) card.remove();
+                        alert('Template deleted');
+                    } else {
+                        res.text().then(t => alert('Delete failed: ' + t));
+                    }
+                }).catch(err => alert('Delete failed: ' + err.message));
+            } catch (err) {
+                console.error('Delete handler failed', err);
+                alert('Delete failed: ' + (err && err.message ? err.message : 'unknown error'));
+            }
         });
     });
-</script>
 
-<style>
+    // Handle "Use template" button clicks
+    document.querySelectorAll('.continue-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var templateId = this.dataset.templateId;
+            var templateInput = document.getElementById('template_id');
+            if (templateInput) {
+                templateInput.value = templateId;
+                // Update preview images if function exists
+                if (typeof updatePreviewImages === 'function') {
+                    updatePreviewImages();
+                }
+            }
+        });
+    });
+    </script>
+
+    <style>
     /* Layout and Containers */
     .templates-hero {
         display: flex;
@@ -337,6 +432,18 @@
         background: linear-gradient(180deg, #f8faff, #eef2ff);
         border-radius: 14px 14px 0 0;
         position: relative;
+    }
+
+    .back-thumb {
+        position: absolute;
+        right: 8px;
+        bottom: 8px;
+        width: 56px;
+        height: 56px;
+        object-fit: cover;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(15,23,42,0.12);
+        border: 2px solid rgba(255,255,255,0.9);
     }
 
     .template-img {
@@ -552,4 +659,5 @@
             max-height: 80vh;
         }
     }
+
 </style>

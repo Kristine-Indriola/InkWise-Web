@@ -17,4 +17,20 @@ class InvitationController extends Controller
 
         return view('customer.Invitations.weddinginvite', compact('products'));
     }
+
+    public function weddingGiveaways()
+    {
+        $products = Product::query()
+            ->with(['template', 'uploads', 'images', 'materials', 'bulkOrders'])
+            ->where('product_type', 'Giveaway')
+            ->where(function ($query) {
+                $query->where('event_type', 'Wedding')
+                      ->orWhereNull('event_type')
+                      ->orWhere('event_type', '');
+            })
+            ->orderByDesc('updated_at')
+            ->get();
+
+        return view('customer.Giveaways.weddinggive', compact('products'));
+    }
 }
