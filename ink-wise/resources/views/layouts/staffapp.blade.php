@@ -737,5 +737,5 @@
 
   @yield('scripts')
   @stack('scripts')
-</body>
+  </body>
 </html>
