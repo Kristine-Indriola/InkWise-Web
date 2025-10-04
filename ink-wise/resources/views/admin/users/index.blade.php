@@ -123,14 +123,15 @@
                             };
                             $rowClass = $status === 'pending' ? 'staff-row staff-row--pending' : 'staff-row';
                         @endphp
-                        <tr class="{{ $rowClass }}" onclick="window.location='{{ route('admin.users.show', $user->user_id) }}'">
+                        @php $isHighlighted = request('highlight') && (int) request('highlight') === (int) $user->user_id; @endphp
+                        <tr {{ $isHighlighted ? 'id=highlighted-staff' : '' }} class="{{ $isHighlighted ? 'staff-row highlight-row' : $rowClass }}" onclick="window.location='{{ route('admin.users.show', $user->user_id) }}'">
                             <td>{{ $staffProfile->staff_id ?? '—' }}</td>
                             <td>
                                 <span class="{{ $roleClass }}">{{ ucfirst($user->role) }}</span>
                             </td>
                             <td class="fw-bold">{{ $fullName ?: '—' }}</td>
-                            <td>{{ $user->email }}</td>
-                            <td>
+                                <td>{{ $user->email }}</td>
+                                <td>
                                 <span class="{{ $statusClass }}">{{ ucfirst($status) }}</span>
                             </td>
                             <td class="table-actions" onclick="event.stopPropagation();">
@@ -162,4 +163,16 @@
         </div>
     </section>
 </main>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const highlightedRow = document.getElementById('highlighted-staff');
+    if (highlightedRow) {
+        highlightedRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        highlightedRow.classList.add('recently-approved');
+        highlightedRow.setAttribute('tabindex', '-1');
+        highlightedRow.focus({ preventScroll: true });
+        setTimeout(() => highlightedRow.removeAttribute('tabindex'), 2500);
+    }
+});
+</script>
 @endsection

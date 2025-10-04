@@ -132,7 +132,9 @@
             @forelse(auth()->user()->unreadNotifications as $notification)
               <li style="margin-bottom: 12px; font-size: 14px; border-bottom: 1px solid #f0f0f0; padding-bottom: 8px;">
                 📩 {{ $notification->data['message'] }}<br>
-                <small>Email: {{ $notification->data['email'] }}</small><br>
+                @if(!empty($notification->data['email']))
+                  <small>Email: {{ $notification->data['email'] }}</small><br>
+                @endif
                 <small>{{ $notification->created_at->diffForHumans() }}</small><br>
 
                 <!-- Mark as Read -->

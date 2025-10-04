@@ -7,11 +7,12 @@ use Illuminate\Http\Request;
 use App\Mail\AccountApproved;
 use App\Models\UserVerification;
 use App\Http\Controllers\Controller;
-use Illuminate\Foundation\Auth\User;
+use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use App\Notifications\StaffApprovedNotification;
 use Illuminate\Support\Facades\Hash; // ✅ ADD THIS
+use Illuminate\Support\Facades\Notification;
 
 class OwnerController extends Controller
 {
@@ -67,9 +68,13 @@ class OwnerController extends Controller
         Mail::to($staff->user->email)->send(new AccountApproved($staff->user));
     }
 
-     $admin = User::where('role', 'admin')->first(); // adjust to your admin role setup
-    if ($admin) {
-        $admin->notify(new StaffApprovedNotification($staff));
+    $admins = User::query()
+        ->where('role', 'admin')
+        ->whereNotNull('email')
+        ->get();
+
+    if ($admins->isNotEmpty()) {
+        Notification::send($admins, new StaffApprovedNotification($staff));
     }
 
     return redirect()->route('owner.staff.index', ['pending' => 'open'])
@@ -103,13 +108,15 @@ class OwnerController extends Controller
 
     public function edit()
     {
-        $owner = Auth::user();
+    /** @var \App\Models\User $owner */
+    $owner = Auth::user();
         return view('owner.profile.edit', compact('owner'));
     }
 
     public function update(Request $request)
     {
-        $owner = Auth::user();
+    /** @var \App\Models\User $owner */
+    $owner = Auth::user();
 
         // ✅ Validation
         $request->validate([
