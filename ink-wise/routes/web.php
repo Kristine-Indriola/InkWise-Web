@@ -52,6 +52,7 @@ use App\Models\Product;
 use App\Http\Controllers\Admin\UserPasswordResetController;
 use App\Models\User as AppUser;
 use Illuminate\Notifications\DatabaseNotification;
+use App\Http\Controllers\Auth\VerifyEmailController;
 
 
 
@@ -225,41 +226,28 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::get('reports/inventory/export/{type}', [ReportsDashboardController::class, 'exportInventory'])
          ->name('reports.inventory.export');
 
-  
+}); // closes the admin group
 
-/*Route::middleware(['auth', 'role:staff'])->group(function () {
-    Route::get('/staff/dashboard', [StaffController::class, 'index'])->name('staff.dashboard');
-});
+Route::patch('/admin/notifications/{id}/read', function ($id) {
+    $user = Auth::user();
 
-Route::middleware(['auth', 'role:customer'])->group(function () {
-    Route::get('/customer/dashboard', [CustomerController::class, 'index'])->name('customer.dashboard');
-});*/
+    abort_unless($user instanceof AppUser, 403);
 
-Route::get('/unauthorized', function () {
-    return view('errors.unauthorized');
-})->name('unauthorized');
+    /** @var AppUser $adminUser */
+    $adminUser = $user;
+
+    $notification = DatabaseNotification::query()
+        ->where('notifiable_id', $adminUser->getKey())
+        ->where('notifiable_type', $adminUser->getMorphClass())
+        ->findOrFail($id);
+
+    $notification->markAsRead();
+
+    return back()->with('success', 'Notification marked as read.');
+})->middleware('auth')->name('notifications.read');
 
 Route::get('/verify-email/{token}', [VerificationController::class, 'verify'])
     ->name('verify.email');
-
-    Route::patch('/notifications/{id}/read', function ($id) {
-        $user = Auth::user();
-
-        abort_unless($user instanceof AppUser, 403);
-
-        /** @var AppUser $adminUser */
-        $adminUser = $user;
-
-        $notification = DatabaseNotification::query()
-            ->where('notifiable_id', $adminUser->getKey())
-            ->where('notifiable_type', $adminUser->getMorphClass())
-            ->findOrFail($id);
-        $notification->markAsRead();
-
-        return back()->with('success', 'Notification marked as read.');
-    })->name('notifications.read');
-
-    });
 
 /*
 |--------------------------------------------------------------------------
@@ -595,7 +583,7 @@ if (interface_exists('Laravel\\Socialite\\Contracts\\Factory')) {
 
 Route::middleware('auth')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
 
-require __DIR__.'/auth.php';
+
 
 
 

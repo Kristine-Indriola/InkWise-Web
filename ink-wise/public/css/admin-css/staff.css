@@ -84,6 +84,28 @@
     border-left: 4px solid rgba(245, 158, 11, 0.6);
 }
 
+.highlight-row {
+    position: relative;
+    background: rgba(34, 197, 94, 0.14) !important;
+    box-shadow: inset 0 0 0 2px rgba(34, 197, 94, 0.35);
+}
+
+.highlight-row.recently-approved::after {
+    content: 'Recently approved';
+    position: absolute;
+    top: -12px;
+    right: 16px;
+    background: #22c55e;
+    color: #0f172a;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 999px;
+    box-shadow: 0 6px 14px rgba(34, 197, 94, 0.35);
+}
+
 .table-actions {
     display: inline-flex;
     gap: 10px;
