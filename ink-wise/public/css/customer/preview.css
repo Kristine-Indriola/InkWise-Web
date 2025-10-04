@@ -125,7 +125,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  padding: clamp(12px, 2.2vw, 22px) clamp(6px, 1.6vw, 18px) clamp(80px, 14vh, 120px);
+  padding: clamp(12px, 2.2vw, 22px) clamp(6px, 1.6vw, 18px) clamp(40px, 8vh, 60px);
   position: relative;
 }
 
@@ -241,7 +241,7 @@ body {
 
 /* BUTTON */
 .edit-btn {
-  width: 100%;
+  width: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -256,18 +256,16 @@ body {
   cursor: pointer;
   margin-top: 32px;
   box-shadow: 0 22px 48px rgba(37, 99, 235, 0.32);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
   text-decoration: none;
   min-height: 64px;
-  position: sticky;
-  bottom: clamp(18px, 5vh, 42px);
+  position: fixed;
+  bottom: 0;
+  right: clamp(18px, 3vw, 36px);
   z-index: 6;
   touch-action: manipulation;
 }
 .edit-btn:hover {
   background: var(--accent-light);
-  transform: translateY(-2px);
-  box-shadow: 0 24px 48px rgba(37, 99, 235, 0.36);
 }
 
 .edit-btn:focus-visible {
@@ -286,6 +284,7 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 18px;
   margin-bottom: 24px;
+  margin-right: 20px;
 }
 
 .addon-orientation .feature-grid {
@@ -446,9 +445,13 @@ body {
 .edit-btn {
   margin-top: auto;
   flex-shrink: 0;
-  position: sticky;
-  bottom: 12px;
+  position: fixed;
+  bottom: clamp(18px, 5vh, 42px);
+  right: clamp(18px, 3vw, 36px);
   margin-bottom: 8px;
+  width: auto;
+  pointer-events: auto;
+  z-index: 1200;
 }
 
 @media (max-width: 900px) {
@@ -465,11 +468,12 @@ body {
   .details {
     max-width: 100%;
     max-height: none;
-    padding: 0 0 56px;
+    padding: 0 0 24px;
   }
 
   .feature-grid {
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    margin-right: 16px;
   }
 
   .preview {
@@ -484,9 +488,11 @@ body {
   }
 
   .edit-btn {
-    position: static;
-    width: 100%;
+    position: fixed;
+    width: auto;
     margin-top: 28px;
+    bottom: clamp(16px, 6vh, 40px);
+    right: 16px;
   }
 
   .details-header {
@@ -512,6 +518,7 @@ body {
 
   .feature-grid {
     gap: 14px;
+    margin-right: 12px;
   }
 
   .toggle-buttons {

@@ -4,13 +4,14 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Finalize Order — InkWise</title>
+	<meta name="csrf-token" content="{{ csrf_token() }}">
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 	<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 	<link rel="stylesheet" href="{{ asset('css/customer/orderflow-finalstep.css') }}">
 	<script src="{{ asset('js/customer/orderflow-finalstep.js') }}" defer></script>
 </head>
-<body>
+<body data-product-id="{{ $product->id ?? '' }}">
 @php
 	// Minimal, robust view setup for finalstep — resolve product/template if provided
 	$product = $product ?? null;
@@ -102,7 +103,7 @@
 		$quantityOptions = collect(range(1, 20))->map(function ($i) {
 			$value = $i * 10;
 			return (object) [
-				'label' => $value . ' Invitations',
+				'label' => number_format($value),
 				'value' => $value,
 				'price' => round($value * max(6 - floor($i / 4), 3), 2),
 			];
@@ -121,8 +122,8 @@
 	$quantityNote = 'Select bulk quantities in increments of 10.';
 	if ($minQuantity !== null && $maxQuantity !== null) {
 		$quantityNote = $minQuantity === $maxQuantity
-			? 'Available bulk quantity: ' . number_format($minQuantity) . ' invitations.'
-			: 'Select bulk quantities from ' . number_format($minQuantity) . ' up to ' . number_format($maxQuantity) . ' invitations (increments of 10).';
+			? 'Available bulk quantity: ' . number_format($minQuantity) . '.'
+			: 'Select bulk quantities from ' . number_format($minQuantity) . ' up to ' . number_format($maxQuantity) . ' (increments of 10).';
 	}
 
 	$paperStocks = collect($paperStocks ?? [])->map(function ($stock, $i) use ($fallbackImage) {
@@ -185,8 +186,14 @@
 	} catch (\Throwable $_eReview) {
 		$reviewUrl = url('/order/review');
 	}
+
+	try {
+		$finalStepSaveUrl = route('order.finalstep.save');
+	} catch (\Throwable $_eSave) {
+		$finalStepSaveUrl = url('/order/finalstep/save');
+	}
 @endphp
-<main class="finalstep-shell" data-storage-key="inkwise-finalstep" data-envelope-url="{{ $envelopeUrl }}" data-fallback-samples="false">
+<main class="finalstep-shell" data-storage-key="inkwise-finalstep" data-envelope-url="{{ $envelopeUrl }}" data-save-url="{{ $finalStepSaveUrl }}" data-fallback-samples="false" data-product-id="{{ $product->id ?? '' }}" data-product-name="{{ $resolvedProductName }}">
 	<header class="finalstep-header">
 		<div class="finalstep-header__content">
 			<a href="{{ $reviewUrl }}" class="finalstep-header__back" aria-label="Back to review">

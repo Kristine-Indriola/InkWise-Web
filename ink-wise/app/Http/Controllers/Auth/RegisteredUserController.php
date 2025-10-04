@@ -30,29 +30,49 @@ class RegisteredUserController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        $request->validate([
-            'first_name' => ['required', 'string', 'max:255'],
-            'last_name'  => ['required', 'string', 'max:255'],
-            'email'      => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email'],
-            'password'   => ['required', 'confirmed', Rules\Password::defaults()],
+        $validated = $request->validate([
+            'name' => ['required_without:first_name', 'nullable', 'string', 'max:255'],
+            'first_name' => ['required_without:name', 'nullable', 'string', 'max:255'],
+            'middle_name' => ['nullable', 'string', 'max:255'],
+            'last_name' => ['required_without:name', 'nullable', 'string', 'max:255'],
+            'contact_number' => ['nullable', 'string', 'max:255'],
+            'birthdate' => ['nullable', 'date'],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email'],
+            'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
+
+        $displayName = trim((string) ($validated['name'] ?? ''));
+
+        $firstName = trim((string) ($validated['first_name'] ?? ''));
+        $lastName = trim((string) ($validated['last_name'] ?? ''));
+
+        if ($displayName && (!$firstName || !$lastName)) {
+            $parts = preg_split('/\s+/', $displayName, -1, PREG_SPLIT_NO_EMPTY);
+            $firstName = $firstName ?: ($parts[0] ?? $displayName);
+            $lastName = $lastName ?: (count($parts) > 1 ? implode(' ', array_slice($parts, 1)) : $firstName);
+        }
+
+        $firstName = $firstName ?: ($displayName ?: 'Customer');
+        $lastName = $lastName ?: ($displayName ?: $firstName);
+        $displayName = $displayName !== '' ? $displayName : trim($firstName . ' ' . $lastName);
 
         // Step 1: Create User
         $user = User::create([
-            'email'    => $request->email,
-            'password' => Hash::make($request->password),
-            'role'     => 'customer',  // force role
-            'status'   => 'active',
+            'name' => $displayName,
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'role' => 'customer',  // force role
+            'status' => 'active',
         ]);
 
         // Step 2: Create Customer profile linked to User
         Customer::create([
-            'user_id'        => $user->user_id,
-            'first_name'     => $request->first_name,
-            'middle_name'    => $request->middle_name,
-            'last_name'      => $request->last_name,
-            'contact_number' => $request->contact_number,
-            'address_id'     => $request->address_id,
+            'user_id' => $user->user_id,
+            'first_name' => $firstName,
+            'middle_name' => $validated['middle_name'] ?? null,
+            'last_name' => $lastName,
+            'contact_number' => $validated['contact_number'] ?? null,
+            'date_of_birth' => $validated['birthdate'] ?? null,
         ]);
 
         event(new Registered($user));

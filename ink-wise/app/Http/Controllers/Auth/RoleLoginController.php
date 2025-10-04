@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route as RouteFacade;
 
 class RoleLoginController extends Controller
 {
@@ -14,76 +15,68 @@ class RoleLoginController extends Controller
     }
 
     public function login(Request $request)
-{
-    $credentials = $request->validate([
-        'email' => 'required|email',
-        'password' => 'required',
-    ]);
+    {
+        $credentials = $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
 
-    if (Auth::attempt($credentials)) {
-        $user = Auth::user();
+        if (Auth::attempt($credentials, $request->boolean('remember'))) {
+            $request->session()->regenerate();
 
-         // ✅ Allow only specific roles
-        if (!in_array($user->role, ['admin', 'owner', 'staff'])) {
-            Auth::logout();
-            return back()->withErrors([
-                'login_error' => '❌ Your account is not authorized to log in.'
-            ])->withInput();
-        }
+            $user = Auth::user();
 
-        // 🔴 Check account status
-        if ($user->staff->status === 'pending') {
-            Auth::logout();
-            return back()->withErrors([
-                'login_error' => '⏳ Your account is still pending approval by the owner.'
-            ])->withInput();
-        }
-        
-        
-        if ($user->status === 'inactive') {
-            Auth::logout();
-            return back()->withErrors([
-                'login_error' => '🚫 Your account has been deactivated. Please contact the administrator.'
-            ])->withInput();
-        }
-
-        if ($user->status !== 'active') {
-            Auth::logout();
-            return back()->withErrors([
-                'login_error' => '❌ Your account is not valid. Please contact support.'
-            ])->withInput();
-        }
-
-        // 🟢 Redirect based on role
-        switch ($user->role) {
-            case 'admin':
-                return redirect()->route('admin.dashboard')
-                     ->with('success', '👋 Welcome back, ' . $user->staff->first_name . '!');
-            case 'owner':
-                return redirect()->route('owner.home')
-                    ->with('success', '👋 Welcome back, ' . $user->staff->first_name . '!');
-            case 'staff':
-                return redirect()->route('staff.dashboard')
-                    ->with('success', '👋 Welcome back, ' . $user->staff->first_name . '!');
-            default:
+            if (!in_array($user->role, ['admin', 'owner', 'staff'])) {
                 Auth::logout();
-                return redirect()->route('login')->withErrors([
-                    'login_error' => '❌ Unauthorized role.'
-                ]);
-        }
-    }
+                return back()->withErrors([
+                    'login_error' => '❌ Your account is not authorized to log in.'
+                ])->withInput();
+            }
 
-    // 🔴 Invalid login
-    return back()->withErrors([
-        'login_error' => '❌ Invalid email or password.'
-    ])->withInput();
-}
+            if ($user->status === 'inactive' || $user->status !== 'active') {
+                Auth::logout();
+                return back()->withErrors([
+                    'login_error' => '🚫 Your account is not active. Please contact the administrator.'
+                ])->withInput();
+            }
+
+            $staffProfile = $user->staff;
+
+            if ($user->role === 'staff' && $staffProfile && $staffProfile->status === 'pending') {
+                Auth::logout();
+                return back()->withErrors([
+                    'login_error' => '⏳ Your account is still pending approval by the owner.'
+                ])->withInput();
+            }
+
+            $greetingName = $staffProfile->first_name ?? $user->name ?? 'there';
+
+            $redirectRoute = match ($user->role) {
+                'admin' => 'admin.dashboard',
+                'owner' => 'owner.home',
+                'staff' => $staffProfile ? 'staff.dashboard' : null,
+                default => null,
+            };
+
+            if ($redirectRoute && RouteFacade::has($redirectRoute)) {
+                return redirect()->intended(route($redirectRoute))
+                    ->with('success', '👋 Welcome back, ' . $greetingName . '!');
+            }
+
+            return redirect()->intended(route('dashboard'))
+                ->with('success', '👋 Welcome back, ' . $greetingName . '!');
+        }
+
+        return back()->withErrors([
+            'login_error' => '❌ Invalid email or password.'
+        ])->withInput();
+    }
 
 
     public function logout(Request $request)
     {
         Auth::logout();
-        return redirect()->route('login')
+        return redirect('/')
             ->with('success', '✅ You have been logged out successfully.');
     }
 }

@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="{{ asset('css/customer/preview.css') }}">
   <script src="{{ asset('js/customer/preview.js') }}" defer></script>
 </head>
-<body>
+<body data-product-id="{{ $product->id ?? '' }}" data-product-name="{{ $product->name ?? '' }}">
 @php
   $uploads = $product->uploads ?? collect();
   $images = $product->product_images ?? $product->images ?? null;
@@ -147,10 +147,10 @@
       <div class="flip-container" id="flipContainer">
         <div class="flipper" id="flipper">
           <div class="front">
-            <img src="{{ $frontImage ?? $defaultImage }}" alt="Front of {{ $product->name }}">
+            <img src="{{ $frontImage ?? $defaultImage }}" alt="Front of {{ $product->name }}" onerror="this.src='{{ $defaultImage }}'">
           </div>
           <div class="back">
-            <img src="{{ $backImage ?? $frontImage ?? $defaultImage }}" alt="Back of {{ $product->name }}">
+            <img src="{{ $backImage ?? $frontImage ?? $defaultImage }}" alt="Back of {{ $product->name }}" onerror="this.src='{{ $defaultImage }}'">
           </div>
         </div>
       </div>
