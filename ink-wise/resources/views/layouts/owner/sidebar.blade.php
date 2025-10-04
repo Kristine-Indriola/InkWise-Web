@@ -1,25 +1,13 @@
 @extends('layouts.owner.app')
 
 <aside class="sidebar">
-  <h2>InkWise</h2>
-
-  <div class="profile">
-    <div class="avatar">👤</div>
-    <div>
-      <div style="font-weight:700;">
-        <a href="{{ route('owner.profile.show') }}">Owner Profile</a>
-      </div>
-      <div style="color:#64748b;font-size:12px;">
-        {{ auth('owner')->user()->email ?? 'owner@example.com' }}
-      </div>
-    </div>
-  </div>
+  <img class="sidebar-logo" src="{{ asset('images/logo.png') }}" alt="InkWise logo">
 
   <ul class="navlist">
     <li>
       <a href="{{ route('owner.home') }}">
         <button class="sidebar-btn {{ request()->routeIs('owner.home') ? 'active' : '' }}">
-          <span class="ico" style="color:#2563eb;">
+          <span class="ico">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <path d="m3 11 9-7 9 7" />
               <path d="M5 9v10a2 2 0 0 0 2 2h3v-6h4v6h3a2 2 0 0 0 2-2V9" />
@@ -32,7 +20,7 @@
     <li>
       <a href="{{ route('owner.staff.index') }}">
         <button class="sidebar-btn {{ request()->routeIs('owner.staff.index') ? 'active' : '' }}">
-          <span class="ico" style="color:#2563eb;">
+          <span class="ico">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" />
               <path d="M6 21v-1a4 4 0 0 1 4-4h0" />
@@ -46,7 +34,7 @@
     <li>
       <a href="{{ route('owner.order.workflow') }}">
         <button class="sidebar-btn {{ request()->routeIs('owner.order.workflow') ? 'active' : '' }}">
-          <span class="ico" style="color:#2563eb;">
+          <span class="ico">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="10" />
               <path d="m12 6 4 6h-8l4 6" />
@@ -59,7 +47,7 @@
     <li>
       <a href="{{ route('owner.inventory-track') }}">
         <button class="sidebar-btn {{ request()->routeIs('owner.inventory-track') ? 'active' : '' }}">
-          <span class="ico" style="color:#2563eb;">
+          <span class="ico">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <rect x="4" y="4" width="16" height="6" rx="1" />
               <rect x="4" y="14" width="16" height="6" rx="1" />
@@ -74,7 +62,7 @@
     <li>
       <a href="{{ route('owner.products.index') }}">
         <button class="sidebar-btn {{ request()->routeIs('owner.products.*') ? 'active' : '' }}">
-          <span class="ico" style="color:#2563eb;">
+          <span class="ico">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <path d="M7 7V5a3 3 0 0 1 6 0v2" />
               <path d="M5 7h14l-1 12H6Z" />
@@ -87,7 +75,7 @@
     <li>
       <a href="{{ route('owner.transactions-view') }}">
         <button class="sidebar-btn {{ request()->routeIs('owner.transactions-view') ? 'active' : '' }}">
-          <span class="ico" style="color:#2563eb;">
+          <span class="ico">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="5" width="18" height="14" rx="2" />
               <path d="M3 10h18" />
@@ -101,7 +89,7 @@
     <li>
       <a href="{{ route('owner.reports') }}" class="text-decoration-none">
         <button class="sidebar-btn {{ request()->routeIs('owner.reports') ? 'active' : '' }}">
-          <span class="ico" style="color:#2563eb;">
+          <span class="ico">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <path d="M5 19V9" />
               <path d="M12 19V5" />
@@ -162,6 +150,14 @@
           </ul>
         </div>
       </div>
+
+      <a href="{{ route('owner.profile.show') }}" class="icon-btn profile-icon-btn" aria-label="Owner profile">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" />
+          <path d="M6 20v-1a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v1" />
+        </svg>
+      </a>
 
       <!-- Logout Button -->
       <form method="POST" action="{{ route('logout') }}">

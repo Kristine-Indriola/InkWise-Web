@@ -241,27 +241,21 @@ Route::get('/unauthorized', function () {
     return view('errors.unauthorized');
 })->name('unauthorized');
 
+});
+
+Route::middleware('auth')->patch('/notifications/{id}/read', function ($id) {
+    $user = Auth::user();
+
+    abort_unless($user, 403);
+
+    $notification = $user->notifications()->findOrFail($id);
+    $notification->markAsRead();
+
+    return back()->with('success', 'Notification marked as read.');
+})->name('notifications.read');
+
 Route::get('/verify-email/{token}', [VerificationController::class, 'verify'])
     ->name('verify.email');
-
-    Route::patch('/notifications/{id}/read', function ($id) {
-        $user = Auth::user();
-
-        abort_unless($user instanceof AppUser, 403);
-
-        /** @var AppUser $adminUser */
-        $adminUser = $user;
-
-        $notification = DatabaseNotification::query()
-            ->where('notifiable_id', $adminUser->getKey())
-            ->where('notifiable_type', $adminUser->getMorphClass())
-            ->findOrFail($id);
-        $notification->markAsRead();
-
-        return back()->with('success', 'Notification marked as read.');
-    })->name('notifications.read');
-
-    });
 
 /*
 |--------------------------------------------------------------------------
