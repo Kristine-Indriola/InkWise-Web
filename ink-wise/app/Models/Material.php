@@ -13,16 +13,30 @@ class Material extends Model
     public $timestamps = false;
 
     protected $fillable = [
+        'sku',
         'material_name',
+        'occasion',
+        'product_type',
         'material_type',
+        'size',
+        'color',
+        'weight_gsm',
+        'volume_ml',
         'unit',
         'unit_cost',
-        'date_added',
-        'date_updated',
+        'stock_qty',
+        'reorder_point',
+        'description',
     ];
 
     public function inventory()
     {
         return $this->hasOne(Inventory::class, 'material_id');
+    }
+
+    public function products()
+    {
+        return $this->belongsToMany(Product::class, 'product_materials', 'material_id', 'product_id')
+            ->withPivot('item', 'type', 'color', 'weight', 'unit_price', 'qty', 'cost');
     }
 }

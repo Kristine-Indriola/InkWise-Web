@@ -1,0 +1,85 @@
+.floating-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+.floating-content {
+    background: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    max-height: 80vh;
+    overflow-y: auto;
+}
+.floating-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+.floating-header h4 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+.floating-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+}
+.floating-body {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+.floating-section h5 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+.floating-description h6 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+.floating-description p {
+    margin: 0;
+    color: #333;
+    line-height: 1.5;
+}
+.floating-section dl {
+    display: grid;
+    gap: 6px;
+}
+.floating-section dl div {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 6px;
+    align-items: baseline;
+}
+.floating-section dt {
+    font-weight: 600;
+    color: #555;
+}
+.floating-section dd {
+    margin: 0;
+    color: #333;
+}
+.floating-media img {
+    width: 100%;
+    height: auto;
+    border-radius: 6px;
+    object-fit: cover;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}

@@ -12,10 +12,6 @@
 @include('layouts.owner.sidebar')
 
 <section class="main-content">
-  <div class="topbar">
-    <div class="welcome-text"><strong>Welcome, Owner!</strong></div>
-
-    <div class="topbar-actions">
       @php
           $lowCount = \App\Models\Material::whereHas('inventory', function($q) {
               $q->whereColumn('stock_level', '<=', 'reorder_level')
@@ -29,34 +25,39 @@
           $notifCount = $lowCount + $outCount;
       @endphp
 
-      <button type="button" class="icon-btn" aria-label="Notifications">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
-             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M15 17H9a4 4 0 0 1-4-4V9a7 7 0 1 1 14 0v4a4 4 0 0 1-4 4z"/>
-          <path d="M10 21a2 2 0 0 0 4 0"/>
-        </svg>
-        <span class="badge">{{ $notifCount }}</span> 
-      </button>
-
-      <form method="POST" action="{{ route('logout') }}">
-        @csrf
-        <button type="submit" class="logout-btn">Logout</button>
-      </form>
-    </div>
-  </div>
        
-  <div class="panel">
-    <h3>Stock Levels</h3>
+      <div class="panel">
+        <h3>Stock Levels</h3>
 
-    {{-- SEARCH FORM --}}
-   <form method="GET" action="{{ route('owner.inventory-track') }}">
-  <div class="search-wrap" style="padding: 6px 12px;">
-    <input class="search-input" type="text" name="search" placeholder="Search by item name or category..." value="{{ request()->input('search') }}" />
-    <button type="submit" class="search-btn" style="padding: 1px 8px; font-size: 13px;">Search</button>
-  </div>
-</form>
+         {{-- SEARCH FORM --}}
+      <form method="GET" action="{{ route('owner.inventory-track') }}">
+      <div class="search-wrap" style="margin: 0 0 15px 0; padding: 0; display: flex; align-items: center;">
+        <input class="search-input" type="text" name="search" placeholder="Search by item name or category..." value="{{ request()->input('search') }}" />
+        <button type="submit" class="search-btn" style="padding: 6px 10px; width: 65px;">Search</button>
+      </div>
+    </form>
+
+
+        @if(request()->has('search') && request()->input('search') != '')
+          <div style="margin: 10px 0;">
+            <a href="{{ route('owner.inventory-track') }}" 
+              style="display:inline-flex; align-items:center; gap:6px;
+                      background:#f9fafb; color:#1f2937; padding:6px 14px;
+                      border-radius:6px; border:1px solid #d1d5db; 
+                      font-weight:600; font-size:15px; text-decoration:none;
+                      cursor:pointer; transition:all 0.2s ease;">
+
+              <!-- SVG Arrow Icon -->
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" 
+                  viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </a>
+          </div>
+        @endif
 
     <div class="table-wrap">
+
       <table class="inventory-table">
         <thead>
           <tr>

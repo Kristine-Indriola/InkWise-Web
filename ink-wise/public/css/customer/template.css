@@ -88,6 +88,31 @@
     100% { transform: translateY(0px) rotate(0deg); }
   }
 }
+
+/* Elegant page title */
+.elegant-title {
+    font-family: 'Playfair Display', 'Times New Roman', serif;
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #a6b7ff;
+    margin-top: 2rem;
+    margin-bottom: 0.5rem;
+    line-height: 1.1;
+}
+.elegant-title .highlight {
+    color: #6c63ff;
+    font-style: italic;
+    letter-spacing: 2px;
+}
+.page-subtitle {
+    font-size: 1.1rem;
+    color: #888;
+    margin-bottom: 2.5rem;
+    margin-top: 0.2rem;
+    font-family: 'Nunito', Arial, sans-serif;
+}
+
 /* Wedding Dropdown */
 #weddingDropdownBtn {
   cursor: pointer;
@@ -113,6 +138,8 @@
   transition: background 0.2s;
 }
 
+
+
 #weddingDropdownMenu a:hover {
   background: #e0f7fa; /* Light Aqua from palette */
 }
@@ -123,4 +150,106 @@
     visibility: visible !important;
     pointer-events: auto;
     transition: opacity 0.2s;
+}
+
+/* Invitation Card Styles */
+.invitation-card {
+    background: #fff;
+    border-radius: 1.25rem;
+    box-shadow: 0 4px 24px 0 rgba(166,183,255,0.10);
+    border: 1px solid #f1f1f1;
+    padding: 1.5rem 1rem 1.5rem 1rem;
+    max-width: 20rem;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: box-shadow 0.3s, transform 0.3s;
+}
+.invitation-card:hover {
+    box-shadow: 0 8px 32px 0 rgba(166,183,255,0.18);
+    transform: translateY(-8px) scale(1.03);
+}
+.invitation-media {
+    width: 100%;
+    height: 260px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    border-radius: 1rem;
+    overflow: hidden;
+    background: #f7f8fa;
+}
+.heart-btn {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 10;
+    background: rgba(255,255,255,0.8);
+    border-radius: 9999px;
+    padding: 0.25rem;
+    box-shadow: 0 2px 8px 0 rgba(166,183,255,0.10);
+    transition: background 0.2s;
+    border: none;
+}
+.heart-btn:hover {
+    background: #a6b7ff;
+}
+.swatch-btn {
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 9999px;
+    border: 2px solid #06b6d4;
+    box-shadow: 0 1px 4px 0 rgba(0,0,0,0.07);
+    cursor: pointer;
+    transition: border 0.2s, box-shadow 0.2s;
+    outline: none;
+    margin-right: 0.25rem;
+}
+.swatch-btn:last-child {
+    margin-right: 0;
+}
+.swatch-btn.ring-2 {
+    border-width: 3px;
+    border-color: #6c63ff;
+    box-shadow: 0 0 0 2px #d3b7ff;
+}
+@media (max-width: 640px) {
+    .elegant-title {
+        font-size: 1.5rem;
+        margin-top: 1.2rem;
+    }
+    .invitation-media {
+        height: 180px;
+    }
+    .invitation-card {
+        max-width: 100%;
+    }
+}
+
+/* Upload Section Styles */
+.upload-section {
+    border: 1px solid #e5e7eb;
+}
+
+.upload-section h2 {
+    color: #374151;
+}
+
+.upload-section input[type="file"] {
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+}
+
+.upload-section button {
+    background-color: #06b6d4;
+    color: white;
+    padding: 0.5rem 1.5rem;
+    border-radius: 0.375rem;
+    transition: background-color 0.2s;
+}
+
+.upload-section button:hover {
+    background-color: #0891b2;
 }

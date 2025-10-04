@@ -4,15 +4,50 @@
 
 @push('styles')
 <link rel="stylesheet" href="{{ asset('css/staff_profiles.css') }}">
+<style>
+    .profile-card--highlight {
+        position: relative;
+        box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.4);
+        border-radius: 20px;
+        animation: profileHighlightPulse 2.6s ease-in-out 3;
+    }
+
+    .profile-card--highlight::after {
+        content: 'Recently approved';
+        position: absolute;
+        top: -14px;
+        right: 20px;
+        background: #22c55e;
+        color: #0f172a;
+        font-weight: 700;
+        font-size: 11px;
+        padding: 4px 12px;
+        border-radius: 999px;
+        box-shadow: 0 6px 14px rgba(34, 197, 94, 0.35);
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+    }
+
+    @keyframes profileHighlightPulse {
+        0%, 100% { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.1); }
+        50% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0.35); }
+    }
+
+    .profile-card--highlight .profile-header-info h2 {
+        color: #047857;
+    }
+</style>
 @endpush
 
 @section('content')
+@php $isRecentlyApproved = in_array(request()->query('highlight'), ['1', 'true', 'yes'], true); @endphp
+
 <div class="profile-wrapper">
 
     {{-- Back Button --}}
-    <a href="{{ route('admin.users.index') }}" class="btn-back">← Back to Staff List</a>
+    <a href="{{ route('admin.users.index', $isRecentlyApproved ? ['highlight' => $user->user_id] : []) }}" class="btn-back">← Back to Staff List</a>
 
-    <div class="profile-card">
+    <div class="profile-card {{ $isRecentlyApproved ? 'profile-card--highlight' : '' }}">
         {{-- Header --}}
         <div class="profile-header">
             <div class="avatar">
@@ -71,16 +106,20 @@
 
         {{-- Tab Content: Actions --}}
         <div id="actions" class="tab-content">
-            <div class="profile-actions">
-                <a href="{{ route('admin.users.edit', $user->user_id) }}" class="btn btn-edit">✏ Edit</a>
-                <form method="POST" action="{{ route('admin.users.destroy', $user->user_id) }}" 
-                      onsubmit="return confirm('Are you sure you want to delete this user?');">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="btn btn-delete">🗑 Delete</button>
-                </form>
-            </div>
-        </div>
+    <div class="profile-actions">
+        @if(($user->staff)->status !== 'archived')
+            <a href="{{ route('admin.users.edit', $user->user_id) }}" class="btn btn-edit">✏ Edit</a>
+            <form method="POST" action="{{ route('admin.users.destroy', $user->user_id) }}" 
+                  onsubmit="return confirm('Are you sure you want to archive this user?');">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="btn btn-delete">📦 Archive</button>
+            </form>
+        @else
+            <span class="badge bg-secondary">📦 Archived Account</span>
+        @endif
+    </div>
+</div>
     </div>
 </div>
 
@@ -107,5 +146,15 @@ function openTab(evt, tabId) {
     document.getElementById(tabId).classList.add("active");
     evt.currentTarget.classList.add("active");
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    const highlightedCard = document.querySelector('.profile-card--highlight');
+    if (highlightedCard) {
+        highlightedCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        highlightedCard.setAttribute('tabindex', '-1');
+        highlightedCard.focus({ preventScroll: true });
+        setTimeout(() => highlightedCard.removeAttribute('tabindex'), 2500);
+    }
+});
 </script>
 @endsection

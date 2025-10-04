@@ -2,95 +2,86 @@
 
 @section('title', 'Invitation Templates')
 
-{{-- Page-specific CSS --}}
 @push('styles')
-<link rel="stylesheet" href="{{ asset('css/admin-css/template.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/admin-css/template/template.css') }}">
 @endpush
 
-{{-- Page-specific JS --}}
 @push('scripts')
-<script src="{{ asset('js/admin/template.js') }}"></script>
+    <script src="{{ asset('js/admin/template/template.js') }}" defer></script>
 @endpush
 
 @section('content')
-
-    <!-- Header Container -->
-    <div class="templates-container">
-        <div class="templates-header">
-            <div>
-                <h2>Invitation Templates</h2>
-                <p>Manage and create beautiful invitation templates</p>
+    <main class="dashboard-container templates-page" role="main">
+        <section class="templates-container" aria-labelledby="templates-heading">
+            <div class="templates-header">
+                <div>
+                    <h2 id="templates-heading">Invitation Templates</h2>
+                    <p>Manage and create beautiful invitation templates</p>
+                </div>
+                <a href="{{ route('admin.templates.create') }}" class="btn-create">
+                    <span aria-hidden="true">+</span>
+                    <span>Create Template</span>
+                </a>
             </div>
-            <a href="{{ route('admin.templates.create') }}" class="btn-create">
-                + Create Template
-            </a>
-        </div>
-    </div>
+        </section>
 
-    <!-- Success Message -->
-    @if(session('success'))
-        <div class="alert alert-success">
-            {{ session('success') }}
-        </div>
-    @endif
+        @if(session('success'))
+            <div class="alert alert-success" role="status">
+                {{ session('success') }}
+            </div>
+        @endif
 
-    <!-- Templates Grid -->
-    @if($templates->isEmpty())
-        <p class="no-templates mt-gap">
-            No templates available yet. Click <b>Create Template</b> to add one.
-        </p>
-    @else
-        <div class="templates-grid mt-gap">
-            @foreach($templates as $template)
-                <div class="template-card">
-                    
-                    <!-- Preview -->
-                    <div class="template-preview">
-    @if($template->preview)
-        <img src="{{ asset('storage/' . $template->preview) }}" alt="Preview" style="max-width:100%;max-height:100px;border-radius:8px;">
-    @else
-        📑
-    @endif
-    @php
-        $design = json_decode($template->design, true);
-    @endphp
-    @if($design)
-        <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-            <span style="display:inline-block;width:22px;height:22px;border-radius:5px;background:{{ $design['primary_color'] ?? '#ccc' }};"></span>
-            <span style="display:inline-block;width:22px;height:22px;border-radius:5px;background:{{ $design['secondary_color'] ?? '#ccc' }};"></span>
-        </div>
-    @endif
-</div>
-                    <!-- Info -->
-                    <div class="template-info">
-    <h3>{{ $template->name }}</h3>
-    <p>Created {{ $template->created_at->diffForHumans() }}</p>
-    @php
-        $design = json_decode($template->design, true);
-    @endphp
-    @if($design)
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-            <span style="font-size:12px;color:#06b6d4;">{{ $design['paper_type'] ?? '' }}</span>
-            <span style="font-size:12px;color:#0891b2;">{{ $design['trim_type'] ?? '' }}</span>
-            <span style="font-size:12px;color:#888;">{{ $design['category'] ?? '' }} | {{ $design['size'] ?? '' }}</span>
-        </div>
-        <p style="font-size:13px;color:#6b7280;">{{ $design['description'] ?? '' }}</p>
-    @endif
-                        <!-- Actions -->
+        @if($templates->isEmpty())
+            <p class="no-templates mt-gap">
+                No templates available yet. Click <b>Create Template</b> to add one.
+            </p>
+        @else
+            <div class="templates-grid mt-gap" role="list">
+                @foreach($templates as $template)
+                    <article class="template-card" role="listitem">
+                        <div class="template-preview">
+                            @php
+                                $front = $template->front_image ?? $template->preview;
+                                $back = $template->back_image ?? null;
+                            @endphp
+                            @if($front)
+                                <img src="{{ \App\Support\ImageResolver::url($front) }}" alt="Preview of {{ $template->name }}">
+                            @else
+                                <span>No preview</span>
+                            @endif
+                            @if($back)
+                                <img src="{{ \App\Support\ImageResolver::url($back) }}" alt="Back of {{ $template->name }}" class="back-thumb">
+                            @endif
+                        </div>
+                        <div class="template-info">
+                            <h3>{{ $template->name }}</h3>
+                            <p>{{ $template->category }}</p>
+                            <p class="description">{{ $template->description }}</p>
+                            @if($template->updated_at)
+                                <small>Last updated: {{ $template->updated_at->format('M d, Y H:i') }}</small>
+                            @endif
+                        </div>
                         <div class="template-actions">
                             <a href="{{ route('admin.templates.editor', $template->id) }}" class="btn-edit">Edit</a>
-                            <a href="{{ route('admin.templates.editor', $template->id) }}" class="btn-use">Use</a>
-                            <form action="{{ route('admin.templates.destroy', $template->id) }}" method="POST" style="display:inline;">
+                            <form action="{{ route('admin.templates.destroy', $template->id) }}" method="POST">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn-delete" onclick="return confirm('Delete this template?')">Delete</button>
                             </form>
+                            <a href="{{ route('admin.products.create.invitation', ['template_id' => $template->id]) }}"
+                               class="btn btn-upload"
+                               data-template-id="{{ $template->id }}">
+                                Upload to Product
+                            </a>
                         </div>
-                    </div>
+                    </article>
+                @endforeach
+            </div>
+        @endif
 
-                </div>
-            @endforeach
+        <div id="previewModal">
+            <span id="closePreview" aria-label="Close preview" role="button">&times;</span>
+            <img id="modalImg" src="" alt="Template preview modal">
         </div>
-    @endif
-
+    </main>
 @endsection

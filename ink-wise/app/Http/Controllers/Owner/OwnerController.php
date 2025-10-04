@@ -2,11 +2,17 @@
 
 namespace App\Http\Controllers\Owner;
 
-use Illuminate\Http\Request;
 use App\Models\Staff;
+use Illuminate\Http\Request;
+use App\Mail\AccountApproved;
+use App\Models\UserVerification;
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
+use App\Notifications\StaffApprovedNotification;
 use Illuminate\Support\Facades\Hash; // ✅ ADD THIS
+use Illuminate\Support\Facades\Notification;
 
 class OwnerController extends Controller
 {
@@ -38,22 +44,43 @@ class OwnerController extends Controller
 
     // Approve staff
     public function approveStaff($staff_id)
-    {
-        $staff = Staff::with('user')->findOrFail($staff_id);
+{
+    $staff = Staff::with('user')->findOrFail($staff_id);
 
-        if ($staff->status !== 'pending') {
-            return back()->with('error', 'Staff account is not pending.');
-        }
-
-        $staff->update(['status' => 'approved']);
-
-        if ($staff->user) {
-            $staff->user->update(['status' => 'active']);
-        }
-
-        return redirect()->route('owner.staff.index', ['pending' => 'open'])
-                         ->with('success', 'Staff Approved Successfully!');
+    if ($staff->status !== 'pending') {
+        return back()->with('error', 'Staff account is not pending.');
     }
+
+    // ✅ Check if this user has a verified record
+    $verification = UserVerification::where('user_id', $staff->user->id)->first();
+
+    if (!$staff->user->verification || is_null($staff->user->verification->verified_at)) {
+    return back()->with('error', '❌ Cannot approve. Email not verified.');
+}
+
+
+    // Approve staff
+    $staff->update(['status' => 'approved']);
+    $staff->user->update(['status' => 'active']);
+
+    // Send email
+    if ($staff->user && $staff->user->email) {
+        Mail::to($staff->user->email)->send(new AccountApproved($staff->user));
+    }
+
+    $admins = User::query()
+        ->where('role', 'admin')
+        ->whereNotNull('email')
+        ->get();
+
+    if ($admins->isNotEmpty()) {
+        Notification::send($admins, new StaffApprovedNotification($staff));
+    }
+
+    return redirect()->route('owner.staff.index', ['pending' => 'open'])
+                     ->with('success', '✅ Staff Approved Successfully!');
+}
+
 
     // Reject staff
     public function rejectStaff($staff_id)
@@ -81,13 +108,15 @@ class OwnerController extends Controller
 
     public function edit()
     {
-        $owner = Auth::user();
+    /** @var \App\Models\User $owner */
+    $owner = Auth::user();
         return view('owner.profile.edit', compact('owner'));
     }
 
     public function update(Request $request)
     {
-        $owner = Auth::user();
+    /** @var \App\Models\User $owner */
+    $owner = Auth::user();
 
         // ✅ Validation
         $request->validate([

@@ -1,0 +1,665 @@
+/* ================================
+   GLOBAL STYLES
+================================== */
+.root, :root {
+    --admin-font: 'Poppins', 'Nunito', sans-serif;
+    --admin-accent: #94b9ff;
+    --admin-accent-strong: #5a8de0;
+    --admin-accent-soft: rgba(148, 185, 255, 0.18);
+    --admin-text-primary: #0f172a;
+    --admin-text-secondary: #6b7280;
+    --admin-gradient-bg: linear-gradient(135deg, #f3f6ff 0%, #f7fff6 100%);
+    --admin-surface: #ffffff;
+    --admin-surface-muted: #f9fafb;
+    --admin-border: rgba(148, 185, 255, 0.28);
+    --admin-shadow-soft: 0 18px 36px rgba(15, 23, 42, 0.08);
+    --admin-shadow-hover: 0 24px 48px rgba(15, 23, 42, 0.12);
+    --admin-success: #23b26d;
+    --admin-danger: #ef4444;
+
+    /* legacy aliases */
+    --primary-color: var(--admin-accent);
+    --primary-hover: var(--admin-accent-strong);
+    --background-light: var(--admin-surface-muted);
+    --text-secondary: var(--admin-text-secondary);
+    --border-color: var(--admin-border);
+    --background-white: var(--admin-surface);
+    --shadow-color: rgba(15, 23, 42, 0.08);
+    --green: var(--admin-success);
+    --red: var(--admin-danger);
+}
+
+/* compact base font sizing */
+html { font-size: 12px; }
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--admin-font);
+    background: var(--admin-surface-muted);
+    color: var(--admin-text-primary);
+}
+
+.dashboard-container {
+    padding: 20px;
+    font-family: var(--admin-font);
+    color: var(--admin-text-primary);
+}
+
+.admin-page-shell {
+    padding: 28px;
+    font-family: var(--admin-font);
+    background: var(--admin-gradient-bg);
+    border-radius: 24px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    min-height: calc(100vh - 112px);
+    box-sizing: border-box;
+}
+
+.page-title {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+}
+
+/* ================================
+   SUMMARY CARDS
+================================== */
+.summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin: 20px 0;
+}
+
+.summary-card {
+    background: var(--background-white);
+    border-radius: 18px;
+    padding: 20px 22px;
+    border: 1px solid var(--admin-border);
+    box-shadow: var(--admin-shadow-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    position: relative;
+    overflow: hidden;
+}
+
+.summary-card::after {
+    content: "";
+    position: absolute;
+    left: 20px;
+    right: 20px;
+    bottom: 12px;
+    height: 4px;
+    border-radius: 99px;
+    background: linear-gradient(90deg, rgba(148,185,255,0.42), rgba(122,168,232,0.6));
+}
+
+.summary-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.summary-card-label {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.summary-card-chip {
+    background: var(--admin-accent-soft);
+    color: var(--admin-accent-strong);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.summary-card-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+/* summary-cards and table UI removed: styles intentionally omitted */
+
+/* ================================
+   ADD BUTTONS
+================================== */
+.search-and-add {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 20px 0;
+    position: relative;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.filter-buttons {
+    display: inline-flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.filter-btn {
+    background: transparent;
+    border: 1px solid var(--admin-border);
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-weight: 600;
+    color: var(--admin-accent-strong);
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.filter-btn:hover,
+.filter-btn:focus {
+    background: var(--admin-accent-soft);
+    box-shadow: 0 10px 20px rgba(15,23,42,0.1);
+    outline: none;
+}
+
+.filter-btn.active {
+    background: var(--admin-accent);
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 14px 26px rgba(14,46,120,0.18);
+}
+
+.add-buttons {
+    position: relative;
+}
+
+.btn-add-new {
+    background: var(--admin-accent);
+    color: #fff;
+    border: none;
+    padding: 12px 18px;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    position: relative;
+    box-shadow: 0 12px 24px rgba(148, 185, 255, 0.32);
+}
+
+.btn-add-new:hover {
+    background: var(--admin-accent-strong);
+    transform: translateY(-2px);
+}
+
+.btn-add-new:focus {
+    outline: 2px solid var(--admin-accent-strong);
+    outline-offset: 2px;
+}
+
+.floating-buttons {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: var(--background-white);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+    min-width: 180px;
+    flex-direction: column;
+    gap: 0;
+}
+
+.add-buttons:hover .floating-buttons {
+    display: flex;
+}
+
+.floating-buttons .btn-floating {
+    background: none;
+    border: none;
+    padding: 12px 16px;
+    border-radius: 0;
+    cursor: pointer;
+    color: var(--primary-color);
+    font-weight: 600;
+    transition: background 0.2s;
+    text-align: left;
+    width: 100%;
+    box-shadow: none;
+}
+
+.floating-buttons .btn-floating:hover {
+    background: var(--background-light);
+}
+
+.floating-buttons .btn-floating:focus {
+    outline: 2px solid var(--primary-hover);
+    outline-offset: -2px;
+}
+
+.btn-download-all,
+.btn-sort-up,
+.btn-sort-down {
+    background: var(--background-white);
+    border: 1px solid var(--border-color);
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+    color: var(--primary-color);
+}
+
+.btn-download-all:hover,
+.btn-sort-up:hover,
+.btn-sort-down:hover {
+    background: #f3f4f6;
+}
+
+.btn-download-all:focus,
+.btn-sort-up:focus,
+.btn-sort-down:focus {
+    outline: 2px solid var(--primary-hover);
+    outline-offset: 2px;
+}
+
+.filter-group select {
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    color: var(--primary-color); /* Select text color */
+    border-color: var(--primary-color); /* Select border */
+}
+
+.filter-group select:focus {
+    outline: 2px solid var(--primary-hover);
+    outline-offset: 2px;
+}
+
+/* products table styles removed (grid-only UI now) */
+
+/* ================================
+   WHITE BACKGROUND / PAGINATION
+   Table-specific UI removed: keep grid container and pagination layout minimal.
+   The detailed table and modal styles were moved into the AJAX partials
+   (if any) or intentionally removed to avoid duplication.
+=================================== */
+
+/* Keep a lightweight container for the products grid */
+.table-container {
+    background: var(--background-white);
+    border-radius: 20px;
+    padding: 22px;
+    box-shadow: var(--admin-shadow-soft);
+    border: 1px solid var(--admin-border);
+    margin-top: 12px;
+}
+.table-container h2 { margin: 0 0 12px 0; font-size: 1.05rem; color: var(--admin-text-primary); font-weight: 700; }
+.table-container .products-grid { margin-top: 0; }
+
+/* Simple pagination layout (keeps responsive behaviour) */
+.table-pagination { display:flex; justify-content:space-between; align-items:center; margin-top:16px; flex-wrap:wrap; gap:12px; }
+.entries-info { font-size:0.9rem; color:#6b7280; }
+.pagination-links { display:flex; gap:6px; }
+.page-link { padding:6px 10px; border:1px solid #d1d5db; border-radius:6px; background:#fff; cursor:pointer; font-size:0.9rem; transition: background .2s; }
+.page-link:hover { background:#f3f4f6; }
+.page-link:focus { outline:2px solid var(--primary-hover); outline-offset:2px; }
+.page-link.active { background:var(--primary-color); color:#fff; border-color:var(--primary-color); }
+
+/* ================================
+   LOADING SPINNER
+================================== */
+.loading { opacity: 0.6; pointer-events: none; }
+.spinner {
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid var(--primary-color);
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+/* ================================
+   RESPONSIVE / IMPROVEMENTS
+   Ensure the product admin layout resizes nicely
+=================================== */
+
+/* make container adapt to viewport while keeping comfortable margins */
+.dashboard-container {
+    max-width: 1500px;
+    width: calc(100% - 48px);
+    padding: 20px 24px;
+    box-sizing: border-box;
+}
+
+/* Remove table-specific styles; keep responsive helpers for grid/cards */
+@media (max-width: 1024px) {
+    .dashboard-container { padding: 16px; }
+    .admin-page-shell { padding: 24px; }
+    .floating-buttons { min-width: 150px; }
+}
+
+@media (max-width: 768px) {
+    .dashboard-container { width: calc(100% - 32px); padding: 12px; }
+    .admin-page-shell { padding: 20px; width: calc(100% - 36px); }
+    .search-and-add { justify-content: space-between; align-items: center; }
+    .filter-group select { padding: 6px; }
+    .summary-card { padding: 16px 18px; }
+    .giveaways-container { padding: 18px; }
+}
+
+@media (max-width: 520px) {
+    .product-card { border-radius: 8px; }
+    .product-card-media { height: 120px; }
+    .table-pagination { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .filter-buttons { width: 100%; }
+    .filter-btn { flex: 1 1 auto; text-align: center; }
+    .admin-page-shell { padding: 18px; width: 100%; }
+}
+
+/* ================================
+   PRODUCTS GRID / CARD LAYOUT
+=================================== */
+.products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+    margin-top: 12px;
+}
+
+.giveaways-container {
+    margin-top: 28px;
+    background: var(--background-white);
+    border-radius: 14px;
+    padding: 22px;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(2,6,23,0.05);
+}
+
+.giveaways-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 18px;
+}
+
+.giveaways-header h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.giveaways-subtitle {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.giveaways-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+.product-card {
+    display: flex;
+    flex-direction: column;
+    background: var(--background-white);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 6px 14px rgba(16,24,40,0.04);
+    transition: transform .12s ease, box-shadow .12s ease;
+}
+.product-card:hover { transform: translateY(-6px); box-shadow: 0 12px 30px rgba(16,24,40,0.08); }
+.product-card-media { width: 100%; height: 140px; background: #f3f4f6; display:flex; align-items:center; justify-content:center; }
+.product-card-thumb { width:100%; height:100%; object-fit:cover; }
+.product-card-body { padding: 12px; }
+.product-card-title { margin:0; font-size:1rem; font-weight:700; }
+.product-card-desc { margin:6px 0 0; color:var(--text-secondary); font-size:0.85rem; }
+.product-card-meta { margin-top:8px; color:var(--text-secondary); font-size:0.85rem; display:flex; gap:8px; align-items:center; }
+.product-card-footer { padding: 10px 12px; display:flex; gap:8px; align-items:center; justify-content:space-between; border-top:1px solid #eef2f6; }
+.card-actions { display:flex; gap:6px; align-items:center; }
+.btn-upload { background: var(--primary-color); color:#fff; border:none; padding:6px 8px; border-radius:6px; cursor:pointer; }
+.no-products { padding: 16px; color: var(--text-secondary); }
+
+/* Hide the inline status text/dot in grid cards (the modal keeps its own badge) */
+.product-card .status-wrap { display: none; }
+
+/* ================================
+   GRID CARD BUTTONS
+   Styles for view / edit / upload / delete controls inside product cards
+=================================== */
+.product-card .card-actions a,
+.product-card .card-actions button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--primary-color);
+    font-weight: 600;
+    font-size: 0.92rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.14s ease, transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.product-card .card-actions i { font-size: 1.05rem; }
+
+/* primary filled action (upload) already uses primary background; make it slightly larger */
+.product-card .card-actions .btn-upload {
+    padding: 7px 10px;
+    border-radius: 8px;
+    box-shadow: 0 6px 12px rgba(14,46,120,0.06);
+}
+
+/* edit link (neutral) */
+.product-card .card-actions .btn-update {
+    background: #fff;
+    border: 1px solid var(--border-color);
+    color: #374151; /* darker text for neutrality */
+    padding: 6px 8px;
+}
+
+/* view button: subtle primary-outline */
+.product-card .card-actions .btn-view {
+    background: transparent;
+    border: 1px solid rgba(148,185,255,0.18);
+    color: var(--primary-color);
+}
+
+/* delete button: warn style */
+.product-card .card-actions .ajax-delete,
+.product-card .card-actions .btn-delete {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--red);
+}
+
+/* Hover / focus states */
+.product-card .card-actions a:hover,
+.product-card .card-actions button:hover {
+    transform: translateY(-1px);
+}
+.product-card .card-actions a:focus,
+.product-card .card-actions button:focus {
+    outline: 3px solid rgba(148,185,255,0.18);
+    outline-offset: 2px;
+}
+
+/* delete hover - gentle red background */
+.product-card .card-actions .ajax-delete:hover,
+.product-card .card-actions .btn-delete:hover {
+    background: rgba(220,53,69,0.06);
+}
+
+/* small screens: slightly reduce padding to keep layout tight */
+@media (max-width: 520px) {
+    .product-card .card-actions a,
+    .product-card .card-actions button { padding: 6px; font-size: 0.88rem; }
+}
+
+/* NOTE: Modal styles are kept in the AJAX partials (e.g. view.blade.php) where needed
+    to avoid duplication and ensure the injected panel carries its own styling. */
+
+/* Enter/Exit animations for modal */
+.modal-enter { animation: modalIn .22s cubic-bezier(.2,.9,.2,1) forwards; }
+.modal-exit { animation: modalOut .18s cubic-bezier(.4,.0,.2,1) forwards; }
+@keyframes modalIn {
+    from { opacity: 0; transform: translateY(8px) scale(.995); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes modalOut {
+    from { opacity: 1; transform: translateY(0) scale(1); }
+    to   { opacity: 0; transform: translateY(6px) scale(.995); }
+}
+
+/* Card removal animation */
+.card-removing { animation: cardRemove .28s ease forwards; }
+@keyframes cardRemove {
+    0% { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-12px) scale(.98); height:0; margin:0; padding:0; }
+}
+
+/* Accessibility helper: prevent background scroll when modal open */
+body.modal-open { overflow: hidden; }
+
+/* Accessibility: ensure focus outlines remain visible on small screens */
+.btn-add-new:focus, .page-link:focus, .filter-group select:focus { outline: 3px solid rgba(148,185,255,0.28); }
+
+/* ================================
+   FILTER BUTTONS / POPUP
+   Clean minimal styles for the filter icon and popup buttons
+=================================== */
+
+/* filter icon (the small funnel button next to search) */
+.filter-icon {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--primary-color);
+    padding: 8px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background .12s ease, box-shadow .12s ease, transform .08s ease;
+    line-height: 0;
+}
+.filter-icon:hover { background: rgba(148,185,255,0.06); box-shadow: 0 4px 10px rgba(16,24,40,0.04); transform: translateY(-1px); }
+.filter-icon:focus { outline: 2px solid var(--primary-hover); outline-offset: 2px; }
+
+/* popup wrapper (override inline minimal positioning styles) */
+.filter-popup { background: var(--background-white); border: 1px solid var(--border-color); border-radius: 10px; padding: 8px; box-shadow: 0 8px 24px rgba(16,24,40,0.06); min-width: 160px; display: none; }
+.filter-popup[aria-hidden="false"] { display: block; }
+
+/* individual filter options inside the popup */
+.btn-filter-option { background: transparent; border: 1px solid transparent; color: var(--text-secondary); padding: 8px 10px; border-radius: 8px; width: 100%; text-align: left; font-weight: 600; cursor: pointer; transition: background .12s, color .12s, border-color .12s; display: inline-block; }
+.btn-filter-option + .btn-filter-option { margin-left: 6px; }
+.filter-popup .btn-filter-option:hover, .filter-popup .btn-filter-option:focus { background: rgba(148,185,255,0.06); color: var(--primary-color); border-color: rgba(148,185,255,0.12); outline: none; }
+.btn-filter-option.active { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+
+@media (max-width: 520px) {
+    .filter-popup { right: 6px; left: 6px; top: calc(100% + 8px); min-width: auto; }
+    .btn-filter-option + .btn-filter-option { margin-left: 0; margin-top: 6px; display: block; }
+}
+
+
+/* ================================
+   TABLE CONTROLS
+================================== */
+.table-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-color); }
+
+.controls-left {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 200px;
+}
+
+.controls-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.search-bar-wrapper {
+    width: 100%;
+    max-width: 300px;
+}
+
+.search-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.search-input {
+    width: 100%;
+    padding: 8px 35px 8px 35px; /* Space for icons */
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    color: var(--primary-color);
+}
+
+.search-icon {
+    position: absolute;
+    left: 10px;
+    color: var(--primary-color);
+}
+
+.filter-icon {
+    position: absolute;
+    right: 10px;
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    cursor: pointer;
+}
+
+.sort-group {
+    display: flex;
+    gap: 4px;
+}
+
+.filter-group select {
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    color: var(--primary-color);
+    background: var(--background-white);
+}
+
+/* ================================
+   MATERIALS AND INKS TABLE
+================================== */
+.materials-table, .inks-table { width: 100%; border-collapse: collapse; margin-top: 2rem; font-size: 14px; }
+.materials-table th, .materials-table td, .inks-table th, .inks-table td { border: 1px solid #e0e7ef; padding: 8px 10px; text-align: left; }
+.materials-table th, .inks-table th { background: #f5f7fa; }
+
+/* ================================
+   RESPONSIVENESS
+================================== */
+@media (max-width: 768px) {
+    .summary-cards {
+        grid-template-columns: 1fr;
+    }
+    .table-container {
+        overflow-x: auto; /* Allow horizontal scroll for table */
+    }
+}
+
+
+

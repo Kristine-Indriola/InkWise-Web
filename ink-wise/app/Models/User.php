@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     use HasFactory, Notifiable;
 
@@ -15,6 +16,7 @@ class User extends Authenticatable
     protected $keyType = 'int';
 
     protected $fillable = [
+        'name',
         'email',
         'password',
         'role',
@@ -25,6 +27,17 @@ class User extends Authenticatable
         'password',
         'remember_token',
     ];
+
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+    ];
+
+    public function getIdAttribute(): ?int
+    {
+        $keyName = $this->getKeyName();
+
+        return $this->getAttribute($keyName);
+    }
 
     // Relationships
     public function staff()
@@ -41,4 +54,10 @@ class User extends Authenticatable
     {
         return $this->hasOne(Address::class, 'user_id', 'user_id');
     }
+
+   public function verification()
+{
+    return $this->hasOne(UserVerification::class, 'user_id');
+}
+
 }

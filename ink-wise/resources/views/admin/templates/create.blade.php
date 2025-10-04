@@ -3,120 +3,134 @@
 @section('title', 'Create New Template')
 
 @push('styles')
-<link rel="stylesheet" href="{{ asset('css/admin-css/template.css') }}">
-<style>
-    .create-container {
-        background: white;
-        border-radius: 16px;
-        padding: 2rem;
-        box-shadow: 0 2px 8px #06b6d420;
-    }
-    .create-form label {
-        color: black;
-        font-weight: 600;
-    }
-    .create-form input[type="text"],
-    .create-form textarea,
-    .create-form select {
-        border: 1px solid black;
-        border-radius: 8px;
-        padding: 0.5rem;
-        background: #fff;
-        color: black;
-    }
-    .btn-submit {
-        background: #06b6d4;
-        color: #fff;
-        border: none;
-    }
-    .btn-cancel {
-        background: #e0f7fa;
-        color: #0891b2;
-        border: 1px solid #06b6d4;
-    }
-    .btn-submit:hover, .btn-cancel:hover {
-        opacity: 0.9;
-    }
-</style>
+    <link rel="stylesheet" href="{{ asset('css/admin-css/template/template.css') }}">
 @endpush
 
 @push('scripts')
-<script src="{{ asset('js/admin/template.js') }}"></script>
+    <script src="{{ asset('js/admin/template/template.js') }}" defer></script>
 @endpush
 
 @section('content')
-<div class="create-container">
-    <h2>Create New Template</h2>
-    <p class="create-subtitle">Fill in the details to create a new invitation template</p>
+<main class="dashboard-container templates-page" role="main">
+    <section class="create-container" aria-labelledby="create-template-heading">
+        <div>
+            <h2 id="create-template-heading">Create New Template</h2>
+            <p class="create-subtitle">Fill in the details to craft a new invitation template</p>
+        </div>
 
-    <form action="{{ route('admin.templates.store') }}" method="POST" class="create-form">
-        @csrf
+        <form action="{{ route('admin.templates.store') }}" method="POST" class="create-form" enctype="multipart/form-data">
+            @csrf
 
-        <!-- Name + Category -->
-        <div class="create-row">
-            <div class="create-group flex-1">
-                <label for="name">Template Name</label>
-                <input type="text" id="name" name="name" placeholder="Enter template name" required>
+            <input type="hidden" name="design" id="design" value="{}">
+
+            <div class="create-row">
+                <div class="create-group flex-1">
+                    <label for="name">Template Name</label>
+                    <input type="text" id="name" name="name" placeholder="Enter template name" required>
+                </div>
+                <div class="create-group flex-1">
+                    <label for="event_type">Event Type</label>
+                    <select id="event_type" name="event_type">
+                        <option value="">Select event type</option>
+                        <option value="Wedding">Wedding</option>
+                        <option value="Birthday">Birthday</option>
+                        <option value="Baptism">Baptism</option>
+                        <option value="Corporate">Corporate</option>
+                    </select>
+                </div>
             </div>
-            <div class="create-group flex-1">
-                <label for="category">Category</label>
-                <select id="category" name="category">
-                    <option value="">Select category</option>
-                    <option value="Wedding">Wedding</option>
-                    <option value="Birthday">Birthday</option>
-                    <option value="Baptism">Baptism</option>
-                    <option value="Corporate">Corporate</option>
-                </select>
+
+            <div class="create-row">
+                <div class="create-group flex-1">
+                    <label for="product_type">Product Type</label>
+                    <select id="product_type" name="product_type" required>
+                        <option value="">Select product type</option>
+                        <option value="Invitation">Invitation</option>
+                        <option value="Giveaway">Giveaway</option>
+                    </select>
+                </div>
+                <div class="create-group flex-1">
+                    <label for="theme_style">Theme/Style</label>
+                    <input type="text" id="theme_style" name="theme_style" placeholder="e.g. Minimalist, Floral">
+                </div>
             </div>
-        </div>
 
-        <!-- Description -->
-        <div class="create-group">
-            <label for="description">Design Description</label>
-            <textarea id="description" name="description" rows="4" placeholder="Describe the template design, style, and intended use..."></textarea>
-        </div>
-
-        <!-- Paper Type + Trim Type -->
-        <div class="create-row">
-            <div class="create-group flex-1">
-                <label for="paper_type">Type of Paper</label>
-                <select id="paper_type" name="paper_type" required>
-                    <option value="">Select paper type</option>
-                    <option value="Matte">Matte</option>
-                    <option value="Glossy">Glossy</option>
-                    <option value="Linen">Linen</option>
-                    <option value="Pearl">Pearl</option>
-                    <option value="Recycled">Recycled</option>
-                </select>
+            <div class="create-group">
+                <label for="description">Design Description</label>
+                <textarea id="description" name="description" rows="4" placeholder="Describe the template design, style, and intended use..."></textarea>
             </div>
-            <div class="create-group flex-1">
-                <label for="trim_type">Type of Trim</label>
-                <select id="trim_type" name="trim_type" required>
-                    <option value="">Select trim type</option>
-                    <option value="Square">Square</option>
-                    <option value="Rounded">Rounded</option>
-                    <option value="Scalloped">Scalloped</option>
-                    <option value="Ticket">Ticket</option>
-                </select>
+
+            <div class="create-row">
+                <div class="create-group flex-1">
+                    <label for="custom_front_image">Front Image *</label>
+                    <input type="file" id="custom_front_image" name="front_image" accept="image/*" required>
+                </div>
+                <div class="create-group flex-1">
+                    <label for="custom_back_image">Back Image *</label>
+                    <input type="file" id="custom_back_image" name="back_image" accept="image/*" required>
+                </div>
             </div>
-        </div>
 
-        <!-- Size -->
-        <div class="create-group flex-1">
-            <label for="size">Template Size</label>
-            <select id="size" name="size">
-                <option value="5x7">Standard (5x7)</option>
-                <option value="4x6">Postcard (4x6)</option>
-                <option value="A5">A5 (148 × 210 mm)</option>
-            </select>
-        </div>
-
-        <!-- Actions -->
-        <div class="create-actions">
-            <a href="{{ route('admin.templates.index') }}" class="btn-cancel">Cancel</a>
-            <button type="submit" class="btn-submit">Create & Edit Template</button>
-        </div>
-
-    </form>
-</div>
+            <div class="create-actions">
+                <a href="{{ route('admin.templates.index') }}" class="btn-cancel">Cancel</a>
+                <button type="submit" class="btn-submit">Create &amp; Edit Template</button>
+            </div>
+        </form>
+    </section>
+</main>
 @endsection
+
+        @push('scripts')
+        <script>
+            // Helper to read CSRF token from meta or hidden input
+            function getCsrfToken() {
+                const meta = document.querySelector('meta[name="csrf-token"]');
+                if (meta && meta.getAttribute) {
+                    const v = meta.getAttribute('content');
+                    if (v) return v;
+                }
+                const hidden = document.querySelector('input[name="_token"]');
+                return hidden ? hidden.value : '';
+            }
+
+            document.querySelector('.create-form').addEventListener('submit', function(e) {
+                // Use default submit only if JS disabled; otherwise handle via fetch
+                e.preventDefault();
+
+                const form = e.target;
+                const formData = new FormData(form);
+
+                // Basic validation
+                if (!formData.get('name') || !formData.get('front_image') || !formData.get('back_image')) {
+                    alert('Please provide a name and both front/back images.');
+                    return;
+                }
+
+                fetch(form.getAttribute('action'), {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': getCsrfToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: formData
+                }).then(async res => {
+                    if (!res.ok) {
+                        const txt = await res.text();
+                        throw new Error(txt || 'Upload failed');
+                    }
+                    return res.json();
+                }).then(json => {
+                    if (json && json.success) {
+                        alert('Template uploaded successfully. Redirecting to templates list.');
+                        window.location = '{{ route('admin.templates.index') }}';
+                    } else {
+                        alert('Upload succeeded but server response unexpected.');
+                    }
+                }).catch(err => {
+                    console.error(err);
+                    alert('Upload failed: ' + (err.message || 'Unknown'));
+                });
+            });
+        </script>
+        @endpush
+

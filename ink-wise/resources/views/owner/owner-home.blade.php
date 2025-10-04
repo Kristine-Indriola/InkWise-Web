@@ -2,66 +2,45 @@
 
 @section('content')
 
-
 @include('layouts.owner.sidebar')
 
 
-
-<section class="main-content">
-  <div class="topbar">
-    <div class="welcome-text"><strong>Welcome, Owner!</strong></div>
-    <div class="topbar-actions">
-      <button type="button" class="icon-btn" aria-label="Notifications">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
-             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M15 17H9a4 4 0 0 1-4-4V9a7 7 0 1 1 14 0v4a4 4 0 0 1-4 4z"/>
-          <path d="M10 21a2 2 0 0 0 4 0"/>
-        </svg>
-        <span class="badge">2</span> 
-      </button>
-
-      <form method="POST" action="{{ route('logout') }}">
-        @csrf
-        <button type="submit" class="logout-btn">
-          Logout
-        </button>
-      </form>
-    </div>
-  </div>
-
-  <!-- Stat Cards Section -->
+  <section class="main-content">
+    
   <div class="cards">
-    <!-- Total Sales Card -->
     <div class="card">
-      <div class="stat-icon icon-sales">
-        <svg viewBox="0 0 24 24">
-          <path d="M3 3v18h18"/>
-          <path d="M7 15l4-4 3 3 5-5"/>
+      <div class="stat-icon icon-orders" aria-hidden="true">
+        <!-- shopping bag icon -->
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true">
+          <path d="M6 2l1.5 3h9L18 2"></path>
+          <path d="M3 6h18v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6z"></path>
+          <path d="M16 10a4 4 0 0 0-8 0"></path>
         </svg>
       </div>
-      <h3>Total Sales</h3>
-      <p>$12,340</p>
+      <h3>New Orders</h3>
+      <p>5 Orders</p>
     </div>
 
     <!-- Low Stock Card -->
-<a href="{{ route('owner.inventory-track', ['status' => 'low']) }}" style="text-decoration:none; color:inherit;">
-  <div class="card">
-    <div class="stat-icon icon-stock">
-      <svg viewBox="0 0 24 24">
-        <path d="M3 7l9 4 9-4-9-4-9 4z"/>
-        <path d="M3 7v6l9 4 9-4V7"/>
-        <path d="M12 11v6"/>
-      </svg>
-    </div>
-    <h3>Low Stock</h3>
-    <p>
-  {{ \App\Models\Material::whereHas('inventory', function($q) {
-        $q->whereColumn('stock_level', '<=', 'reorder_level')
-          ->where('stock_level', '>', 0);
-    })->count() }} Items
-</p>
-  </div>
-</a>
+    <a href="{{ route('owner.inventory-track', ['status' => 'low']) }}" style="text-decoration:none; color:inherit;">
+      <div class="card">
+        <div class="stat-icon icon-stock">
+          <svg viewBox="0 0 24 24">
+            <path d="M3 7l9 4 9-4-9-4-9 4z"/>
+            <path d="M3 7v6l9 4 9-4V7"/>
+            <path d="M12 11v6"/>
+          </svg>
+        </div>
+        <h3>Low Stock Materials</h3>
+        <p>
+          {{ \App\Models\Material::whereHas('inventory', function($q) {
+                $q->whereColumn('stock_level', '<=', 'reorder_level')
+                  ->where('stock_level', '>', 0);
+            })->count() }} Items
+        </p>
+      </div>
+    </a>
+
 
     <!-- Pending Orders Card -->
     <div class="card">
@@ -73,8 +52,39 @@
           <path d="M16 3c0 4-8 4-8 8s8 4 8 8"/>
         </svg>
       </div>
-      <h3>Pending</h3>
+      <h3>Pending Orders</h3>
       <p>8 Orders</p>
+    </div>
+
+    <!-- Revenue Growth Card -->
+    <div class="card">
+      <div class="stat-icon" style="background:#fff6ef;border:1px solid #fde8d6;">
+        <!-- small chart icon -->
+        <svg viewBox="0 0 24 24" style="stroke:#f59e0b;">
+          <path d="M3 3v18h18"/>
+          <path d="M6 15l4-4 3 3 5-5"/>
+        </svg>
+      </div>
+      <h3>Revenue Growth</h3>
+      <p style="color:#16a34a;">
+        {{-- replace with a computed value, fallback shown below --}}
+        {{ $revenueGrowth ?? '+12.4% vs last period' }}
+      </p>
+    </div>
+
+    <!-- New Customer Logins Card -->
+    <div class="card">
+      <div class="stat-icon" style="background:#eef7ff;border:1px solid #dbeefe;">
+        <svg viewBox="0 0 24 24" style="stroke:#3b82f6;">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+      </div>
+      <h3>New Customer Logins</h3>
+      <p>
+        {{-- shows new user registrations in the last 7 days as a simple proxy --}}
+        {{ \App\Models\User::where('created_at', '>=', now()->subDays(7))->count() ?? 0 }} in 7d
+      </p>
     </div>
   </div>
 

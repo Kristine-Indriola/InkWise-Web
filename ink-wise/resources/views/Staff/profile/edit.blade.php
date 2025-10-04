@@ -1,34 +1,111 @@
 
 @extends('layouts.staffapp')
 
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/staff-css/profile.css') }}">
+@endpush
+
 @section('content')
-<div class="max-w-lg mx-auto mt-10 bg-white p-8 rounded shadow">
-    <h2 class="text-2xl font-bold mb-6">Edit Profile</h2>
-    @if(session('success'))
-        <div class="mb-4 text-green-600">{{ session('success') }}</div>
-    @endif
-    <form method="POST" action="{{ route('staff.profile.update') }}" enctype="multipart/form-data">
-        @csrf
-         <div class="mb-4">
-            <label class="block mb-1 font-semibold">Profile Picture</label>
-            <input type="file" name="profile_pic" class="w-full border rounded px-3 py-2">
+@php
+    $abbr = '';
+    if (!empty($user->name)) {
+        $parts = preg_split('/\s+/', trim($user->name));
+        $first = $parts[0] ?? '';
+        $second = $parts[1] ?? '';
+        $abbr = strtoupper(substr($first, 0, 1) . ($second ? substr($second, 0, 1) : ''));
+    }
+    $position = $user->position ?? __('Staff Member');
+@endphp
+
+<main class="materials-page admin-page-shell profile-page" role="main">
+    <header class="page-header">
+        <div>
+            <h1 class="page-title">Staff Account</h1>
+            <p class="page-subtitle">Update your personal details to keep the InkWise records accurate.</p>
+        </div>
+        <div class="page-header__quick-actions">
+            <a href="{{ route('staff.dashboard') }}" class="pill-link" aria-label="Back to dashboard"><i class="fi fi-rr-house-chimney"></i>&nbsp;Dashboard</a>
+        </div>
+    </header>
+
+    <div class="profile-alert-stack" aria-live="polite">
+        @if(session('success'))
+            <div class="alert alert-success profile-success">✅ {{ session('success') }}</div>
+        @endif
+
+        @if ($errors->any())
+            <div class="alert alert-danger" role="alert">
+                <strong>We found a few things to fix:</strong>
+                <ul>
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+    </div>
+
+    <section class="profile-form-shell" aria-label="Edit staff profile">
+        <div class="profile-form-header">
+            <div class="profile-avatar-frame" aria-hidden="true">
+                @if($user->profile_pic)
+                    <img src="@imageUrl($user->profile_pic)" alt="{{ $user->name }} profile photo">
+                @else
+                    <span>{{ $abbr ?: 'ST' }}</span>
+                @endif
+            </div>
+            <div class="profile-form-header__details">
+                <h2>{{ $user->name ?? 'Staff Member' }}</h2>
+                <p>{{ $position }}</p>
+            </div>
+        </div>
+
+        <form method="POST" action="{{ route('staff.profile.update') }}" enctype="multipart/form-data" id="staffProfileForm" class="profile-form">
+            @csrf
+            <div class="profile-form-grid">
+                <div class="profile-field">
+                    <label for="profileName">Full Name</label>
+                    <input id="profileName" type="text" name="name" value="{{ old('name', $user->name ?? '') }}" class="profile-input" required>
+                </div>
+                <div class="profile-field">
+                    <label for="profileEmail">Email</label>
+                    <input id="profileEmail" type="email" name="email" value="{{ old('email', $user->email ?? '') }}" class="profile-input" required>
+                </div>
+                <div class="profile-field">
+                    <label for="profilePhone">Phone</label>
+                    <input id="profilePhone" type="text" name="phone" value="{{ old('phone', $user->phone ?? '') }}" class="profile-input" placeholder="e.g. 09XX-XXX-XXXX">
+                </div>
+                <div class="profile-field">
+                    <label for="profilePosition">Position</label>
+                    <input id="profilePosition" type="text" name="position" value="{{ old('position', $user->position ?? '') }}" class="profile-input" placeholder="Graphic Artist, Coordinator, ...">
+                </div>
+                <div class="profile-field">
+                    <label for="profileAddress">Address</label>
+                    <input id="profileAddress" type="text" name="address" value="{{ old('address', $user->address ?? '') }}" class="profile-input" placeholder="City / Province">
+                </div>
+                <div class="profile-field">
+                    <label for="profilePicInput">Profile Picture</label>
+                    <input id="profilePicInput" type="file" name="profile_pic" class="profile-input">
+                    <p class="profile-avatar-upload-hint">PNG, JPG or GIF up to 5MB.</p>
+                </div>
+            </div>
+
             @if($user->profile_pic)
-                <img src="{{ asset('storage/' . $user->profile_pic) }}" alt="Profile Picture" class="mt-2 w-24 h-24 rounded-full object-cover">
+                <div class="profile-current-photo">
+                    <span class="profile-current-photo__label">Current photo</span>
+                    <div class="profile-current-photo__preview">
+                        <img src="@imageUrl($user->profile_pic)" alt="Current profile" class="profile-current-photo__img">
+                        <span class="profile-current-photo__meta">Last updated {{ optional($user->updated_at)->diffForHumans() }}</span>
+                    </div>
+                </div>
             @endif
-        </div>
-        <div class="mb-4">
-            <label class="block mb-1 font-semibold">Name</label>
-            <input type="text" name="name" value="{{ old('name', $user->name ?? '') }}" class="w-full border rounded px-3 py-2" required>
-        </div>
-        <div class="mb-4">
-            <label class="block mb-1 font-semibold">Email</label>
-            <input type="email" name="email" value="{{ old('email', $user->email ?? '') }}" class="w-full border rounded px-3 py-2" required>
-        </div>
-        <div class="mb-4">
-            <label class="block mb-1 font-semibold">Phone</label>
-            <input type="text" name="phone" value="{{ old('phone', $user->phone ?? '') }}" class="w-full border rounded px-3 py-2">
-        </div>
-        <button type="submit" class="bg-purple-600 text-white px-4 py-2 rounded">Update Profile</button>
-    </form>
-</div>
+
+            <div class="profile-form-actions">
+                <a href="{{ route('staff.dashboard') }}" class="profile-cancel">Cancel</a>
+                <button type="submit" class="profile-btn">Save Changes</button>
+            </div>
+        </form>
+    </section>
+</main>
 @endsection

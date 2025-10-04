@@ -1,0 +1,411 @@
+/* ==============================
+   Invitation Templates Styles
+   ============================== */
+
+:root {
+  --templates-font: 'Poppins', 'Nunito', sans-serif;
+  --templates-accent: #94b9ff;
+  --templates-accent-strong: #5a8de0;
+  --templates-accent-soft: rgba(148, 185, 255, 0.18);
+  --templates-text: #0f172a;
+  --templates-muted: #6b7280;
+  --templates-surface: #ffffff;
+  --templates-surface-muted: #f9fafb;
+  --templates-border: rgba(148, 185, 255, 0.28);
+  --templates-shadow-soft: 0 18px 36px rgba(15, 23, 42, 0.08);
+  --templates-shadow-hover: 0 24px 48px rgba(15, 23, 42, 0.12);
+}
+
+.templates-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  font-family: var(--templates-font);
+  color: var(--templates-text);
+}
+
+.templates-container {
+  background: var(--templates-surface);
+  padding: 24px 28px;
+  border-radius: 20px;
+  border: 1px solid var(--templates-border);
+  box-shadow: var(--templates-shadow-soft);
+}
+
+.templates-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.templates-header h2 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
+.templates-header p {
+  font-size: 0.95rem;
+  color: var(--templates-muted);
+  margin: 0;
+}
+
+.btn-create {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: var(--templates-accent);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 12px 26px rgba(148, 185, 255, 0.32);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.btn-create:hover {
+  background: var(--templates-accent-strong);
+  transform: translateY(-2px);
+}
+
+.btn-create:focus-visible {
+  outline: 2px solid rgba(148, 185, 255, 0.55);
+  outline-offset: 3px;
+}
+
+.templates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.template-card {
+  background: var(--templates-surface);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: var(--templates-shadow-soft);
+  border: 1px solid var(--templates-border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.template-card:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--templates-shadow-hover);
+}
+
+.template-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #f8faff, #eef2ff);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.template-preview img {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: 12px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+}
+
+.template-info {
+  text-align: center;
+  display: grid;
+  gap: 6px;
+  color: var(--templates-text);
+}
+
+.template-info h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.template-info p {
+  font-size: 0.9rem;
+  color: var(--templates-muted);
+  margin: 0;
+}
+
+.template-info p.description,
+.template-info p:nth-of-type(3) {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 2.7em;
+}
+
+.template-info small {
+  color: rgba(15, 23, 42, 0.5);
+  font-size: 0.78rem;
+}
+
+.template-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.template-actions form {
+  margin: 0;
+}
+
+.template-actions .btn,
+.template-actions .btn-edit,
+.template-actions .btn-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--templates-border);
+  background: rgba(148, 185, 255, 0.12);
+  color: var(--templates-text);
+  font-weight: 600;
+  font-size: 0.88rem;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  cursor: pointer;
+}
+
+.template-actions .btn-edit,
+.template-actions .btn {
+  color: var(--templates-text);
+}
+
+.template-actions .btn-delete {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+  border-color: rgba(239, 68, 68, 0.24);
+}
+
+.template-actions a.btn.btn-upload {
+  background: var(--templates-accent);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 10px 20px rgba(148, 185, 255, 0.28);
+}
+
+.template-actions .btn:hover,
+.template-actions .btn-edit:hover,
+.template-actions .btn-delete:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+}
+
+.no-templates {
+  font-style: italic;
+  color: var(--templates-muted);
+  text-align: center;
+}
+
+.mt-gap {
+  margin-top: 28px;
+}
+
+/* -------- Create Page Section -------- */
+.create-container {
+  background: var(--templates-surface);
+  padding: 32px 36px;
+  border-radius: 20px;
+  border: 1px solid var(--templates-border);
+  box-shadow: var(--templates-shadow-soft);
+  max-width: 880px;
+  margin: 0 auto;
+  display: grid;
+  gap: 20px;
+}
+
+.create-container h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.create-subtitle {
+  margin: 0;
+  color: var(--templates-muted);
+  font-size: 0.95rem;
+}
+
+.create-form {
+  display: grid;
+  gap: 18px;
+}
+
+.create-row {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.flex-1 { flex: 1 1 240px; }
+
+.create-group {
+  display: grid;
+  gap: 8px;
+}
+
+.create-group label {
+  font-weight: 600;
+  color: var(--templates-text);
+}
+
+.create-group input,
+.create-group select,
+.create-group textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--templates-border);
+  background: var(--templates-surface-muted);
+  color: var(--templates-text);
+  font-size: 0.95rem;
+  outline: none;
+  transition: border 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.create-group input:focus,
+.create-group select:focus,
+.create-group textarea:focus {
+  border-color: var(--templates-accent);
+  box-shadow: 0 0 0 3px rgba(148, 185, 255, 0.25);
+  background: #fff;
+}
+
+.create-group textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.create-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.btn-cancel,
+.btn-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.btn-cancel {
+  background: rgba(148, 185, 255, 0.12);
+  color: var(--templates-accent-strong);
+  border-color: var(--templates-border);
+}
+
+.btn-cancel:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 22px rgba(15, 23, 42, 0.08);
+}
+
+.btn-submit {
+  background: var(--templates-accent);
+  color: #fff;
+  box-shadow: 0 16px 32px rgba(148, 185, 255, 0.28);
+}
+
+.btn-submit:hover {
+  background: var(--templates-accent-strong);
+  transform: translateY(-1px);
+}
+
+.btn-cancel:focus-visible,
+.btn-submit:focus-visible {
+  outline: 2px solid rgba(148, 185, 255, 0.55);
+  outline-offset: 3px;
+}
+
+.templates-page .alert {
+  border-radius: 16px;
+  border: 1px solid var(--templates-border);
+  background: rgba(148, 185, 255, 0.18);
+  color: var(--templates-text);
+  padding: 12px 16px;
+  font-weight: 500;
+}
+
+#previewModal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(15, 23, 42, 0.7);
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+#previewModal.is-visible {
+  display: flex;
+}
+
+#closePreview {
+  position: absolute;
+  top: 32px;
+  right: 36px;
+  font-size: 2.6rem;
+  color: #fff;
+  cursor: pointer;
+  line-height: 1;
+}
+
+#modalImg {
+  max-width: min(960px, 90vw);
+  max-height: min(620px, 80vh);
+  border-radius: 16px;
+  box-shadow: 0 28px 60px rgba(15, 23, 42, 0.35);
+}
+
+@media (max-width: 768px) {
+  .templates-container {
+    padding: 20px;
+  }
+
+  .create-container {
+    padding: 24px;
+  }
+
+  .templates-header h2 {
+    font-size: 1.4rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .btn-create {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .create-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .btn-cancel,
+  .btn-submit {
+    width: 100%;
+  }
+}

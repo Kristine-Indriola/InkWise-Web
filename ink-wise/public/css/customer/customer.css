@@ -32,6 +32,7 @@
   animation: oceanFade 6s ease-in-out infinite;
 }
 
+
 /* Dropdown Animation */
 @keyframes drop {
   from { opacity: 0; transform: translateY(-4px); }
@@ -42,7 +43,7 @@
 /* Global Styles */
 /* ---------------------------------- */
 html { scroll-behavior: smooth; }
-body { background: #fff; }
+body { background: #fff; padding-top: 64px; }
 
 /* Gradient Background Utility */
 .bg-inkwise-gradient {
@@ -119,6 +120,19 @@ body { background: #fff; }
   background: #f3f4f6;
 }
 
+/* --- Add or update for dropdown smooth hover --- */
+#userDropdownMenu {
+  transition: opacity 0.2s;
+  opacity: 0;
+  pointer-events: none;
+  display: block !important; /* override hidden from blade */
+}
+.group:hover #userDropdownMenu,
+.group:focus-within #userDropdownMenu {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 /* ---------------------------------- */
 /* Modal Styles */
 /* ---------------------------------- */
@@ -178,10 +192,11 @@ body { background: #fff; }
 
 /* Fixed navbar */
 header {
-  position: sticky;
+  position: fixed;
   top: 0;
   z-index: 50;
   background: white;
+  width: 100%;
 }
 
 /* ----------------------------- */
@@ -255,4 +270,20 @@ header {
 .gradient-yellow { background: linear-gradient(135deg, #fff6b7, #fdd819, #fceabb, #f8b500, #ffd700); 
 } 
 .gradient-orange { background: linear-gradient(135deg, #ff9a8b, #ff6a00, #ff9966, #ff5f6d, #ff512f); 
+}
+
+/* Zoom out the customer profile page a little bit */
+body {
+  zoom: 0.92; /* Slight zoom out for the whole page */
+}
+
+@media (max-width: 1024px) {
+  body {
+    zoom: 1; /* Reset zoom for tablets and below for better usability */
+  }
+}
+
+/* Optionally, adjust max-width for main content for a more zoomed-out look */
+.max-w-7xl {
+  max-width: 1280px !important;
 }
