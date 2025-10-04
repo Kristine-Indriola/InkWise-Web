@@ -94,7 +94,7 @@
                 </a>
             </li>
 
-            <!-- Added: Notify Customers -->
+            
             <li>
                 <a href="{{ route('staff.notify.customers') }}"
                    class="flex items-center p-2 rounded hover:bg-purple-200
@@ -257,5 +257,5 @@
 
   @yield('scripts')
   @stack('scripts')
-</body>
+  </body>
 </html>
