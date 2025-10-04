@@ -3,6 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="csrf-token" content="{{ csrf_token() }}">
 	<title>Giveaway Selection — InkWise</title>
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,8 +18,12 @@
 	@endphp
 	<main class="giveaways-shell"
 		  data-summary-url="{{ route('order.summary') }}"
-		  data-summary-api="{{ route('order.summary') }}"
-		  data-storage-key="inkwise-finalstep">
+		  data-summary-api="{{ route('order.summary.json') }}"
+		  data-options-url="{{ route('api.giveaways') }}"
+		  data-sync-url="{{ route('order.giveaways.store') }}"
+		  data-clear-url="{{ route('order.giveaways.clear') }}"
+		  data-storage-key="inkwise-finalstep"
+		  data-placeholder="{{ asset('images/no-image.png') }}">
 		<header class="giveaways-header">
 			<div class="giveaways-header__content">
 				<a href="{{ route('order.envelope') }}" class="giveaways-header__back" aria-label="Back to envelope options">
@@ -41,11 +46,12 @@
 								if (!($uploads instanceof \Illuminate\Support\Collection)) {
 									$uploads = collect($uploads);
 								}
-								$firstUpload = $uploads->first();
+								$imageUpload = $uploads->first(fn ($upload) => str_starts_with($upload->mime_type ?? '', 'image/'));
 
 								$previewSrc = null;
-								if ($firstUpload && str_starts_with($firstUpload->mime_type ?? '', 'image/')) {
-									$previewSrc = \Illuminate\Support\Facades\Storage::disk('public')->url('uploads/products/' . $product->id . '/' . $firstUpload->filename);
+								if ($imageUpload) {
+									$uploadPath = 'uploads/products/' . $product->id . '/' . $imageUpload->filename;
+									$previewSrc = \App\Support\ImageResolver::url($uploadPath);
 								}
 
 								if (!$previewSrc && $product->images) {
@@ -57,7 +63,16 @@
 								}
 
 								if (!$previewSrc && $product->image) {
-									$previewSrc = \App\Support\ImageResolver::url($product->image);
+									// Avoid accidental use of site logo or generic images as a product thumbnail
+									$blacklist = ['ink.png', 'logo.png', 'favicon.ico'];
+									$imgCandidate = $product->image;
+									$basename = basename((string) $imgCandidate);
+									if (!in_array(strtolower($basename), $blacklist, true)) {
+										$previewSrc = \App\Support\ImageResolver::url($imgCandidate);
+									} else {
+										// flagged as site asset; skip so we can search other sources
+										$previewSrc = null;
+									}
 								}
 
 								if (!$previewSrc && $product->template) {

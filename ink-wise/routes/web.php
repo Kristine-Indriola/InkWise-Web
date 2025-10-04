@@ -39,6 +39,7 @@ use App\Http\Controllers\Customer\CustomerController;
 
 use App\Http\Controllers\Owner\OwnerProductsController;
 use App\Http\Controllers\Staff\StaffCustomerController;
+use App\Http\Controllers\Staff\StaffOrderController;
 use App\Http\Controllers\Staff\StaffMaterialController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Owner\OwnerInventoryController;
@@ -52,6 +53,7 @@ use App\Models\Product;
 use App\Http\Controllers\Admin\UserPasswordResetController;
 use App\Models\User as AppUser;
 use Illuminate\Notifications\DatabaseNotification;
+use App\Http\Controllers\ProfileController;
 
 
 
@@ -434,10 +436,21 @@ Route::post('/order/cart/items', [OrderFlowController::class, 'storeDesignSelect
 /**Order Forms & Pages*/
 Route::get('/order/review', [OrderFlowController::class, 'review'])->name('order.review');
 Route::get('/order/finalstep', [OrderFlowController::class, 'finalStep'])->name('order.finalstep');
+Route::post('/order/finalstep/save', [OrderFlowController::class, 'saveFinalStep'])->name('order.finalstep.save');
 Route::get('/order/envelope', [OrderFlowController::class, 'envelope'])->name('order.envelope');
+Route::post('/order/envelope', [OrderFlowController::class, 'storeEnvelope'])->name('order.envelope.store');
+Route::delete('/order/envelope', [OrderFlowController::class, 'clearEnvelope'])->name('order.envelope.clear');
 Route::get('/order/summary', [OrderFlowController::class, 'summary'])->name('order.summary');
+Route::get('/order/summary.json', [OrderFlowController::class, 'summaryJson'])->name('order.summary.json');
+Route::delete('/order/summary', [OrderFlowController::class, 'clearSummary'])->name('order.summary.clear');
 Route::get('/order/giveaways', [OrderFlowController::class, 'giveaways'])->name('order.giveaways');
+Route::post('/order/giveaways', [OrderFlowController::class, 'storeGiveaway'])->name('order.giveaways.store');
+Route::delete('/order/giveaways', [OrderFlowController::class, 'clearGiveaway'])->name('order.giveaways.clear');
+Route::get('/api/envelopes', [OrderFlowController::class, 'envelopeOptions'])->name('api.envelopes');
 Route::get('/api/envelopes', [ProductController::class, 'getEnvelopes'])->name('api.envelopes');
+Route::get('/api/giveaways', [OrderFlowController::class, 'giveawayOptions'])->name('api.giveaways');
+// Temporary debug endpoint: lists resolved giveaway images (thumbnail + gallery)
+Route::get('/debug/giveaways-images', [\App\Http\Controllers\Customer\OrderFlowController::class, 'debugGiveawayImages'])->name('debug.giveaways.images');
 Route::get('/order/birthday', fn () => view('customer.templates.birthday'))->name('order.birthday');
 
 Route::get('/checkout', [OrderFlowController::class, 'checkout'])->name('customer.checkout');
@@ -526,9 +539,12 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
   
 
 Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
+    // Staff routes - updated for order list functionality
     Route::get('/dashboard', fn () => view('staff.dashboard'))->name('dashboard');
-    Route::get('/assigned-orders', fn () => view('staff.assigned_orders'))->name('assigned.orders');
-    Route::get('/order-list', fn () => view('staff.order_list'))->name('order.list');
+    Route::get('/assigned-orders', [StaffAssignedController::class, 'index'])->name('assigned.orders');
+    Route::get('/order-list', [StaffOrderController::class, 'index'])->name('order_list.index');
+    Route::get('/order-list/{id}', [StaffOrderController::class, 'show'])->name('order_list.show');
+    Route::put('/order-list/{id}', [StaffOrderController::class, 'update'])->name('order_list.update');
     Route::get('/notify-customers', fn () => view('staff.notify_customers'))->name('notify.customers');
     Route::get('/profile/edit', [StaffProfileController::class, 'edit'])->name('profile.edit');
     Route::post('/profile/update', [StaffProfileController::class, 'update'])->name('profile.update');
@@ -541,23 +557,19 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
         Route::post('/{message}/reply', [MessageController::class, 'replyToMessage'])->name('reply');
     });
 
-    // ✅ fixed: remove the extra "staff" in URL and name
-
-    Route::prefix('staff')->middleware(['auth'])->group(function () {
-    Route::get('assigned-orders', [StaffAssignedController::class, 'index'])->name('staff.assigned-orders');
-    Route::post('orders/{id}/confirm', [StaffAssignedController::class, 'confirm'])->name('staff.orders.confirm');
-    Route::post('orders/{id}/update-status', [StaffAssignedController::class, 'updateStatus'])->name('staff.orders.updateStatus');
-});
+    Route::post('/orders/{order}/confirm', [StaffAssignedController::class, 'confirm'])->name('orders.confirm');
+    Route::post('/orders/{order}/update-status', [StaffAssignedController::class, 'updateStatus'])->name('orders.updateStatus');
     Route::get('/customers', [StaffCustomerController::class, 'index'])
         ->name('customer_profile'); 
 
     Route::get('/materials/notification', [StaffMaterialController::class, 'notification'])
-     ->name('staff.materials.notification');
+     ->name('materials.notification');
 
         
 
     Route::prefix('inventory')->name('inventory.')->group(function () {
         Route::get('/', [StaffInventoryController::class, 'index'])->name('index');
+        Route::get('/{id}', [StaffInventoryController::class, 'show'])->name('show');
         Route::get('/create', [StaffInventoryController::class, 'create'])->name('create');
         Route::post('/', [StaffInventoryController::class, 'store'])->name('store');
         Route::get('/{id}/edit', [StaffInventoryController::class, 'edit'])->name('edit');
@@ -594,6 +606,12 @@ if (interface_exists('Laravel\\Socialite\\Contracts\\Factory')) {
 }
 
 Route::middleware('auth')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
+
+Route::middleware('auth')->group(function () {
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+});
 
 require __DIR__.'/auth.php';
 

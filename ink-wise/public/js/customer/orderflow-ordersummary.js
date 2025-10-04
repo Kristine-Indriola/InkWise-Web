@@ -7,6 +7,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const checkoutUrl = shell.dataset.checkoutUrl || '/checkout';
   const editUrl = shell.dataset.editUrl || '/order/final-step';
   const giveawaysUrl = shell.dataset.giveawaysUrl || '/order/giveaways';
+  const summaryUrl = shell.dataset.summaryUrl || '/order/summary';
+  const summaryApiUrl = shell.dataset.summaryApi || `${summaryUrl}.json`;
+  const summaryClearUrl = shell.dataset.summaryClearUrl || shell.dataset.orderClearUrl || '/order/summary';
+  const envelopeClearUrl = shell.dataset.envelopeClearUrl || '/order/envelope';
+  const giveawayClearUrl = shell.dataset.giveawayClearUrl || '/order/giveaways';
+  const envelopeStoreUrl = shell.dataset.envelopeStoreUrl || '/order/envelope';
+  const giveawayStoreUrl = shell.dataset.giveawayStoreUrl || '/order/giveaways';
+  const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
 
   const layout = shell.querySelector('[data-summary-wrapper]');
   const summaryGrid = shell.querySelector('[data-summary-grid]');
@@ -19,9 +27,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const previewNextBtn = shell.querySelector('[data-preview-next]');
   const previewNameEl = shell.querySelector('[data-preview-name]');
   const previewEditLink = shell.querySelector('[data-preview-edit]');
+  if (previewEditLink) {
+    previewEditLink.dataset.defaultHref = previewEditLink.getAttribute('href') || '';
+  }
   const previewQuantitySelect = shell.querySelector('[data-preview-quantity]');
   const previewSavingsEl = shell.querySelector('[data-preview-savings]');
   const removeProductBtn = shell.querySelector('#osRemoveProductBtn');
+  const envelopeCard = shell.querySelector('[data-envelope-card]');
+  const giveawaysCard = shell.querySelector('[data-giveaways-card]');
 
   const optionElements = {
     orientation: shell.querySelector('[data-option="orientation"]'),
@@ -119,9 +132,139 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const formatMoney = (amount) => moneyFormatter.format(amount ?? 0);
 
+  const formatQuantityOptionLabel = (option) => {
+    if (!option) return '';
+    const baseLabel = option.label && option.label.toString().trim().length
+      ? option.label.toString().trim()
+      : (option.value !== undefined ? `${option.value}` : 'Quantity');
+    const priceValue = parseMoney(option.price ?? option.amount ?? 0);
+    const hasPrice = Number.isFinite(priceValue);
+    if (!hasPrice) {
+      return baseLabel;
+    }
+    return `${baseLabel} — ${formatMoney(priceValue)}`;
+  };
+
   const setHidden = (node, hidden) => {
     if (!node) return;
     node.hidden = Boolean(hidden);
+  };
+
+  const getCsrfToken = () => csrfTokenMeta?.getAttribute('content') ?? null;
+
+  const applySummaryPayload = (payload) => {
+    if (!payload || typeof payload !== 'object') {
+      return null;
+    }
+
+    const summary = payload.summary ?? payload.data ?? null;
+    if (summary && typeof summary === 'object') {
+      setSummary(summary);
+      return summary;
+    }
+
+    return null;
+  };
+
+  const fetchSummaryFromServer = async () => {
+    if (!summaryApiUrl) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(summaryApiUrl, {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+      });
+
+      if (!response.ok) {
+        console.warn('Order summary API returned status', response.status);
+        return null;
+      }
+
+      const payload = await response.json();
+      const summary = payload?.data ?? payload;
+      if (summary && typeof summary === 'object') {
+        setSummary(summary);
+        return summary;
+      }
+    } catch (error) {
+      console.error('Failed to fetch order summary', error);
+    }
+
+    return null;
+  };
+
+  const requestDelete = async (url) => {
+    if (!url) {
+      return { ok: false };
+    }
+
+    const csrfToken = getCsrfToken();
+
+    try {
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          Accept: 'application/json',
+          ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+        },
+        credentials: 'same-origin',
+      });
+
+      if (!response.ok) {
+        return { ok: false, status: response.status };
+      }
+
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (error) {
+        data = null;
+      }
+
+      return { ok: true, data };
+    } catch (error) {
+      console.error('Failed to send DELETE request', error);
+      return { ok: false, status: 0, error };
+    }
+  };
+
+  const requestPost = async (url, payload) => {
+    if (!url) {
+      return { ok: false };
+    }
+
+    const csrfToken = getCsrfToken();
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload ?? {}),
+      });
+
+      if (!response.ok) {
+        return { ok: false, status: response.status };
+      }
+
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (error) {
+        data = null;
+      }
+
+      return { ok: true, data };
+    } catch (error) {
+      console.error('Failed to send POST request', error);
+      return { ok: false, status: 0, error };
+    }
   };
 
   const hasValue = (value) => {
@@ -181,6 +324,82 @@ document.addEventListener('DOMContentLoaded', () => {
     return match || null;
   };
 
+  const normaliseKey = (value) => {
+    if (value === undefined || value === null) return '';
+    return String(value)
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+  };
+
+  const normaliseUrl = (value) => {
+    if (value === undefined || value === null) return null;
+    const trimmed = String(value).trim();
+    if (!trimmed.length) return null;
+    if (/^javascript:/i.test(trimmed)) return null;
+    return trimmed;
+  };
+
+  const getPreviewSelection = (summary, ...keys) => {
+    if (!summary || typeof summary !== 'object') return null;
+    const selections = summary.previewSelections;
+    if (!selections || typeof selections !== 'object') return null;
+
+    for (const key of keys) {
+      if (!key) continue;
+      const selection = selections[key];
+      if (selection && typeof selection === 'object') {
+        return selection;
+      }
+    }
+
+    return null;
+  };
+
+  const getPreviewSelectionName = (summary, ...keys) => {
+    const selection = getPreviewSelection(summary, ...keys);
+    if (!selection || typeof selection !== 'object') return null;
+    const candidate = selection.name ?? selection.label ?? selection.value ?? null;
+    return hasValue(candidate) ? candidate : null;
+  };
+
+  const formatSelectionWithPrice = (payload, options = {}) => {
+    if (!payload || typeof payload !== 'object') return null;
+    const { showIncludedLabel = true } = options;
+    const label = payload.name ?? payload.label ?? payload.value ?? null;
+    if (!hasValue(label)) return null;
+
+    const priceRaw = payload.price ?? payload.amount ?? payload.total ?? payload.price_value;
+    const price = parseMoney(priceRaw);
+    const hasPriceInfo = priceRaw !== undefined && priceRaw !== null && !(
+      typeof priceRaw === 'string' && priceRaw.trim() === ''
+    );
+
+    if (hasPriceInfo && price > 0.009) {
+      return `${label} — ${formatMoney(price)}`;
+    }
+
+    if (hasPriceInfo && price <= 0.009 && showIncludedLabel) {
+      return `${label} — Included`;
+    }
+
+    return label;
+  };
+
+  const findAddonByTypeExact = (summary, ...types) => {
+    const addons = Array.isArray(summary?.addons) ? summary.addons : [];
+    if (!addons.length) return null;
+
+    const targets = types
+      .map((type) => normaliseKey(type))
+      .filter((type) => type.length);
+
+    if (!targets.length) return null;
+
+    return addons.find((addon) => targets.includes(normaliseKey(addon?.type)));
+  };
+
   const normaliseQuantityOption = (option) => {
     if (!option) return null;
     const value = Number(option.value ?? option.qty ?? option.quantity);
@@ -190,6 +409,65 @@ document.addEventListener('DOMContentLoaded', () => {
       : `${value}`;
     const price = parseMoney(option.price ?? option.amount ?? option.total ?? 0);
     return { value, label, price };
+  };
+
+  const buildSteppedQuantityOptions = ({
+    minQty,
+    maxQty,
+    step = 10,
+    unitPrice,
+    selectedQuantity,
+  }) => {
+    const parsedUnitPrice = parseMoney(unitPrice ?? 0);
+    const quantityStep = Number.isFinite(step) && step > 0 ? Math.floor(step) : 10;
+    const baseStep = quantityStep > 0 ? quantityStep : 10;
+
+    const initialMin = Number(minQty);
+    let resolvedMin = Number.isFinite(initialMin) && initialMin > 0 ? initialMin : baseStep;
+    if (resolvedMin % baseStep !== 0) {
+      resolvedMin = Math.ceil(resolvedMin / baseStep) * baseStep;
+    }
+    resolvedMin = Math.max(baseStep, resolvedMin);
+
+    const initialMax = Number(maxQty);
+    let resolvedMax = Number.isFinite(initialMax) && initialMax > 0 ? initialMax : Number(selectedQuantity) || resolvedMin;
+    if (resolvedMax < resolvedMin) {
+      resolvedMax = resolvedMin;
+    }
+    if (resolvedMax % baseStep !== 0) {
+      resolvedMax = Math.ceil(resolvedMax / baseStep) * baseStep;
+    }
+
+    const options = [];
+    for (let qty = resolvedMin; qty <= resolvedMax; qty += baseStep) {
+      const price = Math.round(parsedUnitPrice * qty * 100) / 100;
+      options.push({
+        value: qty,
+        label: `${qty}`,
+        price,
+      });
+    }
+
+    const selectedQty = Number(selectedQuantity);
+    if (Number.isFinite(selectedQty) && selectedQty > 0 && !options.some((option) => option.value === selectedQty)) {
+      const price = Math.round(parsedUnitPrice * selectedQty * 100) / 100;
+      options.push({
+        value: selectedQty,
+        label: `${selectedQty}`,
+        price,
+      });
+    }
+
+    const seen = new Set();
+    return options
+      .filter((option) => {
+        if (!Number.isFinite(option.value) || option.value <= 0) return false;
+        const key = option.value;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .sort((a, b) => a.value - b.value);
   };
 
   const getQuantityOptions = (summary) => {
@@ -221,7 +499,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .sort((a, b) => a - b)
         .map((qty) => ({
           value: qty,
-          label: `${qty} Invitations`,
+          label: `${qty}`,
           price: Math.round(qty * unitPrice * 100) / 100,
         }));
     }
@@ -245,6 +523,7 @@ document.addEventListener('DOMContentLoaded', () => {
       getFirstValue(
         summary,
         () => summary?.paperStockPrice,
+        () => summary?.previewSelections?.paper_stock?.price,
         'paperStock.price',
         'metadata.paper_stock.price'
       )
@@ -333,8 +612,12 @@ document.addEventListener('DOMContentLoaded', () => {
       'editUrl',
       'metadata.editUrl',
       () => summaryMetadata?.links?.edit
-    ) || editUrl;
-    if (previewEditLink) previewEditLink.href = resolvedEditUrl;
+    );
+    const finalEditUrl = normaliseUrl(resolvedEditUrl) || resolvePreviewEditUrl(summary) || editUrl;
+    if (previewEditLink) {
+      previewEditLink.href = finalEditUrl;
+      previewEditLink.dataset.resolvedHref = finalEditUrl;
+    }
 
     if (previewQuantitySelect) {
       const quantityContainer = previewQuantitySelect.closest('.os-preview-quantity');
@@ -347,7 +630,11 @@ document.addEventListener('DOMContentLoaded', () => {
         quantityOptions.forEach((option) => {
           const opt = document.createElement('option');
           opt.value = String(option.value);
-          opt.textContent = option.label || `${option.value}`;
+          opt.textContent = formatQuantityOptionLabel(option);
+          const priceValue = parseMoney(option.price ?? 0);
+          if (Number.isFinite(priceValue)) {
+            opt.dataset.price = String(priceValue);
+          }
           previewQuantitySelect.appendChild(opt);
         });
 
@@ -361,62 +648,109 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    const orientation = getFirstValue(
-      summary,
-      'orientation',
-      'metadata.invitation.orientation',
-      'metadata.final_step.orientation',
-      'metadata.product.orientation'
-    );
+    const orientationSelection = getPreviewSelection(summary, 'orientation')
+      || findAddonByTypeExact(summary, 'orientation');
+    const orientation = formatSelectionWithPrice(orientationSelection, { showIncludedLabel: false })
+      || getPreviewSelectionName(summary, 'orientation')
+      || getFirstValue(
+        summary,
+        'orientation',
+        'metadata.invitation.orientation',
+        'metadata.final_step.orientation',
+        'metadata.product.orientation'
+      );
     applyOption(optionElements.orientation, orientation);
 
     const foilAddon = findAddonMatch(summary, ['foil', 'metal', 'emboss']);
-    const foilColor = getFirstValue(
-      summary,
-      'foilColor',
-      'metadata.final_step.foilColor',
-      'metadata.invitation.foilColor',
-      () => foilAddon?.name
-    );
+    const foilSelection = getPreviewSelection(summary, 'embossed_powder', 'foil', 'foil_color', 'metallic_powder')
+      || findAddonByTypeExact(summary, 'embossed_powder', 'foil', 'foil_color', 'metallic_powder')
+      || foilAddon;
+    const foilColor = formatSelectionWithPrice(foilSelection)
+      || getPreviewSelectionName(summary, 'embossed_powder', 'foil', 'foil_color', 'metallic_powder')
+      || getFirstValue(
+        summary,
+        'foilColor',
+        'metadata.final_step.foilColor',
+        'metadata.invitation.foilColor'
+      );
     applyOption(optionElements.foilColor, foilColor);
 
     const backsideAddon = findAddonMatch(summary, ['back', 'double', 'reverse']);
-    const backside = getFirstValue(
-      summary,
-      'backside',
-      'metadata.final_step.backside',
-      'metadata.invitation.backside',
-      () => backsideAddon?.name
-    );
+    const backsideSelection = getPreviewSelection(summary, 'backside', 'double_print', 'double_sided', 'reverse', 'back_print')
+      || findAddonByTypeExact(summary, 'backside', 'double_print', 'double_sided', 'reverse')
+      || backsideAddon;
+    const backside = formatSelectionWithPrice(backsideSelection)
+      || getPreviewSelectionName(summary, 'backside', 'double_print', 'double_sided', 'reverse', 'back_print')
+      || getFirstValue(
+        summary,
+        'backside',
+        'metadata.final_step.backside',
+        'metadata.invitation.backside'
+      );
     applyOption(optionElements.backside, backside);
 
     const trimAddon = findAddonMatch(summary, ['trim', 'edge', 'corner']);
-    const trim = getFirstValue(
-      summary,
-      'trim',
-      'metadata.final_step.trim',
-      'metadata.invitation.trim',
-      () => trimAddon?.name
-    );
+    const trimSelection = getPreviewSelection(summary, 'trim', 'edge', 'edge_finish', 'edge_trim')
+      || findAddonByTypeExact(summary, 'trim', 'edge', 'edge_finish', 'edge_trim', 'corner')
+      || trimAddon;
+    const trim = formatSelectionWithPrice(trimSelection)
+      || getPreviewSelectionName(summary, 'trim', 'edge', 'edge_finish', 'edge_trim', 'corner')
+      || getFirstValue(
+        summary,
+        'trim',
+        'metadata.final_step.trim',
+        'metadata.invitation.trim'
+      );
     applyOption(optionElements.trim, trim);
 
-    const resolvedSize = getFirstValue(
-      summary,
-      'size',
-      'metadata.product.size',
-      'metadata.template.size',
-      'metadata.invitation.size'
-    );
+    const sizeSelection = getPreviewSelection(summary, 'size')
+      || findAddonByTypeExact(summary, 'size');
+    const resolvedSize = formatSelectionWithPrice(sizeSelection, { showIncludedLabel: false })
+      || getPreviewSelectionName(summary, 'size')
+      || getFirstValue(
+        summary,
+        'size',
+        'metadata.product.size',
+        'metadata.template.size',
+        'metadata.invitation.size'
+      );
     applyOption(optionElements.size, resolvedSize);
 
     if (optionElements.paperStock) {
-      const paperName = getFirstValue(summary, 'paperStockName', 'paperStock.name', 'metadata.paper_stock.name');
-      const paperPrice = parseMoney(
-        getFirstValue(summary, () => summary?.paperStockPrice, 'paperStock.price', 'metadata.paper_stock.price')
+      const paperSelection = getPreviewSelection(summary, 'paper_stock');
+
+      let paperName = getFirstValue(
+        summary,
+        'paperStockName',
+        'paperStock.name',
+        'metadata.paper_stock.name'
       );
-      const display = hasValue(paperName)
-        ? `${paperName}${paperPrice > 0.009 ? ` — ${formatMoney(paperPrice)}` : ' — Included'}`
-        : null;
+
+      if (!hasValue(paperName) && paperSelection) {
+        paperName = paperSelection.name ?? paperSelection.label ?? paperSelection.value ?? null;
+      }
+      if (!hasValue(paperName)) {
+        paperName = getPreviewSelectionName(summary, 'paper_stock');
+      }
+
+      const rawPaperPrice = getFirstValue(
+        summary,
+        () => summary?.paperStockPrice,
+        () => summary?.previewSelections?.paper_stock?.price,
+        'paperStock.price',
+        'metadata.paper_stock.price',
+        () => paperSelection?.price
+      );
+      const hasPaperPrice = rawPaperPrice !== undefined && rawPaperPrice !== null && !(
+        typeof rawPaperPrice === 'string' && rawPaperPrice.trim() === ''
+      );
+      const paperPrice = parseMoney(rawPaperPrice);
+
+      const selectionDisplay = formatSelectionWithPrice(paperSelection);
+      const display = selectionDisplay
+        || (hasValue(paperName)
+          ? `${paperName}${hasPaperPrice ? (paperPrice > 0.009 ? ` — ${formatMoney(paperPrice)}` : ' — Included') : ''}`
+          : null);
       applyOption(optionElements.paperStock, display);
     }
 
@@ -465,25 +799,90 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const renderEnvelopePreview = (summary) => {
+  const envelopeMeta = summary?.envelope ?? summary?.metadata?.envelope ?? null;
+  const hasEnvelope = summary?.hasEnvelope ?? Boolean(envelopeMeta && typeof envelopeMeta === 'object' && Object.keys(envelopeMeta).length);
+
+    if (envelopeCard) setHidden(envelopeCard, !hasEnvelope);
+    if (removeEnvelopeBtn) removeEnvelopeBtn.hidden = !hasEnvelope;
+
+    if (!hasEnvelope) {
+      if (envelopeQuantitySelect) {
+        envelopeQuantitySelect.innerHTML = '';
+        envelopeQuantitySelect.disabled = true;
+      }
+      envelopeImages = [];
+      envelopeIndex = 0;
+      if (envelopePreviewImageEl && previewPlaceholder) {
+        envelopePreviewImageEl.src = previewPlaceholder;
+        envelopePreviewImageEl.alt = 'Envelope preview placeholder';
+      }
+      if (envelopeOldTotalEl) envelopeOldTotalEl.textContent = formatMoney(0);
+      if (envelopeNewTotalEl) envelopeNewTotalEl.textContent = formatMoney(0);
+      if (envelopeSavingsEl) setHidden(envelopeSavingsEl, true);
+      updateEnvelopeNav();
+      return;
+    }
+
     if (!envelopePreviewFrame || !envelopePreviewImageEl) return;
 
-    const providedImages = Array.isArray(summary?.envelopeImages)
-      ? summary.envelopeImages.filter((src) => typeof src === 'string' && src.length)
+    const providedImages = Array.isArray(envelopeMeta.images)
+      ? envelopeMeta.images.filter((src) => typeof src === 'string' && src.length)
       : [];
 
-    const fallbackImage = summary?.envelopeImage || summary?.envelope?.image || previewPlaceholder;
+    const fallbackImage = envelopeMeta.image || summary?.envelopeImage || previewPlaceholder;
 
-    if (envelopeNameEl) envelopeNameEl.textContent = summary?.envelope?.name || 'Envelope';
+    if (envelopeNameEl) envelopeNameEl.textContent = envelopeMeta.name || 'Envelope';
     if (envelopeEditLink) envelopeEditLink.href = envelopeUrl;
-    if (envelopeQuantitySelect) envelopeQuantitySelect.value = summary?.envelope?.qty || summary?.quantity || 10;
 
-    if (envelopeOptionElements.type) envelopeOptionElements.type.textContent = summary?.envelope?.type || 'Standard';
-    if (envelopeOptionElements.color) envelopeOptionElements.color.textContent = summary?.envelope?.color || 'White';
-    if (envelopeOptionElements.size) envelopeOptionElements.size.textContent = summary?.envelope?.size || 'A6';
-    if (envelopeOptionElements.printing) envelopeOptionElements.printing.textContent = summary?.envelope?.printing || 'Included';
+    if (envelopeQuantitySelect) {
+      const quantity = Number(envelopeMeta.qty ?? summary?.quantity ?? 0);
+      const unitPrice = parseMoney(envelopeMeta.price ?? (quantity ? (envelopeMeta.total ?? 0) / quantity : 0));
+      const minQty = Number(envelopeMeta.min_qty ?? 10);
+      const maxQty = Number(envelopeMeta.max_qty ?? 0);
 
-    const currentTotal = parseMoney(summary?.envelope?.price || summary?.envelope?.total || 0);
-    const original = parseMoney(summary?.envelope?.originalPrice || currentTotal);
+      const options = buildSteppedQuantityOptions({
+        minQty,
+        maxQty,
+        step: 10,
+        unitPrice,
+        selectedQuantity: quantity,
+      });
+
+      envelopeQuantitySelect.innerHTML = '';
+
+      options.forEach((option) => {
+        const opt = document.createElement('option');
+        opt.value = String(option.value);
+        opt.textContent = formatQuantityOptionLabel(option);
+        const priceValue = parseMoney(option.price ?? 0);
+        if (Number.isFinite(priceValue)) {
+          opt.dataset.price = String(priceValue);
+        }
+        envelopeQuantitySelect.appendChild(opt);
+      });
+
+      if (options.length) {
+        const selectedOption = options.find((option) => option.value === quantity) || options[0];
+        envelopeQuantitySelect.value = String(selectedOption.value);
+        envelopeQuantitySelect.dataset.previousValue = String(selectedOption.value);
+        envelopeQuantitySelect.dataset.minQty = String(Math.max(0, options[0].value));
+        envelopeQuantitySelect.dataset.maxQty = String(options[options.length - 1].value);
+        envelopeQuantitySelect.disabled = options.length === 1;
+      } else {
+        envelopeQuantitySelect.disabled = true;
+        envelopeQuantitySelect.dataset.previousValue = '';
+        envelopeQuantitySelect.dataset.minQty = '';
+        envelopeQuantitySelect.dataset.maxQty = '';
+      }
+    }
+
+    if (envelopeOptionElements.type) envelopeOptionElements.type.textContent = envelopeMeta.type || 'Standard';
+    if (envelopeOptionElements.color) envelopeOptionElements.color.textContent = envelopeMeta.color || 'White';
+    if (envelopeOptionElements.size) envelopeOptionElements.size.textContent = envelopeMeta.size || 'A6';
+    if (envelopeOptionElements.printing) envelopeOptionElements.printing.textContent = envelopeMeta.printing || 'Included';
+
+    const currentTotal = parseMoney(envelopeMeta.price ?? envelopeMeta.total ?? 0);
+    const original = parseMoney(envelopeMeta.originalPrice ?? currentTotal);
     const savings = original - currentTotal;
 
     if (envelopeOldTotalEl) envelopeOldTotalEl.textContent = formatMoney(original);
@@ -527,24 +926,92 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const renderGiveawaysPreview = (summary) => {
+    const giveawayMeta = summary?.giveaway
+      ?? summary?.giveaways
+      ?? summary?.metadata?.giveaway
+      ?? null;
+    const hasGiveaway = summary?.hasGiveaway ?? Boolean(giveawayMeta && typeof giveawayMeta === 'object' && Object.keys(giveawayMeta).length);
+
+    if (giveawaysCard) setHidden(giveawaysCard, !hasGiveaway);
+    if (removeGiveawaysBtn) removeGiveawaysBtn.hidden = !hasGiveaway;
+    if (giveawaysEditLink) giveawaysEditLink.href = giveawaysUrl;
+
+    if (!hasGiveaway) {
+      if (giveawaysQuantitySelect) {
+        giveawaysQuantitySelect.innerHTML = '';
+        giveawaysQuantitySelect.disabled = true;
+      }
+      giveawaysImages = [];
+      giveawaysIndex = 0;
+      if (giveawaysPreviewImageEl && previewPlaceholder) {
+        giveawaysPreviewImageEl.src = previewPlaceholder;
+        giveawaysPreviewImageEl.alt = 'Giveaways preview placeholder';
+      }
+      if (giveawaysOldTotalEl) giveawaysOldTotalEl.textContent = formatMoney(0);
+      if (giveawaysNewTotalEl) giveawaysNewTotalEl.textContent = formatMoney(0);
+      if (giveawaysSavingsEl) setHidden(giveawaysSavingsEl, true);
+      updateGiveawaysNav();
+      return;
+    }
+
     if (!giveawaysPreviewFrame || !giveawaysPreviewImageEl) return;
 
-    const providedImages = Array.isArray(summary?.giveawaysImages)
-      ? summary.giveawaysImages.filter((src) => typeof src === 'string' && src.length)
+    const providedImages = Array.isArray(giveawayMeta.images)
+      ? giveawayMeta.images.filter((src) => typeof src === 'string' && src.length)
       : [];
 
-    const fallbackImage = summary?.giveawaysImage || previewPlaceholder;
+    const fallbackImage = giveawayMeta.image || previewPlaceholder;
 
-    if (giveawaysNameEl) giveawaysNameEl.textContent = summary?.giveaways?.name || 'Giveaways';
-    if (giveawaysEditLink) giveawaysEditLink.href = giveawaysUrl;
-    if (giveawaysQuantitySelect) giveawaysQuantitySelect.value = summary?.giveaways?.qty || summary?.quantity || 10;
+    if (giveawaysNameEl) giveawaysNameEl.textContent = giveawayMeta.name || 'Giveaways';
 
-    if (giveawaysOptionElements.type) giveawaysOptionElements.type.textContent = summary?.giveaways?.type || 'Keychain';
-    if (giveawaysOptionElements.material) giveawaysOptionElements.material.textContent = summary?.giveaways?.material || 'Acrylic';
-    if (giveawaysOptionElements.customization) giveawaysOptionElements.customization.textContent = summary?.giveaways?.customization || 'Included';
+    if (giveawaysQuantitySelect) {
+      const quantity = Number(giveawayMeta.qty ?? summary?.quantity ?? 0);
+      const unitPrice = parseMoney(giveawayMeta.price ?? (quantity ? (giveawayMeta.total ?? 0) / quantity : 0));
+      const minQty = Number(giveawayMeta.min_qty ?? 10);
+      const maxQty = Number(giveawayMeta.max_qty ?? 0);
 
-    const currentTotal = parseMoney(summary?.giveaways?.price || summary?.giveaways?.total || 0);
-    const original = parseMoney(summary?.giveaways?.originalPrice || currentTotal);
+      const options = buildSteppedQuantityOptions({
+        minQty,
+        maxQty,
+        step: 10,
+        unitPrice,
+        selectedQuantity: quantity,
+      });
+
+      giveawaysQuantitySelect.innerHTML = '';
+
+      options.forEach((option) => {
+        const opt = document.createElement('option');
+        opt.value = String(option.value);
+        opt.textContent = formatQuantityOptionLabel(option);
+        const priceValue = parseMoney(option.price ?? 0);
+        if (Number.isFinite(priceValue)) {
+          opt.dataset.price = String(priceValue);
+        }
+        giveawaysQuantitySelect.appendChild(opt);
+      });
+
+      if (options.length) {
+        const selectedOption = options.find((option) => option.value === quantity) || options[0];
+        giveawaysQuantitySelect.value = String(selectedOption.value);
+        giveawaysQuantitySelect.dataset.previousValue = String(selectedOption.value);
+        giveawaysQuantitySelect.dataset.minQty = String(Math.max(0, options[0].value));
+        giveawaysQuantitySelect.dataset.maxQty = String(options[options.length - 1].value);
+        giveawaysQuantitySelect.disabled = options.length === 1;
+      } else {
+        giveawaysQuantitySelect.disabled = true;
+        giveawaysQuantitySelect.dataset.previousValue = '';
+        giveawaysQuantitySelect.dataset.minQty = '';
+        giveawaysQuantitySelect.dataset.maxQty = '';
+      }
+    }
+
+    if (giveawaysOptionElements.type) giveawaysOptionElements.type.textContent = giveawayMeta.type || giveawayMeta.name || 'Giveaway';
+    if (giveawaysOptionElements.material) giveawaysOptionElements.material.textContent = giveawayMeta.material || '—';
+    if (giveawaysOptionElements.customization) giveawaysOptionElements.customization.textContent = giveawayMeta.customization || 'Included';
+
+    const currentTotal = parseMoney(giveawayMeta.total ?? giveawayMeta.price ?? 0);
+    const original = parseMoney(giveawayMeta.originalPrice ?? currentTotal);
     const savings = original - currentTotal;
 
     if (giveawaysOldTotalEl) giveawaysOldTotalEl.textContent = formatMoney(original);
@@ -572,19 +1039,19 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const updateSummaryCard = (summary) => {
-    const invitationTotal = parseMoney(summary?.totalAmount ?? summary?.total);
-    const envelopeTotal = parseMoney(summary?.envelope?.price ?? summary?.envelope?.total);
-    const giveawaysTotal = parseMoney(summary?.giveaways?.price ?? summary?.giveaways?.total);
-
-    const discountedSubtotal = invitationTotal + envelopeTotal + giveawaysTotal;
+    const subtotalAmount = parseMoney(summary?.subtotalAmount ?? summary?.subtotal ?? summary?.totalAmount ?? 0);
     const originalSubtotal = parseMoney(
-      summary?.originalTotal ?? summary?.subtotalOriginal ?? discountedSubtotal
+      summary?.originalSubtotal
+        ?? summary?.subtotalOriginal
+        ?? summary?.originalTotal
+        ?? subtotalAmount
     );
+    const grandTotal = parseMoney(summary?.totalAmount ?? summary?.total ?? subtotalAmount);
 
-    const savings = originalSubtotal - discountedSubtotal;
+    const savings = originalSubtotal - subtotalAmount;
 
     if (subtotalOriginalEl) subtotalOriginalEl.textContent = formatMoney(originalSubtotal);
-    if (subtotalDiscountedEl) subtotalDiscountedEl.textContent = formatMoney(discountedSubtotal);
+    if (subtotalDiscountedEl) subtotalDiscountedEl.textContent = formatMoney(subtotalAmount);
     if (subtotalSavingsEl) {
       if (savings > 0.009) {
         subtotalSavingsEl.textContent = `You saved ${formatMoney(savings)}`;
@@ -593,7 +1060,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setHidden(subtotalSavingsEl, true);
       }
     }
-    if (grandTotalEl) grandTotalEl.textContent = formatMoney(discountedSubtotal);
+    if (grandTotalEl) grandTotalEl.textContent = formatMoney(grandTotal);
   };
 
   const handleQuantityChange = (event) => {
@@ -617,8 +1084,8 @@ document.addEventListener('DOMContentLoaded', () => {
     current.quantity = selectedOption.value;
     current.quantityLabel = selectedOption.label;
     current.quantityOptions = options;
-    current.totalAmount = updatedTotal;
-    current.total = formatMoney(updatedTotal);
+  current.totalAmount = updatedTotal;
+  current.total = formatMoney(updatedTotal);
   current.total_amount = updatedTotal;
     current.subtotalAmount = updatedTotal;
 
@@ -639,11 +1106,188 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSummary(current);
   };
 
+  const resolvePreviewEditUrl = (summary) => {
+    const summaryCandidate = summary
+      ? getFirstValue(
+          summary,
+          'editUrl',
+          'metadata.editUrl',
+          'metadata.links.edit',
+          () => summary?.previewSelections?.editUrl,
+        )
+      : null;
+
+    const candidates = [
+      summaryCandidate,
+      previewEditLink?.dataset.resolvedHref,
+      previewEditLink?.dataset.defaultHref,
+      shell.dataset.editUrl,
+      previewEditLink?.getAttribute('href'),
+      editUrl,
+    ];
+
+    for (const candidate of candidates) {
+      const normalised = normaliseUrl(candidate);
+      if (normalised) {
+        return normalised;
+      }
+    }
+
+    return null;
+  };
+
+  const handleEnvelopeQuantityChange = async (event) => {
+    const select = event?.target || envelopeQuantitySelect;
+    if (!select || select.disabled) return;
+
+    const summary = getSummary();
+    const envelopeMeta = summary?.envelope || summary?.metadata?.envelope;
+    if (!envelopeMeta) {
+      return;
+    }
+
+    const newQuantity = Number(select.value);
+    if (!Number.isFinite(newQuantity) || newQuantity <= 0) {
+      select.value = String(envelopeMeta.qty ?? envelopeQuantitySelect?.dataset.previousValue ?? '');
+      return;
+    }
+
+    const previousQuantity = Number(envelopeMeta.qty ?? select.dataset.previousValue ?? newQuantity);
+    if (previousQuantity === newQuantity) {
+      return;
+    }
+
+    const unitPrice = parseMoney(envelopeMeta.price ?? (previousQuantity ? (envelopeMeta.total ?? 0) / previousQuantity : 0));
+    const totalPrice = Math.round(unitPrice * newQuantity * 100) / 100;
+
+    if (!envelopeStoreUrl) {
+      select.value = String(previousQuantity);
+      showToast('Envelope updates are unavailable right now.');
+      return;
+    }
+
+    select.disabled = true;
+
+    const payload = {
+      product_id: envelopeMeta.product_id ?? null,
+      envelope_id: envelopeMeta.id ?? null,
+      quantity: newQuantity,
+      unit_price: unitPrice,
+      total_price: totalPrice,
+      metadata: {
+        name: envelopeMeta.name ?? null,
+        material: envelopeMeta.material ?? null,
+        image: envelopeMeta.image ?? null,
+        min_qty: Number(envelopeMeta.min_qty ?? select.dataset.minQty ?? 10) || 10,
+        max_qty: Number(envelopeMeta.max_qty ?? select.dataset.maxQty ?? newQuantity) || newQuantity,
+      },
+    };
+
+    const result = await requestPost(envelopeStoreUrl, payload);
+
+    select.disabled = false;
+
+    if (result.ok) {
+      const updatedSummary = applySummaryPayload(result.data) ?? await fetchSummaryFromServer();
+      const summaryToRender = updatedSummary ?? getSummary();
+      renderSummary(summaryToRender);
+      showToast(`Envelope quantity updated to ${newQuantity}`);
+      return;
+    }
+
+    const status = result.status ?? 0;
+    if (status === 409 || status === 422) {
+      const refreshed = await fetchSummaryFromServer();
+      renderSummary(refreshed ?? getSummary());
+      showToast('Envelope updated elsewhere. Refreshed details.');
+    } else {
+      select.value = String(previousQuantity);
+      select.dataset.previousValue = String(previousQuantity);
+      showToast('Unable to update envelope quantity. Please try again.');
+    }
+  };
+
+  const handleGiveawayQuantityChange = async (event) => {
+    const select = event?.target || giveawaysQuantitySelect;
+    if (!select || select.disabled) return;
+
+    const summary = getSummary();
+    const giveawayMeta = summary?.giveaway
+      ?? summary?.giveaways
+      ?? summary?.metadata?.giveaway;
+
+    if (!giveawayMeta) {
+      return;
+    }
+
+    const newQuantity = Number(select.value);
+    if (!Number.isFinite(newQuantity) || newQuantity <= 0) {
+      select.value = String(giveawayMeta.qty ?? select.dataset.previousValue ?? '');
+      return;
+    }
+
+    const previousQuantity = Number(giveawayMeta.qty ?? select.dataset.previousValue ?? newQuantity);
+    if (previousQuantity === newQuantity) {
+      return;
+    }
+
+    const unitPrice = parseMoney(giveawayMeta.price ?? (previousQuantity ? (giveawayMeta.total ?? 0) / previousQuantity : 0));
+    const totalPrice = Math.round(unitPrice * newQuantity * 100) / 100;
+
+    if (!giveawayStoreUrl) {
+      select.value = String(previousQuantity);
+      showToast('Giveaway updates are unavailable right now.');
+      return;
+    }
+
+    select.disabled = true;
+
+    const payload = {
+      product_id: giveawayMeta.product_id ?? giveawayMeta.id ?? null,
+      quantity: newQuantity,
+      unit_price: unitPrice,
+      total_price: totalPrice,
+      metadata: {
+        id: giveawayMeta.id ?? null,
+        name: giveawayMeta.name ?? null,
+        image: giveawayMeta.image ?? null,
+        description: giveawayMeta.description ?? null,
+        min_qty: Number(giveawayMeta.min_qty ?? select.dataset.minQty ?? 10) || 10,
+        max_qty: Number(giveawayMeta.max_qty ?? select.dataset.maxQty ?? newQuantity) || newQuantity,
+      },
+    };
+
+    const result = await requestPost(giveawayStoreUrl, payload);
+
+    select.disabled = false;
+
+    if (result.ok) {
+      const updatedSummary = applySummaryPayload(result.data) ?? await fetchSummaryFromServer();
+      const summaryToRender = updatedSummary ?? getSummary();
+      renderSummary(summaryToRender);
+      showToast(`Giveaway quantity updated to ${newQuantity}`);
+      return;
+    }
+
+    const status = result.status ?? 0;
+    if (status === 409 || status === 422) {
+      const refreshed = await fetchSummaryFromServer();
+      renderSummary(refreshed ?? getSummary());
+      showToast('Giveaway selection was refreshed.');
+    } else {
+      select.value = String(previousQuantity);
+      select.dataset.previousValue = String(previousQuantity);
+      showToast('Unable to update giveaway quantity. Please try again.');
+    }
+  };
+
   const showEmptyState = () => {
     setHidden(summaryGrid, true);
     setHidden(summaryCard, true);
     setHidden(layout, true);
     setHidden(emptyState, false);
+    if (removeEnvelopeBtn) removeEnvelopeBtn.hidden = true;
+    if (removeGiveawaysBtn) removeGiveawaysBtn.hidden = true;
   };
 
   const renderSummary = (summary) => {
@@ -667,10 +1311,36 @@ document.addEventListener('DOMContentLoaded', () => {
     window.location.href = checkoutUrl;
   };
 
-  const summary = getSummary();
-  renderSummary(summary);
+  const bootstrapSummary = async () => {
+    const remoteSummary = await fetchSummaryFromServer();
+    if (remoteSummary) {
+      renderSummary(remoteSummary);
+      return;
+    }
+
+    renderSummary(getSummary());
+  };
+
+  bootstrapSummary();
 
   previewQuantitySelect?.addEventListener('change', handleQuantityChange);
+  previewEditLink?.addEventListener('click', async (event) => {
+    event.preventDefault();
+
+    let summary = getSummary();
+    if (!summary) {
+      summary = await fetchSummaryFromServer();
+    }
+
+    const targetUrl = resolvePreviewEditUrl(summary) || editUrl;
+    if (targetUrl) {
+      window.location.href = targetUrl;
+    } else {
+      showToast('Unable to open the design editor right now.');
+    }
+  });
+  envelopeQuantitySelect?.addEventListener('change', handleEnvelopeQuantityChange);
+  giveawaysQuantitySelect?.addEventListener('change', handleGiveawayQuantityChange);
   previewPrevBtn?.addEventListener('click', () => shiftPreview(-1));
   previewNextBtn?.addEventListener('click', () => shiftPreview(1));
   envelopePreviewPrevBtn?.addEventListener('click', () => shiftEnvelopePreview(-1));
@@ -678,31 +1348,115 @@ document.addEventListener('DOMContentLoaded', () => {
   giveawaysPreviewPrevBtn?.addEventListener('click', () => shiftGiveawaysPreview(-1));
   giveawaysPreviewNextBtn?.addEventListener('click', () => shiftGiveawaysPreview(1));
 
-  removeProductBtn?.addEventListener('click', (event) => {
+  removeProductBtn?.addEventListener('click', async (event) => {
     event.preventDefault();
-    window.sessionStorage.removeItem(storageKey);
-    showEmptyState();
-    showToast('Invitation removed from your order.');
+    if (removeProductBtn.disabled) return;
+
+    if (!summaryClearUrl) {
+      window.sessionStorage.removeItem(storageKey);
+      renderSummary(null);
+      showToast('Invitation removed from your order.');
+      return;
+    }
+
+    removeProductBtn.disabled = true;
+    const result = await requestDelete(summaryClearUrl);
+    removeProductBtn.disabled = false;
+
+    if (result.ok) {
+      window.sessionStorage.removeItem(storageKey);
+      renderSummary(null);
+      showToast('Invitation removed from your order.');
+      return;
+    }
+
+    if (result.status === 409 || result.status === 422) {
+      const refreshed = await fetchSummaryFromServer();
+      renderSummary(refreshed ?? getSummary());
+      showToast('Unable to remove invitation. Summary refreshed.');
+      return;
+    }
+
+    showToast('Unable to remove invitation. Please try again.');
   });
 
-  removeEnvelopeBtn?.addEventListener('click', (event) => {
+  removeEnvelopeBtn?.addEventListener('click', async (event) => {
     event.preventDefault();
-    const current = getSummary();
-    if (!current) return;
-    if (current.envelope) delete current.envelope;
-    setSummary(current);
-    renderSummary(current);
-    showToast('Envelope removed from your order.');
+    if (removeEnvelopeBtn.disabled) return;
+
+    if (!envelopeClearUrl) {
+      const current = getSummary();
+      if (!current) return;
+      delete current.envelope;
+      if (current.metadata && typeof current.metadata === 'object') {
+        delete current.metadata.envelope;
+      }
+      current.hasEnvelope = false;
+      setSummary(current);
+      renderSummary(current);
+      showToast('Envelope removed from your order.');
+      return;
+    }
+
+    removeEnvelopeBtn.disabled = true;
+    const result = await requestDelete(envelopeClearUrl);
+    removeEnvelopeBtn.disabled = false;
+
+    if (result.ok) {
+      const summary = applySummaryPayload(result.data) ?? await fetchSummaryFromServer();
+      renderSummary(summary ?? getSummary());
+      showToast('Envelope removed from your order.');
+      return;
+    }
+
+    if (result.status === 409 || result.status === 422) {
+      const refreshed = await fetchSummaryFromServer();
+      renderSummary(refreshed ?? getSummary());
+      showToast('Envelope updated elsewhere. Refreshed options.');
+      return;
+    }
+
+    showToast('Unable to remove envelope. Please try again.');
   });
 
-  removeGiveawaysBtn?.addEventListener('click', (event) => {
+  removeGiveawaysBtn?.addEventListener('click', async (event) => {
     event.preventDefault();
-    const current = getSummary();
-    if (!current) return;
-    if (current.giveaways) delete current.giveaways;
-    setSummary(current);
-    renderSummary(current);
-    showToast('Giveaways removed from your order.');
+    if (removeGiveawaysBtn.disabled) return;
+
+    if (!giveawayClearUrl) {
+      const current = getSummary();
+      if (!current) return;
+      delete current.giveaway;
+      delete current.giveaways;
+      if (current.metadata && typeof current.metadata === 'object') {
+        delete current.metadata.giveaway;
+      }
+      current.hasGiveaway = false;
+      setSummary(current);
+      renderSummary(current);
+      showToast('Giveaway removed from your order.');
+      return;
+    }
+
+    removeGiveawaysBtn.disabled = true;
+    const result = await requestDelete(giveawayClearUrl);
+    removeGiveawaysBtn.disabled = false;
+
+    if (result.ok) {
+      const summary = applySummaryPayload(result.data) ?? await fetchSummaryFromServer();
+      renderSummary(summary ?? getSummary());
+      showToast('Giveaway removed from your order.');
+      return;
+    }
+
+    if (result.status === 409 || result.status === 422) {
+      const refreshed = await fetchSummaryFromServer();
+      renderSummary(refreshed ?? getSummary());
+      showToast('Giveaway selection refreshed.');
+      return;
+    }
+
+    showToast('Unable to remove giveaway. Please try again.');
   });
 
   checkoutBtn?.addEventListener('click', () => {
