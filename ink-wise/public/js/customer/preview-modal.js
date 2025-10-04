@@ -26,14 +26,26 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 200);
     };
 
-    document.querySelectorAll(triggerSelector).forEach((img) => {
-        img.addEventListener('click', (event) => {
-            event.preventDefault();
-            const previewUrl = img.getAttribute('data-preview-url');
-            openPreview(previewUrl);
+    const registerPointerCursor = () => {
+        document.querySelectorAll(triggerSelector).forEach((trigger) => {
+            trigger.style.cursor = 'pointer';
         });
-        img.style.cursor = 'pointer';
+    };
+
+    document.addEventListener('click', (event) => {
+        const trigger = event.target.closest(triggerSelector);
+        if (!trigger) {
+            return;
+        }
+
+        event.preventDefault();
+        const previewUrl = trigger.getAttribute('data-preview-url');
+        openPreview(previewUrl);
     });
+
+    document.addEventListener('preview:register-triggers', registerPointerCursor);
+
+    registerPointerCursor();
 
     closeBtn.addEventListener('click', closePreview);
 

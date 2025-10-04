@@ -13,19 +13,26 @@ document.addEventListener('DOMContentLoaded', () => {
   const summaryApiUrl = shell.dataset.summaryApi || summaryUrl;
   const envelopesUrl = shell.dataset.envelopesUrl || '/api/envelopes';
   const giveawaysUrl = shell.dataset.giveawaysUrl || '/order/giveaways';
+  const syncUrl = shell.dataset.syncUrl || '/order/envelope';
   const STORAGE_KEY = 'inkwise-finalstep';
+  const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
+
+  if (continueBtn) {
+    continueBtn.disabled = true;
+  }
 
   const sampleEnvelopes = [
-    { id: 'env_sample_1', name: 'Classic White', price: 8.5, image: '/images/no-image.png', material: 'Uncoated smooth', max_qty: 200 },
-    { id: 'env_sample_2', name: 'Natural Kraft', price: 9.25, image: '/images/no-image.png', material: 'Kraft paper', max_qty: 300 },
-    { id: 'env_sample_3', name: 'Pearl Shimmer', price: 14.0, image: '/images/no-image.png', material: 'Pearlescent shimmer', max_qty: 150 },
-    { id: 'env_sample_4', name: 'Black Luxe', price: 16.5, image: '/images/no-image.png', material: 'Premium matte', max_qty: 120 }
+    { id: 'env_sample_1', name: 'Classic White', price: 8.5, image: '/images/no-image.png', material: 'Uncoated smooth', min_qty: 10, max_qty: 200 },
+    { id: 'env_sample_2', name: 'Natural Kraft', price: 9.25, image: '/images/no-image.png', material: 'Kraft paper', min_qty: 10, max_qty: 300 },
+    { id: 'env_sample_3', name: 'Pearl Shimmer', price: 14.0, image: '/images/no-image.png', material: 'Pearlescent shimmer', min_qty: 10, max_qty: 150 },
+    { id: 'env_sample_4', name: 'Black Luxe', price: 16.5, image: '/images/no-image.png', material: 'Premium matte', min_qty: 10, max_qty: 120 }
   ];
 
   const state = {
     envelopes: [],
     selectedId: null,
-    skeletonCount: Math.min(6, Math.max(3, Math.floor(((window.innerWidth || 1200) - 180) / 260)))
+    skeletonCount: Math.min(6, Math.max(3, Math.floor(((window.innerWidth || 1200) - 180) / 260))),
+    isSaving: false
   };
 
   let toastTimer;
@@ -54,6 +61,92 @@ document.addEventListener('DOMContentLoaded', () => {
     window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(summary));
   };
 
+  const setContinueState = (disabled) => {
+    if (!continueBtn) return;
+    continueBtn.disabled = Boolean(disabled);
+  };
+
+  const applyServerSummary = (summary) => {
+    if (!summary || typeof summary !== 'object') {
+      return;
+    }
+
+    writeSummary(summary);
+    syncSelectionState(summary);
+  };
+
+  const getCsrfToken = () => csrfTokenMeta?.getAttribute('content') ?? null;
+
+  const persistEnvelopeSelection = async (payload) => {
+    if (!syncUrl) return { ok: false };
+
+    const csrfToken = getCsrfToken();
+
+    try {
+      const response = await fetch(syncUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {})
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        console.warn('Failed to persist envelope selection', response.status);
+        return { ok: false, status: response.status };
+      }
+
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (error) {
+        console.warn('Envelope selection response could not be parsed', error);
+      }
+
+      return { ok: true, data };
+    } catch (error) {
+      console.error('Error persisting envelope selection', error);
+      return { ok: false, status: 0, error };
+    }
+  };
+
+  const clearEnvelopeSelection = async () => {
+    if (!syncUrl) return { ok: false };
+
+    const csrfToken = getCsrfToken();
+
+    try {
+      const response = await fetch(syncUrl, {
+        method: 'DELETE',
+        headers: {
+          Accept: 'application/json',
+          ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {})
+        },
+        credentials: 'same-origin'
+      });
+
+      if (!response.ok) {
+        console.warn('Failed to clear envelope selection', response.status);
+        return { ok: false, status: response.status };
+      }
+
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (error) {
+        console.warn('Envelope clear response could not be parsed', error);
+      }
+
+      return { ok: true, data };
+    } catch (error) {
+      console.error('Error clearing envelope selection', error);
+      return { ok: false, status: 0, error };
+    }
+  };
+
   const fetchSummaryFromServer = async () => {
     if (!summaryApiUrl) {
       return null;
@@ -75,7 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
         : payload;
 
       if (summary && typeof summary === 'object') {
-        writeSummary(summary);
+        applyServerSummary(summary);
         return summary;
       }
     } catch (error) {
@@ -148,18 +241,19 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   };
 
-  const syncSelectionState = () => {
-    const summary = readSummary();
-    const envelope = summary?.envelope;
+  const syncSelectionState = (summaryOverride = null) => {
+    const summary = summaryOverride ?? readSummary() ?? {};
+    const envelope = summary.envelope;
+
+    state.selectedId = envelope?.id ? String(envelope.id) : null;
 
     if (!envelope) {
       if (summaryBody) {
         summaryBody.innerHTML = '<p class="summary-empty">Choose an envelope to see the details here.</p>';
       }
       setBadgeState({ label: 'Pending' });
-      if (continueBtn) {
-        continueBtn.disabled = true;
-      }
+      setContinueState(true);
+      highlightSelectedCard();
       return;
     }
 
@@ -167,9 +261,8 @@ document.addEventListener('DOMContentLoaded', () => {
       summaryBody.innerHTML = buildSummaryMarkup(envelope);
     }
     setBadgeState({ label: 'Selected', tone: 'summary-badge--success' });
-    if (continueBtn) {
-      continueBtn.disabled = false;
-    }
+    highlightSelectedCard();
+    setContinueState(false);
   };
 
   const highlightSelectedCard = () => {
@@ -182,26 +275,93 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
-  const selectEnvelope = (env, qty, total, options = {}) => {
-    const summary = readSummary();
-    summary.envelope = {
-      id: env.id,
-      product_id: env.product_id,
-      name: env.name,
-      price: env.price,
-      qty,
-      total,
-      image: env.image,
-      material: env.material ?? null,
-      max_qty: env.max_qty ?? null
-    };
-    writeSummary(summary);
-    state.selectedId = env.id;
-    highlightSelectedCard();
-    syncSelectionState();
-    if (!options.silent) {
-      showToast(`${env.name} added — ${qty} pcs for ${formatMoney(total)}`);
+  const selectEnvelope = async (env, qty, total, options = {}) => {
+    if (state.isSaving) return;
+
+    state.isSaving = true;
+    setContinueState(true);
+
+    const card = options.cardElement ?? envelopeGrid?.querySelector(`[data-envelope-id="${env.id}"]`);
+    const triggerButton = options.triggerButton ?? card?.querySelector('.envelope-item__select');
+
+    let originalButtonText;
+    if (card) {
+      card.classList.add('is-saving');
     }
+    if (triggerButton) {
+      originalButtonText = triggerButton.textContent;
+      triggerButton.textContent = options.silent ? 'Updating…' : 'Saving…';
+      triggerButton.disabled = true;
+    }
+
+    const numericEnvelopeId = Number(env.id);
+    const envelopeId = Number.isFinite(numericEnvelopeId) && numericEnvelopeId > 0
+      ? numericEnvelopeId
+      : null;
+    const numericProductId = Number(env.product_id);
+    const productId = Number.isFinite(numericProductId) && numericProductId > 0
+      ? numericProductId
+      : null;
+
+    const payload = {
+      product_id: productId,
+      envelope_id: envelopeId,
+      quantity: qty,
+      unit_price: env.price,
+      total_price: total,
+          metadata: {
+            id: envelopeId ?? env.id ?? null,
+        name: env.name,
+        material: env.material ?? null,
+        image: env.image ?? null,
+        min_qty: env.min_qty ?? 10,
+        max_qty: env.max_qty ?? null
+      }
+    };
+
+    const result = await persistEnvelopeSelection(payload);
+
+    if (triggerButton) {
+      triggerButton.disabled = false;
+      triggerButton.textContent = originalButtonText ?? 'Select envelope';
+    }
+    if (card) {
+      card.classList.remove('is-saving');
+    }
+
+    state.isSaving = false;
+
+    if (result?.ok) {
+      if (result.data?.summary) {
+        applyServerSummary(result.data.summary);
+        if (!options.silent) {
+          showToast(`${env.name} added — ${qty} pcs for ${formatMoney(total)}`);
+        }
+        return;
+      }
+
+      const refreshed = await fetchSummaryFromServer();
+      if (refreshed) {
+        if (!options.silent) {
+          showToast(`${env.name} added — ${qty} pcs for ${formatMoney(total)}`);
+        }
+        return;
+      }
+    }
+
+    const status = result?.status ?? 0;
+    if (status === 409 || status === 422) {
+      showToast('That envelope is no longer available.');
+      await loadEnvelopes();
+      const refreshed = await fetchSummaryFromServer();
+      if (!refreshed) {
+        syncSelectionState();
+      }
+      return;
+    }
+
+    showToast('Unable to save envelope. Please try again.');
+    syncSelectionState();
   };
 
   const createCard = (env) => {
@@ -241,20 +401,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (select) {
       select.value = String(initialQty);
-      select.addEventListener('change', () => {
+      select.addEventListener('change', async () => {
         const qty = Number(select.value || initialQty);
         const total = price * qty;
         if (totalDisplay) totalDisplay.textContent = `${qty} pcs — ${formatMoney(total)}`;
         if (state.selectedId === env.id) {
-          selectEnvelope(env, qty, total, { silent: true });
+          await selectEnvelope(env, qty, total, { silent: true, cardElement: card, triggerButton: addBtn });
         }
       });
     }
 
-    addBtn?.addEventListener('click', () => {
+    addBtn?.addEventListener('click', async () => {
       const qty = Number(select?.value || initialQty);
       const total = price * qty;
-      selectEnvelope(env, qty, total);
+      await selectEnvelope(env, qty, total, { cardElement: card, triggerButton: addBtn });
     });
 
     return card;
@@ -275,9 +435,7 @@ document.addEventListener('DOMContentLoaded', () => {
     items.forEach((env) => envelopeGrid.appendChild(createCard(env)));
 
     const storedId = readSummary()?.envelope?.id;
-    if (storedId) {
-      state.selectedId = storedId;
-    }
+    state.selectedId = storedId ? String(storedId) : null;
     highlightSelectedCard();
   };
 
@@ -295,6 +453,7 @@ document.addEventListener('DOMContentLoaded', () => {
             price: normalisePrice(item.price),
             image: item.image,
             material: item.material,
+            min_qty: item.min_qty ?? 10,
             max_qty: item.max_qty
           }));
         } else {
@@ -321,18 +480,52 @@ document.addEventListener('DOMContentLoaded', () => {
     window.location.href = target;
   });
 
-  skipBtn?.addEventListener('click', () => {
-    const summary = readSummary();
-    delete summary.envelope;
-    writeSummary(summary);
-    state.selectedId = null;
-    highlightSelectedCard();
-    syncSelectionState();
-    showToast('Continuing without an envelope…');
+  skipBtn?.addEventListener('click', async () => {
+    if (state.isSaving) return;
+
+    state.isSaving = true;
+    setContinueState(true);
+
     const target = skipBtn.dataset.summaryUrl || giveawaysUrl;
-    window.setTimeout(() => {
-      window.location.href = target;
-    }, 500);
+    skipBtn.disabled = true;
+
+    const result = await clearEnvelopeSelection();
+
+    skipBtn.disabled = false;
+    state.isSaving = false;
+
+    if (result?.ok) {
+      if (result.data?.summary) {
+        applyServerSummary(result.data.summary);
+      } else {
+        const refreshed = await fetchSummaryFromServer();
+        if (!refreshed) {
+          syncSelectionState();
+          showToast('Unable to refresh order summary. Please try again.');
+          return;
+        }
+      }
+
+      showToast('Continuing without an envelope…');
+      window.setTimeout(() => {
+        window.location.href = target;
+      }, 500);
+      return;
+    }
+
+    const status = result?.status ?? 0;
+    if (status === 409 || status === 422) {
+      showToast('That envelope is no longer available. Refreshing options…');
+      await loadEnvelopes();
+      const refreshed = await fetchSummaryFromServer();
+      if (!refreshed) {
+        syncSelectionState();
+      }
+      return;
+    }
+
+    showToast('Unable to clear envelope. Please try again.');
+    syncSelectionState();
   });
 
   const initialise = async () => {

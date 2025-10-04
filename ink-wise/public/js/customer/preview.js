@@ -1,7 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
+  console.log('Preview JS loaded');
   const flipper = document.getElementById('flipper');
   const frontBtn = document.getElementById('frontBtn');
   const backBtn = document.getElementById('backBtn');
+  console.log('Flipper:', flipper, 'FrontBtn:', frontBtn, 'BackBtn:', backBtn);
   const colorBtns = Array.from(document.querySelectorAll('.color-btn'));
   const selectableCards = Array.from(document.querySelectorAll('.selectable-card'));
   const editBtn = document.querySelector('.edit-btn');
@@ -11,7 +13,66 @@ document.addEventListener('DOMContentLoaded', () => {
   const imageCache = new Map();
   let toastTimeout = null;
 
+  const STORAGE_KEY = 'inkwise-preview-selections';
+  const productId = document.body?.dataset?.productId ?? null;
+  const productName = document.body?.dataset?.productName ?? null;
+
+  const readSelectionStore = () => {
+    try {
+      const raw = window.sessionStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (error) {
+      console.warn('Unable to parse stored preview selections', error);
+      return {};
+    }
+  };
+
+  const writeSelectionStore = (store) => {
+    try {
+      window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    } catch (error) {
+      console.warn('Unable to persist preview selections', error);
+    }
+  };
+
+  const getStoredEntry = () => {
+    if (!productId) return null;
+    const store = readSelectionStore();
+    const entry = store?.[productId];
+    if (!entry || typeof entry !== 'object') return null;
+    if (!entry.selections || typeof entry.selections !== 'object') return null;
+    return entry;
+  };
+
+  let suppressPersist = false;
+
+  const cloneSelections = () => Object.fromEntries(
+    Object.entries(selectionState).map(([key, value]) => [key, { ...value }])
+  );
+
+  const persistSelectionState = () => {
+    if (suppressPersist || !productId) return;
+    const store = readSelectionStore();
+    store[productId] = {
+      productId,
+      productName,
+      selections: cloneSelections(),
+      updatedAt: Date.now()
+    };
+    writeSelectionStore(store);
+  };
+
+  const storedEntry = getStoredEntry();
+  const initialStoredSelections = storedEntry?.selections
+    ? JSON.parse(JSON.stringify(storedEntry.selections))
+    : null;
+
+  if (storedEntry?.selections) {
+    Object.assign(selectionState, storedEntry.selections);
+  }
+
   if (!flipper || !frontBtn) {
+    console.log('Flipper or frontBtn not found, exiting');
     return;
   }
 
@@ -53,6 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const updateActiveToggle = () => {
+    console.log('updateActiveToggle, showingFront:', state.showingFront);
     frontBtn.classList.toggle('active', state.showingFront);
     if (backBtn) {
       backBtn.classList.toggle('active', !state.showingFront);
@@ -90,11 +152,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
-  frontBtn.addEventListener('click', showFront);
+  frontBtn.addEventListener('click', () => {
+    console.log('Front button clicked');
+    showFront();
+  });
   handleToggleKeydown(frontBtn, showFront);
 
   if (backBtn) {
-    backBtn.addEventListener('click', showBack);
+    backBtn.addEventListener('click', () => {
+      console.log('Back button clicked');
+      showBack();
+    });
     handleToggleKeydown(backBtn, showBack);
   }
 
@@ -130,8 +198,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   const syncEditButtonState = () => {
-    if (!editBtn) return;
-    editBtn.dataset.selectedOptions = JSON.stringify(selectionState);
+    if (editBtn) {
+      editBtn.dataset.selectedOptions = JSON.stringify(selectionState);
+    }
+    persistSelectionState();
   };
 
   const showToast = (message, duration = 3200) => {
@@ -152,33 +222,44 @@ document.addEventListener('DOMContentLoaded', () => {
     return Number.isFinite(numeric) ? `₱${numeric.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : price;
   };
 
-  const toggleSelection = (card) => {
+  const toggleSelection = (card, options = {}) => {
     const group = card.dataset.optionGroup;
     if (!group) return;
 
-    const current = document.querySelector(
+    const existing = document.querySelector(
       `.selectable-card.selected[data-option-group="${group}"]`
     );
 
-    if (current && current !== card) {
-      current.classList.remove('selected');
-      current.setAttribute('aria-pressed', 'false');
+    const forceProvided = Object.prototype.hasOwnProperty.call(options, 'forceSelect');
+    const shouldSelect = forceProvided ? Boolean(options.forceSelect) : !card.classList.contains('selected');
+
+    if (shouldSelect && existing && existing !== card) {
+      existing.classList.remove('selected');
+      existing.setAttribute('aria-pressed', 'false');
     }
 
-    const isSelected = card.classList.toggle('selected');
-    card.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
-
-    if (isSelected) {
-      selectionState[group] = {
-        id: card.dataset.optionId || null,
+    if (shouldSelect) {
+      card.classList.add('selected');
+      card.setAttribute('aria-pressed', 'true');
+      const payload = {
+        id: card.dataset.optionId ? String(card.dataset.optionId) : null,
         name: card.dataset.optionName || '',
         price: card.dataset.optionPrice || '',
         image: card.dataset.optionImage || ''
       };
-      showToast(`${selectionState[group].name || 'Option'} selected • ${formatPrice(selectionState[group].price)}`);
+      selectionState[group] = payload;
+      if (!options.silent) {
+        showToast(`${payload.name || 'Option'} selected • ${formatPrice(payload.price)}`);
+      }
     } else {
+      if (card.classList.contains('selected')) {
+        card.classList.remove('selected');
+        card.setAttribute('aria-pressed', 'false');
+      }
       delete selectionState[group];
-      showToast('Selection cleared.');
+      if (!options.silent) {
+        showToast('Selection cleared.');
+      }
     }
 
     syncEditButtonState();
@@ -196,29 +277,43 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (event.key === 'Escape' && card.classList.contains('selected')) {
         event.preventDefault();
-        card.classList.remove('selected');
-        card.setAttribute('aria-pressed', 'false');
-        const group = card.dataset.optionGroup;
-        if (group) {
-          delete selectionState[group];
-          syncEditButtonState();
-          showToast('Selection cleared.');
-        }
+        toggleSelection(card, { forceSelect: false });
       }
     });
   });
+
+  if (initialStoredSelections) {
+    suppressPersist = true;
+    Object.entries(initialStoredSelections).forEach(([group, payload]) => {
+      if (!payload || typeof payload !== 'object') return;
+      const card = selectableCards.find((node) =>
+        node.dataset.optionGroup === group &&
+        String(node.dataset.optionId ?? '') === String(payload.id ?? '')
+      );
+      if (card) {
+        toggleSelection(card, { forceSelect: true, silent: true });
+      }
+    });
+    suppressPersist = false;
+  }
+
+  syncEditButtonState();
 
   if (selectableCards.length && selectionToast) {
     showToast('Customize your invite: select paper stock and optional add-ons.', 4200);
   }
 
   if (editBtn) {
+    console.log('Edit button found');
     editBtn.addEventListener('click', () => {
+      console.log('Edit button clicked');
       const hasOptionalAddon = optionalAddonGroups.some((group) => selectionState[group]);
       if (!hasOptionalAddon && selectionToast) {
         showToast('Add-ons are optional. Pick trim, embossed powder, orientation, or size if you like.');
       }
     });
+  } else {
+    console.log('Edit button not found');
   }
 
   updateToggleVisibility();

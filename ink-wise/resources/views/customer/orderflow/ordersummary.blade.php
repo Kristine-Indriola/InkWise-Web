@@ -3,6 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="csrf-token" content="{{ csrf_token() }}">
 	<title>Order Summary — InkWise</title>
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,37 +13,45 @@
 </head>
 <body>
 @php
+$resolveRoute = static function (string $name, string $fallbackPath) {
 	try {
-		$envelopeUrl = route('order.envelope');
-	} catch (\Throwable $eEnvelope) {
-		$envelopeUrl = url('/order/envelope');
+		return route($name);
+	} catch (\Throwable $exception) {
+		return url($fallbackPath);
 	}
+};
 
-	try {
-		$finalStepUrl = route('order.finalstep');
-	} catch (\Throwable $eFinal) {
-		$finalStepUrl = url('/order/final-step');
-	}
+$envelopeUrl = $resolveRoute('order.envelope', '/order/envelope');
+$summaryUrl = $resolveRoute('order.summary', '/order/summary');
+$summaryJsonUrl = $resolveRoute('order.summary.json', '/order/summary.json');
+$summaryClearUrl = $resolveRoute('order.summary.clear', '/order/summary');
+$envelopeClearUrl = $resolveRoute('order.envelope.clear', '/order/envelope');
+$giveawayClearUrl = $resolveRoute('order.giveaways.clear', '/order/giveaways');
+$giveawaysUrl = $resolveRoute('order.giveaways', '/order/giveaways');
+$finalStepUrl = $resolveRoute('order.finalstep', '/order/finalstep');
+$checkoutUrl = $resolveRoute('customer.checkout', '/checkout');
+$envelopeStoreUrl = $resolveRoute('order.envelope.store', '/order/envelope');
+$giveawayStoreUrl = $resolveRoute('order.giveaways.store', '/order/giveaways');
 
-	try {
-		$giveawaysUrl = route('order.giveaways');
-	} catch (\Throwable $eGiveaways) {
-		$giveawaysUrl = url('/order/giveaways');
-	}
-
-	try {
-		$checkoutUrl = url('/checkout');
-	} catch (\Throwable $eCheckout) {
-		$checkoutUrl = '/checkout';
-	}
+$hasEnvelope = (bool) data_get($orderSummary, 'hasEnvelope', !empty(data_get($orderSummary, 'envelope')));
+$hasGiveaway = (bool) data_get($orderSummary, 'hasGiveaway', !empty(data_get($orderSummary, 'giveaway')));
 @endphp
 	<main
 		class="os-shell ordersummary-shell"
 		data-storage-key="inkwise-finalstep"
 		data-envelopes-url="{{ $envelopeUrl }}"
+		data-summary-url="{{ $summaryUrl }}"
+		data-summary-api="{{ $summaryJsonUrl }}"
+		data-summary-clear-url="{{ $summaryClearUrl }}"
+		data-envelope-clear-url="{{ $envelopeClearUrl }}"
+		data-giveaway-clear-url="{{ $giveawayClearUrl }}"
 		data-checkout-url="{{ $checkoutUrl }}"
+		data-has-envelope="{{ $hasEnvelope ? 'true' : 'false' }}"
+		data-has-giveaway="{{ $hasGiveaway ? 'true' : 'false' }}"
 		data-edit-url="{{ $finalStepUrl }}"
 		data-giveaways-url="{{ $giveawaysUrl }}"
+		data-envelope-store-url="{{ $envelopeStoreUrl }}"
+		data-giveaway-store-url="{{ $giveawayStoreUrl }}"
 	>
 		<header class="ordersummary-header">
 			<div class="ordersummary-header__content">
@@ -155,7 +164,7 @@
 					</div>
 				</article>
 
-				<article class="os-card os-product-preview">
+				<article class="os-card os-product-preview" data-envelope-card @if(!$hasEnvelope) hidden @endif>
 					<header class="os-card-header">
 						<h2>Envelope selection</h2>
 						<a href="#" class="os-preview-remove" id="osRemoveEnvelopeBtn">Remove</a>
@@ -163,13 +172,7 @@
 					<div class="os-preview-content">
 						<div class="os-preview-left">
 							<div class="os-preview-frame" data-envelope-preview-frame>
-								<button type="button" class="os-preview-nav os-preview-nav--prev" data-envelope-preview-prev aria-label="Previous envelope preview image" disabled>
-									<span aria-hidden="true">◀</span>
-								</button>
 								<img src="{{ asset('images/placeholder.png') }}" alt="Envelope preview" data-envelope-preview-image>
-								<button type="button" class="os-preview-nav os-preview-nav--next" data-envelope-preview-next aria-label="Next envelope preview image" disabled>
-									<span aria-hidden="true">▶</span>
-								</button>
 							</div>
 							<div class="os-preview-meta">
 								<a href="{{ route('order.envelope') }}" class="os-preview-link" data-envelope-edit>Edit envelope</a>
@@ -237,7 +240,7 @@
 					</div>
 				</article>
 
-				<article class="os-card os-product-preview">
+				<article class="os-card os-product-preview" data-giveaways-card @if(!$hasGiveaway) hidden @endif>
 					<header class="os-card-header">
 						<h2>Giveaways selection</h2>
 						<a href="#" class="os-preview-remove" id="osRemoveGiveawaysBtn">Remove</a>
@@ -245,13 +248,7 @@
 					<div class="os-preview-content">
 						<div class="os-preview-left">
 							<div class="os-preview-frame" data-giveaways-preview-frame>
-								<button type="button" class="os-preview-nav os-preview-nav--prev" data-giveaways-preview-prev aria-label="Previous giveaways preview image" disabled>
-									<span aria-hidden="true">◀</span>
-								</button>
 								<img src="{{ asset('images/placeholder.png') }}" alt="Giveaways preview" data-giveaways-preview-image>
-								<button type="button" class="os-preview-nav os-preview-nav--next" data-giveaways-preview-next aria-label="Next giveaways preview image" disabled>
-									<span aria-hidden="true">▶</span>
-								</button>
 							</div>
 							<div class="os-preview-meta">
 								<a href="#" class="os-preview-link" data-giveaways-edit>Edit giveaways</a>
