@@ -55,10 +55,7 @@
             <h1 class="page-title">Dashboard Overview</h1>
             <p class="page-subtitle">Quick look at orders and stock health.</p>
         </div>
-        <a href="{{ route('admin.users.passwords.index') }}" class="page-action-button" title="Open password reset console">
-            <i class="fa-solid fa-gear" aria-hidden="true"></i>
-            <span>Password resets</span>
-        </a>
+
     </header>
 
     <section class="summary-grid" aria-label="Key performance highlights">

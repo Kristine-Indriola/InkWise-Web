@@ -46,6 +46,8 @@ use App\Http\Controllers\Owner\OwnerInventoryController;
 use App\Http\Controllers\Staff\StaffInventoryController;
 use App\Http\Controllers\Admin\ReportsDashboardController;
 use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\Admin\SiteContentController;
 
 use App\Http\Controllers\Admin\OrderSummaryController;
 use App\Models\Product;
@@ -153,6 +155,11 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::delete('/{user_id}', [UserManagementController::class, 'destroy'])->name('destroy');
 
 });
+
+    Route::prefix('settings')->name('settings.')->group(function () {
+        Route::get('/site-content', [SiteContentController::class, 'edit'])->name('site-content.edit');
+        Route::put('/site-content', [SiteContentController::class, 'update'])->name('site-content.update');
+    });
 
 
      Route::prefix('inventory')->name('inventory.')->group(function () {
@@ -448,6 +455,12 @@ Route::get('/checkout', [OrderFlowController::class, 'checkout'])->name('custome
 Route::post('/checkout/complete', [OrderFlowController::class, 'completeCheckout'])->name('checkout.complete');
 Route::post('/checkout/cancel', [OrderFlowController::class, 'cancelCheckout'])->name('checkout.cancel');
 
+Route::middleware('auth')->group(function () {
+    Route::post('/payments/gcash', [PaymentController::class, 'createGCashPayment'])->name('payment.gcash.create');
+    Route::get('/payments/gcash/return', [PaymentController::class, 'handleGCashReturn'])->name('payment.gcash.return');
+});
+Route::post('/payments/gcash/webhook', [PaymentController::class, 'webhook'])->name('payment.gcash.webhook');
+
 /**Customer Upload Route*/
 Route::middleware('auth')->post('/customer/upload/design', [CustomerAuthController::class, 'uploadDesign'])->name('customer.upload.design');
 
@@ -597,6 +610,10 @@ if (interface_exists('Laravel\\Socialite\\Contracts\\Factory')) {
 }
 
 Route::middleware('auth')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
+
+require __DIR__.'/auth.php';
+
+
 
 
 

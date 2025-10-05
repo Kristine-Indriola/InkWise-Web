@@ -314,6 +314,9 @@ class ProductController extends Controller
         // Create or update product and related records inside a transaction
         $product = null;
         DB::transaction(function() use ($request, $validated, $imagePath, &$product) {
+            $leadTimeInput = $validated['lead_time'] ?? null;
+            $leadTimeDays = is_numeric($leadTimeInput) ? (int) $leadTimeInput : null;
+
             $data = [
                 'template_id' => $validated['template_id'] ?? null,
                 'name' => $validated['invitationName'],
@@ -323,7 +326,8 @@ class ProductController extends Controller
                 'description' => $validated['description'] ?? $request->input('description',''),
                 // ensure the three fields requested are persisted on the product
                 'base_price' => isset($validated['base_price']) ? floatval($validated['base_price']) : null,
-                'lead_time' => $validated['lead_time'] ?? null,
+                'lead_time' => $leadTimeInput,
+                'lead_time_days' => $leadTimeDays,
                 'date_available' => !empty($validated['date_available']) ? $validated['date_available'] : null,
             ];
 
