@@ -8,12 +8,6 @@
 @endpush
 
 @section('content')
-@php
-    $totalStaff = $users->count();
-    $pendingStaff = $users->filter(fn($u) => optional($u->staff)->status === 'pending')->count();
-    $activeStaff = $users->filter(fn($u) => optional($u->staff)->status === 'approved')->count();
-@endphp
-
 <main class="admin-page-shell staff-page" role="main">
     @if(session('warning'))
         <div class="dashboard-alert alert-warning" role="alert" aria-live="polite">
@@ -32,44 +26,12 @@
         </a>
     </header>
 
-    <section class="summary-grid" aria-label="Staff summary">
-        <div class="summary-card">
-            <div class="summary-card-header">
-                <span class="summary-card-label">Total Staff</span>
-                <span class="summary-card-chip accent">Directory</span>
-            </div>
-            <div class="summary-card-body">
-                <span class="summary-card-value">{{ number_format($totalStaff ?? 0) }}</span>
-                <span class="summary-card-icon" aria-hidden="true"><i class="fa-solid fa-users"></i></span>
-            </div>
-            <span class="summary-card-meta">All registered accounts</span>
-        </div>
-        <div class="summary-card">
-            <div class="summary-card-header">
-                <span class="summary-card-label">Active</span>
-                <span class="summary-card-chip success">Approved</span>
-            </div>
-            <div class="summary-card-body">
-                <span class="summary-card-value">{{ number_format($activeStaff ?? 0) }}</span>
-                <span class="summary-card-icon" aria-hidden="true"><i class="fa-solid fa-circle-check"></i></span>
-            </div>
-            <span class="summary-card-meta">Currently approved staff</span>
-        </div>
-        <div class="summary-card">
-            <div class="summary-card-header">
-                <span class="summary-card-label">Pending</span>
-                <span class="summary-card-chip warning">Review</span>
-            </div>
-            <div class="summary-card-body">
-                <span class="summary-card-value">{{ number_format($pendingStaff ?? 0) }}</span>
-                <span class="summary-card-icon" aria-hidden="true"><i class="fa-solid fa-clock"></i></span>
-            </div>
-            <span class="summary-card-meta">Awaiting approval</span>
-        </div>
-    </section>
+    <div id="staff-summary">
+        @include('admin.users.partials.summary', compact('totalStaff', 'activeStaff', 'pendingStaff'))
+    </div>
 
     <section class="staff-toolbar" aria-label="Staff filters and actions">
-        <form method="GET" action="{{ route('admin.users.index') }}" class="materials-toolbar__search">
+        <form method="GET" action="{{ route('admin.users.index') }}" class="materials-toolbar__search" role="search">
             <div class="search-input">
                 <span class="search-icon">
                     <i class="fa-solid fa-magnifying-glass"></i>
@@ -81,6 +43,7 @@
                     placeholder="Search staff by name or email..."
                     class="form-control"
                     aria-label="Search staff"
+                    data-search-url="{{ route('admin.users.index') }}"
                 >
             </div>
             <button type="submit" class="btn btn-secondary">Search</button>
@@ -88,91 +51,99 @@
     </section>
 
     <section class="staff-table" aria-label="Staff list">
-        <div class="table-wrapper">
-            <table class="table" role="grid">
-                <thead>
-                    <tr>
-                        <th scope="col">Staff ID</th>
-                        <th scope="col">Role</th>
-                        <th scope="col">Name</th>
-                        <th scope="col">Email</th>
-                        <th scope="col">Status</th>
-                        <th scope="col" class="text-center">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($users as $user)
-                        @php
-                            $staffProfile = $user->staff;
-                            $fullName = collect([
-                                optional($staffProfile)->first_name,
-                                optional($staffProfile)->middle_name,
-                                optional($staffProfile)->last_name,
-                            ])->filter()->implode(' ');
-                            $roleClass = match($user->role) {
-                                'owner' => 'badge-role badge-role--owner',
-                                'admin' => 'badge-role badge-role--admin',
-                                default => 'badge-role badge-role--staff',
-                            };
-                            $status = optional($staffProfile)->status ?? $user->status;
-                            $statusClass = match($status) {
-                                'approved', 'active' => 'badge-status badge-status--active',
-                                'pending' => 'badge-status badge-status--pending',
-                                'archived' => 'badge-status badge-status--archived',
-                                default => 'badge-status badge-status--inactive',
-                            };
-                            $rowClass = $status === 'pending' ? 'staff-row staff-row--pending' : 'staff-row';
-                        @endphp
-                        @php $isHighlighted = request('highlight') && (int) request('highlight') === (int) $user->user_id; @endphp
-                        <tr {{ $isHighlighted ? 'id=highlighted-staff' : '' }} class="{{ $isHighlighted ? 'staff-row highlight-row' : $rowClass }}" onclick="window.location='{{ route('admin.users.show', $user->user_id) }}'">
-                            <td>{{ $staffProfile->staff_id ?? '—' }}</td>
-                            <td>
-                                <span class="{{ $roleClass }}">{{ ucfirst($user->role) }}</span>
-                            </td>
-                            <td class="fw-bold">{{ $fullName ?: '—' }}</td>
-                                <td>{{ $user->email }}</td>
-                                <td>
-                                <span class="{{ $statusClass }}">{{ ucfirst($status) }}</span>
-                            </td>
-                            <td class="table-actions" onclick="event.stopPropagation();">
-                                @if(optional($staffProfile)->status !== 'archived')
-                                    <a href="{{ route('admin.users.edit', $user->user_id) }}" class="btn btn-warning">
-                                        <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
-                                        <span>Edit</span>
-                                    </a>
-                                    <form action="{{ route('admin.users.destroy', $user->user_id) }}" method="POST" class="inline">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" onclick="return confirm('Archive this staff account?')" class="btn btn-danger">
-                                            <i class="fa-solid fa-box-archive" aria-hidden="true"></i>
-                                            <span>Archive</span>
-                                        </button>
-                                    </form>
-                                @else
-                                    <span class="badge-status badge-status--archived">Archived</span>
-                                @endif
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="6" class="text-center">No staff found.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
+        <div id="staff-table">
+            @include('admin.users.partials.table', ['users' => $users])
         </div>
     </section>
 </main>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const highlightedRow = document.getElementById('highlighted-staff');
-    if (highlightedRow) {
-        highlightedRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        highlightedRow.classList.add('recently-approved');
-        highlightedRow.setAttribute('tabindex', '-1');
-        highlightedRow.focus({ preventScroll: true });
-        setTimeout(() => highlightedRow.removeAttribute('tabindex'), 2500);
+    const searchInput = document.querySelector('input[name="search"]');
+    const summaryContainer = document.getElementById('staff-summary');
+    const tableContainer = document.getElementById('staff-table');
+    let searchDebounceTimer = null;
+    let activeFetchController = null;
+
+    function initHighlightedRow() {
+        const highlightedRow = document.getElementById('highlighted-staff');
+        if (highlightedRow) {
+            highlightedRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            highlightedRow.classList.add('recently-approved');
+            highlightedRow.setAttribute('tabindex', '-1');
+            highlightedRow.focus({ preventScroll: true });
+            setTimeout(() => highlightedRow.removeAttribute('tabindex'), 2500);
+        }
     }
+
+    function fetchResults(term) {
+        if (!searchInput || !summaryContainer || !tableContainer) {
+            return;
+        }
+
+        if (activeFetchController) {
+            activeFetchController.abort();
+        }
+
+        activeFetchController = new AbortController();
+        const baseUrl = searchInput.dataset.searchUrl;
+        const params = new URLSearchParams();
+        if (term) {
+            params.set('search', term);
+        }
+
+        const url = params.toString() ? `${baseUrl}?${params.toString()}` : baseUrl;
+
+        fetch(url, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            signal: activeFetchController.signal
+        })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(function (data) {
+                if (data.summary) {
+                    summaryContainer.innerHTML = data.summary;
+                }
+                if (data.table) {
+                    tableContainer.innerHTML = data.table;
+                }
+                initHighlightedRow();
+
+                if (typeof history.replaceState === 'function') {
+                    history.replaceState({}, '', url);
+                }
+            })
+            .catch(function (error) {
+                if (error.name === 'AbortError') {
+                    return;
+                }
+                console.error('Live staff search failed:', error);
+            });
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function (event) {
+            const term = event.target.value.trim();
+            if (searchDebounceTimer) {
+                clearTimeout(searchDebounceTimer);
+            }
+            searchDebounceTimer = setTimeout(function () {
+                fetchResults(term);
+            }, 300);
+        });
+
+        if (searchInput.value.trim()) {
+            fetchResults(searchInput.value.trim());
+        }
+    }
+
+    initHighlightedRow();
 });
 </script>
 @endsection

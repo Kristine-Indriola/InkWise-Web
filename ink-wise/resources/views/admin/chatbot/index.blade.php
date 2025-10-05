@@ -2,118 +2,198 @@
 
 @section('title', 'Manage Chatbot Q&A')
 
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/admin-css/chatbot.css') }}">
+@endpush
+
 @section('content')
-<link rel="stylesheet" href="{{ asset('css/admin/chatbot.css') }}">
+@php
+    $totalEntries = $qas->count();
+    $entriesWithImage = $qas->whereNotNull('answer_image_path')->count();
+    $lastUpdated = $qas->max('updated_at');
+@endphp
 
-<div class="chatbot-container">
-    <div class="header-row">
-        <h2 class="mb-0">Chatbot Questions & Answers</h2>
-        <input id="qaSearch" type="search" placeholder="Search questions or answers..." class="form-control search-input">
-    </div>
-
+<main class="admin-page-shell chatbot-page" role="main">
     @if(session('success'))
-        <div class="alert-success" role="alert">
+        <div class="dashboard-alert" role="alert" aria-live="polite">
             {{ session('success') }}
         </div>
     @endif
 
-    <div class="grid">
-        <form action="{{ route('admin.chatbot.store') }}" method="POST" class="card card-form" enctype="multipart/form-data">
-            @csrf
-            <h4 class="card-title">Add New Q&A</h4>
-            <div class="form-group">
-                <label>Question</label>
-                <input type="text" name="question" class="form-control" value="{{ old('question') }}" required>
-            </div>
-            <div class="form-group">
-                <label>Answer</label>
-<div class="form-group input-with-icon">
+    <header class="page-header">
+        <div>
+            <h1 class="page-title">Chatbot Knowledge Base</h1>
+            <p class="page-subtitle">Manage automated replies so guests and customers get answers fast.</p>
+        </div>
+        <a href="#chatbotForm" class="btn btn-primary" data-scroll-to="chatbotForm">
+            <i class="fa-solid fa-plus" aria-hidden="true"></i>
+            <span>Add Q&amp;A</span>
+        </a>
+    </header>
 
-    <textarea name="answer" class="form-control" rows="2" required></textarea>
-    <button type="button" class="attach-btn" id="createImageTrigger" title="Attach image">
-         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" 
-             stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" 
-             viewBox="0 0 24 24">
-            <path d="M21.44 11.05l-9.19 9.19a5.5 5.5 0 01-7.78-7.78l9.19-9.19a3.5 3.5 0 115 5l-9.2 9.2a1.5 1.5 0 01-2.12-2.12l8.49-8.49"/>
-            <line x1="19" y1="6" x2="19" y2="12"/>
-            <line x1="16" y1="9" x2="22" y2="9"/>
-        </svg>
-        <span class="sr-only">Attach image</span>
-    </button>
-</div>
-                <input id="createAnswerImage" type="file" name="answer_image" accept="image/*" class="sr-only" aria-hidden="true">
-                <div class="qa-image-feedback text-muted small" id="createImageFeedback">No image selected.</div>
-                <div class="qa-image-preview-frame" id="createImagePreviewWrapper" style="display:none;">
-                    <img id="createImagePreview" alt="New answer image preview" class="qa-image-preview" loading="lazy">
-                    <button type="button" class="qa-image-remove" id="createImageClear" title="Remove image">
-                        <i class="fi fi-rr-cross-small" aria-hidden="true"></i>
-                        <span class="sr-only">Remove image</span>
-                    </button>
+    <section class="summary-grid chatbot-summary" aria-label="Chatbot highlights">
+        <article class="summary-card summary-card--knowledge">
+            <div class="summary-card-header">
+                <span class="summary-card-label">Total Entries</span>
+                <span class="summary-card-chip accent">Knowledge</span>
+            </div>
+            <div class="summary-card-body">
+                <span class="summary-card-value" data-summary="total" data-total="{{ $totalEntries }}">{{ number_format($totalEntries) }}</span>
+                <span class="summary-card-icon" aria-hidden="true"><i class="fi fi-rr-book"></i></span>
+            </div>
+            <span class="summary-card-meta" data-summary-meta="total">Active questions stored</span>
+        </article>
+        <article class="summary-card summary-card--media">
+            <div class="summary-card-header">
+                <span class="summary-card-label">Answers w/ Media</span>
+                <span class="summary-card-chip accent">Rich replies</span>
+            </div>
+            <div class="summary-card-body">
+                <span class="summary-card-value" data-summary="media" data-total-media="{{ $entriesWithImage }}">{{ number_format($entriesWithImage) }}</span>
+                <span class="summary-card-icon" aria-hidden="true"><i class="fi fi-rr-picture"></i></span>
+            </div>
+            <span class="summary-card-meta" data-summary-meta="media">Entries enhanced with images</span>
+        </article>
+        <article class="summary-card summary-card--updated">
+            <div class="summary-card-header">
+                <span class="summary-card-label">Last Updated</span>
+                <span class="summary-card-chip accent">Freshness</span>
+            </div>
+            <div class="summary-card-body">
+                <span class="summary-card-value" data-summary="updated" data-initial-updated="{{ $lastUpdated ? e(optional($lastUpdated)->diffForHumans()) : '—' }}">{{ $lastUpdated ? optional($lastUpdated)->diffForHumans() : '—' }}</span>
+                <span class="summary-card-icon" aria-hidden="true"><i class="fi fi-rr-refresh"></i></span>
+            </div>
+            <span class="summary-card-meta">Most recent change</span>
+        </article>
+    </section>
+
+    <section class="materials-toolbar chatbot-toolbar" aria-label="Chatbot utilities">
+        <div class="materials-toolbar__search chatbot-search">
+            <div class="search-input">
+                <span class="search-icon">
+                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                </span>
+                <input
+                    id="qaSearch"
+                    type="search"
+                    class="form-control"
+                    placeholder="Search questions or answers..."
+                    aria-label="Search chatbot entries"
+                >
+            </div>
+        </div>
+        <p class="chatbot-toolbar__hint" id="chatbotEntriesHint" data-total="{{ $totalEntries }}">
+            <strong>{{ number_format($totalEntries) }}</strong> entries available for the assistant.
+        </p>
+    </section>
+
+    <div id="chatbotResultsLive" class="sr-only" role="status" aria-live="polite"></div>
+
+    <div class="chatbot-grid">
+        <section id="chatbotForm" class="chatbot-card chatbot-card--form" tabindex="-1" aria-labelledby="chatbotFormTitle">
+            <h2 id="chatbotFormTitle" class="card-title">Add New Q&amp;A</h2>
+            <form action="{{ route('admin.chatbot.store') }}" method="POST" class="chatbot-form" enctype="multipart/form-data">
+                @csrf
+                <div class="form-group">
+                    <label for="createQuestion">Question</label>
+                    <input id="createQuestion" type="text" name="question" class="form-control" value="{{ old('question') }}" required>
+                </div>
+                <div class="form-group">
+                    <label for="createAnswer">Answer</label>
+                    <div class="input-with-icon">
+                        <textarea id="createAnswer" name="answer" class="form-control" rows="2" required></textarea>
+                        <button type="button" class="attach-btn" id="createImageTrigger" title="Attach image">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M21.44 11.05l-9.19 9.19a5.5 5.5 0 01-7.78-7.78l9.19-9.19a3.5 3.5 0 115 5l-9.2 9.2a1.5 1.5 0 01-2.12-2.12l8.49-8.49" />
+                                <line x1="19" y1="6" x2="19" y2="12" />
+                                <line x1="16" y1="9" x2="22" y2="9" />
+                            </svg>
+                            <span class="sr-only">Attach image</span>
+                        </button>
+                    </div>
+                    <input id="createAnswerImage" type="file" name="answer_image" accept="image/*" class="sr-only" aria-hidden="true">
+                    <div class="qa-image-feedback text-muted small" id="createImageFeedback">No image selected.</div>
+                    <div class="qa-image-preview-frame" id="createImagePreviewWrapper" hidden>
+                        <img id="createImagePreview" alt="New answer image preview" class="qa-image-preview" loading="lazy">
+                        <button type="button" class="qa-image-remove" id="createImageClear" title="Remove image">
+                            <i class="fi fi-rr-cross-small" aria-hidden="true"></i>
+                            <span class="sr-only">Remove image</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="chatbot-form__actions">
+                    <button type="submit" class="btn btn-primary">Add Q&amp;A</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="chatbot-card chatbot-card--list" tabindex="-1" aria-labelledby="chatbotListTitle">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title" id="chatbotListTitle">Existing Q&amp;A</h2>
+                    <p class="section-subtitle">Edit responses or delete entries that are no longer relevant.</p>
                 </div>
             </div>
-            <div class="text-right">
-                <button type="submit" class="btn btn-primary">Add Q&A</button>
-            </div>
-        </form>
 
-        <div class="card card-list">
-            <h4 class="card-title">Existing Q&A</h4>
-
-            <div class="table-responsive">
-                <table class="table table-hover" id="qasTable">
+            <div class="table-wrapper">
+                <table class="table table-hover" id="qasTable" role="grid">
                     <thead>
                         <tr>
-                            <th class="col-question">Question</th>
-                            <th>Answer</th>
-                            <th class="col-actions">Actions</th>
+                            <th scope="col" class="col-question">Question</th>
+                            <th scope="col">Answer</th>
+                            <th scope="col" class="col-actions">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($qas as $qa)
+                        @forelse($qas as $qa)
                             <tr class="qa-row"
                                 data-id="{{ $qa->id }}"
                                 data-question="{{ htmlentities($qa->question, ENT_QUOTES, 'UTF-8') }}"
                                 data-answer="{{ htmlentities($qa->answer, ENT_QUOTES, 'UTF-8') }}"
-                                data-image-url="{{ $qa->answer_image_path ? htmlentities(asset('storage/' . $qa->answer_image_path), ENT_QUOTES, 'UTF-8') : '' }}">
+                                data-image-url="{{ $qa->answer_image_path ? htmlentities(asset('storage/' . $qa->answer_image_path), ENT_QUOTES, 'UTF-8') : '' }}"
+                                data-has-image="{{ $qa->answer_image_path ? 'true' : 'false' }}"
+                                data-updated="{{ optional($qa->updated_at)->toIso8601String() }}"
+                                data-updated-human="{{ optional($qa->updated_at)->diffForHumans() }}">
                                 <td class="qa-question">{{ $qa->question }}</td>
                                 <td class="qa-answer">
                                     {{ \Illuminate\Support\Str::limit(strip_tags($qa->answer), 200) }}
                                     @if($qa->answer_image_path)
-                                        <div class="qa-answer-media text-muted small" style="margin-top:6px; display:block;">📎 Image attached</div>
+                                        <div class="qa-answer-media text-muted small">📎 Image attached</div>
                                     @endif
                                 </td>
                                 <td class="text-center">
                                     <button type="button" class="btn btn-sm btn-warning edit-qa" title="Edit" data-id="{{ $qa->id }}">Edit</button>
 
                                     <form action="{{ route('admin.chatbot.destroy', $qa->id) }}" method="POST" class="inline-form">
-                                    @csrf
-                                     @method('DELETE')
-                                      <button class="btn btn-sm btn-danger">Delete</button>
-                                        </form>
+                                        @csrf
+                                        @method('DELETE')
+                                        <button class="btn btn-sm btn-danger">Delete</button>
+                                    </form>
                                 </td>
                             </tr>
-                        @endforeach
-                        @if($qas->isEmpty())
+                        @empty
                             <tr>
-                                <td colspan="3" class="text-muted small">No Q&A found.</td>
+                                <td colspan="3" class="text-muted small">No Q&amp;A found.</td>
                             </tr>
-                        @endif
+                        @endforelse
                     </tbody>
                 </table>
             </div>
-        </div>
+        </section>
     </div>
-</div>
+</main>
+@endsection
 
-<!-- Single reuseable Edit Modal -->
+<!-- Single reusable Edit Modal -->
 <div class="modal" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
-      <form id="editForm" method="POST" action="#">
+      <form id="editForm" method="POST" action="#" enctype="multipart/form-data">
         @csrf
         @method('PUT')
         <div class="modal-header">
-          <h5 class="modal-title" id="editModalLabel">Edit Q&A</h5>
+          <h5 class="modal-title" id="editModalLabel">Edit Q&amp;A</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
@@ -123,27 +203,27 @@
           </div>
           <div class="form-group mt-3">
             <label for="editAnswer">Answer</label>
-                        <div class="input-with-icon">
-                            <textarea id="editAnswer" name="answer" class="form-control" rows="6" required></textarea>
-                            <button type="button" class="attach-btn" id="editImageTrigger" title="Attach image">
-                                <i class="fi fi-rr-paperclip" aria-hidden="true"></i>
-                                <span class="sr-only">Attach image</span>
-                            </button>
-                        </div>
-                        <input id="editImage" name="answer_image" type="file" accept="image/*" class="sr-only" aria-hidden="true">
-                        <div class="qa-image-feedback text-muted small" id="editImageFeedback">No image selected. Uploading a new file replaces the existing image.</div>
-                    </div>
-                                <div class="form-group mt-3" id="editImagePreviewWrapper" style="display:none;">
-                                    <label style="display:block; margin-bottom:8px;">Attached Image</label>
-                        <div class="qa-image-preview-frame">
-                            <img id="editImagePreview" alt="Answer image preview" class="qa-image-preview" loading="lazy">
-                            <button type="button" class="qa-image-remove" id="removeImageBtn" title="Remove image">
-                                <i class="fi fi-rr-cross-small" aria-hidden="true"></i>
-                                <span class="sr-only">Remove image</span>
-                            </button>
-                        </div>
-                    </div>
-                    <input type="hidden" id="removeImage" name="remove_image" value="0">
+            <div class="input-with-icon">
+                <textarea id="editAnswer" name="answer" class="form-control" rows="6" required></textarea>
+                <button type="button" class="attach-btn" id="editImageTrigger" title="Attach image">
+                    <i class="fi fi-rr-paperclip" aria-hidden="true"></i>
+                    <span class="sr-only">Attach image</span>
+                </button>
+            </div>
+            <input id="editImage" name="answer_image" type="file" accept="image/*" class="sr-only" aria-hidden="true">
+            <div class="qa-image-feedback text-muted small" id="editImageFeedback">No image selected. Uploading a new file replaces the existing image.</div>
+          </div>
+          <div class="form-group mt-3" id="editImagePreviewWrapper" hidden>
+            <label style="display:block; margin-bottom:8px;">Attached Image</label>
+            <div class="qa-image-preview-frame">
+                <img id="editImagePreview" alt="Answer image preview" class="qa-image-preview" loading="lazy">
+                <button type="button" class="qa-image-remove" id="removeImageBtn" title="Remove image">
+                    <i class="fi fi-rr-cross-small" aria-hidden="true"></i>
+                    <span class="sr-only">Remove image</span>
+                </button>
+            </div>
+          </div>
+          <input type="hidden" id="removeImage" name="remove_image" value="0">
         </div>
         <div class="modal-footer">
           <button type="submit" class="btn btn-primary">Save changes</button>
@@ -157,19 +237,15 @@
 @section('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // search/filter rows
     const search = document.getElementById('qaSearch');
     const rows = Array.from(document.querySelectorAll('#qasTable tbody tr.qa-row'));
-    search && search.addEventListener('input', function () {
-        const q = this.value.trim().toLowerCase();
-        rows.forEach(r => {
-            const question = (r.dataset.question || '').toLowerCase();
-            const answer = (r.dataset.answer || '').toLowerCase();
-            r.style.display = (question.includes(q) || answer.includes(q)) ? '' : 'none';
-        });
-    });
-
-    // Create form elements
+    const summaryTotalValue = document.querySelector('[data-summary="total"]');
+    const summaryMediaValue = document.querySelector('[data-summary="media"]');
+    const summaryUpdatedValue = document.querySelector('[data-summary="updated"]');
+    const summaryTotalMeta = document.querySelector('[data-summary-meta="total"]');
+    const summaryMediaMeta = document.querySelector('[data-summary-meta="media"]');
+    const entriesHint = document.getElementById('chatbotEntriesHint');
+    const liveRegion = document.getElementById('chatbotResultsLive');
     const createImageInput = document.getElementById('createAnswerImage');
     const createImageTrigger = document.getElementById('createImageTrigger');
     const createImagePreviewWrapper = document.getElementById('createImagePreviewWrapper');
@@ -177,7 +253,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const createImageClear = document.getElementById('createImageClear');
     const createImageFeedback = document.getElementById('createImageFeedback');
 
-    // Modal elements
     const editModalEl = document.getElementById('editModal');
     const editForm = document.getElementById('editForm');
     const editQuestion = document.getElementById('editQuestion');
@@ -193,7 +268,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const removeImageInput = document.getElementById('removeImage');
     const deleteForms = document.querySelectorAll('.inline-form');
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-    const flashWrapper = document.querySelector('.chatbot-container');
+    const flashWrapper = document.querySelector('.chatbot-page');
 
     function showFlash(message, type = 'success') {
         if (!flashWrapper) return;
@@ -202,7 +277,12 @@ document.addEventListener('DOMContentLoaded', function () {
             flashEl = document.createElement('div');
             flashEl.className = 'alert-dynamic alert-success';
             flashEl.setAttribute('role', 'alert');
-            flashWrapper.insertBefore(flashEl, flashWrapper.firstElementChild?.nextElementSibling || flashWrapper.firstChild);
+            const header = flashWrapper.querySelector('.page-header');
+            if (header && header.parentNode === flashWrapper) {
+                flashWrapper.insertBefore(flashEl, header.nextSibling);
+            } else {
+                flashWrapper.insertBefore(flashEl, flashWrapper.firstChild);
+            }
         }
         flashEl.textContent = message;
         flashEl.className = `alert-dynamic ${type === 'error' ? 'alert-danger' : 'alert-success'}`;
@@ -232,6 +312,84 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const buildUpdateUrl = (id) => updateUrlTemplate.replace('__ID__', encodeURIComponent(id));
 
+    const numberFormatter = new Intl.NumberFormat();
+
+    function getVisibleRows() {
+        return rows.filter(row => row.style.display !== 'none');
+    }
+
+    function updateSummary() {
+        const visibleRows = getVisibleRows();
+        const totalCount = rows.length;
+        const visibleCount = visibleRows.length;
+        const totalMediaCount = rows.filter(row => row.dataset.hasImage === 'true').length;
+        const visibleMediaCount = visibleRows.filter(row => row.dataset.hasImage === 'true').length;
+
+        if (summaryTotalValue) {
+            summaryTotalValue.textContent = numberFormatter.format(visibleCount);
+            summaryTotalValue.dataset.total = totalCount;
+        }
+
+        if (summaryTotalMeta) {
+            const metaText = visibleCount === totalCount
+                ? 'Active questions stored'
+                : `Showing ${numberFormatter.format(visibleCount)} of ${numberFormatter.format(totalCount)} active questions`;
+            summaryTotalMeta.textContent = metaText;
+        }
+
+        if (summaryMediaValue) {
+            summaryMediaValue.textContent = numberFormatter.format(visibleMediaCount);
+            summaryMediaValue.dataset.totalMedia = totalMediaCount;
+        }
+
+        if (summaryMediaMeta) {
+            const metaText = visibleCount === totalCount
+                ? 'Entries enhanced with images'
+                : `Showing ${numberFormatter.format(visibleMediaCount)} with media (of ${numberFormatter.format(totalMediaCount)})`;
+            summaryMediaMeta.textContent = metaText;
+        }
+
+        if (summaryUpdatedValue) {
+            let latestRow = null;
+            let latestDateValue = null;
+            visibleRows.forEach(row => {
+                const updatedIso = row.dataset.updated;
+                if (!updatedIso) {
+                    return;
+                }
+                const parsedDate = new Date(updatedIso);
+                if (!Number.isNaN(parsedDate.valueOf()) && (!latestDateValue || parsedDate > latestDateValue)) {
+                    latestDateValue = parsedDate;
+                    latestRow = row;
+                }
+            });
+
+            if (latestRow) {
+                summaryUpdatedValue.textContent = latestRow.dataset.updatedHuman || latestRow.dataset.updated || latestDateValue.toLocaleString();
+            } else {
+                summaryUpdatedValue.textContent = summaryUpdatedValue.dataset.initialUpdated || '—';
+            }
+        }
+
+        if (entriesHint) {
+            const totalDisplay = numberFormatter.format(totalCount);
+            if (visibleCount === totalCount) {
+                entriesHint.innerHTML = `<strong>${totalDisplay}</strong> entries available for the assistant.`;
+            } else {
+                entriesHint.innerHTML = `Showing <strong>${numberFormatter.format(visibleCount)}</strong> of <strong>${totalDisplay}</strong> entries.`;
+            }
+            entriesHint.dataset.total = totalCount;
+        }
+
+        if (liveRegion) {
+            if (visibleCount === totalCount) {
+                liveRegion.textContent = `${visibleCount} entries shown.`;
+            } else {
+                liveRegion.textContent = `${visibleCount} of ${totalCount} entries shown.`;
+            }
+        }
+    }
+
     function revokeCreateTempUrl() {
         if (createTempPreviewUrl) {
             try {
@@ -257,10 +415,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (url) {
             createImagePreview.src = url;
-            createImagePreviewWrapper.style.display = '';
+            createImagePreviewWrapper.hidden = false;
         } else {
             createImagePreview.src = '';
-            createImagePreviewWrapper.style.display = 'none';
+            createImagePreviewWrapper.hidden = true;
         }
     }
 
@@ -295,10 +453,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (url) {
             editImagePreview.src = url;
-            editImagePreviewWrapper.style.display = '';
+            editImagePreviewWrapper.hidden = false;
         } else {
             editImagePreview.src = '';
-            editImagePreviewWrapper.style.display = 'none';
+            editImagePreviewWrapper.hidden = true;
         }
 
         if (removeImageBtn) {
@@ -372,14 +530,12 @@ document.addEventListener('DOMContentLoaded', function () {
         editModalEl.style.display = 'none';
     }
 
-    // edit button opens modal and populates fields
     const editButtons = document.querySelectorAll('.edit-qa');
     editButtons.forEach(btn => btn.addEventListener('click', function () {
         const id = this.dataset.id;
-        const row = document.querySelector('tr.qa-row[data-id="'+id+'"]');
-    if (!row) return;
+        const row = document.querySelector('tr.qa-row[data-id="' + id + '"]');
+        if (!row) return;
 
-        // Decode HTML entities for dataset values
         const question = decodeHtml(row.dataset.question);
         const answer = decodeHtml(row.dataset.answer);
         const imageUrl = decodeHtml(row.dataset.imageUrl || '');
@@ -430,9 +586,8 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Cancel button click handler
     if (cancelBtn) {
-        cancelBtn.addEventListener('click', function(e) {
+        cancelBtn.addEventListener('click', function (e) {
             e.preventDefault();
             hideModal();
         });
@@ -530,6 +685,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (index > -1) {
                         rows.splice(index, 1);
                     }
+                    updateSummary();
                     showFlash('Q&A deleted successfully.');
                 } else {
                     throw new Error('Failed to delete');
@@ -550,14 +706,36 @@ document.addEventListener('DOMContentLoaded', function () {
 
     hideModal(true);
 
-    // Modal hidden event listener replacement (manual cleanup on any form submission)
-    if (editModalEl) {
-        editModalEl.addEventListener('submit', function () {
-            hideModal(true);
-        }, { capture: true });
+    document.querySelectorAll('[data-scroll-to]').forEach(function (trigger) {
+        trigger.addEventListener('click', function (event) {
+            const targetId = this.getAttribute('data-scroll-to');
+            if (!targetId) {
+                return;
+            }
+            const target = document.getElementById(targetId);
+            if (!target) {
+                return;
+            }
+            event.preventDefault();
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            if (typeof target.focus === 'function') {
+                target.focus({ preventScroll: true });
+            }
+        });
+    });
+
+    if (search) {
+        search.addEventListener('input', function () {
+            const q = this.value.trim().toLowerCase();
+            rows.forEach(r => {
+                const question = (r.dataset.question || '').toLowerCase();
+                const answer = (r.dataset.answer || '').toLowerCase();
+                r.style.display = (question.includes(q) || answer.includes(q)) ? '' : 'none';
+            });
+            updateSummary();
+        });
     }
 
-    // decode HTML entities for all rows on page load
     rows.forEach(r => {
         r.dataset.question = decodeHtml(r.dataset.question);
         r.dataset.answer = decodeHtml(r.dataset.answer);
@@ -565,8 +743,8 @@ document.addEventListener('DOMContentLoaded', function () {
             r.dataset.imageUrl = decodeHtml(r.dataset.imageUrl);
         }
     });
+
+    updateSummary();
 });
 </script>
-@endsection
-
 @endsection

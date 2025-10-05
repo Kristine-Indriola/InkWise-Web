@@ -543,31 +543,34 @@ class OrderFlowController extends Controller
             return $this->redirectToCatalog();
         }
 
-        $halfPayment = round($order->total_amount / 2, 2);
-
-        if ($order->payment_method !== 'gcash' || $order->payment_status === 'pending') {
-            $metadata = $order->metadata ?? [];
-            $metadata['payments'][] = [
-                'method' => 'gcash',
-                'amount' => $halfPayment,
-                'status' => 'partial',
-                'recorded_at' => now()->toIso8601String(),
-            ];
-
+        if ($order->payment_method !== 'gcash') {
             $order->update([
                 'payment_method' => 'gcash',
-                'payment_status' => 'partial',
-                'metadata' => $metadata,
             ]);
         }
+
+        $metadata = $order->metadata ?? [];
+        $payments = collect($metadata['payments'] ?? []);
+        $paidAmount = round($payments
+            ->filter(fn ($payment) => ($payment['status'] ?? null) === 'paid')
+            ->sum(fn ($payment) => (float) ($payment['amount'] ?? 0)), 2);
+
+        $balanceDue = round(max(($order->total_amount ?? 0) - $paidAmount, 0), 2);
+        $defaultDeposit = round(max($order->total_amount / 2, 0), 2);
+        $depositAmount = $balanceDue <= 0 ? 0 : min($defaultDeposit, $balanceDue);
+
+        $paymongoMeta = $metadata['paymongo'] ?? [];
 
         $order->refresh();
         $this->updateSessionSummary($order);
 
         return view('customer.orderflow.checkout', [
             'order' => $order->loadMissing(['items.product', 'items.addons', 'customerOrder']),
-            'halfPayment' => $halfPayment,
-            'balanceDue' => max($order->total_amount - $halfPayment, 0),
+            'depositAmount' => $depositAmount,
+            'paidAmount' => $paidAmount,
+            'balanceDue' => $balanceDue,
+            'paymentRecords' => $payments->values()->all(),
+            'paymongoMeta' => $paymongoMeta,
             'orderSummary' => session(static::SESSION_SUMMARY_KEY),
         ]);
     }

@@ -24,6 +24,7 @@ class Product extends Model
         'description',
         'base_price',
         'lead_time',
+        'lead_time_days',
         'date_available',
     ];
 

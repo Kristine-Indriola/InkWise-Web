@@ -105,6 +105,88 @@
       color: #333 !important;
     }
 
+    .sidebar ul li.has-submenu {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 6px;
+    }
+
+    .sidebar ul li.has-submenu .submenu-trigger {
+      width: 100%;
+      background: transparent;
+      border: none;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px;
+      border-radius: 8px;
+      color: inherit;
+      font-size: 14px;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .sidebar ul li.has-submenu .submenu-trigger:focus-visible {
+      outline: 2px solid rgba(63,213,200,0.65);
+      outline-offset: 2px;
+    }
+
+    .sidebar ul li.has-submenu .submenu-trigger:hover,
+    .sidebar ul li.has-submenu.expanded .submenu-trigger {
+      background: rgba(255,255,255,0.5);
+      color: #333 !important;
+    }
+
+    .sidebar ul li.has-submenu .submenu-caret {
+      margin-left: auto;
+      transition: transform 0.3s ease;
+    }
+
+    .sidebar ul li.has-submenu.expanded .submenu-caret {
+      transform: rotate(180deg);
+    }
+
+    .sidebar ul li.has-submenu .submenu {
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      margin-left: 36px;
+    }
+
+    .sidebar ul li.has-submenu.expanded .submenu {
+      display: flex;
+    }
+
+    .sidebar ul li.has-submenu .submenu li {
+      margin: 0;
+      padding: 0;
+    }
+
+    .sidebar ul li.has-submenu .submenu li a {
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+
+    .sidebar.collapsed ul li.has-submenu {
+      gap: 0;
+    }
+
+    .sidebar.collapsed ul li.has-submenu .submenu {
+      display: none !important;
+    }
+
+    .sidebar.collapsed ul li.has-submenu .submenu-trigger {
+      justify-content: center;
+      padding: 10px 0;
+    }
+
+    .sidebar.collapsed ul li.has-submenu .submenu-trigger .label,
+    .sidebar.collapsed ul li.has-submenu .submenu-caret {
+      display: none;
+    }
+
     /* Collapsed sidebar: make hover/active background fit icon only */
     .sidebar.collapsed ul li a {
       justify-content: center;
@@ -642,12 +724,6 @@ body.dark-mode .btn-warning {
       <li class="{{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
         <a href="{{ route('admin.dashboard') }}"><i class="fi fi-rr-house-chimney"></i> <span class="label">Dashboard</span></a>
       </li>
-      <li class="{{ request()->routeIs('admin.customers.*') ? 'active' : '' }}">
-        <a href="{{ route('admin.customers.index') }}"><i class="fi fi-rr-user-pen"></i> <span class="label">Customer Accounts</span></a>
-      </li>
-      <li class="{{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
-        <a href="{{ route('admin.users.index') }}"><i class="fi fi-rr-user"></i> <span class="label">Staff Accounts</span></a>
-      </li>
       <li class="{{ request()->routeIs('admin.templates.*') ? 'active' : '' }}">
         <a href="{{ route('admin.templates.index') }}"><i class="fi fi-rr-template"></i> <span class="label">Templates</span></a>
       </li>
@@ -673,6 +749,41 @@ body.dark-mode .btn-warning {
     <span class="label">Chatbot</span>
   </a>
 </li>
+
+       @php
+      $accountsActive = request()->routeIs('admin.customers.*')
+        || (request()->routeIs('admin.users.*') && !request()->routeIs('admin.users.passwords.*'));
+    @endphp
+      <li class="has-submenu {{ $accountsActive ? 'expanded active' : '' }}">
+        <button type="button" class="submenu-trigger" data-submenu-toggle="accounts" aria-expanded="{{ $accountsActive ? 'true' : 'false' }}">
+          <i class="fi fi-rr-users"></i>
+          <span class="label">Accounts</span>
+          <i class="fi fi-rr-angle-small-down submenu-caret" aria-hidden="true"></i>
+        </button>
+        <ul class="submenu" data-submenu="accounts" aria-hidden="{{ $accountsActive ? 'false' : 'true' }}">
+          <li class="{{ request()->routeIs('admin.customers.*') ? 'active' : '' }}">
+            <a href="{{ route('admin.customers.index') }}"><span class="label">Customer Accounts</span></a>
+          </li>
+          <li class="{{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
+            <a href="{{ route('admin.users.index') }}"><span class="label">Staff Accounts</span></a>
+          </li>
+        </ul>
+      </li>
+      @php
+          $settingsActive = request()->routeIs('admin.users.passwords.*');
+      @endphp
+          <li class="has-submenu {{ $settingsActive ? 'expanded active' : '' }}">
+        <button type="button" class="submenu-trigger" data-submenu-toggle="settings" aria-expanded="{{ $settingsActive ? 'true' : 'false' }}">
+          <i class="fi fi-rr-settings"></i>
+          <span class="label">Settings</span>
+          <i class="fi fi-rr-angle-small-down submenu-caret" aria-hidden="true"></i>
+        </button>
+        <ul class="submenu" data-submenu="settings" aria-hidden="{{ $settingsActive ? 'false' : 'true' }}">
+          <li class="{{ request()->routeIs('admin.users.passwords.*') ? 'active' : '' }}">
+            <a href="{{ route('admin.users.passwords.index') }}"><span class="label">Password Reset Console</span></a>
+          </li>
+        </ul>
+      </li>
 
     </ul>
   </div>
@@ -796,6 +907,61 @@ body.dark-mode .btn-warning {
       localStorage.setItem('theme', 'light');
     }
     setThemeSwitch();
+  });
+
+  // Sidebar submenu toggle
+  const submenuParents = Array.from(document.querySelectorAll('.has-submenu'));
+
+  function setParentState(parent, expanded) {
+    const trigger = parent.querySelector('.submenu-trigger');
+    const submenu = parent.querySelector('.submenu');
+
+    if (expanded) {
+      parent.classList.add('expanded', 'active');
+    } else {
+      parent.classList.remove('expanded');
+      const hasActiveChild = parent.querySelector('.submenu li.active') !== null;
+      if (!hasActiveChild) {
+        parent.classList.remove('active');
+      }
+    }
+
+    if (trigger) {
+      trigger.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    }
+    if (submenu) {
+      submenu.setAttribute('aria-hidden', expanded ? 'false' : 'true');
+    }
+  }
+
+  function collapseOtherSubmenus(exceptParent) {
+    submenuParents.forEach(function(parent) {
+      if (parent !== exceptParent) {
+        setParentState(parent, false);
+      }
+    });
+  }
+
+  submenuParents.forEach(function(parent) {
+    const trigger = parent.querySelector('.submenu-trigger');
+    if (!trigger) {
+      return;
+    }
+
+    setParentState(parent, parent.classList.contains('expanded'));
+
+    trigger.addEventListener('click', function(event) {
+      event.preventDefault();
+      const willExpand = !parent.classList.contains('expanded');
+      collapseOtherSubmenus(parent);
+      setParentState(parent, willExpand);
+    });
+  });
+
+  document.addEventListener('click', function(event) {
+    if (!event.target.closest('.has-submenu')) {
+      collapseOtherSubmenus(null);
+    }
   });
 
   // Profile dropdown logic (arrow only)

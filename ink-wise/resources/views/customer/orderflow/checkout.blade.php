@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Checkout - Inkwise</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -306,6 +307,73 @@
             text-decoration: none;
         }
 
+        .payment-alert {
+            display: none;
+            margin-top: 12px;
+            border-radius: 14px;
+            padding: 12px 16px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .payment-alert.info {
+            background: #eff6ff;
+            color: #1d4ed8;
+        }
+
+        .payment-alert.success {
+            background: #ecfdf5;
+            color: #047857;
+        }
+
+        .payment-alert.error {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+        .summary-payments {
+            border-top: 1px dashed rgba(148, 163, 184, 0.25);
+            padding-top: 14px;
+            display: grid;
+            gap: 10px;
+        }
+
+        .summary-payments h3 {
+            margin: 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-strong);
+        }
+
+        .summary-payments ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            gap: 8px;
+        }
+
+        .summary-payments li {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .summary-payments li .payment-line {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            color: var(--text-strong);
+        }
+
+        .summary-payments li .payment-meta {
+            font-size: 11px;
+            color: var(--text-soft);
+        }
+
         @media (max-width: 1200px) {
             .page-wrapper {
                 grid-template-columns: 1fr;
@@ -364,8 +432,13 @@
     $taxAmount = $order?->tax_amount ?? 0;
     $shippingFee = $order?->shipping_fee ?? 0;
     $totalAmount = $order?->total_amount ?? 0;
-    $halfPaymentDisplay = $halfPayment ?? ($totalAmount ? round($totalAmount / 2, 2) : 0);
-    $balanceDueDisplay = $balanceDue ?? max($totalAmount - $halfPaymentDisplay, 0);
+    $paymentRecordsCollection = collect($paymentRecords ?? []);
+    $calculatedPaid = $paidAmount ?? $paymentRecordsCollection
+        ->filter(fn ($payment) => ($payment['status'] ?? null) === 'paid')
+        ->sum(fn ($payment) => (float) ($payment['amount'] ?? 0));
+    $paidAmountDisplay = round($calculatedPaid, 2);
+    $depositSuggested = $depositAmount ?? ($totalAmount ? round($totalAmount / 2, 2) : 0);
+    $balanceDueDisplay = $balanceDue ?? max($totalAmount - $paidAmountDisplay, 0);
     $rawStatus = $order->status ?? 'pending';
     $orderStatusLabel = match ($rawStatus) {
         'completed' => 'Completed',
@@ -390,6 +463,17 @@
     $shippingPostal = $customerOrder->postal_code ?? '';
     $taxRate = $subtotal > 0 ? round($taxAmount / $subtotal, 4) : 0.12;
     $expressShippingFee = $shippingFee > 0 ? $shippingFee + 180 : 180;
+    $hasPendingPayment = ($paymongoMeta['status'] ?? null) === 'awaiting_next_action';
+    $pendingPaymentUrl = $paymongoMeta['next_action_url'] ?? null;
+    $paymentMode = $paymongoMeta['mode'] ?? 'half';
+    $isFullyPaid = $balanceDueDisplay <= 0.01;
+    $formatPaymentDate = static function ($date) {
+        try {
+            return $date ? \Illuminate\Support\Carbon::parse($date)->format('M j, Y g:i A') : null;
+        } catch (\Throwable $e) {
+            return $date;
+        }
+    };
 @endphp
 
 @if(session('status'))
@@ -550,8 +634,8 @@
             </div>
             <hr class="summary-divider">
             <div class="summary-item">
-                <span>Paid via GCash</span>
-                <strong id="paidAmount">₱{{ number_format($halfPaymentDisplay, 2) }}</strong>
+                <span>Total paid via GCash</span>
+                <strong id="paidAmount">₱{{ number_format($paidAmountDisplay, 2) }}</strong>
             </div>
             <div class="summary-item">
                 <span>Balance remaining</span>
@@ -561,6 +645,15 @@
                 <span>Total due</span>
                 <span id="grandTotal">₱{{ number_format($totalAmount, 2) }}</span>
             </div>
+            <button type="button" id="payWithGCash" class="place-order" @if($isFullyPaid) disabled @endif>
+                {{ $isFullyPaid ? 'Order fully paid' : 'Pay ' . '₱' . number_format($depositSuggested > 0 ? $depositSuggested : $balanceDueDisplay, 2) . ' via GCash' }}
+            </button>
+            <div id="paymentAlert" class="payment-alert"></div>
+            @if(!$isFullyPaid)
+                <p class="note" id="paymentHelper">You'll be redirected to GCash to authorize this payment. Ensure your account is ready for ₱{{ number_format($depositSuggested > 0 ? $depositSuggested : $balanceDueDisplay, 2) }}.</p>
+            @else
+                <p class="note" id="paymentHelper">Your order is fully paid. We'll start preparing it right away.</p>
+            @endif
             <form method="POST" action="{{ route('checkout.complete') }}" class="summary-action" style="margin-top:16px;">
                 @csrf
                 <button type="submit" class="place-order">Mark as fully paid</button>
@@ -569,7 +662,28 @@
                 @csrf
                 <button type="submit" class="place-order" style="background:#fee2e2; color:#b91c1c;">Cancel order</button>
             </form>
-            <p class="note">Partial payment of ₱{{ number_format($halfPaymentDisplay, 2) }} has been recorded via GCash. Complete payment to finalize your order.</p>
+            <p class="note">Recorded payments total ₱{{ number_format($paidAmountDisplay, 2) }}. Outstanding balance: ₱{{ number_format($balanceDueDisplay, 2) }}.</p>
+
+            @if($paymentRecordsCollection->isNotEmpty())
+                <div class="summary-payments">
+                    <h3>Payment history</h3>
+                    <ul>
+                        @foreach($paymentRecordsCollection as $record)
+                            @php
+                                $timestamp = $formatPaymentDate($record['recorded_at'] ?? null);
+                                $modeLabel = strtoupper($record['mode'] ?? 'GCASH');
+                            @endphp
+                            <li>
+                                <div class="payment-line">
+                                    <strong>{{ strtoupper($record['status'] ?? 'PAID') }}</strong>
+                                    <span>₱{{ number_format((float) ($record['amount'] ?? 0), 2) }}</span>
+                                </div>
+                                <div class="payment-meta">{{ $modeLabel }} • {{ $timestamp ?? 'Date unavailable' }}</div>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
         </aside>
     </div>
 
@@ -609,7 +723,15 @@
             const subtotal = @json($subtotal);
             const baseShipping = @json($shippingFee);
             const taxRate = @json($taxRate);
-            const paidAmount = @json($halfPaymentDisplay);
+            let recordedPaidAmount = @json($paidAmountDisplay);
+            const paymentConfig = {
+                createUrl: '{{ route('payment.gcash.create') }}',
+                resumeUrl: @json($pendingPaymentUrl),
+                hasPending: @json($hasPendingPayment),
+                depositAmount: @json($depositSuggested),
+                balance: @json($balanceDueDisplay),
+                isFullyPaid: @json($isFullyPaid),
+            };
 
             const shippingRadios = document.querySelectorAll('input[name="shippingOption"]');
             const paymentRadios = document.querySelectorAll('input[name="paymentMethod"]');
@@ -618,6 +740,37 @@
             const grandTotalEl = document.getElementById('grandTotal');
             const paidAmountEl = document.getElementById('paidAmount');
             const balanceAmountEl = document.getElementById('balanceAmount');
+            const payButton = document.getElementById('payWithGCash');
+            const paymentAlert = document.getElementById('paymentAlert');
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+
+            const showPaymentMessage = (type, message) => {
+                if (!paymentAlert) return;
+                paymentAlert.classList.remove('info', 'success', 'error');
+                paymentAlert.classList.add(type);
+                paymentAlert.innerHTML = message;
+                paymentAlert.style.display = 'block';
+            };
+
+            const clearPaymentMessage = () => {
+                if (!paymentAlert) return;
+                paymentAlert.classList.remove('info', 'success', 'error');
+                paymentAlert.style.display = 'none';
+                paymentAlert.textContent = '';
+            };
+
+            const updatePayButton = () => {
+                if (!payButton) return;
+                if (paymentConfig.isFullyPaid) {
+                    payButton.textContent = 'Order fully paid';
+                    payButton.disabled = true;
+                    return;
+                }
+
+                const amountLabel = paymentConfig.depositAmount > 0 ? paymentConfig.depositAmount : paymentConfig.balance;
+                payButton.textContent = `Pay ${priceFormatter.format(amountLabel)} via GCash`;
+                payButton.disabled = false;
+            };
 
             const highlightSelection = (target) => {
                 if (!target) return;
@@ -633,13 +786,19 @@
                 const shippingCost = Number(selectedShipping?.dataset.cost ?? baseShipping ?? 0);
                 const tax = (subtotal ?? 0) * (taxRate ?? 0);
                 const total = (subtotal ?? 0) + shippingCost + tax;
-                const balance = Math.max(total - (paidAmount ?? 0), 0);
+                const balance = Math.max(total - (recordedPaidAmount ?? 0), 0);
 
                 shippingAmountEl.textContent = shippingCost === 0 ? 'Free' : priceFormatter.format(shippingCost);
                 taxAmountEl.textContent = priceFormatter.format(tax);
                 grandTotalEl.textContent = priceFormatter.format(total);
-                if (paidAmountEl) paidAmountEl.textContent = priceFormatter.format(paidAmount ?? 0);
+                if (paidAmountEl) paidAmountEl.textContent = priceFormatter.format(recordedPaidAmount ?? 0);
                 if (balanceAmountEl) balanceAmountEl.textContent = priceFormatter.format(balance);
+
+                paymentConfig.balance = balance;
+                paymentConfig.depositAmount = balance <= 0 ? 0 : Math.min(Number((total / 2).toFixed(2)), balance);
+                paymentConfig.isFullyPaid = paymentConfig.balance <= 0.01;
+
+                updatePayButton();
             };
 
             shippingRadios.forEach((radio) => {
@@ -655,7 +814,76 @@
                 radio.addEventListener('change', (event) => highlightSelection(event.target));
             });
 
+            if (payButton) {
+                payButton.addEventListener('click', async () => {
+                    if (paymentConfig.isFullyPaid) {
+                        showPaymentMessage('info', 'This order is already fully paid.');
+                        return;
+                    }
+
+                    if (!csrfToken) {
+                        showPaymentMessage('error', 'Missing security token. Please refresh the page and try again.');
+                        return;
+                    }
+
+                    clearPaymentMessage();
+                    const originalText = payButton.textContent;
+                    payButton.disabled = true;
+                    payButton.textContent = 'Redirecting to GCash…';
+
+                    try {
+                        const billingName = document.getElementById('fullName')?.value ?? '';
+                        const billingEmail = document.getElementById('email')?.value ?? '';
+                        const billingPhone = document.getElementById('phone')?.value ?? '';
+
+                        const response = await fetch(paymentConfig.createUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                            },
+                            body: JSON.stringify({
+                                name: billingName,
+                                email: billingEmail,
+                                phone: billingPhone,
+                                mode: paymentConfig.depositAmount > 0 && paymentConfig.depositAmount < paymentConfig.balance ? 'half' : 'full',
+                            }),
+                        });
+
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(data.message || 'Unable to start the GCash payment right now.');
+                        }
+
+                        if (data.pending && data.redirect_url) {
+                            showPaymentMessage('info', 'You have a pending payment in progress. Redirecting…');
+                        } else {
+                            clearPaymentMessage();
+                        }
+
+                        if (data.redirect_url) {
+                            window.location.href = data.redirect_url;
+                        } else {
+                            showPaymentMessage('info', 'Payment created. Please check your GCash app to continue.');
+                        }
+                    } catch (error) {
+                        console.error(error);
+                        showPaymentMessage('error', error.message ?? 'Something went wrong while starting the payment.');
+                        payButton.textContent = originalText;
+                    } finally {
+                        paymentConfig.isFullyPaid = paymentConfig.balance <= 0.01;
+                        updatePayButton();
+                    }
+                });
+            }
+
             recalcTotals();
+
+            if (paymentConfig.hasPending && paymentConfig.resumeUrl) {
+                showPaymentMessage('info', `A GCash payment is waiting for completion. <a href="${paymentConfig.resumeUrl}" target="_blank" rel="noopener">Resume payment</a>.`);
+            }
 
             const userDropdownBtn = document.getElementById('userDropdownBtn');
             const userDropdownMenu = document.getElementById('userDropdownMenu');
