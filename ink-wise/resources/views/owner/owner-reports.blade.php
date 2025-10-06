@@ -2,71 +2,118 @@
 @section('content')
 @include('layouts.owner.sidebar')
 
+<link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
+
+<!-- Page-scoped styles to align reports page to owner.products.index without editing materials.css -->
+<style>
+  .materials-page { padding:20px 36px; display:flex; flex-direction:column; gap:18px; }
+  .page-title { font-size:1.7rem; font-weight:800; color:#0f172a; margin:0 0 6px; }
+  .page-subtitle { margin:0; color:#6b7280; font-size:0.95rem; }
+  .page-inner { max-width:1400px; margin:0 auto; width:100%; padding:0 8px; }
+
+  /* Summary cards visual style (small and consistent with products page) */
+  .summary-grid { margin:0 0 12px 0; display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:18px; }
+  .summary-card { background:#fff; border-radius:12px; padding:14px; box-shadow:0 8px 20px rgba(15,23,42,0.04); display:block; text-decoration:none; color:inherit; }
+  .summary-card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .summary-card-label { font-size:0.9rem; color:#475569; }
+  .summary-card-value { display:block; font-size:1.5rem; font-weight:800; color:#0f172a; margin-top:4px; }
+  .summary-card-meta { color:#6b7280; font-size:0.9rem; }
+
+  /* Make chart cards sit side-by-side and match product layout */
+  .charts { display:grid; grid-template-columns: 1fr 1fr; gap:18px; margin-bottom:12px; }
+  .chart-card { background:#fff; border-radius:12px; padding:14px; box-shadow:0 8px 20px rgba(15,23,42,0.04); min-height:220px; }
+
+  /* Toolbar alignment similar to products page */
+  .materials-toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px; }
+
+  /* Table wrapper to match product's spacing */
+  .table-wrapper { background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 12px 24px rgba(15,23,42,0.06); border:1px solid rgba(148,185,255,0.18); margin:0; padding:14px; }
+  .table { width:100%; border-collapse:collapse; font-size:0.95rem; color:#0f172a; }
+  .table thead th { background: rgba(148,185,255,0.14); padding:12px 14px; text-transform:uppercase; font-size:0.75rem; letter-spacing:0.06em; }
+  .table tbody td { padding:12px 14px; border-bottom:1px solid rgba(148,185,255,0.06); vertical-align:middle; }
+  .table tbody tr:hover { background: rgba(148,185,255,0.04); }
+
+  @media (max-width:900px) { .charts { grid-template-columns: 1fr; } .page-inner { max-width:1000px; } }
+
+  /* Dark mode styles */
+  .dark-mode .summary-card { background:#374151; color:#f9fafb; }
+  .dark-mode .summary-card-label { color:#d1d5db; }
+  .dark-mode .summary-card-value { color:#f9fafb; }
+  .dark-mode .summary-card-meta { color:#9ca3af; }
+
+  .dark-mode .chart-card { background:#374151; }
+
+  .dark-mode .table-wrapper { background:#374151; border-color:#4b5563; }
+  .dark-mode .table { color:#f9fafb; }
+  .dark-mode .table thead th { background:#4b5563; color:#f9fafb; }
+  .dark-mode .table tbody td { border-color:#4b5563; }
+  .dark-mode .table tbody tr:hover { background:#4b5563; }
+
+  .dark-mode body { background:#111827; }
+</style>
+
 <section class="main-content">
-  <div class="reports-container">
+  <main class="materials-page admin-page-shell materials-container" role="main">
+    <header class="page-header">
+      <div>
+        <h1 class="page-title">Reports</h1>
+        <p class="page-subtitle">Exportable reports &amp; analytics</p>
+      </div>
+    </header>
 
+    <div class="page-inner">
+    <!-- Summary cards (placeholders; keep numbers as examples) -->
+    <section class="summary-grid" aria-label="Reports summary">
+      <a href="{{ url()->current() }}" class="summary-card">
+        <div class="summary-card-header">
+          <span class="summary-card-label">Total Sales</span>
+          <span class="summary-card-chip accent">Revenue</span>
+        </div>
+        <span class="summary-card-value">₱120,500</span>
+        <span class="summary-card-meta">This period</span>
+      </a>
 
-    <!-- Summary cards -->
-    <div class="summary-cards">
-      <div class="card">
-        <h4>Total Sales</h4>
-        <p>₱120,500</p>
-      </div>
-      <div class="card">
-        <h4>Total Inventory</h4>
-        <p>850 items</p>
-      </div>
-      <div class="card">
-        <h4>Orders</h4>
-        <p>320</p>
-      </div>
-      <div class="card">
-        <h4>Low Stock Alerts</h4>
-        <p>12</p>
-      </div>
-    </div>
+      <a href="{{ url()->current() }}" class="summary-card">
+        <div class="summary-card-header">
+          <span class="summary-card-label">Total Inventory</span>
+          <span class="summary-card-chip accent">Items</span>
+        </div>
+        <span class="summary-card-value">850</span>
+        <span class="summary-card-meta">Materials tracked</span>
+      </a>
+
+      <a href="{{ url()->current() }}" class="summary-card">
+        <div class="summary-card-header">
+          <span class="summary-card-label">Orders</span>
+          <span class="summary-card-chip accent">Count</span>
+        </div>
+        <span class="summary-card-value">320</span>
+        <span class="summary-card-meta">Placed</span>
+      </a>
+
+      <a href="{{ url()->current() }}" class="summary-card">
+        <div class="summary-card-header">
+          <span class="summary-card-label">Low Stock Alerts</span>
+          <span class="summary-card-chip accent">Alert</span>
+        </div>
+        <span class="summary-card-value">12</span>
+        <span class="summary-card-meta">Needs reorder</span>
+      </a>
+    </section>
 
     <!-- Charts -->
     <div class="charts">
       <div class="chart-card">
         <h4>Sales Overview</h4>
-        <canvas id="salesChart"></canvas>
+        <div style="height:220px;"><canvas id="salesChart"></canvas></div>
       </div>
       <div class="chart-card">
         <h4>Inventory Levels</h4>
-        <canvas id="inventoryChart"></canvas>
+        <div style="height:220px;"><canvas id="inventoryChart"></canvas></div>
       </div>
     </div>
 
-    <!-- Report filters + Generate modal trigger -->
-    <div class="report-filters" role="region" aria-label="Report date range filters">
-      <div class="report-filters-left">
-        <div class="custom-select">
-          <select id="reportFilterSelect" aria-label="Sort reports by date range" required>
-            <option value="" disabled selected>Sort by</option>
-            <option value="all">All</option>
-            <option value="daily">Daily (Today)</option>
-            <option value="weekly">Weekly (Last 7 days)</option>
-            <option value="monthly">Monthly (Last 30 days)</option>
-            <option value="yearly">Yearly (Last 365 days)</option>
-          </select>
-
-          <!-- caret (inline SVG, decorative) -->
-          <span class="select-caret" aria-hidden="true">
-            <svg width="12" height="8" viewBox="0 0 12 8" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-              <path d="M1 2l5 4 5-4" stroke="#0f172a" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </span>
-        </div>
-
-        <!-- Generate button kept small and inline with the select -->
-        <button id="openGenerateModalBtn" class="generate-report-btn" aria-haspopup="dialog" aria-controls="generateModal">
-          + Generate Report
-        </button>
-      </div>
-    </div>
-
-    <!-- Generate Report Modal (reworked professional layout) -->
+  <!-- Generate Report Modal (reworked professional layout) -->
     <div id="generateModal" class="generate-modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="generateModalTitle">
       <div class="generate-modal-dialog" role="document">
         <header class="generate-modal-header">

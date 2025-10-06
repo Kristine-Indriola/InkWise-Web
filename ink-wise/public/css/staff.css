@@ -85,8 +85,8 @@ body {
   color: #555;
 }
 
-/* Top bar */
-.topbar {
+/* Staff page header */
+.staff-topbar {
   display: flex;
   justify-content: flex-end;
   align-items: center;

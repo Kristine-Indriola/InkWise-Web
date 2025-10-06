@@ -249,6 +249,7 @@
     .sidebar.collapsed .collapse-btn i {
       transform: rotate(180deg);
     }
+    .collapse-btn i.is-rotated { transform: rotate(180deg); }
     /* Hide profile name and check when collapsed, show only image */
     .sidebar.collapsed .profile div {
       display: none;
@@ -277,7 +278,8 @@
       width: 100%;
       position: sticky;
       top: 0;
-      z-index: 90; /* sit behind sidebar (sidebar z-index:101) */
+  z-index: 90; /* sit behind sidebar (sidebar z-index:101) */
+  transition: left 0.32s ease; /* animate when sidebar collapses */
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
       box-shadow: 0 6px 18px rgba(16,24,40,0.06);
@@ -293,6 +295,15 @@
       gap: 10px;
       padding-left: 6px;
       margin-left: 230px; /* visually align logo to the right of the fixed sidebar */
+      transition: margin-left 0.32s ease;
+    }
+
+    /* When the sidebar collapses, shift the topbar logo to match compact width */
+    .sidebar.collapsed ~ .content-wrapper .topbar {
+      left: 70px; /* if you prefer the topbar to shift, keep this; otherwise topbar remains full-width */
+    }
+    .sidebar.collapsed ~ .content-wrapper .topbar .logo {
+      margin-left: 70px;
     }
 
     .topbar .icons {
@@ -829,7 +840,7 @@ body.dark-mode .btn-warning {
           </span>
         </div>
         <!-- Admin Profile Dropdown -->
-        <div class="profile-dropdown" style="position: relative;">
+        <div class="profile-dropdown" style="position: relative; display:flex; align-items:center; gap:6px;">
           <a href="{{ route('admin.profile.edit') }}" id="profileImageLink" style="display:flex; align-items:center; text-decoration:none; color:inherit;">
             <img src="/adminimage/LEANNE.jpg"
                  alt="Admin Profile"
@@ -843,7 +854,7 @@ body.dark-mode .btn-warning {
                  display:none;
                  position:absolute;
                  right:0;
-                 top:48px;
+                 top: calc(100% + 6px);
                  background:#fff;
                  min-width:180px;
                  box-shadow:0 8px 32px rgba(0,0,0,0.18);
@@ -874,13 +885,23 @@ body.dark-mode .btn-warning {
   // Sidebar toggle logic
   const sidebar = document.getElementById('sidebar');
   const sidebarToggle = document.getElementById('sidebarToggle');
+  const sidebarToggleIcon = document.getElementById('sidebarToggleIcon');
   if (localStorage.getItem('sidebar-collapsed') === 'true') {
     sidebar.classList.add('collapsed');
+    document.body.classList.add('sidebar-collapsed');
+    if (sidebarToggleIcon) sidebarToggleIcon.classList.add('is-rotated');
   }
   sidebarToggle.addEventListener('click', function() {
     sidebar.classList.toggle('collapsed');
     const isCollapsed = sidebar.classList.contains('collapsed');
     localStorage.setItem('sidebar-collapsed', isCollapsed);
+    if (isCollapsed) {
+      document.body.classList.add('sidebar-collapsed');
+      if (sidebarToggleIcon) sidebarToggleIcon.classList.add('is-rotated');
+    } else {
+      document.body.classList.remove('sidebar-collapsed');
+      if (sidebarToggleIcon) sidebarToggleIcon.classList.remove('is-rotated');
+    }
   });
 
   // Theme toggle logic

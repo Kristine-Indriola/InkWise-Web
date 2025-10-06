@@ -1,6 +1,7 @@
-@extends('layouts.owner.app')
-
-<aside class="sidebar">
+<aside class="sidebar" id="sidebar" style="padding-top:32px;">
+  <button class="collapse-btn" id="sidebarToggle" title="Toggle Sidebar" style="margin-left:auto; margin-right:0;">
+    <i class="fi fi-rr-angle-double-right" id="sidebarToggleIcon"></i>
+  </button>
   <img class="sidebar-logo" src="{{ asset('images/logo.png') }}" alt="InkWise logo">
 
   <ul class="navlist">
@@ -103,88 +104,206 @@
   </ul>
 </aside>
 
-<section class="main-content">
-  <!-- Topbar -->
+  @php
+    $owner = auth()->user();
+    $ownerName = $owner->name ?? 'Owner';
+    $ownerInitials = collect(explode(' ', $ownerName))
+      ->filter(fn ($segment) => strlen($segment) > 0)
+      ->map(fn ($segment) => \Illuminate\Support\Str::substr($segment, 0, 1))
+      ->join('');
+    if ($ownerInitials === '') {
+      $ownerInitials = \Illuminate\Support\Str::substr($ownerName, 0, 1);
+    }
+    $ownerInitials = \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr($ownerInitials, 0, 2));
+    $unreadNotifications = $owner?->unreadNotifications ?? collect();
+    $unreadCount = $unreadNotifications->count();
+    $ownerAvatarRelativePath = 'ownerimage/KRISTINE.png';
+    $ownerAvatarUrl = file_exists(public_path($ownerAvatarRelativePath)) ? asset($ownerAvatarRelativePath) : null;
+  @endphp
+
+
   <div class="topbar">
-    <div class="topbar-left">
-      <div class="welcome-text"><strong>Welcome, Owner!</strong></div>
-    </div>
-    <div class="topbar-actions">
-      <!-- Notifications Button with Dropdown -->
-      <div class="notification-wrapper" style="position: relative;">
-        <button type="button" class="icon-btn" aria-label="Notifications" onclick="toggleNotifications()" style="position: relative;">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
-               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M15 17H9a4 4 0 0 1-4-4V9a7 7 0 1 1 14 0v4a4 4 0 0 1-4 4z"/>
-            <path d="M10 21a2 2 0 0 0 4 0"/>
-          </svg>
-          @if(auth()->user()->unreadNotifications->count() > 0)
-            <span class="badge">{{ auth()->user()->unreadNotifications->count() }}</span>
+    <div class="logo">InkWise</div>
+    <div class="icons" style="display: flex; align-items: center; gap: 24px; margin-left: auto; justify-content: center;">
+      <!-- Notification Bell -->
+      <a href="#" class="nav-link notif-btn" id="ownerNotificationToggle" style="display:flex; align-items:center; justify-content:center;">
+        <i class="fi fi-ss-bell" style="font-size:22px;"></i>
+        @if($unreadCount > 0)
+          <span class="notif-badge">{{ $unreadCount }}</span>
+        @endif
+      </a>
+      <div id="notificationDropdown" class="notification-dropdown" role="menu" aria-hidden="true" style="display:none; position:absolute; right:0; top:54px; background:#fff; border:1px solid #ddd; border-radius:8px; width:320px; max-height:400px; overflow-y:auto; box-shadow:0 4px 8px rgba(0,0,0,0.1); z-index:100;">
+        <div class="notification-dropdown__header">Notifications</div>
+        <ul class="notification-dropdown__list">
+          @forelse($unreadNotifications as $notification)
+            <li class="notification-dropdown__item">
+              <div class="notification-dropdown__message">📩 {{ $notification->data['message'] }}</div>
+              @if(!empty($notification->data['email']))
+                <div class="notification-dropdown__meta">Email: {{ $notification->data['email'] }}</div>
+              @endif
+              <div class="notification-dropdown__meta">{{ $notification->created_at->diffForHumans() }}</div>
+              <form action="{{ route('notifications.read', $notification->id) }}" method="POST" class="notification-dropdown__form">
+                @csrf
+                @method('PATCH')
+                <button type="submit" class="notification-dropdown__action">Mark as read</button>
+              </form>
+            </li>
+          @empty
+            <li class="notification-dropdown__item notification-dropdown__item--empty">No new notifications 🎉</li>
+          @endforelse
+        </ul>
+      </div>
+      <!-- Theme Toggle -->
+      <div id="theme-toggle-switch" class="theme-toggle-switch" title="Toggle dark/light mode" style="margin:0;">
+        <span class="theme-toggle-label" id="theme-toggle-label">DAY</span>
+        <span class="theme-toggle-knob" id="theme-toggle-knob">
+          <span class="theme-toggle-icon" id="theme-toggle-icon">
+            <i class="fi fi-rr-brightness"></i>
+          </span>
+        </span>
+      </div>
+      <!-- Profile Dropdown -->
+      <div class="profile-dropdown" style="position: relative;">
+        <a href="{{ route('owner.profile.show') }}" id="profileImageLink" style="display:flex; align-items:center; text-decoration:none; color:inherit;">
+          @if($ownerAvatarUrl)
+            <img src="{{ $ownerAvatarUrl }}" alt="Owner Profile" style="border-radius:50%; width:36px; height:36px; border:2px solid #6a2ebc; object-fit:cover;">
+          @else
+            <span class="profile-avatar profile-avatar--initials" style="border-radius:50%; width:36px; height:36px; background:linear-gradient(135deg,#6a2ebc,#3cd5c8); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:16px;">{{ $ownerInitials }}</span>
           @endif
-        </button>
-
-        <!-- Dropdown -->
-        <div id="notificationDropdown" class="notification-dropdown" 
-             style="display: none; position: absolute; right: 0; top: 40px; background: #fff; border: 1px solid #ddd; border-radius: 8px; width: 320px; max-height: 400px; overflow-y: auto; box-shadow: 0 4px 8px rgba(0,0,0,0.1); z-index: 100;">
-          
-          <h4 style="padding: 10px; border-bottom: 1px solid #ddd; margin:0;">Notifications</h4>
-          <ul style="list-style: none; margin: 0; padding: 10px;">
-            @forelse(auth()->user()->unreadNotifications as $notification)
-              <li style="margin-bottom: 12px; font-size: 14px; border-bottom: 1px solid #f0f0f0; padding-bottom: 8px;">
-                📩 {{ $notification->data['message'] }}<br>
-                @if(!empty($notification->data['email']))
-                  <small>Email: {{ $notification->data['email'] }}</small><br>
-                @endif
-                <small>{{ $notification->created_at->diffForHumans() }}</small><br>
-
-                <!-- Mark as Read -->
-                <form action="{{ route('notifications.read', $notification->id) }}" method="POST" style="display:inline;">
-                  @csrf
-                  @method('PATCH')
-                  <button type="submit" style="background:none; border:none; color:blue; cursor:pointer; font-size:12px;">
-                    Mark as read
-                  </button>
-                </form>
-              </li>
-            @empty
-              <li>No new notifications 🎉</li>
-            @endforelse
-          </ul>
+        </a>
+        <span id="profileDropdownToggle" style="cursor:pointer; display:inline-flex; align-items:center; margin-left:6px;">
+          <i class="fi fi-rr-angle-small-down" style="font-size:18px;"></i>
+        </span>
+        <div id="profileDropdownMenu"
+             style="display:none; position:absolute; right:0; top:48px; background:#fff; min-width:180px; box-shadow:0 8px 32px rgba(0,0,0,0.18); border-radius:14px; z-index:999; overflow:hidden; padding:8px 0; border:1px solid #eaeaea;">
+          <form method="POST" action="{{ route('logout') }}" style="margin:0;">
+            @csrf
+            <button type="submit" style="width:100%; background:none; border:none; color:#f44336; font-size:16px; padding:14px 22px; text-align:left; cursor:pointer;">⏻ Log Out</button>
+          </form>
         </div>
       </div>
-
-      <a href="{{ route('owner.profile.show') }}" class="icon-btn profile-icon-btn" aria-label="Owner profile">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-             stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" />
-          <path d="M6 20v-1a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v1" />
-        </svg>
-      </a>
-
-      <!-- Logout Button -->
-      <form method="POST" action="{{ route('logout') }}">
-        @csrf
-        <button type="submit" class="logout-btn">Logout</button>
-      </form>
     </div>
   </div>
 
-  <!-- Main content goes here -->
-  @yield('content')
-</section>
+<!-- content sections should be provided by the including view (e.g. each owner view opens <section class="main-content">) -->
 
-<!-- JS for toggle -->
 <script>
-  function toggleNotifications() {
-    let dropdown = document.getElementById("notificationDropdown");
-    dropdown.style.display = dropdown.style.display === "none" ? "block" : "none";
-  }
+  document.addEventListener('DOMContentLoaded', function () {
+    // Admin-style notification dropdown
+    const notifToggle = document.getElementById('ownerNotificationToggle');
+    const notifDropdown = document.getElementById('notificationDropdown');
+    if (notifToggle && notifDropdown) {
+      notifToggle.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var isOpen = notifDropdown.style.display === 'block';
+        notifDropdown.style.display = isOpen ? 'none' : 'block';
+        notifDropdown.setAttribute('aria-hidden', isOpen ? 'true' : 'false');
+      });
+      notifDropdown.addEventListener('click', function (e) { e.stopPropagation(); });
+      document.addEventListener('click', function () { 
+        notifDropdown.style.display = 'none';
+        notifDropdown.setAttribute('aria-hidden','true'); 
+      });
+    }
 
-  // Close dropdown when clicking outside
-  window.addEventListener("click", function(e) {
-    let dropdown = document.getElementById("notificationDropdown");
-    if (!e.target.closest(".notification-wrapper")) {
-      dropdown.style.display = "none";
+    // Admin-style profile dropdown
+    const profileToggle = document.getElementById('profileDropdownToggle');
+    const profileMenu = document.getElementById('profileDropdownMenu');
+    if (profileToggle && profileMenu) {
+      profileToggle.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var isOpen = profileMenu.style.display === 'block';
+        profileMenu.style.display = isOpen ? 'none' : 'block';
+        profileMenu.setAttribute('aria-hidden', isOpen ? 'true' : 'false');
+        profileToggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+      });
+      profileMenu.addEventListener('click', function (e) { e.stopPropagation(); });
+      document.addEventListener('click', function () { 
+        profileMenu.style.display = 'none';
+        profileMenu.setAttribute('aria-hidden','true'); 
+        profileToggle.setAttribute('aria-expanded','false'); 
+      });
     }
   });
+</script>
+<script>
+  // Sidebar toggle logic for owner layout (mirror admin behavior)
+  (function(){
+    try {
+      const sidebar = document.getElementById('sidebar');
+      const sidebarToggle = document.getElementById('sidebarToggle');
+      const sidebarToggleIcon = document.getElementById('sidebarToggleIcon');
+      if (!sidebar || !sidebarToggle) return;
+
+      // Helper: set CSS vars for sidebar width and collapsed offset so headers can align precisely
+      function updateSidebarVars() {
+        const root = document.documentElement;
+        const rect = sidebar.getBoundingClientRect();
+        const width = Math.round(rect.width);
+        root.style.setProperty('--sidebar-width', width + 'px');
+        // collapsed offset is small, leave a little breathing room
+        root.style.setProperty('--sidebar-collapsed-offset', '4px');
+        // amount to subtract from the sidebar width so header sits slightly left
+        if (!getComputedStyle(root).getPropertyValue('--sidebar-offset')) {
+          root.style.setProperty('--sidebar-offset', '24px');
+        }
+      }
+
+      // initialize variables on load
+      updateSidebarVars();
+
+      // Explicitly adjust the page header padding to avoid overlap (immediate/direct)
+      function adjustHeaderPadding() {
+        try {
+          const header = document.querySelector('.page-header');
+          if (!header) return;
+          const root = document.documentElement;
+          const sidebarWidth = getComputedStyle(root).getPropertyValue('--sidebar-width')?.trim() || '230px';
+          const collapsedOffset = getComputedStyle(root).getPropertyValue('--sidebar-collapsed-offset')?.trim() || '4px';
+          const offsetVal = getComputedStyle(root).getPropertyValue('--sidebar-offset')?.trim() || '24px';
+          const sidebarPx = parseInt(sidebarWidth, 10) || 230;
+          const offsetPx = parseInt(offsetVal, 10) || 24;
+          const finalPadding = Math.max(0, sidebarPx - offsetPx) + 'px';
+          if (document.body.classList.contains('sidebar-collapsed')) {
+            header.style.paddingLeft = collapsedOffset;
+          } else {
+            header.style.paddingLeft = finalPadding;
+          }
+        } catch (e) { console.warn('adjustHeaderPadding error', e); }
+      }
+
+      // run once to align immediately
+      adjustHeaderPadding();
+
+      if (localStorage.getItem('sidebar-collapsed') === 'true') {
+        sidebar.classList.add('collapsed');
+        document.body.classList.add('sidebar-collapsed');
+        if (sidebarToggleIcon) sidebarToggleIcon.classList.add('is-rotated');
+      }
+
+      // Recompute when window resizes in case the sidebar width changes
+      window.addEventListener('resize', updateSidebarVars);
+
+      sidebarToggle.addEventListener('click', function() {
+        sidebar.classList.toggle('collapsed');
+        const isCollapsed = sidebar.classList.contains('collapsed');
+        localStorage.setItem('sidebar-collapsed', isCollapsed);
+        if (isCollapsed) {
+          document.body.classList.add('sidebar-collapsed');
+          if (sidebarToggleIcon) sidebarToggleIcon.classList.add('is-rotated');
+        } else {
+          document.body.classList.remove('sidebar-collapsed');
+          if (sidebarToggleIcon) sidebarToggleIcon.classList.remove('is-rotated');
+        }
+        // update variables after a small timeout to allow CSS collapse transition to run
+        setTimeout(function(){ updateSidebarVars(); adjustHeaderPadding(); }, 260);
+      });
+      // also adjust on resize so header follows any layout changes
+      window.addEventListener('resize', function(){ updateSidebarVars(); adjustHeaderPadding(); });
+    } catch (err) {
+      console.error('Owner sidebar toggle error', err);
+    }
+  })();
 </script>
