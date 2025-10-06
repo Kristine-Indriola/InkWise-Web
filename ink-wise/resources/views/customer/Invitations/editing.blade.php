@@ -18,7 +18,7 @@
 @endphp
 
     <!-- TOP BAR -->
-    <div class="topbar">
+    <div class="editor-topbar">
         <div class="left-tools">
             <button class="save-btn" type="button">Save</button>
             <button class="undo-btn" type="button">↶ Undo</button>

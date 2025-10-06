@@ -13,15 +13,15 @@
     font-family: 'Inter', sans-serif;
 }
 
-/* Topbar */
-.topbar {
+/* Page header (reports) */
+.reports-topbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 2rem;
 }
 
-.topbar h2 {
+.reports-topbar h2 {
     font-size: 1.75rem;
     font-weight: 700;
     color: #1f2937;

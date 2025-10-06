@@ -11,7 +11,7 @@
 
 
 <section class="main-content">
-    <div class="topbar">
+    <div class="reports-topbar">
         <h2>Reports Dashboard</h2>
     </div>
 
