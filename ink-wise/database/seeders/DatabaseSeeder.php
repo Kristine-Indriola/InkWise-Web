@@ -2,8 +2,9 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
+use App\Models\SiteSetting;
 use App\Models\Staff;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -117,5 +118,9 @@ class DatabaseSeeder extends Seeder
             ]
             
         ]);
+
+        if (! SiteSetting::query()->exists()) {
+            SiteSetting::create(SiteSetting::defaults());
+        }
     }
 }

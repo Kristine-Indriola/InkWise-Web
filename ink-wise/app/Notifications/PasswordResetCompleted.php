@@ -4,11 +4,10 @@ namespace App\Notifications;
 
 use App\Models\User;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class PasswordResetCompleted extends Notification implements ShouldQueue
+class PasswordResetCompleted extends Notification
 {
 	use Queueable;
 
@@ -18,7 +17,7 @@ class PasswordResetCompleted extends Notification implements ShouldQueue
 
 	public function via(object $notifiable): array
 	{
-		return ['mail'];
+		return ['mail', 'database'];
 	}
 
 	public function toMail(object $notifiable): MailMessage
@@ -31,5 +30,14 @@ class PasswordResetCompleted extends Notification implements ShouldQueue
 			->line('Role: '.$this->user->role)
 			->line('If this action was unexpected, please review the account activity immediately.')
 			->salutation('Regards, InkWise System');
+	}
+
+	public function toDatabase(object $notifiable): array
+	{
+		return [
+			'icon' => 'fa-solid fa-lock',
+			'message' => sprintf('🔐 %s just updated their password.', $this->user->email),
+			'url' => route('admin.users.index'),
+		];
 	}
 }

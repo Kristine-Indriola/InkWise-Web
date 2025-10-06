@@ -2,19 +2,39 @@
   <hr class="section-divider">
 
   <div class="layout-container">
-    <h2 class="text-3xl font-bold text-center mb-6 text-gray-800">Contact Us</h2>
-    <p class="text-center text-gray-600 mb-10">
-      Have questions or want to place a custom order? Reach out to us anytime!
-    </p>
+    @php($settings = $siteSettings ?? \App\Models\SiteSetting::current())
+
+    <h2 class="text-3xl font-bold text-center mb-6 text-gray-800">{{ $settings->contact_heading }}</h2>
+
+    @if(filled($settings->contact_subheading))
+      <p class="text-center text-gray-600 mb-10">
+        {{ $settings->contact_subheading }}
+      </p>
+    @endif
 
     <div class="grid md:grid-cols-2 gap-10">
       <!-- Contact Info -->
       <div class="text-black">
-        <h3 class="text-xl font-semibold mb-4" style="font-family: 'Playfair Display', serif;">Merwen Printing Services – InkWise</h3>
-        <p class="mb-3"><strong>📍 Address:</strong> 123 Rue de Paris, 75001 Paris, France</p>
-        <p class="mb-3"><strong>📞 Phone:</strong> +33 1 23 45 67 89</p>
-        <p class="mb-3"><strong>✉️ Email:</strong> InkwiseSystem@gmail.com</p>
-        <p><strong>🕒 Business Hours:</strong><br>Monday – Saturday: 9:00 AM – 7:00 PM</p>
+        @if(filled($settings->contact_company))
+          <h3 class="text-xl font-semibold mb-4" style="font-family: 'Playfair Display', serif;">{{ $settings->contact_company }}</h3>
+        @endif
+
+        @if(filled($settings->contact_address))
+          <p class="mb-3"><strong>📍 Address:</strong> {{ $settings->contact_address }}</p>
+        @endif
+
+        @if(filled($settings->contact_phone))
+          <p class="mb-3"><strong>📞 Phone:</strong> {{ $settings->contact_phone }}</p>
+        @endif
+
+        @if(filled($settings->contact_email))
+          <p class="mb-3"><strong>✉️ Email:</strong> {{ $settings->contact_email }}</p>
+        @endif
+
+        @php($hoursLines = $settings->contactHoursLines())
+        @if($hoursLines)
+          <p><strong>🕒 Business Hours:</strong><br>{!! collect($hoursLines)->map(fn ($line) => e($line))->implode('<br>') !!}</p>
+        @endif
       </div>
 
       <!-- Contact Form -->
