@@ -28,6 +28,7 @@ use App\Http\Controllers\Admin\MaterialController;
 use App\Http\Controllers\Auth\RoleLoginController;
 use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\MaterialsController;
+use App\Http\Controllers\Admin\SiteContentController;
 use App\Http\Controllers\customerProfileController;
 use App\Http\Controllers\Owner\OwnerStaffController;
 use App\Http\Controllers\Auth\CustomerAuthController;
@@ -47,7 +48,6 @@ use App\Http\Controllers\Staff\StaffInventoryController;
 use App\Http\Controllers\Admin\ReportsDashboardController;
 use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
 use App\Http\Controllers\PaymentController;
-use App\Http\Controllers\Admin\SiteContentController;
 
 use App\Http\Controllers\Admin\OrderSummaryController;
 use App\Models\Product;
@@ -156,11 +156,6 @@ Route::prefix('users')->name('users.')->group(function () {
 
 });
 
-    Route::prefix('settings')->name('settings.')->group(function () {
-        Route::get('/site-content', [SiteContentController::class, 'edit'])->name('site-content.edit');
-        Route::put('/site-content', [SiteContentController::class, 'update'])->name('site-content.update');
-    });
-
 
      Route::prefix('inventory')->name('inventory.')->group(function () {
         Route::get('/', [InventoryController::class, 'index'])->name('index');
@@ -237,6 +232,11 @@ Route::prefix('users')->name('users.')->group(function () {
     // Optional: Inventory export
     Route::get('reports/inventory/export/{type}', [ReportsDashboardController::class, 'exportInventory'])
          ->name('reports.inventory.export');
+
+    Route::prefix('settings')->name('settings.')->group(function () {
+        Route::get('site-content', [SiteContentController::class, 'edit'])->name('site-content.edit');
+        Route::put('site-content', [SiteContentController::class, 'update'])->name('site-content.update');
+    });
 
 }); // closes the admin group
 

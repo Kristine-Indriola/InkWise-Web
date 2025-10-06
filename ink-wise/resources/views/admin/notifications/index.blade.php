@@ -32,6 +32,7 @@
                 'StaffApprovedNotification' => route('admin.users.index'),
                 'NewStaffCreated' => route('owner.staff.index'),
                 'StockNotification' => route('admin.inventory.index'),
+                'PasswordResetCompleted' => route('admin.users.index'),
             ];
         @endphp
 

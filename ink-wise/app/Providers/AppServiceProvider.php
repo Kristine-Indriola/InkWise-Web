@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use App\Models\SiteSetting;
 use App\Support\ImageResolver;
 use App\Support\MessageMetrics;
 
@@ -47,6 +48,13 @@ class AppServiceProvider extends ServiceProvider
             }
 
             $view->with('staffUnreadMessageCount', $count);
+        });
+
+        View::composer([
+            'customer.partials.contact',
+            'customer.partials.about',
+        ], function ($view) {
+            $view->with('siteSettings', SiteSetting::current());
         });
     }
 }

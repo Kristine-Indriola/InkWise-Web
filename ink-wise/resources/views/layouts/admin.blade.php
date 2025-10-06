@@ -781,7 +781,7 @@ body.dark-mode .btn-warning {
         </ul>
       </li>
       @php
-          $settingsActive = request()->routeIs('admin.users.passwords.*');
+          $settingsActive = request()->routeIs('admin.users.passwords.*') || request()->routeIs('admin.settings.*');
       @endphp
           <li class="has-submenu {{ $settingsActive ? 'expanded active' : '' }}">
         <button type="button" class="submenu-trigger" data-submenu-toggle="settings" aria-expanded="{{ $settingsActive ? 'true' : 'false' }}">
@@ -790,8 +790,11 @@ body.dark-mode .btn-warning {
           <i class="fi fi-rr-angle-small-down submenu-caret" aria-hidden="true"></i>
         </button>
         <ul class="submenu" data-submenu="settings" aria-hidden="{{ $settingsActive ? 'false' : 'true' }}">
+          <li class="{{ request()->routeIs('admin.settings.site-content.*') ? 'active' : '' }}">
+            <a href="{{ route('admin.settings.site-content.edit') }}"><span class="label">Site Content</span></a>
+          </li>
           <li class="{{ request()->routeIs('admin.users.passwords.*') ? 'active' : '' }}">
-            <a href="{{ route('admin.users.passwords.index') }}"><span class="label">Password Reset Console</span></a>
+            <a href="{{ route('admin.users.passwords.index') }}"><span class="label">Password Reset</span></a>
           </li>
         </ul>
       </li>
