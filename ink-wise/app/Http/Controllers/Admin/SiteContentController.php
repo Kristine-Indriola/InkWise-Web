@@ -4,9 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\SiteSetting;
+use App\Models\Staff;
+use App\Models\User;
+use App\Notifications\SiteContentUpdated;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\View\View;
 
 class SiteContentController extends Controller
@@ -42,12 +46,46 @@ class SiteContentController extends Controller
 			'about_body'         => ['required', 'string'],
 		]);
 
-		$settings->fill($validated)->save();
+		$fields = array_keys($validated);
+		$originalValues = $settings->only($fields);
+
+		$settings->fill($validated);
+
+		$changedFields = collect($fields)
+			->filter(fn (string $field) => ($originalValues[$field] ?? null) !== $settings->getAttribute($field))
+			->mapWithKeys(fn (string $field) => [$field => $settings->getAttribute($field)])
+			->all();
+
+		$settings->save();
 
 		Cache::forget('site_settings.current');
 
 		// Prime cache with fresh copy so public pages reflect changes immediately.
 		SiteSetting::current();
+
+		if (! empty($changedFields)) {
+			$actor = $request->user();
+			$actorName = $actor?->name ?? 'Administrator';
+			$actorEmail = $actor?->email;
+			$actorId = $actor?->getAuthIdentifier();
+
+			$ownerUsers = Staff::query()
+				->where('role', 'owner')
+				->whereHas('user', fn ($query) => $query->whereNotNull('email'))
+				->with('user')
+				->get()
+				->pluck('user')
+				->filter()
+				->unique(fn (User $user) => $user->getAuthIdentifier())
+				->values();
+
+			if ($ownerUsers->isNotEmpty()) {
+				Notification::send(
+					$ownerUsers,
+					new SiteContentUpdated($actorName, $actorEmail, $actorId, $changedFields)
+				);
+			}
+		}
 
 		return back()->with('status', 'Site content updated successfully.');
 	}
