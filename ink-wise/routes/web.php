@@ -255,6 +255,10 @@ Route::patch('/admin/notifications/{id}/read', function ($id) {
 
     $notification->markAsRead();
 
+    if (request()->expectsJson()) {
+        return response()->json(['status' => 'marked']);
+    }
+
     return back()->with('success', 'Notification marked as read.');
 })->middleware('auth')->name('notifications.read');
 

@@ -6,12 +6,76 @@
 
 <!-- Summary cards CSS (page-scoped) -->
 <style>
-  .summary-grid { margin:0 0 12px 0; display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px; }
-  .summary-card { background:#fff; border-radius:10px; padding:12px; box-shadow:0 6px 18px rgba(15,23,42,0.04); display:block; text-decoration:none; color:inherit; }
-  .summary-card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
-  .summary-card-label { font-size:0.86rem; color:#475569; }
-  .summary-card-value { display:block; font-size:1.25rem; font-weight:800; color:#0f172a; margin-top:4px; }
-  .summary-card-meta { color:#6b7280; font-size:0.82rem; }
+  .owner-dashboard-shell {
+    padding: 20px 24px 32px;
+    padding-left: clamp(24px, 3vw, 48px);
+  }
+
+  .owner-dashboard-main {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 28px 28px 36px;
+    width: 100%;
+  }
+
+  .owner-dashboard-inner {
+    max-width: 1390px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 0;
+  }
+
+  .owner-dashboard-main .page-header {
+    margin-bottom: 24px;
+  }
+
+  .summary-grid {
+    margin: 0 0 20px 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
+  }
+  .summary-card {
+    position: relative;
+    background:#fff;
+    border-radius:12px;
+    padding:18px 22px 24px;
+    box-shadow:0 14px 28px rgba(15,23,42,0.08);
+    display:block;
+    text-decoration:none;
+    color:inherit;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+  .summary-card:hover { transform: translateY(-4px); box-shadow: 0 18px 36px rgba(15, 23, 42, 0.12); }
+  .summary-card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .summary-card-label { font-size:0.92rem; font-weight:600; color:#475569; }
+  .summary-card-value { display:block; font-size:1.6rem; font-weight:800; color:#0f172a; margin-top:6px; }
+  .summary-card-meta { color:#6b7280; font-size:0.84rem; }
+  .summary-card-chip {
+    padding:4px 12px;
+    border-radius:999px;
+    background: rgba(148, 185, 255, 0.18);
+    color: #5a8de0;
+    font-weight: 600;
+    font-size: 0.78rem;
+  }
+
+  .summary-card::after {
+    content: "";
+    position: absolute;
+    left:22px;
+    right:22px;
+    bottom:14px;
+    height:3px;
+    border-radius:999px;
+    background: linear-gradient(90deg, rgba(148, 185, 255, 0.45), rgba(111, 150, 227, 0.55));
+  }
+
+  .summary-card-chip.accent { background: rgba(148, 185, 255, 0.18); color: #5a8de0; }
+
+  .dark-mode .summary-card::after {
+    background: linear-gradient(90deg, rgba(148, 185, 255, 0.65), rgba(111, 150, 227, 0.75));
+  }
 
   /* Dark mode styles */
   .dark-mode .summary-card { background:#374151; color:#f9fafb; }
@@ -22,8 +86,8 @@
   .dark-mode body { background:#111827; }
 </style>
 
-<section class="main-content">
-  <main class="materials-page admin-page-shell materials-container" role="main">
+<section class="main-content owner-dashboard-shell">
+  <main class="materials-page admin-page-shell materials-container owner-dashboard-main" role="main">
     <header class="page-header">
       <div>
         <h1 class="page-title">Orders</h1>
@@ -31,7 +95,7 @@
       </div>
     </header>
 
-    <div class="page-inner">
+  <div class="page-inner owner-dashboard-inner">
       @php
         $totalOrders = 0; $confirmed = 0; $pending = 0;
         if (isset($orders) && $orders instanceof \Illuminate\Support\Collection) {

@@ -2,7 +2,7 @@
 @section('title', 'Staff Management')
 
 @push('styles')
-<link rel="stylesheet" href="css/owner/staffapp.css">
+<link rel="stylesheet" href="{{ asset('css/owner/staffapp.css') }}">
 @endpush
 
 
@@ -14,10 +14,107 @@ $highlightStaffId = request()->query('highlight');
 @endphp
 
 
+<style>
+  .owner-dashboard-shell {
+    padding: 20px 24px 32px;
+    padding-left: clamp(24px, 3vw, 48px);
+  }
 
-<section class="main-content">
+  .owner-dashboard-main {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 28px 28px 36px;
+    width: 100%;
+  }
+
+  .owner-dashboard-main .page-header {
+    margin-bottom: 24px;
+  }
+
+  .owner-dashboard-inner {
+    max-width: none;
+    margin: 0;
+    width: 100%;
+    padding: 0;
+  }
+
+  .staff-section-title {
+    margin: 0;
+    font-size: 1.08rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .owner-dashboard-inner .panel {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+  }
+
+  .staff-table-wrapper {
+    margin-top: 8px;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 185, 255, 0.2);
+    background: #f8fbff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 16px 32px rgba(15, 23, 42, 0.08);
+  }
+
+  .staff-table-wrapper .table thead th {
+    background: rgba(148, 185, 255, 0.16);
+    padding: 14px 20px;
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+  }
+
+  .staff-table-wrapper .table tbody td {
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(148, 185, 255, 0.12);
+    vertical-align: middle;
+  }
+
+  .staff-table-wrapper .table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .staff-table-wrapper .table tbody tr:hover {
+    background: rgba(148, 185, 255, 0.08);
+  }
+
+  @media (max-width: 900px) {
+    .staff-table-wrapper .table { min-width: 720px; }
+  }
+
+  .dark-mode .staff-table-wrapper {
+    background: #1f2937;
+    border-color: rgba(148, 185, 255, 0.32);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .dark-mode .staff-table-wrapper .table {
+    color: #f9fafb;
+  }
+
+  .dark-mode .staff-table-wrapper .table thead th {
+    background: rgba(148, 185, 255, 0.22);
+    color: #0f172a;
+  }
+
+  .dark-mode .staff-table-wrapper .table tbody td {
+    border-color: rgba(148, 185, 255, 0.18);
+  }
+
+  .dark-mode .staff-table-wrapper .table tbody tr:hover {
+    background: rgba(148, 185, 255, 0.12);
+  }
+</style>
+
+
+
+<section class="main-content owner-dashboard-shell">
   <link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
-  <main class="materials-page admin-page-shell materials-container" role="main">
+  <main class="materials-page admin-page-shell materials-container owner-dashboard-main" role="main">
     <header class="page-header">
       <div>
         <h1 class="page-title">Staff Management</h1>
@@ -25,7 +122,7 @@ $highlightStaffId = request()->query('highlight');
       </div>
     </header>
 
-    <div class="page-inner">
+  <div class="page-inner owner-dashboard-inner">
       <div class="panel">
         <h2 class="page-title" style="display:flex;align-items:center;gap:8px;">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="vertical-align:middle;"><circle cx="8" cy="8" r="4" stroke="var(--accent-strong, #5a8de0)" stroke-width="1.6"/><circle cx="16" cy="8" r="4" stroke="var(--accent-strong, #5a8de0)" stroke-width="1.6"/><path d="M2 20c0-3.3137 2.6863-6 6-6s6 2.6863 6 6" stroke="var(--accent-strong, #5a8de0)" stroke-width="1.6" stroke-linecap="round"/><path d="M10 20c0-3.3137 2.6863-6 6-6s6 2.6863 6 6" stroke="var(--accent-strong, #5a8de0)" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -77,8 +174,8 @@ $highlightStaffId = request()->query('highlight');
         </a>
         @endif
 
-  <h3 class="page-title" style="font-size:1.1rem; margin-bottom:12px;">Approved Staff Accounts</h3>
-        <div class="table-wrapper">
+  <h3 class="staff-section-title">Approved Staff Accounts</h3>
+        <div class="table-wrapper staff-table-wrapper">
           <table class="table">
             <thead>
               <tr>
@@ -109,7 +206,7 @@ $highlightStaffId = request()->query('highlight');
           </table>
         </div>
 
-        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+        <div style="display:flex; justify-content:flex-start; gap:8px; margin-top:12px;">
           <button id="pendingBtn" class="btn btn-secondary" type="button" aria-controls="pendingSection" title="Show pending staff">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 7v6l4 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <span>Pending Staff</span>
@@ -124,8 +221,8 @@ $highlightStaffId = request()->query('highlight');
           <span>Back</span>
         </button>
 
-        <h3 class="page-title" style="font-size:1.05rem; margin-top:20px;">Pending Staff Accounts</h3>
-        <div class="table-wrapper" style="margin-top:8px;">
+  <h3 class="staff-section-title" style="margin-top:20px;">Pending Staff Accounts</h3>
+  <div class="table-wrapper staff-table-wrapper">
           <table class="table">
             <thead>
               <tr>
@@ -142,7 +239,7 @@ $highlightStaffId = request()->query('highlight');
                 <td>{{ $staff->user->email }}</td>
                 <td>{{ $staff->contact_number }}</td>
                 <td>
-                  <div style="display:flex;gap:8px;align-items:center;">
+                  <div style="display:flex;gap:8px;align-items:center;justify-content:center;">
                     @if(session('warning') && session('pendingStaffId') == $staff->staff_id)
                       <form action="{{ route('owner.staff.approve', $staff->staff_id) }}" method="POST" style="display:inline;">
                         @csrf
@@ -180,8 +277,6 @@ $highlightStaffId = request()->query('highlight');
         </div>
       </div>
     </div>
-  </div>
-</section>
 
 {{-- Section Transitions --}}
 <script>
@@ -269,8 +364,7 @@ function confirmApproval() {
 }
 </script>
 
-@endsection
-
-    </div> <!-- .page-inner -->
+  </div> <!-- .page-inner -->
   </main>
-  </section>
+</section>
+@endsection

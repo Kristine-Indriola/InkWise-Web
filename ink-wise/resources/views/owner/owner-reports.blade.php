@@ -4,56 +4,284 @@
 
 <link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
 
-<!-- Page-scoped styles to align reports page to owner.products.index without editing materials.css -->
+<!-- Page-scoped styles aligned with owner dashboard layout -->
 <style>
-  .materials-page { padding:20px 36px; display:flex; flex-direction:column; gap:18px; }
-  .page-title { font-size:1.7rem; font-weight:800; color:#0f172a; margin:0 0 6px; }
-  .page-subtitle { margin:0; color:#6b7280; font-size:0.95rem; }
-  .page-inner { max-width:1400px; margin:0 auto; width:100%; padding:0 8px; }
+  .owner-dashboard-shell {
+    padding: 20px 24px 32px;
+    padding-left: clamp(24px, 3vw, 48px);
+  }
 
-  /* Summary cards visual style (small and consistent with products page) */
-  .summary-grid { margin:0 0 12px 0; display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:18px; }
-  .summary-card { background:#fff; border-radius:12px; padding:14px; box-shadow:0 8px 20px rgba(15,23,42,0.04); display:block; text-decoration:none; color:inherit; }
-  .summary-card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
-  .summary-card-label { font-size:0.9rem; color:#475569; }
-  .summary-card-value { display:block; font-size:1.5rem; font-weight:800; color:#0f172a; margin-top:4px; }
-  .summary-card-meta { color:#6b7280; font-size:0.9rem; }
+  .owner-dashboard-main {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 28px 28px 36px;
+    width: 100%;
+  }
 
-  /* Make chart cards sit side-by-side and match product layout */
-  .charts { display:grid; grid-template-columns: 1fr 1fr; gap:18px; margin-bottom:12px; }
-  .chart-card { background:#fff; border-radius:12px; padding:14px; box-shadow:0 8px 20px rgba(15,23,42,0.04); min-height:220px; }
+  .owner-dashboard-inner {
+    max-width: 1390px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 0;
+  }
 
-  /* Toolbar alignment similar to products page */
-  .materials-toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px; }
+  .owner-dashboard-main .page-header {
+    margin-bottom: 24px;
+  }
 
-  /* Table wrapper to match product's spacing */
-  .table-wrapper { background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 12px 24px rgba(15,23,42,0.06); border:1px solid rgba(148,185,255,0.18); margin:0; padding:14px; }
-  .table { width:100%; border-collapse:collapse; font-size:0.95rem; color:#0f172a; }
-  .table thead th { background: rgba(148,185,255,0.14); padding:12px 14px; text-transform:uppercase; font-size:0.75rem; letter-spacing:0.06em; }
-  .table tbody td { padding:12px 14px; border-bottom:1px solid rgba(148,185,255,0.06); vertical-align:middle; }
-  .table tbody tr:hover { background: rgba(148,185,255,0.04); }
+  .page-title {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 6px;
+  }
 
-  @media (max-width:900px) { .charts { grid-template-columns: 1fr; } .page-inner { max-width:1000px; } }
+  .page-subtitle {
+    margin: 0;
+    color: #6b7280;
+    font-size: 0.98rem;
+  }
 
-  /* Dark mode styles */
-  .dark-mode .summary-card { background:#374151; color:#f9fafb; }
-  .dark-mode .summary-card-label { color:#d1d5db; }
-  .dark-mode .summary-card-value { color:#f9fafb; }
-  .dark-mode .summary-card-meta { color:#9ca3af; }
+  .summary-grid {
+    margin: 0 0 20px 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
+  }
 
-  .dark-mode .chart-card { background:#374151; }
+  .summary-card {
+    position: relative;
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px 22px 24px;
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
 
-  .dark-mode .table-wrapper { background:#374151; border-color:#4b5563; }
-  .dark-mode .table { color:#f9fafb; }
-  .dark-mode .table thead th { background:#4b5563; color:#f9fafb; }
-  .dark-mode .table tbody td { border-color:#4b5563; }
-  .dark-mode .table tbody tr:hover { background:#4b5563; }
+  .summary-card::after {
+    content: "";
+    position: absolute;
+    left: 22px;
+    right: 22px;
+    bottom: 14px;
+    height: 3px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(148, 185, 255, 0.45), rgba(111, 150, 227, 0.55));
+  }
 
-  .dark-mode body { background:#111827; }
+  .summary-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.12);
+  }
+
+  .summary-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .summary-card-label {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: #475569;
+  }
+
+  .summary-card-value {
+    display: block;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-top: 6px;
+  }
+
+  .summary-card-meta {
+    color: #6b7280;
+    font-size: 0.84rem;
+  }
+
+  .summary-card-chip {
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: rgba(148, 185, 255, 0.18);
+    color: #5a8de0;
+    font-weight: 600;
+    font-size: 0.78rem;
+  }
+
+  .summary-card-chip.accent {
+    background: rgba(148, 185, 255, 0.22);
+  }
+
+  .reports-charts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 18px;
+    margin-bottom: 20px;
+  }
+
+  .chart-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 20px 24px 24px;
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.08);
+    min-height: 240px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .chart-card h4 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .chart-card canvas {
+    width: 100%;
+    flex: 1;
+  }
+
+  .materials-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+
+  .materials-toolbar__search {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .materials-toolbar__search label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #475569;
+  }
+
+  .materials-toolbar__search select {
+    min-width: 160px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(148, 185, 255, 0.28);
+    background: #fff;
+    font-size: 0.92rem;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .materials-toolbar__search select:focus {
+    outline: none;
+    border-color: rgba(59, 130, 246, 0.32);
+    box-shadow: 0 12px 28px rgba(59, 130, 246, 0.08);
+  }
+
+  .materials-toolbar__actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .owner-dashboard-inner .table-wrapper {
+    margin-top: 18px;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 185, 255, 0.2);
+    background: #f8fbff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 16px 32px rgba(15, 23, 42, 0.08);
+    overflow-x: auto;
+  }
+
+  .owner-dashboard-inner .table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+    color: #0f172a;
+    min-width: 880px;
+  }
+
+  .owner-dashboard-inner .table thead th {
+    background: rgba(148, 185, 255, 0.16);
+    padding: 14px 20px;
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+  }
+
+  .owner-dashboard-inner .table tbody td {
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(148, 185, 255, 0.12);
+    vertical-align: middle;
+  }
+
+  .owner-dashboard-inner .table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .owner-dashboard-inner .table tbody tr:hover {
+    background: rgba(148, 185, 255, 0.08);
+  }
+
+  .table-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-top: 10px;
+  }
+
+  .table-section-header h3 {
+    margin: 0;
+    font-size: 1.12rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .table-pagination {
+    margin-top: 16px;
+  }
+
+  @media (max-width: 900px) {
+    .owner-dashboard-shell { padding: 16px; }
+    .owner-dashboard-main { padding: 24px 20px 32px; }
+    .owner-dashboard-inner { padding: 0 4px; }
+    .owner-dashboard-inner .table { min-width: 720px; }
+    .reports-charts { grid-template-columns: 1fr; }
+    .materials-toolbar { flex-direction: column; align-items: stretch; }
+    .materials-toolbar__search { width: 100%; justify-content: space-between; }
+    .materials-toolbar__actions { width: 100%; justify-content: flex-start; }
+  }
+
+  .dark-mode body { background: #111827; }
+  .dark-mode .summary-card { background: #374151; color: #f9fafb; box-shadow: 0 12px 24px rgba(15, 23, 42, 0.4); }
+  .dark-mode .summary-card::after { background: linear-gradient(90deg, rgba(148, 185, 255, 0.65), rgba(111, 150, 227, 0.75)); }
+  .dark-mode .summary-card-label { color: #d1d5db; }
+  .dark-mode .summary-card-value { color: #f9fafb; }
+  .dark-mode .summary-card-meta { color: #9ca3af; }
+  .dark-mode .summary-card-chip { background: rgba(148, 185, 255, 0.28); color: #cbd9ff; }
+  .dark-mode .summary-card-chip.accent { background: rgba(148, 185, 255, 0.32); }
+  .dark-mode .chart-card { background: #1f2937; box-shadow: 0 16px 32px rgba(15, 23, 42, 0.5); }
+  .dark-mode .chart-card h4 { color: #f9fafb; }
+  .dark-mode .materials-toolbar__search select { background: #374151; border-color: #4b5563; color: #f9fafb; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); }
+  .dark-mode .owner-dashboard-inner .table-wrapper { background: #1f2937; border-color: rgba(148, 185, 255, 0.32); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04); }
+  .dark-mode .owner-dashboard-inner .table { color: #f9fafb; }
+  .dark-mode .owner-dashboard-inner .table thead th { background: rgba(148, 185, 255, 0.22); color: #0f172a; }
+  .dark-mode .owner-dashboard-inner .table tbody td { border-color: rgba(148, 185, 255, 0.18); }
+  .dark-mode .owner-dashboard-inner .table tbody tr:hover { background: rgba(148, 185, 255, 0.12); }
 </style>
 
-<section class="main-content">
-  <main class="materials-page admin-page-shell materials-container" role="main">
+<section class="main-content owner-dashboard-shell">
+  <main class="materials-page admin-page-shell materials-container owner-dashboard-main" role="main">
     <header class="page-header">
       <div>
         <h1 class="page-title">Reports</h1>
@@ -61,7 +289,7 @@
       </div>
     </header>
 
-    <div class="page-inner">
+    <div class="page-inner owner-dashboard-inner">
     <!-- Summary cards (placeholders; keep numbers as examples) -->
     <section class="summary-grid" aria-label="Reports summary">
       <a href="{{ url()->current() }}" class="summary-card">
@@ -101,15 +329,42 @@
       </a>
     </section>
 
+    <section class="materials-toolbar" aria-label="Report filters and actions">
+      <div class="materials-toolbar__search">
+        <label for="reportFilterSelect">Range</label>
+        <select id="reportFilterSelect" name="range" aria-label="Filter reports by range">
+          <option value="all">All time</option>
+          <option value="daily">Today</option>
+          <option value="weekly">Last 7 days</option>
+          <option value="monthly">Last 30 days</option>
+          <option value="yearly">This year</option>
+        </select>
+      </div>
+      <div class="materials-toolbar__actions">
+        <button type="button" class="btn btn-primary" id="openGenerateModalBtn" title="Generate new report">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span style="margin-left:8px;">Generate</span>
+        </button>
+        <button type="button" class="btn btn-secondary" onclick="exportCSV()" title="Export visible rows to CSV">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12M8 11l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span style="margin-left:8px;">Export CSV</span>
+        </button>
+        <button type="button" class="btn btn-outline" onclick="exportPDF()" title="Export visible rows to PDF">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 4h9l5 5v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 3v6h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span style="margin-left:8px;">Export PDF</span>
+        </button>
+      </div>
+    </section>
+
     <!-- Charts -->
-    <div class="charts">
+    <div class="reports-charts">
       <div class="chart-card">
         <h4>Sales Overview</h4>
-        <div style="height:220px;"><canvas id="salesChart"></canvas></div>
+        <canvas id="salesChart"></canvas>
       </div>
       <div class="chart-card">
         <h4>Inventory Levels</h4>
-        <div style="height:220px;"><canvas id="inventoryChart"></canvas></div>
+        <canvas id="inventoryChart"></canvas>
       </div>
     </div>
 
@@ -156,10 +411,11 @@
       </div>
     </div>
 
-    <!-- Table container for reports -->
-    <div class="table-container">
+    <div class="table-section-header">
       <h3>Reports</h3>
-      <table id="reportTable">
+    </div>
+    <div class="table-wrapper">
+      <table class="table" id="reportTable">
         <thead>
           <tr>
             <th>Report Name</th>
@@ -169,9 +425,11 @@
             <th>Action</th>
           </tr>
         </thead>
+        <tbody></tbody>
       </table>
     </div>
   </div>
+</main>
 </section>
 
 <!-- jsPDF + AutoTable (kept here) -->
@@ -781,23 +1039,24 @@ document.addEventListener('DOMContentLoaded', function () {
         // insert (append) into tbody — we'll rely on sortReportsTable() to order rows
         tbody.appendChild(tr);
 
-        // after adding, keep table sorted and re-apply the current filter so the row appears/hides correctly
-        sortReportsTable(true);
-        const activeTab = document.querySelector('.report-filters .filter-tab.active') || document.querySelector('.report-filters .filter-tab[aria-selected="true"]');
-        const activeRange = activeTab ? (activeTab.dataset.range || 'all') : 'all';
-        try { applyReportFilter(activeRange); } catch (e) { /* ignore if not available */ }
+  // after adding, keep table sorted and re-apply the current filter so the row appears/hides correctly
+  sortReportsTable(true);
+  const activeRange = getActiveRange();
+  try { applyReportFilter(activeRange); } catch (e) { /* ignore if not available */ }
 
         return tr;
       }
 
-      // Add the row (client-side)
-      addReportRow(reportType, description, generatedBy, dateStr);
+  // persist description for export headers
+  window.lastExportDescription = description;
 
-      // Re-apply current filter so the row respects the visible range
-      const activeTab = document.querySelector('.report-filters .filter-tab.active') || document.querySelector('.report-filters .filter-tab[aria-selected="true"]');
-      const activeRange = activeTab ? (activeTab.dataset.range || 'all') : 'all';
-      // applyReportFilter is defined elsewhere on the page
-      try { applyReportFilter(activeRange); } catch (e) { /* ignore if not available */ }
+  // Add the row (client-side)
+  addReportRow(reportType, description, generatedBy, dateStr);
+
+  // Re-apply current filter so the row respects the visible range
+  const activeRange = getActiveRange();
+  // applyReportFilter is defined elsewhere on the page
+  try { applyReportFilter(activeRange); } catch (e) { /* ignore if not available */ }
 
       // show a centered, professional success notification (replaces the previous green toast)
       (function showToast(msg) {

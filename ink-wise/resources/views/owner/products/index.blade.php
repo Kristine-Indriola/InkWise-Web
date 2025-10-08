@@ -7,101 +7,241 @@
 
 <!-- Inline critical CSS fallback to ensure table is visible and matches admin styles -->
 <style>
-  /* Container & page shell */
-  .materials-page {
-    padding:20px 36px;
-    background: #f3f6ff;
-    border-radius:16px;
-    display:flex;
-    flex-direction:column;
-    gap:18px;
-    margin-left:0; /* let .page-inner center the content */
+  .owner-dashboard-shell {
+    padding: 20px 24px 32px;
+    padding-left: clamp(24px, 3vw, 48px);
   }
 
-  .page-title { font-size:1.7rem; font-weight:800; color:#0f172a; margin:0 0 6px; }
-  .page-subtitle { margin:0; color:#6b7280; font-size:0.95rem; }
-
-  /* Nudge the page title/subtitle to the right so it won't be overlapped by the sliding sidebar */
-  /* Move header more to the left for tighter alignment (helps when zoomed out) */
-  .page-header { padding-left:4px; }
-
-  /* When there's enough horizontal space assume the sidebar is open and add a moderate offset */
-  @media (min-width:1100px) {
-    .page-header { padding-left:60px; }
+  .owner-dashboard-main {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 28px 28px 36px;
+    width: 100%;
   }
 
-  /* Adjust header padding dynamically using CSS variables that reflect the sidebar width */
-  .page-header {
+  .owner-dashboard-inner {
+    max-width: 1390px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 0;
+  }
+
+  .owner-dashboard-main .page-header {
     margin-bottom: 24px;
   }
 
-  /* Make the inner page wider so cards and table can spread more horizontally */
-  .page-inner { max-width:1400px; margin:0 auto; width:100%; padding:0 8px; }
-
-  /* Summary cards - larger minimum so there are fewer rows and they appear wider */
-  .summary-grid { margin:0 0 12px 0; display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:18px; }
-  .summary-card { background:#fff; border-radius:12px; padding:18px; box-shadow:0 8px 20px rgba(15,23,42,0.04); display:block; text-decoration:none; color:inherit; }
-  .summary-card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
-  .summary-card-label { font-size:0.9rem; color:#475569; }
-  .summary-card-value { display:block; font-size:1.5rem; font-weight:800; color:#0f172a; margin-top:4px; }
-
-  /* Table styles - padding inside wrapper so table breathes and looks wider */
-  .table-wrapper { background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 12px 24px rgba(15,23,42,0.06); border:1px solid rgba(148,185,255,0.18); margin:0; padding:14px; }
-  .table { width:100%; border-collapse:collapse; font-size:0.95rem; color:#0f172a; min-width:880px; }
-  .table thead th { background: rgba(148,185,255,0.14); padding:14px 18px; text-transform:uppercase; font-size:0.75rem; letter-spacing:0.06em; }
-  .table tbody td { padding:14px 18px; border-bottom:1px solid rgba(148,185,255,0.12); vertical-align:middle; }
-  .table tbody tr:hover { background: rgba(148,185,255,0.06); }
-
-  .badge { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; font-size:0.75rem; font-weight:700; text-transform:uppercase; }
-  .badge.stock-ok { background: rgba(34,197,94,0.16); color:#15803d; }
-  .badge.stock-low { background: rgba(251,191,36,0.14); color:#b45309; }
-  .badge.stock-critical { background: rgba(239,68,68,0.14); color:#b91c1c; }
-  .fw-bold { font-weight:700; }
-
-  /* Toolbar adjustments */
-  .materials-toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; }
-  .materials-toolbar__search { flex:1 1 auto; }
-  .materials-toolbar__actions { flex:0 0 auto; }
-
-  /* Search input sizing: keep it compact but responsive */
-  .materials-toolbar__search form { display:flex; gap:8px; align-items:center; }
-  .search-input { display:flex; align-items:center; gap:8px; background:#fff; border-radius:10px; padding:6px 8px; border:1px solid rgba(148,185,255,0.22); box-shadow:0 6px 18px rgba(15,23,42,0.04); transition:box-shadow 180ms ease, border-color 180ms ease; }
-  .search-input:focus-within { border-color: rgba(59,130,246,0.32); box-shadow:0 10px 30px rgba(59,130,246,0.06); }
-  .search-input .search-icon { color:#9aa6c2; padding-left:4px; }
-  .search-input input.form-control { border:0; outline:0; width:280px; max-width:40vw; min-width:140px; padding:6px 8px; font-size:0.95rem; background:transparent; }
-  .search-input input.form-control:focus { box-shadow:none; }
-  .materials-toolbar__search .btn { padding:6px 10px; font-size:0.9rem; }
-
-  @media (max-width:1100px) {
-    .page-inner { max-width:1000px; }
-    .summary-grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  .page-title {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 6px;
   }
 
-  @media (max-width:900px) {
-    .materials-page { padding:16px; }
-    .materials-page .table-wrapper { overflow-x:auto; }
-    .table { min-width:720px; }
+  .page-subtitle {
+    margin: 0;
+    color: #6b7280;
+    font-size: 0.98rem;
   }
 
-  /* Dark mode styles */
-  .dark-mode .summary-card { background:#374151; color:#f9fafb; }
-  .dark-mode .summary-card-label { color:#d1d5db; }
-  .dark-mode .summary-card-value { color:#f9fafb; }
+  .summary-grid {
+    margin: 0 0 20px 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
+  }
 
-  .dark-mode .table-wrapper { background:#374151; border-color:#4b5563; }
-  .dark-mode .table { color:#f9fafb; }
-  .dark-mode .table thead th { background:#4b5563; color:#f9fafb; }
-  .dark-mode .table tbody td { border-color:#4b5563; }
-  .dark-mode .table tbody tr:hover { background:#4b5563; }
+  .summary-card {
+    position: relative;
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px 22px 24px;
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
 
-  .dark-mode .search-input { background:#374151; border-color:#4b5563; }
-  .dark-mode .search-input input.form-control { color:#f9fafb; }
+  .summary-card::after {
+    content: "";
+    position: absolute;
+    left: 22px;
+    right: 22px;
+    bottom: 14px;
+    height: 3px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(148, 185, 255, 0.45), rgba(111, 150, 227, 0.55));
+  }
 
-  .dark-mode body { background:#111827; }
+  .summary-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.12);
+  }
+
+  .summary-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .summary-card-label {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: #475569;
+  }
+
+  .summary-card-value {
+    display: block;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-top: 6px;
+  }
+
+  .summary-card-meta {
+    color: #6b7280;
+    font-size: 0.84rem;
+  }
+
+  .summary-card-chip {
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: rgba(148, 185, 255, 0.18);
+    color: #5a8de0;
+    font-weight: 600;
+    font-size: 0.78rem;
+  }
+
+  .summary-card-chip.accent {
+    background: rgba(148, 185, 255, 0.22);
+  }
+
+  .materials-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+
+  .materials-toolbar__search form {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .search-input {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border-radius: 10px;
+    padding: 6px 10px;
+    border: 1px solid rgba(148, 185, 255, 0.22);
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+    transition: box-shadow 0.18s ease, border-color 0.18s ease;
+  }
+
+  .search-input:focus-within {
+    border-color: rgba(59, 130, 246, 0.32);
+    box-shadow: 0 12px 28px rgba(59, 130, 246, 0.08);
+  }
+
+  .search-input input.form-control {
+    border: 0;
+    outline: 0;
+    width: 280px;
+    max-width: 40vw;
+    min-width: 140px;
+    padding: 6px 8px;
+    font-size: 0.95rem;
+    background: transparent;
+  }
+
+  .table-wrapper {
+    border-radius: 14px;
+    border: 1px solid rgba(148, 185, 255, 0.2);
+    background: #f8fbff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 16px 32px rgba(15, 23, 42, 0.08);
+    overflow-x: auto;
+  }
+
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+    color: #0f172a;
+    min-width: 880px;
+  }
+
+  .table thead th {
+    background: rgba(148, 185, 255, 0.16);
+    padding: 14px 20px;
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+  }
+
+  .table tbody td {
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(148, 185, 255, 0.12);
+    vertical-align: middle;
+  }
+
+  .table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .table tbody tr:hover {
+    background: rgba(148, 185, 255, 0.08);
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .badge.stock-ok { background: rgba(34, 197, 94, 0.16); color: #15803d; }
+  .badge.stock-low { background: rgba(251, 191, 36, 0.16); color: #b45309; }
+  .badge.stock-critical { background: rgba(239, 68, 68, 0.16); color: #b91c1c; }
+
+  .fw-bold { font-weight: 700; }
+
+  @media (max-width: 900px) {
+    .owner-dashboard-shell { padding: 16px; }
+    .owner-dashboard-main { padding: 24px 20px 32px; }
+    .owner-dashboard-inner { padding: 0 4px; }
+    .table { min-width: 720px; }
+  }
+
+  /* Dark mode */
+  .dark-mode body { background: #111827; }
+  .dark-mode .summary-card { background: #374151; color: #f9fafb; box-shadow: 0 12px 24px rgba(15, 23, 42, 0.4); }
+  .dark-mode .summary-card::after { background: linear-gradient(90deg, rgba(148, 185, 255, 0.65), rgba(111, 150, 227, 0.75)); }
+  .dark-mode .summary-card-label { color: #d1d5db; }
+  .dark-mode .summary-card-value { color: #f9fafb; }
+  .dark-mode .summary-card-meta { color: #9ca3af; }
+  .dark-mode .summary-card-chip { background: rgba(148, 185, 255, 0.28); color: #cbd9ff; }
+  .dark-mode .summary-card-chip.accent { background: rgba(148, 185, 255, 0.32); }
+  .dark-mode .search-input { background: #374151; border-color: #4b5563; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); }
+  .dark-mode .search-input input.form-control { color: #f9fafb; }
+  .dark-mode .table-wrapper { background: #1f2937; border-color: rgba(148, 185, 255, 0.32); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04); }
+  .dark-mode .table { color: #f9fafb; }
+  .dark-mode .table thead th { background: rgba(148, 185, 255, 0.22); color: #0f172a; }
+  .dark-mode .table tbody td { border-color: rgba(148, 185, 255, 0.18); }
+  .dark-mode .table tbody tr:hover { background: rgba(148, 185, 255, 0.12); }
 </style>
 
-<section class="main-content">
-  <main class="materials-page admin-page-shell materials-container" role="main">
+<section class="main-content owner-dashboard-shell">
+  <main class="materials-page admin-page-shell materials-container owner-dashboard-main" role="main">
   <header class="page-header">
     <div>
       <h1 class="page-title">Products</h1>
@@ -134,7 +274,7 @@
     }
   @endphp
 
-  <div class="page-inner">
+  <div class="page-inner owner-dashboard-inner">
   <section class="summary-grid" aria-label="Products summary">
     <a href="{{ route('owner.products.index') }}" class="summary-card" aria-label="Total products">
       <div class="summary-card-header">
