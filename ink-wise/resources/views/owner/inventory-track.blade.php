@@ -5,7 +5,7 @@
 @extends('layouts.owner.app')
 
 @push('styles')
-  <link rel="stylesheet" href="css/owner/staffapp.css">
+  <link rel="stylesheet" href="{{ asset('css/owner/staffapp.css') }}">
 @endpush
 
 @section('content')
@@ -13,86 +13,200 @@
 
 <link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
 
-<!-- Page-scoped layout overrides: keep materials.css untouched, adjust only this blade -->
+<!-- Page-scoped layout overrides aligned with owner dashboard sizing -->
 <style>
-  /* Reduce outer page padding so content isn't pushed under sidebar/topbar */
-  main.materials-page.admin-page-shell.materials-container {
-    /* Add top padding to keep content below any fixed topbar; respects a CSS variable if available */
-    padding: 12px 18px 18px 18px !important;
-    padding-top: calc(var(--owner-topbar-height, 64px) + 12px) !important;
-    margin-left: 230px !important;
+  .owner-dashboard-shell {
+    padding: 20px 24px 32px;
+    padding-left: clamp(24px, 3vw, 48px);
   }
 
-  /* Constrain inner content width so tables don't overflow under the sidebar */
-  main.materials-page .page-inner {
-    max-width: 1100px;
+  .owner-dashboard-main {
+    max-width: 1440px;
     margin: 0 auto;
-    padding: 0 10px;
+    padding: 28px 28px 36px;
+    width: 100%;
   }
 
-  /* Make table wrapper more compact and allow horizontal scrolling on small screens */
-  main.materials-page .table-wrapper {
-    padding: 10px !important;
+  .owner-dashboard-inner {
+    max-width: 1390px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 0;
+  }
+
+  .owner-dashboard-main .page-header {
+    margin-bottom: 24px;
+  }
+
+  .owner-dashboard-inner .panel {
+    width: 100%;
+    max-width: 100%;
+    background: #fff;
+    border-radius: 18px;
+    border: 1px solid rgba(148, 185, 255, 0.22);
+    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.08);
+    padding: 24px 24px 28px;
+    margin: 0;
+  }
+
+  .owner-dashboard-inner .panel h3 {
+    margin: 0 0 20px;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .owner-dashboard-inner .materials-toolbar {
+    margin-bottom: 20px;
+  }
+
+  .owner-dashboard-inner .table-wrapper {
+    margin-top: 18px;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 185, 255, 0.2);
+    background: #f8fbff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
     overflow-x: auto;
+    overflow-y: hidden;
   }
 
-  /* Avoid forcing a very large min-width on the inventory table; let it be responsive */
-  main.materials-page .table {
-    min-width: 720px; /* modest minimum */
+  .owner-dashboard-inner .table {
+    min-width: 720px;
     font-size: 0.92rem;
   }
 
-  /* Tweak table cell padding for denser rows on owner pages */
-  main.materials-page .table tbody td,
-  main.materials-page .table thead th {
-    padding: 10px 12px;
+  .owner-dashboard-inner .table tbody td,
+  .owner-dashboard-inner .table thead th {
+    padding: 12px 18px;
   }
 
-  /* Dark mode for table */
-  .dark-mode .table { background:#1f2937; color:#f9fafb; }
-  .dark-mode .table thead th { background:#374151; color:#f9fafb; border-color:#4b5563; }
-  .dark-mode .table tbody td { border-color:#4b5563; }
-  .dark-mode .table tbody tr:hover { background:#374151; }
+  .owner-dashboard-inner .table thead th {
+    background: rgba(148, 185, 255, 0.16);
+    color: #1e293b;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
 
-  /* Dark mode for panel */
-  .dark-mode .panel { background:#374151; color:#f9fafb; }
-  .dark-mode .panel h3 { color:#f9fafb; }
+  .owner-dashboard-inner .table tbody tr:hover {
+    background: rgba(148, 185, 255, 0.08);
+  }
 
-  /* Dark mode for body */
-  .dark-mode body { background:#111827; }
+  .summary-grid {
+    margin: 0 0 20px 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+  }
 
-  /* Ensure the header doesn't get extra left padding that misaligns the title */
-  main.materials-page .page-header { padding-left: 8px !important; position:relative; z-index:5; }
+  .summary-card {
+    position: relative;
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px 20px 24px;
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
 
-  /* Small screens: reduce min-width and allow better fit */
+  .summary-card::after {
+    content: "";
+    position: absolute;
+    left: 20px;
+    right: 20px;
+    bottom: 14px;
+    height: 3px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(148, 185, 255, 0.45), rgba(111, 150, 227, 0.55));
+  }
+
+  .summary-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.12);
+  }
+
+  .summary-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .summary-card-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #475569;
+  }
+
+  .summary-card-value {
+    display: block;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-top: 6px;
+  }
+
+  .summary-card-meta {
+    color: #6b7280;
+    font-size: 0.84rem;
+  }
+
+  .summary-card-chip {
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: rgba(148, 185, 255, 0.18);
+    color: #5a8de0;
+    font-weight: 600;
+    font-size: 0.78rem;
+  }
+
+  /* Dark mode adjustments */
+  .dark-mode body { background: #111827; }
+  .dark-mode .summary-card { background: #374151; color: #f9fafb; box-shadow: 0 12px 24px rgba(15, 23, 42, 0.4); }
+  .dark-mode .summary-card::after { background: linear-gradient(90deg, rgba(148, 185, 255, 0.65), rgba(111, 150, 227, 0.75)); }
+  .dark-mode .summary-card-label { color: #d1d5db; }
+  .dark-mode .summary-card-value { color: #f9fafb; }
+  .dark-mode .summary-card-meta { color: #9ca3af; }
+  .dark-mode .summary-card-chip { background: rgba(148, 185, 255, 0.28); color: #cbd9ff; }
+  .dark-mode .table { background: #1f2937; color: #f9fafb; }
+  .dark-mode .table thead th { background: #374151; color: #f9fafb; border-color: #4b5563; }
+  .dark-mode .table tbody td { border-color: #4b5563; }
+  .dark-mode .table tbody tr:hover { background: #374151; }
+  .dark-mode .panel {
+    background: #1f2937;
+    border-color: rgba(148, 185, 255, 0.35);
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.35);
+    color: #f9fafb;
+  }
+  .dark-mode .panel h3 { color: #f9fafb; }
+  .dark-mode .owner-dashboard-inner .table-wrapper {
+    background: #161e2e;
+    border-color: rgba(148, 185, 255, 0.28);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+  .dark-mode .owner-dashboard-inner .table tbody tr:hover {
+    background: rgba(148, 185, 255, 0.12);
+  }
+
   @media (max-width: 900px) {
-    main.materials-page .page-inner { max-width: 100%; padding: 0 8px; }
-    main.materials-page .table { min-width: 600px; font-size:0.9rem; }
-    main.materials-page { padding: 10px !important; margin-left: 90px !important; }
+    .owner-dashboard-shell { padding: 16px; }
+    .owner-dashboard-main { padding: 24px 20px 32px; }
+    .owner-dashboard-inner { padding: 0 4px; }
+    .owner-dashboard-inner .table { min-width: 600px; font-size: 0.9rem; }
   }
-
-  /* Summary cards for inventory (page-scoped) */
-  .summary-grid { margin:0 0 12px 0; display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px; }
-  .summary-card { background:#fff; border-radius:10px; padding:12px; box-shadow:0 6px 18px rgba(15,23,42,0.04); display:block; text-decoration:none; color:inherit; }
-  .summary-card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
-  .summary-card-label { font-size:0.86rem; color:#475569; }
-  .summary-card-value { display:block; font-size:1.25rem; font-weight:800; color:#0f172a; margin-top:4px; }
-  .summary-card-meta { color:#6b7280; font-size:0.82rem; }
-
-  /* Dark mode styles */
-  .dark-mode .summary-card { background:#374151; color:#f9fafb; }
-  .dark-mode .summary-card-label { color:#d1d5db; }
-  .dark-mode .summary-card-value { color:#f9fafb; }
-  .dark-mode .summary-card-meta { color:#9ca3af; }
 </style>
 
-<main class="materials-page admin-page-shell materials-container" role="main">
+<section class="main-content owner-dashboard-shell">
+<main class="materials-page admin-page-shell materials-container owner-dashboard-main" role="main">
   <header class="page-header">
     <div>
       <h1 class="page-title">Inventory</h1>
       <p class="page-subtitle">Track stock levels across materials</p>
     </div>
   </header>
+  <div class="page-inner owner-dashboard-inner">
       @php
           // Compute counts using provided $materials when possible to avoid extra queries
           $lowCount = 0; $outCount = 0; $totalMaterials = 0;
@@ -123,7 +237,7 @@
           $notifCount = $lowCount + $outCount;
       @endphp
 
-      <section class="summary-grid" aria-label="Inventory summary">
+  <section class="summary-grid" aria-label="Inventory summary">
         <a href="{{ url()->current() }}" class="summary-card">
           <div class="summary-card-header">
             <div style="display:flex;align-items:center;gap:8px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 7h18M3 12h18M3 17h18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="summary-card-label">Total Items</span></div>
@@ -162,7 +276,7 @@
       </section>
 
        
-      <div class="panel">
+  <div class="panel">
         <h3>Stock Levels</h3>
 
          {{-- SEARCH FORM --}}
@@ -239,8 +353,10 @@
         </tbody>
       </table>
     </div>
+    </div>
   </div>
 </main>
+</section>
 
 @endsection
 

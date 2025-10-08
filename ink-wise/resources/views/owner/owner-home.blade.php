@@ -32,17 +32,105 @@
   .dark-mode .welcome-message { background: rgba(16, 185, 129, 0.2); color: #a7f3d0; }
 
   /* Dark mode for summary cards */
-  .dark-mode .summary-card { background:#374151; color:#f9fafb; }
+  .dark-mode .summary-card { background:#374151; color:#f9fafb; box-shadow: 0 12px 24px rgba(15, 23, 42, 0.4); }
+  .dark-mode .summary-card::after { background: linear-gradient(90deg, rgba(148, 185, 255, 0.65), rgba(111, 150, 227, 0.75)); }
   .dark-mode .summary-card .summary-card-label { color:#d1d5db; }
   .dark-mode .summary-card .summary-card-value { color:#f9fafb; }
   .dark-mode .summary-card .summary-card-meta { color:#9ca3af; }
+  .dark-mode .summary-card-chip { background: rgba(148, 185, 255, 0.28); color: #bcd3ff; }
 
   /* Dark mode for body */
   .dark-mode body { background:#111827; }
+
+  /* Owner dashboard layout balancing */
+  .owner-dashboard-shell {
+    padding: 20px 24px 32px;
+    padding-left: clamp(24px, 3vw, 48px);
+  }
+
+  .owner-dashboard-main {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 28px 28px 36px;
+  }
+
+  .owner-dashboard-inner {
+    max-width: 1390px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 0;
+  }
+
+  .owner-dashboard-inner .summary-grid {
+    margin: 0;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+  }
+
+  .owner-dashboard-inner .charts {
+    margin: 32px 0 0;
+  }
+
+  .owner-dashboard-main .page-header {
+    margin-bottom: 24px;
+  }
+  .summary-grid, .summary-card, .charts {
+    /* placeholder for overrides if needed */
+  }
+
+  .summary-card {
+    position: relative;
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px 20px 24px;
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .summary-card::after {
+    content: "";
+    position: absolute;
+    left: 20px;
+    right: 20px;
+    bottom: 14px;
+    height: 3px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(148, 185, 255, 0.45), rgba(111, 150, 227, 0.55));
+  }
+
+  .summary-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.12);
+  }
+
+  .summary-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .summary-card-label { font-size: 0.88rem; color: #475569; }
+  .summary-card-value { display: block; font-size: 1.35rem; font-weight: 800; color: #0f172a; margin-top: 4px; }
+  .summary-card-meta { color: #6b7280; font-size: 0.8rem; }
+
+  .summary-card-chip {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(148, 185, 255, 0.18);
+    color: #5a8de0;
+    font-weight: 600;
+    font-size: 0.75rem;
+  }
 </style>
 
-  <section class="main-content">
-    <main class="materials-page admin-page-shell materials-container" role="main">
+  <section class="main-content owner-dashboard-shell">
+    <main class="materials-page admin-page-shell materials-container owner-dashboard-main" role="main">
       <header class="page-header">
         <div>
           <h1 class="page-title">Dashboard</h1>
@@ -54,10 +142,27 @@
         <div id="welcome-message" class="welcome-message">
           {{ session('success') }}
         </div>
+        <script>
+          document.addEventListener('DOMContentLoaded', function () {
+            const welcomeMessage = document.getElementById('welcome-message');
+            if (!welcomeMessage) return;
+
+            const removeMessage = () => {
+              if (welcomeMessage && welcomeMessage.parentNode) {
+                welcomeMessage.parentNode.removeChild(welcomeMessage);
+              }
+            };
+
+            welcomeMessage.addEventListener('animationend', removeMessage, { once: true });
+
+            // Fallback in case animationEnd doesn't fire (e.g., reduced motion settings)
+            setTimeout(removeMessage, 4500);
+          });
+        </script>
       @endif
 
-    <div class="page-inner">
-    <section class="summary-grid" aria-label="Dashboard summary">
+  <div class="page-inner owner-dashboard-inner">
+  <section class="summary-grid" aria-label="Dashboard summary">
       <div class="summary-card">
         <div class="summary-card-header">
           <span class="summary-card-label">New Orders</span>
@@ -97,13 +202,6 @@
         <span class="summary-card-meta">vs last period</span>
       </div>
     </section>
-
-  <style>
-    /* Header styling - no padding adjustments needed since main-content handles spacing */
-    .page-header {
-      margin-bottom: 24px;
-    }
-  </style>
 
   <!-- Charts Section -->
   <div class="charts">

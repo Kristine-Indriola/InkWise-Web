@@ -6,13 +6,23 @@
   <title>InkWise System - Owner Dashboard</title>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="/css/owner/appstaff.css">
-  <link rel="stylesheet" href="/css/owner/orderworkflow.css">
-  <link rel="stylesheet" href="/css/owner/inventorytrack.css">
-  <link rel="stylesheet" href="/css/owner/transactionsview.css">
-  <link rel="stylesheet" href="/css/owner/reports.css">
-  <!-- index.css should be loaded after page-specific owner CSS so its layout rules take precedence -->
-  <link rel="stylesheet" href="/css/owner/index.css">
+  @php
+    $ownerCssFiles = [
+      'css/owner/appstaff.css',
+      'css/owner/orderworkflow.css',
+      'css/owner/inventorytrack.css',
+      'css/owner/transactionsview.css',
+      'css/owner/reports.css',
+      'css/owner/index.css',
+    ];
+  @endphp
+  @foreach($ownerCssFiles as $cssPath)
+    @php
+      $fullPath = public_path($cssPath);
+      $version = file_exists($fullPath) ? filemtime($fullPath) : null;
+    @endphp
+    <link rel="stylesheet" href="{{ asset($cssPath) }}{{ $version ? '?v='.$version : '' }}">
+  @endforeach
   <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css">
   <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-solid-rounded/css/uicons-solid-rounded.css">
   <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-solid-straight/css/uicons-solid-straight.css">
