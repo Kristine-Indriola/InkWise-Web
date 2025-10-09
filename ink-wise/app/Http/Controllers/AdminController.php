@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Material;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -18,6 +19,7 @@ class AdminController extends Controller
     // Show profile info
     public function show()
     {
+        /** @var User $admin */
         $admin = Auth::user(); // current logged-in admin
         return view('admin.profile.show', compact('admin'));
     }
@@ -25,6 +27,7 @@ class AdminController extends Controller
     // Show edit form
     public function edit()
     {
+        /** @var User $admin */
         $admin = Auth::user();
         return view('admin.profile.edit', compact('admin'));
     }
@@ -32,6 +35,7 @@ class AdminController extends Controller
     // Update admin info (users + staff + address)
     public function update(Request $request)
     {
+        /** @var User $admin */
         $admin = Auth::user();
 
         // ✅ Validation
@@ -96,10 +100,21 @@ class AdminController extends Controller
     }
 
     public function notifications()
-{
-    $notifications = auth()->user()->notifications; 
-    return view('admin.notifications.index', compact('notifications'));
-}
+    {
+        /** @var \App\Models\User|null $admin */
+    /** @var User|null $admin */
+    $admin = Auth::user();
+
+        if ($admin) {
+            $admin->unreadNotifications()->update(['read_at' => now()]);
+        }
+
+        $notifications = $admin
+            ? $admin->notifications()->latest()->get()
+            : collect();
+
+        return view('admin.notifications.index', compact('notifications'));
+    }
 
     
 }

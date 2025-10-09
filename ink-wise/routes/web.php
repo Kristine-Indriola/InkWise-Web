@@ -293,6 +293,7 @@ Route::get('/search', function (\Illuminate\Http\Request $request) {
 /** Auth (Register/Login/Logout) */
 Route::get('/customer/register', [CustomerAuthController::class, 'showRegister'])->name('customer.register.form');
 Route::post('/customer/register', [CustomerAuthController::class, 'register'])->name('customer.register');
+Route::post('/customer/register/send-code', [CustomerAuthController::class, 'sendVerificationCode'])->name('customer.register.send-code');
 Route::get('/customer/login', [CustomerAuthController::class, 'showLogin'])->name('customer.login.form');
 Route::post('/customer/login', [CustomerAuthController::class, 'login'])->name('customer.login');
 Route::post('/customer/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');

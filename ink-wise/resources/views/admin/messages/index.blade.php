@@ -1275,8 +1275,16 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
-    function renderThread(items) {
+    function renderThread(items, options = {}) {
         if (!threadMessages) return;
+
+        const { forceScroll = false, preserveScroll = false } = options;
+        const previousScrollTop = threadMessages.scrollTop;
+        const previousScrollHeight = threadMessages.scrollHeight;
+        const previousClientHeight = threadMessages.clientHeight;
+        const scrollTolerance = 32;
+        const distanceFromBottom = previousScrollHeight - previousClientHeight - previousScrollTop;
+        const wasNearBottom = forceScroll || (preserveScroll && distanceFromBottom <= scrollTolerance);
 
         threadMessages.innerHTML = '';
 
@@ -1285,6 +1293,10 @@ document.addEventListener('DOMContentLoaded', () => {
             empty.className = 'thread-empty';
             empty.textContent = threadMessages.dataset.empty || 'Conversations you open will appear here.';
             threadMessages.appendChild(empty);
+
+            if (wasNearBottom || forceScroll) {
+                threadMessages.scrollTop = threadMessages.scrollHeight;
+            }
             updateSendButtonState();
             return;
         }
@@ -1381,7 +1393,14 @@ document.addEventListener('DOMContentLoaded', () => {
             threadMessages.appendChild(row);
         });
 
-        threadMessages.scrollTop = threadMessages.scrollHeight;
+        if (wasNearBottom || forceScroll) {
+            threadMessages.scrollTop = threadMessages.scrollHeight;
+        } else if (preserveScroll) {
+            const scrollDelta = threadMessages.scrollHeight - previousScrollHeight;
+            const targetScrollTop = previousScrollTop + scrollDelta;
+            threadMessages.scrollTop = Math.max(0, targetScrollTop);
+        }
+
         updateSendButtonState();
     }
 
@@ -1440,8 +1459,8 @@ document.addEventListener('DOMContentLoaded', () => {
             activeItem.dataset.unread = '0';
         }
 
-        const { items } = await fetchThread(messageId);
-        renderThread(items);
+    const { items } = await fetchThread(messageId);
+    renderThread(items, { forceScroll: true });
 
         if (activeItem && items.length) {
             const latest = items[items.length - 1];
@@ -1453,7 +1472,7 @@ document.addEventListener('DOMContentLoaded', () => {
         pollInterval = setInterval(async () => {
             if (!currentMessageId) return;
             const { items: refreshed } = await fetchThread(currentMessageId);
-            renderThread(refreshed);
+            renderThread(refreshed, { preserveScroll: true });
         }, 3000);
 
         if (replyMessage) replyMessage.focus();
@@ -1586,7 +1605,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearAttachmentPreview();
 
                 const { items } = await fetchThread(currentMessageId);
-                renderThread(items);
+                renderThread(items, { forceScroll: true });
 
                 if (activeConversation && items.length) {
                     const latest = items.at(-1) ?? null;
