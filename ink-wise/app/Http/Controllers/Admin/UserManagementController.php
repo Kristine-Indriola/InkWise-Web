@@ -88,6 +88,7 @@ public function store(Request $request)
 
     UserVerification::create([
         'user_id' => $user->user_id,
+        'email'   => $user->email,
         'token'   => $token,
     ]);
 

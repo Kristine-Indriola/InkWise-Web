@@ -810,28 +810,34 @@ body.dark-mode .btn-warning {
       <div class="logo">InkWise</div>
       <div class="icons" style="display: flex; align-items: center; gap: 24px; margin-left: auto; justify-content: center;">
         <!-- Notification Bell -->
-        <a href="{{ route('admin.notifications') }}" class="nav-link notif-btn" style="display:flex; align-items:center; justify-content:center;">
-          <i class="fi fi-ss-bell" style="font-size:22px;"></i>
-          @php
-              $lowCount = \App\Models\Material::whereHas('inventory', function($q) {
-                  $q->whereColumn('stock_level', '<=', 'reorder_level')
-                    ->where('stock_level', '>', 0);
-              })->count();
+    <a href="{{ route('admin.notifications') }}" class="nav-link notif-btn" style="display:flex; align-items:center; justify-content:center;">
+      <i class="fi fi-ss-bell" style="font-size:22px;"></i>
+      @php
+        /** @var \App\Models\User|null $adminUser */
+        $adminUser = auth()->user();
+        $notifCount = $adminUser?->notifications()->whereNull('read_at')->count() ?? 0;
+      @endphp
 
-              $outCount = \App\Models\Material::whereHas('inventory', function($q) {
-                  $q->where('stock_level', '<=', 0);
-              })->count();
-
-              $notifCount = $lowCount + $outCount;
-          @endphp
-
-          @if($notifCount > 0)
-              <span class="notif-badge">{{ $notifCount }}</span>
-          @endif
-        </a>
+      @if($notifCount > 0)
+        <span class="notif-badge">{{ $notifCount }}</span>
+      @endif
+    </a>
         <!-- Paper plane / Messages quick-link (transparent background, colored icon) -->
-        <a href="{{ route('admin.messages.index') }}" class="nav-link notif-btn" title="Messages" style="display:flex; align-items:center; justify-content:center;">
+        @php
+          $adminUnreadMessageCount = isset($adminUnreadMessageCount)
+            ? (int) $adminUnreadMessageCount
+            : 0;
+        @endphp
+        <a href="{{ route('admin.messages.index') }}"
+           class="nav-link notif-btn"
+           title="Messages"
+           data-messages-toggle="true"
+           data-initial-unread="{{ $adminUnreadMessageCount }}"
+           style="display:flex; align-items:center; justify-content:center;">
           <i class="fi fi-sr-envelope" style="font-size:20px;"></i>
+          @if($adminUnreadMessageCount > 0)
+            <span class="notif-badge" data-role="messages-unread-count">{{ $adminUnreadMessageCount }}</span>
+          @endif
         </a>
         <!-- Day/Night Toggle Switch -->
         <div id="theme-toggle-switch" class="theme-toggle-switch" title="Toggle dark/light mode" style="margin:0;">
