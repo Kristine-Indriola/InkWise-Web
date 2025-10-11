@@ -246,16 +246,17 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::get('messages/unread-count', [MessageController::class, 'adminUnreadCount'])
         ->name('messages.unread-count');
 
-     Route::get('reports', [ReportsDashboardController::class, 'index'])
-         ->name('reports.index');
+    Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/', [ReportsDashboardController::class, 'index'])->name('index');
+        Route::get('/sales', [ReportsDashboardController::class, 'sales'])->name('sales');
+        Route::get('/inventory', [ReportsDashboardController::class, 'inventory'])->name('inventory');
 
-    // Optional: Sales export
-    Route::get('reports/sales/export/{type}', [ReportsDashboardController::class, 'exportSales'])
-         ->name('reports.sales.export');
+        Route::get('/sales/export/{type}', [ReportsDashboardController::class, 'exportSales'])
+            ->name('sales.export');
 
-    // Optional: Inventory export
-    Route::get('reports/inventory/export/{type}', [ReportsDashboardController::class, 'exportInventory'])
-         ->name('reports.inventory.export');
+        Route::get('/inventory/export/{type}', [ReportsDashboardController::class, 'exportInventory'])
+            ->name('inventory.export');
+    });
 
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::get('site-content', [SiteContentController::class, 'edit'])->name('site-content.edit');
