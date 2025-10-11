@@ -303,14 +303,86 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('Customize your invite: select paper stock and optional add-ons.', 4200);
   }
 
+  let editNavigationPending = false;
+  const isEmbeddedPreview = window.top !== window;
+
+  const navigateToEdit = (event) => {
+    if (!editBtn || !editBtn.href || editNavigationPending) {
+      return;
+    }
+
+    editNavigationPending = true;
+
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    const targetAttr = (editBtn.getAttribute('target') || '_self').toLowerCase();
+    const href = editBtn.href;
+
+    const redirect = () => {
+      try {
+        if (targetAttr === '_blank') {
+          window.open(href, '_blank', 'noopener');
+          editNavigationPending = false;
+          return;
+        }
+
+        if (targetAttr === '_top' || targetAttr === '_parent') {
+          if (window.top && window.top !== window) {
+            try {
+              window.top.location.href = href;
+              return;
+            } catch (err) {
+              console.warn('Unable to redirect top window (cross-origin).', err);
+            }
+          }
+        }
+
+        window.location.href = href;
+      } finally {
+        editNavigationPending = false;
+      }
+    };
+
+    if (isEmbeddedPreview) {
+      try {
+        window.parent.postMessage({
+          type: 'inkwise:open-editor',
+          href,
+          target: targetAttr,
+          productId
+        }, '*');
+      } catch (postMessageError) {
+        console.warn('Unable to postMessage to parent window.', postMessageError);
+      }
+
+      // Give the parent time (1 frame) to handle the message before we forcibly redirect.
+      window.setTimeout(() => {
+        if (editNavigationPending) {
+          window.requestAnimationFrame(redirect);
+        }
+      }, 50);
+
+      return;
+    }
+
+    // Allow the browser a moment to flush layout and storage writes before navigating.
+    window.requestAnimationFrame(redirect);
+  };
+
   if (editBtn) {
     console.log('Edit button found');
-    editBtn.addEventListener('click', () => {
+    editBtn.addEventListener('click', (event) => {
       console.log('Edit button clicked');
       const hasOptionalAddon = optionalAddonGroups.some((group) => selectionState[group]);
       if (!hasOptionalAddon && selectionToast) {
         showToast('Add-ons are optional. Pick trim, embossed powder, orientation, or size if you like.');
       }
+
+      persistSelectionState();
+      navigateToEdit(event);
     });
   } else {
     console.log('Edit button not found');

@@ -35,8 +35,23 @@
             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4 border-b pb-4">
                 <div>
                     <div class="flex flex-col mb-1">
-                        <span class="font-bold text-lg">{{ auth()->user()->name }}</span>
-                        <span class="text-gray-600">{{ auth()->user()->phone ?? '' }}</span>
+                        @php
+                            // Prefer address-specific recipient info, then customer's profile, then user record
+                            $addrFull = data_get($address, 'full_name');
+                            $addrPhone = data_get($address, 'phone');
+                            $cust = auth()->user()->customer ?? null;
+                            $custFull = null;
+                            if ($cust) {
+                                $parts = array_filter([data_get($cust, 'first_name'), data_get($cust, 'middle_name'), data_get($cust, 'last_name')]);
+                                $custFull = trim(implode(' ', $parts));
+                            }
+                            $recipientName = $addrFull ?: ($custFull ?: (auth()->user()->name ?? ''));
+                            $recipientPhone = $addrPhone ?: ($cust ? data_get($cust, 'contact_number') : (auth()->user()->phone ?? ''));
+                        @endphp
+                        <span class="font-bold text-lg">{{ $recipientName }}</span>
+                        @if($recipientPhone)
+                            <span class="text-gray-600">{{ $recipientPhone }}</span>
+                        @endif
                     </div>
                     <div class="text-gray-600 mt-1">
                         {{ $address->street }}<br>
@@ -72,6 +87,14 @@
                 @csrf
                 <!-- method spoofing toggled by JS -->
                 <input type="hidden" name="_method" id="addressFormMethod" value="POST">
+
+                {{-- Full name (customer) --}}
+                <label for="form_full_name" class="block font-medium">Full name</label>
+                <input type="text" id="form_full_name" name="full_name" class="w-full border rounded p-2 mb-2" placeholder="Recipient full name">
+
+                {{-- Phone number (customer) --}}
+                <label for="form_phone" class="block font-medium">Phone number</label>
+                <input type="text" id="form_phone" name="phone" class="w-full border rounded p-2 mb-3" placeholder="e.g. 09XXXXXXXXX">
 
                 {{-- Region --}}
                 <label for="form_region" class="block font-medium">Region</label>
@@ -134,7 +157,9 @@ document.addEventListener("DOMContentLoaded", function () {
     const submitBtn = document.getElementById("submitBtn");
     const methodInput = document.getElementById('addressFormMethod');
 
-    const fields = {
+                const fields = {
+        full_name: document.getElementById("form_full_name"),
+        phone: document.getElementById("form_phone"),
         region: document.getElementById("form_region"),
         province: document.getElementById("form_province"),
         city: document.getElementById("form_city"),
@@ -155,7 +180,12 @@ document.addEventListener("DOMContentLoaded", function () {
         form.action = storeUrl;
         methodInput.value = "POST";
 
+        // Prefill full name and phone from authenticated user when available
         Object.values(fields).forEach(input => input.value = "");
+        try {
+            fields.full_name.value = "{{ addslashes(auth()->user()->name ?? '') }}";
+            fields.phone.value = "{{ addslashes(auth()->user()->phone ?? '') }}";
+        } catch (e) {}
         modal.classList.remove("hidden");
     });
 
@@ -174,6 +204,9 @@ document.addEventListener("DOMContentLoaded", function () {
             fields.postal_code.value = address.postal_code ?? "";
             fields.street.value = address.street ?? "";
             fields.label.value = address.label ?? "Home";
+            // If address object contains full_name / phone, populate them
+            if (address.full_name !== undefined) fields.full_name.value = address.full_name || '';
+            if (address.phone !== undefined) fields.phone.value = address.phone || '';
 
             // Load PSGC values dynamically
             loadRegions().then(() => {

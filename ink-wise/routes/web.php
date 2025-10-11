@@ -99,6 +99,30 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::get('/ordersummary/{order:order_number?}', [OrderSummaryController::class, 'show'])
         ->name('ordersummary.index');
 
+    // Admin orders list (table) - simple closure for listing orders in the admin UI
+    Route::get('/orders', function () {
+        $allowed = [10, 20, 25, 50, 100];
+        $default = 20;
+        $perPage = (int) request()->query('per_page', $default);
+        if (!in_array($perPage, $allowed, true)) {
+            $perPage = $default;
+        }
+
+        $orders = \App\Models\Order::query()
+            ->select(['id', 'order_number', 'customer_id', 'total_amount', 'order_date', 'status', 'payment_status'])
+            ->latest('order_date')
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        // Render the table view inside the ordersummary folder
+        return view('admin.ordersummary.tables', compact('orders'));
+    })->name('orders.index');
+
+    // Delete an order (AJAX / API-friendly)
+    Route::delete('/orders/{order}', [\App\Http\Controllers\Admin\OrderController::class, 'destroy'])
+        ->name('orders.destroy');
+
 
 
     // Templates 
@@ -240,6 +264,10 @@ Route::prefix('users')->name('users.')->group(function () {
 
 }); // closes the admin group
 
+// Temporary debug route: return the current session order summary payload.
+// Accessible only in local environment or when allow_debug=1 is provided.
+Route::get('/debug/order-summary', [OrderFlowController::class, 'debugSessionSummary'])->name('debug.order_summary');
+
 Route::patch('/admin/notifications/{id}/read', function ($id) {
     $user = Auth::user();
 
@@ -304,6 +332,12 @@ Route::post('/customer/logout', [CustomerAuthController::class, 'logout'])->name
 
 Route::get('/customer/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');
 
+Route::middleware('auth')->group(function () {
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+});
+
 Route::post('/messages', [MessageController::class, 'storeFromContact'])->name('messages.store');
 
     Route::get('customer/chat/thread', [MessageController::class, 'customerChatThread'])->name('customer.chat.thread');
@@ -350,8 +384,14 @@ Route::middleware('auth')->get('/customerprofile/dashboard', [CustomerAuthContro
 
 
 // My Purchases
-
 Route::get('/customer/my-orders', fn () => view('customer.profile.my_purchase'))->name('customer.my_purchase');
+// To Pay tab (lists orders pending payment)
+Route::get('/customer/my-orders/topay', fn () => view('customer.profile.purchase.topay'))->name('customer.my_purchase.topay');
+Route::get('/customer/my-orders/toship', fn () => view('customer.profile.purchase.toship'))->name('customer.my_purchase.toship');
+Route::get('/customer/my-orders/toreceive', fn () => view('customer.profile.purchase.toreceive'))->name('customer.my_purchase.toreceive');
+Route::get('/customer/my-orders/completed', fn () => view('customer.profile.purchase.completed'))->name('customer.my_purchase.completed');
+Route::get('/customer/my-orders/cancelled', fn () => view('customer.profile.purchase.cancelled'))->name('customer.my_purchase.cancelled');
+Route::get('/customer/my-orders/return-refund', fn () => view('customer.profile.purchase.return_refund'))->name('customer.my_purchase.return_refund');
 
 
 /** Profile & Addresses (Protected) */
@@ -445,6 +485,7 @@ Route::post('/order/envelope', [OrderFlowController::class, 'storeEnvelope'])->n
 Route::delete('/order/envelope', [OrderFlowController::class, 'clearEnvelope'])->name('order.envelope.clear');
 Route::get('/order/summary', [OrderFlowController::class, 'summary'])->name('order.summary');
 Route::get('/order/summary.json', [OrderFlowController::class, 'summaryJson'])->name('order.summary.json');
+Route::post('/order/summary/sync', [OrderFlowController::class, 'syncSummary'])->name('order.summary.sync');
 Route::delete('/order/summary', [OrderFlowController::class, 'clearSummary'])->name('order.summary.clear');
 Route::get('/order/giveaways', [OrderFlowController::class, 'giveaways'])->name('order.giveaways');
 Route::post('/order/giveaways', [OrderFlowController::class, 'storeGiveaway'])->name('order.giveaways.store');

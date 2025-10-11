@@ -64,13 +64,14 @@
 
 								if (!$previewSrc && $product->image) {
 									// Avoid accidental use of site logo or generic images as a product thumbnail
-									$blacklist = ['ink.png', 'logo.png', 'favicon.ico'];
+									$blacklist = ['ink.png', 'logo.png', 'favicon.ico', 'inkwise.png', 'logo.svg', 'default.png'];
 									$imgCandidate = $product->image;
-									$basename = basename((string) $imgCandidate);
-									if (!in_array(strtolower($basename), $blacklist, true)) {
+									$basename = strtolower(trim(basename((string) $imgCandidate)));
+									// Also skip if the image path contains 'adminimage' or is in a known admin directory
+									$isBlacklisted = in_array($basename, $blacklist, true) || strpos((string)$imgCandidate, 'adminimage') !== false;
+									if (!$isBlacklisted) {
 										$previewSrc = \App\Support\ImageResolver::url($imgCandidate);
 									} else {
-										// flagged as site asset; skip so we can search other sources
 										$previewSrc = null;
 									}
 								}

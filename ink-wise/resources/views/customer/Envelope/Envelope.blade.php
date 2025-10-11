@@ -44,7 +44,7 @@
     }
 @endphp
     <main
-        class="envelope-shell"
+        class="envelope-shell env-shell"
         data-summary-url="{{ $summaryUrl }}"
         data-summary-api="{{ $summaryUrl }}"
         data-envelopes-url="{{ $envelopesApiUrl }}"

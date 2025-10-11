@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 
 class SiteSetting extends Model
 {
@@ -33,6 +34,12 @@ class SiteSetting extends Model
 	 */
 	public static function current(): self
 	{
+		$table = (new static())->getTable();
+
+		if (!Schema::hasTable($table)) {
+			return static::make(static::defaults());
+		}
+
 		return Cache::remember('site_settings.current', 600, function () {
 			$settings = static::first();
 

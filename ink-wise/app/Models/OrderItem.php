@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
+
 class OrderItem extends Model
 {
 	use HasFactory;
@@ -19,6 +20,10 @@ class OrderItem extends Model
 		'created_at' => 'datetime',
 		'updated_at' => 'datetime',
 	];
+
+	public const LINE_TYPE_INVITATION = 'invitation';
+	public const LINE_TYPE_ENVELOPE = 'envelope';
+	public const LINE_TYPE_GIVEAWAY = 'giveaway';
 
 	public function order(): BelongsTo
 	{
@@ -48,5 +53,10 @@ class OrderItem extends Model
 	public function colors(): HasMany
 	{
 		return $this->hasMany(OrderItemColor::class);
+	}
+
+	public function scopeLineType($query, string $lineType)
+	{
+		return $query->where('line_type', $lineType);
 	}
 }

@@ -731,6 +731,98 @@ body.dark-mode .btn-warning {
       <img src="/adminimage/inkwise.png" alt="InkWise Logo"
            style="width:90px; height:90px; max-width:100%; max-height:100px; background:transparent; border-radius:24px; border:none; box-shadow:0 4px 16px rgba(0,0,0,0.07); object-fit:contain; margin-bottom:8px;">
     </div>
+
+    <!-- Sidebar hover behavior: open submenu on pointer hover and support touch/keyboard -->
+    <style>
+      /* When pointer hovers the parent, show submenu */
+      .sidebar ul li.has-submenu:hover > .submenu,
+      .sidebar ul li.has-submenu.expanded > .submenu {
+        display: block !important;
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+
+      /* Keep the submenu visually consistent with existing styles */
+      .sidebar ul li.has-submenu > .submenu {
+        display: none;
+        transition: opacity 150ms ease, transform 150ms ease;
+        opacity: 0;
+        transform: translateY(-6px);
+        pointer-events: none;
+        z-index: 30;
+      }
+
+      /* Small hit-target to make hover feel responsive */
+      .sidebar ul li.has-submenu {
+        position: relative;
+      }
+
+      /* Avoid hover behavior on very small screens (touch-first) */
+      @media (max-width: 768px) {
+        .sidebar ul li.has-submenu:hover > .submenu {
+          display: none !important;
+        }
+      }
+
+      /* Rotate caret when submenu is visible */
+      .sidebar ul li.has-submenu:hover .submenu-caret,
+      .sidebar ul li.has-submenu.expanded .submenu-caret {
+        transform: rotate(180deg);
+        transition: transform 150ms ease;
+      }
+    </style>
+
+    <script>
+      (function () {
+        // Add pointer event handlers to support touch devices and keyboard toggling
+        const submenuParents = document.querySelectorAll('.sidebar .has-submenu');
+
+        submenuParents.forEach(parent => {
+          // For touch devices we toggle expanded class on first tap, follow link on second
+          parent.addEventListener('touchstart', function (e) {
+            // If not expanded, expand and prevent the immediate navigation
+            if (!parent.classList.contains('expanded')) {
+              parent.classList.add('expanded');
+              const btn = parent.querySelector('.submenu-trigger');
+              if (btn) btn.setAttribute('aria-expanded', 'true');
+              e.preventDefault();
+            }
+          }, {passive: true});
+
+          // Ensure hover (mouseenter) also sets expanded so caret & aria stay in sync
+          parent.addEventListener('mouseenter', function () {
+            if (!parent.classList.contains('expanded')) {
+              parent.classList.add('expanded');
+              const btn = parent.querySelector('.submenu-trigger');
+              if (btn) btn.setAttribute('aria-expanded', 'true');
+            }
+          });
+
+          // Toggle expanded on keyboard Enter/Space when focused
+          const trigger = parent.querySelector('.submenu-trigger');
+          if (trigger) {
+            trigger.addEventListener('keydown', function (e) {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                parent.classList.toggle('expanded');
+                const expanded = parent.classList.contains('expanded');
+                trigger.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+              }
+            });
+          }
+
+          // Remove expanded on mouseleave to keep hover UX tidy
+          parent.addEventListener('mouseleave', function () {
+            if (parent.classList.contains('expanded')) {
+              parent.classList.remove('expanded');
+              const btn = parent.querySelector('.submenu-trigger');
+              if (btn) btn.setAttribute('aria-expanded', 'false');
+            }
+          });
+        });
+      })();
+    </script>
     <ul>
       <li class="{{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
         <a href="{{ route('admin.dashboard') }}"><i class="fi fi-rr-house-chimney"></i> <span class="label">Dashboard</span></a>
@@ -741,8 +833,8 @@ body.dark-mode .btn-warning {
       <li class="{{ request()->routeIs('admin.products.*') ? 'active' : '' }}">
         <a href="{{ route('admin.products.index') }}"><i class="fi fi-rr-boxes"></i> <span class="label">Products</span></a>
       </li>
-      <li class="{{ request()->routeIs('admin.ordersummary.*') ? 'active' : '' }}">
-        <a href="{{ route('admin.ordersummary.index') }}"><i class="fi fi-rr-list-check"></i> <span class="label">Order Summaries</span></a>
+      <li class="{{ (request()->routeIs('admin.ordersummary.*') || request()->routeIs('admin.orders.index')) ? 'active' : '' }}">
+        <a href="{{ route('admin.orders.index') }}"><i class="fi fi-rr-list-check"></i> <span class="label">Order Summaries</span></a>
       </li>
       {{--<li class="{{ request()->routeIs('admin.messages.*') ? 'active' : '' }}">
         <a href="{{ route('admin.messages.index') }}"><i class="fi fi-rr-comment-dots"></i> <span class="label">Messages</span></a>
@@ -1017,6 +1109,8 @@ body.dark-mode .btn-warning {
   </div>
 
   {{-- make sure scripts from views are rendered here --}}
+  {{-- First render any @push("scripts") stacks (preferred), then support older @section('scripts') uses. --}}
+  @stack('scripts')
   @yield('scripts')
 </body>
 </html>

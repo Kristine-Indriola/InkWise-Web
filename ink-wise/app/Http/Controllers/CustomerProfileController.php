@@ -82,6 +82,7 @@ class CustomerProfileController extends Controller
 
     public function storeAddress(Request $request)
     {
+        // Accept full_name and phone as optional inputs in the form; Address model doesn't have these columns yet.
         $data = $this->validateAddress($request);
 
         Address::create(array_merge($data, [
@@ -113,6 +114,8 @@ class CustomerProfileController extends Controller
     protected function validateAddress(Request $request)
 {
     return $request->validate([
+        'full_name' => 'nullable|string|max:255',
+        'phone' => 'nullable|string|max:255',
         'region'      => 'required|string|max:255',
         'province'    => 'required|string|max:255',
         'city'        => 'required|string|max:255',

@@ -15,6 +15,10 @@
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
 
+  <!-- Icon fonts used by invitations header -->
+  <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-bold-rounded/css/uicons-bold-rounded.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ asset('css/customer/customer.css') }}">
     <link rel="stylesheet" href="{{ asset('css/customer/customerprofile.css') }}">
@@ -54,6 +58,40 @@
                 <input type="text" name="query" placeholder="Search..." 
                        class="border rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring focus:ring-[#06b6d4]">
             </form>
+            
+      <!-- Favorites & Cart icons (copied from invitations topbar) -->
+      <div class="hidden md:flex items-center gap-2">
+        @php
+          $hasFavoritesRoute = \Illuminate\Support\Facades\Route::has('customer.favorites');
+          $favoritesLink = [
+            'url' => $hasFavoritesRoute ? route('customer.favorites') : '#',
+            'disabled' => !$hasFavoritesRoute,
+            'label' => 'My favorites',
+          ];
+
+          $hasCartRoute = \Illuminate\Support\Facades\Route::has('customer.cart');
+          $cartLink = [
+            'url' => $hasCartRoute ? route('customer.cart') : '#',
+            'disabled' => !$hasCartRoute,
+            'label' => 'My cart',
+          ];
+        @endphp
+
+        <a href="{{ $favoritesLink['url'] }}"
+           class="nav-icon-button"
+           aria-label="{{ $favoritesLink['label'] }}"
+           title="{{ $favoritesLink['label'] }}"
+           @if($favoritesLink['disabled']) aria-disabled="true" @endif>
+          <i class="fi fi-br-comment-heart" aria-hidden="true"></i>
+        </a>
+        <a href="{{ $cartLink['url'] }}"
+           class="nav-icon-button"
+           aria-label="{{ $cartLink['label'] }}"
+           title="{{ $cartLink['label'] }}"
+           @if($cartLink['disabled']) aria-disabled="true" @endif>
+          <i class="bi bi-bag-heart-fill" aria-hidden="true"></i>
+        </a>
+      </div>
             {{-- If not logged in --}}
             @guest
                 <a href="{{ route('customer.login') }}"
@@ -90,6 +128,47 @@
         </div>
     </div>
 </header>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const storageKey = 'inkwise-finalstep';
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+  const icons = Array.from(document.querySelectorAll('.nav-icon-button'));
+  if (!icons.length) return;
+
+  icons.forEach((icon) => {
+    // If the server rendered this anchor as aria-disabled (pointer-events:none),
+    // remove it so our JS can handle clicks. Store original state so we could restore if needed.
+    try {
+      if (icon.getAttribute && icon.getAttribute('aria-disabled') === 'true') {
+        icon.setAttribute('data-was-aria-disabled', 'true');
+        icon.removeAttribute('aria-disabled');
+        // ensure it's clickable and keyboard accessible
+        try { icon.style.pointerEvents = 'auto'; } catch (e) {}
+        try { icon.setAttribute('tabindex', '0'); } catch (e) {}
+        try { icon.setAttribute('role', 'button'); } catch (e) {}
+        // support Enter key
+        icon.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); icon.click(); } });
+      }
+    } catch (e) {
+      // ignore
+    }
+    icon.addEventListener('click', (e) => {
+      try {
+        e.preventDefault();
+        const href = icon.getAttribute('href');
+        if (href && href !== '#') {
+          window.location.href = href;
+          return;
+        }
+        // Default: navigate to order summary page (no POST)
+        window.location.href = '/order/summary';
+      } catch (err) {
+        window.location.href = '/order/summary';
+      }
+    });
+  });
+});
+</script>
       <!-- Welcome Section -->
 <div class="welcome-section">
     <h1>Welcome to InkWise</h1>
