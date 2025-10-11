@@ -842,8 +842,23 @@ body.dark-mode .btn-warning {
       <li class="{{ request()->routeIs('admin.materials.*') ? 'active' : '' }}">
         <a href="{{ route('admin.materials.index') }}"><i class="fi fi-rr-blog-pencil"></i> <span class="label">Materials</span></a>
       </li>
-      <li class="{{ request()->routeIs('admin.reports.*') ? 'active' : '' }}">
-        <a href="{{ route('admin.reports.index') }}"><i class="fi fi-rr-document"></i> <span class="label">Reports</span></a>
+      @php
+        $reportsActive = request()->routeIs('admin.reports.*');
+      @endphp
+      <li class="has-submenu {{ $reportsActive ? 'expanded active' : '' }}">
+        <button type="button" class="submenu-trigger" data-submenu-toggle="reports" aria-expanded="{{ $reportsActive ? 'true' : 'false' }}">
+          <i class="fi fi-rr-document"></i>
+          <span class="label">Reports</span>
+          <i class="fi fi-rr-angle-small-down submenu-caret" aria-hidden="true"></i>
+        </button>
+        <ul class="submenu" data-submenu="reports" aria-hidden="{{ $reportsActive ? 'false' : 'true' }}">
+          <li class="{{ request()->routeIs('admin.reports.sales') ? 'active' : '' }}">
+            <a href="{{ route('admin.reports.sales') }}"><span class="label">Sales analytics</span></a>
+          </li>
+          <li class="{{ request()->routeIs('admin.reports.inventory') ? 'active' : '' }}">
+            <a href="{{ route('admin.reports.inventory') }}"><span class="label">Inventory analytics</span></a>
+          </li>
+        </ul>
       </li>
 
           <li class="{{ request()->routeIs('admin.chatbot.index') ? 'active' : '' }}">
