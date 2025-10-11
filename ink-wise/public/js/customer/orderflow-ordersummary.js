@@ -2,6 +2,46 @@ document.addEventListener('DOMContentLoaded', () => {
   const shell = document.querySelector('.os-shell');
   if (!shell) return;
 
+  // Debug: script loaded and initial elements
+  if (window && window.console && typeof window.console.debug === 'function') {
+    console.debug('OrderSummary script initialized', {
+      hasShell: !!shell,
+      envelopeSelect: !!shell.querySelector('[data-envelope-quantity]'),
+      giveawaysSelect: !!shell.querySelector('[data-giveaways-quantity]'),
+    });
+  }
+
+  // Delegated listener: catch change events for selects even if they're replaced
+  document.addEventListener('change', (e) => {
+    try {
+      const t = e.target;
+      if (!t) return;
+      if (t.matches && t.matches('[data-envelope-quantity]')) {
+        if (window && window.console && typeof window.console.debug === 'function') {
+          console.debug('Delegated: envelope select changed', { value: t.value, target: t });
+        }
+      }
+      if (t.matches && t.matches('[data-giveaways-quantity]')) {
+        if (window && window.console && typeof window.console.debug === 'function') {
+          console.debug('Delegated: giveaways select changed', { value: t.value, target: t });
+        }
+      }
+    } catch (err) { /* ignore */ }
+  }, { capture: false });
+
+  // Expose a small global bridge for inline onchange hooks in the blade
+  try {
+    window._inkwiseEnvelopeChange = (el) => {
+      try {
+        handleEnvelopeQuantityChange({ target: el });
+      } catch (e) {
+        // ignore
+      }
+    };
+  } catch (e) {
+    // ignore
+  }
+
   const storageKey = shell.dataset.storageKey || 'inkwise-finalstep';
   const envelopeUrl = shell.dataset.envelopesUrl || '/order/envelope';
   const checkoutUrl = shell.dataset.checkoutUrl || '/checkout';
@@ -14,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const giveawayClearUrl = shell.dataset.giveawayClearUrl || '/order/giveaways';
   const envelopeStoreUrl = shell.dataset.envelopeStoreUrl || '/order/envelope';
   const giveawayStoreUrl = shell.dataset.giveawayStoreUrl || '/order/giveaways';
+  const summarySyncUrl = shell.dataset.summarySyncUrl || '/order/summary/sync';
   const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
 
   const layout = shell.querySelector('[data-summary-wrapper]');
@@ -68,6 +109,24 @@ document.addEventListener('DOMContentLoaded', () => {
   const envelopeNewTotalEl = shell.querySelector('[data-envelope-new-total]');
   const envelopeSavingsEl = shell.querySelector('[data-envelope-savings]');
 
+  // Small visual debug element for envelope totals (helps confirm UI updates)
+  let envelopeDebugEl = null;
+  const ensureEnvelopeDebugEl = () => {
+    try {
+      if (envelopeDebugEl && document.contains(envelopeDebugEl)) return envelopeDebugEl;
+      if (!envelopeNewTotalEl) return null;
+      envelopeDebugEl = document.createElement('div');
+      envelopeDebugEl.className = 'os-envelope-debug';
+      envelopeDebugEl.style.fontSize = '12px';
+      envelopeDebugEl.style.color = '#666';
+      envelopeDebugEl.style.marginTop = '6px';
+      envelopeNewTotalEl.parentNode && envelopeNewTotalEl.parentNode.appendChild(envelopeDebugEl);
+      return envelopeDebugEl;
+    } catch (e) {
+      return null;
+    }
+  };
+
   const giveawaysPreviewFrame = shell.querySelector('[data-giveaways-preview-frame]');
   const giveawaysPreviewImageEl = shell.querySelector('[data-giveaways-preview-image]');
   const giveawaysPreviewPrevBtn = shell.querySelector('[data-giveaways-preview-prev]');
@@ -91,6 +150,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const subtotalDiscountedEl = shell.querySelector('[data-summary="subtotal-discounted"]');
   const subtotalSavingsEl = shell.querySelector('[data-summary="subtotal-savings"]');
   const grandTotalEl = shell.querySelector('[data-summary="grand-total"]');
+  const invitationTotalEl = shell.querySelector('[data-summary="invitation-total"]');
+  const envelopeTotalEl = shell.querySelector('[data-summary="envelope-total"]');
+  const giveawaysTotalEl = shell.querySelector('[data-summary="giveaways-total"]');
   const toast = shell.querySelector('#osToast');
   const checkoutBtn = shell.querySelector('#osCheckoutBtn');
 
@@ -101,6 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let envelopeIndex = 0;
   let giveawaysImages = [];
   let giveawaysIndex = 0;
+  let checkoutInFlight = false;
 
   const getSummary = () => {
     const raw = window.sessionStorage.getItem(storageKey);
@@ -193,6 +256,59 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     return null;
+  };
+
+  const syncSummaryWithServer = async () => {
+    if (!summarySyncUrl) {
+      return true;
+    }
+
+    const summary = getSummary();
+    if (!summary || typeof summary !== 'object') {
+      return true;
+    }
+
+    const csrfToken = getCsrfToken();
+
+    try {
+      const response = await fetch(summarySyncUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({ summary }),
+      });
+
+      if (!response.ok) {
+        console.warn('Summary sync endpoint returned status', response.status);
+        return false;
+      }
+
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (error) {
+        data = null;
+      }
+
+      if (data && typeof data === 'object') {
+        const summaryPayload = (data.summary && typeof data.summary === 'object')
+          ? data.summary
+          : (data.data && typeof data.data === 'object' ? data.data : null);
+
+        if (summaryPayload) {
+          applySummaryPayload(summaryPayload);
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Failed to sync order summary with server', error);
+      return false;
+    }
   };
 
   const requestDelete = async (url) => {
@@ -387,6 +503,68 @@ document.addEventListener('DOMContentLoaded', () => {
     return label;
   };
 
+  const buildSelectionKey = (item) => {
+    if (!item || typeof item !== 'object') return 'selection:null';
+
+    const idCandidate = item.id ?? item.value ?? item.addon_id ?? item.color_id ?? null;
+    if (idCandidate !== undefined && idCandidate !== null && String(idCandidate).length) {
+      return `id:${String(idCandidate).trim()}`;
+    }
+
+    const typePart = normaliseKey(item.type ?? item.group ?? item.category ?? '');
+    const namePart = normaliseKey(item.name ?? item.label ?? item.value ?? '');
+    return `name:${typePart}:${namePart}`;
+  };
+
+  const dedupeSelections = (items) => {
+    if (!Array.isArray(items) || !items.length) return [];
+
+    const seen = new Set();
+    const deduped = [];
+
+    items.forEach((item) => {
+      if (!item) return;
+      const key = buildSelectionKey(item);
+      if (seen.has(key)) return;
+      seen.add(key);
+      deduped.push(item);
+    });
+
+    return deduped;
+  };
+
+  const ADDON_SUMMARY_SKIP_TYPES = new Set([
+    'trim',
+    'edge',
+    'edge_finish',
+    'edge_trim',
+    'corner',
+    'size',
+    'orientation',
+    'paper',
+    'paper_stock',
+    'paperstock',
+    'paper_stock_option',
+    'foil',
+    'foil_color',
+    'metallic_powder',
+    'embossed_powder',
+    'backside',
+    'double_print',
+    'double_sided',
+    'reverse'
+  ]);
+
+  const filterDisplayableAddonItems = (items) => {
+    if (!Array.isArray(items) || !items.length) return [];
+    return items.filter((item) => {
+      if (!item || typeof item !== 'object') return false;
+      const typeKey = normaliseKey(item.type ?? item.group ?? item.category ?? null);
+      if (typeKey && ADDON_SUMMARY_SKIP_TYPES.has(typeKey)) return false;
+      return true;
+    });
+  };
+
   const findAddonByTypeExact = (summary, ...types) => {
     const addons = Array.isArray(summary?.addons) ? summary.addons : [];
     if (!addons.length) return null;
@@ -519,28 +697,193 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const computeExtras = (summary) => {
-    const paperPrice = parseMoney(
-      getFirstValue(
-        summary,
-        () => summary?.paperStockPrice,
-        () => summary?.previewSelections?.paper_stock?.price,
-        'paperStock.price',
-        'metadata.paper_stock.price'
-      )
+    const qty = Number(summary?.quantity ?? 1) || 1;
+
+    const rawPaperPrice = getFirstValue(
+      summary,
+      () => summary?.paperStockPrice,
+      () => summary?.previewSelections?.paper_stock?.price,
+      'paperStock.price',
+      'metadata.paper_stock.price'
     );
 
-    const addonList = Array.isArray(summary?.addons)
+    const paperPriceValue = parseMoney(rawPaperPrice);
+
+    const isPerUnitPricing = (obj) => {
+      if (!obj) return true; // default to per-unit when unsure
+      if (typeof obj === 'object') {
+        if (obj.per_unit === true || obj.is_per_unit === true) return true;
+        if (obj.pricing === 'per_unit' || obj.price_type === 'per_unit') return true;
+        if (obj.pricing === 'flat' || obj.price_type === 'flat' || obj.per_unit === false) return false;
+      }
+      // fallback: if value is small relative to typical unit price, assume per-unit
+      return true;
+    };
+
+    // Determine paper total: if paper stock indicates per-unit pricing multiply by qty
+    let paperPrice = 0;
+    try {
+      const paperObj = summary?.paperStock ?? summary?.paperStockOptions?.find?.((p) => String(p?.id) === String(summary?.paperStockId)) ?? null;
+      const paperIsPerUnit = isPerUnitPricing(paperObj) && !(paperObj && paperObj.pricing === 'flat');
+      paperPrice = paperIsPerUnit ? (paperPriceValue * qty) : paperPriceValue;
+    } catch (e) {
+      paperPrice = paperPriceValue * qty;
+    }
+
+    // Resolve addon list from summary.addons / summary.addonItems if present.
+    let addonList = Array.isArray(summary?.addons)
       ? summary.addons
       : Array.isArray(summary?.addonItems)
         ? summary.addonItems
         : [];
 
-    const addonTotal = addonList.reduce((sum, addon) => {
-      const price = parseMoney(addon?.price ?? addon?.amount ?? 0);
-      return sum + price;
+    // If no explicit addon list, try to extract addon-like selections from
+    // previewSelections or the client preview-store so their prices are
+    // included in the computed extras (this ensures item totals include
+    // add-on prices even when the server summary lacks addon lists).
+    if (!addonList.length) {
+      try {
+        const preview = summary?.previewSelections ?? {};
+        const extracted = [];
+        const skipKeys = new Set(['paper_stock', 'orientation', 'size', 'backside', 'foil', 'foil_color']);
+
+        if (preview && typeof preview === 'object' && Object.keys(preview).length) {
+          Object.keys(preview).forEach((k) => {
+            if (skipKeys.has(k)) return;
+            const p = preview[k];
+            if (!p) return;
+            const price = parseMoney(p?.price ?? p?.amount ?? p?.total ?? 0);
+            if (price > 0) {
+              extracted.push({ id: p?.id ?? null, name: p?.name ?? k, price, type: p?.type ?? k });
+            }
+          });
+        }
+
+        // If none found in summary.previewSelections, try the session preview-store
+        if (!extracted.length && window && window.sessionStorage) {
+          try {
+            const raw = window.sessionStorage.getItem('inkwise-preview-selections');
+            if (raw) {
+              const store = JSON.parse(raw);
+              const productId = summary?.productId ?? summary?.product_id ?? null;
+              let entry = null;
+              if (productId && store && typeof store === 'object') {
+                entry = store[String(productId)] || store[Number(productId)] || null;
+              }
+              if (!entry && store && typeof store === 'object') {
+                const keys = Object.keys(store);
+                if (keys.length) entry = store[keys[0]];
+              }
+
+              if (entry && entry.selections && typeof entry.selections === 'object') {
+                Object.keys(entry.selections).forEach((k) => {
+                  if (skipKeys.has(k)) return;
+                  const p = entry.selections[k];
+                  if (!p) return;
+                  const price = parseMoney(p?.price ?? p?.amount ?? p?.total ?? 0);
+                  if (price > 0) {
+                    extracted.push({ id: p?.id ?? null, name: p?.name ?? k, price, type: p?.type ?? k });
+                  }
+                });
+              }
+            }
+          } catch (e) {
+            // ignore parse errors
+          }
+        }
+
+        if (extracted.length) {
+          addonList = extracted;
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    const addonTotalFromList = (Array.isArray(addonList) ? addonList : []).reduce((sum, addon) => {
+      const priceRaw = parseMoney(addon?.price ?? addon?.amount ?? 0);
+      const perUnit = (() => {
+        if (!addon || typeof addon !== 'object') return true;
+        if (addon.per_unit === true || addon.is_per_unit === true) return true;
+        if (addon.pricing === 'per_unit' || addon.price_type === 'per_unit') return true;
+        if (addon.pricing === 'flat' || addon.price_type === 'flat' || addon.per_unit === false) return false;
+        return true;
+      })();
+
+      return sum + (perUnit ? priceRaw * qty : priceRaw);
     }, 0);
 
-    return paperPrice + addonTotal;
+    const extrasAddonTotal = parseMoney(
+      summary?.extras?.addons
+        ?? summary?.metadata?.final_step?.addons_total
+        ?? summary?.metadata?.addons_total
+        ?? 0
+    );
+
+    const addonTotal = addonTotalFromList > 0
+      ? addonTotalFromList
+      : extrasAddonTotal;
+
+    // Optional: ink cost (if separate fields present)
+    let inkCost = 0;
+    try {
+      const inkPerUnit = parseMoney(summary?.inkUsagePerUnit ?? summary?.metadata?.ink_usage_per_unit ?? 0);
+      const inkUnitPrice = parseMoney(summary?.inkPricePerUnit ?? summary?.metadata?.ink_price_per_unit ?? 0);
+      if (inkPerUnit > 0 && inkUnitPrice > 0) {
+        inkCost = Math.round(inkPerUnit * inkUnitPrice * qty * 100) / 100;
+      }
+    } catch (e) {
+      inkCost = 0;
+    }
+
+    return paperPrice + addonTotal + inkCost;
+  };
+
+  // Recompute invitation subtotal and grand totals from current summary
+  const recomputeTotals = (current) => {
+    if (!current || typeof current !== 'object') return current;
+
+    try {
+      let invitationBase = 0;
+      const quantityOptionsForTotals = getQuantityOptions(current);
+      const selectedQuantityForTotals = Number(current.quantity ?? quantityOptionsForTotals[0]?.value ?? 0);
+      const selectedOptionForTotals = quantityOptionsForTotals.find((opt) => opt.value === selectedQuantityForTotals) || quantityOptionsForTotals[0] || null;
+      const selPrice = parseMoney(selectedOptionForTotals?.price ?? null);
+      if (Number.isFinite(selPrice) && selPrice > 0) {
+        invitationBase = selPrice;
+      } else if (Number.isFinite(current.unitPrice) && Number.isFinite(selectedQuantityForTotals) && selectedQuantityForTotals > 0) {
+        invitationBase = Math.round((parseMoney(current.unitPrice) * selectedQuantityForTotals) * 100) / 100;
+      } else {
+        const subtotalAmount = parseMoney(current.subtotalAmount ?? current.totalAmount ?? 0);
+        const envelopeExtra = parseMoney(current.extras?.envelope ?? current.envelope?.total ?? 0);
+        const giveawayExtra = parseMoney(current.extras?.giveaway ?? current.giveaway?.total ?? 0);
+        const deduced = subtotalAmount - envelopeExtra - giveawayExtra;
+        invitationBase = Number.isFinite(deduced) && deduced >= 0 ? Math.round(deduced * 100) / 100 : subtotalAmount;
+      }
+
+      // extras related to invitation (paper, addons, ink)
+      const extrasForInvitation = computeExtras(current);
+      const invitationTotal = Math.round((invitationBase + extrasForInvitation) * 100) / 100;
+
+      // envelope and giveaway totals (may be stored in extras or on meta)
+      const envelopeTotal = parseMoney(current.extras?.envelope ?? current.envelope?.total ?? current.envelope?.price ?? 0);
+      const giveawayTotal = parseMoney(current.extras?.giveaway ?? current.giveaway?.total ?? current.giveaway?.price ?? 0);
+
+      const grandTotal = Math.round((invitationTotal + envelopeTotal + giveawayTotal) * 100) / 100;
+
+      // invitation (item) total stored separately so we don't overwrite it
+      current.subtotalAmount = invitationTotal;
+      current.invitationTotal = invitationTotal;
+      // grand total stored as grandTotal and human text in total
+      current.grandTotal = grandTotal;
+      current.total = formatMoney(grandTotal);
+      // keep originalTotal unchanged if present
+      setSummary(current);
+    } catch (err) {
+      // ignore and return
+    }
+
+    return current;
   };
 
   let toastTimer;
@@ -556,6 +899,17 @@ document.addEventListener('DOMContentLoaded', () => {
         toast.hidden = true;
       }, 240);
     }, 2400);
+  };
+
+  const setCheckoutBusyState = (busy) => {
+    if (!checkoutBtn) return;
+    const isBusy = Boolean(busy);
+    checkoutBtn.classList.toggle('is-busy', isBusy);
+    if (isBusy) {
+      checkoutBtn.setAttribute('aria-disabled', 'true');
+    } else {
+      checkoutBtn.removeAttribute('aria-disabled');
+    }
   };
 
   const updatePreviewNav = () => {
@@ -586,6 +940,38 @@ document.addEventListener('DOMContentLoaded', () => {
     const fallbackImage = summary?.previewImage || summary?.invitationImage || previewPlaceholder;
 
     const summaryMetadata = summary?.metadata || {};
+
+    // If preview selections are missing from the session summary, try to
+    // read them from the preview store (used by the product preview UI).
+    try {
+      if ((!summary || !summary.previewSelections || Object.keys(summary.previewSelections).length === 0)) {
+        const raw = window.sessionStorage.getItem('inkwise-preview-selections');
+        if (raw) {
+          try {
+            const store = JSON.parse(raw);
+            const productId = summary?.productId ?? summary?.product_id ?? summaryMetadata?.product?.id ?? null;
+            let entry = null;
+            if (productId && store && typeof store === 'object') {
+              entry = store[String(productId)] || store[Number(productId)] || null;
+            }
+            // fallback: take first entry
+            if (!entry && store && typeof store === 'object') {
+              const keys = Object.keys(store);
+              if (keys.length) entry = store[keys[0]];
+            }
+
+            if (entry && entry.selections && typeof entry.selections === 'object') {
+              summary.previewSelections = summary.previewSelections || {};
+              Object.assign(summary.previewSelections, entry.selections);
+            }
+          } catch (e) {
+            // ignore parse errors
+          }
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
 
     const applyOption = (node, value) => {
       if (!node) return;
@@ -754,12 +1140,228 @@ document.addEventListener('DOMContentLoaded', () => {
       applyOption(optionElements.paperStock, display);
     }
 
-    const basePrice = parseMoney(summary?.totalAmount ?? summary?.total ?? 0);
-    const originalBasePrice = parseMoney(summary?.originalTotal ?? summary?.subtotalOriginal ?? basePrice);
-    const savings = originalBasePrice - basePrice;
+    // If addonGroups are present, mark items as selected when previewSelections indicate so
+    try {
+      const previewSel = summary?.previewSelections ?? {};
+      const addonGroupsArr = Array.isArray(summary?.addonGroups) ? summary.addonGroups : [];
+      if (addonGroupsArr.length) {
+        addonGroupsArr.forEach((group) => {
+          (group.items || []).forEach((item) => {
+            let selected = !!item.selected;
+            try {
+              // Match by group type key
+              const byType = previewSel[group.type];
+              if (!selected && byType && (byType.id || byType.value || byType.name)) {
+                if (String(byType.id) === String(item.id) || String(byType.value) === String(item.id) || String((byType.name || '')).trim().toLowerCase() === String((item.name || '')).trim().toLowerCase()) {
+                  selected = true;
+                }
+              }
+
+              // Also scan all preview selections for an id match
+              if (!selected) {
+                for (const k of Object.keys(previewSel || {})) {
+                  const v = previewSel[k];
+                  if (v && (v.id && String(v.id) === String(item.id) || v.value && String(v.value) === String(item.id))) {
+                    selected = true;
+                    break;
+                  }
+                }
+              }
+            } catch (e) {
+              // ignore
+            }
+            item.selected = selected;
+          });
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    // Populate add-ons summary, preserving group labels (like finalstep)
+    try {
+      const addonsNode = shell.querySelector('[data-option="addons"]');
+      if (addonsNode) {
+        // Clear existing content
+        addonsNode.textContent = '';
+        const addonGroups = Array.isArray(summary?.addonGroups) ? summary.addonGroups : [];
+        let hadSelection = false;
+
+        if (addonGroups.length) {
+          addonGroups.forEach((group) => {
+            const groupTypeKey = normaliseKey(group?.type ?? group?.label ?? '');
+            if (groupTypeKey && ADDON_SUMMARY_SKIP_TYPES.has(groupTypeKey)) {
+              return;
+            }
+
+            const items = Array.isArray(group.items) ? group.items : [];
+            const selected = dedupeSelections(
+              filterDisplayableAddonItems(items).filter((item) => item && item.selected)
+            );
+            if (!selected.length) return;
+            hadSelection = true;
+
+            const groupLabel = document.createElement('div');
+            groupLabel.className = 'os-addon-group';
+            const labelEl = document.createElement('strong');
+            labelEl.textContent = group.label || group.type || '';
+            groupLabel.appendChild(labelEl);
+
+            const listEl = document.createElement('span');
+            listEl.className = 'os-addon-list';
+            const labels = selected
+              .map((it) => formatSelectionWithPrice(it) || it.name || it.label || it.id)
+              .filter(Boolean);
+            listEl.textContent = Array.from(new Set(labels)).join(', ');
+            groupLabel.appendChild(document.createTextNode(' '));
+            groupLabel.appendChild(listEl);
+
+            addonsNode.appendChild(groupLabel);
+          });
+        }
+
+        // Fallback to flat summary.addons
+        if (!hadSelection && Array.isArray(summary?.addons) && summary.addons.length) {
+          const selections = dedupeSelections(filterDisplayableAddonItems(summary.addons.filter(Boolean)));
+          const flat = selections
+            .map((a) => {
+              if (!a) return null;
+              const formatted = formatSelectionWithPrice(a);
+              if (formatted) return formatted;
+              if (a.name) {
+                const pricePart = a.price ? ` — ${formatMoney(parseMoney(a.price))}` : '';
+                return `${a.name}${pricePart}`;
+              }
+              return null;
+            })
+            .filter(Boolean);
+          const uniqueFlat = Array.from(new Set(flat));
+          if (uniqueFlat.length) {
+            addonsNode.textContent = uniqueFlat.join(', ');
+            hadSelection = true;
+          }
+        }
+
+        // Additional fallback: if there are no addonGroups or addons but the
+        // previewSelections store contains addon-like entries, surface them.
+        // This covers the session-only flow where the client wrote preview
+        // selections but the server-side summary wasn't enriched with addon
+        // lists yet. We also try reading the client preview-store directly
+        // (inkwise-preview-selections) to handle cases where previewSelections
+        // were not merged into the session summary.
+        if (!hadSelection && (!Array.isArray(summary?.addons) || !summary.addons.length)) {
+          // First try summary.previewSelections
+          try {
+            const preview = summary?.previewSelections ?? {};
+            const skipKeys = new Set([
+              'paper_stock',
+              'orientation',
+              'size',
+              'backside',
+              'foil',
+              'foil_color',
+              'trim',
+              'edge',
+              'edge_finish',
+              'edge_trim',
+              'corner'
+            ]);
+            const labels = [];
+
+            if (preview && typeof preview === 'object' && Object.keys(preview).length) {
+              Object.keys(preview).forEach((key) => {
+                if (skipKeys.has(key)) return;
+                const payload = preview[key];
+                if (!payload) return;
+                const formatted = formatSelectionWithPrice(payload) || payload.name || payload.label || payload.value || null;
+                if (formatted) labels.push(formatted);
+              });
+            }
+
+            // If nothing found in summary.previewSelections, try the client-side
+            // preview store (might contain entries keyed by product id).
+            if (!labels.length && window && window.sessionStorage) {
+              try {
+                const raw = window.sessionStorage.getItem('inkwise-preview-selections');
+                if (raw) {
+                  const store = JSON.parse(raw);
+                  const productId = summary?.productId ?? summary?.product_id ?? null;
+                  let entry = null;
+                  if (productId && store && typeof store === 'object') {
+                    entry = store[String(productId)] || store[Number(productId)] || null;
+                  }
+                  if (!entry && store && typeof store === 'object') {
+                    const keys = Object.keys(store);
+                    if (keys.length) entry = store[keys[0]];
+                  }
+
+                  if (entry && entry.selections && typeof entry.selections === 'object') {
+                    Object.keys(entry.selections).forEach((key) => {
+                      if (skipKeys.has(key)) return;
+                      const payload = entry.selections[key];
+                      if (!payload) return;
+                      const formatted = formatSelectionWithPrice(payload) || payload.name || payload.label || payload.value || null;
+                      if (formatted) labels.push(formatted);
+                    });
+                  }
+                }
+              } catch (e) {
+                // ignore parse errors
+              }
+            }
+
+            if (labels.length) {
+              const uniqueLabels = Array.from(new Set(labels));
+              addonsNode.textContent = uniqueLabels.join(', ');
+              hadSelection = true;
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+
+        const addonsContainer = addonsNode.closest('.os-option');
+        if (hadSelection) {
+          setHidden(addonsContainer, false);
+        } else {
+          addonsNode.textContent = '—';
+          setHidden(addonsContainer, true);
+          // Debug: surface preview selections when no add-ons are shown
+          if (window && window.console && typeof window.console.debug === 'function') {
+            console.debug('OrderSummary: no add-ons selected; previewSelections=', summary?.previewSelections, 'addonGroups=', summary?.addonGroups, 'addons=', summary?.addons);
+          }
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    // Calculate totals using the selected quantity option price plus extras
+    const quantityOptionsForTotals = getQuantityOptions(summary);
+    const selectedQuantityForTotals = Number(summary?.quantity ?? quantityOptionsForTotals[0]?.value ?? 0);
+    const selectedOptionForTotals = quantityOptionsForTotals.find((opt) => opt.value === selectedQuantityForTotals) || quantityOptionsForTotals[0] || null;
+    const computedBase = parseMoney(selectedOptionForTotals?.price ?? 0);
+    const extrasForTotals = computeExtras(summary);
+    const computedTotal = Math.round((computedBase + extrasForTotals) * 100) / 100;
+
+    const originalBasePrice = parseMoney(summary?.originalTotal ?? summary?.subtotalOriginal ?? computedBase);
+    const savings = originalBasePrice - computedTotal;
+
+    // Update session summary so other interactions see consistent values
+    try {
+      if (summary && typeof summary === 'object') {
+        summary.subtotalAmount = computedBase;
+        summary.totalAmount = computedTotal;
+        summary.total = formatMoney(computedTotal);
+        summary.originalTotal = summary.originalTotal ?? originalBasePrice;
+        setSummary(summary);
+      }
+    } catch (e) {
+      // ignore storage errors
+    }
 
     if (previewOldTotalEl) previewOldTotalEl.textContent = formatMoney(originalBasePrice);
-    if (previewNewTotalEl) previewNewTotalEl.textContent = formatMoney(basePrice);
+    if (previewNewTotalEl) previewNewTotalEl.textContent = formatMoney(computedTotal);
     if (previewSavingsEl) {
       if (savings > 0.009) {
         previewSavingsEl.textContent = `You saved ${formatMoney(savings)}`;
@@ -874,6 +1476,22 @@ document.addEventListener('DOMContentLoaded', () => {
         envelopeQuantitySelect.dataset.minQty = '';
         envelopeQuantitySelect.dataset.maxQty = '';
       }
+      // Ensure the change handler is attached even when the select is rendered dynamically
+      try {
+        const sel = shell.querySelector('[data-envelope-quantity]');
+        if (sel) {
+          // debug attach
+          if (window && window.console && typeof window.console.debug === 'function') {
+            console.debug('renderEnvelopePreview: attaching handler to envelope select', sel);
+          }
+          sel.removeEventListener('change', handleEnvelopeQuantityChange);
+          sel.addEventListener('change', handleEnvelopeQuantityChange);
+          // also set onchange to ensure legacy listeners fire
+          try { sel.onchange = handleEnvelopeQuantityChange; } catch (e) { /* ignore */ }
+        }
+      } catch (e) {
+        // ignore
+      }
     }
 
     if (envelopeOptionElements.type) envelopeOptionElements.type.textContent = envelopeMeta.type || 'Standard';
@@ -901,7 +1519,16 @@ document.addEventListener('DOMContentLoaded', () => {
     envelopeIndex = 0;
     applyEnvelopeImage();
     updateEnvelopeNav();
+
+    // update debug element with current values
+    try {
+      const dbg = ensureEnvelopeDebugEl();
+      if (dbg) dbg.textContent = `Unit: ${formatMoney(unitPrice)} · Total: ${formatMoney(currentTotal)} (qty ${Number(envelopeMeta.qty ?? summary?.quantity ?? 0)})`;
+    } catch (e) {
+      // ignore
+    }
   };
+
 
   const shiftEnvelopePreview = (direction) => {
     if (!envelopeImages.length || envelopeImages.length === 1) return;
@@ -1004,6 +1631,16 @@ document.addEventListener('DOMContentLoaded', () => {
         giveawaysQuantitySelect.dataset.minQty = '';
         giveawaysQuantitySelect.dataset.maxQty = '';
       }
+        // Ensure the change handler is attached even when the select is rendered dynamically
+        try {
+          const sel = shell.querySelector('[data-giveaways-quantity]');
+          if (sel) {
+            sel.removeEventListener('change', handleGiveawayQuantityChange);
+            sel.addEventListener('change', handleGiveawayQuantityChange);
+          }
+        } catch (e) {
+          // ignore
+        }
     }
 
     if (giveawaysOptionElements.type) giveawaysOptionElements.type.textContent = giveawayMeta.type || giveawayMeta.name || 'Giveaway';
@@ -1039,19 +1676,30 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const updateSummaryCard = (summary) => {
-    const subtotalAmount = parseMoney(summary?.subtotalAmount ?? summary?.subtotal ?? summary?.totalAmount ?? 0);
+    // individual item totals
+  const invitationAmount = parseMoney(summary?.invitationTotal ?? summary?.subtotalAmount ?? summary?.totalAmount ?? 0);
+    const envelopeAmount = parseMoney(summary?.extras?.envelope ?? summary?.envelope?.total ?? summary?.envelope?.price ?? 0);
+    const giveawaysAmount = parseMoney(summary?.extras?.giveaway ?? summary?.giveaway?.total ?? summary?.giveaway?.price ?? 0);
+
+    // Subtotal should be the sum of the three item totals
+    const subtotalAmount = Math.round((invitationAmount + envelopeAmount + giveawaysAmount) * 100) / 100;
     const originalSubtotal = parseMoney(
       summary?.originalSubtotal
         ?? summary?.subtotalOriginal
         ?? summary?.originalTotal
         ?? subtotalAmount
     );
-    const grandTotal = parseMoney(summary?.totalAmount ?? summary?.total ?? subtotalAmount);
+
+    const grandTotal = parseMoney(summary?.grandTotal ?? subtotalAmount);
 
     const savings = originalSubtotal - subtotalAmount;
 
-    if (subtotalOriginalEl) subtotalOriginalEl.textContent = formatMoney(originalSubtotal);
-    if (subtotalDiscountedEl) subtotalDiscountedEl.textContent = formatMoney(subtotalAmount);
+  if (invitationTotalEl) invitationTotalEl.textContent = formatMoney(invitationAmount);
+  if (envelopeTotalEl) envelopeTotalEl.textContent = formatMoney(envelopeAmount);
+  if (giveawaysTotalEl) giveawaysTotalEl.textContent = formatMoney(giveawaysAmount);
+
+  if (subtotalOriginalEl) subtotalOriginalEl.textContent = formatMoney(originalSubtotal);
+  if (subtotalDiscountedEl) subtotalDiscountedEl.textContent = formatMoney(subtotalAmount);
     if (subtotalSavingsEl) {
       if (savings > 0.009) {
         subtotalSavingsEl.textContent = `You saved ${formatMoney(savings)}`;
@@ -1060,7 +1708,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setHidden(subtotalSavingsEl, true);
       }
     }
-    if (grandTotalEl) grandTotalEl.textContent = formatMoney(grandTotal);
+  if (grandTotalEl) grandTotalEl.textContent = formatMoney(grandTotal);
   };
 
   const handleQuantityChange = (event) => {
@@ -1140,9 +1788,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const select = event?.target || envelopeQuantitySelect;
     if (!select || select.disabled) return;
 
+    if (window && window.console && typeof window.console.debug === 'function') {
+      console.debug('EnvelopeQtyChange: summary=', getSummary(), 'select.value=', select.value);
+    }
+
     const summary = getSummary();
-    const envelopeMeta = summary?.envelope || summary?.metadata?.envelope;
+    // Try several locations for envelope metadata (defensive)
+    let envelopeMeta = summary?.envelope || summary?.metadata?.envelope || null;
+    if (!envelopeMeta && Array.isArray(summary?.envelopes) && summary.envelopes.length) {
+      envelopeMeta = summary.envelopes[0];
+    }
+    if (!envelopeMeta && summary?.envelope_meta) {
+      envelopeMeta = summary.envelope_meta;
+    }
     if (!envelopeMeta) {
+      // nothing to do
       return;
     }
 
@@ -1157,16 +1817,72 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const unitPrice = parseMoney(envelopeMeta.price ?? (previousQuantity ? (envelopeMeta.total ?? 0) / previousQuantity : 0));
+    // Resolve unit price from multiple fallbacks:
+    // 1) explicit envelopeMeta.price (unit)
+    // 2) envelopeMeta.unit_price / unitPrice keys
+    // 3) if option dataset contains a price (which may be total for that option), derive unit
+    // 4) fallback to envelopeMeta.total / previousQuantity
+    let unitPrice = parseMoney(envelopeMeta.price ?? envelopeMeta.unit_price ?? envelopeMeta.unitPrice ?? null);
+    if ((!Number.isFinite(unitPrice) || unitPrice <= 0) && select && select.selectedOptions && select.selectedOptions[0]) {
+      const opt = select.selectedOptions[0];
+      const optPrice = parseMoney(opt?.dataset?.price ?? opt?.getAttribute('data-price') ?? null);
+      if (Number.isFinite(optPrice) && optPrice > 0 && Number.isFinite(newQuantity) && newQuantity > 0) {
+        // optPrice may be total for the option (unit * qty), so derive unit
+        unitPrice = Math.round((optPrice / newQuantity) * 100) / 100;
+      }
+    }
+    if ((!Number.isFinite(unitPrice) || unitPrice <= 0) && previousQuantity) {
+      unitPrice = parseMoney((envelopeMeta.total ?? 0) / previousQuantity);
+    }
+    unitPrice = Number.isFinite(unitPrice) ? unitPrice : 0;
     const totalPrice = Math.round(unitPrice * newQuantity * 100) / 100;
 
     if (!envelopeStoreUrl) {
-      select.value = String(previousQuantity);
-      showToast('Envelope updates are unavailable right now.');
+      // No server endpoint configured; update session summary locally
+      try {
+        const current = getSummary();
+        if (!current) return;
+        const envelopeMetaLocal = current.envelope || current.metadata?.envelope || {};
+        envelopeMetaLocal.qty = newQuantity;
+        // store unit price and total explicitly
+        envelopeMetaLocal.price = unitPrice;
+        envelopeMetaLocal.unit_price = unitPrice;
+        envelopeMetaLocal.total = totalPrice;
+        current.envelope = envelopeMetaLocal;
+        current.extras = current.extras || { paper: 0, addons: 0, envelope: 0, giveaway: 0 };
+        current.extras.envelope = Number(totalPrice);
+
+        // Recompute grand totals: invitation total (use existing totalAmount) + envelope + giveaway
+        const invitationTotal = parseMoney(current.totalAmount ?? current.subtotalAmount ?? current.total ?? 0);
+        const envelopeTotal = parseMoney(current.extras.envelope ?? 0);
+        const giveawayTotal = parseMoney(current.extras.giveaway ?? 0);
+        const grandTotal = Math.round((invitationTotal + envelopeTotal + giveawayTotal) * 100) / 100;
+
+  current.totalAmount = grandTotal;
+  current.total = formatMoney(grandTotal);
+  current.subtotalAmount = Math.round((invitationTotal) * 100) / 100;
+
+        // Persist and recompute deterministically
+        setSummary(current);
+        recomputeTotals(current);
+        // Force immediate visible DOM update for envelope and grand total
+        try {
+          if (envelopeNewTotalEl) envelopeNewTotalEl.textContent = formatMoney(current.extras.envelope ?? current.envelope?.total ?? 0);
+          if (grandTotalEl) grandTotalEl.textContent = formatMoney(current.totalAmount ?? current.total ?? 0);
+        } catch (e) { /* ignore visual update errors */ }
+        renderSummary(current);
+        if (window && window.console && typeof window.console.debug === 'function') {
+          console.debug('Envelope local update applied', current);
+        }
+        showToast(`Envelope quantity updated to ${newQuantity}`);
+      } catch (e) {
+        select.value = String(previousQuantity);
+        showToast('Envelope updates are unavailable right now.');
+      }
       return;
     }
 
-    select.disabled = true;
+  select.disabled = true;
 
     const payload = {
       product_id: envelopeMeta.product_id ?? null,
@@ -1186,10 +1902,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const result = await requestPost(envelopeStoreUrl, payload);
 
     select.disabled = false;
-
     if (result.ok) {
       const updatedSummary = applySummaryPayload(result.data) ?? await fetchSummaryFromServer();
       const summaryToRender = updatedSummary ?? getSummary();
+      // Ensure select previousValue is current
+      try { select.dataset.previousValue = String(newQuantity); } catch (e) { /* ignore */ }
+      // Recompute/persist then force DOM update
+      try { recomputeTotals(summaryToRender); } catch (e) { /* ignore */ }
+      try {
+        if (envelopeNewTotalEl) envelopeNewTotalEl.textContent = formatMoney(summaryToRender.extras?.envelope ?? summaryToRender.envelope?.total ?? 0);
+        if (grandTotalEl) grandTotalEl.textContent = formatMoney(summaryToRender.totalAmount ?? summaryToRender.total ?? 0);
+      } catch (e) { /* ignore */ }
       renderSummary(summaryToRender);
       showToast(`Envelope quantity updated to ${newQuantity}`);
       return;
@@ -1201,6 +1924,37 @@ document.addEventListener('DOMContentLoaded', () => {
       renderSummary(refreshed ?? getSummary());
       showToast('Envelope updated elsewhere. Refreshed details.');
     } else {
+      // Try local update fallback so the UI still reflects the selection
+      try {
+        const current = getSummary();
+        if (current) {
+          const envelopeMetaLocal = current.envelope || current.metadata?.envelope || {};
+          envelopeMetaLocal.qty = newQuantity;
+          envelopeMetaLocal.price = unitPrice;
+          envelopeMetaLocal.unit_price = unitPrice;
+          envelopeMetaLocal.total = totalPrice;
+          current.envelope = envelopeMetaLocal;
+          current.extras = current.extras || { paper: 0, addons: 0, envelope: 0, giveaway: 0 };
+          current.extras.envelope = Number(totalPrice);
+
+          const invitationTotal = parseMoney(current.totalAmount ?? current.subtotalAmount ?? current.total ?? 0);
+          const envelopeTotal = parseMoney(current.extras.envelope ?? 0);
+          const giveawayTotal = parseMoney(current.extras.giveaway ?? 0);
+          const grandTotal = Math.round((invitationTotal + envelopeTotal + giveawayTotal) * 100) / 100;
+
+          current.totalAmount = grandTotal;
+          current.total = formatMoney(grandTotal);
+          current.subtotalAmount = Math.round((invitationTotal) * 100) / 100;
+
+          setSummary(current);
+          renderSummary(current);
+          showToast(`Envelope quantity updated to ${newQuantity}`);
+          return;
+        }
+      } catch (e) {
+        // fall through to error handling
+      }
+
       select.value = String(previousQuantity);
       select.dataset.previousValue = String(previousQuantity);
       showToast('Unable to update envelope quantity. Please try again.');
@@ -1235,8 +1989,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const totalPrice = Math.round(unitPrice * newQuantity * 100) / 100;
 
     if (!giveawayStoreUrl) {
-      select.value = String(previousQuantity);
-      showToast('Giveaway updates are unavailable right now.');
+      // No server endpoint configured; update session summary locally
+      try {
+        const current = getSummary();
+        if (!current) return;
+        const gwMeta = current.giveaway || current.giveaways || {};
+        gwMeta.qty = newQuantity;
+        gwMeta.price = unitPrice;
+        gwMeta.total = totalPrice;
+        current.giveaway = gwMeta;
+        current.extras = current.extras || { paper: 0, addons: 0, envelope: 0, giveaway: 0 };
+        current.extras.giveaway = Number(totalPrice);
+
+        const invitationTotal = parseMoney(current.totalAmount ?? current.subtotalAmount ?? 0);
+        const envelopeTotal = parseMoney(current.extras.envelope ?? 0);
+        const giveawayTotal = parseMoney(current.extras.giveaway ?? 0);
+        const grandTotal = Math.round((invitationTotal + envelopeTotal + giveawayTotal) * 100) / 100;
+
+        current.totalAmount = grandTotal;
+        current.total = formatMoney(grandTotal);
+        current.subtotalAmount = Math.round((invitationTotal) * 100) / 100;
+
+        setSummary(current);
+        renderSummary(current);
+        showToast(`Giveaway quantity updated to ${newQuantity}`);
+      } catch (e) {
+        select.value = String(previousQuantity);
+        showToast('Giveaway updates are unavailable right now.');
+      }
       return;
     }
 
@@ -1262,8 +2042,10 @@ document.addEventListener('DOMContentLoaded', () => {
     select.disabled = false;
 
     if (result.ok) {
-      const updatedSummary = applySummaryPayload(result.data) ?? await fetchSummaryFromServer();
-      const summaryToRender = updatedSummary ?? getSummary();
+  const updatedSummary = applySummaryPayload(result.data) ?? await fetchSummaryFromServer();
+  const summaryToRender = updatedSummary ?? getSummary();
+  // Ensure totals are recomputed/persisted after server response
+  recomputeTotals(summaryToRender);
       renderSummary(summaryToRender);
       showToast(`Giveaway quantity updated to ${newQuantity}`);
       return;
@@ -1275,6 +2057,37 @@ document.addEventListener('DOMContentLoaded', () => {
       renderSummary(refreshed ?? getSummary());
       showToast('Giveaway selection was refreshed.');
     } else {
+      // Fallback to local update so the UI reflects the new quantity
+      try {
+        const current = getSummary();
+        if (current) {
+          const gwMeta = current.giveaway || current.giveaways || {};
+          gwMeta.qty = newQuantity;
+          gwMeta.price = unitPrice;
+          gwMeta.total = totalPrice;
+          current.giveaway = gwMeta;
+          current.extras = current.extras || { paper: 0, addons: 0, envelope: 0, giveaway: 0 };
+          current.extras.giveaway = Number(totalPrice);
+
+          const invitationTotal = parseMoney(current.totalAmount ?? current.subtotalAmount ?? 0);
+          const envelopeTotal = parseMoney(current.extras.envelope ?? 0);
+          const giveawayTotal = parseMoney(current.extras.giveaway ?? 0);
+          const grandTotal = Math.round((invitationTotal + envelopeTotal + giveawayTotal) * 100) / 100;
+
+          current.totalAmount = grandTotal;
+          current.total = formatMoney(grandTotal);
+          current.subtotalAmount = Math.round((invitationTotal) * 100) / 100;
+
+          // Persist and recompute deterministically
+          setSummary(current);
+          recomputeTotals(current);
+          renderSummary(current);
+          showToast(`Giveaway quantity updated to ${newQuantity}`);
+          return;
+        }
+      } catch (e) {
+      }
+
       select.value = String(previousQuantity);
       select.dataset.previousValue = String(previousQuantity);
       showToast('Unable to update giveaway quantity. Please try again.');
@@ -1301,13 +2114,33 @@ document.addEventListener('DOMContentLoaded', () => {
     setHidden(summaryGrid, false);
     setHidden(summaryCard, false);
 
+    // Ensure totals are recomputed (invitation base + extras) before rendering
+    try { recomputeTotals(summary); } catch (e) { /* ignore */ }
+
     renderPreview(summary);
     renderEnvelopePreview(summary);
     renderGiveawaysPreview(summary);
     updateSummaryCard(summary);
   };
 
-  const redirectToCheckout = () => {
+  const redirectToCheckout = async () => {
+    if (checkoutInFlight) {
+      return;
+    }
+
+    checkoutInFlight = true;
+    setCheckoutBusyState(true);
+
+    const synced = await syncSummaryWithServer();
+
+    setCheckoutBusyState(false);
+    checkoutInFlight = false;
+
+    if (!synced) {
+      showToast('We couldn\'t save your selections. Please try again.');
+      return;
+    }
+
     window.location.href = checkoutUrl;
   };
 
@@ -1459,12 +2292,47 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('Unable to remove giveaway. Please try again.');
   });
 
-  checkoutBtn?.addEventListener('click', () => {
+  checkoutBtn?.addEventListener('click', async (event) => {
+    if (event && typeof event.preventDefault === 'function') {
+      event.preventDefault();
+    }
+
+    if (checkoutInFlight) {
+      return;
+    }
+
     const current = getSummary();
     if (!current || !current.quantity) {
       showToast('Add an invitation before checking out.');
       return;
     }
-    redirectToCheckout();
+
+    await redirectToCheckout();
   });
+
+  // Final delegated fallback: ensure envelope select changes always trigger the handler
+  // This runs after handlers are defined and will catch events from dynamically replaced selects.
+  try {
+    document.addEventListener('change', (e) => {
+      try {
+        const t = e.target;
+        if (!t) return;
+        if (t.matches && t.matches('[data-envelope-quantity]')) {
+          // call the handler with an object shaped like an event
+          try {
+            handleEnvelopeQuantityChange({ target: t });
+          } catch (err) {
+            // ensure we don't break the page
+            if (window && window.console && typeof window.console.error === 'function') {
+              console.error('Fallback envelope change handler failed', err);
+            }
+          }
+        }
+      } catch (err) {
+        // swallow
+      }
+    }, { capture: false });
+  } catch (e) {
+    // ignore environment where document isn't available
+  }
 });

@@ -189,6 +189,35 @@
     color: var(--admin-text-primary);
 }
 
+.ordersummary-row--breakdown td {
+    background: rgba(148, 185, 255, 0.08);
+    font-size: 0.82rem;
+    color: var(--admin-text-secondary);
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+.ordersummary-row--breakdown td:first-child {
+    width: 28px;
+}
+
+.ordersummary-row--breakdown .item-breakdown-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: var(--admin-text-primary);
+}
+
+.ordersummary-row--breakdown .item-breakdown-label::before {
+    content: "";
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(148, 185, 255, 0.8);
+}
+
 .ordersummary-table .text-center {
     text-align: center;
 }

@@ -287,3 +287,35 @@ body {
 .max-w-7xl {
   max-width: 1280px !important;
 }
+
+/* nav-icon-button (copied from invitations topbar) */
+.nav-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 9999px;
+  border: 1px solid #dbeafe;
+  background-color: rgba(255, 255, 255, 0.9);
+  color: #f472b6;
+  transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 12px 24px rgba(166, 183, 255, 0.25);
+}
+
+.nav-icon-button:hover {
+  transform: translateY(-2px);
+  background-color: #f8f5ff;
+}
+
+.nav-icon-button:focus {
+  outline: 2px solid #a6b7ff;
+  outline-offset: 2px;
+}
+
+.nav-icon-button[aria-disabled="true"] {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.nav-icon-button i { font-size: 1.15rem; }

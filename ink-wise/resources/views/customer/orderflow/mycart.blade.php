@@ -32,6 +32,7 @@ $finalStepUrl = $resolveRoute('order.finalstep', '/order/finalstep');
 $checkoutUrl = $resolveRoute('customer.checkout', '/checkout');
 $envelopeStoreUrl = $resolveRoute('order.envelope.store', '/order/envelope');
 $giveawayStoreUrl = $resolveRoute('order.giveaways.store', '/order/giveaways');
+$summarySyncUrl = $resolveRoute('order.summary.sync', '/order/summary/sync');
 
 $hasEnvelope = (bool) data_get($orderSummary, 'hasEnvelope', !empty(data_get($orderSummary, 'envelope')));
 $hasGiveaway = (bool) data_get($orderSummary, 'hasGiveaway', !empty(data_get($orderSummary, 'giveaway')));
@@ -52,6 +53,7 @@ $hasGiveaway = (bool) data_get($orderSummary, 'hasGiveaway', !empty(data_get($or
 		data-giveaways-url="{{ $giveawaysUrl }}"
 		data-envelope-store-url="{{ $envelopeStoreUrl }}"
 		data-giveaway-store-url="{{ $giveawayStoreUrl }}"
+		data-summary-sync-url="{{ $summarySyncUrl }}"
 	>
 		<header class="ordersummary-header">
 			<div class="ordersummary-header__content">
@@ -148,6 +150,9 @@ $hasGiveaway = (bool) data_get($orderSummary, 'hasGiveaway', !empty(data_get($or
 										<dt>Paper stock</dt>
 										<dd data-option="paper-stock">—</dd>
 									</div>
+									<div class="os-option">
+										<dd data-option="addons">—</dd>
+									</div>
 								</dl>
 							</details>
 							<div class="os-preview-pricing">
@@ -182,7 +187,7 @@ $hasGiveaway = (bool) data_get($orderSummary, 'hasGiveaway', !empty(data_get($or
 							<h3 class="os-preview-title" data-envelope-name>Envelope</h3>
 							<div class="os-preview-quantity">
 								<label for="osEnvelopeQuantity">Quantity</label>
-								<select id="osEnvelopeQuantity" data-envelope-quantity disabled>
+								<select id="osEnvelopeQuantity" data-envelope-quantity onchange="window._inkwiseEnvelopeChange && window._inkwiseEnvelopeChange(this)">
 									<option value="10">10</option>
 									<option value="20">20</option>
 									<option value="30">30</option>
@@ -194,6 +199,7 @@ $hasGiveaway = (bool) data_get($orderSummary, 'hasGiveaway', !empty(data_get($or
 									<option value="90">90</option>
 									<option value="100">100</option>
 									<option value="110">110</option>
+									
 									<option value="120">120</option>
 									<option value="130">130</option>
 									<option value="140">140</option>
@@ -258,7 +264,7 @@ $hasGiveaway = (bool) data_get($orderSummary, 'hasGiveaway', !empty(data_get($or
 							<h3 class="os-preview-title" data-giveaways-name>Giveaways</h3>
 							<div class="os-preview-quantity">
 								<label for="osGiveawaysQuantity">Quantity</label>
-								<select id="osGiveawaysQuantity" data-giveaways-quantity disabled>
+								<select id="osGiveawaysQuantity" data-giveaways-quantity>
 									<option value="10">10</option>
 									<option value="20">20</option>
 									<option value="30">30</option>
@@ -317,16 +323,29 @@ $hasGiveaway = (bool) data_get($orderSummary, 'hasGiveaway', !empty(data_get($or
 				<div class="os-summary-card">
 					<header class="os-summary-header">
 						<h2>Order summary</h2>
-						<span class="os-summary-secure">Secure checkout</span>
 					</header>
 
 					<div class="os-summary-pricing">
-						<div class="os-summary-line os-summary-line--subtotal">
-							<span>Subtotal</span>
-							<div class="os-summary-amount">
-								<span class="os-price-old" data-summary="subtotal-original">₱0.00</span>
-								<span class="os-price-new" data-summary="subtotal-discounted">₱0.00</span>
-								<span class="os-price-savings" data-summary="subtotal-savings" hidden>You saved ₱0.00</span>
+						<div class="os-summary-line os-summary-line--items">
+							<div class="os-summary-item">
+								<span>Invitation</span>
+								<span data-summary="invitation-total">₱0.00</span>
+							</div>
+							<div class="os-summary-item">
+								<span>Envelope</span>
+								<span data-summary="envelope-total">₱0.00</span>
+							</div>
+							<div class="os-summary-item">
+								<span>Giveaways</span>
+								<span data-summary="giveaways-total">₱0.00</span>
+							</div>
+							<div class="os-summary-line os-summary-line--subtotal">
+								<span>Subtotal</span>
+								<div class="os-summary-amount">
+									<span class="os-price-old" data-summary="subtotal-original">₱0.00</span>
+									<span class="os-price-new" data-summary="subtotal-discounted">₱0.00</span>
+									<span class="os-price-savings" data-summary="subtotal-savings" hidden>You saved ₱0.00</span>
+								</div>
 							</div>
 						</div>
 						<div class="os-summary-total">
@@ -336,7 +355,7 @@ $hasGiveaway = (bool) data_get($orderSummary, 'hasGiveaway', !empty(data_get($or
 					</div>
 
 					<div class="os-checkout-buttons">
-						<button type="button" class="btn primary os-checkout-primary" id="osCheckoutBtn">Checkout</button>
+						<a id="osCheckoutBtn" href="{{ $checkoutUrl }}" class="btn primary os-checkout-primary" role="button">Checkout</a>
 					</div>
 				</div>
 			</aside>
@@ -346,11 +365,17 @@ $hasGiveaway = (bool) data_get($orderSummary, 'hasGiveaway', !empty(data_get($or
 	<div id="osToast" class="os-toast" aria-live="polite" role="status" hidden></div>
 @if(!empty($orderSummary))
 	<script>
-		document.addEventListener('DOMContentLoaded', () => {
-			const summaryData = {!! \Illuminate\Support\Js::from($orderSummary) !!};
-			window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(summaryData));
-		});
+		(function () {
+			try {
+				const summaryData = {!! \Illuminate\Support\Js::from($orderSummary) !!};
+				window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(summaryData));
+			} catch (e) {
+				// ignore serialization/storage errors
+			}
+		})();
 	</script>
 @endif
+
+	<!-- Checkout is a plain link; no POST will be triggered from this page. -->
 </body>
 </html>

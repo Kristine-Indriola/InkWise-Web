@@ -11,15 +11,20 @@ return new class extends Migration
 	 */
 	public function up(): void
 	{
-		Schema::create('contact_infos', function (Blueprint $table) {
-			$table->id();
-			$table->string('label');
-			$table->string('icon')->nullable();
-			$table->string('value')->nullable();
-			$table->unsignedInteger('display_order')->default(0);
-			$table->boolean('is_active')->default(true);
-			$table->timestamps();
-		});
+		if (!Schema::hasTable('contact_infos')) {
+			Schema::create('contact_infos', function (Blueprint $table) {
+				$table->id();
+				$table->string('label');
+				$table->string('icon')->nullable();
+				$table->string('value')->nullable();
+				$table->unsignedInteger('display_order')->default(0);
+				$table->boolean('is_active')->default(true);
+				$table->timestamps();
+			});
+		} else {
+			// Table already exists (likely created manually or by a previous attempt).
+			// Skipping creation so migration can complete and be recorded.
+		}
 	}
 
 	/**

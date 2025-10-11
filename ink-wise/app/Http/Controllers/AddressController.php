@@ -17,6 +17,8 @@ class AddressController extends Controller
     public function store(Request $request)
     {
         $request->validate([
+            'full_name' => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:255',
             'region'      => 'required|string|max:255',
             'province'    => 'required|string|max:255',
             'city'        => 'required|string|max:255',
@@ -28,6 +30,8 @@ class AddressController extends Controller
 
         Address::create([
             'user_id'     => Auth::id(),
+            'full_name'   => $request->input('full_name'),
+            'phone'       => $request->input('phone'),
             'street'      => $request->street,
             'barangay'    => $request->barangay,
             'city'        => $request->city,
@@ -42,8 +46,8 @@ class AddressController extends Controller
     public function update(Request $request, Address $address)
     {
         $request->validate([
-            'full_name' => 'required|string|max:255',
-            'phone' => 'required|string|max:255',
+            'full_name' => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:255',
             'region' => 'required|string|max:255',
             'province' => 'required|string|max:255',
             'city' => 'required|string|max:255',
@@ -52,7 +56,18 @@ class AddressController extends Controller
             'street' => 'required|string|max:255',
             'label' => 'required|string|max:50',
         ]);
-        $address->update($request->all());
+        // Only update allowed address fields (avoid mass assignment of unrelated input)
+        $address->update([
+            'full_name' => $request->input('full_name'),
+            'phone' => $request->input('phone'),
+            'street' => $request->input('street'),
+            'barangay' => $request->input('barangay'),
+            'city' => $request->input('city'),
+            'province' => $request->input('province'),
+            'postal_code' => $request->input('postal_code'),
+            'country' => $address->country ?? 'Philippines',
+            'label' => $request->input('label') ?? ($address->label ?? 'Home'),
+        ]);
         return redirect()->route('customer.profile.addresses')->with('success', 'Address updated!');
     }
 

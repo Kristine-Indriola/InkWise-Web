@@ -231,6 +231,8 @@
             border: 1px solid rgba(0, 0, 0, 0.04);
         }
 
+        /* icon placement for header */
+
         .chat-header {
             padding: 16px 18px;
             display: flex;
@@ -510,6 +512,12 @@
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
 
+    <!-- Icon fonts used by invitations/header -->
+    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-bold-rounded/css/uicons-bold-rounded.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
     <!-- Custom CSS -->
 
     <link rel="stylesheet" href="{{ asset('css/customer/customer.css') }}">
@@ -752,8 +760,11 @@
         <div class="flex items-center space-x-4 relative min-w-0">
             <!-- Search Form -->
             <form action="{{ url('/search') }}" method="GET" class="hidden md:flex">
-                <input type="text" name="query" placeholder="Search..." 
-                       class="border rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring focus:ring-[#06b6d4]">
+                <div class="search-with-icons" style="position:relative; display:flex; align-items:center;">
+                    <input type="text" name="query" placeholder="Search..."
+                           class="border rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring focus:ring-[#06b6d4]"
+                           style="padding-right:3.5rem;" />
+                </div>
             </form>
   
    {{-- If not logged in --}}
@@ -802,6 +813,113 @@
     @endauth
 </div>
 </header>
+<!-- Add favorites & cart icons to match customerprofile layout -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // inject icons into header right-side (only on desktop)
+    try {
+        const headerRight = document.querySelector('header .flex.items-center.space-x-4.relative.min-w-0');
+        const searchIcons = document.querySelector('.search-icons');
+        // check if icons already present anywhere
+        if (!document.querySelector('.nav-icon-button')) {
+            const fav = document.createElement('a');
+            fav.className = 'nav-icon-button';
+            fav.setAttribute('href', '#');
+            fav.setAttribute('aria-label', 'My favorites');
+            fav.setAttribute('title', 'My favorites');
+            fav.innerHTML = '<i class="fi fi-br-comment-heart" aria-hidden="true"></i>';
+
+            const cart = document.createElement('a');
+            cart.className = 'nav-icon-button';
+            cart.setAttribute('href', '#');
+            cart.setAttribute('aria-label', 'My cart');
+            cart.setAttribute('title', 'My cart');
+            cart.innerHTML = '<i class="bi bi-bag-heart-fill" aria-hidden="true"></i>';
+
+            if (headerRight) {
+                // prefer to place icons right after the search form (outside the input)
+                const searchForm = headerRight.querySelector('form[action="{{ url('/search') }}"]');
+                if (searchForm && searchForm.parentElement) {
+                    const iconsWrap = document.createElement('div');
+                    iconsWrap.className = 'hidden md:flex items-center gap-2 ml-3';
+                    iconsWrap.appendChild(fav);
+                    iconsWrap.appendChild(cart);
+                    // insert after the search form element
+                    searchForm.parentElement.insertBefore(iconsWrap, searchForm.nextSibling);
+                } else {
+                    const container = document.createElement('div');
+                    container.className = 'hidden md:flex items-center gap-2';
+                    container.appendChild(fav);
+                    container.appendChild(cart);
+                    headerRight.insertBefore(container, headerRight.firstChild);
+                }
+            }
+        }
+    } catch (e) { /* ignore */ }
+
+    // Attach behavior: check server order, create from sessionStorage if missing, then redirect to /order/summary
+    const storageKey = 'inkwise-finalstep';
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    const icons = Array.from(document.querySelectorAll('.nav-icon-button'));
+    if (!icons.length) return;
+
+    const serverHasOrder = async () => {
+        try {
+            const res = await fetch('/order/summary.json', { method: 'GET', headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
+            return res.ok;
+        } catch (e) { return false; }
+    };
+
+    const createOrderFromSummary = async (summary) => {
+        if (!summary) return false;
+        const pid = summary.productId ?? summary.product_id ?? null;
+        const quantity = Number(summary.quantity ?? 10);
+        if (!pid) return false;
+        try {
+            const res = await fetch('/order/cart/items', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {})
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ product_id: Number(pid), quantity: Number(quantity) })
+            });
+            return res.ok;
+        } catch (e) { return false; }
+    };
+
+    icons.forEach((icon) => {
+        try {
+            if (icon.getAttribute && icon.getAttribute('aria-disabled') === 'true') {
+                icon.setAttribute('data-was-aria-disabled', 'true');
+                icon.removeAttribute('aria-disabled');
+                try { icon.style.pointerEvents = 'auto'; } catch (e) {}
+                try { icon.setAttribute('tabindex', '0'); } catch (e) {}
+                try { icon.setAttribute('role', 'button'); } catch (e) {}
+                icon.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); icon.click(); } });
+            }
+        } catch (e) { /* ignore */ }
+
+        icon.addEventListener('click', async (e) => {
+            try {
+                e.preventDefault();
+                if (await serverHasOrder()) { window.location.href = '/order/summary'; return; }
+                let raw = null; try { raw = window.sessionStorage.getItem(storageKey); } catch (err) { raw = null; }
+                let summary = null; try { summary = raw ? JSON.parse(raw) : null; } catch (err) { summary = null; }
+                if (summary && (summary.productId || summary.product_id)) {
+                    const created = await createOrderFromSummary(summary);
+                    if (created) { window.location.href = '/order/summary'; return; }
+                }
+                const href = icon.getAttribute('href');
+                if (href && href !== '#') { window.location.href = href; return; }
+                window.location.href = '/order/summary';
+            } catch (err) { window.location.href = '/order/summary'; }
+        });
+    });
+});
+</script>
 
 
 <div class="py-2 px-4">

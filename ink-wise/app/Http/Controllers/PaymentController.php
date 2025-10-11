@@ -179,7 +179,8 @@ class PaymentController extends Controller
 
         $order->forceFill([
             'payment_method' => 'gcash',
-            'payment_status' => $order->payment_status === 'paid' ? 'paid' : 'processing',
+            // When GCash payment is created, mark payment status as pending unless already paid
+            'payment_status' => $order->payment_status === 'paid' ? 'paid' : 'pending',
             'metadata' => $metadata,
         ])->save();
 

@@ -71,54 +71,52 @@ class OrderFlowController extends Controller
         $shippingFee = static::DEFAULT_SHIPPING_FEE;
         $total = round($subtotal + $taxAmount + $shippingFee, 2);
 
-        $order = null;
+        // Instead of persisting an Order early in the flow, store a session-only
+        // summary payload. The actual DB Order will be created when the user
+        // advances to the final step (checkout) to avoid cluttering the orders
+        // table with draft rows.
 
-        DB::transaction(function () use (&$order, $product, $quantity, $unitPrice, $subtotal, $taxAmount, $shippingFee, $total) {
-            $this->clearExistingOrder();
+        $designMetadata = $this->orderFlow->buildDesignMetadata($product);
 
-            $customerOrder = $this->orderFlow->createCustomerOrder(Auth::user());
+        $images = $this->orderFlow->resolveProductImages($product);
 
-            $order = $customerOrder->orders()->create([
-                'customer_id' => $customerOrder->customer_id,
-                'user_id' => optional(Auth::user())->user_id,
-                'order_number' => $this->orderFlow->generateOrderNumber(),
-                'status' => 'pending',
-                'subtotal_amount' => $subtotal,
-                'tax_amount' => $taxAmount,
-                'shipping_fee' => $shippingFee,
-                'total_amount' => $total,
-                'shipping_option' => 'standard',
-                'payment_method' => null,
-                'payment_status' => 'pending',
-                'summary_snapshot' => null,
-                'metadata' => [
-                    'source' => 'design_editor',
-                    'initiated_at' => now()->toIso8601String(),
-                ],
-            ]);
+        $summary = [
+            'orderId' => null,
+            'orderNumber' => null,
+            'orderStatus' => 'draft',
+            'paymentStatus' => null,
+            'productId' => $product->id,
+            'productName' => $product->name ?? 'Custom Invitation',
+            'quantity' => $quantity,
+            'unitPrice' => $unitPrice,
+            'subtotalAmount' => $subtotal,
+            'taxAmount' => $taxAmount,
+            'shippingFee' => $shippingFee,
+            'totalAmount' => $total,
+            'previewImages' => $images['all'] ?? [],
+            'previewImage' => $images['front'] ?? null,
+            'invitationImage' => $images['front'] ?? null,
+            'paperStockId' => null,
+            'paperStockName' => null,
+            'paperStockPrice' => null,
+            'addons' => [],
+            'addonIds' => [],
+            'metadata' => [
+                'design' => $designMetadata,
+            ],
+            'placeholders' => $designMetadata['placeholders'] ?? [],
+            'extras' => [
+                'paper' => 0,
+                'addons' => 0,
+                'envelope' => 0,
+                'giveaway' => 0,
+            ],
+        ];
 
-            $designMetadata = $this->orderFlow->buildDesignMetadata($product);
-
-            $orderItem = $order->items()->create([
-                'product_id' => $product->id,
-                'product_name' => $product->name ?? 'Custom Invitation',
-                'quantity' => $quantity,
-                'unit_price' => $unitPrice,
-                'subtotal' => $subtotal,
-                'design_metadata' => $designMetadata,
-            ]);
-
-            $this->orderFlow->attachOptionalSelections($orderItem, $product);
-
-            $order->update([
-                'summary_snapshot' => $this->orderFlow->buildSummarySnapshot($order, $orderItem),
-            ]);
-        });
-
-        if ($order instanceof Order) {
-            session()->put(static::SESSION_ORDER_ID, $order->id);
-            $this->updateSessionSummary($order);
-        }
+        // Replace any existing session summary for a fresh edit flow
+        session()->put(static::SESSION_SUMMARY_KEY, $summary);
+        // Ensure we are not pointing at an existing persisted order
+        session()->forget(static::SESSION_ORDER_ID);
 
         return redirect()->route('order.review');
     }
@@ -126,8 +124,37 @@ class OrderFlowController extends Controller
     public function review(): RedirectResponse|ViewContract
     {
         $order = $this->currentOrder();
+
+        // If there's no persisted order, allow rendering the review page from a
+        // session-only summary created in the editor flow.
         if (!$order) {
-            return $this->redirectToCatalog();
+            $summary = session(static::SESSION_SUMMARY_KEY);
+            if (!$summary || empty($summary['productId'])) {
+                return $this->redirectToCatalog();
+            }
+
+            $product = $this->orderFlow->resolveProduct(null, $summary['productId']);
+            $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
+            $placeholderItems = collect($summary['placeholders'] ?? []);
+
+            $orderPlaceholder = (object) ['items' => collect()];
+
+            return view('customer.orderflow.review', [
+                'order' => $orderPlaceholder,
+                'product' => $product,
+                'proof' => null,
+                'templateRef' => optional($product)->template,
+                'finalArtworkFront' => $images['front'],
+                'finalArtworkBack' => $images['back'],
+                'finalArtwork' => [
+                    'front' => $images['front'],
+                    'back' => $images['back'],
+                ],
+                'placeholderItems' => $placeholderItems,
+                'continueHref' => route('order.finalstep'),
+                'editHref' => $product ? route('design.edit', ['product' => $product->id]) : route('design.edit'),
+                'orderSummary' => $summary,
+            ]);
         }
 
         $this->updateSessionSummary($order);
@@ -156,13 +183,70 @@ class OrderFlowController extends Controller
         ]);
     }
 
-    public function finalStep(): RedirectResponse|ViewContract
+    public function finalStep(Request $request): RedirectResponse|ViewContract
     {
         $order = $this->currentOrder();
+
+        // Session-only or product-preview path
         if (!$order) {
-            return $this->redirectToCatalog();
+            $summary = session(static::SESSION_SUMMARY_KEY);
+
+            if (!$summary || empty($summary['productId'])) {
+                // try product preview via query param
+                $productId = $request->integer('product_id');
+                if ($productId) {
+                    $product = $this->orderFlow->resolveProduct(null, $productId);
+                    $summary = [
+                        'productId' => $productId,
+                        'productName' => $product?->name ?? 'Custom Invitation',
+                        'quantity' => $this->orderFlow->defaultQuantityFor($product),
+                        'unitPrice' => $this->orderFlow->unitPriceFor($product),
+                    ];
+                } else {
+                    return $this->redirectToCatalog();
+                }
+            }
+
+            $product = $this->orderFlow->resolveProduct(null, $summary['productId']);
+
+            if ($product) {
+                $product->loadMissing([
+                    'template',
+                    'uploads',
+                    'images',
+                    'paperStocks',
+                    'addons',
+                    'bulkOrders',
+                ]);
+            }
+
+            $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
+            $selectedQuantity = $summary['quantity'] ?? null;
+            $selectedPaperStockId = $summary['paperStockId'] ?? null;
+            $selectedAddonIds = $summary['addonIds'] ?? [];
+
+            $quantityOptions = $this->orderFlow->buildQuantityOptions($product, $selectedQuantity);
+            $paperStockOptions = $this->orderFlow->buildPaperStockOptions($product, $selectedPaperStockId);
+            $addonGroups = $this->orderFlow->buildAddonGroups($product, $selectedAddonIds);
+
+            $orderPlaceholder = (object) ['items' => collect()];
+
+            return view('customer.orderflow.finalstep', [
+                'order' => $orderPlaceholder,
+                'product' => $product,
+                'proof' => null,
+                'templateRef' => optional($product)->template,
+                'finalArtworkFront' => $images['front'],
+                'finalArtworkBack' => $images['back'],
+                'quantityOptions' => $quantityOptions,
+                'paperStocks' => $paperStockOptions,
+                'addonGroups' => $addonGroups,
+                'estimatedDeliveryDate' => Carbon::now()->addWeekdays(5)->format('F j, Y'),
+                'orderSummary' => $summary,
+            ]);
         }
 
+        // Persisted order path
         $this->updateSessionSummary($order);
 
         $item = $order->items->first();
@@ -207,9 +291,58 @@ class OrderFlowController extends Controller
     {
         $order = $this->currentOrder();
         if (!$order) {
+            $summary = session(static::SESSION_SUMMARY_KEY);
+            if (!$summary || !is_array($summary) || empty($summary['productId'])) {
+                return response()->json([
+                    'message' => 'No active order found for the current session.',
+                ], 404);
+            }
+
+            DB::transaction(function () use (&$order, $summary) {
+                $customerOrder = $this->orderFlow->createCustomerOrder(Auth::user());
+                $metadata = $this->orderFlow->buildInitialOrderMetadata($summary);
+
+                $order = $customerOrder->orders()->create([
+                    'customer_id' => $customerOrder->customer_id,
+                    'user_id' => optional(Auth::user())->user_id,
+                    'order_number' => $this->orderFlow->generateOrderNumber(),
+                    'order_date' => now(),
+                    'status' => 'pending',
+                    'subtotal_amount' => $summary['subtotalAmount'] ?? 0,
+                    'tax_amount' => $summary['taxAmount'] ?? 0,
+                    'shipping_fee' => $summary['shippingFee'] ?? static::DEFAULT_SHIPPING_FEE,
+                    'total_amount' => $summary['totalAmount'] ?? 0,
+                    'shipping_option' => 'standard',
+                    'payment_method' => null,
+                    'payment_status' => 'pending',
+                    'summary_snapshot' => null,
+                    'metadata' => $metadata,
+                ]);
+
+                $order = $this->orderFlow->initializeOrderFromSummary($order, $summary);
+                $this->orderFlow->recalculateOrderTotals($order);
+                $order->refresh();
+
+                $primaryItem = $this->orderFlow->primaryInvitationItem($order);
+                if ($primaryItem instanceof OrderItem) {
+                    $order->update([
+                        'summary_snapshot' => $this->orderFlow->buildSummarySnapshot($order, $primaryItem),
+                    ]);
+                }
+
+                session()->put(static::SESSION_ORDER_ID, $order->id);
+                session()->put(static::SESSION_SUMMARY_KEY, $this->orderFlow->buildSummary($order));
+            });
+
+            $order = $this->currentOrder();
+        }
+
+        // Guard: only enforce checkout allowance when one is set in session
+        $allowedFor = session()->get('order_checkout_allowed_for');
+        if ($allowedFor && (int) $allowedFor !== (int) $order->id) {
             return response()->json([
-                'message' => 'No active order found for the current session.',
-            ], 404);
+                'message' => 'Saving final selections is only allowed from the checkout page.',
+            ], 403);
         }
 
         $payload = $request->validated();
@@ -228,19 +361,42 @@ class OrderFlowController extends Controller
 
         $this->updateSessionSummary($order);
 
+        // remove the one-time allowance to prevent other pages from reusing it
+        session()->forget('order_checkout_allowed_for');
+
+        // Return admin redirect URL so the client (GCash button) can redirect to admin order summary
+        try {
+            $adminRedirect = route('admin.ordersummary.index', ['order' => $order->order_number]);
+        } catch (\Throwable $e) {
+            $adminRedirect = url('/admin/ordersummary') . '/' . ($order->order_number ?? $order->id);
+        }
+
         return response()->json([
             'message' => 'Order selections saved.',
             'order_id' => $order->id,
             'order_number' => $order->order_number,
             'summary' => session(static::SESSION_SUMMARY_KEY),
+            'admin_redirect' => $adminRedirect,
         ]);
     }
 
     public function envelope(): RedirectResponse|ViewContract
     {
         $order = $this->currentOrder(false);
+
+        // If there's no persisted order, allow the envelope page to be
+        // rendered from a session-only summary (editor flow). This keeps the
+        // envelope step accessible even before the Order is persisted.
         if (!$order) {
-            return $this->redirectToCatalog();
+            $summary = session(static::SESSION_SUMMARY_KEY);
+            if (!$summary || empty($summary['productId'])) {
+                return $this->redirectToCatalog();
+            }
+
+            return view('customer.Envelope.Envelope', [
+                'order' => null,
+                'orderSummary' => $summary,
+            ]);
         }
 
         $this->updateSessionSummary($order);
@@ -341,9 +497,51 @@ class OrderFlowController extends Controller
     {
         $order = $this->currentOrder();
         if (!$order) {
+            // session-only flow: persist envelope selection into the session summary
+            $payload = $request->validated();
+            $summary = session(static::SESSION_SUMMARY_KEY) ?? [];
+
+            $quantity = max(1, (int) ($payload['quantity'] ?? 0));
+            $unitPrice = (float) ($payload['unit_price'] ?? 0);
+            $total = $payload['total_price'] ?? null;
+            if ($total === null) {
+                $total = $quantity * $unitPrice;
+            }
+
+            $envelopeMeta = $payload['metadata'] ?? [];
+
+            $meta = array_filter([
+                'id' => $payload['envelope_id'] ?? $envelopeMeta['id'] ?? null,
+                'product_id' => $payload['product_id'] ?? null,
+                'name' => $envelopeMeta['name'] ?? null,
+                'price' => $unitPrice,
+                'qty' => $quantity,
+                'total' => (float) $total,
+                'material' => $envelopeMeta['material'] ?? null,
+                'image' => $envelopeMeta['image'] ?? null,
+                'min_qty' => $envelopeMeta['min_qty'] ?? null,
+                'max_qty' => $envelopeMeta['max_qty'] ?? null,
+                'updated_at' => now()->toIso8601String(),
+            ], fn ($v) => $v !== null && $v !== '');
+
+            $summary['giveaway'] = $summary['giveaway'] ?? null; // keep any existing
+            $summary['envelope'] = $meta;
+            $summary['extras'] = $summary['extras'] ?? ['paper' => 0, 'addons' => 0, 'envelope' => 0, 'giveaway' => 0];
+            $summary['extras']['envelope'] = (float) $meta['total'];
+
+            // update totals
+            $summary['subtotalAmount'] = ($summary['subtotalAmount'] ?? 0);
+            $summary['taxAmount'] = round(($summary['subtotalAmount']) * static::DEFAULT_TAX_RATE, 2);
+            $summary['totalAmount'] = round(($summary['subtotalAmount'] + $summary['taxAmount'] + ($summary['shippingFee'] ?? static::DEFAULT_SHIPPING_FEE) + ($summary['extras']['envelope'] ?? 0) + ($summary['extras']['giveaway'] ?? 0)), 2);
+
+            session()->put(static::SESSION_SUMMARY_KEY, $summary);
+
             return response()->json([
-                'message' => 'No active order found for the current session.',
-            ], 404);
+                'message' => 'Envelope selection saved to session.',
+                'order_id' => null,
+                'order_number' => null,
+                'summary' => $summary,
+            ]);
         }
 
         $payload = $request->validated();
@@ -374,9 +572,18 @@ class OrderFlowController extends Controller
     {
         $order = $this->currentOrder();
         if (!$order) {
+            $summary = session(static::SESSION_SUMMARY_KEY) ?? [];
+            unset($summary['envelope']);
+            $summary['extras'] = $summary['extras'] ?? ['paper' => 0, 'addons' => 0, 'envelope' => 0, 'giveaway' => 0];
+            $summary['extras']['envelope'] = 0;
+            session()->put(static::SESSION_SUMMARY_KEY, $summary);
+
             return response()->json([
-                'message' => 'No active order found for the current session.',
-            ], 404);
+                'message' => 'Envelope selection cleared from session.',
+                'order_id' => null,
+                'order_number' => null,
+                'summary' => $summary,
+            ]);
         }
 
         $updatedOrder = $order;
@@ -406,9 +613,60 @@ class OrderFlowController extends Controller
     {
         $order = $this->currentOrder();
         if (!$order) {
+            $payload = $request->validated();
+            $summary = session(static::SESSION_SUMMARY_KEY) ?? [];
+
+            $productId = (int) ($payload['product_id'] ?? 0);
+            $product = $productId ? Product::with(['template', 'uploads', 'images', 'bulkOrders'])->find($productId) : null;
+
+            $quantity = max(1, (int) ($payload['quantity'] ?? 0));
+            $payloadUnitPrice = $payload['unit_price'] ?? null;
+            $unitPrice = $payloadUnitPrice !== null ? (float) $payloadUnitPrice : ($product ? $this->orderFlow->unitPriceFor($product) : 0);
+            $providedTotal = $payload['total_price'] ?? null;
+            $total = $providedTotal !== null ? (float) $providedTotal : round($unitPrice * $quantity, 2);
+
+            $metadata = $payload['metadata'] ?? [];
+            $resolvedImages = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
+            $normalizedImages = array_values(array_filter($metadata['images'] ?? $resolvedImages['all'] ?? [], fn ($src) => is_string($src) && trim($src) !== ''));
+
+            $meta = array_filter([
+                'id' => $metadata['id'] ?? $product?->id,
+                'product_id' => $product?->id,
+                'name' => $metadata['name'] ?? $product?->name,
+                'price' => $unitPrice,
+                'qty' => $quantity,
+                'total' => round($total, 2),
+                'image' => $metadata['image'] ?? ($normalizedImages[0] ?? $resolvedImages['front'] ?? null),
+                'images' => $normalizedImages,
+                'description' => $metadata['description'] ?? ($product?->description ? Str::limit(strip_tags($product->description), 220) : null),
+                'max_qty' => $metadata['max_qty'] ?? null,
+                'min_qty' => $metadata['min_qty'] ?? null,
+                'updated_at' => now()->toIso8601String(),
+            ], function ($value, $key) {
+                if ($key === 'images') {
+                    return is_array($value) && !empty($value);
+                }
+
+                return $value !== null && $value !== '';
+            }, ARRAY_FILTER_USE_BOTH);
+
+            $summary['giveaway'] = $meta;
+            $summary['extras'] = $summary['extras'] ?? ['paper' => 0, 'addons' => 0, 'envelope' => 0, 'giveaway' => 0];
+            $summary['extras']['giveaway'] = (float) $meta['total'];
+
+            // update totals
+            $summary['subtotalAmount'] = ($summary['subtotalAmount'] ?? 0);
+            $summary['taxAmount'] = round(($summary['subtotalAmount']) * static::DEFAULT_TAX_RATE, 2);
+            $summary['totalAmount'] = round(($summary['subtotalAmount'] + $summary['taxAmount'] + ($summary['shippingFee'] ?? static::DEFAULT_SHIPPING_FEE) + ($summary['extras']['envelope'] ?? 0) + ($summary['extras']['giveaway'] ?? 0)), 2);
+
+            session()->put(static::SESSION_SUMMARY_KEY, $summary);
+
             return response()->json([
-                'message' => 'No active order found for the current session.',
-            ], 404);
+                'message' => 'Giveaway selection saved to session.',
+                'order_id' => null,
+                'order_number' => null,
+                'summary' => $summary,
+            ]);
         }
 
         $payload = $request->validated();
@@ -439,9 +697,18 @@ class OrderFlowController extends Controller
     {
         $order = $this->currentOrder();
         if (!$order) {
+            $summary = session(static::SESSION_SUMMARY_KEY) ?? [];
+            unset($summary['giveaway']);
+            $summary['extras'] = $summary['extras'] ?? ['paper' => 0, 'addons' => 0, 'envelope' => 0, 'giveaway' => 0];
+            $summary['extras']['giveaway'] = 0;
+            session()->put(static::SESSION_SUMMARY_KEY, $summary);
+
             return response()->json([
-                'message' => 'No active order found for the current session.',
-            ], 404);
+                'message' => 'Giveaway selection cleared from session.',
+                'order_id' => null,
+                'order_number' => null,
+                'summary' => $summary,
+            ]);
         }
 
         $updatedOrder = $order;
@@ -470,25 +737,87 @@ class OrderFlowController extends Controller
     public function summary(Request $request): RedirectResponse|ViewContract|JsonResponse
     {
         $order = $this->currentOrder();
-        if (!$order) {
-            return $this->redirectToCatalog();
+
+        // Always render the cart page. If there is a persisted order, refresh
+        // the session summary from it. Otherwise, allow the client-side
+        // sessionStorage (inkwise-finalstep) to supply the draft payload.
+
+        if ($order) {
+            $this->updateSessionSummary($order);
         }
 
-        $this->updateSessionSummary($order);
+        $summary = session(static::SESSION_SUMMARY_KEY) ?? null;
 
-        $summary = session(static::SESSION_SUMMARY_KEY);
+        // If the session summary exists but lacks option lists (quantity, paper,
+        // addons), attempt to enrich it from the product so the cart view can
+        // render selection dropdowns even when the user didn't visit finalStep.
+        if ($summary && is_array($summary)) {
+            $needsQuantity = empty($summary['quantityOptions']);
+            $needsPaper = empty($summary['paperStockOptions']);
+            $needsAddons = empty($summary['addonGroups']);
+
+            if ($needsQuantity || $needsPaper || $needsAddons) {
+                $product = $this->orderFlow->resolveProduct(null, $summary['productId'] ?? null);
+                if ($product) {
+                    $product->loadMissing([
+                        'template',
+                        'uploads',
+                        'images',
+                        'paperStocks',
+                        'addons',
+                        'bulkOrders',
+                    ]);
+                }
+
+                if ($needsQuantity) {
+                    $summary['quantityOptions'] = $this->orderFlow->buildQuantityOptions($product, $summary['quantity'] ?? null);
+                }
+                if ($needsPaper) {
+                    $summary['paperStockOptions'] = $this->orderFlow->buildPaperStockOptions($product, $summary['paperStockId'] ?? null);
+                    // Also populate simple paper stock selection fields for display
+                    $firstPaper = $product && $product->paperStocks->isNotEmpty() ? $product->paperStocks->first() : null;
+                    if ($firstPaper) {
+                        $summary['paperStockId'] = $summary['paperStockId'] ?? $firstPaper->id;
+                        $summary['paperStockName'] = $summary['paperStockName'] ?? $firstPaper->name;
+                        $summary['paperStockPrice'] = $summary['paperStockPrice'] ?? $firstPaper->price;
+                        $summary['previewSelections'] = $summary['previewSelections'] ?? [];
+                        $summary['previewSelections']['paper_stock'] = $summary['previewSelections']['paper_stock'] ?? [
+                            'id' => $summary['paperStockId'],
+                            'name' => $summary['paperStockName'],
+                            'price' => $summary['paperStockPrice'],
+                        ];
+                    }
+                }
+                if ($needsAddons) {
+                    $summary['addonGroups'] = $this->orderFlow->buildAddonGroups($product, $summary['addonIds'] ?? []);
+                    // Also provide a simplified addons array (id,name,price) for legacy consumers
+                    $summary['addons'] = $summary['addons'] ?? $product->addons->map(function ($a) {
+                        return [
+                            'id' => $a->id,
+                            'name' => $a->name ?? 'Add-on',
+                            'price' => $a->price ?? 0,
+                            'type' => $a->addon_type ?? null,
+                        ];
+                    })->values()->all();
+                }
+
+                // Persist the enriched summary so subsequent calls and the
+                // client-side script receive the option lists.
+                session()->put(static::SESSION_SUMMARY_KEY, $summary);
+            }
+        }
 
         if ($request->expectsJson()) {
             return response()->json([
-                'order_id' => $order->id,
-                'order_number' => $order->order_number,
+                'order_id' => $order?->id ?? null,
+                'order_number' => $order?->order_number ?? null,
                 'data' => $summary,
                 'updated_at' => Carbon::now()->toIso8601String(),
             ]);
         }
 
-        return view('customer.orderflow.ordersummary', [
-            'order' => $order,
+        return view('customer.orderflow.mycart', [
+            'order' => $order ?? null,
             'orderSummary' => $summary,
         ]);
     }
@@ -509,6 +838,98 @@ class OrderFlowController extends Controller
             'order_number' => $order->order_number,
             'data' => session(static::SESSION_SUMMARY_KEY),
             'updated_at' => Carbon::now()->toIso8601String(),
+        ]);
+    }
+
+    public function syncSummary(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'summary' => ['required', 'array'],
+        ]);
+
+        $incoming = $this->sanitizeSummaryPayload($data['summary']);
+        $existing = session(static::SESSION_SUMMARY_KEY) ?? [];
+
+        $base = array_merge(
+            Arr::except($existing, ['envelope', 'giveaway', 'extras', 'hasEnvelope', 'hasGiveaway']),
+            Arr::except($incoming, ['envelope', 'giveaway', 'extras'])
+        );
+
+        if (array_key_exists('extras', $incoming)) {
+            $base['extras'] = array_merge($existing['extras'] ?? [], $incoming['extras']);
+        } elseif (isset($existing['extras'])) {
+            $base['extras'] = $existing['extras'];
+        }
+
+        if (array_key_exists('envelope', $incoming)) {
+            if (!empty($incoming['envelope'])) {
+                $base['envelope'] = $incoming['envelope'];
+                $base['hasEnvelope'] = true;
+            } else {
+                unset($base['envelope']);
+                $base['hasEnvelope'] = false;
+            }
+        } elseif (isset($existing['envelope'])) {
+            $base['envelope'] = $existing['envelope'];
+            $base['hasEnvelope'] = $existing['hasEnvelope'] ?? true;
+        }
+
+        if (array_key_exists('giveaway', $incoming)) {
+            if (!empty($incoming['giveaway'])) {
+                $base['giveaway'] = $incoming['giveaway'];
+                $base['hasGiveaway'] = true;
+            } else {
+                unset($base['giveaway']);
+                $base['hasGiveaway'] = false;
+            }
+        } elseif (isset($existing['giveaway'])) {
+            $base['giveaway'] = $existing['giveaway'];
+            $base['hasGiveaway'] = $existing['hasGiveaway'] ?? true;
+        }
+
+        session()->put(static::SESSION_SUMMARY_KEY, $base);
+
+        $order = $this->currentOrder();
+        if ($order) {
+            DB::transaction(function () use (&$order, $base) {
+                $order = $this->orderFlow->initializeOrderFromSummary($order, $base);
+                $this->orderFlow->recalculateOrderTotals($order);
+                $order->refresh();
+                $this->updateSessionSummary($order);
+            });
+        }
+
+        return response()->json([
+            'message' => 'Order summary synced.',
+            'order_id' => $order?->id,
+            'order_number' => $order?->order_number,
+            'summary' => session(static::SESSION_SUMMARY_KEY),
+        ]);
+    }
+
+    /**
+     * Debug helper: return the current session order summary payload.
+     * Only allowed in local environment or when allow_debug=1 is present.
+     */
+    public function debugSessionSummary(Request $request): JsonResponse
+    {
+        $allow = config('app.env') === 'local' || $request->query('allow_debug') == '1';
+        if (!$allow) {
+            return response()->json(['message' => 'Debug endpoint not available.'], 403);
+        }
+
+        $summary = session(static::SESSION_SUMMARY_KEY) ?? null;
+        $preview = null;
+        try {
+            $raw = session()->get('inkwise-preview-selections');
+            $preview = $raw;
+        } catch (\Throwable $e) {
+            $preview = null;
+        }
+
+        return response()->json([
+            'summary' => $summary,
+            'preview_store' => $preview,
         ]);
     }
 
@@ -539,13 +960,67 @@ class OrderFlowController extends Controller
     public function checkout(): RedirectResponse|ViewContract
     {
         $order = $this->currentOrder();
+
+        // If there is no persisted Order yet, but we have a session summary,
+        // persist the Order now because Checkout is the place where we commit
+        // the user's selections to the database.
         if (!$order) {
-            return $this->redirectToCatalog();
+            $summary = session(static::SESSION_SUMMARY_KEY);
+            if (!$summary || empty($summary['productId'])) {
+                return $this->redirectToCatalog();
+            }
+
+            DB::transaction(function () use (&$order, $summary) {
+                $this->clearExistingOrder();
+
+                $customerOrder = $this->orderFlow->createCustomerOrder(Auth::user());
+
+                $metadata = $this->orderFlow->buildInitialOrderMetadata($summary);
+
+                $order = $customerOrder->orders()->create([
+                    'customer_id' => $customerOrder->customer_id,
+                    'user_id' => optional(Auth::user())->user_id,
+                    'order_number' => $this->orderFlow->generateOrderNumber(),
+                    'status' => 'pending',
+                    'subtotal_amount' => $summary['subtotalAmount'] ?? 0,
+                    'tax_amount' => $summary['taxAmount'] ?? 0,
+                    'shipping_fee' => $summary['shippingFee'] ?? static::DEFAULT_SHIPPING_FEE,
+                    'total_amount' => $summary['totalAmount'] ?? 0,
+                    'shipping_option' => 'standard',
+                    'payment_method' => null,
+                    'payment_status' => 'pending',
+                    'summary_snapshot' => null,
+                    'metadata' => $metadata,
+                ]);
+
+                $order = $this->orderFlow->initializeOrderFromSummary($order, $summary);
+
+                $this->orderFlow->recalculateOrderTotals($order);
+
+                $order = $order->refresh(['items.product', 'items.addons', 'items.paperStockSelection']);
+
+                $primaryItem = $this->orderFlow->primaryInvitationItem($order);
+                if ($primaryItem instanceof OrderItem) {
+                    $order->update([
+                        'summary_snapshot' => $this->orderFlow->buildSummarySnapshot($order, $primaryItem),
+                    ]);
+                }
+
+                session()->put(static::SESSION_ORDER_ID, $order->id);
+            });
+
+            // reload order
+            $order = $this->currentOrder();
         }
+
+        // Mark that the current session is allowed to submit final-step for this order
+        session()->put('order_checkout_allowed_for', $order->id);
 
         if ($order->payment_method !== 'gcash') {
             $order->update([
                 'payment_method' => 'gcash',
+                // mark pending when GCash is chosen unless already paid
+                'payment_status' => $order->payment_status === 'paid' ? 'paid' : 'pending',
             ]);
         }
 
@@ -618,6 +1093,7 @@ class OrderFlowController extends Controller
 
         $order->update([
             'status' => 'cancelled',
+            
             'payment_status' => 'cancelled',
             'metadata' => $metadata,
         ]);
@@ -630,12 +1106,22 @@ class OrderFlowController extends Controller
     public function giveaways(Request $request)
     {
         $order = $this->currentOrder();
-        if (!$order) {
-            return $this->redirectToCatalog();
-        }
 
-        $this->updateSessionSummary($order);
-        $orderSummary = session(static::SESSION_SUMMARY_KEY);
+        // Support session-only flow: if there's no persisted order, allow the
+        // giveaways page to be rendered from the session summary created in
+        // the editor flow. Otherwise, redirect the user to the catalog.
+        if (!$order) {
+            $summary = session(static::SESSION_SUMMARY_KEY);
+            if (!$summary || empty($summary['productId'])) {
+                return $this->redirectToCatalog();
+            }
+
+            // Render giveaways view using session summary
+            $orderSummary = $summary;
+        } else {
+            $this->updateSessionSummary($order);
+            $orderSummary = session(static::SESSION_SUMMARY_KEY);
+        }
 
         $selectedEvent = $request->query('event');
         $search = $request->query('q');
@@ -677,6 +1163,198 @@ class OrderFlowController extends Controller
             'order' => $order,
             'orderSummary' => $orderSummary,
         ]);
+    }
+
+    private function sanitizeSummaryPayload(array $payload): array
+    {
+        $summary = Arr::only($payload, [
+            'orderId',
+            'orderNumber',
+            'orderStatus',
+            'paymentStatus',
+            'productId',
+            'productName',
+            'quantity',
+            'unitPrice',
+            'subtotalAmount',
+            'taxAmount',
+            'shippingFee',
+            'totalAmount',
+            'previewImages',
+            'previewImage',
+            'invitationImage',
+            'paperStockId',
+            'paperStockName',
+            'paperStockPrice',
+            'addons',
+            'addonIds',
+            'metadata',
+            'extras',
+            'envelope',
+            'giveaway',
+            'placeholders',
+            'previewSelections',
+        ]);
+
+        if (isset($summary['quantity'])) {
+            $summary['quantity'] = max(0, (int) $summary['quantity']);
+        }
+
+        foreach (['unitPrice', 'subtotalAmount', 'taxAmount', 'shippingFee', 'totalAmount', 'paperStockPrice'] as $field) {
+            if (isset($summary[$field]) && $summary[$field] !== null && $summary[$field] !== '') {
+                $summary[$field] = (float) $summary[$field];
+            }
+        }
+
+        if (isset($summary['addonIds']) && is_array($summary['addonIds'])) {
+            $summary['addonIds'] = array_values(array_filter(array_map(function ($id) {
+                if (is_int($id)) {
+                    return $id;
+                }
+
+                if (is_string($id) && is_numeric($id)) {
+                    return (int) $id;
+                }
+
+                if (is_float($id) || is_numeric($id)) {
+                    return (int) $id;
+                }
+
+                return null;
+            }, $summary['addonIds'])));
+        }
+
+        if (isset($summary['addons']) && is_array($summary['addons'])) {
+            $summary['addons'] = array_values(array_filter(array_map(function ($addon) {
+                if (!is_array($addon)) {
+                    return null;
+                }
+
+                if (isset($addon['id']) && is_numeric($addon['id'])) {
+                    $addon['id'] = (int) $addon['id'];
+                }
+
+                if (isset($addon['price']) && $addon['price'] !== null && $addon['price'] !== '') {
+                    $addon['price'] = (float) $addon['price'];
+                }
+
+                return $addon;
+            }, $summary['addons'])));
+        } else {
+            unset($summary['addons']);
+        }
+
+        if (isset($summary['metadata']) && !is_array($summary['metadata'])) {
+            unset($summary['metadata']);
+        }
+
+        if (isset($summary['previewImages']) && !is_array($summary['previewImages'])) {
+            unset($summary['previewImages']);
+        }
+
+        if (isset($summary['placeholders']) && !is_array($summary['placeholders'])) {
+            unset($summary['placeholders']);
+        }
+
+        if (isset($summary['previewSelections']) && !is_array($summary['previewSelections'])) {
+            unset($summary['previewSelections']);
+        }
+
+        if (array_key_exists('extras', $summary)) {
+            $summary['extras'] = $this->sanitizeExtras($summary['extras']);
+        }
+
+        $envelope = Arr::get($summary, 'envelope');
+        if (is_array($envelope)) {
+            $summary['envelope'] = $this->sanitizeLineSummary($envelope);
+        } else {
+            unset($summary['envelope']);
+        }
+
+        $giveaway = Arr::get($summary, 'giveaway');
+        if (is_array($giveaway)) {
+            $summary['giveaway'] = $this->sanitizeLineSummary($giveaway);
+        } else {
+            unset($summary['giveaway']);
+        }
+
+        return $summary;
+    }
+
+    private function sanitizeExtras($extras): array
+    {
+        if (!is_array($extras)) {
+            return [
+                'paper' => 0.0,
+                'addons' => 0.0,
+                'envelope' => 0.0,
+                'giveaway' => 0.0,
+            ];
+        }
+
+        $normalized = [
+            'paper' => (float) ($extras['paper'] ?? 0),
+            'addons' => (float) ($extras['addons'] ?? 0),
+            'envelope' => (float) ($extras['envelope'] ?? 0),
+            'giveaway' => (float) ($extras['giveaway'] ?? 0),
+        ];
+
+        if (isset($extras['ink']) && is_array($extras['ink'])) {
+            $ink = $extras['ink'];
+            if (isset($ink['usage_per_invite_ml'])) {
+                $ink['usage_per_invite_ml'] = (float) $ink['usage_per_invite_ml'];
+            }
+            if (isset($ink['unit_price_per_ml'])) {
+                $ink['unit_price_per_ml'] = (float) $ink['unit_price_per_ml'];
+            }
+            if (isset($ink['total'])) {
+                $ink['total'] = (float) $ink['total'];
+            }
+            $normalized['ink'] = $ink;
+        }
+
+        return $normalized;
+    }
+
+    private function sanitizeLineSummary(array $meta): array
+    {
+        $line = $meta;
+
+        if (isset($line['qty'])) {
+            $qty = (int) $line['qty'];
+            $line['qty'] = $qty > 0 ? $qty : 0;
+        }
+
+        if (isset($line['quantity'])) {
+            $qty = (int) $line['quantity'];
+            $line['quantity'] = $qty > 0 ? $qty : 0;
+        }
+
+        foreach (['price', 'unit_price', 'unitPrice', 'total', 'total_price'] as $key) {
+            if (isset($line[$key]) && $line[$key] !== null && $line[$key] !== '') {
+                $line[$key] = (float) $line[$key];
+            }
+        }
+
+        if (isset($line['addons']) && is_array($line['addons'])) {
+            $line['addons'] = array_values(array_filter(array_map(function ($addon) {
+                if (!is_array($addon)) {
+                    return null;
+                }
+
+                if (isset($addon['id']) && is_numeric($addon['id'])) {
+                    $addon['id'] = (int) $addon['id'];
+                }
+
+                if (isset($addon['price']) && $addon['price'] !== null && $addon['price'] !== '') {
+                    $addon['price'] = (float) $addon['price'];
+                }
+
+                return $addon;
+            }, $line['addons'])));
+        }
+
+        return array_filter($line, static fn ($value) => $value !== null && $value !== '');
     }
 
     private function currentOrder(bool $withRelations = true): ?Order
