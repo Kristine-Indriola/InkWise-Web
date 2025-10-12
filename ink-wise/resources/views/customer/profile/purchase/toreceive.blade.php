@@ -13,7 +13,59 @@
     <a href="{{ route('customer.my_purchase.cancelled') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Cancelled</a>
     <a href="{{ route('customer.my_purchase.return_refund') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Return/Refund</a>
     </div>
-    <p class="text-gray-600">No items to receive yet.</p>
+    @php
+        if (!empty($orders) && is_iterable($orders)) {
+            $ordersList = $orders;
+        } else {
+            $ordersList = [
+                (object)[
+                    'id' => 2001,
+                    'product_id' => 601,
+                    'product_name' => 'Classic RSVP Invitation',
+                    'quantity' => 50,
+                    'image' => asset('customerimages/image/invitation.png'),
+                    'total_amount' => 1200.00,
+                    'tracking_number' => 'TRK-20251012-01',
+                    'carrier' => 'Inkwise Logistics',
+                    'status' => 'Out for delivery',
+                    'expected_date' => now()->addDays(1)->format('M d, Y'),
+                ],
+                (object)[
+                    'id' => 2002,
+                    'product_id' => 602,
+                    'product_name' => 'Corporate Giveaway Set',
+                    'quantity' => 30,
+                    'image' => asset('customerimages/image/giveaway.png'),
+                    'total_amount' => 1750.00,
+                    'tracking_number' => 'TRK-20251012-02',
+                    'carrier' => 'Local Courier',
+                    'status' => 'In transit',
+                    'expected_date' => now()->addDays(2)->format('M d, Y'),
+                ],
+            ];
+        }
+    @endphp
+
+    <div class="space-y-4">
+        @foreach($ordersList as $order)
+            <div class="bg-white border rounded-xl p-4 shadow-sm flex items-center gap-4">
+                <img src="{{ $order->image ?? asset('images/placeholder.png') }}" alt="{{ $order->product_name }}" class="w-24 h-24 object-cover rounded-lg">
+                <div class="flex-1">
+                    <div class="font-semibold text-lg">{{ $order->product_name }}</div>
+                    <div class="text-sm text-gray-500">Qty: {{ $order->quantity }} pcs</div>
+                    <div class="text-sm text-gray-500 mt-2">Tracking: <span class="font-medium">{{ $order->tracking_number }}</span> — {{ $order->carrier }}</div>
+                    <div class="text-sm text-gray-500">Status: <span class="text-[#a6b7ff] font-semibold">{{ $order->status }}</span></div>
+                    <div class="text-sm text-gray-500">Expected: {{ $order->expected_date }}</div>
+                </div>
+                <div class="flex flex-col gap-2">
+                    <form method="POST" action="#" onsubmit="return false;">
+                        <button type="button" class="bg-[#a6b7ff] text-white px-4 py-2 rounded font-semibold js-confirm-received" data-order-id="{{ $order->id }}">Confirm Received</button>
+                    </form>
+                    <div class="text-gray-600 text-sm">₱{{ number_format($order->total_amount,2) }}</div>
+                </div>
+            </div>
+        @endforeach
+    </div>
 
 <script>
 // Normalize nav hover/active behavior (copied from Topay)
@@ -99,3 +151,20 @@
 </script>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const buttons = Array.from(document.querySelectorAll('.js-confirm-received'));
+    buttons.forEach(btn => {
+        btn.addEventListener('click', function () {
+            const id = btn.dataset.orderId;
+            if (!confirm('Mark order #' + id + ' as received?')) return;
+            const card = btn.closest('.bg-white.border.rounded-xl');
+            if (card) card.remove();
+            // TODO: call server endpoint to confirm receipt and update order status
+        });
+    });
+});
+</script>
+@endpush

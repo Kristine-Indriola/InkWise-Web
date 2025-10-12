@@ -14,7 +14,38 @@
         <a href="{{ route('customer.my_purchase.return_refund') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Return/Refund</a>
     </div>
 
-    <p class="text-gray-600">No cancelled orders.</p>
+    @php
+        if (!empty($orders) && is_iterable($orders)) {
+            $ordersList = $orders;
+        } else {
+            $ordersList = [
+                (object)[
+                    'id' => 4001,
+                    'product_name' => 'Cancelled Invitation Order',
+                    'quantity' => 80,
+                    'image' => asset('customerimages/image/invitation.png'),
+                    'total_amount' => 1600.00,
+                    'cancelled_date' => now()->subDays(3)->format('M d, Y'),
+                    'reason' => 'Customer requested cancellation'
+                ],
+            ];
+        }
+    @endphp
+
+    <div class="space-y-4">
+        @foreach($ordersList as $order)
+            <div class="bg-white border rounded-xl p-4 shadow-sm flex items-center gap-4">
+                <img src="{{ $order->image ?? asset('images/placeholder.png') }}" alt="{{ $order->product_name }}" class="w-24 h-24 object-cover rounded-lg">
+                <div class="flex-1">
+                    <div class="font-semibold text-lg">{{ $order->product_name }}</div>
+                    <div class="text-sm text-gray-500">Qty: {{ $order->quantity }} pcs</div>
+                    <div class="text-sm text-gray-500">Cancelled: <span class="font-medium">{{ $order->cancelled_date }}</span></div>
+                    <div class="text-sm text-gray-500">Reason: {{ $order->reason }}</div>
+                </div>
+                <div class="text-gray-700 font-bold">₱{{ number_format($order->total_amount,2) }}</div>
+            </div>
+        @endforeach
+    </div>
 </div>
 
 <script>

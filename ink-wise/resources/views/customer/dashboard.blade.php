@@ -795,14 +795,14 @@
                class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] transition-colors">
                 My Account
             </a>
-            <!-- My Purchase (no link) -->
-            <div class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] cursor-pointer transition-colors">
+            <!-- My Purchase (link to my_purchase) -->
+            <a href="{{ route('customer.my_purchase') }}" class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] transition-colors">
                 My Purchase
-            </div>
-            <!-- My Favorites (no link) -->
-            <div class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] cursor-pointer transition-colors">
+            </a>
+            <!-- My Favorites (link to favorites) -->
+            <a href="{{ route('customer.favorites') }}" class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] transition-colors">
                 My Favorites
-            </div>
+            </a>
             <!-- Logout -->
             <form method="POST" action="{{ route('customer.logout') }}">
     @csrf
@@ -824,7 +824,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!document.querySelector('.nav-icon-button')) {
             const fav = document.createElement('a');
             fav.className = 'nav-icon-button';
-            fav.setAttribute('href', '#');
+            fav.setAttribute('href', '{{ route('customer.favorites') }}');
             fav.setAttribute('aria-label', 'My favorites');
             fav.setAttribute('title', 'My favorites');
             fav.innerHTML = '<i class="fi fi-br-comment-heart" aria-hidden="true"></i>';

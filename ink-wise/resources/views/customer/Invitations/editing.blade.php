@@ -15,6 +15,78 @@
     $frontPreview = $frontImage ?? asset('images/placeholder.png');
     $backPreview = $backImage ?? $frontPreview;
     $presetQuantity = $defaultQuantity ?? 50;
+    $frontSvg = $frontSvg ?? null;
+    $backSvg = $backSvg ?? null;
+
+    $textFieldPresets = [
+        [
+            'node' => 'front-date',
+            'value' => '06.28.26',
+            'side' => 'front',
+            'top' => 18,
+            'left' => 50,
+            'align' => 'center',
+            'font_size' => 28,
+        ],
+        [
+            'node' => 'front-save',
+            'value' => 'SAVE',
+            'side' => 'front',
+            'top' => 28,
+            'left' => 50,
+            'align' => 'center',
+            'font_size' => 32,
+            'letter_spacing' => 0.35,
+        ],
+        [
+            'node' => 'front-dateword',
+            'value' => 'DATE',
+            'side' => 'front',
+            'top' => 36,
+            'left' => 50,
+            'align' => 'center',
+            'font_size' => 16,
+            'letter_spacing' => 0.5,
+        ],
+        [
+            'node' => 'front-names',
+            'value' => 'KENDRA AND ANDREW',
+            'side' => 'front',
+            'top' => 48,
+            'left' => 50,
+            'align' => 'center',
+            'font_size' => 22,
+        ],
+        [
+            'node' => 'front-location',
+            'value' => 'BROOKLYN, NY',
+            'side' => 'front',
+            'top' => 58,
+            'left' => 50,
+            'align' => 'center',
+            'font_size' => 16,
+            'letter_spacing' => 0.1,
+        ],
+        [
+            'node' => 'back-heading',
+            'value' => 'RECEPTION DETAILS',
+            'side' => 'back',
+            'top' => 26,
+            'left' => 50,
+            'align' => 'center',
+            'font_size' => 26,
+        ],
+        [
+            'node' => 'back-body',
+            'value' => "Join us for dinner at seven o'clock in the evening.\nThe Foundry, Long Island City.",
+            'side' => 'back',
+            'top' => 43,
+            'left' => 50,
+            'align' => 'center',
+            'font_size' => 16,
+            'letter_spacing' => 0.05,
+        ],
+    ];
 @endphp
 
     <!-- TOP BAR -->
@@ -53,8 +125,89 @@
             <div class="canvas">
                 <div class="safety-area">Safety Area</div>
                 <div class="bleed-line">Bleed</div>
-                <img id="cardFront" src="{{ $frontPreview }}" class="card active" alt="Front design preview">
-                <img id="cardBack" src="{{ $backPreview }}" class="card" alt="Back design preview">
+                <div id="cardFront" class="card active" data-card="front" role="img" aria-label="Front design preview">
+                    @if(!empty($frontSvg))
+                        {!! $frontSvg !!}
+                    @else
+                        <svg viewBox="0 0 500 700" xmlns="http://www.w3.org/2000/svg" aria-labelledby="frontTitle">
+                            <title id="frontTitle">Editable front invitation preview</title>
+                            <defs>
+                                <linearGradient id="frontGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" stop-color="#f6f7ff"/>
+                                    <stop offset="100%" stop-color="#dde4ff"/>
+                                </linearGradient>
+                            </defs>
+                            <rect x="0" y="0" width="500" height="700" fill="url(#frontGradient)" rx="24"/>
+                            <text data-text-node="front-date"
+                                  x="250"
+                                  y="126"
+                                  text-anchor="middle"
+                                  dominant-baseline="middle"
+                                  font-size="28"
+                                  fill="#1f2933">06.28.26</text>
+                            <text data-text-node="front-save"
+                                  x="250"
+                                  y="196"
+                                  text-anchor="middle"
+                                  dominant-baseline="middle"
+                                  font-size="32"
+                        letter-spacing="0.35"
+                                  fill="#1f2933">SAVE</text>
+                            <text data-text-node="front-dateword"
+                                  x="250"
+                                  y="252"
+                                  text-anchor="middle"
+                                  dominant-baseline="middle"
+                                  font-size="16"
+                        letter-spacing="0.5"
+                                  fill="#4b5563">DATE</text>
+                            <text data-text-node="front-names"
+                                  x="250"
+                                  y="336"
+                                  text-anchor="middle"
+                                  dominant-baseline="middle"
+                                  font-size="22"
+                                  fill="#1f2933">KENDRA AND ANDREW</text>
+                            <text data-text-node="front-location"
+                                  x="250"
+                                  y="406"
+                                  text-anchor="middle"
+                                  dominant-baseline="middle"
+                                  font-size="16"
+                        letter-spacing="0.1"
+                                  fill="#4b5563">BROOKLYN, NY</text>
+                        </svg>
+                    @endif
+                </div>
+                <div id="cardBack" class="card" data-card="back" role="img" aria-label="Back design preview">
+                    @if(!empty($backSvg))
+                        {!! $backSvg !!}
+                    @else
+                        <svg viewBox="0 0 500 700" xmlns="http://www.w3.org/2000/svg" aria-labelledby="backTitle">
+                            <title id="backTitle">Editable back invitation preview</title>
+                            <rect x="0" y="0" width="500" height="700" fill="#fdfcfa" rx="24"/>
+                            <rect x="60" y="80" width="380" height="540" fill="#ffffff" stroke="#d1d9ff" stroke-width="2" rx="18"/>
+                            <text data-text-node="back-heading"
+                                  x="250"
+                                  y="180"
+                                  text-anchor="middle"
+                                  dominant-baseline="middle"
+                                  font-size="26"
+                                  fill="#1f2933">RECEPTION DETAILS</text>
+                            <text data-text-node="back-body"
+                                  x="250"
+                                  y="300"
+                                  text-anchor="middle"
+                                  dominant-baseline="middle"
+                                  font-size="16"
+                                                                    letter-spacing="0.05"
+                                                                    fill="#4b5563">
+                                                                <tspan x="250" y="300">Join us for dinner at seven o'clock in the evening.</tspan>
+                                                                <tspan x="250" y="332">The Foundry, Long Island City.</tspan>
+                                                        </text>
+                        </svg>
+                    @endif
+                </div>
             </div>
             <div class="zoom-controls">
                 <button id="zoomOut" type="button">-</button>
@@ -79,26 +232,28 @@
             <div class="text-editor">
                 <h3>Placeholder text</h3>
                 <div id="textFields">
-                    <div class="text-field">
-                        <input type="text" value="06.28.26">
-                        <button class="delete-text" type="button">🗑</button>
-                    </div>
-                    <div class="text-field">
-                        <input type="text" value="SAVE">
-                        <button class="delete-text" type="button">🗑</button>
-                    </div>
-                    <div class="text-field">
-                        <input type="text" value="DATE">
-                        <button class="delete-text" type="button">🗑</button>
-                    </div>
-                    <div class="text-field">
-                        <input type="text" value="KENDRA AND ANDREW">
-                        <button class="delete-text" type="button">🗑</button>
-                    </div>
-                    <div class="text-field">
-                        <input type="text" value="BROOKLYN, NY">
-                        <button class="delete-text" type="button">🗑</button>
-                    </div>
+                    @foreach($textFieldPresets as $field)
+                        @php
+                            $inputValue = old('text_fields.' . $field['node'], $field['value']);
+                        @endphp
+                        <div class="text-field" data-card-side="{{ $field['side'] }}" data-text-node="{{ $field['node'] }}">
+                            <input
+                                type="text"
+                                name="text_fields[{{ $field['node'] }}]"
+                                value="{{ $inputValue }}"
+                                placeholder="{{ $field['value'] }}"
+                                data-default-value="{{ $field['value'] }}"
+                                data-card-side="{{ $field['side'] }}"
+                                data-text-node="{{ $field['node'] }}"
+                                data-top-percent="{{ $field['top'] }}"
+                                data-left-percent="{{ $field['left'] }}"
+                                data-align="{{ $field['align'] }}"
+                                @if(!empty($field['font_size'])) data-font-size="{{ $field['font_size'] }}" @endif
+                                @if(!empty($field['letter_spacing'])) data-letter-spacing="{{ $field['letter_spacing'] }}" @endif
+                            >
+                            <button class="delete-text" type="button" aria-label="Remove text field">🗑</button>
+                        </div>
+                    @endforeach
                 </div>
                 <button id="addTextField" class="add-btn" type="button">+ New Text Field</button>
             </div>

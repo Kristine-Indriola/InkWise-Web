@@ -87,9 +87,9 @@
                                     Order Total: <span class="text-[#a6b7ff] font-bold text-lg">₱{{ number_format($totalAmount, 2) }}</span>
                                 </div>
                                 <div class="flex gap-2">
-                                    <button class="bg-[#a6b7ff] hover:bg-[#bce6ff] text-white px-6 py-2 rounded font-semibold">Order Again</button>
-                                    <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white">Contact Shop</button>
-                                    <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white">View Shop Rating</button>
+                                    <button class="bg-[#a6b7ff] hover:bg-[#bce6ff] text-white px-6 py-2 rounded font-semibold transition-colors duration-150">Order Again</button>
+                                    <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white hover:bg-[#bce6ff] hover:text-white transition-colors duration-150">Contact Shop</button>
+                                    <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white hover:bg-[#bce6ff] hover:text-white transition-colors duration-150">View Shop Rating</button>
                                 </div>
                             </div>
                         </div>
@@ -127,9 +127,9 @@
                                 Order Total: <span class="text-[#a6b7ff] font-bold text-lg">₱2,500</span>
                             </div>
                             <div class="flex gap-2">
-                                <button class="bg-[#a6b7ff] hover:bg-[#bce6ff] text-white px-6 py-2 rounded font-semibold">Order Again</button>
-                                <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white">Contact Shop</button>
-                                <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white">View Shop Rating</button>
+                                <button class="bg-[#a6b7ff] hover:bg-[#bce6ff] text-white px-6 py-2 rounded font-semibold transition-colors duration-150">Order Again</button>
+                                <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white hover:bg-[#bce6ff] hover:text-white transition-colors duration-150">Contact Shop</button>
+                                <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white hover:bg-[#bce6ff] hover:text-white transition-colors duration-150">View Shop Rating</button>
                             </div>
                         </div>
                     </div>

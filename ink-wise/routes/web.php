@@ -377,6 +377,9 @@ Route::get('/order', fn () => view('customer.profile.orderform'))->name('custome
 
 Route::middleware('auth')->get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');  // Protected
 
+// Customer Favorites (render favorites page)
+Route::get('/customer/favorites', fn () => view('customer.profile.favorite'))->name('customer.favorites');
+
 
 // My Purchases
 Route::get('/customer/my-orders', fn () => view('customer.profile.my_purchase'))->name('customer.my_purchase');
