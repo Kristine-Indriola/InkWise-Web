@@ -73,17 +73,25 @@
 
                 <!-- Step 3 -->
                 <div class="register-step hidden" data-step="3">
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Email</label>
-                        <div class="mt-1 flex gap-2">
-                            <input type="email" name="email" required
-                                   class="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition">
-                            <button type="button"
-                                    class="px-3 py-2 text-xs font-semibold text-white bg-indigo-500 hover:bg-indigo-600 rounded-lg shadow-sm transition"
-                                    id="sendEmailVerificationCode">
-                                Send Code
-                            </button>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Email</label>
+                            <div class="mt-1 flex gap-2">
+                                <input type="email" name="email" id="registerEmail" required
+                                       class="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition">
+                                <button type="button"
+                                        class="px-3 py-2 text-xs font-semibold text-white bg-indigo-500 hover:bg-indigo-600 rounded-lg shadow-sm transition"
+                                        id="sendVerificationCode">
+                                    Send Code
+                                </button>
+                            </div>
                         </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Verification Code</label>
+                            <input type="text" name="verification_code" id="verificationCode" value="{{ old('verification_code') }}" required maxlength="6"
+                                   class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition uppercase tracking-widest">
+                        </div>
+                        <p id="verificationStatus" class="text-xs text-gray-500"></p>
                     </div>
                     <div class="flex items-center justify-between mt-6">
                         <button type="button" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700" data-prev-step>Back</button>
@@ -188,5 +196,63 @@
         });
 
         goToStep(activeIndex);
+
+        // Email verification code sending
+        const sendButton = document.getElementById('sendVerificationCode');
+        const emailInput = document.getElementById('registerEmail');
+        const statusElement = document.getElementById('verificationStatus');
+        let cooldownTime = 60;
+        let cooldownInterval;
+
+        function startCooldown() {
+            sendButton.disabled = true;
+            sendButton.textContent = `Resend in ${cooldownTime}s`;
+            cooldownInterval = setInterval(() => {
+                cooldownTime--;
+                sendButton.textContent = `Resend in ${cooldownTime}s`;
+                if (cooldownTime <= 0) {
+                    clearInterval(cooldownInterval);
+                    sendButton.disabled = false;
+                    sendButton.textContent = 'Send Code';
+                    cooldownTime = 60;
+                }
+            }, 1000);
+        }
+
+        function setStatus(message, type) {
+            statusElement.textContent = message;
+            statusElement.className = `text-xs ${type === 'error' ? 'text-red-500' : 'text-green-500'}`;
+        }
+
+        sendButton.addEventListener('click', async () => {
+            const email = emailInput.value.trim();
+            if (!email) {
+                setStatus('Please enter your email address.', 'error');
+                return;
+            }
+            sendButton.disabled = true;
+            sendButton.textContent = 'Sending...';
+            try {
+                const response = await fetch('/customer/register/send-code', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: JSON.stringify({ email })
+                });
+                const body = await response.json();
+                if (!response.ok) {
+                    const message = body?.errors?.email?.[0] ?? body?.message ?? 'Unable to send verification code.';
+                    throw new Error(message);
+                }
+                setStatus(body.message ?? 'Verification code sent! Check your inbox.', 'success');
+                startCooldown();
+            } catch (error) {
+                sendButton.disabled = false;
+                sendButton.textContent = 'Send Code';
+                setStatus(error.message, 'error');
+            }
+        });
     });
 </script>
