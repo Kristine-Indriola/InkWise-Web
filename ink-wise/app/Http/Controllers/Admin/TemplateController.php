@@ -33,8 +33,8 @@ class TemplateController extends Controller
             'product_type' => 'nullable|string|max:255',
             'theme_style' => 'nullable|string|max:255',
             'description' => 'nullable|string',
-            'front_image' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:5120',
-            'back_image' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:5120',
+            'front_image' => 'required|file|mimes:jpeg,png,jpg,gif,svg|max:5120',
+            'back_image' => 'required|file|mimes:jpeg,png,jpg,gif,svg|max:5120',
         ]);
 
         // Handle front image upload
@@ -49,7 +49,15 @@ class TemplateController extends Controller
             $validated['back_image'] = $backImagePath;
         }
 
-        \App\Models\Template::create($validated);
+        $template = \App\Models\Template::create($validated);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'template_id' => $template->id,
+                'redirect' => route('admin.templates.index'),
+            ]);
+        }
 
         return redirect()->route('admin.templates.index')->with('success', 'Template created successfully!');
     }
@@ -123,8 +131,8 @@ public function uploadPreview(Request $request, $id)
     public function customUpload(Request $request)
     {
         $validated = $request->validate([
-            'front_image' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:10240',
-            'back_image' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:10240',
+            'front_image' => 'required|file|mimes:jpeg,png,jpg,gif,svg|max:10240',
+            'back_image' => 'required|file|mimes:jpeg,png,jpg,gif,svg|max:10240',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
         ]);

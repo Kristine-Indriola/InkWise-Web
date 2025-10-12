@@ -17,108 +17,119 @@
         </div>
 
         <!-- Register Form -->
-        <form method="POST" action="{{ route('customer.register') }}" class="space-y-3" id="customerRegisterForm">
+        <form method="POST" action="{{ route('customer.register') }}" id="customerRegisterForm" class="space-y-6">
             @csrf
 
-            @if ($errors->any())
-                <div class="bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg p-2">
-                    <ul class="list-disc ml-4 space-y-1">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
+            <div id="registerSteps" class="space-y-6">
+                <!-- Step 1 -->
+                <div class="register-step" data-step="1">
+                    <div class="flex gap-3">
+                        <div class="flex-1">
+                            <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">First Name</label>
+                            <input type="text" name="first_name" required
+                                   class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Middle Name</label>
+                            <input type="text" name="middle_name"
+                                   class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Last Name</label>
+                            <input type="text" name="last_name" required
+                                   class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition">
+                        </div>
+                    </div>
+                    <div class="mt-4">
+               <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Birthdate</label>
+               <input type="date" name="birthdate" value="{{ old('birthdate') }}" required
+                   class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition">
+                    </div>
+                    <div class="flex items-center justify-end mt-6">
+                        <button type="button" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700" data-next-step>Next</button>
+                    </div>
+                    <p class="text-center text-xs text-gray-600 mt-4">
+                        Already have an account?
+                        <a href="#" id="openLoginFromRegister" class="text-indigo-600 font-medium hover:underline">Sign In</a>
+                    </p>
                 </div>
-            @endif
 
-            <!-- Names Row -->
-            <div class="flex gap-2">
-                <div class="flex-1">
-                    <label class="block text-xs font-medium text-gray-700">First Name</label>
-                    <input type="text" name="first_name" value="{{ old('first_name') }}" required
-                           class="mt-1 w-full px-2 py-1.5 border rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-xs">
+                <!-- Step 2 -->
+                <div class="register-step hidden" data-step="2">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Contact Number</label>
+                        <input type="text" name="contact_number"
+                               class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition">
+                    </div>
+                    <div class="flex items-center justify-between mt-6">
+                        <button type="button" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700" data-prev-step>Back</button>
+                        <button type="button" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700" data-next-step>Next</button>
+                    </div>
+                    <p class="text-center text-xs text-gray-600 mt-4">
+                        Already have an account?
+                        <a href="#" class="text-indigo-600 font-medium hover:underline" data-open-login>Sign In</a>
+                    </p>
                 </div>
-                <div class="flex-1">
-                    <label class="block text-xs font-medium text-gray-700">Middle Name</label>
-                    <input type="text" name="middle_name" value="{{ old('middle_name') }}"
-                           class="mt-1 w-full px-2 py-1.5 border rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-xs">
+
+                <!-- Step 3 -->
+                <div class="register-step hidden" data-step="3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Email</label>
+                        <div class="mt-1 flex gap-2">
+                            <input type="email" name="email" required
+                                   class="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition">
+                            <button type="button"
+                                    class="px-3 py-2 text-xs font-semibold text-white bg-indigo-500 hover:bg-indigo-600 rounded-lg shadow-sm transition"
+                                    id="sendEmailVerificationCode">
+                                Send Code
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between mt-6">
+                        <button type="button" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700" data-prev-step>Back</button>
+                        <button type="button" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700" data-next-step>Next</button>
+                    </div>
+                    <p class="text-center text-xs text-gray-600 mt-4">
+                        Already have an account?
+                        <a href="#" class="text-indigo-600 font-medium hover:underline" data-open-login>Sign In</a>
+                    </p>
                 </div>
-                <div class="flex-1">
-                    <label class="block text-xs font-medium text-gray-700">Last Name</label>
-                    <input type="text" name="last_name" value="{{ old('last_name') }}" required
-                           class="mt-1 w-full px-2 py-1.5 border rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-xs">
-                </div>
-            </div>
 
-            <!-- Birthdate -->
-            <div>
-                <label class="block text-xs font-medium text-gray-700">Birthdate</label>
-                <input type="date" name="birthdate" value="{{ old('birthdate') }}" required
-                       class="mt-1 w-full px-2 py-1.5 border rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-xs">
-            </div>
-
-            <!-- Contact Number -->
-            <div>
-                <label class="block text-xs font-medium text-gray-700">Contact Number</label>
-                <input type="text" name="contact_number" value="{{ old('contact_number') }}"
-                       class="mt-1 w-full px-2 py-1.5 border rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-xs">
-            </div>
-
-            <!-- Email -->
-            <div class="space-y-2">
-                <div>
-                    <label class="block text-xs font-medium text-gray-700">Email</label>
-                    <div class="mt-1 flex gap-2">
-                        <input type="email" name="email" id="registerEmail" value="{{ old('email') }}" required
-                               class="flex-1 px-2 py-1.5 border rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-xs">
-                        <button type="button" id="sendVerificationCode"
-                                class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold shadow-md hover:bg-indigo-700 focus:outline-none">
-                            Send Code
+                <!-- Step 4 -->
+                <div class="register-step hidden" data-step="4">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Password</label>
+                            <input type="password" name="password" required
+                                   class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Confirm Password</label>
+                            <input type="password" name="password_confirmation" required
+                                   class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition">
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between mt-6">
+                        <button type="button" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700" data-prev-step>Back</button>
+                        <button type="submit"
+                                class="bg-gradient-to-r from-indigo-600 to-blue-500 hover:from-indigo-700 hover:to-blue-600 text-white font-semibold py-2 px-6 rounded-xl shadow-lg transition text-sm">
+                            Sign Up
                         </button>
                     </div>
+                    <label for="terms" class="mt-3 flex items-start gap-2 text-[11px] text-gray-500 leading-tight text-center justify-center">
+                        <input type="checkbox" name="terms" id="terms" required
+                               class="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        <span>By signing up, you agree to InkWise's <a href="#" class="underline hover:text-indigo-600">Terms of Service</a> and <a href="#" class="underline hover:text-indigo-600">Privacy Policy</a>.</span>
+                    </label>
+                    <p class="text-center text-xs text-gray-600 mt-4">
+                        Already have an account?
+                        <a href="#" class="text-indigo-600 font-medium hover:underline" data-open-login>Sign In</a>
+                    </p>
                 </div>
-                <p id="verificationStatus" class="text-[11px] text-gray-500"></p>
             </div>
-
-            <!-- Verification Code -->
-            <div>
-                <label class="block text-xs font-medium text-gray-700">Verification Code</label>
-                <input type="text" name="verification_code" id="verificationCode" value="{{ old('verification_code') }}" required maxlength="6"
-                       class="mt-1 w-full px-2 py-1.5 border rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-xs uppercase tracking-widest">
-            </div>
-
-            <!-- Password -->
-            <div>
-                <label class="block text-xs font-medium text-gray-700">Password</label>
-                <input type="password" name="password" required
-                       class="mt-1 w-full px-2 py-1.5 border rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-xs">
-            </div>
-
-            <!-- Confirm Password -->
-            <div>
-                <label class="block text-xs font-medium text-gray-700">Confirm Password</label>
-                <input type="password" name="password_confirmation" required
-                       class="mt-1 w-full px-2 py-1.5 border rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-xs">
-            </div>
-
-            <!-- Submit -->
-            <button type="submit"
-                    class="w-full bg-gradient-to-r from-indigo-600 to-blue-500 hover:from-indigo-700 hover:to-blue-600 text-white font-semibold py-2 rounded-lg shadow-md transition text-xs">
-                Sign Up
-            </button>
         </form>
 
         {{-- Third-party login coming soon --}}
-
-        <!-- Terms and Privacy Message -->
-        <p class="text-[11px] text-gray-500 text-center mt-2 mb-1">
-            By signing up, you agree to InkWise's <a href="#" class="underline hover:text-indigo-600">Terms of Services</a> &amp; <a href="#" class="underline hover:text-indigo-600">privacy policy</a>
-        </p>
-
-        <!-- Switch to Login -->
-        <p class="text-center text-xs text-gray-600 mt-2">
-            Already have an account?
-            <a href="#" id="openLoginFromRegister" class="text-indigo-600 font-medium hover:underline">Sign In</a>
-        </p>
     </div>
 </div>
 
@@ -135,98 +146,47 @@
 </style>
 
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
-    const sendButton = document.getElementById('sendVerificationCode');
-    const emailInput = document.getElementById('registerEmail');
-    const statusText = document.getElementById('verificationStatus');
-    const codeInput = document.getElementById('verificationCode');
-        const form = document.getElementById('customerRegisterForm');
-
-        if (!sendButton || !emailInput || !statusText || !form || !codeInput) {
+    document.addEventListener('DOMContentLoaded', function () {
+        const steps = Array.from(document.querySelectorAll('#registerSteps .register-step'));
+        if (!steps.length) {
             return;
         }
 
-        const csrfToken = form.querySelector('input[name="_token"]').value;
+        let activeIndex = 0;
 
-        codeInput.addEventListener('input', (event) => {
-            const sanitized = event.target.value.replace(/\D/g, '').slice(0, 6);
-            event.target.value = sanitized;
-        });
-
-        const setStatus = (message, type = 'info') => {
-            const colorMap = {
-                info: 'text-gray-500',
-                success: 'text-green-600',
-                error: 'text-red-600',
-            };
-
-            statusText.textContent = message;
-            statusText.className = `text-[11px] ${colorMap[type] ?? colorMap.info}`;
+        const goToStep = (index) => {
+            steps.forEach((step, idx) => {
+                step.classList.toggle('hidden', idx !== index);
+            });
+            activeIndex = index;
         };
 
-        let cooldownTimer;
-
-        const startCooldown = (seconds = 60) => {
-            let remaining = seconds;
-            sendButton.disabled = true;
-            sendButton.classList.add('opacity-60', 'cursor-not-allowed');
-            sendButton.textContent = `Resend in ${remaining}s`;
-
-            cooldownTimer = setInterval(() => {
-                remaining -= 1;
-                if (remaining <= 0) {
-                    clearInterval(cooldownTimer);
-                    sendButton.disabled = false;
-                    sendButton.classList.remove('opacity-60', 'cursor-not-allowed');
-                    sendButton.textContent = 'Send Code';
-                    return;
+        document.querySelectorAll('[data-next-step]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                if (activeIndex < steps.length - 1) {
+                    goToStep(activeIndex + 1);
                 }
-
-                sendButton.textContent = `Resend in ${remaining}s`;
-            }, 1000);
-        };
-
-        sendButton.addEventListener('click', async () => {
-            const email = emailInput.value.trim();
-
-            if (!email) {
-                setStatus('Enter your email before requesting a code.', 'error');
-                emailInput.focus();
-                return;
-            }
-
-            clearInterval(cooldownTimer);
-            sendButton.disabled = true;
-            sendButton.classList.add('opacity-60', 'cursor-not-allowed');
-            sendButton.textContent = 'Sending…';
-            setStatus('Sending verification code…');
-
-            try {
-                const response = await fetch('{{ route('customer.register.send-code') }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': csrfToken,
-                        'Accept': 'application/json',
-                    },
-                    body: JSON.stringify({ email }),
-                });
-
-                const body = await response.json();
-
-                if (!response.ok) {
-                    const message = body?.errors?.email?.[0] ?? body?.message ?? 'Unable to send verification code.';
-                    throw new Error(message);
-                }
-
-                setStatus(body.message ?? 'Verification code sent! Check your inbox.', 'success');
-                startCooldown();
-            } catch (error) {
-                sendButton.disabled = false;
-                sendButton.classList.remove('opacity-60', 'cursor-not-allowed');
-                sendButton.textContent = 'Send Code';
-                setStatus(error.message, 'error');
-            }
+            });
         });
+
+        document.querySelectorAll('[data-prev-step]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                if (activeIndex > 0) {
+                    goToStep(activeIndex - 1);
+                }
+            });
+        });
+
+        document.querySelectorAll('[data-open-login]').forEach((link) => {
+            link.addEventListener('click', (event) => {
+                event.preventDefault();
+                const loginTrigger = document.getElementById('openLoginFromRegister');
+                if (loginTrigger) {
+                    loginTrigger.click();
+                }
+            });
+        });
+
+        goToStep(activeIndex);
     });
 </script>

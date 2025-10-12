@@ -113,7 +113,7 @@
                         <a href="{{ route('customer.profile.index') }}"
 
                            class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa]">
-                            Profile
+                            My Account
                         </a>
                         <form id="logout-form" action="{{ route('customer.logout') }}" method="POST">
                             @csrf
@@ -181,14 +181,25 @@ document.addEventListener('DOMContentLoaded', function () {
     <aside class="sidebar rounded-2xl p-4 md:col-span-1 h-full">
       <nav class="space-y-2">
         <!-- My Account Dropdown -->
-        <div x-data="{ open: true }" class="relative">
-          <!-- Dropdown is open by default (open: true) -->
-          <button @click="open = !open"
-                  class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition w-full text-left font-medium bg-[#e0f7fa]">
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-5 0-9 2.5-9 5.5A1.5 1.5 0 0 0 4.5 21h15a1.5 1.5 0 0 0 1.5-1.5C21 16.5 17 14 12 14Z"/></svg>
-            My Account
-            <svg class="w-4 h-4 ml-auto transition-transform" :class="{'rotate-180': open}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"></path></svg>
-          </button>
+        @php
+          $myAccountActive = request()->routeIs('customer.profile.*');
+        @endphp
+        <div x-data="{ open: {{ $myAccountActive ? 'true' : 'false' }} }" class="relative">
+          <!-- Dropdown header with link + toggle -->
+          <div class="flex items-stretch gap-2">
+            <a href="{{ route('customer.profile.index') }}"
+               class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition w-full font-medium {{ $myAccountActive ? 'bg-[#e0f7fa] text-gray-700' : 'text-gray-700 hover:bg-[#e0f7fa]' }}">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-5 0-9 2.5-9 5.5A1.5 1.5 0 0 0 4.5 21h15a1.5 1.5 0 0 0 1.5-1.5C21 16.5 17 14 12 14Z"/></svg>
+              <span>My Account</span>
+            </a>
+            @if($myAccountActive)
+              <button type="button"
+                      @click="open = !open"
+                      class="px-3 py-3 rounded-xl text-gray-500 hover:bg-[#e0f7fa] transition">
+                <svg class="w-4 h-4 transition-transform" :class="{'rotate-180': open}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"></path></svg>
+              </button>
+            @endif
+          </div>
           <div x-show="open" @click.away="open = false" class="mt-1 ml-6 space-y-1">
             <!-- Profile (with link) -->
             <a href="{{ route('customer.profile.index') }}"
@@ -201,20 +212,23 @@ document.addEventListener('DOMContentLoaded', function () {
                class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] rounded transition">
               Addresses
             </a>
-            <!-- My Favorites (no link) -->
-            <div class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] rounded transition cursor-pointer">
-              My Favorites
-            </div>
+            <!-- My Favorites removed from dropdown (moved below) -->
           </div>
         </div>
         <!-- Other Sidebar Items -->
-        <a href="{{ route('customer.my_purchase') }}" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition">
+        @php
+          $myPurchaseActive = request()->routeIs('customer.my_purchase*');
+        @endphp
+      <a href="{{ route('customer.my_purchase') }}"
+        class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition {{ $myPurchaseActive ? 'bg-[#e0f7fa] text-gray-700 font-medium' : 'text-gray-700 hover:bg-[#e0f7fa]' }}">
           <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M3 7h18v2H3zm0 4h18v2H3zm0 4h18v2H3z"/></svg>
-          <span class="font-medium">My Purchase</span>
+          <span class="font-medium">Purchase</span>
         </a>
-        <a href="#" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition">
-          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M7 3h10a2 2 0 0 1 2 2v14l-7-3-7 3V5a2 2 0 0 1 2-2z"/></svg>
-          <span class="font-medium">Order History</span>
+        @php $favoritesActive = request()->routeIs('customer.favorites*'); @endphp
+        <a href="{{ route('customer.favorites') }}"
+          class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition {{ $favoritesActive ? 'bg-[#e0f7fa] text-gray-700 font-medium' : 'text-gray-700 hover:bg-[#e0f7fa]' }}">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 6 4 4 6.5 4c1.74 0 3.41.81 4.5 2.09C12.09 4.81 13.76 4 15.5 4 18 4 20 6 20 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          <span class="font-medium">Favorites</span>
         </a>
         <a href="#" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition relative group">
           <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -237,13 +251,6 @@ document.addEventListener('DOMContentLoaded', function () {
   </div>
 </a>
 
-        <form method="POST" action="{{ route('customer.logout')}}">
-          @csrf
-          <button type="submit" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition w-full text-left">
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M16 13v-2H7V8l-5 4 5 4v-3zM20 3h-8a2 2 0 0 0-2 2v3h2V5h8v14h-8v-3h-2v3a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/></svg>
-            <span class="font-medium">Log Out</span>
-          </button>
-        </form>
       </nav>
     </aside>
     <!-- Main Content Area -->

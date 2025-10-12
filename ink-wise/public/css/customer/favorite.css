@@ -1,0 +1,4 @@
+/* Favorite page styles */
+#favoritesContainer .favorite-card { transition: transform .12s ease, box-shadow .12s ease; }
+#favoritesContainer .favorite-card:hover { transform: translateY(-4px); box-shadow: 0 10px 22px rgba(4,29,66,0.06); }
+.remove-favorite { background: transparent; border: 0; cursor: pointer; }

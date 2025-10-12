@@ -55,7 +55,7 @@ class CustomerAuthController extends Controller
             'middle_name'    => $request->middle_name,
             'last_name'      => $request->last_name,
             'contact_number' => $request->contact_number,
-            'birthdate'      => $request->birthdate,
+            'date_of_birth'  => $request->birthdate,
         ]);
 
         if ($verificationRecord) {

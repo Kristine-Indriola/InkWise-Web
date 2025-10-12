@@ -16,8 +16,36 @@
      </div>
 
     @php
-        // Expect $orders to be passed to this view. Do not render placeholder/sample data here.
-        $ordersList = $orders ?? [];
+        // If the controller didn't pass any orders (for dev/demo), provide sample data
+        if (!empty($orders) && is_iterable($orders)) {
+            $ordersList = $orders;
+        } else {
+            $ordersList = [
+                (object)[
+                    'id' => 1001,
+                    'product_id' => 501,
+                    'product_name' => 'Rustic Wedding Invitation',
+                    'quantity' => 100,
+                    'image' => asset('customerimages/image/weddinginvite.png'),
+                    'total_amount' => 2450.00,
+                    'theme' => 'Rustic Floral',
+                    'paper' => 'Linen',
+                    // addons as JSON string (view code can decode it)
+                    'addons' => json_encode([['name' => 'Gold Foil', 'price' => 150.00], ['name' => 'Envelope Lining', 'price' => 0]]),
+                ],
+                (object)[
+                    'id' => 1002,
+                    'product_id' => 502,
+                    'product_name' => 'Birthday Giveaway Pack',
+                    'quantity' => 50,
+                    'image' => asset('customerimages/image/giveaway.png'),
+                    'total_amount' => 950.00,
+                    'theme' => 'Bright & Fun',
+                    'paper' => 'Glossy',
+                    'addons' => json_encode([['name' => 'Custom Tag', 'price' => 0]]),
+                ],
+            ];
+        }
     @endphp
 
     <div class="space-y-4">
@@ -149,8 +177,7 @@
                     </div>
                     <div class="flex gap-2">
                         <button class="bg-[#a6b7ff] hover:bg-[#bce6ff] text-white px-6 py-2 rounded font-semibold js-to-pay-checkout" type="button" data-summary='@json($summary)'>Checkout</button>
-                        <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white hover:bg-[#d3b7ff]">Contact Shop</button>
-                        <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white hover:bg-[#d3b7ff]">View Shop Rating</button>
+                        <button type="button" class="border border-gray-300 text-gray-700 px-5 py-2 rounded font-semibold js-to-pay-cancel" data-order-id="{{ $order->id ?? '' }}">Cancel</button>
                     </div>
                 </div>
             </div>
@@ -175,8 +202,33 @@ document.addEventListener('DOMContentLoaded', function () {
                 // ignore, continue to redirect
                 console.warn('failed to save order summary to sessionStorage', err);
             }
-            // Redirect to the order summary page where the saved summary will be picked up
-            window.location.href = '{{ route('order.summary') }}';
+            // Redirect to the checkout page where the saved summary will be picked up
+            window.location.href = '{{ route('customer.checkout') }}';
+        });
+    });
+    // Cancel handler for server-rendered cards
+    const cancels = Array.from(document.querySelectorAll('.js-to-pay-cancel'));
+    cancels.forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            try {
+                const orderId = btn.dataset.orderId || null;
+                if (!confirm('Cancel this order? This will remove it from your To Pay list.')) return;
+                const card = btn.closest('.bg-white.border.rounded-xl') || btn.closest('.favorite-card') || btn.closest('[data-summary-order-id]');
+                if (card) card.remove();
+                // If this was the stored summary, clear session and call server clear endpoint
+                try {
+                    const stored = window.sessionStorage.getItem('inkwise-finalstep');
+                    if (stored) {
+                        window.sessionStorage.removeItem('inkwise-finalstep');
+                        // attempt server-side clear (best-effort)
+                        await fetch('{{ route('order.summary.clear') }}', { method: 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || '' } });
+                    }
+                } catch (err) {
+                    // ignore network errors
+                }
+            } catch (err) {
+                console.warn('cancel failed', err);
+            }
         });
     });
 });
@@ -283,8 +335,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
                 <div class="flex gap-2">
                     <button class="bg-[#a6b7ff] hover:bg-[#bce6ff] text-white px-6 py-2 rounded font-semibold">Checkout</button>
-                    <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white">Contact Shop</button>
-                    <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white">View Shop Rating</button>
+                    <button class="border border-gray-300 text-gray-700 px-5 py-2 rounded font-semibold js-client-cancel">Cancel</button>
                 </div>
             </div>
         `;

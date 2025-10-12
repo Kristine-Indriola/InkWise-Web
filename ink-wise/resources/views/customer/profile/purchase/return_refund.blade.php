@@ -14,7 +14,36 @@
      <a href="{{ route('customer.my_purchase.return_refund') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Return/Refund</a>
      </div>
 
-    <p class="text-gray-600">No return or refund requests yet.</p>
+    @php
+        if (!empty($requests) && is_iterable($requests)) {
+            $requestsList = $requests;
+        } else {
+            $requestsList = [
+                (object)[
+                    'id' => 5001,
+                    'order_id' => 'ORD-5001',
+                    'product_name' => 'Defective Giveaway Item',
+                    'requested_date' => now()->subDays(2)->format('M d, Y'),
+                    'status' => 'Pending',
+                    'amount_refund' => 250.00
+                ],
+            ];
+        }
+    @endphp
+
+    <div class="space-y-4">
+        @foreach($requestsList as $r)
+            <div class="bg-white border rounded-xl p-4 shadow-sm flex items-center gap-4">
+                <div class="flex-1">
+                    <div class="font-semibold text-lg">{{ $r->product_name }}</div>
+                    <div class="text-sm text-gray-500">Order: {{ $r->order_id }}</div>
+                    <div class="text-sm text-gray-500">Requested: <span class="font-medium">{{ $r->requested_date }}</span></div>
+                    <div class="text-sm text-gray-500">Status: <span class="font-semibold">{{ $r->status }}</span></div>
+                </div>
+                <div class="text-gray-700 font-bold">₱{{ number_format($r->amount_refund,2) }}</div>
+            </div>
+        @endforeach
+    </div>
 </div>
 
 <script>
