@@ -88,6 +88,7 @@ public function store(Request $request)
 
     UserVerification::create([
         'user_id' => $user->user_id,
+        'email'   => $user->email,
         'token'   => $token,
     ]);
 
@@ -126,16 +127,56 @@ if ($owner) {
         
     }
 
-    public function index(Request $request) 
-    { $search = $request->input('search'); 
-        $users = User::with(['staff','address']) 
-        ->where('role', '!=', 'customer') 
-        ->when($search, fn($query, $search) => $query->where('email', 'LIKE', "%{$search}%") 
-        ->orWhere('role', 'LIKE', "%{$search}%") 
-        ->orWhereHas('staff', fn($q) => $q->where('staff_id', 'LIKE', "%{$search}%") 
-        ->orWhere('first_name', 'LIKE', "%{$search}%") 
-        ->orWhere('last_name', 'LIKE', "%{$search}%") 
-        ->orWhere('role', 'LIKE', "%{$search}%") ) ) ->get(); return view('admin.users.index', compact('users', 'search')); }
+    public function index(Request $request)
+    {
+        $search = $request->input('search');
+
+        $users = User::with(['staff', 'address'])
+            ->where('role', '!=', 'customer')
+            ->when($search, function ($query) use ($search) {
+                $query->where(function ($query) use ($search) {
+                    $query->where('email', 'LIKE', "%{$search}%")
+                        ->orWhere('role', 'LIKE', "%{$search}%")
+                        ->orWhereHas('staff', function ($q) use ($search) {
+                            $q->where('staff_id', 'LIKE', "%{$search}%")
+                                ->orWhere('first_name', 'LIKE', "%{$search}%")
+                                ->orWhere('last_name', 'LIKE', "%{$search}%")
+                                ->orWhere('role', 'LIKE', "%{$search}%");
+                        });
+                });
+            })
+            ->orderByDesc('created_at')
+            ->get();
+
+        $totalStaff = $users->count();
+        $pendingStaff = $users->filter(function ($user) {
+            return optional($user->staff)->status === 'pending';
+        })->count();
+        $activeStaff = $users->filter(function ($user) {
+            return optional($user->staff)->status === 'approved';
+        })->count();
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'summary' => view('admin.users.partials.summary', [
+                    'totalStaff' => $totalStaff,
+                    'activeStaff' => $activeStaff,
+                    'pendingStaff' => $pendingStaff,
+                ])->render(),
+                'table' => view('admin.users.partials.table', [
+                    'users' => $users,
+                ])->render(),
+            ]);
+        }
+
+        return view('admin.users.index', compact(
+            'users',
+            'search',
+            'totalStaff',
+            'pendingStaff',
+            'activeStaff'
+        ));
+    }
 
     // Only remove strict role limit check from update
     public function update(Request $request, $id)

@@ -5,22 +5,45 @@
     currency: 'PHP',
     maximumFractionDigits: 2
   });
+  const CDN_CHART_SRC = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js';
 
-  const getReportData = () => {
-    const payload = window.__INKWISE_REPORTS__ || {};
-    return {
-      inventory: {
-        labels: Array.isArray(payload.inventory?.labels) ? payload.inventory.labels : (payload.inventory?.labels?.data ?? []),
-        stock: Array.isArray(payload.inventory?.stock) ? payload.inventory.stock : (payload.inventory?.stock?.data ?? []),
-        reorder: Array.isArray(payload.inventory?.reorder) ? payload.inventory.reorder : (payload.inventory?.reorder?.data ?? [])
-      },
-      sales: {
-        labels: Array.isArray(payload.sales?.labels) ? payload.sales.labels : [],
-        totals: Array.isArray(payload.sales?.totals) ? payload.sales.totals : []
-      },
-      summaries: payload.summaries || {}
-    };
+  const resolveChartSrc = () => {
+    const script = document.querySelector('script[data-chartjs-src]');
+    return script && script.src ? script.src : CDN_CHART_SRC;
   };
+
+  const ensureChartJs = (() => {
+    let loaderPromise = null;
+    return () => {
+      if (typeof Chart !== 'undefined') {
+        return Promise.resolve();
+      }
+
+      if (loaderPromise) {
+        return loaderPromise;
+      }
+
+      loaderPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = resolveChartSrc();
+        script.defer = true;
+        script.dataset.chartjsFallback = 'true';
+        script.addEventListener('load', () => {
+          if (typeof Chart === 'undefined') {
+            reject(new Error('Chart.js loaded but Chart global is unavailable.'));
+            return;
+          }
+          resolve();
+        }, { once: true });
+        script.addEventListener('error', () => reject(new Error('Failed to load Chart.js from CDN.')), { once: true });
+        document.head.appendChild(script);
+      });
+
+      return loaderPromise;
+    };
+  })();
+
+  const payload = () => window.__INKWISE_REPORTS__ || {};
 
   const createToast = () => {
     const toast = document.createElement('div');
@@ -50,11 +73,9 @@
     if (!table) return false;
     const rows = Array.from(table.querySelectorAll('tr'));
     if (!rows.length) return false;
-    const csv = rows.map((row) => {
-      return Array.from(row.querySelectorAll('th, td'))
-        .map((cell) => '"' + (cell.textContent || '').replace(/"/g, '""') + '"')
-        .join(',');
-    });
+    const csv = rows.map((row) => Array.from(row.querySelectorAll('th, td'))
+      .map((cell) => '"' + (cell.textContent || '').replace(/"/g, '""') + '"')
+      .join(','));
     const blob = new Blob([csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -81,53 +102,67 @@
     return true;
   };
 
-  const initTabs = (shell) => {
-    const tabs = shell.querySelectorAll('.reports-tab');
-    const panels = shell.querySelectorAll('.reports-panel__content');
-    tabs.forEach((tab) => {
-      tab.addEventListener('click', () => {
-        const targetId = tab.dataset.tabTarget;
-        tabs.forEach((btn) => {
-          btn.classList.toggle('is-active', btn === tab);
-          btn.setAttribute('aria-selected', btn === tab ? 'true' : 'false');
-        });
-        panels.forEach((panel) => {
-          const isTarget = panel.id === targetId;
-          panel.classList.toggle('is-visible', isTarget);
-          panel.hidden = !isTarget;
-        });
-      });
+  const fallbackDataset = (labels, values, labelName) => {
+    const safeLabels = Array.isArray(labels) ? labels : [];
+    const safeValues = Array.isArray(values) ? values : [];
+    if (safeLabels.length && safeValues.length) {
+      return { labels: safeLabels, values: safeValues, labelName };
+    }
+    return { labels: ['No data'], values: [0], labelName };
+  };
+
+  const highlightSalesIntervalButtons = (shell, activeKey) => {
+    shell.querySelectorAll('[data-sales-interval]').forEach((btn) => {
+      const isActive = btn.dataset.salesInterval === activeKey;
+      btn.classList.toggle('is-active', isActive);
+      btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
     });
   };
 
-  const fallbackDataset = (labels, values, labelName) => {
-    if (labels.length && values.length) return { labels, values };
-    return {
-      labels: ['No data'],
-      values: [0],
-      labelName
-    };
+  const updateSalesRange = (shell, label) => {
+    const rangeNode = shell.querySelector('[data-sales-range]');
+    if (!rangeNode) return;
+    if (!rangeNode.dataset.defaultRange) {
+      rangeNode.dataset.defaultRange = rangeNode.textContent || 'Showing the most recent activity.';
+    }
+    rangeNode.textContent = label ? `Showing ${label}` : rangeNode.dataset.defaultRange;
   };
 
-  const initCharts = (shell, data, toast) => {
-    if (typeof Chart === 'undefined') {
-      showToast(toast, 'Charts unavailable — Chart.js not loaded.');
-      return;
-    }
+  const initSalesDashboard = (shell) => {
+    const toast = createToast();
+    const dataPayload = payload();
+    const intervals = dataPayload.sales?.intervals || {};
+    let activeInterval = dataPayload.sales?.defaultInterval || Object.keys(intervals)[0] || 'daily';
+    const baseSummary = dataPayload.sales?.summary;
+    const baseRange = dataPayload.sales?.rangeLabel;
+    let salesChart = null;
 
-    const salesCanvas = shell.querySelector('[data-chart="sales"]');
-    if (salesCanvas) {
-      const fallback = fallbackDataset(data.sales.labels, data.sales.totals, 'Revenue');
-      const labels = fallback.labels;
-      const totals = fallback.values;
-      new Chart(salesCanvas, {
+    const summaryNodes = {
+      orders: shell.querySelector('[data-metric="orders-count"]'),
+      revenue: shell.querySelector('[data-metric="revenue-total"]'),
+      average: shell.querySelector('[data-metric="average-order"]')
+    };
+
+    const applySummary = (summary = {}) => {
+      if (summaryNodes.orders) summaryNodes.orders.textContent = numberFormat.format(summary.orders || 0);
+      if (summaryNodes.revenue) summaryNodes.revenue.textContent = moneyFormat.format(summary.revenue || 0);
+      if (summaryNodes.average) summaryNodes.average.textContent = moneyFormat.format(summary.averageOrder || 0);
+    };
+
+    const ensureSalesChart = () => {
+      if (salesChart) return salesChart;
+      const canvas = shell.querySelector('[data-chart="sales"]');
+      if (!canvas) return null;
+      const interval = intervals[activeInterval] || {};
+      const dataset = fallbackDataset(interval.labels, interval.totals, 'Total sales (PHP)');
+      salesChart = new Chart(canvas, {
         type: 'line',
         data: {
-          labels,
+          labels: dataset.labels,
           datasets: [
             {
-              label: 'Total sales (PHP)',
-              data: totals,
+              label: dataset.labelName,
+              data: dataset.values,
               borderColor: '#5a8de0',
               backgroundColor: 'rgba(90, 141, 224, 0.18)',
               fill: true,
@@ -157,101 +192,80 @@
           }
         }
       });
-    }
-
-    const inventoryCanvas = shell.querySelector('[data-chart="inventory"]');
-    if (inventoryCanvas) {
-      const fallback = fallbackDataset(data.inventory.labels, data.inventory.stock, 'Stock level');
-      const labels = fallback.labels;
-      const stock = fallback.values;
-      const reorder = data.inventory.reorder && data.inventory.reorder.length
-        ? data.inventory.reorder
-        : new Array(labels.length).fill(0);
-      new Chart(inventoryCanvas, {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [
-            {
-              label: 'Current stock',
-              data: stock,
-              backgroundColor: 'rgba(90, 141, 224, 0.65)',
-              borderRadius: 6
-            },
-            {
-              label: 'Reorder level',
-              data: reorder,
-              backgroundColor: 'rgba(251, 191, 36, 0.65)',
-              borderRadius: 6
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          scales: {
-            y: {
-              beginAtZero: true,
-              ticks: {
-                callback: (value) => numberFormat.format(value)
-              }
-            }
-          }
-        }
-      });
-    }
-  };
-
-  const updateSummaryMetrics = (shell, data) => {
-    const summaries = data.summaries || {};
-    const sales = summaries.sales || {};
-    const inventory = summaries.inventory || {};
-
-    const ordersNode = shell.querySelector('[data-metric="orders-count"]');
-    const revenueNode = shell.querySelector('[data-metric="revenue-total"]');
-    const avgNode = shell.querySelector('[data-metric="average-order"]');
-    const stockNode = shell.querySelector('[data-metric="stock-status"]');
-
-    if (ordersNode) ordersNode.textContent = numberFormat.format(sales.orders || 0);
-    if (revenueNode) revenueNode.textContent = moneyFormat.format(sales.revenue || 0);
-    if (avgNode) avgNode.textContent = moneyFormat.format(sales.averageOrder || 0);
-    if (stockNode) {
-      const low = inventory.lowStock || 0;
-      const out = inventory.outStock || 0;
-      stockNode.textContent = `${numberFormat.format(low)} / ${numberFormat.format(out)}`;
-    }
-  };
-
-  const bindActions = (shell, toast) => {
-    const tables = {
-      sales: shell.querySelector('#salesTable'),
-      inventory: shell.querySelector('#inventoryTable')
+      return salesChart;
     };
 
-    shell.addEventListener('click', (event) => {
-      const exportBtn = event.target.closest('[data-export]');
-      if (exportBtn) {
-        const key = exportBtn.dataset.export;
-        const table = tables[key];
-        if (!table) {
-          showToast(toast, 'Table not found for export.');
-          return;
+    const applyInterval = (intervalKey, options = {}) => {
+      const { skipSummary = false } = options;
+      if (!intervals[intervalKey]) {
+        showToast(toast, 'No data for that interval yet.');
+        return;
+      }
+      activeInterval = intervalKey;
+      highlightSalesIntervalButtons(shell, intervalKey);
+      const interval = intervals[intervalKey];
+      if (!skipSummary) {
+        applySummary(interval.summary || {});
+        updateSalesRange(shell, interval.range_label || '');
+      } else if (!baseRange) {
+        updateSalesRange(shell, interval.range_label || '');
+      }
+      const chart = ensureSalesChart();
+      if (chart) {
+        const dataset = fallbackDataset(interval.labels, interval.totals, 'Total sales (PHP)');
+        chart.data.labels = dataset.labels;
+        chart.data.datasets[0].data = dataset.values;
+        chart.update();
+      }
+    };
+
+    if (intervals[activeInterval]) {
+      if (baseSummary) {
+        applySummary(baseSummary);
+      } else {
+        applySummary(intervals[activeInterval].summary || {});
+      }
+      if (typeof baseRange === 'string' && baseRange.length) {
+        updateSalesRange(shell, baseRange);
+      } else {
+        updateSalesRange(shell, intervals[activeInterval].range_label || '');
+      }
+    }
+
+    ensureChartJs()
+      .then(() => {
+        if (!ensureSalesChart()) {
+          showToast(toast, 'Charts unavailable — failed to initialise.');
         }
-        const filename = `${key}-report-${new Date().toISOString().slice(0, 10)}.csv`;
-        downloadCSV(table, filename);
-        showToast(toast, 'CSV export started.');
+      })
+      .catch((error) => {
+        console.warn(error);
+        showToast(toast, 'Charts unavailable — please check your connection.');
+      });
+
+    shell.addEventListener('click', (event) => {
+      const intervalBtn = event.target.closest('[data-sales-interval]');
+      if (intervalBtn) {
+        applyInterval(intervalBtn.dataset.salesInterval);
         return;
       }
 
-      const printBtn = event.target.closest('[data-print]');
-      if (printBtn) {
-        const key = printBtn.dataset.print;
-        const table = tables[key];
-        if (!table) {
-          showToast(toast, 'Table not found for printing.');
-          return;
+      const exportBtn = event.target.closest('[data-export="sales"]');
+      if (exportBtn) {
+        const table = shell.querySelector('#salesTable');
+        const filename = `sales-report-${new Date().toISOString().slice(0, 10)}.csv`;
+        if (downloadCSV(table, filename)) {
+          showToast(toast, 'Sales CSV export started.');
         }
-        printTable(table, `${key.charAt(0).toUpperCase() + key.slice(1)} report`);
-        showToast(toast, 'Print dialog opened.');
+        return;
+      }
+
+      const printBtn = event.target.closest('[data-print="sales"]');
+      if (printBtn) {
+        const table = shell.querySelector('#salesTable');
+        if (printTable(table, 'Sales report')) {
+          showToast(toast, 'Print dialog opened.');
+        }
         return;
       }
 
@@ -260,36 +274,122 @@
         const action = actionBtn.dataset.reportAction;
         if (action === 'refresh') {
           showToast(toast, 'Data refreshed. Latest numbers loaded.');
-        } else if (action === 'export-all') {
-          const now = new Date().toISOString().slice(0, 10);
-          Object.entries(tables).forEach(([key, table]) => {
-            if (!table) return;
-            downloadCSV(table, `${key}-report-${now}.csv`);
-          });
-          showToast(toast, 'All tables exported as CSV.');
+        }
+        if (action === 'export-sales') {
+          const table = shell.querySelector('#salesTable');
+          const filename = `sales-report-${new Date().toISOString().slice(0, 10)}.csv`;
+          if (downloadCSV(table, filename)) {
+            showToast(toast, 'Sales CSV export started.');
+          }
         }
       }
     });
 
-    const rangeSelect = shell.querySelector('[data-report-filter="sales-range"]');
-    if (rangeSelect) {
-      rangeSelect.addEventListener('change', () => {
-        showToast(toast, 'Custom ranges coming soon. Displaying default data.');
-        rangeSelect.value = '6m';
-      });
+    // Apply default interval once the listeners are ready
+    if (intervals[activeInterval]) {
+      applyInterval(activeInterval, { skipSummary: Boolean(baseSummary) });
     }
   };
 
-  document.addEventListener('DOMContentLoaded', () => {
-    const shell = document.getElementById('adminReportsShell');
-    if (!shell) return;
-
+  const initInventoryDashboard = (shell) => {
     const toast = createToast();
-    const data = getReportData();
+    const dataPayload = payload();
+    const inventory = dataPayload.inventory || {};
+    const labels = Array.isArray(inventory.labels?.data) ? inventory.labels.data : inventory.labels;
+    const stock = Array.isArray(inventory.stock?.data) ? inventory.stock.data : inventory.stock;
+    const reorder = Array.isArray(inventory.reorder?.data) ? inventory.reorder.data : inventory.reorder;
 
-    updateSummaryMetrics(shell, data);
-    initTabs(shell);
-    initCharts(shell, data, toast);
-    bindActions(shell, toast);
+    ensureChartJs()
+      .then(() => {
+        const canvas = shell.querySelector('[data-chart="inventory"]');
+        if (!canvas) return;
+        const dataset = fallbackDataset(labels, stock, 'Current stock');
+        const reorderData = Array.isArray(reorder) && reorder.length
+          ? reorder
+          : new Array(dataset.labels.length).fill(0);
+        new Chart(canvas, {
+          type: 'bar',
+          data: {
+            labels: dataset.labels,
+            datasets: [
+              {
+                label: 'Current stock',
+                data: dataset.values,
+                backgroundColor: 'rgba(90, 141, 224, 0.65)',
+                borderRadius: 6
+              },
+              {
+                label: 'Reorder level',
+                data: reorderData,
+                backgroundColor: 'rgba(251, 191, 36, 0.65)',
+                borderRadius: 6
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  callback: (value) => numberFormat.format(value)
+                }
+              }
+            }
+          }
+        });
+      })
+      .catch((error) => {
+        console.warn(error);
+        showToast(toast, 'Charts unavailable — please check your connection.');
+      });
+
+    shell.addEventListener('click', (event) => {
+      const exportBtn = event.target.closest('[data-export="inventory"]');
+      if (exportBtn) {
+        const table = shell.querySelector('#inventoryTable');
+        const filename = `inventory-report-${new Date().toISOString().slice(0, 10)}.csv`;
+        if (downloadCSV(table, filename)) {
+          showToast(toast, 'Inventory CSV export started.');
+        }
+        return;
+      }
+
+      const printBtn = event.target.closest('[data-print="inventory"]');
+      if (printBtn) {
+        const table = shell.querySelector('#inventoryTable');
+        if (printTable(table, 'Inventory report')) {
+          showToast(toast, 'Print dialog opened.');
+        }
+        return;
+      }
+
+      const actionBtn = event.target.closest('[data-report-action]');
+      if (actionBtn) {
+        const action = actionBtn.dataset.reportAction;
+        if (action === 'refresh') {
+          showToast(toast, 'Data refreshed. Latest numbers loaded.');
+        }
+        if (action === 'export-inventory') {
+          const table = shell.querySelector('#inventoryTable');
+          const filename = `inventory-report-${new Date().toISOString().slice(0, 10)}.csv`;
+          if (downloadCSV(table, filename)) {
+            showToast(toast, 'Inventory CSV export started.');
+          }
+        }
+      }
+    });
+  };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const salesShell = document.getElementById('adminSalesReportsShell');
+    if (salesShell) {
+      initSalesDashboard(salesShell);
+    }
+
+    const inventoryShell = document.getElementById('adminInventoryReportsShell');
+    if (inventoryShell) {
+      initInventoryDashboard(inventoryShell);
+    }
   });
 })();

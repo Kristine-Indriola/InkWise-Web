@@ -105,6 +105,88 @@
       color: #333 !important;
     }
 
+    .sidebar ul li.has-submenu {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 6px;
+    }
+
+    .sidebar ul li.has-submenu .submenu-trigger {
+      width: 100%;
+      background: transparent;
+      border: none;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px;
+      border-radius: 8px;
+      color: inherit;
+      font-size: 14px;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .sidebar ul li.has-submenu .submenu-trigger:focus-visible {
+      outline: 2px solid rgba(63,213,200,0.65);
+      outline-offset: 2px;
+    }
+
+    .sidebar ul li.has-submenu .submenu-trigger:hover,
+    .sidebar ul li.has-submenu.expanded .submenu-trigger {
+      background: rgba(255,255,255,0.5);
+      color: #333 !important;
+    }
+
+    .sidebar ul li.has-submenu .submenu-caret {
+      margin-left: auto;
+      transition: transform 0.3s ease;
+    }
+
+    .sidebar ul li.has-submenu.expanded .submenu-caret {
+      transform: rotate(180deg);
+    }
+
+    .sidebar ul li.has-submenu .submenu {
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      margin-left: 36px;
+    }
+
+    .sidebar ul li.has-submenu.expanded .submenu {
+      display: flex;
+    }
+
+    .sidebar ul li.has-submenu .submenu li {
+      margin: 0;
+      padding: 0;
+    }
+
+    .sidebar ul li.has-submenu .submenu li a {
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+
+    .sidebar.collapsed ul li.has-submenu {
+      gap: 0;
+    }
+
+    .sidebar.collapsed ul li.has-submenu .submenu {
+      display: none !important;
+    }
+
+    .sidebar.collapsed ul li.has-submenu .submenu-trigger {
+      justify-content: center;
+      padding: 10px 0;
+    }
+
+    .sidebar.collapsed ul li.has-submenu .submenu-trigger .label,
+    .sidebar.collapsed ul li.has-submenu .submenu-caret {
+      display: none;
+    }
+
     /* Collapsed sidebar: make hover/active background fit icon only */
     .sidebar.collapsed ul li a {
       justify-content: center;
@@ -167,6 +249,7 @@
     .sidebar.collapsed .collapse-btn i {
       transform: rotate(180deg);
     }
+    .collapse-btn i.is-rotated { transform: rotate(180deg); }
     /* Hide profile name and check when collapsed, show only image */
     .sidebar.collapsed .profile div {
       display: none;
@@ -195,7 +278,8 @@
       width: 100%;
       position: sticky;
       top: 0;
-      z-index: 90; /* sit behind sidebar (sidebar z-index:101) */
+  z-index: 90; /* sit behind sidebar (sidebar z-index:101) */
+  transition: left 0.32s ease; /* animate when sidebar collapses */
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
       box-shadow: 0 6px 18px rgba(16,24,40,0.06);
@@ -211,6 +295,15 @@
       gap: 10px;
       padding-left: 6px;
       margin-left: 230px; /* visually align logo to the right of the fixed sidebar */
+      transition: margin-left 0.32s ease;
+    }
+
+    /* When the sidebar collapses, shift the topbar logo to match compact width */
+    .sidebar.collapsed ~ .content-wrapper .topbar {
+      left: 70px; /* if you prefer the topbar to shift, keep this; otherwise topbar remains full-width */
+    }
+    .sidebar.collapsed ~ .content-wrapper .topbar .logo {
+      margin-left: 70px;
     }
 
     .topbar .icons {
@@ -638,15 +731,101 @@ body.dark-mode .btn-warning {
       <img src="/adminimage/inkwise.png" alt="InkWise Logo"
            style="width:90px; height:90px; max-width:100%; max-height:100px; background:transparent; border-radius:24px; border:none; box-shadow:0 4px 16px rgba(0,0,0,0.07); object-fit:contain; margin-bottom:8px;">
     </div>
+
+    <!-- Sidebar hover behavior: open submenu on pointer hover and support touch/keyboard -->
+    <style>
+      /* When pointer hovers the parent, show submenu */
+      .sidebar ul li.has-submenu:hover > .submenu,
+      .sidebar ul li.has-submenu.expanded > .submenu {
+        display: block !important;
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+
+      /* Keep the submenu visually consistent with existing styles */
+      .sidebar ul li.has-submenu > .submenu {
+        display: none;
+        transition: opacity 150ms ease, transform 150ms ease;
+        opacity: 0;
+        transform: translateY(-6px);
+        pointer-events: none;
+        z-index: 30;
+      }
+
+      /* Small hit-target to make hover feel responsive */
+      .sidebar ul li.has-submenu {
+        position: relative;
+      }
+
+      /* Avoid hover behavior on very small screens (touch-first) */
+      @media (max-width: 768px) {
+        .sidebar ul li.has-submenu:hover > .submenu {
+          display: none !important;
+        }
+      }
+
+      /* Rotate caret when submenu is visible */
+      .sidebar ul li.has-submenu:hover .submenu-caret,
+      .sidebar ul li.has-submenu.expanded .submenu-caret {
+        transform: rotate(180deg);
+        transition: transform 150ms ease;
+      }
+    </style>
+
+    <script>
+      (function () {
+        // Add pointer event handlers to support touch devices and keyboard toggling
+        const submenuParents = document.querySelectorAll('.sidebar .has-submenu');
+
+        submenuParents.forEach(parent => {
+          // For touch devices we toggle expanded class on first tap, follow link on second
+          parent.addEventListener('touchstart', function (e) {
+            // If not expanded, expand and prevent the immediate navigation
+            if (!parent.classList.contains('expanded')) {
+              parent.classList.add('expanded');
+              const btn = parent.querySelector('.submenu-trigger');
+              if (btn) btn.setAttribute('aria-expanded', 'true');
+              e.preventDefault();
+            }
+          }, {passive: true});
+
+          // Ensure hover (mouseenter) also sets expanded so caret & aria stay in sync
+          parent.addEventListener('mouseenter', function () {
+            if (!parent.classList.contains('expanded')) {
+              parent.classList.add('expanded');
+              const btn = parent.querySelector('.submenu-trigger');
+              if (btn) btn.setAttribute('aria-expanded', 'true');
+            }
+          });
+
+          // Toggle expanded on keyboard Enter/Space when focused
+          const trigger = parent.querySelector('.submenu-trigger');
+          if (trigger) {
+            trigger.addEventListener('keydown', function (e) {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                parent.classList.toggle('expanded');
+                const expanded = parent.classList.contains('expanded');
+                trigger.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+              }
+            });
+          }
+
+          // Remove expanded on mouseleave to keep hover UX tidy
+          parent.addEventListener('mouseleave', function () {
+            if (parent.classList.contains('expanded')) {
+              parent.classList.remove('expanded');
+              const btn = parent.querySelector('.submenu-trigger');
+              if (btn) btn.setAttribute('aria-expanded', 'false');
+            }
+          });
+        });
+      })();
+    </script>
     <ul>
       <li class="{{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
         <a href="{{ route('admin.dashboard') }}"><i class="fi fi-rr-house-chimney"></i> <span class="label">Dashboard</span></a>
-      </li>
-      <li class="{{ request()->routeIs('admin.customers.*') ? 'active' : '' }}">
-        <a href="{{ route('admin.customers.index') }}"><i class="fi fi-rr-user-pen"></i> <span class="label">Customer Accounts</span></a>
-      </li>
-      <li class="{{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
-        <a href="{{ route('admin.users.index') }}"><i class="fi fi-rr-user"></i> <span class="label">Staff Accounts</span></a>
       </li>
       <li class="{{ request()->routeIs('admin.templates.*') ? 'active' : '' }}">
         <a href="{{ route('admin.templates.index') }}"><i class="fi fi-rr-template"></i> <span class="label">Templates</span></a>
@@ -654,8 +833,8 @@ body.dark-mode .btn-warning {
       <li class="{{ request()->routeIs('admin.products.*') ? 'active' : '' }}">
         <a href="{{ route('admin.products.index') }}"><i class="fi fi-rr-boxes"></i> <span class="label">Products</span></a>
       </li>
-      <li class="{{ request()->routeIs('admin.ordersummary.*') ? 'active' : '' }}">
-        <a href="{{ route('admin.ordersummary.index') }}"><i class="fi fi-rr-list-check"></i> <span class="label">Order Summaries</span></a>
+      <li class="{{ (request()->routeIs('admin.ordersummary.*') || request()->routeIs('admin.orders.index')) ? 'active' : '' }}">
+        <a href="{{ route('admin.orders.index') }}"><i class="fi fi-rr-list-check"></i> <span class="label">Order Summaries</span></a>
       </li>
       {{--<li class="{{ request()->routeIs('admin.messages.*') ? 'active' : '' }}">
         <a href="{{ route('admin.messages.index') }}"><i class="fi fi-rr-comment-dots"></i> <span class="label">Messages</span></a>
@@ -663,8 +842,23 @@ body.dark-mode .btn-warning {
       <li class="{{ request()->routeIs('admin.materials.*') ? 'active' : '' }}">
         <a href="{{ route('admin.materials.index') }}"><i class="fi fi-rr-blog-pencil"></i> <span class="label">Materials</span></a>
       </li>
-      <li class="{{ request()->routeIs('admin.reports.*') ? 'active' : '' }}">
-        <a href="{{ route('admin.reports.index') }}"><i class="fi fi-rr-document"></i> <span class="label">Reports</span></a>
+      @php
+        $reportsActive = request()->routeIs('admin.reports.*');
+      @endphp
+      <li class="has-submenu {{ $reportsActive ? 'expanded active' : '' }}">
+        <button type="button" class="submenu-trigger" data-submenu-toggle="reports" aria-expanded="{{ $reportsActive ? 'true' : 'false' }}">
+          <i class="fi fi-rr-document"></i>
+          <span class="label">Reports</span>
+          <i class="fi fi-rr-angle-small-down submenu-caret" aria-hidden="true"></i>
+        </button>
+        <ul class="submenu" data-submenu="reports" aria-hidden="{{ $reportsActive ? 'false' : 'true' }}">
+          <li class="{{ request()->routeIs('admin.reports.sales') ? 'active' : '' }}">
+            <a href="{{ route('admin.reports.sales') }}"><span class="label">Sales analytics</span></a>
+          </li>
+          <li class="{{ request()->routeIs('admin.reports.inventory') ? 'active' : '' }}">
+            <a href="{{ route('admin.reports.inventory') }}"><span class="label">Inventory analytics</span></a>
+          </li>
+        </ul>
       </li>
 
           <li class="{{ request()->routeIs('admin.chatbot.index') ? 'active' : '' }}">
@@ -673,6 +867,44 @@ body.dark-mode .btn-warning {
     <span class="label">Chatbot</span>
   </a>
 </li>
+
+       @php
+      $accountsActive = request()->routeIs('admin.customers.*')
+        || (request()->routeIs('admin.users.*') && !request()->routeIs('admin.users.passwords.*'));
+    @endphp
+      <li class="has-submenu {{ $accountsActive ? 'expanded active' : '' }}">
+        <button type="button" class="submenu-trigger" data-submenu-toggle="accounts" aria-expanded="{{ $accountsActive ? 'true' : 'false' }}">
+          <i class="fi fi-rr-users"></i>
+          <span class="label">Accounts</span>
+          <i class="fi fi-rr-angle-small-down submenu-caret" aria-hidden="true"></i>
+        </button>
+        <ul class="submenu" data-submenu="accounts" aria-hidden="{{ $accountsActive ? 'false' : 'true' }}">
+          <li class="{{ request()->routeIs('admin.customers.*') ? 'active' : '' }}">
+            <a href="{{ route('admin.customers.index') }}"><span class="label">Customer Accounts</span></a>
+          </li>
+          <li class="{{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
+            <a href="{{ route('admin.users.index') }}"><span class="label">Staff Accounts</span></a>
+          </li>
+        </ul>
+      </li>
+      @php
+          $settingsActive = request()->routeIs('admin.users.passwords.*') || request()->routeIs('admin.settings.*');
+      @endphp
+          <li class="has-submenu {{ $settingsActive ? 'expanded active' : '' }}">
+        <button type="button" class="submenu-trigger" data-submenu-toggle="settings" aria-expanded="{{ $settingsActive ? 'true' : 'false' }}">
+          <i class="fi fi-rr-settings"></i>
+          <span class="label">Settings</span>
+          <i class="fi fi-rr-angle-small-down submenu-caret" aria-hidden="true"></i>
+        </button>
+        <ul class="submenu" data-submenu="settings" aria-hidden="{{ $settingsActive ? 'false' : 'true' }}">
+          <li class="{{ request()->routeIs('admin.settings.site-content.*') ? 'active' : '' }}">
+            <a href="{{ route('admin.settings.site-content.edit') }}"><span class="label">Site Content</span></a>
+          </li>
+          <li class="{{ request()->routeIs('admin.users.passwords.*') ? 'active' : '' }}">
+            <a href="{{ route('admin.users.passwords.index') }}"><span class="label">Password Reset</span></a>
+          </li>
+        </ul>
+      </li>
 
     </ul>
   </div>
@@ -685,28 +917,34 @@ body.dark-mode .btn-warning {
       <div class="logo">InkWise</div>
       <div class="icons" style="display: flex; align-items: center; gap: 24px; margin-left: auto; justify-content: center;">
         <!-- Notification Bell -->
-        <a href="{{ route('admin.notifications') }}" class="nav-link notif-btn" style="display:flex; align-items:center; justify-content:center;">
-          <i class="fi fi-ss-bell" style="font-size:22px;"></i>
-          @php
-              $lowCount = \App\Models\Material::whereHas('inventory', function($q) {
-                  $q->whereColumn('stock_level', '<=', 'reorder_level')
-                    ->where('stock_level', '>', 0);
-              })->count();
+    <a href="{{ route('admin.notifications') }}" class="nav-link notif-btn" style="display:flex; align-items:center; justify-content:center;">
+      <i class="fi fi-ss-bell" style="font-size:22px;"></i>
+      @php
+        /** @var \App\Models\User|null $adminUser */
+        $adminUser = auth()->user();
+        $notifCount = $adminUser?->notifications()->whereNull('read_at')->count() ?? 0;
+      @endphp
 
-              $outCount = \App\Models\Material::whereHas('inventory', function($q) {
-                  $q->where('stock_level', '<=', 0);
-              })->count();
-
-              $notifCount = $lowCount + $outCount;
-          @endphp
-
-          @if($notifCount > 0)
-              <span class="notif-badge">{{ $notifCount }}</span>
-          @endif
-        </a>
+      @if($notifCount > 0)
+        <span class="notif-badge">{{ $notifCount }}</span>
+      @endif
+    </a>
         <!-- Paper plane / Messages quick-link (transparent background, colored icon) -->
-        <a href="{{ route('admin.messages.index') }}" class="nav-link notif-btn" title="Messages" style="display:flex; align-items:center; justify-content:center;">
+        @php
+          $adminUnreadMessageCount = isset($adminUnreadMessageCount)
+            ? (int) $adminUnreadMessageCount
+            : 0;
+        @endphp
+        <a href="{{ route('admin.messages.index') }}"
+           class="nav-link notif-btn"
+           title="Messages"
+           data-messages-toggle="true"
+           data-initial-unread="{{ $adminUnreadMessageCount }}"
+           style="display:flex; align-items:center; justify-content:center;">
           <i class="fi fi-sr-envelope" style="font-size:20px;"></i>
+          @if($adminUnreadMessageCount > 0)
+            <span class="notif-badge" data-role="messages-unread-count">{{ $adminUnreadMessageCount }}</span>
+          @endif
         </a>
         <!-- Day/Night Toggle Switch -->
         <div id="theme-toggle-switch" class="theme-toggle-switch" title="Toggle dark/light mode" style="margin:0;">
@@ -718,7 +956,7 @@ body.dark-mode .btn-warning {
           </span>
         </div>
         <!-- Admin Profile Dropdown -->
-        <div class="profile-dropdown" style="position: relative;">
+        <div class="profile-dropdown" style="position: relative; display:flex; align-items:center; gap:6px;">
           <a href="{{ route('admin.profile.edit') }}" id="profileImageLink" style="display:flex; align-items:center; text-decoration:none; color:inherit;">
             <img src="/adminimage/LEANNE.jpg"
                  alt="Admin Profile"
@@ -732,7 +970,7 @@ body.dark-mode .btn-warning {
                  display:none;
                  position:absolute;
                  right:0;
-                 top:48px;
+                 top: calc(100% + 6px);
                  background:#fff;
                  min-width:180px;
                  box-shadow:0 8px 32px rgba(0,0,0,0.18);
@@ -763,13 +1001,23 @@ body.dark-mode .btn-warning {
   // Sidebar toggle logic
   const sidebar = document.getElementById('sidebar');
   const sidebarToggle = document.getElementById('sidebarToggle');
+  const sidebarToggleIcon = document.getElementById('sidebarToggleIcon');
   if (localStorage.getItem('sidebar-collapsed') === 'true') {
     sidebar.classList.add('collapsed');
+    document.body.classList.add('sidebar-collapsed');
+    if (sidebarToggleIcon) sidebarToggleIcon.classList.add('is-rotated');
   }
   sidebarToggle.addEventListener('click', function() {
     sidebar.classList.toggle('collapsed');
     const isCollapsed = sidebar.classList.contains('collapsed');
     localStorage.setItem('sidebar-collapsed', isCollapsed);
+    if (isCollapsed) {
+      document.body.classList.add('sidebar-collapsed');
+      if (sidebarToggleIcon) sidebarToggleIcon.classList.add('is-rotated');
+    } else {
+      document.body.classList.remove('sidebar-collapsed');
+      if (sidebarToggleIcon) sidebarToggleIcon.classList.remove('is-rotated');
+    }
   });
 
   // Theme toggle logic
@@ -798,6 +1046,61 @@ body.dark-mode .btn-warning {
     setThemeSwitch();
   });
 
+  // Sidebar submenu toggle
+  const submenuParents = Array.from(document.querySelectorAll('.has-submenu'));
+
+  function setParentState(parent, expanded) {
+    const trigger = parent.querySelector('.submenu-trigger');
+    const submenu = parent.querySelector('.submenu');
+
+    if (expanded) {
+      parent.classList.add('expanded', 'active');
+    } else {
+      parent.classList.remove('expanded');
+      const hasActiveChild = parent.querySelector('.submenu li.active') !== null;
+      if (!hasActiveChild) {
+        parent.classList.remove('active');
+      }
+    }
+
+    if (trigger) {
+      trigger.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    }
+    if (submenu) {
+      submenu.setAttribute('aria-hidden', expanded ? 'false' : 'true');
+    }
+  }
+
+  function collapseOtherSubmenus(exceptParent) {
+    submenuParents.forEach(function(parent) {
+      if (parent !== exceptParent) {
+        setParentState(parent, false);
+      }
+    });
+  }
+
+  submenuParents.forEach(function(parent) {
+    const trigger = parent.querySelector('.submenu-trigger');
+    if (!trigger) {
+      return;
+    }
+
+    setParentState(parent, parent.classList.contains('expanded'));
+
+    trigger.addEventListener('click', function(event) {
+      event.preventDefault();
+      const willExpand = !parent.classList.contains('expanded');
+      collapseOtherSubmenus(parent);
+      setParentState(parent, willExpand);
+    });
+  });
+
+  document.addEventListener('click', function(event) {
+    if (!event.target.closest('.has-submenu')) {
+      collapseOtherSubmenus(null);
+    }
+  });
+
   // Profile dropdown logic (arrow only)
   const profileToggle = document.getElementById('profileDropdownToggle');
   const profileMenu = document.getElementById('profileDropdownMenu');
@@ -821,6 +1124,8 @@ body.dark-mode .btn-warning {
   </div>
 
   {{-- make sure scripts from views are rendered here --}}
+  {{-- First render any @push("scripts") stacks (preferred), then support older @section('scripts') uses. --}}
+  @stack('scripts')
   @yield('scripts')
 </body>
 </html>

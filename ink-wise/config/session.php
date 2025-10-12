@@ -18,7 +18,9 @@ return [
     |
     */
 
-    'driver' => env('SESSION_DRIVER', 'database'),
+    // Default to 'file' for local development to avoid DB session dependency when migrations/tables
+    // are not present. In production set SESSION_DRIVER in the environment accordingly.
+    'driver' => env('SESSION_DRIVER', 'file'),
 
     /*
     |--------------------------------------------------------------------------

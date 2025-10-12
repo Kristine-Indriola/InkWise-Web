@@ -256,17 +256,35 @@ a:hover {
     font-size: 13px;
 }
 
+/* Two-column label / value layout for selected options */
 .os-option {
-    display: flex;
-    justify-content: space-between;
-    gap: 20px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 12px;
     color: var(--text-muted);
+}
+
+.os-option dt {
+    margin: 0;
+    color: var(--text-muted);
+    font-weight: 600;
 }
 
 .os-option dd {
     margin: 0;
     font-weight: 600;
     color: var(--text-strong);
+    text-align: right;
+}
+
+@media (max-width: 480px) {
+    .os-option {
+        grid-template-columns: 1fr;
+    }
+    .os-option dd {
+        text-align: left;
+    }
 }
 
 .os-preview-pricing {
@@ -359,6 +377,30 @@ a:hover {
     gap: 18px;
     font-size: 14px;
     color: var(--text-muted);
+}
+
+.os-summary-line--items {
+    display: grid;
+    gap: 8px;
+}
+
+.os-summary-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 12px;
+    font-weight: 600;
+    color: var(--text-default);
+}
+
+.os-summary-item span:last-child {
+    text-align: right;
+    color: var(--text-strong);
+}
+
+@media (max-width: 480px) {
+    .os-summary-item { grid-template-columns: 1fr auto; }
+    .os-summary-item span:last-child { text-align: right; }
 }
 
 .os-summary-amount {

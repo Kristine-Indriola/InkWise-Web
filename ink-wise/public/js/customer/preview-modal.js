@@ -32,6 +32,36 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     };
 
+    const handleEditorRequest = (event) => {
+        if (!event || typeof event.data !== 'object' || event.data === null) {
+            return;
+        }
+
+        if (event.data.type !== 'inkwise:open-editor') {
+            return;
+        }
+
+        if (event.origin && event.origin !== window.location.origin) {
+            return;
+        }
+
+        closePreview();
+
+        if (event.data.href) {
+            const target = (event.data.target || '_self').toLowerCase();
+            if (target === '_blank') {
+                window.open(event.data.href, '_blank', 'noopener');
+                return;
+            }
+
+            try {
+                window.location.href = event.data.href;
+            } catch (error) {
+                console.warn('Unable to navigate parent window to editor.', error);
+            }
+        }
+    };
+
     document.addEventListener('click', (event) => {
         const trigger = event.target.closest(triggerSelector);
         if (!trigger) {
@@ -60,4 +90,6 @@ document.addEventListener('DOMContentLoaded', function () {
             closePreview();
         }
     });
+
+    window.addEventListener('message', handleEditorRequest);
 });

@@ -725,6 +725,13 @@ document.addEventListener('DOMContentLoaded', () => {
       summary.quantityOptions = quantityOptionsSnapshot;
     }
 
+    if (window && window.console && typeof window.console.debug === 'function') {
+      console.debug('FinalStep: summary before writeSummary', {
+        addonIds: summary.addonIds,
+        addons: summary.addons,
+        previewSelections: summary.previewSelections,
+      });
+    }
     writeSummary(summary);
 
     if (finalStepSaveUrl) {

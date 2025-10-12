@@ -11,7 +11,7 @@
 
 
 <section class="main-content">
-    <div class="topbar">
+    <div class="reports-topbar">
         <h2>Reports Dashboard</h2>
     </div>
 
@@ -44,8 +44,12 @@
             <tbody>
                 @forelse($materials as $material)
                     @php
-                        $stock = $material->inventory->stock_level ?? 0;
-                        $reorder = $material->inventory->reorder_level ?? 0;
+                        $stock = $material->inventory->stock_level
+                            ?? $material->stock_qty
+                            ?? 0;
+                        $reorder = $material->inventory->reorder_level
+                            ?? $material->reorder_point
+                            ?? 0;
                         $status = $stock <= 0 ? 'Out' : ($stock <= $reorder ? 'Low' : 'In Stock');
                     @endphp
                     <tr>
@@ -85,14 +89,14 @@
                 </tr>
             </thead>
             <tbody>
-                @forelse($sales ?? [] as $sale)
+                @forelse($sales as $sale)
                     <tr>
-                        <td>{{ $sale->id }}</td>
-                        <td>{{ $sale->customer->name ?? '-' }}</td>
-                        <td>{{ $sale->items->pluck('name')->join(', ') }}</td>
-                        <td>{{ $sale->items->sum('pivot.quantity') }}</td>
-                        <td>{{ number_format($sale->total_price,2) }}</td>
-                        <td>{{ $sale->created_at->format('Y-m-d') }}</td>
+                        <td>{{ $sale->order_number ?? $sale->id }}</td>
+                        <td>{{ $sale->customer_name }}</td>
+                        <td>{{ $sale->items_list }}</td>
+                        <td>{{ $sale->items_quantity }}</td>
+                        <td>{{ number_format($sale->total_amount_value, 2) }}</td>
+                        <td>{{ optional($sale->order_date_value)->format('Y-m-d') }}</td>
                     </tr>
                 @empty
                     <tr><td colspan="6" class="text-center">No sales records found.</td></tr>

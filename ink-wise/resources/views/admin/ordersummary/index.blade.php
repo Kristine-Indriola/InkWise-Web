@@ -53,6 +53,50 @@
 		?? data_get($order, 'billing_address');
 
 	$items = collect(data_get($order, 'items', []));
+
+	// Compute subtotal from items and their breakdowns (prefer breakdown totals when present).
+	$computedSubtotal = $items->reduce(function ($carry, $it) {
+		$qty = (int) data_get($it, 'quantity', 1);
+		$unit = (float) data_get($it, 'unit_price', data_get($it, 'price', 0));
+		$break = collect(data_get($it, 'breakdown', []));
+		// consider numeric breakdown totals (multiply by their quantity when present)
+		$breakSum = $break->reduce(function ($bcarry, $row) {
+			$rowQty = data_get($row, 'quantity');
+			$rowTotal = data_get($row, 'total', data_get($row, 'unit_price'));
+			if (is_numeric($rowTotal)) {
+				$mult = ($rowQty !== null && is_numeric($rowQty)) ? (int) $rowQty : 1;
+				return $bcarry + ((float) $rowTotal * $mult);
+			}
+			return $bcarry;
+		}, 0);
+
+		if ($breakSum > 0) {
+			// If breakdown provides totals, use that as this item's subtotal
+			return $carry + $breakSum;
+		}
+
+		// fallback to explicit item total or computed quantity * unit price
+		$itemTotal = data_get($it, 'total');
+		if (is_numeric($itemTotal)) {
+			return $carry + (float) $itemTotal;
+		}
+
+		return $carry + ($qty * $unit);
+	}, 0);
+
+	// Use computed subtotal unless order explicitly provided one
+	$subtotal = $computedSubtotal ?: (float) data_get($order, 'subtotal', data_get($order, 'total_amount', 0));
+	$grandTotal = (float) data_get($order, 'grand_total', $subtotal - $discount + $shipping + $tax);
+
+	// initialize grouped sums (will be accumulated while rendering each item)
+	$groupSums = [
+		'invitations' => 0.0,
+		'paper_stock' => 0.0,
+		'addons' => 0.0,
+		'envelopes' => 0.0,
+		'giveaways' => 0.0,
+		'others' => 0.0,
+	];
 	$timeline = collect(data_get($order, 'timeline', data_get($order, 'events', [])))->sortByDesc(function ($event) {
 		$timestamp = data_get($event, 'timestamp', data_get($event, 'created_at'));
 		try {
@@ -150,16 +194,267 @@
 							<tbody>
 								@foreach($items as $item)
 									@php
-										$options = collect(data_get($item, 'options', []))
-											->filter(fn ($value) => filled($value))
-											->map(function ($value, $key) {
-												return ucfirst(str_replace('_', ' ', $key)) . ': ' . (is_string($value) ? $value : json_encode($value));
-											})
-											->values();
-										$images = collect(data_get($item, 'preview_images', data_get($item, 'images', [])))->filter();
 										$quantity = (int) data_get($item, 'quantity', 1);
 										$unitPrice = (float) data_get($item, 'unit_price', data_get($item, 'price', 0));
-										$lineTotal = (float) data_get($item, 'total', $quantity * $unitPrice);
+										$lineTotal = (float) data_get($item, 'total', data_get($item, 'subtotal', $quantity * $unitPrice));
+										// fallback: some giveaway items store their computed total in design_metadata or item metadata
+										if (empty($lineTotal) || $lineTotal === 0.0) {
+											$lineTotal = (float) data_get($item, 'design_metadata.total', data_get($item, 'metadata.giveaway.total', data_get($item, 'metadata.giveaway.price', data_get($item, 'metadata.total', 0))));
+										}
+
+										$normalizeToArray = function ($value) {
+											if ($value instanceof \Illuminate\Support\Collection) {
+												$value = $value->all();
+											}
+
+											if (is_string($value)) {
+												$decoded = json_decode($value, true);
+												if (json_last_error() === JSON_ERROR_NONE) {
+													return $decoded;
+												}
+											}
+
+											return is_array($value) ? $value : null;
+										};
+
+										$extractMoney = function ($value) {
+											if ($value === null || $value === '') {
+												return null;
+											}
+
+											if (is_numeric($value)) {
+												return (float) $value;
+											}
+
+											if (is_string($value)) {
+												$numeric = preg_replace('/[^0-9.\\-]/', '', $value);
+												return $numeric === '' ? null : (float) $numeric;
+											}
+
+											return null;
+										};
+
+
+										// normalize breakdown and sync quantities for paper stock and addons
+										$rawOptions = data_get($item, 'options', []);
+										$paperStockValue = data_get($rawOptions, 'paper_stock') ?? data_get($rawOptions, 'paper stock') ?? null;
+										$addonValues = [];
+										foreach ($rawOptions as $optKey => $optVal) {
+											if (str_contains(strtolower((string) $optKey), 'addon')) {
+												$vals = $normalizeToArray($optVal) ?: (is_string($optVal) && trim($optVal) !== '' ? [$optVal] : []);
+												foreach ($vals as $av) {
+													if (is_array($av)) {
+														$addonValues[] = strtolower(trim((string) ($av['name'] ?? $av['label'] ?? $av['title'] ?? $av['value'] ?? '')));
+													} elseif (is_object($av)) {
+														$tmp = json_decode(json_encode($av), true);
+														$addonValues[] = strtolower(trim((string) ($tmp['name'] ?? $tmp['label'] ?? $tmp['title'] ?? $tmp['value'] ?? '')));
+													} else {
+														$addonValues[] = strtolower(trim((string) $av));
+													}
+												}
+											}
+										}
+										$addonValues = array_filter($addonValues);
+
+										$breakdown = collect(data_get($item, 'breakdown', []))
+											->filter(function ($row) {
+												return !empty($row['label']);
+											})
+											->map(function ($row) use ($quantity, $paperStockValue, $addonValues) {
+												$label = strtolower((string) ($row['label'] ?? ''));
+												$row = is_array($row) ? $row : (array) $row;
+
+												// if this row matches the paper stock option, multiply quantity/total
+												if ($paperStockValue && $paperStockValue !== '' && str_contains($label, strtolower((string) $paperStockValue))) {
+													$row['quantity'] = $quantity;
+													if (isset($row['unit_price']) && is_numeric($row['unit_price'])) {
+														$row['total'] = (float) $row['unit_price'] * $quantity;
+													} elseif (isset($row['total']) && is_numeric($row['total'])) {
+														$row['total'] = (float) $row['total'] * $quantity;
+													}
+													return $row;
+												}
+
+												// if this row matches any addon name, multiply quantity/total
+												foreach ($addonValues as $av) {
+													if ($av !== '' && str_contains($label, $av)) {
+														$row['quantity'] = $quantity;
+														if (isset($row['unit_price']) && is_numeric($row['unit_price'])) {
+															$row['total'] = (float) $row['unit_price'] * $quantity;
+														} elseif (isset($row['total']) && is_numeric($row['total'])) {
+															$row['total'] = (float) $row['total'] * $quantity;
+														}
+														break;
+													}
+												}
+
+												return $row;
+											})
+											->values();
+
+										$formatAddon = function ($addon) use ($extractMoney, $quantity) {
+											if ($addon instanceof \Illuminate\Contracts\Support\Arrayable) {
+												$addon = $addon->toArray();
+											}
+
+											if (is_object($addon)) {
+												$addon = (array) $addon;
+											}
+
+											if (!is_array($addon)) {
+												return trim((string) $addon);
+											}
+
+											$name = $addon['name'] ?? $addon['label'] ?? $addon['title'] ?? $addon['value'] ?? null;
+											$type = $addon['type'] ?? $addon['category'] ?? null;
+											$price = $extractMoney($addon['price'] ?? $addon['amount'] ?? $addon['total'] ?? null);
+
+											if (!$name) {
+												try {
+													return json_encode($addon, JSON_UNESCAPED_UNICODE);
+												} catch (\Throwable $e) {
+													return 'Add-on';
+												}
+											}
+
+											$parts = [$name];
+											if ($type) {
+												$parts[] = '(' . ucfirst(str_replace('_', ' ', (string) $type)) . ')';
+											}
+
+											if ($price !== null) {
+												$totalPrice = $price * $quantity;
+												$priceLabel = $totalPrice > 0.009
+													? 'x' . $quantity . ' — ₱' . number_format($totalPrice, 2)
+													: 'Included';
+												$parts[] = $priceLabel;
+											}
+
+											return trim(implode(' ', array_filter($parts)));
+										};
+
+										$formatOptionValue = function ($key, $value) use ($normalizeToArray, $formatAddon, $quantity) {
+											$keyLower = strtolower((string) $key);
+
+											if (str_contains($keyLower, 'addon')) {
+												$addons = $normalizeToArray($value);
+												if (!$addons) {
+													if (is_string($value) && trim($value) !== '') {
+														return trim($value);
+													}
+
+													if (is_object($value)) {
+														$value = json_decode(json_encode($value), true);
+														$addons = is_array($value) ? $value : null;
+													}
+
+													if (!$addons) {
+														return 'None';
+													}
+												}
+												$labels = array_filter(array_map($formatAddon, $addons));
+												return $labels ? implode('; ', $labels) : 'None';
+											}
+
+											if ($keyLower == 'paper_stock') {
+												return (string) $value . ' x' . $quantity;
+											}
+
+											if ($keyLower == 'paper_stock_price' && is_numeric($value)) {
+												$total = (float) $value * $quantity;
+												return '₱' . number_format($total, 2);
+											}
+
+											if (is_array($value) || $value instanceof \Illuminate\Support\Collection) {
+												$asArray = $normalizeToArray($value);
+												if ($asArray) {
+													return implode(', ', array_map(fn ($entry) => is_scalar($entry) ? (string) $entry : json_encode($entry), $asArray));
+												}
+											}
+
+											if (is_object($value)) {
+												$value = json_decode(json_encode($value), true);
+												return $value ? implode(', ', array_map(fn ($entry) => is_scalar($entry) ? (string) $entry : json_encode($entry), $value)) : '';
+											}
+
+											return (string) $value;
+										};
+
+										$options = collect(data_get($item, 'options', []))
+											->filter(function ($value, $key) {
+												$k = strtolower($key);
+												// exclude duplicated summary keys (quantity/price) and paper stock/addon summaries
+												if (in_array($k, ['quantity_set', 'price_per_unit', 'paper_stock', 'paper_stock_price'])) {
+													return false;
+												}
+												if (str_contains($k, 'addon')) {
+													return false;
+												}
+												return true;
+											})
+											->filter(fn ($value) => filled($value))
+											->map(function ($value, $key) use ($formatOptionValue) {
+												$label = ucfirst(str_replace('_', ' ', $key));
+												$valueLabel = trim($formatOptionValue($key, $value));
+												return $label . ': ' . ($valueLabel !== '' ? $valueLabel : '—');
+											})
+											->unique(fn ($option) => \Illuminate\Support\Str::lower($option))
+											->values();
+										$images = collect(data_get($item, 'preview_images', data_get($item, 'images', [])))->filter();
+
+										// detect if item is envelope or giveaway by product_type or name
+										$ptype = strtolower((string) data_get($item, 'product_type', ''));
+										$iname = strtolower((string) data_get($item, 'name', ''));
+										$ltype = strtolower((string) data_get($item, 'line_type', ''));
+										$isEnvelope = str_contains($ptype, 'envelope') || str_contains($iname, 'envelope');
+										$isGiveaway = $ltype === 'giveaway' || str_contains($ptype, 'giveaway') || str_contains($iname, 'giveaway') || str_contains($iname, 'freebie');
+
+										// calculate breakdown sum for this item
+										$breakdownSum = 0;
+										foreach ($breakdown as $brow) {
+											$btotal = data_get($brow, 'total');
+											if (!is_numeric($btotal)) {
+												$bunit = data_get($brow, 'unit_price');
+												$bqty = data_get($brow, 'quantity') ?: 1;
+												$btotal = is_numeric($bunit) ? ((float) $bunit * (int) $bqty) : 0;
+											}
+											$breakdownSum += (float) $btotal;
+										}
+
+										// accumulate grouping sums: invitations (main line only, breakdowns are separate)
+										if (!$isEnvelope && !$isGiveaway) {
+											$groupSums['invitations'] += $lineTotal;
+										}
+
+										if ($isEnvelope) {
+											$groupSums['envelopes'] += $lineTotal;
+										}
+
+										if ($isGiveaway) {
+											$groupSums['giveaways'] += $lineTotal;
+										}
+
+										// breakdown rows (paper stock and addons) add to group sums only for invitations
+										if (!$isEnvelope && !$isGiveaway) {
+											foreach ($breakdown as $brow) {
+												$lbl = strtolower((string) data_get($brow, 'label', ''));
+												$btotal = data_get($brow, 'total');
+												if (!is_numeric($btotal)) {
+													$bunit = data_get($brow, 'unit_price');
+													$bqty = data_get($brow, 'quantity') ?: 1;
+													$btotal = is_numeric($bunit) ? ((float) $bunit * (int) $bqty) : 0;
+												}
+												$btotal = (float) $btotal;
+
+												if ($lbl !== '' && str_contains($lbl, strtolower((string) $paperStockValue))) {
+													$groupSums['paper_stock'] += $btotal;
+												} elseif (collect($addonValues)->contains(function ($v) use ($lbl) { return $v !== '' && str_contains($lbl, $v); })) {
+													$groupSums['addons'] += $btotal;
+												} else {
+													$groupSums['others'] += $btotal;
+												}
+											}
+										}
 									@endphp
 									<tr>
 										<td>
@@ -190,6 +485,28 @@
 										<td class="text-end" data-money>{{ number_format($unitPrice, 2) }}</td>
 										<td class="text-end" data-money>{{ number_format($lineTotal, 2) }}</td>
 									</tr>
+									@if($breakdown->isNotEmpty())
+										@foreach($breakdown as $row)
+											@php
+												$rowQuantity = data_get($row, 'quantity');
+												$rowUnit = data_get($row, 'unit_price');
+												$rowTotal = data_get($row, 'total', $rowUnit);
+											@endphp
+											<tr class="ordersummary-row--breakdown">
+												<td></td>
+												<td colspan="1">
+													<span class="item-breakdown-label">{{ $row['label'] }}</span>
+												</td>
+												<td class="text-center">{{ $rowQuantity !== null ? $rowQuantity : '—' }}</td>
+												<td class="text-end" @if($rowUnit !== null) data-money @endif>
+													{{ $rowUnit !== null ? number_format((float) $rowUnit, 2) : '—' }}
+												</td>
+												<td class="text-end" @if($rowTotal !== null) data-money @endif>
+													{{ $rowTotal !== null ? number_format((float) $rowTotal, 2) : '—' }}
+												</td>
+											</tr>
+										@endforeach
+									@endif
 								@endforeach
 							</tbody>
 						</table>
@@ -356,7 +673,38 @@
 				</header>
 				<dl class="sidebar-totals" data-sidebar-section>
 					<div>
+						<dt>Invitations</dt>
+						<dd data-money>{{ number_format($groupSums['invitations'] ?? 0, 2) }}</dd>
+					</div>
+					<div>
+						<dt>Paper stock</dt>
+						<dd data-money>{{ number_format($groupSums['paper_stock'] ?? 0, 2) }}</dd>
+					</div>
+					<div>
+						<dt>Add-ons</dt>
+						<dd data-money>{{ number_format($groupSums['addons'] ?? 0, 2) }}</dd>
+					</div>
+					<div>
+						<dt>Envelopes</dt>
+						<dd data-money>{{ number_format($groupSums['envelopes'] ?? 0, 2) }}</dd>
+					</div>
+					<div>
+						<dt>Giveaways</dt>
+						<dd data-money>{{ number_format($groupSums['giveaways'] ?? 0, 2) }}</dd>
+					</div>
+					@if(!empty($groupSums['others']) && (float) $groupSums['others'] !== 0.0)
+						<div>
+							<dt>Other line items</dt>
+							<dd data-money>{{ number_format($groupSums['others'] ?? 0, 2) }}</dd>
+						</div>
+					@endif
+					<div>
 						<dt>Subtotal</dt>
+						@php
+							$computedSidebarSubtotal = array_sum($groupSums);
+							$subtotal = $computedSidebarSubtotal ?: $subtotal;
+							$grandTotal = (float) data_get($order, 'grand_total', $subtotal - $discount + $shipping + $tax);
+						@endphp
 						<dd data-money>{{ number_format($subtotal, 2) }}</dd>
 					</div>
 					<div>
@@ -367,10 +715,12 @@
 						<dt>Shipping</dt>
 						<dd data-money>{{ number_format($shipping, 2) }}</dd>
 					</div>
-					<div>
-						<dt>Tax</dt>
-						<dd data-money>{{ number_format($tax, 2) }}</dd>
-					</div>
+					@if(!empty($tax) && (float) $tax !== 0.0)
+						<div>
+							<dt>Tax</dt>
+							<dd data-money>{{ number_format($tax, 2) }}</dd>
+						</div>
+					@endif
 					<div class="sidebar-totals__total">
 						<dt>Total due</dt>
 						<dd data-grand-total data-money>{{ number_format($grandTotal, 2) }}</dd>

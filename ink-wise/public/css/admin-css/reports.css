@@ -35,6 +35,49 @@
     gap: 18px;
 }
 
+.reports-filter-bar {
+    background: var(--admin-surface);
+    border-radius: 18px;
+    border: 1px solid rgba(148, 185, 255, 0.18);
+    box-shadow: var(--admin-shadow-soft);
+    padding: 18px 22px;
+}
+
+.reports-filter-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    align-items: flex-end;
+}
+
+.reports-filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 180px;
+}
+
+.reports-filter-field label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--admin-text-secondary);
+}
+
+.reports-filter-field input[type="date"] {
+    border-radius: 12px;
+    border: 1px solid rgba(148, 185, 255, 0.35);
+    background: rgba(148, 185, 255, 0.12);
+    padding: 9px 12px;
+    font-weight: 600;
+    color: var(--admin-text-primary);
+}
+
+.reports-filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
 .reports-summary-card {
     background: var(--admin-surface);
     border-radius: 18px;
@@ -82,47 +125,7 @@
     gap: 18px;
 }
 
-.reports-tabs {
-    display: inline-flex;
-    gap: 10px;
-    background: rgba(148, 185, 255, 0.1);
-    padding: 6px;
-    border-radius: 999px;
-}
-
-.reports-tab {
-    border: none;
-    background: transparent;
-    color: var(--admin-text-secondary);
-    padding: 8px 18px;
-    border-radius: 999px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.18s ease;
-}
-
-.reports-tab.is-active {
-    background: var(--admin-surface);
-    color: var(--admin-text-primary);
-    box-shadow: 0 10px 24px rgba(148, 185, 255, 0.25);
-}
-
-.reports-tab-panels {
-    position: relative;
-}
-
-.reports-panel__content {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-.reports-panel__content[hidden] {
-    display: none !important;
-}
-
-.reports-panel__content canvas {
+.reports-panel canvas {
     width: 100%;
     min-height: 320px;
 }
@@ -167,6 +170,10 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
     gap: 22px;
+}
+
+.reports-detail-grid.single-column {
+    grid-template-columns: minmax(0, 1fr);
 }
 
 .reports-card {

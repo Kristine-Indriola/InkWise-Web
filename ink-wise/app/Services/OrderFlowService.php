@@ -7,6 +7,8 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductAddon;
+use App\Models\ProductBulkOrder;
+use App\Models\ProductColor;
 use App\Models\ProductPaperStock;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Arr;
@@ -111,6 +113,15 @@ class OrderFlowService
 
         if (!$back && $template) {
             $back = $resolve($template->preview_back ?? $template->back_image ?? null);
+        }
+
+        // Consider explicit product->image (legacy field) as a valid candidate before falling back
+        if (!$front && !empty($product->image)) {
+            $front = $resolve($product->image);
+        }
+
+        if (!$back && !empty($product->image)) {
+            $back = $resolve($product->image);
         }
 
         if (!$front && $uploads->isNotEmpty()) {
@@ -259,6 +270,65 @@ class OrderFlowService
         ];
     }
 
+    public function primaryInvitationItem(Order $order): ?OrderItem
+    {
+        $order->loadMissing('items');
+
+        return $order->items->firstWhere('line_type', OrderItem::LINE_TYPE_INVITATION)
+            ?? $order->items->first();
+    }
+
+    protected function upsertLineItem(Order $order, string $lineType, array $attributes): OrderItem
+    {
+        $payload = array_merge(['line_type' => $lineType], $attributes);
+
+        $item = $order->items()->firstOrNew(['line_type' => $lineType]);
+        $item->fill($payload);
+
+        if (array_key_exists('design_metadata', $payload) && $payload['design_metadata'] === null) {
+            $item->design_metadata = null;
+        }
+
+        $item->save();
+
+        return $item->fresh([
+            'addons',
+            'paperStockSelection',
+            'bulkSelections',
+            'colors',
+        ]);
+    }
+
+    protected function removeLineItem(Order $order, string $lineType): void
+    {
+        $item = $order->items()->where('line_type', $lineType)->first();
+        if (!$item) {
+            return;
+        }
+
+        $item->addons()->delete();
+        $item->bulkSelections()->delete();
+        $item->paperStockSelection()->delete();
+        $item->colors()->delete();
+        $item->delete();
+    }
+
+    protected function calculateItemTotal(?OrderItem $item): float
+    {
+        if (!$item) {
+            return 0.0;
+        }
+
+        $baseSubtotal = $item->subtotal !== null
+            ? (float) $item->subtotal
+            : round(($item->unit_price ?? 0) * ($item->quantity ?? 0), 2);
+
+        $paperPrice = (float) ($item->paperStockSelection?->price ?? 0);
+        $addonTotal = (float) ($item->addons?->sum('addon_price') ?? 0);
+
+        return round($baseSubtotal + $paperPrice + $addonTotal, 2);
+    }
+
     public function attachOptionalSelections(OrderItem $orderItem, Product $product): void
     {
         $bulkTier = $product->bulkOrders->sortBy('min_qty')->first();
@@ -286,6 +356,481 @@ class OrderFlowService
                 'addon_name' => $addon->name,
                 'addon_price' => $addon->price,
             ]);
+        });
+    }
+
+    protected function syncPaperAndAddonsFromSummary(OrderItem $orderItem, array $summary): void
+    {
+        $previewSelections = Arr::get($summary, 'previewSelections', Arr::get($summary, 'metadata.final_step.preview_selections', []));
+
+        $castMoney = static function ($value): ?float {
+            if ($value === null || $value === '') {
+                return null;
+            }
+
+            if (is_numeric($value)) {
+                return (float) $value;
+            }
+
+            if (is_string($value)) {
+                $numeric = preg_replace('/[^0-9.\-]/', '', $value);
+                if ($numeric === '' || $numeric === null) {
+                    return null;
+                }
+
+                return (float) $numeric;
+            }
+
+            return null;
+        };
+
+        $paperStockId = Arr::get($summary, 'paperStockId')
+            ?? Arr::get($summary, 'metadata.final_step.paper_stock_id');
+        $paperStockName = Arr::get($summary, 'paperStockName')
+            ?? Arr::get($summary, 'metadata.final_step.paper_stock_name');
+        $paperStockPrice = Arr::get($summary, 'paperStockPrice');
+        if ($paperStockPrice === null) {
+            $paperStockPrice = Arr::get($summary, 'metadata.final_step.paper_stock_price');
+        }
+
+        if (is_array($previewSelections)) {
+            $previewPaper = Arr::get($previewSelections, 'paper_stock');
+            if (is_array($previewPaper)) {
+                if (!$paperStockId && isset($previewPaper['id']) && $previewPaper['id'] !== '') {
+                    $paperStockId = is_numeric($previewPaper['id']) ? (int) $previewPaper['id'] : $previewPaper['id'];
+                }
+
+                if ((!$paperStockName || $paperStockName === '') && isset($previewPaper['name'])) {
+                    $paperStockName = $previewPaper['name'];
+                }
+
+                if (($paperStockPrice === null || (is_numeric($paperStockPrice) && (float) $paperStockPrice <= 0)) && array_key_exists('price', $previewPaper)) {
+                    $paperStockPrice = $castMoney($previewPaper['price']);
+                }
+            }
+        }
+
+        if ($paperStockId || $paperStockName || $paperStockPrice !== null) {
+            $orderItem->paperStockSelection()->updateOrCreate([], [
+                'paper_stock_id' => $paperStockId,
+                'paper_stock_name' => $paperStockName,
+                'price' => $paperStockPrice !== null ? (float) $paperStockPrice : null,
+            ]);
+        } else {
+            $orderItem->paperStockSelection()->delete();
+        }
+
+        $addons = Arr::get($summary, 'addons', []);
+        $addonIds = Arr::get($summary, 'addonIds', []);
+
+        if (empty($addons)) {
+            $finalStepAddons = Arr::get($summary, 'metadata.final_step.addons');
+            if (is_array($finalStepAddons) && !empty($finalStepAddons)) {
+                $addons = $finalStepAddons;
+            }
+        }
+
+        if (empty($addons) && !empty($addonIds)) {
+            $addons = ProductAddon::query()
+                ->whereIn('id', collect($addonIds)->filter()->map(fn ($id) => (int) $id)->all())
+                ->get()
+                ->map(function (ProductAddon $addon) {
+                    return [
+                        'id' => $addon->id,
+                        'name' => $addon->name ?? 'Add-on',
+                        'price' => $addon->price ?? 0,
+                        'type' => $addon->addon_type,
+                    ];
+                })
+                ->values()
+                ->all();
+        }
+
+        $normaliseAddon = static function ($addon) use ($castMoney) {
+            if (!is_array($addon)) {
+                return null;
+            }
+
+            $id = $addon['id'] ?? $addon['addon_id'] ?? null;
+            if ($id !== null && is_numeric($id)) {
+                $id = (int) $id;
+            } else {
+                $id = null;
+            }
+
+            $type = $addon['type'] ?? $addon['addon_type'] ?? $addon['group'] ?? $addon['category'] ?? null;
+            $type = $type ? Str::snake((string) $type) : null;
+
+            $name = $addon['name'] ?? $addon['label'] ?? $addon['value'] ?? null;
+            if ($name === null) {
+                return null;
+            }
+
+            $price = $addon['price'] ?? $addon['amount'] ?? $addon['total'] ?? null;
+            $price = $castMoney($price) ?? 0.0;
+
+            return [
+                'id' => $id,
+                'type' => $type,
+                'name' => $name,
+                'price' => $price,
+            ];
+        };
+
+        $previewAddonCandidates = [];
+        if (is_array($previewSelections) && !empty($previewSelections)) {
+            foreach ($previewSelections as $group => $payload) {
+                if (!is_array($payload)) {
+                    continue;
+                }
+
+                $normalizedGroup = Str::snake((string) $group);
+                if (in_array($normalizedGroup, ['paper_stock', 'color', 'colors', 'foil', 'foil_color', 'ink_color', 'embossed_powder', 'metallic_powder'], true)) {
+                    continue;
+                }
+
+                $candidate = [
+                    'id' => $payload['id'] ?? null,
+                    'type' => $payload['type'] ?? $normalizedGroup,
+                    'name' => $payload['name'] ?? $payload['label'] ?? $payload['value'] ?? Str::headline(str_replace('_', ' ', (string) $group)),
+                    'price' => $payload['price'] ?? $payload['amount'] ?? $payload['total'] ?? null,
+                ];
+
+                $normalisedCandidate = $normaliseAddon($candidate);
+                if ($normalisedCandidate) {
+                    $previewAddonCandidates[] = $normalisedCandidate;
+                }
+            }
+        }
+
+        $combinedAddons = [];
+        $seenKeys = [];
+
+        foreach ($addons as $addon) {
+            $normalised = $normaliseAddon($addon);
+            if (!$normalised) {
+                continue;
+            }
+
+            $key = $normalised['id'] !== null
+                ? 'id:' . $normalised['id']
+                : 'name:' . Str::snake($normalised['type'] ?? 'addon') . ':' . Str::slug((string) $normalised['name']);
+
+            if (isset($seenKeys[$key])) {
+                continue;
+            }
+
+            $seenKeys[$key] = true;
+            $combinedAddons[] = $normalised;
+        }
+
+        foreach ($previewAddonCandidates as $addon) {
+            $key = $addon['id'] !== null
+                ? 'id:' . $addon['id']
+                : 'name:' . Str::snake($addon['type'] ?? 'addon') . ':' . Str::slug((string) $addon['name']);
+
+            if (isset($seenKeys[$key])) {
+                continue;
+            }
+
+            $seenKeys[$key] = true;
+            $combinedAddons[] = $addon;
+        }
+
+        $addons = $combinedAddons;
+
+        $orderItem->addons()->delete();
+
+        foreach ($addons as $addon) {
+            if (!is_array($addon)) {
+                continue;
+            }
+
+            $orderItem->addons()->create([
+                'addon_id' => $addon['id'] ?? null,
+                'addon_type' => $addon['type'] ?? null,
+                'addon_name' => $addon['name'] ?? 'Add-on',
+                'addon_price' => isset($addon['price']) ? (float) $addon['price'] : 0,
+            ]);
+        }
+    }
+
+    protected function resolveBulkTierForQuantity(?Product $product, int $quantity): ?ProductBulkOrder
+    {
+        if (!$product) {
+            return null;
+        }
+
+        $product->loadMissing(['bulkOrders']);
+
+        $bulkOrders = $product->bulkOrders;
+        if (!$bulkOrders || $bulkOrders->isEmpty()) {
+            return null;
+        }
+
+        $bulkOrders = $bulkOrders->sortBy('min_qty')->values();
+
+        $matchingTier = $bulkOrders->first(function (ProductBulkOrder $tier) use ($quantity) {
+            $min = $tier->min_qty !== null ? (int) $tier->min_qty : null;
+            $max = $tier->max_qty !== null ? (int) $tier->max_qty : null;
+
+            $minMatches = $min === null || $quantity >= $min;
+            $maxMatches = $max === null || $quantity <= $max;
+
+            return $minMatches && $maxMatches;
+        });
+
+        return $matchingTier ?? $bulkOrders->last();
+    }
+
+    protected function syncBulkSelection(OrderItem $orderItem, ?Product $product, int $quantity, float $unitPrice): void
+    {
+        $orderItem->bulkSelections()->delete();
+
+        if ($quantity <= 0) {
+            return;
+        }
+
+        $bulkTier = $this->resolveBulkTierForQuantity($product, $quantity);
+
+        $orderItem->bulkSelections()->create([
+            'product_bulk_order_id' => $bulkTier?->id,
+            'qty_selected' => $quantity,
+            'price_per_unit' => $bulkTier?->price_per_unit ?? $unitPrice,
+        ]);
+    }
+
+    protected function syncColorSelections(OrderItem $orderItem, array $previewSelections, ?Product $product = null): void
+    {
+        $orderItem->colors()->delete();
+
+        if (!$previewSelections || !is_array($previewSelections)) {
+            return;
+        }
+
+        if ($product) {
+            $product->loadMissing(['colors']);
+        }
+
+        $recognizedGroups = [
+            'color',
+            'colors',
+            'foil',
+            'foil_color',
+            'ink_color',
+            'embossed_powder',
+        ];
+
+        $records = [];
+
+        foreach ($previewSelections as $group => $payload) {
+            $normalizedGroup = Str::snake((string) $group);
+            if (!in_array($normalizedGroup, $recognizedGroups, true)) {
+                continue;
+            }
+
+            if (!is_array($payload)) {
+                continue;
+            }
+
+            $candidateId = $payload['id'] ?? null;
+            $color = null;
+            $colorId = null;
+
+            if ($candidateId !== null && is_numeric($candidateId)) {
+                $colorId = (int) $candidateId;
+                $color = $product?->colors?->firstWhere('id', $colorId) ?? ProductColor::find($colorId);
+            } elseif ($product?->colors) {
+                $color = $product->colors->first(function ($model) use ($payload) {
+                    return isset($payload['name'])
+                        && isset($model->name)
+                        && strcasecmp($model->name, (string) $payload['name']) === 0;
+                });
+                $colorId = $color?->id;
+            }
+
+            $colorName = $color?->name ?? ($payload['name'] ?? null);
+            $colorCode = $color?->color_code ?? ($payload['color_code'] ?? null);
+            $imagePath = $payload['image'] ?? null;
+
+            if ($colorId === null && $colorName === null) {
+                continue;
+            }
+
+            $key = ($colorId !== null ? $colorId : 'null') . ':' . strtolower((string) $colorName);
+            $records[$key] = [
+                'color_id' => $colorId,
+                'color_name' => $colorName,
+                'color_code' => $colorCode,
+                'image_path' => $imagePath,
+            ];
+        }
+
+        foreach ($records as $record) {
+            $orderItem->colors()->create($record);
+        }
+    }
+
+    protected function upsertEnvelopeOrderItem(Order $order, array $meta): OrderItem
+    {
+        $quantity = (int) ($meta['qty'] ?? $meta['quantity'] ?? 0);
+        if ($quantity < 1) {
+            $quantity = 1;
+        }
+
+        $unitPrice = (float) ($meta['price'] ?? $meta['unit_price'] ?? 0);
+        $total = $meta['total'] ?? $meta['subtotal'] ?? round($unitPrice * $quantity, 2);
+
+        $designMeta = is_array($meta) ? $meta : [];
+
+        $productId = $meta['product_id'] ?? $meta['id'] ?? null;
+        $product = $productId ? Product::with(['bulkOrders', 'paperStocks', 'addons', 'colors'])->find($productId) : null;
+
+        $orderItem = $this->upsertLineItem($order, OrderItem::LINE_TYPE_ENVELOPE, [
+            'product_id' => $product?->id ?? $productId,
+            'product_name' => $meta['name'] ?? $product?->name ?? 'Envelope',
+            'quantity' => $quantity,
+            'unit_price' => $unitPrice,
+            'subtotal' => round((float) $total, 2),
+            'design_metadata' => array_filter($designMeta, function ($value) {
+                if (is_array($value)) {
+                    return !empty($value);
+                }
+
+                return $value !== null && $value !== '';
+            }),
+        ]);
+
+        $this->syncEnvelopeAssociations($orderItem, $product, $meta);
+
+        return $orderItem->fresh([
+            'addons',
+            'paperStockSelection',
+            'bulkSelections',
+            'colors',
+        ]);
+    }
+
+    protected function upsertGiveawayOrderItem(Order $order, array $meta): OrderItem
+    {
+        $quantity = (int) ($meta['qty'] ?? $meta['quantity'] ?? 0);
+        if ($quantity < 1) {
+            $quantity = 1;
+        }
+
+        $unitPrice = (float) ($meta['price'] ?? $meta['unit_price'] ?? 0);
+        $total = $meta['total'] ?? $meta['subtotal'] ?? round($unitPrice * $quantity, 2);
+
+        $designMeta = is_array($meta) ? $meta : [];
+
+        return $this->upsertLineItem($order, OrderItem::LINE_TYPE_GIVEAWAY, [
+            'product_id' => $meta['product_id'] ?? $meta['id'] ?? null,
+            'product_name' => $meta['name'] ?? 'Giveaway',
+            'quantity' => $quantity,
+            'unit_price' => $unitPrice,
+            'subtotal' => round((float) $total, 2),
+            'design_metadata' => array_filter($designMeta, function ($value) {
+                if (is_array($value)) {
+                    return !empty($value);
+                }
+
+                return $value !== null && $value !== '';
+            }),
+        ]);
+    }
+
+    public function initializeOrderFromSummary(Order $order, array $summary): Order
+    {
+        $product = $this->resolveProduct(null, $summary['productId'] ?? null);
+        $quantity = max(1, (int) ($summary['quantity'] ?? 1));
+        $unitPrice = (float) ($summary['unitPrice'] ?? 0);
+
+        $invitationItem = $this->upsertLineItem($order, OrderItem::LINE_TYPE_INVITATION, [
+            'product_id' => $summary['productId'] ?? null,
+            'product_name' => $summary['productName'] ?? 'Custom Invitation',
+            'quantity' => $quantity,
+            'unit_price' => $unitPrice,
+            'subtotal' => round($unitPrice * $quantity, 2),
+            'design_metadata' => Arr::get($summary, 'metadata.design'),
+        ]);
+
+        $this->syncPaperAndAddonsFromSummary($invitationItem, $summary);
+        $this->syncBulkSelection($invitationItem, $product, $quantity, $unitPrice);
+
+        $previewSelections = Arr::get($summary, 'previewSelections', Arr::get($summary, 'metadata.final_step.preview_selections', []));
+        if (!is_array($previewSelections)) {
+            $previewSelections = [];
+        }
+        $this->syncColorSelections($invitationItem, $previewSelections, $product);
+
+        if (!empty($summary['envelope']) && is_array($summary['envelope'])) {
+            $this->upsertEnvelopeOrderItem($order, $summary['envelope']);
+        } else {
+            $this->removeLineItem($order, OrderItem::LINE_TYPE_ENVELOPE);
+        }
+
+        if (!empty($summary['giveaway']) && is_array($summary['giveaway'])) {
+            $this->upsertGiveawayOrderItem($order, $summary['giveaway']);
+        } else {
+            $this->removeLineItem($order, OrderItem::LINE_TYPE_GIVEAWAY);
+        }
+
+        return $order->fresh([
+            'items.addons',
+            'items.paperStockSelection',
+            'items.bulkSelections',
+            'items.colors',
+        ]);
+    }
+
+    protected function syncEnvelopeAssociations(OrderItem $orderItem, ?Product $product, array $meta): void
+    {
+        $quantity = max(1, (int) ($meta['qty'] ?? $meta['quantity'] ?? $orderItem->quantity ?? 1));
+        $unitPrice = (float) ($meta['price'] ?? $meta['unit_price'] ?? $orderItem->unit_price ?? 0);
+
+        // Envelope selections do not populate ancillary tables (addons, paper stock, colors, bulk)
+        $orderItem->bulkSelections()->delete();
+        $orderItem->paperStockSelection()->delete();
+        $orderItem->colors()->delete();
+        $orderItem->addons()->delete();
+    }
+
+    public function buildInitialOrderMetadata(array $summary): array
+    {
+        $metadata = [
+            'source' => 'design_editor',
+            'initiated_at' => now()->toIso8601String(),
+        ];
+
+        $designMeta = Arr::get($summary, 'metadata.design');
+        if ($designMeta) {
+            $metadata['design'] = $designMeta;
+        }
+
+        $inkMeta = Arr::get($summary, 'metadata.ink');
+        if ($inkMeta) {
+            $metadata['ink'] = $inkMeta;
+        }
+
+        $finalStepMeta = Arr::get($summary, 'metadata.final_step');
+        if ($finalStepMeta) {
+            $metadata['final_step'] = $finalStepMeta;
+        }
+
+        if (!empty($summary['envelope']) && is_array($summary['envelope'])) {
+            $metadata['envelope'] = $summary['envelope'];
+        }
+
+        if (!empty($summary['giveaway']) && is_array($summary['giveaway'])) {
+            $metadata['giveaway'] = $summary['giveaway'];
+        }
+
+        return array_filter($metadata, function ($value) {
+            if (is_array($value)) {
+                return !empty($value);
+            }
+
+            return $value !== null && $value !== '';
         });
     }
 
@@ -516,12 +1061,17 @@ class OrderFlowService
             'items.product.uploads',
             'items.paperStockSelection',
             'items.addons',
+            'items.bulkSelections',
+            'items.colors',
             'customerOrder',
         ]);
 
-        $item = $order->items->first();
-        $product = optional($item)->product;
+        $invitationItem = $this->primaryInvitationItem($order);
+        $product = optional($invitationItem)->product;
         $images = $product ? $this->resolveProductImages($product) : $this->placeholderImages();
+
+        $envelopeItem = $order->items->firstWhere('line_type', OrderItem::LINE_TYPE_ENVELOPE);
+        $giveawayItem = $order->items->firstWhere('line_type', OrderItem::LINE_TYPE_GIVEAWAY);
 
         $summary = [
             'orderId' => $order->id,
@@ -529,11 +1079,11 @@ class OrderFlowService
             'orderStatus' => $order->status,
             'paymentStatus' => $order->payment_status,
             'productId' => $product?->id,
-            'productName' => $item?->product_name ?? 'Custom invitation',
-            'quantity' => $item?->quantity ?? 0,
-            'quantityOptions' => $this->buildQuantityOptions($product, $item?->quantity),
-            'quantityLabel' => $item && $item->quantity ? number_format($item->quantity) : null,
-            'unitPrice' => $item?->unit_price ?? 0,
+            'productName' => $invitationItem?->product_name ?? 'Custom invitation',
+            'quantity' => $invitationItem?->quantity ?? 0,
+            'quantityOptions' => $this->buildQuantityOptions($product, $invitationItem?->quantity),
+            'quantityLabel' => $invitationItem && $invitationItem->quantity ? number_format($invitationItem->quantity) : null,
+            'unitPrice' => $invitationItem?->unit_price ?? 0,
             'subtotalAmount' => $order->subtotal_amount,
             'taxAmount' => $order->tax_amount,
             'shippingFee' => $order->shipping_fee,
@@ -541,10 +1091,10 @@ class OrderFlowService
             'previewImages' => $images['all'],
             'previewImage' => $images['front'],
             'invitationImage' => $images['front'],
-            'paperStockId' => $item?->paperStockSelection?->paper_stock_id,
-            'paperStockName' => $item?->paperStockSelection?->paper_stock_name,
-            'paperStockPrice' => $item?->paperStockSelection?->price,
-            'addons' => $item?->addons?->map(function ($addon) {
+            'paperStockId' => $invitationItem?->paperStockSelection?->paper_stock_id,
+            'paperStockName' => $invitationItem?->paperStockSelection?->paper_stock_name,
+            'paperStockPrice' => $invitationItem?->paperStockSelection?->price,
+            'addons' => $invitationItem?->addons?->map(function ($addon) {
                 return [
                     'id' => $addon->addon_id,
                     'name' => $addon->addon_name,
@@ -552,22 +1102,69 @@ class OrderFlowService
                     'type' => $addon->addon_type,
                 ];
             })->values()->all(),
-            'addonIds' => $item?->addons?->pluck('addon_id')->filter()->values()->all(),
+            'addonIds' => $invitationItem?->addons?->pluck('addon_id')->filter()->values()->all(),
+            'bulkSelection' => optional($invitationItem?->bulkSelections?->first(), function ($bulk) {
+                return array_filter([
+                    'product_bulk_order_id' => $bulk->product_bulk_order_id,
+                    'qty_selected' => $bulk->qty_selected,
+                    'price_per_unit' => $bulk->price_per_unit,
+                ], fn ($value) => $value !== null && $value !== '');
+            }),
+            'colorSelections' => $invitationItem?->colors?->map(function ($color) {
+                return array_filter([
+                    'color_id' => $color->color_id,
+                    'color_name' => $color->color_name,
+                    'color_code' => $color->color_code,
+                    'image_path' => $color->image_path,
+                ], fn ($value) => $value !== null && $value !== '');
+            })->values()->all(),
+            'colorIds' => $invitationItem?->colors?->pluck('color_id')->filter()->values()->all(),
             'metadata' => $order->metadata,
         ];
 
-        if ($item?->design_metadata) {
-            $summary['placeholders'] = Arr::get($item->design_metadata, 'placeholders', []);
+        if ($invitationItem?->design_metadata) {
+            $summary['placeholders'] = Arr::get($invitationItem->design_metadata, 'placeholders', []);
         }
 
+        $envelopeTotal = $this->calculateItemTotal($envelopeItem);
+        $giveawayTotal = $this->calculateItemTotal($giveawayItem);
+
         $summary['extras'] = [
-            'paper' => $item?->paperStockSelection?->price ?? 0,
-            'addons' => $item?->addons?->sum('addon_price') ?? 0,
-            'envelope' => (float) Arr::get($order->metadata, 'envelope.total', Arr::get($order->metadata, 'envelope.price', 0)),
-            'giveaway' => (float) Arr::get($order->metadata, 'giveaway.total', Arr::get($order->metadata, 'giveaway.price', 0)),
+            'paper' => $invitationItem?->paperStockSelection?->price ?? 0,
+            'addons' => $invitationItem?->addons?->sum('addon_price') ?? 0,
+            'envelope' => $envelopeItem ? $envelopeTotal : (float) Arr::get($order->metadata, 'envelope.total', Arr::get($order->metadata, 'envelope.price', 0)),
+            'giveaway' => $giveawayItem ? $giveawayTotal : (float) Arr::get($order->metadata, 'giveaway.total', Arr::get($order->metadata, 'giveaway.price', 0)),
+        ];
+
+        // Provide detailed ink breakdown if present in metadata
+        $inkMetaSummary = Arr::get($order->metadata, 'ink', []);
+        $inkUsageSummary = (float) Arr::get($inkMetaSummary, 'usage_per_invite_ml', Arr::get($inkMetaSummary, 'usage_ml', 0));
+        $inkUnitPriceSummary = (float) Arr::get($inkMetaSummary, 'unit_price', Arr::get($inkMetaSummary, 'price', 0));
+        $inkTotalSummary = 0.0;
+        if ($inkUnitPriceSummary > 0 && $inkUsageSummary > 0) {
+            $inkTotalSummary = round($inkUsageSummary * $inkUnitPriceSummary * ($invitationItem?->quantity ?? 0), 2);
+        } else {
+            $inkTotalSummary = (float) Arr::get($inkMetaSummary, 'total', 0);
+        }
+
+        $summary['extras']['ink'] = [
+            'usage_per_invite_ml' => $inkUsageSummary,
+            'unit_price_per_ml' => $inkUnitPriceSummary,
+            'total' => $inkTotalSummary,
         ];
 
         $envelopeMeta = Arr::get($order->metadata, 'envelope');
+        if (!$envelopeMeta && $envelopeItem) {
+            $envelopeMeta = array_merge(
+                is_array($envelopeItem->design_metadata) ? $envelopeItem->design_metadata : [],
+                [
+                    'qty' => $envelopeItem->quantity,
+                    'price' => (float) $envelopeItem->unit_price,
+                    'total' => $envelopeTotal,
+                ]
+            );
+        }
+
         $hasEnvelope = !empty($envelopeMeta);
         $summary['hasEnvelope'] = $hasEnvelope;
         if ($hasEnvelope) {
@@ -575,6 +1172,17 @@ class OrderFlowService
         }
 
         $giveawayMeta = Arr::get($order->metadata, 'giveaway');
+        if (!$giveawayMeta && $giveawayItem) {
+            $giveawayMeta = array_merge(
+                is_array($giveawayItem->design_metadata) ? $giveawayItem->design_metadata : [],
+                [
+                    'qty' => $giveawayItem->quantity,
+                    'price' => (float) $giveawayItem->unit_price,
+                    'total' => $giveawayTotal,
+                ]
+            );
+        }
+
         $hasGiveaway = !empty($giveawayMeta);
         $summary['hasGiveaway'] = $hasGiveaway;
         if ($hasGiveaway) {
@@ -637,36 +1245,102 @@ class OrderFlowService
 
     public function recalculateOrderTotals(Order $order): void
     {
-        $order->loadMissing(['items.addons', 'items.paperStockSelection']);
+        $order->loadMissing([
+            'items.addons',
+            'items.paperStockSelection',
+            'items.bulkSelections',
+        ]);
 
-        $item = $order->items->first();
-        if (!$item) {
+        if ($order->items->isEmpty()) {
             return;
         }
 
-        $baseSubtotal = round(($item->unit_price ?? 0) * ($item->quantity ?? 0), 2);
-        $paperPrice = (float) ($item->paperStockSelection?->price ?? 0);
-        $addonTotal = (float) $item->addons?->sum('addon_price') ?? 0;
-        $envelopeTotal = (float) Arr::get($order->metadata, 'envelope.total', Arr::get($order->metadata, 'envelope.price', 0));
-    $giveawayTotal = (float) Arr::get($order->metadata, 'giveaway.total', Arr::get($order->metadata, 'giveaway.price', 0));
+        $meta = $order->metadata ?? [];
+        $baseSubtotal = 0.0;
 
-    $subtotal = round($baseSubtotal + $paperPrice + $addonTotal + $envelopeTotal + $giveawayTotal, 2);
-        $tax = round($subtotal * static::DEFAULT_TAX_RATE, 2);
-        $shipping = static::DEFAULT_SHIPPING_FEE;
-        $total = round($subtotal + $tax + $shipping, 2);
+        $invitationItem = $this->primaryInvitationItem($order);
+
+        foreach ($order->items as $lineItem) {
+            $storedSubtotal = $lineItem->subtotal !== null
+                ? (float) $lineItem->subtotal
+                : round(($lineItem->unit_price ?? 0) * ($lineItem->quantity ?? 0), 2);
+
+            if ($lineItem->subtotal === null || abs(((float) $lineItem->subtotal) - $storedSubtotal) > 0.009) {
+                $lineItem->forceFill([
+                    'subtotal' => $storedSubtotal,
+                ])->save();
+            }
+
+            $baseSubtotal += $storedSubtotal;
+
+            if ($lineItem->line_type === OrderItem::LINE_TYPE_ENVELOPE) {
+                $meta['envelope'] = array_merge(
+                    is_array($lineItem->design_metadata) ? $lineItem->design_metadata : [],
+                    [
+                        'qty' => $lineItem->quantity,
+                        'price' => (float) $lineItem->unit_price,
+                        'total' => $storedSubtotal,
+                    ]
+                );
+            }
+
+            if ($lineItem->line_type === OrderItem::LINE_TYPE_GIVEAWAY) {
+                $meta['giveaway'] = array_merge(
+                    is_array($lineItem->design_metadata) ? $lineItem->design_metadata : [],
+                    [
+                        'qty' => $lineItem->quantity,
+                        'price' => (float) $lineItem->unit_price,
+                        'total' => $storedSubtotal,
+                    ]
+                );
+            }
+        }
+
+        if (!$order->items->firstWhere('line_type', OrderItem::LINE_TYPE_ENVELOPE)) {
+            unset($meta['envelope']);
+        }
+
+        if (!$order->items->firstWhere('line_type', OrderItem::LINE_TYPE_GIVEAWAY)) {
+            unset($meta['giveaway']);
+        }
+
+        $inkMeta = Arr::get($meta, 'ink', Arr::get($order->metadata ?? [], 'ink', []));
+        $inkUsagePerInvite = (float) Arr::get($inkMeta, 'usage_per_invite_ml', Arr::get($inkMeta, 'usage_ml', 0));
+        $inkUnitPrice = Arr::get($inkMeta, 'unit_price', Arr::get($inkMeta, 'price', null));
+        $inkTotal = 0.0;
+        if ($inkUnitPrice !== null && $inkUsagePerInvite > 0) {
+            $inkTotal = round($inkUsagePerInvite * (float) $inkUnitPrice * ($invitationItem?->quantity ?? 0), 2);
+        } else {
+            $inkTotal = (float) Arr::get($inkMeta, 'total', (float) Arr::get($inkMeta, 'price', 0));
+        }
+
+        if (is_array($inkMeta)) {
+            $inkMeta['total'] = $inkTotal;
+            $meta['ink'] = $inkMeta;
+        }
+
+    $paperTotal = (float) ($invitationItem?->paperStockSelection?->price ?? 0);
+    $addonsTotal = (float) ($invitationItem?->addons?->sum(fn($addon) => $addon->addon_price * $invitationItem->quantity) ?? 0);
+    $extrasTotal = round($paperTotal + $addonsTotal + $inkTotal, 2);
+
+    $subtotal = round($baseSubtotal + $extrasTotal, 2);
+        $tax = 0.0;
+        $shipping = $order->shipping_fee !== null ? (float) $order->shipping_fee : static::DEFAULT_SHIPPING_FEE;
+    $total = round($subtotal + $shipping, 2);
 
         $order->update([
             'subtotal_amount' => $subtotal,
             'tax_amount' => $tax,
             'shipping_fee' => $shipping,
             'total_amount' => $total,
+            'metadata' => $meta,
         ]);
     }
 
     public function applyFinalSelections(Order $order, array $payload): Order
     {
         $order->loadMissing(['items.product', 'items.addons', 'items.paperStockSelection']);
-        $item = $order->items->first();
+        $item = $this->primaryInvitationItem($order);
 
         if (!$item) {
             throw new \RuntimeException('Unable to apply final selections without an order item.');
@@ -720,15 +1394,37 @@ class OrderFlowService
             }
         }
 
-        $item->load(['addons', 'paperStockSelection']);
+        $this->syncBulkSelection($item, $product, $quantity, $unitPrice);
+        $this->syncColorSelections($item, $previewSelections, $product);
+
+        $item->load(['addons', 'paperStockSelection', 'bulkSelections', 'colors']);
 
         $meta = $order->metadata ?? [];
+        $bulkSelection = $item->bulkSelections->first();
         $meta['final_step'] = [
             'quantity' => $item->quantity,
             'paper_stock_id' => $item->paperStockSelection?->paper_stock_id,
             'paper_stock_name' => $item->paperStockSelection?->paper_stock_name,
             'paper_stock_price' => $item->paperStockSelection?->price,
             'addon_ids' => $item->addons->pluck('addon_id')->filter()->values()->all(),
+            'bulk' => $bulkSelection ? [
+                'product_bulk_order_id' => $bulkSelection->product_bulk_order_id,
+                'qty_selected' => $bulkSelection->qty_selected,
+                'price_per_unit' => $bulkSelection->price_per_unit,
+            ] : [
+                'product_bulk_order_id' => null,
+                'qty_selected' => $item->quantity,
+                'price_per_unit' => $item->unit_price,
+            ],
+            'color_ids' => $item->colors->pluck('color_id')->filter()->values()->all(),
+            'colors' => $item->colors->map(function ($color) {
+                return array_filter([
+                    'color_id' => $color->color_id,
+                    'color_name' => $color->color_name,
+                    'color_code' => $color->color_code,
+                    'image_path' => $color->image_path,
+                ], fn ($value) => $value !== null && $value !== '');
+            })->values()->all(),
             'metadata' => $metadataPayload,
             'preview_selections' => $previewSelections,
             'updated_at' => now()->toIso8601String(),
@@ -736,6 +1432,7 @@ class OrderFlowService
 
         $order->update(['metadata' => $meta]);
 
+        $order->refresh();
         $this->recalculateOrderTotals($order);
 
         return $order->fresh([
@@ -778,7 +1475,7 @@ class OrderFlowService
             $maxQuantity = $quantity;
         }
 
-        $meta['envelope'] = array_filter([
+        $envelopeMeta = array_filter([
             'id' => $payload['envelope_id'] ?? $envelopeMeta['id'] ?? null,
             'product_id' => $payload['product_id'] ?? null,
             'name' => $envelopeMeta['name'] ?? null,
@@ -792,8 +1489,12 @@ class OrderFlowService
             'updated_at' => now()->toIso8601String(),
         ], fn ($value) => $value !== null && $value !== '');
 
+        $meta['envelope'] = $envelopeMeta;
         $order->update(['metadata' => $meta]);
 
+        $this->upsertEnvelopeOrderItem($order, $envelopeMeta);
+
+        $order->refresh();
         $this->recalculateOrderTotals($order);
 
         return $order->fresh([
@@ -830,7 +1531,7 @@ class OrderFlowService
             fn ($src) => is_string($src) && trim($src) !== ''
         ));
 
-        $meta['giveaway'] = array_filter([
+        $giveawayMeta = array_filter([
             'id' => $metadata['id'] ?? $product->id,
             'product_id' => $product->id,
             'name' => $metadata['name'] ?? $product->name,
@@ -851,8 +1552,12 @@ class OrderFlowService
             return $value !== null && $value !== '';
         }, ARRAY_FILTER_USE_BOTH);
 
+        $meta['giveaway'] = $giveawayMeta;
         $order->update(['metadata' => $meta]);
 
+        $this->upsertGiveawayOrderItem($order, $giveawayMeta);
+
+        $order->refresh();
         $this->recalculateOrderTotals($order);
 
         return $order->fresh([
@@ -868,6 +1573,10 @@ class OrderFlowService
         unset($meta['envelope']);
 
         $order->update(['metadata' => $meta]);
+
+        $this->removeLineItem($order, OrderItem::LINE_TYPE_ENVELOPE);
+
+        $order->refresh();
 
         $this->recalculateOrderTotals($order);
 
@@ -885,6 +1594,10 @@ class OrderFlowService
 
         $order->update(['metadata' => $meta]);
 
+        $this->removeLineItem($order, OrderItem::LINE_TYPE_GIVEAWAY);
+
+        $order->refresh();
+
         $this->recalculateOrderTotals($order);
 
         return $order->fresh([
@@ -898,7 +1611,7 @@ class OrderFlowService
     {
         $summary = $this->buildSummary($order);
 
-        $primaryItem = $order->items->first();
+        $primaryItem = $this->primaryInvitationItem($order);
         if ($primaryItem instanceof OrderItem) {
             $order->update([
                 'summary_snapshot' => $this->buildSummarySnapshot($order, $primaryItem),

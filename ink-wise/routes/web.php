@@ -28,6 +28,7 @@ use App\Http\Controllers\Admin\MaterialController;
 use App\Http\Controllers\Auth\RoleLoginController;
 use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\MaterialsController;
+use App\Http\Controllers\Admin\SiteContentController;
 use App\Http\Controllers\customerProfileController;
 use App\Http\Controllers\Owner\OwnerStaffController;
 use App\Http\Controllers\Auth\CustomerAuthController;
@@ -46,6 +47,7 @@ use App\Http\Controllers\Owner\OwnerInventoryController;
 use App\Http\Controllers\Staff\StaffInventoryController;
 use App\Http\Controllers\Admin\ReportsDashboardController;
 use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
+use App\Http\Controllers\PaymentController;
 
 use App\Http\Controllers\Admin\OrderSummaryController;
 use App\Models\Product;
@@ -96,6 +98,30 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
 
     Route::get('/ordersummary/{order:order_number?}', [OrderSummaryController::class, 'show'])
         ->name('ordersummary.index');
+
+    // Admin orders list (table) - simple closure for listing orders in the admin UI
+    Route::get('/orders', function () {
+        $allowed = [10, 20, 25, 50, 100];
+        $default = 20;
+        $perPage = (int) request()->query('per_page', $default);
+        if (!in_array($perPage, $allowed, true)) {
+            $perPage = $default;
+        }
+
+        $orders = \App\Models\Order::query()
+            ->select(['id', 'order_number', 'customer_id', 'total_amount', 'order_date', 'status', 'payment_status'])
+            ->latest('order_date')
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        // Render the table view inside the ordersummary folder
+        return view('admin.ordersummary.tables', compact('orders'));
+    })->name('orders.index');
+
+    // Delete an order (AJAX / API-friendly)
+    Route::delete('/orders/{order}', [\App\Http\Controllers\Admin\OrderController::class, 'destroy'])
+        ->name('orders.destroy');
 
 
 
@@ -220,18 +246,28 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::get('messages/unread-count', [MessageController::class, 'adminUnreadCount'])
         ->name('messages.unread-count');
 
-     Route::get('reports', [ReportsDashboardController::class, 'index'])
-         ->name('reports.index');
+    Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/', [ReportsDashboardController::class, 'index'])->name('index');
+        Route::get('/sales', [ReportsDashboardController::class, 'sales'])->name('sales');
+        Route::get('/inventory', [ReportsDashboardController::class, 'inventory'])->name('inventory');
 
-    // Optional: Sales export
-    Route::get('reports/sales/export/{type}', [ReportsDashboardController::class, 'exportSales'])
-         ->name('reports.sales.export');
+        Route::get('/sales/export/{type}', [ReportsDashboardController::class, 'exportSales'])
+            ->name('sales.export');
 
-    // Optional: Inventory export
-    Route::get('reports/inventory/export/{type}', [ReportsDashboardController::class, 'exportInventory'])
-         ->name('reports.inventory.export');
+        Route::get('/inventory/export/{type}', [ReportsDashboardController::class, 'exportInventory'])
+            ->name('inventory.export');
+    });
+
+    Route::prefix('settings')->name('settings.')->group(function () {
+        Route::get('site-content', [SiteContentController::class, 'edit'])->name('site-content.edit');
+        Route::put('site-content', [SiteContentController::class, 'update'])->name('site-content.update');
+    });
 
 }); // closes the admin group
+
+// Temporary debug route: return the current session order summary payload.
+// Accessible only in local environment or when allow_debug=1 is provided.
+Route::get('/debug/order-summary', [OrderFlowController::class, 'debugSessionSummary'])->name('debug.order_summary');
 
 Route::patch('/admin/notifications/{id}/read', function ($id) {
     $user = Auth::user();
@@ -247,6 +283,10 @@ Route::patch('/admin/notifications/{id}/read', function ($id) {
         ->findOrFail($id);
 
     $notification->markAsRead();
+
+    if (request()->expectsJson()) {
+        return response()->json(['status' => 'marked']);
+    }
 
     return back()->with('success', 'Notification marked as read.');
 })->middleware('auth')->name('notifications.read');
@@ -286,11 +326,18 @@ Route::get('/search', function (\Illuminate\Http\Request $request) {
 /** Auth (Register/Login/Logout) */
 Route::get('/customer/register', [CustomerAuthController::class, 'showRegister'])->name('customer.register.form');
 Route::post('/customer/register', [CustomerAuthController::class, 'register'])->name('customer.register');
+Route::post('/customer/register/send-code', [CustomerAuthController::class, 'sendVerificationCode'])->name('customer.register.send-code');
 Route::get('/customer/login', [CustomerAuthController::class, 'showLogin'])->name('customer.login.form');
 Route::post('/customer/login', [CustomerAuthController::class, 'login'])->name('customer.login');
 Route::post('/customer/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
 
 Route::get('/customer/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');
+
+Route::middleware('auth')->group(function () {
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+});
 
 Route::post('/messages', [MessageController::class, 'storeFromContact'])->name('messages.store');
 
@@ -336,10 +383,19 @@ Route::get('/order', fn () => view('customer.profile.orderform'))->name('custome
 
 Route::middleware('auth')->get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');  // Protected
 
+// Customer Favorites (render favorites page)
+Route::get('/customer/favorites', fn () => view('customer.profile.favorite'))->name('customer.favorites');
+
 
 // My Purchases
-
 Route::get('/customer/my-orders', fn () => view('customer.profile.my_purchase'))->name('customer.my_purchase');
+// To Pay tab (lists orders pending payment)
+Route::get('/customer/my-orders/topay', fn () => view('customer.profile.purchase.topay'))->name('customer.my_purchase.topay');
+Route::get('/customer/my-orders/toship', fn () => view('customer.profile.purchase.toship'))->name('customer.my_purchase.toship');
+Route::get('/customer/my-orders/toreceive', fn () => view('customer.profile.purchase.toreceive'))->name('customer.my_purchase.toreceive');
+Route::get('/customer/my-orders/completed', fn () => view('customer.profile.purchase.completed'))->name('customer.my_purchase.completed');
+Route::get('/customer/my-orders/cancelled', fn () => view('customer.profile.purchase.cancelled'))->name('customer.my_purchase.cancelled');
+Route::get('/customer/my-orders/return-refund', fn () => view('customer.profile.purchase.return_refund'))->name('customer.my_purchase.return_refund');
 
 
 /** Profile & Addresses (Protected) */
@@ -433,6 +489,7 @@ Route::post('/order/envelope', [OrderFlowController::class, 'storeEnvelope'])->n
 Route::delete('/order/envelope', [OrderFlowController::class, 'clearEnvelope'])->name('order.envelope.clear');
 Route::get('/order/summary', [OrderFlowController::class, 'summary'])->name('order.summary');
 Route::get('/order/summary.json', [OrderFlowController::class, 'summaryJson'])->name('order.summary.json');
+Route::post('/order/summary/sync', [OrderFlowController::class, 'syncSummary'])->name('order.summary.sync');
 Route::delete('/order/summary', [OrderFlowController::class, 'clearSummary'])->name('order.summary.clear');
 Route::get('/order/giveaways', [OrderFlowController::class, 'giveaways'])->name('order.giveaways');
 Route::post('/order/giveaways', [OrderFlowController::class, 'storeGiveaway'])->name('order.giveaways.store');
@@ -447,6 +504,12 @@ Route::get('/order/birthday', fn () => view('customer.templates.birthday'))->nam
 Route::get('/checkout', [OrderFlowController::class, 'checkout'])->name('customer.checkout');
 Route::post('/checkout/complete', [OrderFlowController::class, 'completeCheckout'])->name('checkout.complete');
 Route::post('/checkout/cancel', [OrderFlowController::class, 'cancelCheckout'])->name('checkout.cancel');
+
+Route::middleware('auth')->group(function () {
+    Route::post('/payments/gcash', [PaymentController::class, 'createGCashPayment'])->name('payment.gcash.create');
+    Route::get('/payments/gcash/return', [PaymentController::class, 'handleGCashReturn'])->name('payment.gcash.return');
+});
+Route::post('/payments/gcash/webhook', [PaymentController::class, 'webhook'])->name('payment.gcash.webhook');
 
 /**Customer Upload Route*/
 Route::middleware('auth')->post('/customer/upload/design', [CustomerAuthController::class, 'uploadDesign'])->name('customer.upload.design');
@@ -597,6 +660,10 @@ if (interface_exists('Laravel\\Socialite\\Contracts\\Factory')) {
 }
 
 Route::middleware('auth')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
+
+require __DIR__.'/auth.php';
+
+
 
 
 

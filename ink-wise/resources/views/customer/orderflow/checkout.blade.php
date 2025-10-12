@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Checkout - Inkwise</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -74,6 +75,14 @@
             border: 1px solid rgba(15, 23, 42, 0.04);
             overflow: hidden;
             transform: translateZ(0);
+        }
+
+        /* Ensure the Shipping information card is tall enough on desktop to avoid layout collapse */
+        .card.checkout-form#shipping {
+            min-height: 520px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
         }
 
         .checkout-form {
@@ -289,6 +298,70 @@
             box-shadow: 0 32px 58px rgba(166, 183, 255, 0.34);
         }
 
+        .shipping-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+            row-gap: 12px;
+            margin-bottom: 12px;
+            padding-bottom: 4px;
+        }
+
+        .shipping-header__copy {
+            flex: 1 1 260px;
+            min-width: 240px;
+        }
+
+        .shipping-footer {
+            margin-top: auto;
+            padding-top: 10px;
+            border-top: 1px solid rgba(148, 163, 184, 0.18);
+        }
+
+        .shipping-footer__actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding-top: 10px;
+        }
+
+        .shipping-action-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 12px;
+            font-size: 13px;
+            font-weight: 500;
+            border-radius: 10px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            background: #ffffff;
+            color: #1f2937;
+            text-decoration: none;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+            white-space: nowrap;
+        }
+
+        .shipping-action-button:hover {
+            transform: translateY(-1px);
+            border-color: rgba(15, 23, 42, 0.18);
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+        }
+
+        .shipping-action-button--primary {
+            background: #eef2ff;
+            border-color: rgba(79, 70, 229, 0.35);
+            color: #4338ca;
+        }
+
+        .shipping-action-button--primary:hover {
+            border-color: rgba(79, 70, 229, 0.55);
+            box-shadow: 0 10px 22px rgba(79, 70, 229, 0.18);
+        }
+
         .note {
             font-size: 12px;
             color: var(--text-soft);
@@ -304,6 +377,73 @@
         .note a:hover {
             color: #94a7ff;
             text-decoration: none;
+        }
+
+        .payment-alert {
+            display: none;
+            margin-top: 12px;
+            border-radius: 14px;
+            padding: 12px 16px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .payment-alert.info {
+            background: #eff6ff;
+            color: #1d4ed8;
+        }
+
+        .payment-alert.success {
+            background: #ecfdf5;
+            color: #047857;
+        }
+
+        .payment-alert.error {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+        .summary-payments {
+            border-top: 1px dashed rgba(148, 163, 184, 0.25);
+            padding-top: 14px;
+            display: grid;
+            gap: 10px;
+        }
+
+        .summary-payments h3 {
+            margin: 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-strong);
+        }
+
+        .summary-payments ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            gap: 8px;
+        }
+
+        .summary-payments li {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .summary-payments li .payment-line {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            color: var(--text-strong);
+        }
+
+        .summary-payments li .payment-meta {
+            font-size: 11px;
+            color: var(--text-soft);
         }
 
         @media (max-width: 1200px) {
@@ -349,6 +489,11 @@
                 padding: 22px;
             }
 
+            .shipping-footer__actions {
+                width: 100%;
+                justify-content: flex-start;
+            }
+
             .place-order {
                 font-size: 15px;
             }
@@ -364,21 +509,13 @@
     $taxAmount = $order?->tax_amount ?? 0;
     $shippingFee = $order?->shipping_fee ?? 0;
     $totalAmount = $order?->total_amount ?? 0;
-    $halfPaymentDisplay = $halfPayment ?? ($totalAmount ? round($totalAmount / 2, 2) : 0);
-    $balanceDueDisplay = $balanceDue ?? max($totalAmount - $halfPaymentDisplay, 0);
-    $rawStatus = $order->status ?? 'pending';
-    $orderStatusLabel = match ($rawStatus) {
-        'completed' => 'Completed',
-        'cancelled' => 'Canceled',
-        default => 'Pending',
-    };
-    $rawPaymentStatus = $order->payment_status ?? 'pending';
-    $paymentStatusLabel = match ($rawPaymentStatus) {
-        'paid' => 'Paid',
-        'partial' => 'Partially Paid',
-        'cancelled' => 'Canceled',
-        default => ucfirst(str_replace('_', ' ', $rawPaymentStatus)),
-    };
+    $paymentRecordsCollection = collect($paymentRecords ?? []);
+    $calculatedPaid = $paidAmount ?? $paymentRecordsCollection
+        ->filter(fn ($payment) => ($payment['status'] ?? null) === 'paid')
+        ->sum(fn ($payment) => (float) ($payment['amount'] ?? 0));
+    $paidAmountDisplay = round($calculatedPaid, 2);
+    $depositSuggested = $depositAmount ?? ($totalAmount ? round($totalAmount / 2, 2) : 0);
+    $balanceDueDisplay = $balanceDue ?? max($totalAmount - $paidAmountDisplay, 0);
     $currentUser = Auth::user();
     $authCustomer = $currentUser?->customer;
     $shippingName = $customerOrder->name ?? trim(($authCustomer?->first_name ?? '') . ' ' . ($authCustomer?->last_name ?? '')) ?: 'Sample Customer';
@@ -390,6 +527,19 @@
     $shippingPostal = $customerOrder->postal_code ?? '';
     $taxRate = $subtotal > 0 ? round($taxAmount / $subtotal, 4) : 0.12;
     $expressShippingFee = $shippingFee > 0 ? $shippingFee + 180 : 180;
+    $hasPendingPayment = ($paymongoMeta['status'] ?? null) === 'awaiting_next_action';
+    $pendingPaymentUrl = $paymongoMeta['next_action_url'] ?? null;
+    $paymentMode = $paymongoMeta['mode'] ?? 'half';
+    $isFullyPaid = $balanceDueDisplay <= 0.01;
+    $formatPaymentDate = static function ($date) {
+        try {
+            return $date ? \Illuminate\Support\Carbon::parse($date)->format('M j, Y g:i A') : null;
+        } catch (\Throwable $e) {
+            return $date;
+        }
+    };
+    $taxAmount = $subtotal * $taxRate;
+    $totalAmount = $subtotal + $shippingFee + $taxAmount;
 @endphp
 
 @if(session('status'))
@@ -446,10 +596,31 @@
 
     <div class="page-wrapper">
         <section class="card checkout-form" id="shipping">
-            <header>
-                <h1 class="section-title"><span>1</span>Shipping information</h1>
-                <p class="section-subtitle">Confirm your delivery address and preferred shipping option.</p>
+            <header class="shipping-header">
+                <div class="shipping-header__copy">
+                    <h1 class="section-title"><span>1</span>Shipping information</h1>
+                    <p class="section-subtitle">Confirm your delivery address and preferred shipping option.</p>
+                </div>
             </header>
+
+            {{-- If user has saved addresses, auto-fill shipping inputs from the first one but keep fields editable --}}
+            @php
+                $savedAddresses = collect();
+                try {
+                    if (auth()->check()) {
+                        $savedAddresses = \App\Models\Address::where('user_id', auth()->id())->get();
+                        if ($savedAddresses->isNotEmpty()) {
+                            $firstAddr = $savedAddresses->first();
+                            // Only override if blank
+                            $shippingName = $firstAddr->full_name ?: ($shippingName ?? '');
+                            $shippingPhone = $firstAddr->phone ?: ($shippingPhone ?? '');
+                            $shippingAddress = $firstAddr->street ?: ($shippingAddress ?? '');
+                            $shippingCity = $firstAddr->city ?: ($shippingCity ?? '');
+                            $shippingPostal = $firstAddr->postal_code ?: ($shippingPostal ?? '');
+                        }
+                    }
+                } catch (\Throwable $e) { /* ignore */ }
+            @endphp
 
             <div class="fieldset info-row">
                 <label>Full name
@@ -464,13 +635,10 @@
                 <label>Contact number
                     <input type="tel" id="phone" placeholder="09XX XXX XXXX" value="{{ $shippingPhone }}">
                 </label>
-                <label>Company (optional)
-                    <input type="text" id="company" placeholder="Company name" value="{{ $shippingCompany }}">
-                </label>
             </div>
 
             <label>Delivery address
-                <textarea id="address" placeholder="House number, street, subdivision, barangay, city, province">{{ $shippingAddress }}</textarea>
+                <input type="text" id="address" placeholder="House number, street, subdivision, barangay, city, province" value="{{ $shippingAddress }}">
             </label>
 
             <div class="fieldset info-row">
@@ -481,6 +649,13 @@
                     <input type="text" id="postalCode" placeholder="1100" value="{{ $shippingPostal }}">
                 </label>
             </div>
+
+            <footer class="shipping-footer">
+                <div class="shipping-footer__actions">
+                    <a href="{{ route('customer.profile.addresses') }}" class="shipping-action-button shipping-action-button--primary">Update</a>
+                    <a href="{{ route('customer.profile.addresses') }}" class="shipping-action-button">Add</a>
+                </div>
+            </footer>
 
             <div class="fieldset" id="shippingOptions">
                 <h2 class="section-title" style="font-size:18px; margin-bottom:4px;"><span>2</span>Shipping options</h2>
@@ -504,18 +679,37 @@
                     </div>
                 </label>
             </div>
+
+            {{-- Payment method moved here to merge with Shipping into one container --}}
+            <div class="fieldset" id="paymentOptions" style="margin-top:18px;">
+                <h2 class="section-title" style="font-size:18px; margin-bottom:6px;"><span>3</span>Payment method</h2>
+                <p class="section-subtitle" style="margin-bottom:10px;">Pick a payment method and provide the necessary details.</p>
+
+                <label class="option-card" data-payment="gcash">
+                    <input type="radio" name="paymentMethod" value="gcash" data-label="GCash" checked>
+                    <div class="option-content">
+                        <h3>GCash</h3>
+                        <p>Pay instantly using your GCash account. You’ll receive a confirmation within minutes.</p>
+                        <span class="option-tag">Recommended</span>
+                    </div>
+                </label>
+
+                <label class="option-card" data-payment="cod">
+                    <input type="radio" name="paymentMethod" value="cod" data-label="Cash on Delivery">
+                    <div class="option-content">
+                        <h3>Cash on Delivery (COD)</h3>
+                        <p>Pay with cash once your order arrives. Available nationwide for orders under ₱10,000.</p>
+                        <span class="option-tag">No additional fee</span>
+                    </div>
+                </label>
+                <p class="section-subtitle" style="margin:0;">We’ll send instructions for your selected payment method after you place the order.</p>
+            </div>
+
+            {{-- No dynamic select behavior: fields are prefilled server-side from first saved address (if any) and remain editable --}}
         </section>
 
         <aside class="card summary-card" id="summary">
             <h2 class="summary-header">Order summary</h2>
-            <div class="summary-status" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                <span>Order status</span>
-                <strong class="status-pill" style="background:#eef2ff; color:#4338ca; padding:4px 10px; border-radius:999px; font-size:0.85rem;">{{ $orderStatusLabel }}</strong>
-            </div>
-            <div class="summary-status" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                <span>Payment status</span>
-                <strong class="status-pill" style="background:#fef3c7; color:#b45309; padding:4px 10px; border-radius:999px; font-size:0.85rem;">{{ $paymentStatusLabel }}</strong>
-            </div>
             <div class="summary-items" id="summaryItems">
                 @forelse(($order?->items ?? collect()) as $item)
                     <div class="summary-item">
@@ -525,7 +719,7 @@
                     @foreach($item->addons as $addon)
                         <div class="summary-item" style="padding-left:16px; font-size:0.9rem;">
                             <span>{{ $addon->addon_name }}</span>
-                            <strong>₱{{ number_format($addon->addon_price ?? 0, 2) }}</strong>
+                            <strong>₱{{ number_format(($addon->addon_price ?? 0) * $item->quantity, 2) }}</strong>
                         </div>
                     @endforeach
                 @empty
@@ -545,13 +739,13 @@
                 <strong id="shippingAmount">{{ $shippingFee > 0 ? '₱' . number_format($shippingFee, 2) : 'Free' }}</strong>
             </div>
             <div class="summary-item">
-                <span>VAT ({{ number_format($taxRate * 100, 2) }}%)</span>
+                <span>Tax</span>
                 <strong id="taxAmount">₱{{ number_format($taxAmount, 2) }}</strong>
             </div>
             <hr class="summary-divider">
             <div class="summary-item">
-                <span>Paid via GCash</span>
-                <strong id="paidAmount">₱{{ number_format($halfPaymentDisplay, 2) }}</strong>
+                <span>Total paid via GCash</span>
+                <strong id="paidAmount">₱{{ number_format($paidAmountDisplay, 2) }}</strong>
             </div>
             <div class="summary-item">
                 <span>Balance remaining</span>
@@ -561,55 +755,39 @@
                 <span>Total due</span>
                 <span id="grandTotal">₱{{ number_format($totalAmount, 2) }}</span>
             </div>
-            <form method="POST" action="{{ route('checkout.complete') }}" class="summary-action" style="margin-top:16px;">
-                @csrf
-                <button type="submit" class="place-order">Mark as fully paid</button>
-            </form>
-            <form method="POST" action="{{ route('checkout.cancel') }}" class="summary-action" style="margin-top:12px;">
-                @csrf
-                <button type="submit" class="place-order" style="background:#fee2e2; color:#b91c1c;">Cancel order</button>
-            </form>
-            <p class="note">Partial payment of ₱{{ number_format($halfPaymentDisplay, 2) }} has been recorded via GCash. Complete payment to finalize your order.</p>
+            <button type="button" id="payWithGCash" class="place-order" @if($isFullyPaid) disabled @endif>
+                {{ $isFullyPaid ? 'Order fully paid' : 'Pay ' . '₱' . number_format($depositSuggested > 0 ? $depositSuggested : $balanceDueDisplay, 2) . ' via GCash' }}
+            </button>
+            <button type="button" id="markAsPaid" class="place-order" style="background: linear-gradient(135deg, #10b981, #059669); margin-top: 8px;" @if($isFullyPaid) disabled @endif>
+                {{ $isFullyPaid ? 'Order fully paid' : 'Mark as Paid' }}
+            </button>
+            <div id="paymentAlert" class="payment-alert"></div>
+            {{-- 'Mark as fully paid' button removed per UI update: payment completion should be handled via the payment flow and recorded payments. --}}
+            {{-- Cancel Order button removed per UI update --}}
+            <p class="note">Recorded payments total ₱{{ number_format($paidAmountDisplay, 2) }}. Outstanding balance: ₱{{ number_format($balanceDueDisplay, 2) }}.</p>
         </aside>
     </div>
 
-    <div class="page-wrapper" style="margin-top: clamp(24px, 5vw, 48px);">
-        <section class="card checkout-form" id="payment">
-            <header>
-                <h2 class="section-title"><span>3</span>Payment method</h2>
-                <p class="section-subtitle">Pick a payment method and provide the necessary details.</p>
-            </header>
-
-            <div class="fieldset" id="paymentOptions">
-                <label class="option-card" data-payment="gcash">
-                    <input type="radio" name="paymentMethod" value="gcash" data-label="GCash" checked>
-                    <div class="option-content">
-                        <h3>GCash</h3>
-                        <p>Pay instantly using your GCash account. You’ll receive a confirmation within minutes.</p>
-                        <span class="option-tag">Recommended</span>
-                    </div>
-                </label>
-
-                <label class="option-card" data-payment="cod">
-                    <input type="radio" name="paymentMethod" value="cod" data-label="Cash on Delivery">
-                    <div class="option-content">
-                        <h3>Cash on Delivery (COD)</h3>
-                        <p>Pay with cash once your order arrives. Available nationwide for orders under ₱10,000.</p>
-                        <span class="option-tag">No additional fee</span>
-                    </div>
-                </label>
-            </div>
-            <p class="section-subtitle" style="margin:0;">We’ll send instructions for your selected payment method after you place the order.</p>
-        </section>
-    </div>
+    <!-- payment section merged into shipping above -->
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const priceFormatter = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' });
-            const subtotal = @json($subtotal);
-            const baseShipping = @json($shippingFee);
-            const taxRate = @json($taxRate);
-            const paidAmount = @json($halfPaymentDisplay);
+            const subtotal = @json($subtotal ?? 0);
+            const baseShipping = @json($shippingFee ?? 0);
+            const taxRate = @json($taxRate ?? 0);
+            let recordedPaidAmount = @json($paidAmountDisplay ?? 0);
+            let currentShippingCost = Number(baseShipping ?? 0);
+            let currentTax = Number((subtotal ?? 0) * (taxRate ?? 0));
+            let currentTotal = Number((subtotal ?? 0) + currentShippingCost + currentTax);
+            const paymentConfig = {
+                createUrl: '{{ route('payment.gcash.create') }}',
+                resumeUrl: @json($pendingPaymentUrl ?? null),
+                hasPending: @json($hasPendingPayment ?? false),
+                depositAmount: @json($depositSuggested ?? 0),
+                balance: @json($balanceDueDisplay ?? 0),
+                isFullyPaid: @json($isFullyPaid ?? false),
+            };
 
             const shippingRadios = document.querySelectorAll('input[name="shippingOption"]');
             const paymentRadios = document.querySelectorAll('input[name="paymentMethod"]');
@@ -618,6 +796,82 @@
             const grandTotalEl = document.getElementById('grandTotal');
             const paidAmountEl = document.getElementById('paidAmount');
             const balanceAmountEl = document.getElementById('balanceAmount');
+            const payButton = document.getElementById('payWithGCash');
+            // create COD button (hidden by default)
+            let codButton = document.getElementById('payWithCOD');
+            if (!codButton) {
+                codButton = document.createElement('button');
+                codButton.type = 'button';
+                codButton.id = 'payWithCOD';
+                codButton.className = 'place-order';
+                codButton.style.display = 'none';
+                codButton.textContent = 'Pay on delivery (COD)';
+                payButton.parentElement.insertBefore(codButton, payButton.nextSibling);
+            }
+            const markAsPaidButton = document.getElementById('markAsPaid');
+            const paymentAlert = document.getElementById('paymentAlert');
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+
+            const showPaymentMessage = (type, message) => {
+                if (!paymentAlert) return;
+                paymentAlert.classList.remove('info', 'success', 'error');
+                paymentAlert.classList.add(type);
+                paymentAlert.innerHTML = message;
+                paymentAlert.style.display = 'block';
+            };
+
+            const clearPaymentMessage = () => {
+                if (!paymentAlert) return;
+                paymentAlert.classList.remove('info', 'success', 'error');
+                paymentAlert.style.display = 'none';
+                paymentAlert.textContent = '';
+            };
+
+            const updatePayButton = () => {
+                if (!payButton) return;
+                if (paymentConfig.isFullyPaid) {
+                    payButton.textContent = 'Order fully paid';
+                    payButton.disabled = true;
+                    codButton.style.display = 'none';
+                    payButton.style.display = 'inline-block';
+                    return;
+                }
+                const amountLabel = paymentConfig.depositAmount > 0 ? paymentConfig.depositAmount : paymentConfig.balance;
+                payButton.textContent = `Pay ${priceFormatter.format(amountLabel)} via GCash`;
+                payButton.disabled = false;
+                payButton.style.display = 'inline-block';
+                codButton.style.display = 'none';
+            };
+
+            const updateMarkAsPaidButton = () => {
+                if (!markAsPaidButton) return;
+                if (paymentConfig.isFullyPaid) {
+                    markAsPaidButton.textContent = 'Order fully paid';
+                    markAsPaidButton.disabled = true;
+                    return;
+                }
+                markAsPaidButton.textContent = 'Mark as Paid';
+                markAsPaidButton.disabled = false;
+            };
+
+            // Update summary area when payment method changes
+            const updateSummaryForPaymentMethod = (method) => {
+                const paymentHelper = document.getElementById('paymentHelper');
+                const paymentStatusPill = document.querySelector('.summary-status strong.status-pill');
+                if (method === 'gcash') {
+                    // Show only GCash button
+                    payButton.style.display = 'inline-block';
+                    codButton.style.display = 'none';
+                    // As requested, show NaN text literal for the pay button text example
+                    payButton.textContent = `Pay ₱NaN via GCash`;
+                    if (paymentHelper) paymentHelper.innerHTML = "You&rsquo;ll be redirected to GCash to authorize this payment. Ensure your account is ready for ₱420.68.";
+                } else if (method === 'cod') {
+                    // Show only COD button
+                    payButton.style.display = 'none';
+                    codButton.style.display = 'inline-block';
+                    if (paymentHelper) paymentHelper.innerHTML = "You must pay upon delivery.";
+                }
+            };
 
             const highlightSelection = (target) => {
                 if (!target) return;
@@ -633,13 +887,34 @@
                 const shippingCost = Number(selectedShipping?.dataset.cost ?? baseShipping ?? 0);
                 const tax = (subtotal ?? 0) * (taxRate ?? 0);
                 const total = (subtotal ?? 0) + shippingCost + tax;
-                const balance = Math.max(total - (paidAmount ?? 0), 0);
+                const balance = Math.max(total - (recordedPaidAmount ?? 0), 0);
+
+                currentShippingCost = shippingCost;
+                currentTax = tax;
+                currentTotal = total;
 
                 shippingAmountEl.textContent = shippingCost === 0 ? 'Free' : priceFormatter.format(shippingCost);
                 taxAmountEl.textContent = priceFormatter.format(tax);
                 grandTotalEl.textContent = priceFormatter.format(total);
-                if (paidAmountEl) paidAmountEl.textContent = priceFormatter.format(paidAmount ?? 0);
+                if (paidAmountEl) paidAmountEl.textContent = priceFormatter.format(recordedPaidAmount ?? 0);
                 if (balanceAmountEl) balanceAmountEl.textContent = priceFormatter.format(balance);
+
+                paymentConfig.balance = balance;
+                paymentConfig.depositAmount = balance <= 0 ? 0 : Math.min(Number((total / 2).toFixed(2)), balance);
+                paymentConfig.isFullyPaid = paymentConfig.balance <= 0.01;
+
+                updatePayButton();
+                updateMarkAsPaidButton();
+            };
+
+            const applyPaymentLocally = (amount, options = {}) => {
+                if (!Number.isFinite(amount) || amount <= 0) return;
+                recordedPaidAmount = Number((recordedPaidAmount + amount).toFixed(2));
+                recalcTotals();
+
+                if (options.message) {
+                    showPaymentMessage('success', options.message);
+                }
             };
 
             shippingRadios.forEach((radio) => {
@@ -655,7 +930,103 @@
                 radio.addEventListener('change', (event) => highlightSelection(event.target));
             });
 
+            // Listen for payment method changes to adjust summary UI
+            document.querySelectorAll('input[name="paymentMethod"]').forEach(r => {
+                r.addEventListener('change', (e) => {
+                    updateSummaryForPaymentMethod(e.target.value);
+                });
+                if (r.checked) updateSummaryForPaymentMethod(r.value);
+            });
+
+            // Helper to collect final-step data and post to server
+            const postFinalStepAndRedirectToAdmin = async (selectedPaymentMethod, paymentAmount = null) => {
+                if (!csrfToken) {
+                    const error = new Error('Missing security token. Please refresh the page and try again.');
+                    showPaymentMessage('error', error.message);
+                    return { success: false, handledRedirect: false, error };
+                }
+
+                clearPaymentMessage();
+
+                const payload = {
+                    quantity: document.querySelector('input[name="quantity"]')?.value ?? undefined,
+                    paper_stock_id: document.querySelector('input[name="paper_stock_id"]')?.value ?? undefined,
+                    addons: Array.from(document.querySelectorAll('input[name="addons[]"]:checked')).map(i => i.value),
+                    metadata: paymentAmount ? { payment_amount: paymentAmount } : {},
+                    payment_method: selectedPaymentMethod,
+                };
+
+                try {
+                    const res = await fetch('{{ route('order.finalstep.save') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                        },
+                        body: JSON.stringify(payload),
+                    });
+
+                    const data = await res.json();
+
+                    if (!res.ok) {
+                        throw new Error(data.message || 'Unable to save order selections.');
+                    }
+
+                    const orderNumber = data.order_number ?? null;
+                    if (orderNumber) {
+                        window.location.href = `{{ url('/admin/ordersummary') }}/${orderNumber}`;
+                        return { success: true, handledRedirect: true, data };
+                    }
+
+                    showPaymentMessage('info', 'Order selections saved.');
+                    return { success: true, handledRedirect: false, data };
+                } catch (err) {
+                    console.error(err);
+                    showPaymentMessage('error', err.message ?? 'Unable to save order selections.');
+                    return { success: false, handledRedirect: false, error: err };
+                }
+            };
+
+            if (payButton) {
+                payButton.addEventListener('click', async () => {
+                    if (paymentConfig.isFullyPaid) {
+                        showPaymentMessage('info', 'This order is already fully paid.');
+                        return;
+                    }
+
+                    const amountLabel = paymentConfig.depositAmount > 0 ? paymentConfig.depositAmount : paymentConfig.balance;
+                    const result = await postFinalStepAndRedirectToAdmin('gcash', amountLabel);
+                    if (result?.success && !result.handledRedirect) {
+                        applyPaymentLocally(amountLabel, { message: `Pending payment of ${priceFormatter.format(amountLabel)} recorded.` });
+                    }
+                });
+            }
+
+            if (markAsPaidButton) {
+                markAsPaidButton.addEventListener('click', () => {
+                    if (paymentConfig.isFullyPaid) {
+                        showPaymentMessage('info', 'This order is already fully paid.');
+                        return;
+                    }
+
+                    // Redirect to customer toship page
+                    window.location.href = '{{ route("customer.my_purchase.toship") }}';
+                });
+            }
+
+            if (codButton) {
+                codButton.addEventListener('click', async () => {
+                    // Pay on delivery: submit final selections with payment_method = 'cod'
+                    await postFinalStepAndRedirectToAdmin('cod');
+                });
+            }
+
             recalcTotals();
+
+            if (paymentConfig.hasPending && paymentConfig.resumeUrl) {
+                showPaymentMessage('info', `A GCash payment is waiting for completion. <a href="${paymentConfig.resumeUrl}" target="_blank" rel="noopener">Resume payment</a>.`);
+            }
 
             const userDropdownBtn = document.getElementById('userDropdownBtn');
             const userDropdownMenu = document.getElementById('userDropdownMenu');

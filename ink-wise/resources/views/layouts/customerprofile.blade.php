@@ -15,6 +15,10 @@
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
 
+  <!-- Icon fonts used by invitations header -->
+  <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-bold-rounded/css/uicons-bold-rounded.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ asset('css/customer/customer.css') }}">
     <link rel="stylesheet" href="{{ asset('css/customer/customerprofile.css') }}">
@@ -54,6 +58,40 @@
                 <input type="text" name="query" placeholder="Search..." 
                        class="border rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring focus:ring-[#06b6d4]">
             </form>
+            
+      <!-- Favorites & Cart icons (copied from invitations topbar) -->
+      <div class="hidden md:flex items-center gap-2">
+        @php
+          $hasFavoritesRoute = \Illuminate\Support\Facades\Route::has('customer.favorites');
+          $favoritesLink = [
+            'url' => $hasFavoritesRoute ? route('customer.favorites') : '#',
+            'disabled' => !$hasFavoritesRoute,
+            'label' => 'My favorites',
+          ];
+
+          $hasCartRoute = \Illuminate\Support\Facades\Route::has('customer.cart');
+          $cartLink = [
+            'url' => $hasCartRoute ? route('customer.cart') : '#',
+            'disabled' => !$hasCartRoute,
+            'label' => 'My cart',
+          ];
+        @endphp
+
+        <a href="{{ $favoritesLink['url'] }}"
+           class="nav-icon-button"
+           aria-label="{{ $favoritesLink['label'] }}"
+           title="{{ $favoritesLink['label'] }}"
+           @if($favoritesLink['disabled']) aria-disabled="true" @endif>
+          <i class="fi fi-br-comment-heart" aria-hidden="true"></i>
+        </a>
+        <a href="{{ $cartLink['url'] }}"
+           class="nav-icon-button"
+           aria-label="{{ $cartLink['label'] }}"
+           title="{{ $cartLink['label'] }}"
+           @if($cartLink['disabled']) aria-disabled="true" @endif>
+          <i class="bi bi-bag-heart-fill" aria-hidden="true"></i>
+        </a>
+      </div>
             {{-- If not logged in --}}
             @guest
                 <a href="{{ route('customer.login') }}"
@@ -75,7 +113,7 @@
                         <a href="{{ route('customer.profile.index') }}"
 
                            class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa]">
-                            Profile
+                            My Account
                         </a>
                         <form id="logout-form" action="{{ route('customer.logout') }}" method="POST">
                             @csrf
@@ -90,6 +128,47 @@
         </div>
     </div>
 </header>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const storageKey = 'inkwise-finalstep';
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+  const icons = Array.from(document.querySelectorAll('.nav-icon-button'));
+  if (!icons.length) return;
+
+  icons.forEach((icon) => {
+    // If the server rendered this anchor as aria-disabled (pointer-events:none),
+    // remove it so our JS can handle clicks. Store original state so we could restore if needed.
+    try {
+      if (icon.getAttribute && icon.getAttribute('aria-disabled') === 'true') {
+        icon.setAttribute('data-was-aria-disabled', 'true');
+        icon.removeAttribute('aria-disabled');
+        // ensure it's clickable and keyboard accessible
+        try { icon.style.pointerEvents = 'auto'; } catch (e) {}
+        try { icon.setAttribute('tabindex', '0'); } catch (e) {}
+        try { icon.setAttribute('role', 'button'); } catch (e) {}
+        // support Enter key
+        icon.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); icon.click(); } });
+      }
+    } catch (e) {
+      // ignore
+    }
+    icon.addEventListener('click', (e) => {
+      try {
+        e.preventDefault();
+        const href = icon.getAttribute('href');
+        if (href && href !== '#') {
+          window.location.href = href;
+          return;
+        }
+        // Default: navigate to order summary page (no POST)
+        window.location.href = '/order/summary';
+      } catch (err) {
+        window.location.href = '/order/summary';
+      }
+    });
+  });
+});
+</script>
       <!-- Welcome Section -->
 <div class="welcome-section">
     <h1>Welcome to InkWise</h1>
@@ -102,14 +181,25 @@
     <aside class="sidebar rounded-2xl p-4 md:col-span-1 h-full">
       <nav class="space-y-2">
         <!-- My Account Dropdown -->
-        <div x-data="{ open: true }" class="relative">
-          <!-- Dropdown is open by default (open: true) -->
-          <button @click="open = !open"
-                  class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition w-full text-left font-medium bg-[#e0f7fa]">
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-5 0-9 2.5-9 5.5A1.5 1.5 0 0 0 4.5 21h15a1.5 1.5 0 0 0 1.5-1.5C21 16.5 17 14 12 14Z"/></svg>
-            My Account
-            <svg class="w-4 h-4 ml-auto transition-transform" :class="{'rotate-180': open}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"></path></svg>
-          </button>
+        @php
+          $myAccountActive = request()->routeIs('customer.profile.*');
+        @endphp
+        <div x-data="{ open: {{ $myAccountActive ? 'true' : 'false' }} }" class="relative">
+          <!-- Dropdown header with link + toggle -->
+          <div class="flex items-stretch gap-2">
+            <a href="{{ route('customer.profile.index') }}"
+               class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition w-full font-medium {{ $myAccountActive ? 'bg-[#e0f7fa] text-gray-700' : 'text-gray-700 hover:bg-[#e0f7fa]' }}">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-5 0-9 2.5-9 5.5A1.5 1.5 0 0 0 4.5 21h15a1.5 1.5 0 0 0 1.5-1.5C21 16.5 17 14 12 14Z"/></svg>
+              <span>My Account</span>
+            </a>
+            @if($myAccountActive)
+              <button type="button"
+                      @click="open = !open"
+                      class="px-3 py-3 rounded-xl text-gray-500 hover:bg-[#e0f7fa] transition">
+                <svg class="w-4 h-4 transition-transform" :class="{'rotate-180': open}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"></path></svg>
+              </button>
+            @endif
+          </div>
           <div x-show="open" @click.away="open = false" class="mt-1 ml-6 space-y-1">
             <!-- Profile (with link) -->
             <a href="{{ route('customer.profile.index') }}"
@@ -122,20 +212,23 @@
                class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] rounded transition">
               Addresses
             </a>
-            <!-- My Favorites (no link) -->
-            <div class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] rounded transition cursor-pointer">
-              My Favorites
-            </div>
+            <!-- My Favorites removed from dropdown (moved below) -->
           </div>
         </div>
         <!-- Other Sidebar Items -->
-        <a href="{{ route('customer.my_purchase') }}" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition">
+        @php
+          $myPurchaseActive = request()->routeIs('customer.my_purchase*');
+        @endphp
+      <a href="{{ route('customer.my_purchase') }}"
+        class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition {{ $myPurchaseActive ? 'bg-[#e0f7fa] text-gray-700 font-medium' : 'text-gray-700 hover:bg-[#e0f7fa]' }}">
           <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M3 7h18v2H3zm0 4h18v2H3zm0 4h18v2H3z"/></svg>
-          <span class="font-medium">My Purchase</span>
+          <span class="font-medium">Purchase</span>
         </a>
-        <a href="#" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition">
-          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M7 3h10a2 2 0 0 1 2 2v14l-7-3-7 3V5a2 2 0 0 1 2-2z"/></svg>
-          <span class="font-medium">Order History</span>
+        @php $favoritesActive = request()->routeIs('customer.favorites*'); @endphp
+        <a href="{{ route('customer.favorites') }}"
+          class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition {{ $favoritesActive ? 'bg-[#e0f7fa] text-gray-700 font-medium' : 'text-gray-700 hover:bg-[#e0f7fa]' }}">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 6 4 4 6.5 4c1.74 0 3.41.81 4.5 2.09C12.09 4.81 13.76 4 15.5 4 18 4 20 6 20 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          <span class="font-medium">Favorites</span>
         </a>
         <a href="#" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition relative group">
           <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -158,13 +251,6 @@
   </div>
 </a>
 
-        <form method="POST" action="{{ route('customer.logout')}}">
-          @csrf
-          <button type="submit" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition w-full text-left">
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M16 13v-2H7V8l-5 4 5 4v-3zM20 3h-8a2 2 0 0 0-2 2v3h2V5h8v14h-8v-3h-2v3a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/></svg>
-            <span class="font-medium">Log Out</span>
-          </button>
-        </form>
       </nav>
     </aside>
     <!-- Main Content Area -->

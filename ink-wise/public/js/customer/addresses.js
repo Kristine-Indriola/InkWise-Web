@@ -29,8 +29,10 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.edit-address-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const address = JSON.parse(this.dataset.address);
-            document.getElementById('edit_full_name').value = address.full_name || '';
-            document.getElementById('edit_phone').value = address.phone || '';
+            const editFull = document.getElementById('edit_full_name');
+            const editPhone = document.getElementById('edit_phone');
+            if (editFull) editFull.value = address.full_name || '';
+            if (editPhone) editPhone.value = address.phone || '';
             document.getElementById('edit_region').value = address.region || '';
             document.getElementById('edit_region').dispatchEvent(new Event('change'));
             setTimeout(() => {
@@ -223,8 +225,10 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.edit-address-btn').forEach(button => {
         button.addEventListener('click', function() {
             const address = JSON.parse(this.getAttribute('data-address'));
-            document.getElementById('edit_full_name').value = address.full_name;
-            document.getElementById('edit_phone').value = address.phone;
+            const eFull = document.getElementById('edit_full_name');
+            const ePhone = document.getElementById('edit_phone');
+            if (eFull) eFull.value = address.full_name || '';
+            if (ePhone) ePhone.value = address.phone || '';
             document.getElementById('edit_region').value = address.region;
             document.getElementById('edit_province').value = address.province;
             document.getElementById('edit_city').value = address.city;

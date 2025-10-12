@@ -1,6 +1,16 @@
 @extends('layouts.owner.app')
 @section('content')
-@include('layouts.owner.sidebar') 
+@include('layouts.owner.sidebar')
+
+<style>
+  /* Dark mode styles */
+  .dark-mode .table-container { background:#374151; color:#f9fafb; }
+  .dark-mode table { color:#f9fafb; }
+  .dark-mode table thead th { background:#4b5563; color:#f9fafb; }
+  .dark-mode table tbody td { border-color:#4b5563; }
+  .dark-mode table tbody tr:hover { background:#4b5563; }
+  .dark-mode body { background:#111827; }
+</style>
 
     <section class="main-content">
     <!-- Table container for pending staff account requests -->

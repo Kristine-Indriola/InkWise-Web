@@ -59,8 +59,9 @@ class RoleLoginController extends Controller
             };
 
             if ($redirectRoute && RouteFacade::has($redirectRoute)) {
+                $greeting = $user->role === 'owner' ? 'Owner' : $greetingName;
                 return redirect()->intended(route($redirectRoute))
-                    ->with('success', '👋 Welcome back, ' . $greetingName . '!');
+                    ->with('success', '👋 Welcome back, ' . $greeting . '!');
             }
 
             return redirect()->intended(route('dashboard'))
@@ -76,6 +77,10 @@ class RoleLoginController extends Controller
     public function logout(Request $request)
     {
         Auth::logout();
+
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
         return redirect('/')
             ->with('success', '✅ You have been logged out successfully.');
     }

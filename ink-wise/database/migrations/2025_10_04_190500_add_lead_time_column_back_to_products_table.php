@@ -14,7 +14,7 @@ return new class extends Migration
 
 		if (!Schema::hasColumn('products', 'lead_time_days')) {
 			Schema::table('products', function (Blueprint $table) {
-				$table->unsignedSmallInteger('lead_time_days')->nullable()->after('status');
+				$table->unsignedSmallInteger('lead_time_days')->nullable()->after('unit_price');
 			});
 		}
 

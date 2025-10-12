@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const summaryUrl = shell.dataset.summaryUrl || '/order/summary';
   const envelopesUrl = shell.dataset.envelopesUrl || '/api/envelopes';
+  const giveawaysUrl = shell.dataset.giveawaysUrl || '/order/giveaways';
   const STORAGE_KEY = 'inkwise-finalstep';
 
   const sampleEnvelopes = [
@@ -284,7 +285,8 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   continueBtn?.addEventListener('click', () => {
-    const target = continueBtn.dataset.summaryUrl || summaryUrl;
+    // Always prefer the configured giveaways URL for continuing from envelopes
+    const target = continueBtn.dataset.summaryUrl || giveawaysUrl || summaryUrl;
     window.location.href = target;
   });
 
@@ -296,7 +298,8 @@ document.addEventListener('DOMContentLoaded', () => {
   highlightSelectedCard();
   syncSelectionState();
     showToast('Continuing without an envelope…');
-    const target = skipBtn.dataset.summaryUrl || summaryUrl;
+    // After skipping, go directly to giveaways (if configured)
+    const target = skipBtn.dataset.summaryUrl || giveawaysUrl || summaryUrl;
     window.setTimeout(() => {
       window.location.href = target;
     }, 450);

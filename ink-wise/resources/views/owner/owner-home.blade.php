@@ -4,89 +4,204 @@
 
 @include('layouts.owner.sidebar')
 
+<!-- Use admin materials stylesheet to align layout and spacing with owner.products.index -->
+<link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
+<!-- keep flaticon icons (if used elsewhere) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@flaticon/flaticon-uicons/css/all/all.css">
 
-  <section class="main-content">
-    
-  <div class="cards">
-    <div class="card">
-      <div class="stat-icon icon-orders" aria-hidden="true">
-        <!-- shopping bag icon -->
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true">
-          <path d="M6 2l1.5 3h9L18 2"></path>
-          <path d="M3 6h18v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6z"></path>
-          <path d="M16 10a4 4 0 0 0-8 0"></path>
-        </svg>
-      </div>
-      <h3>New Orders</h3>
-      <p>5 Orders</p>
-    </div>
+<style>
+  .welcome-message {
+    background: rgba(16, 185, 129, 0.1); /* Transparent green background */
+    color: #065f46; /* Dark green text */
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin: 16px 0;
+    font-weight: 600;
+    text-align: left; /* Align text to the left */
+    opacity: 0;
+    animation: fadeInOut 4s ease-in-out;
+  }
+  @keyframes fadeInOut {
+    0% { opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { opacity: 0; }
+  }
 
-    <!-- Low Stock Card -->
-    <a href="{{ route('owner.inventory-track', ['status' => 'low']) }}" style="text-decoration:none; color:inherit;">
-      <div class="card">
-        <div class="stat-icon icon-stock">
-          <svg viewBox="0 0 24 24">
-            <path d="M3 7l9 4 9-4-9-4-9 4z"/>
-            <path d="M3 7v6l9 4 9-4V7"/>
-            <path d="M12 11v6"/>
-          </svg>
+  /* Dark mode for welcome message */
+  .dark-mode .welcome-message { background: rgba(16, 185, 129, 0.2); color: #a7f3d0; }
+
+  /* Dark mode for summary cards */
+  .dark-mode .summary-card { background:#374151; color:#f9fafb; box-shadow: 0 12px 24px rgba(15, 23, 42, 0.4); }
+  .dark-mode .summary-card::after { background: linear-gradient(90deg, rgba(148, 185, 255, 0.65), rgba(111, 150, 227, 0.75)); }
+  .dark-mode .summary-card .summary-card-label { color:#d1d5db; }
+  .dark-mode .summary-card .summary-card-value { color:#f9fafb; }
+  .dark-mode .summary-card .summary-card-meta { color:#9ca3af; }
+  .dark-mode .summary-card-chip { background: rgba(148, 185, 255, 0.28); color: #bcd3ff; }
+
+  /* Dark mode for body */
+  .dark-mode body { background:#111827; }
+
+  /* Owner dashboard layout balancing */
+  .owner-dashboard-shell {
+    padding: 20px 24px 32px;
+    padding-left: clamp(24px, 3vw, 48px);
+  }
+
+  .owner-dashboard-main {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 28px 28px 36px;
+  }
+
+  .owner-dashboard-inner {
+    max-width: 1390px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 0;
+  }
+
+  .owner-dashboard-inner .summary-grid {
+    margin: 0;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+  }
+
+  .owner-dashboard-inner .charts {
+    margin: 32px 0 0;
+  }
+
+  .owner-dashboard-main .page-header {
+    margin-bottom: 24px;
+  }
+  .summary-grid, .summary-card, .charts {
+    /* placeholder for overrides if needed */
+  }
+
+  .summary-card {
+    position: relative;
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px 20px 24px;
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .summary-card::after {
+    content: "";
+    position: absolute;
+    left: 20px;
+    right: 20px;
+    bottom: 14px;
+    height: 3px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(148, 185, 255, 0.45), rgba(111, 150, 227, 0.55));
+  }
+
+  .summary-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.12);
+  }
+
+  .summary-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .summary-card-label { font-size: 0.88rem; color: #475569; }
+  .summary-card-value { display: block; font-size: 1.35rem; font-weight: 800; color: #0f172a; margin-top: 4px; }
+  .summary-card-meta { color: #6b7280; font-size: 0.8rem; }
+
+  .summary-card-chip {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(148, 185, 255, 0.18);
+    color: #5a8de0;
+    font-weight: 600;
+    font-size: 0.75rem;
+  }
+</style>
+
+  <section class="main-content owner-dashboard-shell">
+    <main class="materials-page admin-page-shell materials-container owner-dashboard-main" role="main">
+      <header class="page-header">
+        <div>
+          <h1 class="page-title">Dashboard</h1>
+          <p class="page-subtitle">Overview and quick stats</p>
         </div>
-        <h3>Low Stock Materials</h3>
-        <p>
-          {{ \App\Models\Material::whereHas('inventory', function($q) {
-                $q->whereColumn('stock_level', '<=', 'reorder_level')
-                  ->where('stock_level', '>', 0);
-            })->count() }} Items
-        </p>
-      </div>
-    </a>
+      </header>
 
+      @if(session('success'))
+        <div id="welcome-message" class="welcome-message">
+          {{ session('success') }}
+        </div>
+        <script>
+          document.addEventListener('DOMContentLoaded', function () {
+            const welcomeMessage = document.getElementById('welcome-message');
+            if (!welcomeMessage) return;
 
-    <!-- Pending Orders Card -->
-    <div class="card">
-      <div class="stat-icon icon-pending">
-        <svg viewBox="0 0 24 24">
-          <path d="M6 3h12"/>
-          <path d="M6 21h12"/>
-          <path d="M8 3c0 4 8 4 8 8s-8 4-8 8"/>
-          <path d="M16 3c0 4-8 4-8 8s8 4 8 8"/>
-        </svg>
-      </div>
-      <h3>Pending Orders</h3>
-      <p>8 Orders</p>
-    </div>
+            const removeMessage = () => {
+              if (welcomeMessage && welcomeMessage.parentNode) {
+                welcomeMessage.parentNode.removeChild(welcomeMessage);
+              }
+            };
 
-    <!-- Revenue Growth Card -->
-    <div class="card">
-      <div class="stat-icon" style="background:#fff6ef;border:1px solid #fde8d6;">
-        <!-- small chart icon -->
-        <svg viewBox="0 0 24 24" style="stroke:#f59e0b;">
-          <path d="M3 3v18h18"/>
-          <path d="M6 15l4-4 3 3 5-5"/>
-        </svg>
-      </div>
-      <h3>Revenue Growth</h3>
-      <p style="color:#16a34a;">
-        {{-- replace with a computed value, fallback shown below --}}
-        {{ $revenueGrowth ?? '+12.4% vs last period' }}
-      </p>
-    </div>
+            welcomeMessage.addEventListener('animationend', removeMessage, { once: true });
 
-    <!-- New Customer Logins Card -->
-    <div class="card">
-      <div class="stat-icon" style="background:#eef7ff;border:1px solid #dbeefe;">
-        <svg viewBox="0 0 24 24" style="stroke:#3b82f6;">
-          <path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-          <circle cx="12" cy="7" r="4"/>
-        </svg>
+            // Fallback in case animationEnd doesn't fire (e.g., reduced motion settings)
+            setTimeout(removeMessage, 4500);
+          });
+        </script>
+      @endif
+
+  <div class="page-inner owner-dashboard-inner">
+  <section class="summary-grid" aria-label="Dashboard summary">
+      <div class="summary-card">
+        <div class="summary-card-header">
+          <span class="summary-card-label">New Orders</span>
+          <span class="summary-card-chip">Orders</span>
+        </div>
+        <span class="summary-card-value">5</span>
+        <span class="summary-card-meta">Recent new orders</span>
       </div>
-      <h3>New Customer Logins</h3>
-      <p>
-        {{-- shows new user registrations in the last 7 days as a simple proxy --}}
-        {{ \App\Models\User::where('created_at', '>=', now()->subDays(7))->count() ?? 0 }} in 7d
-      </p>
-    </div>
-  </div>
+
+      <a href="{{ route('owner.inventory-track', ['status' => 'low']) }}" class="summary-card" style="text-decoration:none; color:inherit;">
+        <div class="summary-card-header">
+          <span class="summary-card-label">Low Stock Materials</span>
+          <span class="summary-card-chip">Inventory</span>
+        </div>
+        <span class="summary-card-value">{{ \App\Models\Material::whereHas('inventory', function($q) {
+              $q->whereColumn('stock_level', '<=', 'reorder_level')
+                ->where('stock_level', '>', 0);
+          })->count() }}</span>
+        <span class="summary-card-meta">Items approaching reorder level</span>
+      </a>
+
+      <div class="summary-card">
+        <div class="summary-card-header">
+          <span class="summary-card-label">Pending Orders</span>
+          <span class="summary-card-chip">Orders</span>
+        </div>
+        <span class="summary-card-value">8</span>
+        <span class="summary-card-meta">Awaiting processing</span>
+      </div>
+
+      <div class="summary-card">
+        <div class="summary-card-header">
+          <span class="summary-card-label">Revenue Growth</span>
+          <span class="summary-card-chip">Finance</span>
+        </div>
+        <span class="summary-card-value" style="color:#0f172a;">{{ $revenueGrowth ?? '+12.4%' }}</span>
+        <span class="summary-card-meta">vs last period</span>
+      </div>
+    </section>
 
   <!-- Charts Section -->
   <div class="charts">
@@ -116,7 +231,7 @@ document.addEventListener('DOMContentLoaded', function() {
         datasets: [{
           label: 'Units Sold',
           data: [12, 15, 20],
-          backgroundColor: ['#68b4e3ff','#4487daff','#1147dbff'],
+          backgroundColor: ['rgba(59,130,246,0.12)','rgba(59,130,246,0.18)','rgba(59,130,246,0.28)'],
           borderRadius: 6
         }]
       },
@@ -155,8 +270,8 @@ document.addEventListener('DOMContentLoaded', function() {
       data: {
         labels: ['Week 1','Week 2','Week 3','Week 4'],
         datasets: [
-          { label: 'Incoming Stock', data: [20,40,25,35], borderColor: '#16a34a', fill:false, tension:.3 },
-          { label: 'Outgoing Stock', data: [70,30,20,50], borderColor: '#ef4444', fill:false, tension:.3 }
+          { label: 'Incoming Stock', data: [20,40,25,35], borderColor: 'rgba(16,185,129,0.9)', fill:false, tension:.3 },
+          { label: 'Outgoing Stock', data: [70,30,20,50], borderColor: 'rgba(14,165,233,0.9)', fill:false, tension:.3 }
         ]
       },
       options: { responsive: true, maintainAspectRatio: false }
@@ -164,4 +279,154 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 </script>
+
+<!-- Admin materials JS: floating add button, filter menu, and pagination behaviors -->
+<script>
+  // Floating add button behaviour (copied from admin materials)
+  (function(){
+    const addBtn = document.getElementById('addMaterialBtn');
+    const floating = document.getElementById('floatingOptions');
+
+    if (addBtn && floating) {
+      const showFloating = () => {
+        floating.style.display = 'block';
+        floating.setAttribute('aria-hidden', 'false');
+        addBtn.setAttribute('aria-expanded', 'true');
+      };
+
+      const hideFloating = () => {
+        floating.style.display = 'none';
+        floating.setAttribute('aria-hidden', 'true');
+        addBtn.setAttribute('aria-expanded', 'false');
+      };
+
+      addBtn.addEventListener('mouseenter', showFloating);
+      addBtn.addEventListener('mouseleave', () => {
+        setTimeout(() => {
+          if (!floating.matches(':hover')) {
+            hideFloating();
+          }
+        }, 100);
+      });
+
+      floating.addEventListener('mouseenter', showFloating);
+      floating.addEventListener('mouseleave', hideFloating);
+    }
+  })();
+</script>
+
+<script>
+  // Filter icon menu behavior (copied from admin materials)
+  (function(){
+    const filterToggle = document.getElementById('filterToggle');
+    const filterMenu = document.getElementById('filterMenu');
+    const occasionInput = document.getElementById('occasionInput');
+    const searchForm = filterToggle ? filterToggle.closest('form') : null;
+
+    if (!filterToggle || !filterMenu) return;
+
+    const openMenu = () => {
+      filterMenu.style.display = 'block';
+      filterMenu.setAttribute('aria-hidden', 'false');
+      filterToggle.setAttribute('aria-expanded', 'true');
+    };
+
+    const closeMenu = () => {
+      filterMenu.style.display = 'none';
+      filterMenu.setAttribute('aria-hidden', 'true');
+      filterToggle.setAttribute('aria-expanded', 'false');
+    };
+
+    filterToggle.addEventListener('click', function(e){
+      e.stopPropagation();
+      const isOpen = filterMenu.style.display === 'block';
+      if (isOpen) {
+        closeMenu();
+      } else {
+        openMenu();
+      }
+    });
+
+    document.querySelectorAll('#filterMenu .filter-option-btn').forEach(btn => {
+      btn.addEventListener('click', function(){
+        const val = this.getAttribute('data-value');
+        if (occasionInput) occasionInput.value = val;
+        closeMenu();
+        if (searchForm) searchForm.submit();
+      });
+    });
+
+    // close when clicking outside
+    document.addEventListener('click', function(e){
+      if (!filterMenu.contains(e.target) && e.target !== filterToggle) {
+        closeMenu();
+      }
+    });
+  })();
+</script>
+
+<script>
+  // Simple client-side pagination for tables (copied from admin materials)
+  (function(){
+    document.addEventListener('DOMContentLoaded', function () {
+      const rows = Array.from(document.querySelectorAll('.materials-table-body tr[data-entry-index]'));
+      const infoEl = document.querySelector('[data-entry-info]');
+      const prevBtn = document.getElementById('entriesPrev');
+      const nextBtn = document.getElementById('entriesNext');
+      const totalEntries = rows.length;
+      const pageSize = 10;
+      let currentPage = 1;
+
+      if (!rows.length) {
+        if (infoEl) {
+          infoEl.textContent = 'Showing 0 to 0 of 0 entries';
+        }
+        return;
+      }
+
+      const updateView = () => {
+        const totalPages = Math.max(1, Math.ceil(totalEntries / pageSize));
+        currentPage = Math.min(Math.max(1, currentPage), totalPages);
+        const startIndex = (currentPage - 1) * pageSize;
+        const endIndex = Math.min(startIndex + pageSize, totalEntries);
+
+        rows.forEach((row, idx) => {
+          row.style.display = (idx >= startIndex && idx < endIndex) ? 'table-row' : 'none';
+        });
+
+        if (infoEl) {
+          const entryLabel = (totalEntries === 1) ? 'entry' : 'entries';
+          infoEl.textContent = `Showing ${startIndex + 1} to ${endIndex} of ${totalEntries} ${entryLabel}`;
+        }
+
+        if (prevBtn) prevBtn.disabled = currentPage <= 1;
+        if (nextBtn) nextBtn.disabled = currentPage >= totalPages;
+      };
+
+      if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+          if (currentPage > 1) {
+            currentPage--;
+            updateView();
+          }
+        });
+      }
+
+      if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+          const totalPages = Math.max(1, Math.ceil(totalEntries / pageSize));
+          if (currentPage < totalPages) {
+            currentPage++;
+            updateView();
+          }
+        });
+      }
+
+      updateView();
+    });
+  })();
+</script>
+  </div> <!-- .page-inner -->
+  </main>
+  </section>
 @endsection

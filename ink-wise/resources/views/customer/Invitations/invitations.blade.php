@@ -387,6 +387,95 @@
             });
         });
     </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const storageKey = 'inkwise-finalstep';
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+            const icons = Array.from(document.querySelectorAll('.nav-icon-button'));
+            if (!icons.length) return;
+
+            const serverHasOrder = async () => {
+                try {
+                    const res = await fetch('/order/summary.json', { method: 'GET', headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
+                    return res.ok;
+                } catch (e) {
+                    return false;
+                }
+            };
+
+            const createOrderFromSummary = async (summary) => {
+                if (!summary) return false;
+                const pid = summary.productId ?? summary.product_id ?? null;
+                const quantity = Number(summary.quantity ?? 10);
+                if (!pid) return false;
+
+                try {
+                    const res = await fetch('/order/cart/items', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {})
+                        },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ product_id: Number(pid), quantity: Number(quantity) })
+                    });
+                    return res.ok;
+                } catch (e) {
+                    return false;
+                }
+            };
+
+            icons.forEach((icon) => {
+                // If the server rendered this anchor as aria-disabled, enable it for JS handling and remember original state
+                try {
+                    if (icon.getAttribute && icon.getAttribute('aria-disabled') === 'true') {
+                        icon.setAttribute('data-was-aria-disabled', 'true');
+                        icon.removeAttribute('aria-disabled');
+                        try { icon.style.pointerEvents = 'auto'; } catch (e) {}
+                        try { icon.setAttribute('tabindex', '0'); } catch (e) {}
+                        try { icon.setAttribute('role', 'button'); } catch (e) {}
+                        icon.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); icon.click(); } });
+                    }
+                } catch (e) {
+                    // ignore
+                }
+                icon.addEventListener('click', async (e) => {
+                    try {
+                        e.preventDefault();
+
+                        if (await serverHasOrder()) {
+                            window.location.href = '/order/summary';
+                            return;
+                        }
+
+                        let raw = null;
+                        try { raw = window.sessionStorage.getItem(storageKey); } catch (err) { raw = null; }
+                        let summary = null;
+                        try { summary = raw ? JSON.parse(raw) : null; } catch (err) { summary = null; }
+
+                        if (summary && (summary.productId || summary.product_id)) {
+                            const created = await createOrderFromSummary(summary);
+                            if (created) {
+                                window.location.href = '/order/summary';
+                                return;
+                            }
+                        }
+
+                        const href = icon.getAttribute('href');
+                        if (href && href !== '#') {
+                            window.location.href = href;
+                            return;
+                        }
+
+                        window.location.href = '/order/summary';
+                    } catch (err) {
+                        window.location.href = '/order/summary';
+                    }
+                });
+            });
+        });
+    </script>
 @stack('scripts')
 </body>
 </html>

@@ -153,13 +153,57 @@ class OrderSummaryPresenter
                 'id' => $item->id,
                 'name' => $item->product_name ?? $item->product?->name ?? 'Custom product',
                 'sku' => $item->product?->sku,
+                'product_type' => $item->product?->product_type,
+                'line_type' => $item->line_type,
                 'quantity' => $item->quantity,
                 'unit_price' => static::toFloat($item->unit_price),
                 'total' => static::toFloat($item->subtotal ?: $item->unit_price * $item->quantity),
                 'options' => $options,
+                'breakdown' => static::buildItemBreakdown($item),
                 'preview_images' => Arr::wrap($previewImages),
             ];
         })->values()->all();
+    }
+
+    protected static function buildItemBreakdown(OrderItem $item): array
+    {
+        $rows = [];
+
+        $paper = $item->paperStockSelection;
+        if ($paper) {
+            $paperName = $paper->paperStock?->name ?? $paper->paper_stock_name ?? 'Paper stock';
+            $paperPrice = static::toFloat($paper->price);
+
+            $rows[] = [
+                'label' => 'Paper stock: ' . $paperName,
+                'quantity' => 1,
+                'unit_price' => $paperPrice,
+                'total' => $paperPrice,
+                'type' => 'paper_stock',
+            ];
+        }
+
+        if ($item->addons->isNotEmpty()) {
+            foreach ($item->addons as $addon) {
+                $addonName = $addon->productAddon?->name ?? $addon->addon_name ?? 'Add-on';
+                $addonType = $addon->addon_type ? Str::headline(str_replace('_', ' ', $addon->addon_type)) : null;
+                $addonPrice = static::toFloat($addon->addon_price);
+
+                $label = $addonType
+                    ? sprintf('%s (%s)', $addonName, $addonType)
+                    : $addonName;
+
+                $rows[] = [
+                    'label' => $label,
+                    'quantity' => 1,
+                    'unit_price' => $addonPrice,
+                    'total' => $addonPrice,
+                    'type' => 'addon',
+                ];
+            }
+        }
+
+        return $rows;
     }
 
     protected static function deriveOptionsFromRelations(OrderItem $item): array
