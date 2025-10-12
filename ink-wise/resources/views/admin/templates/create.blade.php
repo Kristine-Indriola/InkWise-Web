@@ -110,19 +110,27 @@
                     method: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': getCsrfToken(),
-                        'X-Requested-With': 'XMLHttpRequest'
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
                     },
                     body: formData
                 }).then(async res => {
                     if (!res.ok) {
-                        const txt = await res.text();
-                        throw new Error(txt || 'Upload failed');
+                        let message = 'Upload failed';
+                        try {
+                            const data = await res.json();
+                            message = data?.message || JSON.stringify(data);
+                        } catch (err) {
+                            const txt = await res.text();
+                            if (txt) message = txt;
+                        }
+                        throw new Error(message);
                     }
                     return res.json();
                 }).then(json => {
                     if (json && json.success) {
                         alert('Template uploaded successfully. Redirecting to templates list.');
-                        window.location = '{{ route('admin.templates.index') }}';
+                        window.location = json.redirect || '{{ route('admin.templates.index') }}';
                     } else {
                         alert('Upload succeeded but server response unexpected.');
                     }
