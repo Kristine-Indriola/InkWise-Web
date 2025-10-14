@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\OrderFlow\FinalizeOrderRequest;
 use App\Http\Requests\OrderFlow\SelectEnvelopeRequest;
 use App\Http\Requests\OrderFlow\SelectGiveawayRequest;
+use App\Models\Admin as AdminAccount;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductEnvelope;
+use App\Models\User;
+use App\Notifications\NewOrderPlaced;
 use App\Services\OrderFlowService;
 use Illuminate\Contracts\View\View as ViewContract;
 use Illuminate\Http\JsonResponse;
@@ -19,6 +22,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 
 class OrderFlowController extends Controller
@@ -348,6 +352,7 @@ class OrderFlowController extends Controller
     public function saveFinalStep(FinalizeOrderRequest $request): JsonResponse
     {
         $order = $this->currentOrder();
+        $createdNewOrder = false;
         if (!$order) {
             $summary = session(static::SESSION_SUMMARY_KEY);
             if (!$summary || !is_array($summary) || empty($summary['productId'])) {
@@ -356,7 +361,7 @@ class OrderFlowController extends Controller
                 ], 404);
             }
 
-            DB::transaction(function () use (&$order, $summary) {
+            DB::transaction(function () use (&$order, $summary, &$createdNewOrder) {
                 $customerOrder = $this->orderFlow->createCustomerOrder(Auth::user());
                 $metadata = $this->orderFlow->buildInitialOrderMetadata($summary);
 
@@ -376,6 +381,8 @@ class OrderFlowController extends Controller
                     'summary_snapshot' => null,
                     'metadata' => $metadata,
                 ]);
+
+                $createdNewOrder = true;
 
                 $order = $this->orderFlow->initializeOrderFromSummary($order, $summary);
                 $this->orderFlow->recalculateOrderTotals($order);
@@ -422,6 +429,10 @@ class OrderFlowController extends Controller
         // remove the one-time allowance to prevent other pages from reusing it
         session()->forget('order_checkout_allowed_for');
 
+        if ($createdNewOrder && $order) {
+            $this->notifyAdminsOfNewOrder($order->fresh());
+        }
+
         // Return admin redirect URL so the client (GCash button) can redirect to admin order summary
         try {
             $adminRedirect = route('admin.ordersummary.index', ['order' => $order->order_number]);
@@ -436,6 +447,61 @@ class OrderFlowController extends Controller
             'summary' => session(static::SESSION_SUMMARY_KEY),
             'admin_redirect' => $adminRedirect,
         ]);
+    }
+
+    protected function notifyAdminsOfNewOrder(Order $order): void
+    {
+    $order->loadMissing(['customerOrder', 'customer']);
+
+        $summary = $this->orderFlow->buildSummary($order);
+
+        $recipients = collect();
+
+        $recipients = $recipients->merge(
+            User::query()
+                ->whereIn('role', ['admin', 'owner'])
+                ->get()
+        );
+
+        $recipients = $recipients->merge(AdminAccount::query()->get());
+
+        $recipients = $recipients->unique(function ($notifiable) {
+            $key = method_exists($notifiable, 'getKey') ? $notifiable->getKey() : spl_object_id($notifiable);
+
+            return sprintf('%s-%s', get_class($notifiable), $key);
+        });
+
+        if ($recipients->isEmpty()) {
+            return;
+        }
+
+        $customerName = $order->customerOrder?->name
+            ?? trim(implode(' ', array_filter([
+                $order->customer?->first_name,
+                $order->customer?->last_name,
+            ])))
+            ?: 'Customer';
+
+        $orderNumber = $order->order_number ?: (string) $order->getKey();
+        $totalAmount = (float) Arr::get($summary, 'totalAmount', $order->total_amount ?? 0);
+
+        $summaryUrl = url('/admin/ordersummary/' . $orderNumber);
+        try {
+            $summaryUrl = route('admin.ordersummary.index', ['order' => $orderNumber]);
+        } catch (\Throwable $e) {
+            // Fall back to the constructed URL when the named route is unavailable.
+        }
+
+        Notification::send(
+            $recipients,
+            new NewOrderPlaced(
+                (int) $order->getKey(),
+                $order->order_number,
+                $customerName,
+                $totalAmount,
+                $summaryUrl
+            )
+        );
     }
 
     public function envelope(): RedirectResponse|ViewContract

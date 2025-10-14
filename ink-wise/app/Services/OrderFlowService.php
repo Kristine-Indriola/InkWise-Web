@@ -3,13 +3,16 @@
 namespace App\Services;
 
 use App\Models\CustomerOrder;
+use App\Models\Material;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductAddon;
 use App\Models\ProductBulkOrder;
 use App\Models\ProductColor;
+use App\Models\ProductMaterial;
 use App\Models\ProductPaperStock;
+use App\Models\ProductEnvelope;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
@@ -45,6 +48,7 @@ class OrderFlowService
                 'addons',
                 'colors',
                 'bulkOrders',
+                'materials.material.inventory',
             ])->find($productId);
         } else {
             $product->loadMissing([
@@ -55,6 +59,7 @@ class OrderFlowService
                 'addons',
                 'colors',
                 'bulkOrders',
+                'materials.material.inventory',
             ]);
         }
 
@@ -775,12 +780,16 @@ class OrderFlowService
             $this->removeLineItem($order, OrderItem::LINE_TYPE_GIVEAWAY);
         }
 
-        return $order->fresh([
+        $initialized = $order->fresh([
             'items.addons',
             'items.paperStockSelection',
             'items.bulkSelections',
             'items.colors',
         ]);
+
+        $this->syncMaterialUsage($initialized);
+
+        return $initialized;
     }
 
     protected function syncEnvelopeAssociations(OrderItem $orderItem, ?Product $product, array $meta): void
@@ -1435,6 +1444,9 @@ class OrderFlowService
         $order->refresh();
         $this->recalculateOrderTotals($order);
 
+        $order->refresh();
+        $this->syncMaterialUsage($order);
+
         return $order->fresh([
             'items.product',
             'items.addons',
@@ -1619,5 +1631,352 @@ class OrderFlowService
         }
 
         return $summary;
+    }
+
+    /**
+     * Sync inventory levels with the material usage implied by the current order configuration.
+     * Applies differential adjustments so materials are only deducted once and restored on changes.
+     */
+    public function syncMaterialUsage(Order $order): void
+    {
+        $order->loadMissing([
+            'items.product',
+            'items.paperStockSelection',
+            'items.addons',
+        ]);
+
+        $materialTotals = [];
+        $materialCache = [];
+        $paperStockCache = [];
+        $envelopeCache = [];
+        $addonCache = [];
+        $materialNameCache = [];
+
+        $resolveMaterialByName = function (?string $name) use (&$materialNameCache) {
+            if (!$name) {
+                return null;
+            }
+
+            $key = Str::lower(trim($name));
+            if ($key === '') {
+                return null;
+            }
+
+            if (!array_key_exists($key, $materialNameCache)) {
+                $material = Material::query()
+                    ->with('inventory')
+                    ->whereRaw('LOWER(material_name) = ?', [$key])
+                    ->first();
+
+                $materialNameCache[$key] = $material ?: false;
+            }
+
+            $cached = $materialNameCache[$key];
+
+            return $cached instanceof Material ? $cached : null;
+        };
+
+        $accumulateMaterial = function (OrderItem $item, ?Material $material, float $perUnitQty, array $meta = []) use (&$materialTotals, &$materialCache) {
+            if (!$material || $perUnitQty <= 0) {
+                return;
+            }
+
+            $materialId = $material->getKey();
+            if (!$materialId) {
+                return;
+            }
+
+            if (!isset($materialCache[$materialId])) {
+                if (!$material->relationLoaded('inventory')) {
+                    $material->loadMissing('inventory');
+                }
+                $materialCache[$materialId] = $material;
+            } else {
+                $material = $materialCache[$materialId];
+            }
+
+            $quantityMode = $meta['quantity_mode'] ?? 'per_item';
+            unset($meta['quantity_mode']);
+
+            $orderQty = max(0, (int) $item->quantity);
+            $requiredQty = match ($quantityMode) {
+                'per_order' => $perUnitQty,
+                default => $perUnitQty * $orderQty,
+            };
+            if ($requiredQty <= 0) {
+                return;
+            }
+
+            if (!isset($materialTotals[$materialId])) {
+                $materialTotals[$materialId] = [
+                    'material' => $material,
+                    'per_unit_qty' => $perUnitQty,
+                    'required' => 0.0,
+                    'components' => [],
+                ];
+            }
+
+            $materialTotals[$materialId]['required'] += $requiredQty;
+            $materialTotals[$materialId]['per_unit_qty'] = max($materialTotals[$materialId]['per_unit_qty'], $perUnitQty);
+            $materialTotals[$materialId]['components'][] = array_merge([
+                'order_item_id' => $item->id,
+                'product_id' => $item->product_id,
+                'line_type' => $item->line_type,
+                'order_quantity' => $orderQty,
+                'required_qty' => $requiredQty,
+                'per_unit_qty' => $perUnitQty,
+                'quantity_mode' => $quantityMode,
+            ], $meta);
+        };
+
+        foreach ($order->items as $item) {
+            if ($item->product_id) {
+                $productMaterials = ProductMaterial::query()
+                    ->with(['material.inventory'])
+                    ->where('product_id', $item->product_id)
+                    ->get();
+
+                foreach ($productMaterials as $productMaterial) {
+                    $perUnitQty = (float) ($productMaterial->qty ?? 0);
+                    if ($perUnitQty <= 0) {
+                        continue;
+                    }
+
+                    $accumulateMaterial($item, $productMaterial->material, $perUnitQty, [
+                        'product_material_id' => $productMaterial->id,
+                        'source' => 'product_material',
+                    ]);
+                }
+            }
+
+            if ($item->line_type === OrderItem::LINE_TYPE_INVITATION) {
+                $paperStock = null;
+                $selection = $item->paperStockSelection;
+
+                if ($selection && $selection->paper_stock_id) {
+                    $paperStock = $paperStockCache[$selection->paper_stock_id] ??= ProductPaperStock::query()
+                        ->with(['material.inventory'])
+                        ->find($selection->paper_stock_id);
+                }
+
+                if (!$paperStock && $item->product_id) {
+                    $fallbackKey = 'product_' . $item->product_id;
+                    if (!isset($paperStockCache[$fallbackKey])) {
+                        $paperStockCache[$fallbackKey] = ProductPaperStock::query()
+                            ->with(['material.inventory'])
+                            ->where('product_id', $item->product_id)
+                            ->orderBy('id')
+                            ->first();
+                    }
+                    $paperStock = $paperStockCache[$fallbackKey];
+                }
+
+                if ($paperStock && $paperStock->material) {
+                    $accumulateMaterial($item, $paperStock->material, 1.0, [
+                        'paper_stock_id' => $paperStock->id,
+                        'source' => 'paper_stock',
+                    ]);
+                }
+            }
+
+            if ($item->line_type === OrderItem::LINE_TYPE_ENVELOPE && $item->product_id) {
+                $envelope = $envelopeCache[$item->product_id] ??= ProductEnvelope::query()
+                    ->with(['material.inventory'])
+                    ->where('product_id', $item->product_id)
+                    ->first();
+
+                if ($envelope && $envelope->material) {
+                    $accumulateMaterial($item, $envelope->material, 1.0, [
+                        'envelope_id' => $envelope->id,
+                        'source' => 'envelope',
+                    ]);
+                }
+            }
+
+            if ($item->addons && $item->addons->isNotEmpty()) {
+                foreach ($item->addons as $addonSelection) {
+                    $addon = null;
+                    if ($addonSelection->addon_id) {
+                        $addon = $addonCache[$addonSelection->addon_id] ??= ProductAddon::query()->find($addonSelection->addon_id);
+                    }
+
+                    $addonName = $addon?->name ?? $addonSelection->addon_name ?? null;
+                    $material = $resolveMaterialByName($addonName);
+
+                    if (!$material) {
+                        continue;
+                    }
+
+                    $accumulateMaterial($item, $material, 1.0, [
+                        'addon_id' => $addonSelection->addon_id,
+                        'addon_name' => $addonName,
+                        'source' => 'addon',
+                        'quantity_mode' => 'per_order',
+                    ]);
+                }
+            }
+        }
+
+        $metadata = $order->metadata ?? [];
+        $previousUsage = Arr::get($metadata, 'materials.usage', []);
+        $now = now()->toIso8601String();
+
+        if (empty($materialTotals)) {
+            if (!empty($previousUsage)) {
+                foreach ($previousUsage as $materialId => $usage) {
+                    $previousTotal = (float) Arr::get($usage, 'total_used', 0);
+                    if ($previousTotal <= 0) {
+                        continue;
+                    }
+
+                    $material = Material::query()
+                        ->with('inventory')
+                        ->whereKey($materialId)
+                        ->first();
+
+                    if ($material) {
+                        $this->adjustMaterialStock($material, -$previousTotal);
+                    }
+                }
+            }
+
+            if (isset($metadata['materials'])) {
+                unset($metadata['materials']);
+                $order->update(['metadata' => $metadata]);
+            }
+
+            return;
+        }
+
+        $updatedUsage = [];
+
+        foreach ($materialTotals as $materialId => $aggregate) {
+            /** @var Material $material */
+            $material = $aggregate['material'];
+            if (!$material->relationLoaded('inventory')) {
+                $material->loadMissing('inventory');
+            }
+
+            $previousTotal = (float) Arr::get($previousUsage, $materialId . '.total_used', 0);
+            $requiredTotal = (float) $aggregate['required'];
+            $diff = $requiredTotal - $previousTotal;
+
+            $adjustment = [
+                'applied' => 0.0,
+                'shortage' => (float) Arr::get($previousUsage, $materialId . '.pending_shortage', 0),
+                'remaining_stock' => [
+                    'inventory' => $material->inventory?->stock_level,
+                    'material' => $material->stock_qty,
+                ],
+            ];
+
+            if (abs($diff) > 0.00001) {
+                $adjustment = $this->adjustMaterialStock($material, $diff);
+            }
+
+            $updatedUsage[$materialId] = [
+                'material_id' => $material->getKey(),
+                'material_name' => $material->material_name ?? null,
+                'sku' => $material->sku ?? null,
+                'qty_per_unit' => $aggregate['per_unit_qty'],
+                'total_used' => $requiredTotal,
+                'components' => $aggregate['components'],
+                'pending_shortage' => $adjustment['shortage'] ?? 0,
+                'remaining_stock' => $adjustment['remaining_stock'] ?? [
+                    'inventory' => $material->inventory?->stock_level,
+                    'material' => $material->stock_qty,
+                ],
+                'applied_delta' => $diff,
+                'synced_at' => $now,
+            ];
+        }
+
+        foreach ($previousUsage as $materialId => $usage) {
+            if (isset($updatedUsage[$materialId])) {
+                continue;
+            }
+
+            $previousTotal = (float) Arr::get($usage, 'total_used', 0);
+            if ($previousTotal <= 0) {
+                continue;
+            }
+
+            $material = Material::query()
+                ->with('inventory')
+                ->whereKey($materialId)
+                ->first();
+
+            if ($material) {
+                $this->adjustMaterialStock($material, -$previousTotal);
+            }
+        }
+
+        if (!empty($updatedUsage)) {
+            $metadata['materials'] = [
+                'usage' => $updatedUsage,
+                'last_synced_at' => $now,
+            ];
+        } else {
+            unset($metadata['materials']);
+        }
+
+        $order->update(['metadata' => $metadata]);
+    }
+
+    /**
+     * Apply a stock delta to a material (and linked inventory row) while preventing negative levels.
+     * Returns the applied delta, any shortage encountered, and the remaining stock snapshot.
+     */
+    protected function adjustMaterialStock(Material $material, float $delta): array
+    {
+        $materialRecord = Material::query()
+            ->whereKey($material->getKey())
+            ->lockForUpdate()
+            ->with(['inventory' => function ($query) {
+                $query->lockForUpdate();
+            }])
+            ->first();
+
+        if ($materialRecord) {
+            $material = $materialRecord;
+        } else {
+            $material->loadMissing('inventory');
+        }
+
+        $inventory = $material->inventory;
+        $currentInventory = $inventory?->stock_level ?? 0;
+        $currentMaterialStock = $material->stock_qty ?? $currentInventory;
+
+        $newInventoryLevel = $inventory ? $currentInventory - $delta : null;
+        $newMaterialStock = $currentMaterialStock - $delta;
+
+        $shortage = 0.0;
+
+        if ($newInventoryLevel !== null && $newInventoryLevel < 0) {
+            $shortage = max($shortage, abs($newInventoryLevel));
+            $newInventoryLevel = 0;
+        }
+
+        if ($newMaterialStock < 0) {
+            $shortage = max($shortage, abs($newMaterialStock));
+            $newMaterialStock = 0;
+        }
+
+        if ($inventory && $newInventoryLevel !== null) {
+            $inventory->stock_level = (int) round($newInventoryLevel);
+            $inventory->save();
+        }
+
+        $material->stock_qty = (int) round($newMaterialStock);
+        $material->save();
+
+        return [
+            'applied' => $delta,
+            'shortage' => $shortage,
+            'remaining_stock' => [
+                'inventory' => $inventory ? (int) round($newInventoryLevel) : null,
+                'material' => (int) round($newMaterialStock),
+            ],
+        ];
     }
 }
