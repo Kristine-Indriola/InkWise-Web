@@ -59,7 +59,7 @@
     })();
   </script>
 </head>
-<body>
+<body class="owner-layout">
     @yield('content')
     @stack('scripts')
 
