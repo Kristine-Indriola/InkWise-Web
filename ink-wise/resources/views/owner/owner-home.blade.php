@@ -44,19 +44,21 @@
 
   /* Owner dashboard layout balancing */
   .owner-dashboard-shell {
-    padding: 20px 24px 32px;
-    padding-left: clamp(24px, 3vw, 48px);
+    padding-right: 0;
+    padding-bottom: 0;
+    padding-left: 0;
   }
 
   .owner-dashboard-main {
-    max-width: 1440px;
-    margin: 0 auto;
-    padding: 28px 28px 36px;
+    max-width: var(--owner-content-shell-max, 1440px);
+    margin: 0;
+    padding: 0 28px 36px 12px;
+    width: 100%;
   }
 
   .owner-dashboard-inner {
-    max-width: 1390px;
-    margin: 0 auto;
+    max-width: var(--owner-content-shell-max, 1390px);
+    margin: 0;
     width: 100%;
     padding: 0;
   }

@@ -7,20 +7,21 @@
 <!-- Page-scoped layout alignment with owner dashboard -->
 <style>
   .owner-dashboard-shell {
-    padding: 20px 24px 32px;
-    padding-left: clamp(24px, 3vw, 48px);
+    padding-right: 0;
+    padding-bottom: 0;
+    padding-left: 0;
   }
 
   .owner-dashboard-main {
-    max-width: 1440px;
-    margin: 0 auto;
-    padding: 28px 28px 36px;
+    max-width: var(--owner-content-shell-max, 1440px);
+    margin: 0;
+    padding: 0 28px 36px 12px;
     width: 100%;
   }
 
   .owner-dashboard-inner {
-    max-width: 1390px;
-    margin: 0 auto;
+    max-width: var(--owner-content-shell-max, 1390px);
+    margin: 0;
     width: 100%;
     padding: 0;
   }
@@ -225,8 +226,12 @@
   }
 
   @media (max-width: 900px) {
-    .owner-dashboard-shell { padding: 16px; }
-    .owner-dashboard-main { padding: 24px 20px 32px; }
+    .owner-dashboard-shell {
+      padding-right: 0;
+      padding-bottom: 0;
+      padding-left: 0;
+    }
+    .owner-dashboard-main { padding: 24px 20px 32px 12px; }
     .owner-dashboard-inner { padding: 0 4px; }
     .owner-dashboard-inner .table { min-width: 720px; }
     .materials-toolbar { flex-direction: column; align-items: stretch; }
