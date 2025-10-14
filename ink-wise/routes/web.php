@@ -331,7 +331,7 @@ Route::get('/customer/login', [CustomerAuthController::class, 'showLogin'])->nam
 Route::post('/customer/login', [CustomerAuthController::class, 'login'])->name('customer.login');
 Route::post('/customer/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
 
-Route::get('/customer/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');
+// Route::get('/customer/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
