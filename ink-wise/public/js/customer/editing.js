@@ -13,13 +13,38 @@ document.addEventListener("DOMContentLoaded", () => {
   const textFieldsContainer = document.getElementById("textFields");
   const addTextBtn = document.getElementById("addTextField");
   const sideButtons = document.querySelectorAll(".side-btn");
+  const panels = document.querySelectorAll(".editor-panel");
+  const imageInputs = document.querySelectorAll("[data-image-input]");
+  const resetImageButtons = document.querySelectorAll("[data-reset-image]");
+  const imagePreviews = {
+    front: document.querySelector('[data-image-preview="front"]'),
+    back: document.querySelector('[data-image-preview="back"]'),
+  };
 
   const SVG_NS = "http://www.w3.org/2000/svg";
+  const XLINK_NS = "http://www.w3.org/1999/xlink";
   const ZOOM_MIN = 0.5;
   const ZOOM_MAX = 2;
   const ZOOM_STEP = 0.1;
   const TEXT_BASE_TOP = 24;
   const TEXT_SPACING = 12;
+  const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB limit
+
+  const imageState = {
+    front: {
+      defaultSrc: imagePreviews.front?.dataset?.defaultSrc || cardFront?.dataset?.defaultImage || "",
+      currentSrc: "",
+    },
+    back: {
+      defaultSrc: imagePreviews.back?.dataset?.defaultSrc || cardBack?.dataset?.defaultImage || "",
+      currentSrc: "",
+    },
+  };
+
+  const imageLayers = {
+    front: null,
+    back: null,
+  };
 
   let zoom = 1.0;
   let currentView = "front";
@@ -52,6 +77,93 @@ document.addEventListener("DOMContentLoaded", () => {
     const card = side === "front" ? cardFront : cardBack;
     if (!card) return null;
     return card.querySelector("svg");
+  }
+
+  function ensureImageLayer(side) {
+    if (imageLayers[side]) {
+      return imageLayers[side];
+    }
+
+    const svg = getSvgRoot(side);
+    if (!svg) return null;
+
+    let layer = svg.querySelector(`image[data-editable-image="${side}"]`);
+    if (!layer) {
+      layer = document.createElementNS(SVG_NS, "image");
+      layer.setAttribute("data-editable-image", side);
+      layer.setAttribute("x", "0");
+      layer.setAttribute("y", "0");
+      layer.setAttribute("width", "100%");
+      layer.setAttribute("height", "100%");
+      layer.setAttribute("preserveAspectRatio", "xMidYMid slice");
+      layer.style.display = "none";
+
+      const firstTextNode = svg.querySelector("[data-text-node]");
+      if (firstTextNode) {
+        svg.insertBefore(layer, firstTextNode);
+      } else {
+        svg.appendChild(layer);
+      }
+    }
+
+    imageLayers[side] = layer;
+    return layer;
+  }
+
+  function setImageElementSource(element, src) {
+    if (!element) return;
+    if (src) {
+      element.setAttribute("href", src);
+      element.setAttributeNS(XLINK_NS, "xlink:href", src);
+      element.style.removeProperty("display");
+    } else {
+      element.removeAttribute("href");
+      element.setAttributeNS(XLINK_NS, "xlink:href", "");
+      element.style.display = "none";
+    }
+  }
+
+  function updatePreview(side, src) {
+    const preview = imagePreviews[side];
+    if (!preview) return;
+    const fallback = imageState[side]?.defaultSrc || preview.dataset.defaultSrc || preview.src;
+    preview.src = src || fallback;
+  }
+
+  function applyImage(side, src, { skipPreview = false } = {}) {
+    if (!imageState[side]) return;
+
+    const layer = ensureImageLayer(side);
+    imageState[side].currentSrc = src || "";
+    const displaySrc = imageState[side].currentSrc || imageState[side].defaultSrc || "";
+    setImageElementSource(layer, displaySrc);
+
+    const card = side === "front" ? cardFront : cardBack;
+    if (card) {
+      card.dataset.currentImage = displaySrc;
+    }
+
+    if (!skipPreview) {
+      updatePreview(side, displaySrc);
+    } else if (imagePreviews[side] && !imagePreviews[side].getAttribute("src")) {
+      updatePreview(side, displaySrc);
+    }
+  }
+
+  function resetImage(side) {
+    if (!imageState[side]) return;
+    imageState[side].currentSrc = "";
+    applyImage(side, "");
+    const input = document.querySelector(`[data-image-input="${side}"]`);
+    if (input) {
+      input.value = "";
+    }
+  }
+
+  function showPanel(panelName) {
+    panels.forEach(panel => {
+      panel.classList.toggle("active", panel.dataset.panel === panelName);
+    });
   }
 
   function parseViewBox(svg) {
@@ -170,90 +282,26 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function startInlineEditor(node, side) {
-    if (!canvas || !node) return;
+    if (!node) return;
     const nodeKey = node.getAttribute("data-text-node") || "";
-    const safeKey = escapeAttr(nodeKey);
+    if (!nodeKey || !textFieldsContainer) return;
 
     if (currentView !== side) {
       setActiveView(side);
     }
 
-    closeInlineEditor(true);
-
-    const editor = document.createElement("textarea");
-    editor.className = "inline-svg-editor";
-    editor.value = getSvgNodeValue(node);
-    editor.setAttribute("spellcheck", "false");
-
-    const canvasRect = canvas.getBoundingClientRect();
-    const nodeRect = node.getBoundingClientRect();
-    const scale = zoom || 1;
-    const baseTop = (nodeRect.top - canvasRect.top) / scale;
-    const baseLeft = (nodeRect.left - canvasRect.left) / scale;
-    const baseWidth = nodeRect.width / scale;
-    const baseHeight = nodeRect.height / scale;
-
-    editor.style.top = `${baseTop}px`;
-    editor.style.left = `${baseLeft}px`;
-    editor.style.width = `${Math.max(baseWidth, 140)}px`;
-    editor.style.height = `${Math.max(baseHeight, 32)}px`;
-    editor.style.transformOrigin = "top left";
-
-    const input = textFieldsContainer?.querySelector(`input[data-text-node="${safeKey}"][data-card-side="${side}"]`);
-    const fontSize = input?.dataset?.fontSize || node.getAttribute("font-size");
-    if (fontSize) editor.style.fontSize = `${fontSize}px`;
-
-    const alignRaw = (input?.dataset?.align || node.getAttribute("data-align") || "").toLowerCase();
-    if (alignRaw === "center") {
-      editor.style.transform = "translate(-50%, -50%)";
-      editor.style.left = `${baseLeft + baseWidth / 2}px`;
-      editor.style.top = `${baseTop + baseHeight / 2}px`;
-      editor.style.textAlign = "center";
-    } else if (alignRaw === "right") {
-      editor.style.transform = "translate(-100%, -50%)";
-      editor.style.left = `${baseLeft + baseWidth}px`;
-      editor.style.top = `${baseTop + baseHeight / 2}px`;
-      editor.style.textAlign = "right";
-    } else {
-      editor.style.transform = "translate(0, -50%)";
-      editor.style.top = `${baseTop + baseHeight / 2}px`;
-      editor.style.textAlign = "left";
+    const safeKey = escapeAttr(nodeKey);
+    const input = textFieldsContainer.querySelector(`input[data-text-node="${safeKey}"][data-card-side="${side}"]`);
+    if (input) {
+      requestAnimationFrame(() => {
+        try {
+          input.focus({ preventScroll: true });
+        } catch (err) {
+          input.focus();
+        }
+        input.select?.();
+      });
     }
-
-    const letterSpacing = input?.dataset?.letterSpacing || node.getAttribute("letter-spacing");
-    if (letterSpacing) editor.style.letterSpacing = `${letterSpacing}em`;
-
-    canvas.appendChild(editor);
-
-    inlineEditor = editor;
-    inlineEditorNode = node;
-    inlineEditorSide = side;
-
-    node.classList.add("svg-text-focus");
-    if (nodeKey) {
-      syncFieldHighlight(nodeKey, side, true);
-    }
-
-    editor.addEventListener("blur", () => closeInlineEditor(true));
-    editor.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" && !event.shiftKey) {
-        event.preventDefault();
-        closeInlineEditor(true);
-      } else if (event.key === "Escape") {
-        event.preventDefault();
-        closeInlineEditor(false);
-      }
-    });
-
-    editor.addEventListener("input", () => {
-      editor.style.height = "auto";
-      editor.style.height = `${Math.max(editor.scrollHeight, 32)}px`;
-    });
-
-    setTimeout(() => {
-      editor.focus();
-      editor.select();
-    }, 0);
   }
 
   function prepareSvgNode(node, side) {
@@ -438,7 +486,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const side = getFieldSide(input);
     const nodeKey = getTextNodeKey(input);
-    const defaultValue = input.dataset.defaultValue || input.getAttribute("placeholder") || "";
+  const defaultValue = input.dataset.defaultValue ?? "";
+  const placeholderValue = input.getAttribute("placeholder") || "";
     const existingNode = svgTextCache[side]?.get(nodeKey);
     const existingValue = getSvgNodeValue(existingNode);
 
@@ -450,7 +499,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    if (!input.placeholder && defaultValue) {
+    if (!input.placeholder && placeholderValue) {
+      input.placeholder = placeholderValue;
+    } else if (!input.placeholder && defaultValue) {
       input.placeholder = defaultValue;
     }
 
@@ -550,6 +601,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   cacheSvgNodes(cardFront, "front");
   cacheSvgNodes(cardBack, "back");
+  applyImage("front", imageState.front.currentSrc, { skipPreview: false });
+  applyImage("back", imageState.back.currentSrc, { skipPreview: false });
   initializeTextFields();
 
   if (addTextBtn && textFieldsContainer) {
@@ -566,8 +619,8 @@ document.addEventListener("DOMContentLoaded", () => {
       input.dataset.topPercent = TEXT_BASE_TOP;
       input.dataset.leftPercent = 50;
       input.dataset.align = "center";
-  input.dataset.defaultValue = "New Text";
-  input.placeholder = "New Text";
+    input.dataset.defaultValue = "New Text";
+    input.placeholder = "New Text";
 
       const delBtn = document.createElement("button");
       delBtn.classList.add("delete-text");
@@ -591,11 +644,52 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   sideButtons.forEach(btn => {
+    const panelName = btn.dataset.panel || "text";
     btn.addEventListener("click", () => {
       sideButtons.forEach(sideBtn => sideBtn.classList.remove("active"));
       btn.classList.add("active");
+      showPanel(panelName);
     });
   });
 
+  imageInputs.forEach(input => {
+    const side = input.dataset.imageInput;
+    input.addEventListener("change", () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+
+      if (!file.type.startsWith("image/")) {
+        input.value = "";
+        alert("Please choose an image file.");
+        return;
+      }
+
+      if (file.size > MAX_IMAGE_SIZE) {
+        input.value = "";
+        alert("Image is too large. Please upload a file smaller than 5MB.");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = event => {
+        const result = event.target?.result;
+        if (typeof result === "string") {
+          applyImage(side, result);
+        }
+      };
+      reader.onerror = () => {
+        console.error("Unable to read selected image file.");
+        alert("Unable to read the selected image file. Please try another image.");
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+
+  resetImageButtons.forEach(btn => {
+    const side = btn.dataset.resetImage;
+    btn.addEventListener("click", () => resetImage(side));
+  });
+
   setActiveView("front");
+  showPanel(sideButtons[0]?.dataset?.panel || "text");
 });

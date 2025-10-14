@@ -38,12 +38,70 @@ class OrderFlowController extends Controller
         $product = $this->orderFlow->resolveProduct($product, $productId);
         $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
 
+        $templatesConfig = config('invitation_templates', []);
+        $aliases = $templatesConfig['aliases'] ?? [];
+        $templateKey = $request->query('template');
+
+        $resolveFromAliases = static function (?string $key) use ($aliases) {
+            if (!$key) {
+                return null;
+            }
+
+            return $aliases[$key] ?? $key;
+        };
+
+        $templateKey = $resolveFromAliases($templateKey);
+
+        if (!$templateKey && $product && $product->template) {
+            $candidate = Str::slug($product->template->name ?? '');
+            $templateKey = $resolveFromAliases($candidate);
+        }
+
+        $availableTemplates = array_filter(
+            $templatesConfig,
+            static fn ($value, $key) => $key !== 'aliases' && is_array($value),
+            ARRAY_FILTER_USE_BOTH
+        );
+
+        if (!$templateKey || !isset($availableTemplates[$templateKey])) {
+            $templateKey = 'default';
+        }
+
+        $templateConfig = $availableTemplates[$templateKey] ?? [];
+
+        $frontSvg = null;
+        $backSvg = null;
+        $textFieldPresets = [];
+        $imageSlots = [];
+
+        if (!empty($templateConfig)) {
+            $frontSvgPath = $templateConfig['front_svg'] ?? null;
+            $backSvgPath = $templateConfig['back_svg'] ?? null;
+
+            if ($frontSvgPath && is_file($frontSvgPath)) {
+                $frontSvg = file_get_contents($frontSvgPath) ?: null;
+            }
+
+            if ($backSvgPath && is_file($backSvgPath)) {
+                $backSvg = file_get_contents($backSvgPath) ?: null;
+            }
+
+            $textFieldPresets = array_values($templateConfig['text_fields'] ?? []);
+            $imageSlots = array_values($templateConfig['image_slots'] ?? []);
+        }
+
         return view('customer.Invitations.editing', [
             'product' => $product,
             'frontImage' => $images['front'],
             'backImage' => $images['back'],
             'previewImages' => $images['all'],
             'defaultQuantity' => $product ? $this->orderFlow->defaultQuantityFor($product) : 50,
+            'activeTemplateKey' => $templateKey,
+            'templateConfig' => $templateConfig,
+            'textFieldPresets' => $textFieldPresets,
+            'imageSlots' => $imageSlots,
+            'frontSvg' => $frontSvg,
+            'backSvg' => $backSvg,
         ]);
     }
 
