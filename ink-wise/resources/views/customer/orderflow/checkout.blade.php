@@ -540,6 +540,9 @@
     };
     $taxAmount = $subtotal * $taxRate;
     $totalAmount = $subtotal + $shippingFee + $taxAmount;
+    $checkoutQuantity = $orderItem?->quantity
+        ?? ($orderSummary['quantity'] ?? null)
+        ?? null;
 @endphp
 
 @if(session('status'))
@@ -706,6 +709,7 @@
             </div>
 
             {{-- No dynamic select behavior: fields are prefilled server-side from first saved address (if any) and remain editable --}}
+            <input type="hidden" id="checkoutQuantity" name="quantity" value="{{ $checkoutQuantity }}">
         </section>
 
         <aside class="card summary-card" id="summary">
@@ -862,8 +866,7 @@
                     // Show only GCash button
                     payButton.style.display = 'inline-block';
                     codButton.style.display = 'none';
-                    // As requested, show NaN text literal for the pay button text example
-                    payButton.textContent = `Pay ₱NaN via GCash`;
+                    updatePayButton();
                     if (paymentHelper) paymentHelper.innerHTML = "You&rsquo;ll be redirected to GCash to authorize this payment. Ensure your account is ready for ₱420.68.";
                 } else if (method === 'cod') {
                     // Show only COD button
@@ -938,8 +941,20 @@
                 if (r.checked) updateSummaryForPaymentMethod(r.value);
             });
 
-            // Helper to collect final-step data and post to server
-            const postFinalStepAndRedirectToAdmin = async (selectedPaymentMethod, paymentAmount = null) => {
+            const readQuantityInput = () => {
+                const quantityInput = document.querySelector('input[name="quantity"]');
+                if (!quantityInput) return undefined;
+
+                const parsed = Number.parseInt(quantityInput.value, 10);
+                return Number.isNaN(parsed) || parsed <= 0 ? undefined : parsed;
+            };
+
+            const collectAddonSelections = () => Array.from(document.querySelectorAll('input[name="addons[]"]:checked')).map((input) => input.value);
+
+            // Helper to persist final-step data without forcing a redirect
+            const persistFinalStepSelections = async (selectedPaymentMethod, options = {}) => {
+                const { paymentAmount = null, redirectOnSuccess = false } = options;
+
                 if (!csrfToken) {
                     const error = new Error('Missing security token. Please refresh the page and try again.');
                     showPaymentMessage('error', error.message);
@@ -949,9 +964,9 @@
                 clearPaymentMessage();
 
                 const payload = {
-                    quantity: document.querySelector('input[name="quantity"]')?.value ?? undefined,
+                    quantity: readQuantityInput(),
                     paper_stock_id: document.querySelector('input[name="paper_stock_id"]')?.value ?? undefined,
-                    addons: Array.from(document.querySelectorAll('input[name="addons[]"]:checked')).map(i => i.value),
+                    addons: collectAddonSelections(),
                     metadata: paymentAmount ? { payment_amount: paymentAmount } : {},
                     payment_method: selectedPaymentMethod,
                 };
@@ -973,18 +988,110 @@
                         throw new Error(data.message || 'Unable to save order selections.');
                     }
 
-                    const orderNumber = data.order_number ?? null;
-                    if (orderNumber) {
-                        window.location.href = `{{ url('/admin/ordersummary') }}/${orderNumber}`;
-                        return { success: true, handledRedirect: true, data };
+                    if (data.summary) {
+                        try {
+                            window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(data.summary));
+                        } catch (storageError) {
+                            console.debug('Unable to cache order summary in session storage.', storageError);
+                        }
                     }
 
-                    showPaymentMessage('info', 'Order selections saved.');
+                    if (redirectOnSuccess) {
+                        const redirectUrl = data.admin_redirect ?? (data.order_number ? `{{ url('/admin/ordersummary') }}/${data.order_number}` : null);
+                        if (redirectUrl) {
+                            window.location.href = redirectUrl;
+                            return { success: true, handledRedirect: true, data };
+                        }
+                    }
+
                     return { success: true, handledRedirect: false, data };
                 } catch (err) {
                     console.error(err);
                     showPaymentMessage('error', err.message ?? 'Unable to save order selections.');
                     return { success: false, handledRedirect: false, error: err };
+                }
+            };
+
+            const determineGcashMode = () => {
+                const balance = Number(paymentConfig.balance ?? 0);
+                const deposit = Number(paymentConfig.depositAmount ?? 0);
+
+                if (balance <= 0.01) {
+                    return 'full';
+                }
+
+                if (deposit > 0 && deposit + 0.01 < balance) {
+                    return 'half';
+                }
+
+                return 'full';
+            };
+
+            const collectContactDetails = () => ({
+                name: document.getElementById('fullName')?.value?.trim() || undefined,
+                email: document.getElementById('email')?.value?.trim() || undefined,
+                phone: document.getElementById('phone')?.value?.trim() || undefined,
+            });
+
+            const startGCashPayment = async () => {
+                if (!paymentConfig.createUrl) {
+                    showPaymentMessage('error', 'GCash payment endpoint is not configured.');
+                    return { success: false };
+                }
+
+                const amount = Number(paymentConfig.depositAmount > 0 ? paymentConfig.depositAmount : paymentConfig.balance);
+                if (!Number.isFinite(amount) || amount <= 0) {
+                    showPaymentMessage('error', 'There is no outstanding balance to charge.');
+                    return { success: false };
+                }
+
+                const mode = determineGcashMode();
+                const contact = collectContactDetails();
+
+                try {
+                    const response = await fetch(paymentConfig.createUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                        },
+                        body: JSON.stringify({
+                            name: contact.name,
+                            email: contact.email,
+                            phone: contact.phone,
+                            mode,
+                        }),
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.message || 'Unable to start the GCash payment.');
+                    }
+
+                    if (data.status) {
+                        paymentConfig.hasPending = data.status === 'awaiting_next_action';
+                    }
+                    if (typeof data.pending === 'boolean') {
+                        paymentConfig.hasPending = data.pending;
+                    }
+                    if (data.redirect_url) {
+                        paymentConfig.resumeUrl = data.redirect_url;
+                    }
+
+                    showPaymentMessage('info', 'Redirecting you to GCash to complete the payment...');
+                    if (data.redirect_url) {
+                        window.location.href = data.redirect_url;
+                        return { success: true, redirected: true, data };
+                    }
+
+                    showPaymentMessage('success', data.message ?? 'GCash payment initialized.');
+                    return { success: true, redirected: false, data };
+                } catch (err) {
+                    console.error(err);
+                    showPaymentMessage('error', err.message ?? 'Unable to start the GCash payment.');
+                    return { success: false, error: err };
                 }
             };
 
@@ -995,10 +1102,23 @@
                         return;
                     }
 
-                    const amountLabel = paymentConfig.depositAmount > 0 ? paymentConfig.depositAmount : paymentConfig.balance;
-                    const result = await postFinalStepAndRedirectToAdmin('gcash', amountLabel);
-                    if (result?.success && !result.handledRedirect) {
-                        applyPaymentLocally(amountLabel, { message: `Pending payment of ${priceFormatter.format(amountLabel)} recorded.` });
+                    const amountLabel = Number(paymentConfig.depositAmount > 0 ? paymentConfig.depositAmount : paymentConfig.balance);
+                    payButton.disabled = true;
+
+                    try {
+                        const result = await persistFinalStepSelections('gcash', { paymentAmount: amountLabel });
+                        if (!result?.success || result?.handledRedirect) {
+                            payButton.disabled = false;
+                            return;
+                        }
+
+                        const paymentResult = await startGCashPayment();
+                        if (!paymentResult?.success || paymentResult.redirected !== true) {
+                            payButton.disabled = false;
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        payButton.disabled = false;
                     }
                 });
             }
@@ -1010,15 +1130,16 @@
                         return;
                     }
 
-                    // Redirect to customer toship page
                     window.location.href = '{{ route("customer.my_purchase.toship") }}';
                 });
             }
 
             if (codButton) {
                 codButton.addEventListener('click', async () => {
-                    // Pay on delivery: submit final selections with payment_method = 'cod'
-                    await postFinalStepAndRedirectToAdmin('cod');
+                    const result = await persistFinalStepSelections('cod', { redirectOnSuccess: true });
+                    if (result?.success && !result.handledRedirect) {
+                        window.location.href = '{{ route("customer.my_purchase.toship") }}';
+                    }
                 });
             }
 

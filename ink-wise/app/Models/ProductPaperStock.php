@@ -21,4 +21,9 @@ class ProductPaperStock extends Model
     {
         return $this->belongsTo(Product::class);
     }
+
+    public function material()
+    {
+        return $this->belongsTo(Material::class, 'material_id', 'material_id');
+    }
 }

@@ -33,6 +33,7 @@
                 'NewStaffCreated' => route('owner.staff.index'),
                 'StockNotification' => route('admin.inventory.index'),
                 'PasswordResetCompleted' => route('admin.users.index'),
+                'NewOrderPlaced' => route('admin.orders.index'),
             ];
         @endphp
 

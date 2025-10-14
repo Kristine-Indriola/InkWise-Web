@@ -19,6 +19,15 @@
         <!-- Register Form -->
         <form method="POST" action="{{ route('customer.register') }}" id="customerRegisterForm" class="space-y-6">
             @csrf
+            @if ($errors->any())
+                <div class="bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg p-2">
+                    <ul class="list-disc ml-4 space-y-1">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
 
             <div id="registerSteps" class="space-y-6">
                 <!-- Step 1 -->
@@ -26,17 +35,17 @@
                     <div class="flex gap-3">
                         <div class="flex-1">
                             <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">First Name</label>
-                            <input type="text" name="first_name" required
+                <input type="text" name="first_name" value="{{ old('first_name') }}" required
                                    class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition">
                         </div>
                         <div class="flex-1">
                             <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Middle Name</label>
-                            <input type="text" name="middle_name"
+                <input type="text" name="middle_name" value="{{ old('middle_name') }}"
                                    class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition">
                         </div>
                         <div class="flex-1">
                             <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Last Name</label>
-                            <input type="text" name="last_name" required
+                <input type="text" name="last_name" value="{{ old('last_name') }}" required
                                    class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition">
                         </div>
                     </div>
@@ -58,7 +67,7 @@
                 <div class="register-step hidden" data-step="2">
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Contact Number</label>
-                        <input type="text" name="contact_number"
+               <input type="text" name="contact_number" value="{{ old('contact_number') }}"
                                class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition">
                     </div>
                     <div class="flex items-center justify-between mt-6">
@@ -77,7 +86,7 @@
                         <div>
                             <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Email</label>
                             <div class="mt-1 flex gap-2">
-                                <input type="email" name="email" id="registerEmail" required
+                    <input type="email" name="email" id="registerEmail" value="{{ old('email') }}" required
                                        class="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition">
                                 <button type="button"
                                         class="px-3 py-2 text-xs font-semibold text-white bg-indigo-500 hover:bg-indigo-600 rounded-lg shadow-sm transition"
@@ -88,7 +97,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Verification Code</label>
-                            <input type="text" name="verification_code" id="verificationCode" value="{{ old('verification_code') }}" required maxlength="6"
+                <input type="text" name="verification_code" id="verificationCode" value="{{ old('verification_code') }}" required maxlength="6"
                                    class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition uppercase tracking-widest">
                         </div>
                         <p id="verificationStatus" class="text-xs text-gray-500"></p>
@@ -119,13 +128,13 @@
                     </div>
                     <div class="flex items-center justify-between mt-6">
                         <button type="button" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700" data-prev-step>Back</button>
-                        <button type="submit"
+                        <button type="button" id="submitRegister"
                                 class="bg-gradient-to-r from-indigo-600 to-blue-500 hover:from-indigo-700 hover:to-blue-600 text-white font-semibold py-2 px-6 rounded-xl shadow-lg transition text-sm">
                             Sign Up
                         </button>
                     </div>
                     <label for="terms" class="mt-3 flex items-start gap-2 text-[11px] text-gray-500 leading-tight text-center justify-center">
-                        <input type="checkbox" name="terms" id="terms" required
+               <input type="checkbox" name="terms" id="terms" {{ old('terms') ? 'checked' : '' }} required
                                class="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
                         <span>By signing up, you agree to InkWise's <a href="#" class="underline hover:text-indigo-600">Terms of Service</a> and <a href="#" class="underline hover:text-indigo-600">Privacy Policy</a>.</span>
                     </label>
@@ -155,12 +164,28 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const registerModal = document.getElementById('registerModal');
+        const registerForm = document.getElementById('customerRegisterForm');
         const steps = Array.from(document.querySelectorAll('#registerSteps .register-step'));
-        if (!steps.length) {
+        if (!steps.length || !registerForm) {
             return;
         }
 
         let activeIndex = 0;
+        let cooldownTime = 60;
+        let cooldownInterval;
+        let verificationSent = false;
+
+        const sendButton = document.getElementById('sendVerificationCode');
+        const emailInput = document.getElementById('registerEmail');
+        const verificationCodeInput = document.getElementById('verificationCode');
+        const statusElement = document.getElementById('verificationStatus');
+        const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
+        const csrfToken = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : '';
+
+        if (verificationCodeInput && verificationCodeInput.value.trim().length === 6) {
+            verificationSent = true;
+        }
 
         const goToStep = (index) => {
             steps.forEach((step, idx) => {
@@ -169,9 +194,81 @@
             activeIndex = index;
         };
 
+        const validateRequiredFields = (step) => {
+            const fields = Array.from(step.querySelectorAll('input, select, textarea'));
+            for (const field of fields) {
+                field.setCustomValidity('');
+                if (!field.checkValidity()) {
+                    field.reportValidity();
+                    return false;
+                }
+            }
+
+            return true;
+        };
+
+        const clearStatus = () => {
+            if (!statusElement) {
+                return;
+            }
+            statusElement.textContent = '';
+            statusElement.removeAttribute('data-state');
+            statusElement.className = 'text-xs text-gray-500';
+        };
+
+        const setStatus = (message, type) => {
+            if (!statusElement) {
+                return;
+            }
+
+            if (!message) {
+                clearStatus();
+                return;
+            }
+
+            statusElement.textContent = message;
+            statusElement.dataset.state = type;
+            statusElement.className = `text-xs ${type === 'error' ? 'text-red-500' : 'text-green-500'}`;
+        };
+
+        const resolveMessage = (payload, fallback) => {
+            if (!payload || typeof payload !== 'object') {
+                return fallback;
+            }
+
+            const errors = payload.errors;
+            if (errors && errors.email && errors.email.length) {
+                return errors.email[0];
+            }
+
+            if (payload.message) {
+                return payload.message;
+            }
+
+            return fallback;
+        };
+
+        const validateStep = (index) => {
+            const step = steps[index];
+            if (!step) {
+                return true;
+            }
+
+            if (!validateRequiredFields(step)) {
+                return false;
+            }
+
+            if (index === 2 && !verificationSent) {
+                setStatus('Please send your verification code before continuing.', 'error');
+                return false;
+            }
+
+            return true;
+        };
+
         document.querySelectorAll('[data-next-step]').forEach((btn) => {
             btn.addEventListener('click', () => {
-                if (activeIndex < steps.length - 1) {
+                if (activeIndex < steps.length - 1 && validateStep(activeIndex)) {
                     goToStep(activeIndex + 1);
                 }
             });
@@ -195,16 +292,11 @@
             });
         });
 
-        goToStep(activeIndex);
-
-        // Email verification code sending
-        const sendButton = document.getElementById('sendVerificationCode');
-        const emailInput = document.getElementById('registerEmail');
-        const statusElement = document.getElementById('verificationStatus');
-        let cooldownTime = 60;
-        let cooldownInterval;
-
-        function startCooldown() {
+        const startCooldown = () => {
+            if (cooldownInterval) {
+                clearInterval(cooldownInterval);
+            }
+            cooldownTime = 60;
             sendButton.disabled = true;
             sendButton.textContent = `Resend in ${cooldownTime}s`;
             cooldownInterval = setInterval(() => {
@@ -217,42 +309,106 @@
                     cooldownTime = 60;
                 }
             }, 1000);
-        }
+        };
 
-        function setStatus(message, type) {
-            statusElement.textContent = message;
-            statusElement.className = `text-xs ${type === 'error' ? 'text-red-500' : 'text-green-500'}`;
-        }
-
-        sendButton.addEventListener('click', async () => {
-            const email = emailInput.value.trim();
-            if (!email) {
-                setStatus('Please enter your email address.', 'error');
-                return;
-            }
-            sendButton.disabled = true;
-            sendButton.textContent = 'Sending...';
-            try {
-                const response = await fetch('/customer/register/send-code', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                    },
-                    body: JSON.stringify({ email })
-                });
-                const body = await response.json();
-                if (!response.ok) {
-                    const message = body?.errors?.email?.[0] ?? body?.message ?? 'Unable to send verification code.';
-                    throw new Error(message);
+        if (sendButton) {
+            sendButton.addEventListener('click', async () => {
+                const email = emailInput ? emailInput.value.trim() : '';
+                if (!email) {
+                    setStatus('Please enter your email address.', 'error');
+                    return;
                 }
-                setStatus(body.message ?? 'Verification code sent! Check your inbox.', 'success');
-                startCooldown();
-            } catch (error) {
-                sendButton.disabled = false;
-                sendButton.textContent = 'Send Code';
-                setStatus(error.message, 'error');
+
+                if (!csrfToken) {
+                    setStatus('Unable to send verification code right now.', 'error');
+                    return;
+                }
+
+                sendButton.disabled = true;
+                sendButton.textContent = 'Sending...';
+
+                try {
+                    const response = await fetch('/customer/register/send-code', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json'
+                        },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ email })
+                    });
+
+                    const contentType = response.headers.get('content-type') || '';
+                    const isJson = contentType.includes('application/json');
+                    const body = isJson ? await response.json() : {};
+
+                    if (!response.ok) {
+                        const message = resolveMessage(body, 'Unable to send verification code.');
+                        throw new Error(message);
+                    }
+
+                    verificationSent = true;
+                    const successMessage = resolveMessage(body, 'Verification code sent! Check your inbox.');
+                    setStatus(successMessage, 'success');
+                    startCooldown();
+                } catch (error) {
+                    verificationSent = false;
+                    sendButton.disabled = false;
+                    sendButton.textContent = 'Send Code';
+                    setStatus(error.message ?? 'Unable to send verification code.', 'error');
+                }
+            });
+        }
+
+        if (emailInput) {
+            emailInput.addEventListener('input', () => {
+                verificationSent = false;
+                clearStatus();
+            });
+        }
+
+        if (registerForm) {
+            registerForm.addEventListener('submit', (event) => {
+                if (!registerForm.checkValidity()) {
+                    event.preventDefault();
+                    registerForm.reportValidity();
+                }
+            });
+        }
+
+        const submitButton = document.getElementById('submitRegister');
+        if (submitButton) {
+            submitButton.addEventListener('click', () => {
+                if (validateStep(activeIndex)) {
+                    if (registerForm.checkValidity()) {
+                        registerForm.requestSubmit ? registerForm.requestSubmit() : registerForm.submit();
+                    } else {
+                        registerForm.reportValidity();
+                    }
+                }
+            });
+        }
+
+        goToStep(activeIndex);
+
+        if (document.querySelector('.bg-red-50')) {
+            if (registerModal) {
+                registerModal.classList.remove('hidden');
             }
-        });
+        }
+
+        const errorFields = @json(array_keys($errors->toArray()));
+        if (errorFields.length) {
+            const fieldName = errorFields.find((name) => registerForm.elements[name]);
+            if (fieldName) {
+                const field = registerForm.elements[fieldName];
+                const fieldStep = field ? field.closest('.register-step') : null;
+                const stepIndex = steps.indexOf(fieldStep);
+                if (stepIndex >= 0) {
+                    goToStep(stepIndex);
+                }
+            }
+        }
     });
 </script>

@@ -37,6 +37,7 @@ class CustomerAuthController extends Controller
             'contact_number' => 'nullable|string|max:20',
             'middle_name'    => 'nullable|string|max:255',
             'verification_code' => 'required|string|size:6',
+            'terms' => 'accepted',
         ]);
 
         $verificationRecord = $this->ensureEmailIsVerified($request->email, $request->verification_code);

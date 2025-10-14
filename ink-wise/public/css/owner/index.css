@@ -5,9 +5,27 @@ body {
   height: 100vh;
 }
 
+body.owner-layout {
+  --owner-sidebar-expanded: 230px;
+  --owner-sidebar-collapsed: 70px;
+  --owner-sidebar-width: var(--owner-sidebar-expanded);
+  --owner-content-shell-gutter: clamp(16px, 3vw, 36px);
+  --owner-content-shell-max: max(
+    320px,
+    calc(100vw - var(--owner-sidebar-width, 230px) - (var(--owner-main-horizontal-gap, 24px) * 2))
+  );
+  --owner-main-horizontal-gap: clamp(12px, 2vw, 24px);
+  --owner-topbar-height: 64px;
+  --owner-topbar-gap: 24px;
+}
+
+body.owner-layout.sidebar-collapsed {
+  --owner-sidebar-width: var(--owner-sidebar-collapsed);
+}
+
 /* Sidebar */
 .sidebar {
-  width: 230px;
+  width: var(--owner-sidebar-width, 230px);
   background: linear-gradient(135deg, #acd9b5 0%, #6f94d6 100%);
   border-right: 1px solid rgba(148, 163, 184, 0.18);
   box-shadow: 6px 0 24px rgba(15, 23, 42, 0.05);
@@ -25,8 +43,7 @@ body {
 
 /* Collapsed sidebar styles (match admin behavior) */
 .sidebar.collapsed {
-  width: 70px;
-  transition: width 0.3s;
+  width: var(--owner-sidebar-collapsed, 70px);
 }
 .sidebar.collapsed .profile strong,
 .sidebar.collapsed .profile span,
@@ -109,9 +126,9 @@ body {
 }
 
 /* When sidebar is collapsed via body class, shrink to compact width (don't hide off-screen) */
-body.sidebar-collapsed .sidebar {
-  width: 70px;
-  transition: width 0.3s ease;
+body.owner-layout.sidebar-collapsed .sidebar {
+  width: var(--owner-sidebar-collapsed, 70px);
+  transition: width 0.3s ease, transform 0.3s ease;
 }
 
 body.sidebar-collapsed .sidebar::after {
@@ -407,31 +424,24 @@ body.sidebar-collapsed .sidebar > * {
 
 /* Main content layout */
 .main-content {
-  position: absolute;
-  top: 64px;
-  left: 70px;
-  right: 0;
-  bottom: 0;
-  padding: 20px;
+  min-height: calc(100vh - var(--owner-topbar-height, 64px));
+  width: min(100%, calc(100vw - var(--owner-sidebar-width, 230px)));
+  margin-left: var(--owner-sidebar-width, 230px);
+  padding-top: calc(var(--owner-topbar-height, 64px) + var(--owner-topbar-gap, 24px));
+  padding-right: var(--owner-main-horizontal-gap, 24px);
+  padding-bottom: 32px;
+  padding-left: var(--owner-main-horizontal-gap, 24px);
   background-color: #f8f9fa;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  transition: padding-left 0.3s ease;
-}
-
-body:not(.sidebar-collapsed) .main-content {
-  padding-left: 250px;
-}
-
-body.sidebar-collapsed .main-content {
-  padding-left: 90px;
+  transition: margin-left 0.32s ease, padding 0.32s ease;
 }
 
 .page-inner {
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
+  max-width: var(--owner-content-shell-max, 1200px);
+  margin: 0;
+  transition: max-width 0.32s ease;
 }
 
 .panel {
@@ -446,12 +456,12 @@ body.sidebar-collapsed .main-content {
 .topbar {
   position: fixed; /* keep the topbar at the top of the viewport */
   top: 0;
-  left: 230px; /* match sidebar width */
+  left: var(--owner-sidebar-width, 230px); /* match sidebar width */
   right: 0;
   height: 64px;
   display: flex;
   align-items: center;
-  padding: 0 18px;
+  padding: 0 var(--owner-main-horizontal-gap, 24px);
   background: linear-gradient(135deg, rgba(172,217,181,0.95), rgba(111,148,214,0.92));
   border-bottom: 1px solid rgba(0,0,0,0.06);
   box-shadow: 0 6px 18px rgba(16,24,40,0.06);
@@ -459,20 +469,13 @@ body.sidebar-collapsed .main-content {
   -webkit-backdrop-filter: blur(8px);
   /* sit above main content but below the sidebar */
   z-index: 10000;
-  transition: left 0.32s ease; /* animate shift when sidebar collapses */
-}
-
-/* When sidebar is collapsed the topbar should expand to the left edge */
-body.sidebar-collapsed .topbar,
-.sidebar.collapsed ~ .main-content .topbar {
-  left: 70px;
+  transition: left 0.32s ease;
 }
 
 @media (max-width: 900px) {
-  .sidebar { width: 70px; }
-  .sidebar:not(.collapsed) { width: 230px; }
-  .topbar { left: 70px; }
-  .main-content { left: 70px; padding-left: 20px; }
+  body.owner-layout {
+    --owner-main-horizontal-gap: clamp(8px, 4vw, 18px);
+  }
 }
 
 /* Layout container - ensure content is positioned under topbar and cleared from sidebar */
@@ -484,8 +487,9 @@ body.sidebar-collapsed .topbar,
 
 .main {
   flex: 1;
-  padding: 25px;
-  padding-left: 230px; /* offset main content so sidebar doesn't overlap */
+  padding: 25px var(--owner-main-horizontal-gap, 24px);
+  margin-left: var(--owner-sidebar-width, 230px);
+  transition: margin-left 0.32s ease;
 }
 
 
@@ -500,6 +504,10 @@ body.sidebar-collapsed .topbar,
   padding-left: 6px;
   margin-left: 12px; /* smaller left offset so title sits closer to the sidebar edge */
   transition: margin-left 0.32s ease;
+}
+
+body.sidebar-collapsed .topbar .logo {
+  margin-left: 4px;
 }
 
 .topbar .icons {

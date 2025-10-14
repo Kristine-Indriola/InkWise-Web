@@ -440,14 +440,14 @@
         if (dashboardShell) dashboardShell.style.paddingLeft = baseShellPaddingLeft || '';
       }
 
-      updateSidebarVars();
-      adjustHeaderPadding();
-
       if (localStorage.getItem('sidebar-collapsed') === 'true') {
         sidebar.classList.add('collapsed');
         document.body.classList.add('sidebar-collapsed');
         if (sidebarToggleIcon) sidebarToggleIcon.classList.add('is-rotated');
       }
+
+      updateSidebarVars();
+      adjustHeaderPadding();
 
       window.addEventListener('resize', updateSidebarVars);
 
