@@ -19,6 +19,15 @@
         <!-- Register Form -->
         <form method="POST" action="{{ route('customer.register') }}" id="customerRegisterForm" class="space-y-6">
             @csrf
+            @if ($errors->any())
+                <div class="bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg p-2">
+                    <ul class="list-disc ml-4 space-y-1">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
 
             <div id="registerSteps" class="space-y-6">
                 <!-- Step 1 -->
@@ -26,17 +35,17 @@
                     <div class="flex gap-3">
                         <div class="flex-1">
                             <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">First Name</label>
-                            <input type="text" name="first_name" required
+                <input type="text" name="first_name" value="{{ old('first_name') }}" required
                                    class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition">
                         </div>
                         <div class="flex-1">
                             <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Middle Name</label>
-                            <input type="text" name="middle_name"
+                <input type="text" name="middle_name" value="{{ old('middle_name') }}"
                                    class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition">
                         </div>
                         <div class="flex-1">
                             <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Last Name</label>
-                            <input type="text" name="last_name" required
+                <input type="text" name="last_name" value="{{ old('last_name') }}" required
                                    class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition">
                         </div>
                     </div>
@@ -58,7 +67,7 @@
                 <div class="register-step hidden" data-step="2">
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Contact Number</label>
-                        <input type="text" name="contact_number"
+               <input type="text" name="contact_number" value="{{ old('contact_number') }}"
                                class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition">
                     </div>
                     <div class="flex items-center justify-between mt-6">
@@ -77,7 +86,7 @@
                         <div>
                             <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Email</label>
                             <div class="mt-1 flex gap-2">
-                                <input type="email" name="email" id="registerEmail" required
+                    <input type="email" name="email" id="registerEmail" value="{{ old('email') }}" required
                                        class="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition">
                                 <button type="button"
                                         class="px-3 py-2 text-xs font-semibold text-white bg-indigo-500 hover:bg-indigo-600 rounded-lg shadow-sm transition"
@@ -88,7 +97,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Verification Code</label>
-                            <input type="text" name="verification_code" id="verificationCode" value="{{ old('verification_code') }}" required maxlength="6"
+                <input type="text" name="verification_code" id="verificationCode" value="{{ old('verification_code') }}" required maxlength="6"
                                    class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-500 transition uppercase tracking-widest">
                         </div>
                         <p id="verificationStatus" class="text-xs text-gray-500"></p>
@@ -119,13 +128,13 @@
                     </div>
                     <div class="flex items-center justify-between mt-6">
                         <button type="button" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700" data-prev-step>Back</button>
-                        <button type="submit"
+                        <button type="button" id="submitRegister"
                                 class="bg-gradient-to-r from-indigo-600 to-blue-500 hover:from-indigo-700 hover:to-blue-600 text-white font-semibold py-2 px-6 rounded-xl shadow-lg transition text-sm">
                             Sign Up
                         </button>
                     </div>
                     <label for="terms" class="mt-3 flex items-start gap-2 text-[11px] text-gray-500 leading-tight text-center justify-center">
-                        <input type="checkbox" name="terms" id="terms" required
+               <input type="checkbox" name="terms" id="terms" {{ old('terms') ? 'checked' : '' }} required
                                class="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
                         <span>By signing up, you agree to InkWise's <a href="#" class="underline hover:text-indigo-600">Terms of Service</a> and <a href="#" class="underline hover:text-indigo-600">Privacy Policy</a>.</span>
                     </label>
@@ -254,5 +263,14 @@
                 setStatus(error.message, 'error');
             }
         });
+
+        document.getElementById('submitRegister').addEventListener('click', () => {
+            document.getElementById('customerRegisterForm').submit();
+        });
+
+        // Show modal if there are errors
+        if (document.querySelector('.bg-red-50')) {
+            document.getElementById('registerModal').classList.remove('hidden');
+        }
     });
 </script>
