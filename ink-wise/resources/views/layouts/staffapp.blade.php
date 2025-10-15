@@ -545,7 +545,7 @@
     }
   </style>
   <script>
-    // Apply theme on page load (before body renders) - avoids flash and persists across pages
+    // Apply theme on page load (before body renders) - avoids flash and persists across pages..
     (function() {
       try {
         var isDark = localStorage.getItem('theme') === 'dark';
