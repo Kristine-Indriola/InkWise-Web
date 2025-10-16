@@ -317,7 +317,7 @@ Route::get('/auth/google/callback', function () {
 */
 
 /**Dashboard & Home*/
-Route::get('/', fn () => view('customer.dashboard'))->name('dashboard');  // Public
+Route::get('/', [CustomerAuthController::class, 'dashboard'])->name(name: 'customer.dashboard');
 Route::middleware('auth')->get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');  // Protected
 Route::get('/search', function (\Illuminate\Http\Request $request) {
     return 'Search for: ' . e($request->query('query', ''));
@@ -429,10 +429,16 @@ Route::middleware('auth')->prefix('customer/profile')->name('customer.profile.')
 
 });*/
 
+
+
+    
+
 // Profile update (protected)
 /*Route::middleware(['auth:customer'])->group(function () {
     Route::put('/customer/profile/update', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
 });*/
+
+
 
 
 /** Templates (Category Home & Invitations/Giveaways)*/
@@ -650,6 +656,8 @@ if (interface_exists('Laravel\\Socialite\\Contracts\\Factory')) {
         return 'Google login successful (dev placeholder)';
     })->name('google.callback');
 }
+
+Route::middleware('auth')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
 
 require __DIR__.'/auth.php';
 
