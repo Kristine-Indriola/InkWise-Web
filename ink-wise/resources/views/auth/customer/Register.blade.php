@@ -164,12 +164,28 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const registerModal = document.getElementById('registerModal');
+        const registerForm = document.getElementById('customerRegisterForm');
         const steps = Array.from(document.querySelectorAll('#registerSteps .register-step'));
-        if (!steps.length) {
+        if (!steps.length || !registerForm) {
             return;
         }
 
         let activeIndex = 0;
+        let cooldownTime = 60;
+        let cooldownInterval;
+        let verificationSent = false;
+
+        const sendButton = document.getElementById('sendVerificationCode');
+        const emailInput = document.getElementById('registerEmail');
+        const verificationCodeInput = document.getElementById('verificationCode');
+        const statusElement = document.getElementById('verificationStatus');
+        const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
+        const csrfToken = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : '';
+
+        if (verificationCodeInput && verificationCodeInput.value.trim().length === 6) {
+            verificationSent = true;
+        }
 
         const goToStep = (index) => {
             steps.forEach((step, idx) => {
@@ -178,9 +194,81 @@
             activeIndex = index;
         };
 
+        const validateRequiredFields = (step) => {
+            const fields = Array.from(step.querySelectorAll('input, select, textarea'));
+            for (const field of fields) {
+                field.setCustomValidity('');
+                if (!field.checkValidity()) {
+                    field.reportValidity();
+                    return false;
+                }
+            }
+
+            return true;
+        };
+
+        const clearStatus = () => {
+            if (!statusElement) {
+                return;
+            }
+            statusElement.textContent = '';
+            statusElement.removeAttribute('data-state');
+            statusElement.className = 'text-xs text-gray-500';
+        };
+
+        const setStatus = (message, type) => {
+            if (!statusElement) {
+                return;
+            }
+
+            if (!message) {
+                clearStatus();
+                return;
+            }
+
+            statusElement.textContent = message;
+            statusElement.dataset.state = type;
+            statusElement.className = `text-xs ${type === 'error' ? 'text-red-500' : 'text-green-500'}`;
+        };
+
+        const resolveMessage = (payload, fallback) => {
+            if (!payload || typeof payload !== 'object') {
+                return fallback;
+            }
+
+            const errors = payload.errors;
+            if (errors && errors.email && errors.email.length) {
+                return errors.email[0];
+            }
+
+            if (payload.message) {
+                return payload.message;
+            }
+
+            return fallback;
+        };
+
+        const validateStep = (index) => {
+            const step = steps[index];
+            if (!step) {
+                return true;
+            }
+
+            if (!validateRequiredFields(step)) {
+                return false;
+            }
+
+            if (index === 2 && !verificationSent) {
+                setStatus('Please send your verification code before continuing.', 'error');
+                return false;
+            }
+
+            return true;
+        };
+
         document.querySelectorAll('[data-next-step]').forEach((btn) => {
             btn.addEventListener('click', () => {
-                if (activeIndex < steps.length - 1) {
+                if (activeIndex < steps.length - 1 && validateStep(activeIndex)) {
                     goToStep(activeIndex + 1);
                 }
             });
@@ -204,16 +292,11 @@
             });
         });
 
-        goToStep(activeIndex);
-
-        // Email verification code sending
-        const sendButton = document.getElementById('sendVerificationCode');
-        const emailInput = document.getElementById('registerEmail');
-        const statusElement = document.getElementById('verificationStatus');
-        let cooldownTime = 60;
-        let cooldownInterval;
-
-        function startCooldown() {
+        const startCooldown = () => {
+            if (cooldownInterval) {
+                clearInterval(cooldownInterval);
+            }
+            cooldownTime = 60;
             sendButton.disabled = true;
             sendButton.textContent = `Resend in ${cooldownTime}s`;
             cooldownInterval = setInterval(() => {
@@ -226,51 +309,106 @@
                     cooldownTime = 60;
                 }
             }, 1000);
-        }
+        };
 
-        function setStatus(message, type) {
-            statusElement.textContent = message;
-            statusElement.className = `text-xs ${type === 'error' ? 'text-red-500' : 'text-green-500'}`;
-        }
-
-        sendButton.addEventListener('click', async () => {
-            const email = emailInput.value.trim();
-            if (!email) {
-                setStatus('Please enter your email address.', 'error');
-                return;
-            }
-            sendButton.disabled = true;
-            sendButton.textContent = 'Sending...';
-            try {
-                const response = await fetch('/customer/register/send-code', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                    },
-                    body: JSON.stringify({ email })
-                });
-                const body = await response.json();
-                if (!response.ok) {
-                    const message = body?.errors?.email?.[0] ?? body?.message ?? 'Unable to send verification code.';
-                    throw new Error(message);
+        if (sendButton) {
+            sendButton.addEventListener('click', async () => {
+                const email = emailInput ? emailInput.value.trim() : '';
+                if (!email) {
+                    setStatus('Please enter your email address.', 'error');
+                    return;
                 }
-                setStatus(body.message ?? 'Verification code sent! Check your inbox.', 'success');
-                startCooldown();
-            } catch (error) {
-                sendButton.disabled = false;
-                sendButton.textContent = 'Send Code';
-                setStatus(error.message, 'error');
-            }
-        });
 
-        document.getElementById('submitRegister').addEventListener('click', () => {
-            document.getElementById('customerRegisterForm').submit();
-        });
+                if (!csrfToken) {
+                    setStatus('Unable to send verification code right now.', 'error');
+                    return;
+                }
 
-        // Show modal if there are errors
+                sendButton.disabled = true;
+                sendButton.textContent = 'Sending...';
+
+                try {
+                    const response = await fetch('/customer/register/send-code', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json'
+                        },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ email })
+                    });
+
+                    const contentType = response.headers.get('content-type') || '';
+                    const isJson = contentType.includes('application/json');
+                    const body = isJson ? await response.json() : {};
+
+                    if (!response.ok) {
+                        const message = resolveMessage(body, 'Unable to send verification code.');
+                        throw new Error(message);
+                    }
+
+                    verificationSent = true;
+                    const successMessage = resolveMessage(body, 'Verification code sent! Check your inbox.');
+                    setStatus(successMessage, 'success');
+                    startCooldown();
+                } catch (error) {
+                    verificationSent = false;
+                    sendButton.disabled = false;
+                    sendButton.textContent = 'Send Code';
+                    setStatus(error.message ?? 'Unable to send verification code.', 'error');
+                }
+            });
+        }
+
+        if (emailInput) {
+            emailInput.addEventListener('input', () => {
+                verificationSent = false;
+                clearStatus();
+            });
+        }
+
+        if (registerForm) {
+            registerForm.addEventListener('submit', (event) => {
+                if (!registerForm.checkValidity()) {
+                    event.preventDefault();
+                    registerForm.reportValidity();
+                }
+            });
+        }
+
+        const submitButton = document.getElementById('submitRegister');
+        if (submitButton) {
+            submitButton.addEventListener('click', () => {
+                if (validateStep(activeIndex)) {
+                    if (registerForm.checkValidity()) {
+                        registerForm.requestSubmit ? registerForm.requestSubmit() : registerForm.submit();
+                    } else {
+                        registerForm.reportValidity();
+                    }
+                }
+            });
+        }
+
+        goToStep(activeIndex);
+
         if (document.querySelector('.bg-red-50')) {
-            document.getElementById('registerModal').classList.remove('hidden');
+            if (registerModal) {
+                registerModal.classList.remove('hidden');
+            }
+        }
+
+        const errorFields = @json(array_keys($errors->toArray()));
+        if (errorFields.length) {
+            const fieldName = errorFields.find((name) => registerForm.elements[name]);
+            if (fieldName) {
+                const field = registerForm.elements[fieldName];
+                const fieldStep = field ? field.closest('.register-step') : null;
+                const stepIndex = steps.indexOf(fieldStep);
+                if (stepIndex >= 0) {
+                    goToStep(stepIndex);
+                }
+            }
         }
     });
 </script>
