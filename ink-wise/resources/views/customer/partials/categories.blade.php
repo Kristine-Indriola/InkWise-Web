@@ -18,7 +18,7 @@
                     <!-- Wedding -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
                         <a href="{{ url('/templates/wedding/invitations') }}">
-                            <img src="{{ asset('customerimages/image/invite1.png') }}" 
+                            <img src="{{ public_path('customerimages/image/invite1.png') }}" 
                                  alt="Wedding Invitation" 
                                  class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
@@ -27,7 +27,7 @@
                     <!-- Baptism -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
                         <a href="{{ url('/templates/baptism/invitations') }}">
-                            <img src="{{ asset('customerimages/image/invite2.png') }}" 
+                            <img src="{{ public_path('customerimages/image/invite2.png') }}" 
                                  alt="Baptism Invitation" 
                                  class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
@@ -36,7 +36,7 @@
                     <!-- Birthday -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
                         <a href="{{ url('/templates/birthday/invitations') }}">
-                            <img src="{{ asset('customerimages/image/invite3.png') }}" 
+                            <img src="{{ public_path('customerimages/image/invite3.png') }}" 
                                  alt="Birthday Invitation" 
                                  class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
@@ -45,7 +45,7 @@
                     <!-- Corporate -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
                         <a href="{{ url('/templates/corporate/invitations') }}">
-                            <img src="{{ asset('customerimages/image/invite4.png') }}" 
+                            <img src="{{ public_path('customerimages/image/invite4.png') }}" 
                                  alt="Corporate Invitation" 
                                  class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
@@ -62,7 +62,7 @@
                     <!-- Wedding -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
                         <a href="{{ url('/templates/wedding/giveaways') }}">
-                            <img src="{{ asset('customerimages/image/weddinggive.png') }}" 
+                            <img src="{{ public_path('customerimages/image/weddinggive.png') }}" 
                                  alt="Wedding Giveaway" 
                                  class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
@@ -71,7 +71,7 @@
                     <!-- Baptism -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
                         <a href="{{ url('/templates/baptism/giveaways') }}">
-                            <img src="{{ asset('customerimages/image/baptismgive.png') }}" 
+                            <img src="{{ public_path('customerimages/image/baptismgive.png') }}" 
                                  alt="Baptism Giveaway" 
                                  class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
@@ -80,7 +80,7 @@
                     <!-- Birthday -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
                         <a href="{{ url('/templates/birthday/giveaways') }}">
-                            <img src="{{ asset('customerimages/image/birthdaygive.png') }}" 
+                            <img src="{{ public_path('customerimages/image/birthdaygive.png') }}" 
                                  alt="Birthday Giveaway" 
                                  class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
@@ -89,7 +89,7 @@
                     <!-- Corporate -->
                     <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
                         <a href="{{ url('/templates/corporate/giveaways') }}">
-                            <img src="{{ asset('customerimages/image/corporategive.png') }}" 
+                            <img src="{{ public_path('customerimages/image/corporategive.png') }}" 
                                  alt="Corporate Giveaway" 
                                  class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 bg-white p-2">
                         </a>
