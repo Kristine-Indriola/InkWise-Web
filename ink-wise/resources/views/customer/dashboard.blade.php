@@ -980,7 +980,7 @@ document.addEventListener('DOMContentLoaded', function () {
 {{-- include modals --}}
 {{-- Login and Register Modals --}}
 @include('auth.customer.login')
-@include('auth.customer.register')
+{{-- @include('auth.customer.register') --}}
 
 {{-- Templates Section --}}
 <div class="layout-stack">
