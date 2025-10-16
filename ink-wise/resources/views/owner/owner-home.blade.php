@@ -170,8 +170,8 @@
           <span class="summary-card-label">New Orders</span>
           <span class="summary-card-chip">Orders</span>
         </div>
-        <span class="summary-card-value">5</span>
-        <span class="summary-card-meta">Recent new orders</span>
+        <span class="summary-card-value">{{ number_format($newOrdersCount ?? 0) }}</span>
+        <span class="summary-card-meta">Placed in the last 7 days</span>
       </div>
 
       <a href="{{ route('owner.inventory-track', ['status' => 'low']) }}" class="summary-card" style="text-decoration:none; color:inherit;">
@@ -191,7 +191,7 @@
           <span class="summary-card-label">Pending Orders</span>
           <span class="summary-card-chip">Orders</span>
         </div>
-        <span class="summary-card-value">8</span>
+        <span class="summary-card-value">{{ number_format($pendingOrdersCount ?? 0) }}</span>
         <span class="summary-card-meta">Awaiting processing</span>
       </div>
 
