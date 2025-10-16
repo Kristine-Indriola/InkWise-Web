@@ -116,7 +116,8 @@
 
     <div class="pt-2">
       <button type="submit"
-              class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-medium hover:opacity-95">
+        class="px-5 py-2.5 rounded-xl text-white font-medium hover:opacity-95"
+        style="background-color:#a6b7ff;">
         Update Profile
       </button>
       @if (session('status'))

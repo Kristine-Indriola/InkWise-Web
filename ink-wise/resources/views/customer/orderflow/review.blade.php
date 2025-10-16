@@ -56,14 +56,14 @@
 	if (!$frontImage && $uploads->isNotEmpty()) {
 		$first = $uploads->firstWhere(fn ($upload) => str_starts_with($upload->mime_type ?? '', 'image/'));
 		if ($first) {
-			$frontImage = asset('storage/uploads/products/' . ($product->id ?? 'generic') . '/' . $first->filename);
+			$frontImage = $resolveImage('uploads/products/' . ($product->id ?? 'generic') . '/' . $first->filename) ?? asset('storage/uploads/products/' . ($product->id ?? 'generic') . '/' . $first->filename);
 		}
 	}
 
 	if (!$backImage && $uploads->count() > 1) {
 		$second = $uploads->skip(1)->firstWhere(fn ($upload) => str_starts_with($upload->mime_type ?? '', 'image/'));
 		if ($second) {
-			$backImage = asset('storage/uploads/products/' . ($product->id ?? 'generic') . '/' . $second->filename);
+			$backImage = $resolveImage('uploads/products/' . ($product->id ?? 'generic') . '/' . $second->filename) ?? asset('storage/uploads/products/' . ($product->id ?? 'generic') . '/' . $second->filename);
 		}
 	}
 

@@ -331,7 +331,7 @@ Route::get('/customer/login', [CustomerAuthController::class, 'showLogin'])->nam
 Route::post('/customer/login', [CustomerAuthController::class, 'login'])->name('customer.login');
 Route::post('/customer/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
 
-Route::get('/customer/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');
+// Route::get('/customer/dashboard'...) removed: dashboard route already defined above as '/dashboard' (auth-protected).
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -431,16 +431,10 @@ Route::middleware('auth')->prefix('customer/profile')->name('customer.profile.')
 
 });*/
 
-
-
-    
-
 // Profile update (protected)
 /*Route::middleware(['auth:customer'])->group(function () {
     Route::put('/customer/profile/update', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
 });*/
-
-
 
 
 /** Templates (Category Home & Invitations/Giveaways)*/
@@ -659,7 +653,7 @@ if (interface_exists('Laravel\\Socialite\\Contracts\\Factory')) {
     })->name('google.callback');
 }
 
-Route::middleware('auth')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
+// duplicate '/customer/profile' route removed (already defined earlier in file)
 
 require __DIR__.'/auth.php';
 
