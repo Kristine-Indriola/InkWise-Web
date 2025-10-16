@@ -188,8 +188,9 @@ class CustomerAuthController extends Controller
 
     public function dashboard()
     {
+
         return view('customer.dashboard', [
-            'customer' => Auth::user()?->customer ?? null, // safe access
+            'customer' => Auth::user()->customer ?? null, // safe access
         ]);
     }
 
