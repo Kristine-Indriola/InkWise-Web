@@ -6,13 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\OrderFlow\FinalizeOrderRequest;
 use App\Http\Requests\OrderFlow\SelectEnvelopeRequest;
 use App\Http\Requests\OrderFlow\SelectGiveawayRequest;
-use App\Models\Admin as AdminAccount;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductEnvelope;
-use App\Models\User;
-use App\Notifications\NewOrderPlaced;
 use App\Services\OrderFlowService;
 use Illuminate\Contracts\View\View as ViewContract;
 use Illuminate\Http\JsonResponse;
@@ -22,7 +19,6 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 
 class OrderFlowController extends Controller
@@ -42,70 +38,16 @@ class OrderFlowController extends Controller
         $product = $this->orderFlow->resolveProduct($product, $productId);
         $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
 
-        $templatesConfig = config('invitation_templates', []);
-        $aliases = $templatesConfig['aliases'] ?? [];
-        $templateKey = $request->query('template');
-
-        $resolveFromAliases = static function (?string $key) use ($aliases) {
-            if (!$key) {
-                return null;
-            }
-
-            return $aliases[$key] ?? $key;
-        };
-
-        $templateKey = $resolveFromAliases($templateKey);
-
-        if (!$templateKey && $product && $product->template) {
-            $candidate = Str::slug($product->template->name ?? '');
-            $templateKey = $resolveFromAliases($candidate);
-        }
-
-        $availableTemplates = array_filter(
-            $templatesConfig,
-            static fn ($value, $key) => $key !== 'aliases' && is_array($value),
-            ARRAY_FILTER_USE_BOTH
-        );
-
-        if (!$templateKey || !isset($availableTemplates[$templateKey])) {
-            $templateKey = 'default';
-        }
-
-        $templateConfig = $availableTemplates[$templateKey] ?? [];
-
-        $frontSvg = null;
-        $backSvg = null;
-        $textFieldPresets = [];
-        $imageSlots = [];
-
-        if (!empty($templateConfig)) {
-            $frontSvgPath = $templateConfig['front_svg'] ?? null;
-            $backSvgPath = $templateConfig['back_svg'] ?? null;
-
-            if ($frontSvgPath && is_file($frontSvgPath)) {
-                $frontSvg = file_get_contents($frontSvgPath) ?: null;
-            }
-
-            if ($backSvgPath && is_file($backSvgPath)) {
-                $backSvg = file_get_contents($backSvgPath) ?: null;
-            }
-
-            $textFieldPresets = array_values($templateConfig['text_fields'] ?? []);
-            $imageSlots = array_values($templateConfig['image_slots'] ?? []);
-        }
-
         return view('customer.Invitations.editing', [
             'product' => $product,
             'frontImage' => $images['front'],
             'backImage' => $images['back'],
             'previewImages' => $images['all'],
+            'imageSlots' => $product ? [
+                ['side' => 'front', 'default' => $product->template->front_image ?? null],
+                ['side' => 'back', 'default' => $product->template->back_image ?? null],
+            ] : [],
             'defaultQuantity' => $product ? $this->orderFlow->defaultQuantityFor($product) : 50,
-            'activeTemplateKey' => $templateKey,
-            'templateConfig' => $templateConfig,
-            'textFieldPresets' => $textFieldPresets,
-            'imageSlots' => $imageSlots,
-            'frontSvg' => $frontSvg,
-            'backSvg' => $backSvg,
         ]);
     }
 
@@ -352,7 +294,6 @@ class OrderFlowController extends Controller
     public function saveFinalStep(FinalizeOrderRequest $request): JsonResponse
     {
         $order = $this->currentOrder();
-        $createdNewOrder = false;
         if (!$order) {
             $summary = session(static::SESSION_SUMMARY_KEY);
             if (!$summary || !is_array($summary) || empty($summary['productId'])) {
@@ -361,7 +302,7 @@ class OrderFlowController extends Controller
                 ], 404);
             }
 
-            DB::transaction(function () use (&$order, $summary, &$createdNewOrder) {
+            DB::transaction(function () use (&$order, $summary) {
                 $customerOrder = $this->orderFlow->createCustomerOrder(Auth::user());
                 $metadata = $this->orderFlow->buildInitialOrderMetadata($summary);
 
@@ -381,8 +322,6 @@ class OrderFlowController extends Controller
                     'summary_snapshot' => null,
                     'metadata' => $metadata,
                 ]);
-
-                $createdNewOrder = true;
 
                 $order = $this->orderFlow->initializeOrderFromSummary($order, $summary);
                 $this->orderFlow->recalculateOrderTotals($order);
@@ -429,10 +368,6 @@ class OrderFlowController extends Controller
         // remove the one-time allowance to prevent other pages from reusing it
         session()->forget('order_checkout_allowed_for');
 
-        if ($createdNewOrder && $order) {
-            $this->notifyAdminsOfNewOrder($order->fresh());
-        }
-
         // Return admin redirect URL so the client (GCash button) can redirect to admin order summary
         try {
             $adminRedirect = route('admin.ordersummary.index', ['order' => $order->order_number]);
@@ -447,61 +382,6 @@ class OrderFlowController extends Controller
             'summary' => session(static::SESSION_SUMMARY_KEY),
             'admin_redirect' => $adminRedirect,
         ]);
-    }
-
-    protected function notifyAdminsOfNewOrder(Order $order): void
-    {
-    $order->loadMissing(['customerOrder', 'customer']);
-
-        $summary = $this->orderFlow->buildSummary($order);
-
-        $recipients = collect();
-
-        $recipients = $recipients->merge(
-            User::query()
-                ->whereIn('role', ['admin', 'owner'])
-                ->get()
-        );
-
-        $recipients = $recipients->merge(AdminAccount::query()->get());
-
-        $recipients = $recipients->unique(function ($notifiable) {
-            $key = method_exists($notifiable, 'getKey') ? $notifiable->getKey() : spl_object_id($notifiable);
-
-            return sprintf('%s-%s', get_class($notifiable), $key);
-        });
-
-        if ($recipients->isEmpty()) {
-            return;
-        }
-
-        $customerName = $order->customerOrder?->name
-            ?? trim(implode(' ', array_filter([
-                $order->customer?->first_name,
-                $order->customer?->last_name,
-            ])))
-            ?: 'Customer';
-
-        $orderNumber = $order->order_number ?: (string) $order->getKey();
-        $totalAmount = (float) Arr::get($summary, 'totalAmount', $order->total_amount ?? 0);
-
-        $summaryUrl = url('/admin/ordersummary/' . $orderNumber);
-        try {
-            $summaryUrl = route('admin.ordersummary.index', ['order' => $orderNumber]);
-        } catch (\Throwable $e) {
-            // Fall back to the constructed URL when the named route is unavailable.
-        }
-
-        Notification::send(
-            $recipients,
-            new NewOrderPlaced(
-                (int) $order->getKey(),
-                $order->order_number,
-                $customerName,
-                $totalAmount,
-                $summaryUrl
-            )
-        );
     }
 
     public function envelope(): RedirectResponse|ViewContract

@@ -1,4 +1,19 @@
 document.addEventListener("DOMContentLoaded", () => {
+  // Always show toolbar when a text field is focused or clicked
+  document.addEventListener('focusin', (e) => {
+    if (e.target && e.target.matches('input[data-text-node]')) {
+      showTextToolbar(e.target);
+    }
+  });
+  document.addEventListener('click', (e) => {
+    if (e.target && e.target.matches('input[data-text-node]')) {
+      showTextToolbar(e.target);
+    }
+    // Also handle SVG text node click
+    if (e.target && e.target.closest && e.target.closest('svg [data-text-node]')) {
+      showTextToolbar(e.target);
+    }
+  });
   const frontBtn = document.getElementById("showFront");
   const backBtn = document.getElementById("showBack");
   const viewToggleButtons = document.querySelectorAll(".view-toggle button");
@@ -20,6 +35,433 @@ document.addEventListener("DOMContentLoaded", () => {
     front: document.querySelector('[data-image-preview="front"]'),
     back: document.querySelector('[data-image-preview="back"]'),
   };
+  const textToolbar = document.getElementById("textToolbar");
+
+  let toolbarHideTimer = null;
+  let fontModalOpen = false;
+  let colorModalOpen = false;
+
+  function showTextToolbar(trigger) {
+    if (!textToolbar) return;
+    clearTimeout(toolbarHideTimer);
+    textToolbar.classList.add("is-visible");
+    textToolbar.setAttribute("aria-hidden", "false");
+  }
+
+  function hideTextToolbar() {
+    if (!textToolbar) return;
+    clearTimeout(toolbarHideTimer);
+    textToolbar.classList.remove("is-visible");
+    textToolbar.setAttribute("aria-hidden", "true");
+  }
+
+  function scheduleToolbarHide() {
+    if (!textToolbar) return;
+    clearTimeout(toolbarHideTimer);
+    toolbarHideTimer = setTimeout(() => {
+      // if font modal is open we should not hide the toolbar
+  // don't hide toolbar if either modal is open
+  if (fontModalOpen || colorModalOpen) return;
+      const activeEl = document.activeElement;
+      if (!activeEl) {
+        hideTextToolbar();
+        return;
+      }
+      if (textToolbar.contains(activeEl)) return;
+      if (activeEl.closest?.(".text-field")) return;
+      hideTextToolbar();
+    }, 150);
+  }
+
+  if (textToolbar) {
+    textToolbar.addEventListener("focusin", () => clearTimeout(toolbarHideTimer));
+    textToolbar.addEventListener("focusout", scheduleToolbarHide);
+  }
+
+  /* FONT MODAL */
+  const fontModal = document.getElementById("fontModal");
+  const fontList = document.getElementById("fontList");
+  const fontSearch = document.getElementById("fontSearch");
+  const fontClose = document.getElementById("fontClose");
+  const googleApiKey = fontModal?.dataset?.googleFontsKey;
+
+  function openFontModal() {
+    if (!fontModal) return;
+    fontModal.setAttribute("aria-hidden", "false");
+    fontModalOpen = true;
+    // ensure toolbar remains visible while modal is open
+    showTextToolbar();
+    loadFontsList();
+    try { fontSearch.focus(); } catch (e) {}
+  }
+
+  function closeFontModal() {
+    if (!fontModal) return;
+    fontModal.setAttribute("aria-hidden", "true");
+    fontModalOpen = false;
+  }
+
+  if (fontClose) fontClose.addEventListener("click", closeFontModal);
+  if (fontModal) fontModal.addEventListener("pointerdown", (e) => {
+    if (e.target === fontModal) closeFontModal();
+  });
+
+  /* COLOR MODAL */
+  const colorModal = document.getElementById('colorModal');
+  const colorClose = document.getElementById('colorClose');
+  const colorNative = document.getElementById('colorNative');
+  const colorHexInput = document.getElementById('colorHexInput');
+  const colorSample = document.getElementById('colorSample');
+  const recentColorsContainer = document.getElementById('recentColors');
+
+  function openColorModal() {
+    if (!colorModal) return;
+    colorModal.setAttribute('aria-hidden','false');
+    colorModalOpen = true;
+    showTextToolbar();
+    // sync current toolbar color value
+    try {
+      const sw = document.querySelector('.toolbar-color-swatch');
+      const v = sw?.dataset?.color || (sw && sw.style && sw.style.background) || '#1f2933';
+      if (colorNative) colorNative.value = v;
+      if (colorHexInput) colorHexInput.value = v;
+      if (colorSample) colorSample.style.background = v;
+    } catch(e){}
+  }
+
+  function closeColorModal() {
+    if (!colorModal) return;
+    colorModal.setAttribute('aria-hidden','true');
+    colorModalOpen = false;
+  }
+
+  if (colorClose) colorClose.addEventListener('click', closeColorModal);
+  if (colorModal) colorModal.addEventListener('pointerdown', (e)=>{ if (e.target===colorModal) closeColorModal(); });
+
+  // open color modal when toolbar color swatch clicked
+  document.querySelectorAll('.toolbar-color').forEach(el => {
+    el.addEventListener('click', (e)=>{ e.stopPropagation(); openColorModal(); });
+  });
+
+  // sync native color and hex input
+  if (colorNative) {
+    colorNative.addEventListener('input', (e)=>{
+      const v = colorNative.value;
+      if (colorHexInput) colorHexInput.value = v;
+      if (colorSample) colorSample.style.background = v;
+      // apply live
+      applyColorToActive(v);
+    });
+  }
+  if (colorHexInput) {
+    colorHexInput.addEventListener('change', ()=>{
+      const v = colorHexInput.value.trim();
+      if (/^#([0-9A-F]{3}){1,2}$/i.test(v)) {
+        if (colorNative) colorNative.value = v;
+        if (colorSample) colorSample.style.background = v;
+        applyColorToActive(v);
+        addRecentColor(v);
+      }
+    });
+  }
+
+  // preset swatches
+  document.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.swatch');
+    if (!btn) return;
+    const c = btn.dataset.color;
+    if (!c) return;
+    if (colorNative) colorNative.value = c;
+    if (colorHexInput) colorHexInput.value = c;
+    if (colorSample) colorSample.style.background = c;
+    applyColorToActive(c);
+    addRecentColor(c);
+  });
+
+  function applyColorToActive(color) {
+    if (!color) return;
+    const active = document.activeElement;
+    if (active && active.matches && active.matches('input[data-text-node]')) {
+      active.style.color = color;
+      // update SVG node fill
+      const side = getFieldSide(active);
+      const key = getTextNodeKey(active);
+      const node = svgTextCache[side]?.get(key);
+      if (node) node.setAttribute('fill', color);
+    } else if (inlineEditorNode) {
+      inlineEditorNode.setAttribute('fill', color);
+    }
+    // update toolbar color input value
+    const sw = document.querySelector('.toolbar-color-swatch');
+    if (sw) { sw.style.background = color; sw.dataset.color = color; }
+  }
+
+  function addRecentColor(color) {
+    if (!recentColorsContainer) return;
+    const list = recentColorsContainer.querySelector('.recent-list');
+    if (!list) return;
+    // maintain up to 8 unique colors
+    const existing = Array.from(list.querySelectorAll('.swatch')).map(s=>s.dataset.color.toLowerCase());
+    const c = color.toLowerCase();
+    if (existing.includes(c)) return;
+    const btn = document.createElement('button');
+    btn.type='button';
+    btn.className='swatch';
+    btn.dataset.color = color;
+    btn.style.background = color;
+    list.insertBefore(btn, list.firstChild);
+    // trim
+    const all = list.querySelectorAll('.swatch');
+    if (all.length > 8) all[all.length-1].remove();
+  }
+
+
+  async function loadFontsList() {
+    if (!fontList) return;
+    fontList.innerHTML = '<div class="font-list-loading">Loading fonts…</div>';
+    const fallback = ["Roboto","Open Sans","Lato","Montserrat","Merriweather","Playfair Display","Source Sans Pro"];
+    if (!googleApiKey) {
+      // show fallback
+      fontList.innerHTML = '';
+      fallback.forEach(name => appendFontItem(name));
+      return;
+    }
+
+    try {
+      const res = await fetch(`https://www.googleapis.com/webfonts/v1/webfonts?key=${encodeURIComponent(googleApiKey)}&sort=popularity`);
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      const items = data.items || [];
+      fontList.innerHTML = '';
+      items.slice(0, 200).forEach(f => appendFontItem(f.family));
+      populateRecentFonts();
+    } catch (err) {
+      console.error('Fonts API failed', err);
+      fontList.innerHTML = '';
+      fallback.forEach(name => appendFontItem(name));
+      populateRecentFonts();
+    }
+  }
+
+  function collectRecentFonts() {
+    const set = new Set();
+    // scan text inputs
+    document.querySelectorAll('input[data-text-node]').forEach(i => {
+      const ff = i.style.fontFamily || i.dataset.fontFamily || null;
+      if (ff) set.add(ff.replace(/['\"]+/g, '').split(',')[0].trim());
+    });
+    // scan svg nodes
+    ['front','back'].forEach(side => {
+      svgTextCache[side]?.forEach(node => {
+        if (!node) return;
+        const style = node.getAttribute('style') || '';
+        const match = style.match(/font-family:\s*['"]?([^;',]+)['"]?/i);
+        if (match && match[1]) set.add(match[1].trim());
+      });
+    });
+    return Array.from(set).slice(0, 8);
+  }
+
+  function populateRecentFonts() {
+    const recent = document.getElementById('recentFonts');
+    const list = recent?.querySelector('.recent-list');
+    if (!recent || !list) return;
+    const fonts = collectRecentFonts();
+    list.innerHTML = '';
+    if (fonts.length === 0) {
+      recent.setAttribute('aria-hidden', 'true');
+      list.textContent = 'No recent fonts';
+      return;
+    }
+    recent.setAttribute('aria-hidden', 'false');
+    fonts.forEach(f => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'recent-item';
+      b.textContent = f;
+      b.addEventListener('click', () => selectFont(f));
+      list.appendChild(b);
+    });
+  }
+
+  function appendFontItem(family) {
+    if (!fontList) return;
+    const div = document.createElement('div');
+    div.className = 'font-item';
+    div.dataset.family = family;
+    const sample = document.createElement('div');
+    sample.className = 'font-sample';
+    sample.textContent = family;
+    // Use safe fallback initially; the real font will be applied when loaded by the observer
+    sample.style.fontFamily = 'system-ui, sans-serif';
+    div.appendChild(sample);
+    div.addEventListener('click', () => selectFont(family));
+    fontList.appendChild(div);
+    // observe for lazy-loading
+    try {
+      if (fontObserver) fontObserver.observe(div);
+    } catch (e) {}
+  }
+
+  let lastLoadedFonts = new Set();
+  function loadFontCss(family) {
+    // load via Google Fonts stylesheet
+    if (lastLoadedFonts.has(family)) return Promise.resolve();
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}:wght@400;700&display=swap`;
+    document.head.appendChild(link);
+    lastLoadedFonts.add(family);
+    return new Promise(resolve => {
+      link.onload = () => resolve();
+      link.onerror = () => resolve();
+    });
+  }
+
+  // IntersectionObserver to lazy-load fonts when their item enters view
+  let fontObserver = null;
+  try {
+    fontObserver = new IntersectionObserver((entries) => {
+      entries.forEach(async entry => {
+        if (!entry.isIntersecting) return;
+        const el = entry.target;
+        const family = el.dataset.family;
+        if (!family) return;
+        // load the font css and then apply to sample
+        await loadFontCss(family);
+        const sample = el.querySelector('.font-sample');
+        if (sample) sample.style.fontFamily = `'${family}', system-ui, sans-serif`;
+        fontObserver.unobserve(el);
+      });
+    }, { root: fontList, rootMargin: '200px', threshold: 0.01 });
+  } catch (e) {
+    fontObserver = null;
+  }
+
+  async function selectFont(family) {
+    await loadFontCss(family);
+    // apply to focused input or svg node
+    const active = document.activeElement;
+    if (active && active.matches && active.matches('input[data-text-node]')) {
+      // update input dataset and value styling
+      active.style.fontFamily = `'${family}', system-ui, sans-serif`;
+      // persist to dataset for form submit
+      try { active.dataset.fontFamily = family; } catch(e){}
+      // update SVG node
+      const side = getFieldSide(active);
+      const nodeKey = getTextNodeKey(active);
+      const node = svgTextCache[side]?.get(nodeKey);
+      if (node) {
+        node.setAttribute('style', `font-family: '${family}', system-ui, sans-serif;`);
+        try { node.dataset.fontFamily = family; } catch(e){}
+      }
+    } else if (inlineEditorNode) {
+      inlineEditorNode.setAttribute('style', `font-family: '${family}', system-ui, sans-serif;`);
+      try { inlineEditorNode.dataset.fontFamily = family; } catch(e){}
+    }
+    closeFontModal();
+  }
+
+  // open modal when font toolbar button clicked
+  document.querySelectorAll('[data-tool="font"]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openFontModal();
+    });
+  });
+
+  // Font size input + dropdown behavior
+  const fontSizeControl = document.querySelector('.font-size-control');
+  const fontSizeInput = document.getElementById('toolbarFontSizeInput');
+  const fontSizeToggle = document.getElementById('toolbarFontSizeToggle');
+  const fontSizeDropdown = document.querySelector('.font-size-dropdown');
+
+  function applyFontSizeToActive(size) {
+    if (!size) return;
+    const active = document.activeElement;
+    if (active && active.matches && active.matches('input[data-text-node]')) {
+      active.style.fontSize = size + 'px';
+      try { active.dataset.fontSize = String(size); } catch(e){}
+      const side = getFieldSide(active);
+      const nodeKey = getTextNodeKey(active);
+      const node = svgTextCache[side]?.get(nodeKey);
+      if (node) node.setAttribute('font-size', String(size));
+      if (node) try { node.dataset.fontSize = String(size); } catch(e){}
+    } else if (inlineEditorNode) {
+      // if inline editor open, apply to svg node directly
+      inlineEditorNode.setAttribute('font-size', String(size));
+      try { inlineEditorNode.dataset.fontSize = String(size); } catch(e){}
+    }
+  }
+
+  if (fontSizeToggle && fontSizeDropdown) {
+    fontSizeToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = fontSizeDropdown.getAttribute('aria-hidden') === 'false';
+      fontSizeDropdown.setAttribute('aria-hidden', isOpen ? 'true' : 'false');
+    });
+
+    fontSizeDropdown.addEventListener('click', (e) => {
+      const btn = e.target.closest('.font-size-option');
+      if (!btn) return;
+      const val = Number(btn.textContent.trim());
+      fontSizeInput.value = String(val);
+      applyFontSizeToActive(val);
+      fontSizeDropdown.setAttribute('aria-hidden', 'true');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!fontSizeControl) return;
+      if (fontSizeControl.contains(e.target)) return;
+      fontSizeDropdown.setAttribute('aria-hidden', 'true');
+    });
+  }
+
+  if (fontSizeInput) {
+    fontSizeInput.addEventListener('change', () => {
+      const val = Number(fontSizeInput.value);
+      if (Number.isFinite(val)) applyFontSizeToActive(val);
+    });
+    // make clicking the input open the dropdown as a single control
+    fontSizeInput.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (fontSizeDropdown) fontSizeDropdown.setAttribute('aria-hidden', 'false');
+    });
+    fontSizeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (fontSizeDropdown) fontSizeDropdown.setAttribute('aria-hidden', 'false');
+      }
+    });
+  }
+
+  // quick filter
+  if (fontSearch) {
+    let timer = null;
+    fontSearch.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const q = fontSearch.value.trim().toLowerCase();
+        Array.from(document.querySelectorAll('.font-item')).forEach(item => {
+          const text = item.textContent.toLowerCase();
+          item.style.display = q && !text.includes(q) ? 'none' : '';
+        });
+      }, 160);
+    });
+  }
+
+  document.addEventListener("pointerdown", event => {
+    if (!textToolbar) return;
+    if (textToolbar.contains(event.target)) return;
+    if (
+      event.target.closest?.(".text-field") ||
+      event.target.closest?.(".canvas [data-text-node]")
+    ) {
+      showTextToolbar(event.target);
+      return;
+    }
+    hideTextToolbar();
+  });
 
   const SVG_NS = "http://www.w3.org/2000/svg";
   const XLINK_NS = "http://www.w3.org/1999/xlink";
@@ -46,6 +488,17 @@ document.addEventListener("DOMContentLoaded", () => {
     back: null,
   };
 
+  const imageFallbackLayers = {
+    front: null,
+    back: null,
+  };
+
+  // store created blob URLs for fetched SVGs so we can revoke them when replaced
+  const imageBlobUrls = {
+    front: null,
+    back: null,
+  };
+
   let zoom = 1.0;
   let currentView = "front";
 
@@ -57,6 +510,39 @@ document.addEventListener("DOMContentLoaded", () => {
   let inlineEditor = null;
   let inlineEditorNode = null;
   let inlineEditorSide = null;
+  // Enable image debug panel during troubleshooting to surface hrefs/load status
+  const DEBUG_IMAGES = true;
+  // debug panel element
+  let __iw_debug_panel = null;
+
+  function ensureDebugPanel() {
+    if (!DEBUG_IMAGES) return null;
+    if (__iw_debug_panel) return __iw_debug_panel;
+    try {
+      __iw_debug_panel = document.createElement('div');
+      __iw_debug_panel.className = 'editor-debug-panel';
+      __iw_debug_panel.innerHTML = '<h4>Image debug</h4><pre id="__iw_debug_pre">(no diagnostics yet)</pre>';
+      const canvasArea = document.querySelector('.canvas-area');
+      if (canvasArea) canvasArea.appendChild(__iw_debug_panel);
+      return __iw_debug_panel;
+    } catch (e) { return null; }
+  }
+
+  function updateDebugPanel(obj) {
+    if (!DEBUG_IMAGES) return;
+    try {
+      const panel = ensureDebugPanel();
+      if (!panel) return;
+      const pre = panel.querySelector('#__iw_debug_pre');
+      if (!pre) return;
+      const o = Object.assign({}, obj || {});
+      // stringify bbox safely
+      if (o.bbox && typeof o.bbox === 'object') {
+        o.bbox = { x: o.bbox.x, y: o.bbox.y, width: o.bbox.width, height: o.bbox.height };
+      }
+      pre.textContent = JSON.stringify(o, null, 2);
+    } catch (e) { /* ignore */ }
+  }
 
   function escapeAttr(value) {
     if (typeof CSS !== "undefined" && CSS.escape) {
@@ -84,21 +570,25 @@ document.addEventListener("DOMContentLoaded", () => {
       return imageLayers[side];
     }
 
+    const card = side === 'front' ? cardFront : cardBack;
+    if (!card) return null;
+
     const svg = getSvgRoot(side);
     if (!svg) return null;
 
     let layer = svg.querySelector(`image[data-editable-image="${side}"]`);
     if (!layer) {
-      layer = document.createElementNS(SVG_NS, "image");
-      layer.setAttribute("data-editable-image", side);
-      layer.setAttribute("x", "0");
-      layer.setAttribute("y", "0");
-      layer.setAttribute("width", "100%");
-      layer.setAttribute("height", "100%");
-      layer.setAttribute("preserveAspectRatio", "xMidYMid slice");
-      layer.style.display = "none";
+      layer = document.createElementNS(SVG_NS, 'image');
+      layer.setAttribute('data-editable-image', side);
+      layer.setAttribute('x', '0');
+      layer.setAttribute('y', '0');
+      layer.setAttribute('width', '100%');
+      layer.setAttribute('height', '100%');
+      layer.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+      layer.style.display = 'none';
 
-      const firstTextNode = svg.querySelector("[data-text-node]");
+      // insert the new image before the first editable text node so text stays on top
+      const firstTextNode = Array.from(svg.children).find(node => node.hasAttribute && node.hasAttribute('data-text-node'));
       if (firstTextNode) {
         svg.insertBefore(layer, firstTextNode);
       } else {
@@ -107,40 +597,278 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     imageLayers[side] = layer;
+    try {
+      const href = layer.getAttribute && (layer.getAttribute('href') || layer.getAttributeNS(XLINK_NS, 'href') || (layer.href && layer.href.baseVal));
+      console.debug('[ensureImageLayer] side:', side, 'layer:', layer, 'href:', href);
+      updateDebugPanel({ event: 'ensureImageLayer', side, href });
+    } catch (e) {}
     return layer;
+  }
+
+  function ensureFallbackImage(side) {
+    if (imageFallbackLayers[side]) {
+      return imageFallbackLayers[side];
+    }
+
+    const card = side === 'front' ? cardFront : cardBack;
+    if (!card) return null;
+
+    let fallback = card.querySelector(`img[data-image-layer="${side}"]`);
+    if (!fallback) {
+      fallback = document.createElement('img');
+      fallback.setAttribute('data-image-layer', side);
+      fallback.setAttribute('alt', '');
+      fallback.setAttribute('aria-hidden', 'true');
+      fallback.decoding = 'async';
+      fallback.loading = 'lazy';
+      fallback.style.display = 'none';
+      fallback.style.visibility = 'hidden';
+
+      const svg = getSvgRoot(side);
+      if (svg && svg.parentNode === card) {
+        card.insertBefore(fallback, svg);
+      } else {
+        card.appendChild(fallback);
+      }
+    }
+
+    imageFallbackLayers[side] = fallback;
+    return fallback;
   }
 
   function setImageElementSource(element, src) {
     if (!element) return;
-    if (src) {
-      element.setAttribute("href", src);
-      element.setAttributeNS(XLINK_NS, "xlink:href", src);
-      element.style.removeProperty("display");
-    } else {
-      element.removeAttribute("href");
-      element.setAttributeNS(XLINK_NS, "xlink:href", "");
-      element.style.display = "none";
+    try {
+      const isImg = element.tagName && element.tagName.toLowerCase() === 'img';
+      console.debug('[setImageElementSource] element:', element, 'src:', src, 'isImg:', isImg);
+
+      if (isImg) {
+        element.dataset.loaded = 'pending';
+        element.onload = function () {
+          element.dataset.loaded = 'true';
+          console.debug('[setImageElementSource] <img> load', element.currentSrc, element.naturalWidth, element.naturalHeight);
+          updateDebugPanel({
+            type: 'img',
+            src: element.currentSrc,
+            naturalWidth: element.naturalWidth,
+            naturalHeight: element.naturalHeight,
+          });
+          const card = element.closest && element.closest('.card');
+          if (card) {
+            card.classList.remove('background-fallback');
+            card.style.removeProperty('background-image');
+          }
+        };
+        element.onerror = function (ev) {
+          element.dataset.loaded = 'error';
+          console.warn('[setImageElementSource] <img> load error', src, ev);
+          updateDebugPanel({ type: 'img', src, error: 'load failed' });
+          const card = element.closest && element.closest('.card');
+          if (card && src) {
+            try {
+              card.classList.add('background-fallback');
+              card.style.backgroundImage = `url("${src}")`;
+            } catch (err) {}
+          }
+        };
+
+        if (src) {
+          element.src = src;
+          try { element.style.removeProperty('display'); } catch (e) {}
+          element.style.visibility = 'visible';
+          try { element.style.removeProperty('filter'); } catch(e){}
+          try { element.style.removeProperty('image-rendering'); } catch(e){}
+        } else {
+          try { element.removeAttribute('src'); } catch (e) {}
+          element.style.display = 'none';
+          element.style.visibility = 'hidden';
+          try { element.style.removeProperty('filter'); } catch(e){}
+          try { element.style.removeProperty('image-rendering'); } catch(e){}
+        }
+
+        updateDebugPanel({ type: 'img', src });
+        return;
+      }
+
+      // fallback for legacy SVG <image>
+      try { element.removeEventListener && element.removeEventListener('load', element.__iw_onload); } catch(e) {}
+      try { element.removeEventListener && element.removeEventListener('error', element.__iw_onerror); } catch(e) {}
+
+      if (src) {
+        try { element.setAttribute('href', src); } catch(e) {}
+        try { element.setAttributeNS(null, 'href', src); } catch(e) {}
+        try { element.setAttributeNS(XLINK_NS, 'xlink:href', src); } catch(e) {}
+        try { element.setAttribute('xlink:href', src); } catch(e) {}
+
+        element.__iw_onload = function () {
+          console.debug('[setImageElementSource] svg image load', src);
+          try { element.style.removeProperty('display'); element.style.visibility = 'visible'; } catch(e){}
+          try { element.style.removeProperty('filter'); } catch(e){}
+          try { element.style.removeProperty('image-rendering'); } catch(e){}
+          const card = element.closest && element.closest('.card');
+          if (card) {
+            card.classList.remove('background-fallback');
+            card.style.removeProperty('background-image');
+          }
+          updateDebugPanel({
+            type: 'svg-image',
+            href: src,
+            status: 'loaded'
+          });
+        };
+        element.__iw_onerror = function (ev) {
+          console.warn('[setImageElementSource] svg image load error', src, ev);
+          const card = element.closest && element.closest('.card');
+          if (card && src) {
+            try {
+              card.classList.add('background-fallback');
+              card.style.backgroundImage = `url("${src}")`;
+              try { card.style.removeProperty('filter'); } catch(e){}
+              try { card.style.removeProperty('image-rendering'); } catch(e){}
+            } catch (err) {}
+          }
+          updateDebugPanel({ type: 'svg-image', href: src, error: 'load failed' });
+        };
+        try { element.addEventListener && element.addEventListener('load', element.__iw_onload); } catch(e) {}
+        try { element.addEventListener && element.addEventListener('error', element.__iw_onerror); } catch(e) {}
+
+        try { element.style.removeProperty('display'); } catch(e) {}
+        element.style.visibility = 'visible';
+      } else {
+        try { element.removeAttribute('href'); } catch(e) {}
+        try { element.removeAttributeNS(XLINK_NS, 'xlink:href'); } catch(e) {}
+        try { element.setAttribute('xlink:href', ''); } catch(e) {}
+        element.style.display = 'none';
+        element.style.visibility = 'hidden';
+      }
+
+      try {
+        const hrefAttr = element.getAttribute('href') || (element.href && element.href.baseVal) || element.getAttributeNS(XLINK_NS, 'href');
+        let bbox = null;
+        try { bbox = element.getBBox && element.getBBox(); } catch (e) {}
+        updateDebugPanel({ type: 'svg-image', href: hrefAttr, bbox });
+      } catch (e) {}
+    } catch (err) {
+      console.error('setImageElementSource error', err);
     }
   }
 
   function updatePreview(side, src) {
     const preview = imagePreviews[side];
     if (!preview) return;
+    // Always use the provided src if available, else fallback
     const fallback = imageState[side]?.defaultSrc || preview.dataset.defaultSrc || preview.src;
-    preview.src = src || fallback;
+    if (src) {
+      preview.src = src;
+      preview.style.filter = 'none';
+    } else {
+      preview.src = fallback || "";
+      preview.style.filter = 'none';
+    }
   }
 
   function applyImage(side, src, { skipPreview = false } = {}) {
     if (!imageState[side]) return;
 
     const layer = ensureImageLayer(side);
+    if (!layer) return;
+
     imageState[side].currentSrc = src || "";
-    const displaySrc = imageState[side].currentSrc || imageState[side].defaultSrc || "";
-    setImageElementSource(layer, displaySrc);
+
+  const displaySrc = imageState[side].currentSrc || imageState[side].defaultSrc || "";
+  console.debug('[applyImage] side:', side, 'displaySrc:', displaySrc);
+  updateDebugPanel({ event: 'applyImage', side, displaySrc });
+
+  // helper: convert local filesystem-like paths into root-relative web paths when possible
+  function normalizeToWebPath(u) {
+    if (!u || typeof u !== 'string') return u;
+  u = u.replace(/\\/g, '/');
+    if (/^https?:\/\//i.test(u)) {
+      // If an absolute URL points to the same host and contains a templates path,
+      // convert it to a root-relative storage/templates path so we don't request
+      // `/templates/...` which can 404 when files live under `/storage/templates/`.
+      try {
+        const tmp = new URL(u, window.location.origin);
+        const p = (tmp.pathname || '') + (tmp.search || '') + (tmp.hash || '');
+        if (p.startsWith('/templates/')) {
+          return '/storage/templates/' + p.substring('/templates/'.length);
+        }
+        const idx = p.indexOf('/storage/templates/');
+        if (idx !== -1) return p.substring(idx);
+        // return path portion for same-origin absolute URLs, otherwise fall back to original
+        if (tmp.origin === window.location.origin) return p;
+        return u;
+      } catch (e) {
+        return u;
+      }
+    }
+    if (u.startsWith('/templates/')) {
+      const base = u.substring('/templates/'.length);
+      return '/storage/templates/' + base;
+    }
+    if (u.startsWith('/')) return u;
+    // map project paths to root-relative web paths
+    const m = u.match(/.*\/public\/(.*)/i);
+    if (m && m[1]) return '/' + m[1];
+    // prefer explicit storage/templates if present in the string
+    const n = u.match(/.*(storage\/templates\/.*)/i);
+    if (n && n[1]) return '/' + n[1];
+    // fallback: if something looks like templates/<file>, prefer storage/templates first
+    const p = u.match(/.*templates\/(.+)$/i);
+    if (p && p[1]) return '/storage/templates/' + p[1];
+    return u;
+  }
+
+  const normalizedDisplaySrc = normalizeToWebPath(displaySrc);
+
+  // If the target is an external SVG, fetch it and use a blob URL to avoid embedding quirks
+  const isSvg = typeof normalizedDisplaySrc === 'string' && /\.svg(\?|$)/i.test(normalizedDisplaySrc);
+  if (isSvg && normalizedDisplaySrc) {
+    // revoke previous blob if any
+    try { if (imageBlobUrls[side]) { URL.revokeObjectURL(imageBlobUrls[side]); imageBlobUrls[side] = null; } } catch(e){}
+    // attempt to fetch the SVG text and create a blob URL
+    fetch(normalizedDisplaySrc, { credentials: 'same-origin' }).then(res => {
+      if (!res.ok) throw new Error('fetch failed ' + res.status + ' for ' + normalizedDisplaySrc);
+      return res.text();
+    }).then(svgText => {
+      try {
+        const blob = new Blob([svgText], { type: 'image/svg+xml' });
+        const blobUrl = URL.createObjectURL(blob);
+        imageBlobUrls[side] = blobUrl;
+        // set blob URL on svg <image> and fallback <img>
+        setImageElementSource(layer, blobUrl);
+        const fallbackLayer = ensureFallbackImage(side);
+        if (fallbackLayer) setImageElementSource(fallbackLayer, blobUrl);
+        updateDebugPanel({ event: 'applyImage', side, fetched: true, blobUrl });
+      } catch (e) {
+        console.warn('[applyImage] failed to inline svg, falling back to direct href', e);
+        setImageElementSource(layer, normalizedDisplaySrc);
+        const fallbackLayer = ensureFallbackImage(side);
+        if (fallbackLayer) setImageElementSource(fallbackLayer, normalizedDisplaySrc);
+      }
+    }).catch(err => {
+      console.warn('[applyImage] fetch svg failed, using direct src', err);
+      setImageElementSource(layer, normalizedDisplaySrc || displaySrc);
+      const fallbackLayer = ensureFallbackImage(side);
+      if (fallbackLayer) setImageElementSource(fallbackLayer, normalizedDisplaySrc || displaySrc);
+    });
+  } else {
+    setImageElementSource(layer, normalizedDisplaySrc || displaySrc);
+    const fallbackLayer = ensureFallbackImage(side);
+    if (fallbackLayer) {
+      setImageElementSource(fallbackLayer, normalizedDisplaySrc || displaySrc);
+    }
+  }
+
+    
 
     const card = side === "front" ? cardFront : cardBack;
     if (card) {
       card.dataset.currentImage = displaySrc;
+      if (!displaySrc) {
+        card.classList.remove('background-fallback');
+        card.style.removeProperty('background-image');
+      }
     }
 
     if (!skipPreview) {
@@ -150,6 +878,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // one-time debug scan to show what SVG <image> hrefs are present after init
+  try {
+    ['front','back'].forEach(s => {
+      const svg = getSvgRoot(s);
+      if (!svg) return;
+      const img = svg.querySelector('image[data-editable-image="'+s+'"]');
+      if (!img) return;
+      const h = img.getAttribute('href') || img.getAttributeNS(XLINK_NS, 'href') || (img.href && img.href.baseVal) || null;
+      console.debug('[init-scan] side:', s, 'svg-image-href:', h, 'element:', img);
+      updateDebugPanel({ event: 'init-scan', side: s, href: h });
+    });
+  } catch (e) {}
+
   function resetImage(side) {
     if (!imageState[side]) return;
     imageState[side].currentSrc = "";
@@ -158,6 +899,36 @@ document.addEventListener("DOMContentLoaded", () => {
     if (input) {
       input.value = "";
     }
+  }
+
+  function registerTextMetaSubmitHandlers() {
+    document.querySelectorAll('.next-form').forEach(form => {
+      if (form.dataset.textMetaBound === 'true') return;
+      form.dataset.textMetaBound = 'true';
+
+      form.addEventListener('submit', () => {
+        form.querySelectorAll('input[name^="text_fields_meta["]').forEach(el => el.remove());
+
+        document.querySelectorAll('input[data-text-node]').forEach(input => {
+          const node = input.dataset.textNode || input.getAttribute('data-text-node');
+          const safe = node || '';
+          const meta = {
+            font_size: input.dataset.fontSize || input.getAttribute('data-font-size') || '',
+            font_family: input.dataset.fontFamily || '',
+            color: input.dataset.color || ''
+          };
+
+          Object.keys(meta).forEach(key => {
+            const name = `text_fields_meta[${safe}][${key}]`;
+            const hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = name;
+            hidden.value = meta[key];
+            form.appendChild(hidden);
+          });
+        });
+      });
+    });
   }
 
   function showPanel(panelName) {
@@ -279,6 +1050,7 @@ document.addEventListener("DOMContentLoaded", () => {
     inlineEditor = null;
     inlineEditorNode = null;
     inlineEditorSide = null;
+    scheduleToolbarHide();
   }
 
   function startInlineEditor(node, side) {
@@ -300,6 +1072,7 @@ document.addEventListener("DOMContentLoaded", () => {
           input.focus();
         }
         input.select?.();
+        showTextToolbar(node);
       });
     }
   }
@@ -389,6 +1162,8 @@ document.addEventListener("DOMContentLoaded", () => {
       input.dispatchEvent(new Event("input", { bubbles: true }));
       input.dispatchEvent(new Event("change", { bubbles: true }));
     }
+    // update the thumbnail preview for this side to reflect the changed SVG text
+    try { updatePreviewFromSvg(side); } catch (e) { console.debug('preview-from-svg failed', e); }
   }
 
   function ensureSvgNodeForInput(input) {
@@ -422,6 +1197,41 @@ document.addEventListener("DOMContentLoaded", () => {
       inlineEditor.value = value;
       inlineEditor.dispatchEvent(new Event("input"));
     }
+    // update the thumbnail preview after programmatic update
+    try { updatePreviewFromSvg(side); } catch (e) { console.debug('preview-from-svg failed', e); }
+  }
+
+  // Create a blob URL from the SVG DOM and set it as the preview image src for a side
+  function updatePreviewFromSvg(side) {
+    const svg = getSvgRoot(side);
+    const preview = imagePreviews[side];
+    if (!svg || !preview) return;
+    // clone and serialize the SVG so we don't modify the live DOM
+    const clone = svg.cloneNode(true);
+    // ensure width/height/viewBox are present for correct rasterization by the browser
+    try {
+      if (!clone.getAttribute('viewBox')) {
+        const w = svg.getAttribute('width') || svg.clientWidth || 0;
+        const h = svg.getAttribute('height') || svg.clientHeight || 0;
+        if (w && h) clone.setAttribute('viewBox', `0 0 ${w} ${h}`);
+      }
+    } catch (e) {}
+
+    const serializer = new XMLSerializer();
+    const svgText = serializer.serializeToString(clone);
+    const blob = new Blob([svgText], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    // revoke previous preview blob if we stored it
+    try {
+      const prev = preview.dataset.__svg_blob_url;
+      if (prev) {
+        URL.revokeObjectURL(prev);
+      }
+    } catch (e) {}
+    preview.dataset.__svg_blob_url = url;
+    preview.src = url;
+    // ensure no filters on preview
+    try { preview.style.removeProperty('filter'); } catch(e){}
   }
 
   function removeSvgNode(nodeKey, side) {
@@ -522,10 +1332,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const side = getFieldSide(input);
       if (currentView !== side) setActiveView(side);
       syncFieldHighlight(getTextNodeKey(input), side, true);
+      showTextToolbar(input);
     });
 
     input.addEventListener("blur", () => {
       syncFieldHighlight(getTextNodeKey(input), getFieldSide(input), false);
+      scheduleToolbarHide();
     });
 
     if (delBtn && !delBtn.dataset.bound) {
@@ -536,6 +1348,7 @@ document.addEventListener("DOMContentLoaded", () => {
         removeSvgNode(nodeKey, side);
         wrapper.remove();
         refreshPositions();
+        scheduleToolbarHide();
       });
     }
 
@@ -601,9 +1414,31 @@ document.addEventListener("DOMContentLoaded", () => {
 
   cacheSvgNodes(cardFront, "front");
   cacheSvgNodes(cardBack, "back");
+  // Try to apply images. If SVG <image> can't render for any reason, ensure the card shows the server-provided default as a background so the user sees a preview.
   applyImage("front", imageState.front.currentSrc, { skipPreview: false });
   applyImage("back", imageState.back.currentSrc, { skipPreview: false });
+
+  // Immediate visual fallback: if the card has a default image URL, apply it as background so the canvas is never empty.
+  try {
+    ['front','back'].forEach(side => {
+      const card = side === 'front' ? cardFront : cardBack;
+      if (!card) return;
+      const defaultSrc = card.dataset.defaultImage || '';
+      const current = card.dataset.currentImage || '';
+      if (defaultSrc && !current) {
+        try {
+          card.classList.add('background-fallback');
+          card.style.backgroundImage = `url("${defaultSrc}")`;
+          // also update preview panel image if present
+          const previewImg = document.querySelector(`[data-image-preview="${side}"]`);
+          if (previewImg && !previewImg.getAttribute('src')) previewImg.src = defaultSrc;
+          updateDebugPanel({ event: 'immediate-background-fallback', side, defaultSrc });
+        } catch (e) { console.warn('background fallback apply failed', e); }
+      }
+    });
+  } catch (e) {}
   initializeTextFields();
+  registerTextMetaSubmitHandlers();
 
   if (addTextBtn && textFieldsContainer) {
     addTextBtn.addEventListener("click", () => {
