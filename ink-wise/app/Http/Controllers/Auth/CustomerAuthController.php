@@ -18,7 +18,7 @@ class CustomerAuthController extends Controller
 {
     public function showRegister()
     {
-        return view('auth.customer.Register');   // or rename the file and use all-lowercase
+        return view('auth.customer.register');
     }
 
     public function showLogin()
