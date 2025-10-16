@@ -318,7 +318,7 @@ Route::get('/auth/google/callback', function () {
 
 /**Dashboard & Home*/
 Route::get('/', [CustomerAuthController::class, 'dashboard'])->name(name: 'customer.dashboard');
-Route::middleware('auth')->get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');  // Protected
+Route::middleware('auth')->get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard2');  // Protected
 Route::get('/search', function (\Illuminate\Http\Request $request) {
     return 'Search for: ' . e($request->query('query', ''));
 })->name('search');
