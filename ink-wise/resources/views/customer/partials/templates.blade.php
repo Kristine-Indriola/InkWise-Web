@@ -44,12 +44,12 @@
 
     <!-- Birthday (Image left) -->
     <div class="relative flex items-center gap-8 gradient-pink p-6 rounded-3xl">
-      <img src="{{ asset('customerimages/image/star.png') }}" class="absolute -top-6 -left-8 w-12 h-12 rotate-12" alt="">
-      <img src="{{ asset('customerimages/image/gift.png') }}" class="absolute -bottom-6 right-10 w-12 h-12" alt="">
+      <img src="{{ asset('Customerimages/image/star.png') }}" class="absolute -top-6 -left-8 w-12 h-12 rotate-12" alt="">
+      <img src="{{ asset('Customerimages/image/gift.png') }}" class="absolute -bottom-6 right-10 w-12 h-12" alt="">
 
       
       <a href="{{ route('templates.birthday.invitations') }}" class="block w-80 -rotate-3 rounded-3xl shadow-xl overflow-hidden border-4 border-pink-300 cursor-pointer hover:scale-105 transition-transform">
-        <img src="{{ asset('customerimages/image/birthday.png') }}" alt="Birthday" class="w-full h-40 object-cover">
+        <img src="{{ asset('Customerimages/image/birthday.png') }}" alt="Birthday" class="w-full h-40 object-cover">
       </a>
 
       <div class="max-w-sm">
@@ -62,11 +62,11 @@
 
     <!-- Wedding (Image right) -->
     <div class="relative flex items-center gap-8 gradient-yellow p-6 rounded-3xl flex-row-reverse">
-      <img src="{{ asset('customerimages/image/ring.png') }}" class="absolute -top-6 -right-8 w-20 h-20 rotate-12 z-20" alt="">
-      <img src="{{ asset('customerimages/image/ribbon.png') }}" class="absolute -bottom-6 left-10 w-12 h-12 rotate-12" alt="">
+      <img src="{{ asset('Customerimages/image/ring.png') }}" class="absolute -top-6 -right-8 w-20 h-20 rotate-12 z-20" alt="">
+      <img src="{{ asset('Customerimages/image/ribbon.png') }}" class="absolute -bottom-6 left-10 w-12 h-12 rotate-12" alt="">
 
       <a href="{{ route('templates.wedding.invitations') }}" class="block w-80 rotate-3 rounded-3xl shadow-xl overflow-hidden border-4 border-yellow-400 cursor-pointer hover:scale-105 transition-transform">
-        <img src="{{ asset('customerimages/image/wedding.png') }}" alt="Wedding" class="w-full h-40 object-cover">
+        <img src="{{ asset('Customerimages/image/wedding.png') }}" alt="Wedding" class="w-full h-40 object-cover">
       </a>
 
       <div class="max-w-sm">
@@ -79,11 +79,11 @@
 
     <!-- Corporate (Image left) -->
     <div class="relative flex items-center gap-8 gradient-orange p-6 rounded-3xl">
-      <img src="{{ asset('customerimages/image/Glass.png') }}" class="absolute -top-6 -left-8 w-20 h-20 rotate-12 z-20" alt="">
-      <img src="{{ asset('customerimages/image/paperclip.png') }}" class="absolute -bottom-6 left-44 w-12 h-12 rotate-12 z-20" alt="">
+      <img src="{{ asset('Customerimages/image/Glass.png') }}" class="absolute -top-6 -left-8 w-20 h-20 rotate-12 z-20" alt="">
+      <img src="{{ asset('Customerimages/image/paperclip.png') }}" class="absolute -bottom-6 left-44 w-12 h-12 rotate-12 z-20" alt="">
 
       <a href="{{ route('templates.corporate.invitations') }}" class="block w-80 -rotate-2 rounded-3xl shadow-xl overflow-hidden border-4 border-orange-400 cursor-pointer hover:scale-105 transition-transform">
-        <img src="{{ asset('customerimages/image/corporate.png') }}" alt="Corporate" class="w-full h-40 object-cover">
+        <img src="{{ asset('Customerimages/image/corporate.png') }}" alt="Corporate" class="w-full h-40 object-cover">
       </a>
 
       <div class="max-w-sm">
@@ -96,11 +96,11 @@
 
     <!-- Baptism (Image right) -->
     <div class="relative flex items-center gap-8 gradient-skyblue p-6 rounded-3xl flex-row-reverse">
-      <img src="{{ asset('customerimages/image/footprint.png') }}" class="absolute -top-6 -right-8 w-20 h-20 rotate-12 z-20" alt="">
-      <img src="{{ asset('customerimages/image/cloud.png') }}" class="absolute -bottom-8 left-32 w-12 h-12 rotate-12" alt="">
+      <img src="{{ asset('Customerimages/image/footprint.png') }}" class="absolute -top-6 -right-8 w-20 h-20 rotate-12 z-20" alt="">
+      <img src="{{ asset('Customerimages/image/cloud.png') }}" class="absolute -bottom-8 left-32 w-12 h-12 rotate-12" alt="">
 
       <a href="{{ route('templates.baptism.invitations') }}" class="block w-80 rotate-3 rounded-3xl shadow-xl overflow-hidden border-4 border-blue-400 cursor-pointer hover:scale-105 transition-transform">
-        <img src="{{ asset('customerimages/image/baptism.png') }}" alt="Baptism" class="w-full h-40 object-cover">
+        <img src="{{ asset('Customerimages/image/baptism.png') }}" alt="Baptism" class="w-full h-40 object-cover">
       </a>
 
       <div class="max-w-sm">
