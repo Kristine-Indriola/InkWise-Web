@@ -317,8 +317,8 @@ Route::get('/auth/google/callback', function () {
 */
 
 /**Dashboard & Home*/
-Route::get('/', [CustomerAuthController::class, 'dashboard'])->name(name: 'customer.dashboard');
-Route::middleware('auth')->get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard2');  // Protected
+Route::get('/', fn () => view('customer.dashboard'))->name('dashboard');
+Route::middleware('auth')->get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');  // Protected
  Route::get('/search', function (\Illuminate\Http\Request $request) {
      return 'Search for: ' . e($request->query('query', ''));
  })->name('search');
@@ -657,7 +657,7 @@ if (interface_exists('Laravel\\Socialite\\Contracts\\Factory')) {
     })->name('google.callback');
 }
 
-Route::middleware('auth')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
+Route::middleware('auth')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.show');
 
 require __DIR__.'/auth.php';
 
