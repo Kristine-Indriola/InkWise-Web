@@ -20,6 +20,8 @@ class FinalizeOrderRequest extends FormRequest
             'paper_stock_name' => ['nullable', 'string', 'max:255'],
             'addons' => ['nullable', 'array'],
             'addons.*' => ['integer', 'exists:product_addons,id'],
+            'addon_quantities' => ['nullable', 'array'],
+            'addon_quantities.*' => ['nullable', 'integer', 'min:1'],
             'metadata' => ['nullable', 'array'],
             'preview_selections' => ['nullable', 'array'],
         ];

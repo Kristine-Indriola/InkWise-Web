@@ -2,52 +2,33 @@
 
 @section('title', 'To Pay')
 
-@section('content')
-<div class="bg-white rounded-2xl shadow p-6">
-    <!-- Tabs (mirror of my_purchase) -->
-         <div class="flex border-b text-base font-semibold mb-4">
-    <a href="{{ route('customer.my_purchase') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab" data-route="all">All</a>
-     <a href="{{ route('customer.my_purchase.topay') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Pay</a>
-     <a href="{{ route('customer.my_purchase.toship') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Ship</a>
-     <a href="{{ route('customer.my_purchase.toreceive') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Receive</a>
-     <a href="{{ route('customer.my_purchase.completed') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Completed</a>
-     <a href="{{ route('customer.my_purchase.cancelled') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Cancelled</a>
-     <a href="{{ route('customer.my_purchase.return_refund') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Return/Refund</a>
-     </div>
-
     @php
-        // If the controller didn't pass any orders (for dev/demo), provide sample data
-        if (!empty($orders) && is_iterable($orders)) {
-            $ordersList = $orders;
-        } else {
-            $ordersList = [
-                (object)[
-                    'id' => 1001,
-                    'product_id' => 501,
-                    'product_name' => 'Rustic Wedding Invitation',
-                    'quantity' => 100,
-                    'image' => asset('customerimages/image/weddinginvite.png'),
-                    'total_amount' => 2450.00,
-                    'theme' => 'Rustic Floral',
-                    'paper' => 'Linen',
-                    // addons as JSON string (view code can decode it)
-                    'addons' => json_encode([['name' => 'Gold Foil', 'price' => 150.00], ['name' => 'Envelope Lining', 'price' => 0]]),
-                ],
-                (object)[
-                    'id' => 1002,
-                    'product_id' => 502,
-                    'product_name' => 'Birthday Giveaway Pack',
-                    'quantity' => 50,
-                    'image' => asset('customerimages/image/giveaway.png'),
-                    'total_amount' => 950.00,
-                    'theme' => 'Bright & Fun',
-                    'paper' => 'Glossy',
-                    'addons' => json_encode([['name' => 'Custom Tag', 'price' => 0]]),
-                ],
-            ];
-        }
+        $ordersList = collect($orders ?? []);
     @endphp
 
+    <div class="space-y-4">
+        @forelse($ordersList as $order)
+                    'quantity' => 50,
+                $orderId = data_get($order, 'id');
+                $productId = data_get($order, 'product_id');
+                $productName = data_get($order, 'product_name', 'Custom invitation');
+                $previewImage = data_get($order, 'image', asset('customerimages/image/weddinginvite.png'));
+                $theme = data_get($order, 'theme', 'N/A');
+                $quantity = (int) data_get($order, 'quantity', 0);
+                $paper = data_get($order, 'paper', 'Standard');
+                $addonsRaw = data_get($order, 'addons', []);
+                $totalAmount = data_get($order, 'total_amount', data_get($order, 'total', 0));
+
+                    'image' => asset('customerimages/image/giveaway.png'),
+                    'total_amount' => 950.00,
+                    'orderId' => $orderId,
+                    'productId' => $productId,
+                    'productName' => $productName,
+                    'quantity' => $quantity ?: 10,
+                    'previewImage' => $previewImage ?? asset('images/placeholder.png'),
+                    'previewImages' => [($previewImage ?? asset('images/placeholder.png'))],
+                    'totalAmount' => $totalAmount,
+                    'originalTotal' => data_get($order, 'original_total'),
     <div class="space-y-4">
         @foreach($ordersList as $order)
             @php
@@ -76,12 +57,12 @@
                     </div>
                 </div>
                 <div class="flex flex-col md:flex-row items-start md:items-center px-4 py-4 gap-4">
-                    <img src="{{ $order->image ?? asset('customerimages/image/weddinginvite.png') }}" alt="Invitation Design" class="w-24 h-24 object-cover rounded-lg border">
+                    <img src="{{ $previewImage }}" alt="Invitation Design" class="w-24 h-24 object-cover rounded-lg border">
                     <div class="flex-1">
-                        <div class="font-semibold text-lg text-[#a6b7ff]">{{ $order->product_name }}</div>
-                        <div class="text-sm text-gray-500">Theme: {{ $order->theme ?? 'N/A' }}</div>
-                        <div class="text-sm text-gray-500">Quantity: {{ $order->quantity }} pcs</div>
-                        <div class="text-sm text-gray-500">Paper: {{ $order->paper ?? 'Standard' }}</div>
+                        <div class="font-semibold text-lg text-[#a6b7ff]">{{ $productName }}</div>
+                        <div class="text-sm text-gray-500">Theme: {{ $theme }}</div>
+                        <div class="text-sm text-gray-500">Quantity: {{ $quantity ?: '—' }} pcs</div>
+                        <div class="text-sm text-gray-500">Paper: {{ $paper }}</div>
                         @php
                             $formatAddonPrice = function ($value) {
                                 if ($value === null || $value === '') {
@@ -148,15 +129,15 @@
 
                             $addonsDisplay = 'NONE';
 
-                            if (!empty($order->addons)) {
-                                if ($order->addons instanceof \Illuminate\Support\Collection || is_array($order->addons)) {
-                                    $addonsDisplay = $collectAddons($order->addons);
+                            if (!empty($addonsRaw)) {
+                                if ($addonsRaw instanceof \Illuminate\Support\Collection || is_array($addonsRaw)) {
+                                    $addonsDisplay = $collectAddons($addonsRaw);
                                 } else {
-                                    $decoded = json_decode($order->addons, true);
+                                    $decoded = json_decode($addonsRaw, true);
                                     if (is_array($decoded)) {
                                         $addonsDisplay = $collectAddons($decoded);
                                     } else {
-                                        $addonsDisplay = $formatAddonLabel($order->addons);
+                                        $addonsDisplay = $formatAddonLabel($addonsRaw);
                                     }
                                 }
 
@@ -168,20 +149,22 @@
                         <div class="text-sm text-gray-500">Add-ons: {{ $addonsDisplay }}</div>
                     </div>
                     <div class="text-right">
-                        <div class="text-lg font-bold text-gray-700">₱{{ number_format($order->total_amount, 2) }}</div>
+                        <div class="text-lg font-bold text-gray-700">₱{{ number_format($totalAmount, 2) }}</div>
                     </div>
                 </div>
                 <div class="flex flex-col md:flex-row items-center justify-between px-4 py-3 bg-[#f7f8fa] rounded-b-xl">
                     <div class="text-sm text-gray-500 mb-2 md:mb-0">
-                        Order Total: <span class="text-[#a6b7ff] font-bold text-lg">₱{{ number_format($order->total_amount, 2) }}</span>
+                        Order Total: <span class="text-[#a6b7ff] font-bold text-lg">₱{{ number_format($totalAmount, 2) }}</span>
                     </div>
                     <div class="flex gap-2">
                         <button class="bg-[#a6b7ff] hover:bg-[#bce6ff] text-white px-6 py-2 rounded font-semibold js-to-pay-checkout" type="button" data-summary='@json($summary)'>Checkout</button>
-                        <button type="button" class="border border-gray-300 text-gray-700 px-5 py-2 rounded font-semibold js-to-pay-cancel" data-order-id="{{ $order->id ?? '' }}">Cancel</button>
+                        <button type="button" class="border border-gray-300 text-gray-700 px-5 py-2 rounded font-semibold js-to-pay-cancel" data-order-id="{{ $orderId ?? '' }}">Cancel</button>
                     </div>
                 </div>
             </div>
-        @endforeach
+        @empty
+            <div class="text-sm text-gray-500">No orders awaiting payment.</div>
+        @endforelse
     </div>
 </div>
 

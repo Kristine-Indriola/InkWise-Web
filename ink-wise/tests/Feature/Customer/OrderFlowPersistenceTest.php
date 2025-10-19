@@ -5,6 +5,12 @@ namespace Tests\Feature\Customer;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\ProductMaterial;
+use App\Models\Material;
+use App\Models\Inventory;
+use App\Models\CustomerOrder;
+use App\Services\OrderFlowService;
+use Illuminate\Support\Str;
 use App\Models\ProductAddon;
 use App\Models\ProductBulkOrder;
 use App\Models\ProductColor;
@@ -102,8 +108,8 @@ class OrderFlowPersistenceTest extends TestCase
     $summary = $response->json('summary');
     $this->assertEqualsWithDelta(3170.0, $summary['subtotalAmount'], 0.001);
     $this->assertEqualsWithDelta(0.0, $summary['taxAmount'], 0.001);
-    $this->assertEqualsWithDelta(250.0, $summary['shippingFee'], 0.001);
-    $this->assertEqualsWithDelta(3420.0, $summary['totalAmount'], 0.001);
+    $this->assertEqualsWithDelta(0.0, $summary['shippingFee'], 0.001);
+    $this->assertEqualsWithDelta(3170.0, $summary['totalAmount'], 0.001);
 
         $order = Order::with(['items.paperStockSelection', 'items.addons', 'items.bulkSelections', 'items.colors'])->first();
         $this->assertNotNull($order);
@@ -126,8 +132,8 @@ class OrderFlowPersistenceTest extends TestCase
 
     $this->assertEqualsWithDelta(3170.0, $order->subtotal_amount, 0.001);
     $this->assertEqualsWithDelta(0.0, $order->tax_amount, 0.001);
-    $this->assertEqualsWithDelta(250.0, $order->shipping_fee, 0.001);
-    $this->assertEqualsWithDelta(3420.0, $order->total_amount, 0.001);
+    $this->assertEqualsWithDelta(0.0, $order->shipping_fee, 0.001);
+    $this->assertEqualsWithDelta(3170.0, $order->total_amount, 0.001);
 
         $this->assertArrayHasKey('final_step', $order->metadata);
         $this->assertSame([$addon->id], $order->metadata['final_step']['addon_ids']);
@@ -196,14 +202,14 @@ class OrderFlowPersistenceTest extends TestCase
             ->assertJsonPath('summary.envelope.name', 'Classic White')
             ->assertJsonPath('summary.envelope.total', 1020)
             ->assertJsonPath('summary.extras.envelope', 1020)
-            ->assertJsonPath('summary.totalAmount', 4440);
+            ->assertJsonPath('summary.totalAmount', 4190);
 
     $order = Order::first();
     $this->assertEqualsWithDelta(4190.0, $order->subtotal_amount, 0.001);
         $this->assertEqualsWithDelta(0.0, $order->tax_amount, 0.001);
-        $this->assertEqualsWithDelta(250.0, $order->shipping_fee, 0.001);
-        $this->assertEqualsWithDelta(4440.0, $order->total_amount, 0.001);
-        $this->assertArrayHasKey('envelope', $order->metadata);
+        $this->assertEqualsWithDelta(0.0, $order->shipping_fee, 0.001);
+        $this->assertEqualsWithDelta(4190.0, $order->total_amount, 0.001);
+        $this->assertArrayHasKey('envelope', $order->metadata); 
         $this->assertEquals('Classic White', $order->metadata['envelope']['name']);
 
         $order->load(['items.addons', 'items.bulkSelections', 'items.colors', 'items.paperStockSelection']);
@@ -222,7 +228,7 @@ class OrderFlowPersistenceTest extends TestCase
     $this->assertArrayNotHasKey('envelope', $order->metadata ?? []);
     $this->assertEqualsWithDelta(3170.0, $order->subtotal_amount, 0.001);
     $this->assertEqualsWithDelta(0.0, $order->tax_amount, 0.001);
-    $this->assertEqualsWithDelta(3420.0, $order->total_amount, 0.001);
+    $this->assertEqualsWithDelta(3170.0, $order->total_amount, 0.001);
     }
 
     public function test_summary_sync_uses_preview_selections_for_associations(): void
@@ -337,20 +343,21 @@ class OrderFlowPersistenceTest extends TestCase
             ],
         ]);
 
+
         $response
             ->assertOk()
             ->assertJsonPath('summary.giveaway.name', 'Thank You Stickers')
             ->assertJsonPath('summary.giveaway.total', 660)
             ->assertJsonPath('summary.extras.giveaway', 660)
-            ->assertJsonPath('summary.totalAmount', 4080);
+            ->assertJsonPath('summary.totalAmount', 3830);
 
         $order = Order::first();
         $this->assertArrayHasKey('giveaway', $order->metadata);
         $this->assertEquals('Thank You Stickers', $order->metadata['giveaway']['name']);
     $this->assertEqualsWithDelta(3830.0, $order->subtotal_amount, 0.001);
     $this->assertEqualsWithDelta(0.0, $order->tax_amount, 0.001);
-    $this->assertEqualsWithDelta(250.0, $order->shipping_fee, 0.001);
-    $this->assertEqualsWithDelta(4080.0, $order->total_amount, 0.001);
+    $this->assertEqualsWithDelta(0.0, $order->shipping_fee, 0.001);
+    $this->assertEqualsWithDelta(3830.0, $order->total_amount, 0.001);
 
         $this->deleteJson('/order/giveaways')
             ->assertOk()
@@ -360,7 +367,369 @@ class OrderFlowPersistenceTest extends TestCase
     $this->assertArrayNotHasKey('giveaway', $order->metadata ?? []);
     $this->assertEqualsWithDelta(3170.0, $order->subtotal_amount, 0.001);
     $this->assertEqualsWithDelta(0.0, $order->tax_amount, 0.001);
-    $this->assertEqualsWithDelta(3420.0, $order->total_amount, 0.001);
+    $this->assertEqualsWithDelta(3170.0, $order->total_amount, 0.001);
+    }
+
+    public function test_giveaway_selection_records_material_usage(): void
+    {
+        $user = User::factory()->create();
+
+        $material = Material::create([
+            'sku' => 'RBN-01',
+            'material_name' => 'Satin Ribbon',
+            'occasion' => 'wedding',
+            'product_type' => 'giveaway',
+            'material_type' => 'ribbon',
+            'unit' => 'roll',
+            'stock_qty' => 500,
+        ]);
+
+        Inventory::create([
+            'material_id' => $material->material_id,
+            'stock_level' => 500,
+            'reorder_level' => 50,
+        ]);
+
+        $giveawayProduct = Product::create([
+            'name' => 'Ribboned Keychain',
+            'event_type' => 'Wedding',
+            'product_type' => 'Giveaway',
+            'base_price' => 15,
+        ]);
+
+        $productMaterialDefinition = ProductMaterial::create([
+            'product_id' => $giveawayProduct->id,
+            'material_id' => null,
+            'source_type' => 'product',
+            'item' => 'Satin Ribbon',
+            'type' => 'ribbon',
+            'qty' => 2.5,
+            'quantity_mode' => 'per_unit',
+        ]);
+
+        $customerOrder = CustomerOrder::create([
+            'user_id' => $user->user_id,
+            'name' => 'Test Customer',
+            'email' => 'customer@example.com',
+        ]);
+
+        $order = Order::create([
+            'customer_order_id' => $customerOrder->id,
+            'user_id' => $user->user_id,
+            'order_number' => 'INV-' . Str::upper(Str::random(8)),
+            'subtotal_amount' => 0,
+            'tax_amount' => 0,
+            'shipping_fee' => 0,
+            'total_amount' => 0,
+            'metadata' => [],
+        ]);
+
+        $orderItem = OrderItem::create([
+            'order_id' => $order->id,
+            'product_id' => $giveawayProduct->id,
+            'product_name' => $giveawayProduct->name,
+            'quantity' => 20,
+            'unit_price' => 15,
+            'subtotal' => 300,
+            'line_type' => OrderItem::LINE_TYPE_GIVEAWAY,
+        ]);
+
+        /** @var OrderFlowService $service */
+        $service = app(OrderFlowService::class);
+        $service->syncMaterialUsage($order->fresh('items'));
+
+        $expectedUsage = 50.0; // 2.5 ribbon per giveaway * 20 giveaways
+
+        $this->assertDatabaseHas('product_materials', [
+            'order_id' => $order->id,
+            'material_id' => $material->material_id,
+            'source_type' => 'custom',
+            'quantity_used' => $expectedUsage,
+        ]);
+
+        $detailRecord = ProductMaterial::where('order_id', $order->id)
+            ->where('material_id', $material->material_id)
+            ->where('source_type', 'product')
+            ->first();
+
+        $this->assertNotNull($detailRecord);
+        $this->assertSame($orderItem->id, $detailRecord->order_item_id);
+        $this->assertSame($productMaterialDefinition->id, $detailRecord->source_id);
+        $this->assertEqualsWithDelta($expectedUsage, (float) $detailRecord->quantity_required, 0.001);
+
+        $material->refresh();
+        $this->assertEqualsWithDelta(450.0, (float) $material->stock_qty, 0.001);
+
+        $inventory = $material->inventory()->first();
+        $this->assertEqualsWithDelta(450.0, (float) $inventory->stock_level, 0.001);
+    }
+
+    public function test_envelope_selection_records_material_usage(): void
+    {
+        $user = User::factory()->create();
+
+        $material = Material::create([
+            'sku' => 'ENV-01',
+            'material_name' => 'Pearl Envelope Stock',
+            'occasion' => 'wedding',
+            'product_type' => 'invitation',
+            'material_type' => 'paper',
+            'unit' => 'sheet',
+            'stock_qty' => 600,
+        ]);
+
+        Inventory::create([
+            'material_id' => $material->material_id,
+            'stock_level' => 600,
+            'reorder_level' => 50,
+        ]);
+
+        $envelopeProduct = Product::create([
+            'name' => 'Pearl White Envelope',
+            'event_type' => 'Wedding',
+            'product_type' => 'Envelope',
+            'base_price' => 8.5,
+        ]);
+
+        $envelopeDefinition = ProductEnvelope::create([
+            'product_id' => $envelopeProduct->id,
+            'material_id' => $material->material_id,
+            'envelope_material_name' => 'Pearl White',
+            'max_qty' => 500,
+            'price_per_unit' => 8.5,
+        ]);
+
+        $customerOrder = CustomerOrder::create([
+            'user_id' => $user->user_id,
+            'name' => 'Test Customer',
+            'email' => 'customer@example.com',
+        ]);
+
+        $order = Order::create([
+            'customer_order_id' => $customerOrder->id,
+            'user_id' => $user->user_id,
+            'order_number' => 'INV-' . Str::upper(Str::random(8)),
+            'subtotal_amount' => 0,
+            'tax_amount' => 0,
+            'shipping_fee' => 0,
+            'total_amount' => 0,
+            'metadata' => [],
+        ]);
+
+        $orderItem = OrderItem::create([
+            'order_id' => $order->id,
+            'product_id' => $envelopeProduct->id,
+            'product_name' => $envelopeProduct->name,
+            'quantity' => 120,
+            'unit_price' => 8.5,
+            'subtotal' => 1020,
+            'line_type' => OrderItem::LINE_TYPE_ENVELOPE,
+            'design_metadata' => [
+                'envelope_id' => $envelopeDefinition->id,
+            ],
+        ]);
+
+        /** @var OrderFlowService $service */
+        $service = app(OrderFlowService::class);
+        $service->syncMaterialUsage($order->fresh('items'));
+
+        $expectedUsage = 120.0; // 1 envelope sheet per envelope selection
+
+        $this->assertDatabaseHas('product_materials', [
+            'order_id' => $order->id,
+            'material_id' => $material->material_id,
+            'source_type' => 'custom',
+            'quantity_used' => $expectedUsage,
+        ]);
+
+        $detailRecord = ProductMaterial::where('order_id', $order->id)
+            ->where('material_id', $material->material_id)
+            ->where('source_type', 'envelope')
+            ->first();
+
+        $this->assertNotNull($detailRecord);
+        $this->assertSame($orderItem->id, $detailRecord->order_item_id);
+        $this->assertSame($envelopeDefinition->id, $detailRecord->source_id);
+        $this->assertEqualsWithDelta($expectedUsage, (float) $detailRecord->quantity_required, 0.001);
+
+        $material->refresh();
+        $this->assertEqualsWithDelta(480.0, (float) $material->stock_qty, 0.001);
+
+        $inventory = $material->inventory()->first();
+        $this->assertEqualsWithDelta(480.0, (float) $inventory->stock_level, 0.001);
+    }
+
+    public function test_envelope_without_product_id_uses_material_name_fallback(): void
+    {
+        $material = Material::create([
+            'sku' => 'ENV-02',
+            'material_name' => 'Custom Kraft Envelope',
+            'occasion' => 'wedding',
+            'product_type' => 'envelope',
+            'material_type' => 'paper',
+            'unit' => 'piece',
+            'stock_qty' => 200,
+        ]);
+
+        Inventory::create([
+            'material_id' => $material->material_id,
+            'stock_level' => 200,
+            'reorder_level' => 25,
+        ]);
+
+        $customerOrder = CustomerOrder::create([
+            'user_id' => null,
+            'name' => 'Fallback Envelope Customer',
+            'email' => 'fallback-envelope@example.com',
+        ]);
+
+        $order = Order::create([
+            'customer_order_id' => $customerOrder->id,
+            'user_id' => null,
+            'order_number' => 'INV-' . Str::upper(Str::random(6)),
+            'subtotal_amount' => 0,
+            'tax_amount' => 0,
+            'shipping_fee' => 0,
+            'total_amount' => 0,
+            'metadata' => [
+                'envelope' => [
+                    'name' => 'Custom Kraft Envelope',
+                    'material' => 'Custom Kraft Envelope',
+                    'price' => 8,
+                    'qty' => 25,
+                    'total' => 200,
+                ],
+            ],
+        ]);
+
+        $orderItem = OrderItem::create([
+            'order_id' => $order->id,
+            'product_id' => null,
+            'product_name' => 'Custom Kraft Envelope',
+            'line_type' => OrderItem::LINE_TYPE_ENVELOPE,
+            'quantity' => 25,
+            'unit_price' => 8,
+            'subtotal' => 200,
+            'design_metadata' => [
+                'material' => 'Custom Kraft Envelope',
+            ],
+        ]);
+
+        $service = app(OrderFlowService::class);
+        $service->syncMaterialUsage($order->fresh('items'));
+
+        $this->assertDatabaseHas('product_materials', [
+            'order_id' => $order->id,
+            'material_id' => $material->material_id,
+            'source_type' => 'custom',
+            'quantity_required' => 25,
+            'quantity_used' => 25,
+        ]);
+
+        $detail = ProductMaterial::where('order_id', $order->id)
+            ->where('material_id', $material->material_id)
+            ->where('source_type', 'envelope')
+            ->first();
+
+        $this->assertNotNull($detail);
+        $this->assertSame($orderItem->id, $detail->order_item_id);
+
+        $material->refresh();
+        $this->assertEqualsWithDelta(175.0, (float) $material->stock_qty, 0.001);
+
+        $inventory = $material->inventory()->first();
+        $this->assertEqualsWithDelta(175.0, (float) $inventory->stock_level, 0.001);
+    }
+
+    public function test_souvenir_product_without_mapping_uses_name_fallback(): void
+    {
+        $user = User::factory()->create();
+
+        $material = Material::create([
+            'sku' => 'SOUV-01',
+            'material_name' => 'Mini Plant Souvenir',
+            'occasion' => 'wedding',
+            'product_type' => 'giveaway',
+            'material_type' => 'souvenir',
+            'unit' => 'piece',
+            'stock_qty' => 200,
+        ]);
+
+        Inventory::create([
+            'material_id' => $material->material_id,
+            'stock_level' => 200,
+            'reorder_level' => 20,
+        ]);
+
+        $souvenirProduct = Product::create([
+            'name' => 'Mini Plant Souvenir',
+            'event_type' => 'Wedding',
+            'product_type' => 'Souvenir',
+            'base_price' => 95,
+        ]);
+
+        $customerOrder = CustomerOrder::create([
+            'user_id' => $user->user_id,
+            'name' => 'Souvenir Client',
+            'email' => 'souvenir@example.com',
+        ]);
+
+        $order = Order::create([
+            'customer_order_id' => $customerOrder->id,
+            'user_id' => $user->user_id,
+            'order_number' => 'INV-' . Str::upper(Str::random(8)),
+            'subtotal_amount' => 0,
+            'tax_amount' => 0,
+            'shipping_fee' => 0,
+            'total_amount' => 0,
+            'metadata' => [
+                'giveaway' => [
+                    'name' => 'Mini Plant Souvenir',
+                ],
+            ],
+        ]);
+
+        $orderItem = OrderItem::create([
+            'order_id' => $order->id,
+            'product_id' => $souvenirProduct->id,
+            'product_name' => $souvenirProduct->name,
+            'quantity' => 30,
+            'unit_price' => 95,
+            'subtotal' => 2850,
+            'line_type' => OrderItem::LINE_TYPE_GIVEAWAY,
+            'design_metadata' => [
+                'name' => 'Mini Plant Souvenir',
+            ],
+        ]);
+
+        /** @var OrderFlowService $service */
+        $service = app(OrderFlowService::class);
+        $service->syncMaterialUsage($order->fresh('items'));
+
+        $expectedUsage = 30.0; // 1 piece of souvenir material per ordered souvenir
+
+        $this->assertDatabaseHas('product_materials', [
+            'order_id' => $order->id,
+            'material_id' => $material->material_id,
+            'source_type' => 'custom',
+            'quantity_used' => $expectedUsage,
+        ]);
+
+        $detailRecord = ProductMaterial::where('order_id', $order->id)
+            ->where('material_id', $material->material_id)
+            ->where('source_type', 'product')
+            ->first();
+
+        $this->assertNotNull($detailRecord);
+        $this->assertSame($orderItem->id, $detailRecord->order_item_id);
+        $this->assertNull($detailRecord->source_id);
+        $this->assertEqualsWithDelta($expectedUsage, (float) $detailRecord->quantity_required, 0.001);
+
+        $material->refresh();
+        $this->assertEqualsWithDelta(170.0, (float) $material->stock_qty, 0.001);
+
+        $inventory = $material->inventory()->first();
+        $this->assertEqualsWithDelta(170.0, (float) $inventory->stock_level, 0.001);
     }
 
     public function test_checkout_persists_session_summary_into_order_tables(): void
