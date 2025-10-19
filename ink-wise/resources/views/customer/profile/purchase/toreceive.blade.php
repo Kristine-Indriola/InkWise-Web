@@ -14,57 +14,49 @@
     <a href="{{ route('customer.my_purchase.return_refund') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Return/Refund</a>
     </div>
     @php
-        if (!empty($orders) && is_iterable($orders)) {
-            $ordersList = $orders;
-        } else {
-            $ordersList = [
-                (object)[
-                    'id' => 2001,
-                    'product_id' => 601,
-                    'product_name' => 'Classic RSVP Invitation',
-                    'quantity' => 50,
-                    'image' => asset('customerimages/image/invitation.png'),
-                    'total_amount' => 1200.00,
-                    'tracking_number' => 'TRK-20251012-01',
-                    'carrier' => 'Inkwise Logistics',
-                    'status' => 'Out for delivery',
-                    'expected_date' => now()->addDays(1)->format('M d, Y'),
-                ],
-                (object)[
-                    'id' => 2002,
-                    'product_id' => 602,
-                    'product_name' => 'Corporate Giveaway Set',
-                    'quantity' => 30,
-                    'image' => asset('customerimages/image/giveaway.png'),
-                    'total_amount' => 1750.00,
-                    'tracking_number' => 'TRK-20251012-02',
-                    'carrier' => 'Local Courier',
-                    'status' => 'In transit',
-                    'expected_date' => now()->addDays(2)->format('M d, Y'),
-                ],
-            ];
-        }
+        $ordersList = collect($orders ?? []);
     @endphp
 
     <div class="space-y-4">
-        @foreach($ordersList as $order)
+        @forelse($ordersList as $order)
+            @php
+                $productName = data_get($order, 'product_name', 'Order in transit');
+                $quantity = (int) data_get($order, 'quantity', 0);
+                $image = data_get($order, 'image', asset('images/placeholder.png'));
+                $trackingNumber = data_get($order, 'tracking_number');
+                $carrier = data_get($order, 'carrier', '—');
+                $statusLabel = data_get($order, 'status', 'In transit');
+                $expectedDate = data_get($order, 'expected_date');
+                if (!$expectedDate && $timestamp = data_get($order, 'expected_delivery_at')) {
+                    try {
+                        $expectedDate = \Illuminate\Support\Carbon::parse($timestamp)->format('M d, Y');
+                    } catch (\Throwable $e) {
+                        $expectedDate = null;
+                    }
+                }
+                $totalAmount = data_get($order, 'total_amount', 0);
+                $orderId = data_get($order, 'id');
+            @endphp
+
             <div class="bg-white border rounded-xl p-4 shadow-sm flex items-center gap-4">
-                <img src="{{ $order->image ?? asset('images/placeholder.png') }}" alt="{{ $order->product_name }}" class="w-24 h-24 object-cover rounded-lg">
+                <img src="{{ $image }}" alt="{{ $productName }}" class="w-24 h-24 object-cover rounded-lg">
                 <div class="flex-1">
-                    <div class="font-semibold text-lg">{{ $order->product_name }}</div>
-                    <div class="text-sm text-gray-500">Qty: {{ $order->quantity }} pcs</div>
-                    <div class="text-sm text-gray-500 mt-2">Tracking: <span class="font-medium">{{ $order->tracking_number }}</span> — {{ $order->carrier }}</div>
-                    <div class="text-sm text-gray-500">Status: <span class="text-[#a6b7ff] font-semibold">{{ $order->status }}</span></div>
-                    <div class="text-sm text-gray-500">Expected: {{ $order->expected_date }}</div>
+                    <div class="font-semibold text-lg">{{ $productName }}</div>
+                    <div class="text-sm text-gray-500">Qty: {{ $quantity ?: '—' }} pcs</div>
+                    <div class="text-sm text-gray-500 mt-2">Tracking: <span class="font-medium">{{ $trackingNumber ?? 'Pending' }}</span> — {{ $carrier }}</div>
+                    <div class="text-sm text-gray-500">Status: <span class="text-[#a6b7ff] font-semibold">{{ $statusLabel }}</span></div>
+                    <div class="text-sm text-gray-500">Expected: {{ $expectedDate ?? 'To be announced' }}</div>
                 </div>
                 <div class="flex flex-col gap-2">
                     <form method="POST" action="#" onsubmit="return false;">
-                        <button type="button" class="bg-[#a6b7ff] text-white px-4 py-2 rounded font-semibold js-confirm-received" data-order-id="{{ $order->id }}">Confirm Received</button>
+                        <button type="button" class="bg-[#a6b7ff] text-white px-4 py-2 rounded font-semibold js-confirm-received" data-order-id="{{ $orderId }}">Confirm Received</button>
                     </form>
-                    <div class="text-gray-600 text-sm">₱{{ number_format($order->total_amount,2) }}</div>
+                    <div class="text-gray-600 text-sm">₱{{ number_format($totalAmount, 2) }}</div>
                 </div>
             </div>
-        @endforeach
+        @empty
+            <div class="text-sm text-gray-500">No orders are currently on their way.</div>
+        @endforelse
     </div>
 
 <script>

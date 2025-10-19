@@ -12,28 +12,60 @@ return new class extends Migration
             Schema::create('product_materials', function (Blueprint $table) {
                 $table->id();
 
-                $table->unsignedBigInteger('product_id');
-                $table->unsignedBigInteger('material_id');
+                $table->foreignId('customer_id')
+                    ->nullable()
+                    ->constrained('customers', 'customer_id')
+                    ->nullOnDelete();
 
-                $table->unsignedBigInteger('order_id')->nullable()->index();
-                $table->unsignedBigInteger('order_item_id')->nullable()->index();
+                $table->foreignId('order_id')
+                    ->nullable()
+                    ->constrained('orders')
+                    ->cascadeOnDelete();
+
+                $table->foreignId('order_item_id')
+                    ->nullable()
+                    ->constrained('order_items')
+                    ->cascadeOnDelete();
+
+                $table->foreignId('product_id')
+                    ->nullable()
+                    ->constrained('products')
+                    ->nullOnDelete();
+
+                $table->foreignId('material_id')
+                    ->nullable()
+                    ->constrained('materials', 'material_id')
+                    ->nullOnDelete();
+
+                $table->enum('source_type', ['product', 'paper_stock', 'envelope', 'addon', 'custom'])
+                    ->default('product');
+                $table->unsignedBigInteger('source_id')->nullable();
 
                 $table->string('item')->nullable();
                 $table->string('type')->nullable();
                 $table->string('color')->nullable();
+                $table->string('unit')->nullable();
                 $table->integer('weight')->nullable();
-                $table->decimal('unit_price', 10, 2)->nullable();
-                $table->integer('qty')->nullable();
-                $table->decimal('cost', 10, 2)->nullable();
-                $table->decimal('quantity_used', 10, 2)->nullable();
+
+                $table->decimal('qty', 12, 4)->default(0);
+
+                $table->enum('quantity_mode', ['per_unit', 'per_order'])->default('per_unit');
+                $table->unsignedInteger('order_quantity')->nullable();
+                $table->decimal('quantity_required', 12, 4)->default(0);
+                $table->decimal('quantity_reserved', 12, 4)->default(0);
+                $table->decimal('quantity_used', 12, 4)->default(0);
+
+                $table->timestamp('reserved_at')->nullable();
                 $table->timestamp('deducted_at')->nullable();
+
+                $table->json('metadata')->nullable();
 
                 $table->timestamps();
 
-                $table->foreign('product_id')->references('id')->on('products')->onDelete('cascade');
-                $table->foreign('material_id')->references('id')->on('materials')->onDelete('cascade');
-                $table->foreign('order_id')->references('id')->on('orders')->onDelete('cascade');
-                $table->foreign('order_item_id')->references('id')->on('order_items')->onDelete('cascade');
+                $table->index(['order_id', 'order_item_id']);
+                $table->index(['product_id', 'material_id']);
+                $table->index(['customer_id']);
+                $table->index(['source_type', 'source_id']);
             });
         }
     }

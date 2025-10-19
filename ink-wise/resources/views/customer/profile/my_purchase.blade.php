@@ -15,10 +15,9 @@
     <a href="{{ route('customer.my_purchase.return_refund') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Return/Refund</a>
     </div>
     @php
-        // Expect a collection/array of orders passed in as $orders
-        $ordersList = $orders ?? [];
-        // Map of status keys to human labels and optional classes
-        $statusMap = [
+        $ordersList = collect($orders ?? []);
+
+        $statusCategories = [
             'to_pay' => 'To Pay',
             'to_ship' => 'To Ship',
             'to_receive' => 'To Receive',
@@ -27,115 +26,235 @@
             'return_refund' => 'Return/Refund',
         ];
 
-        // Group orders by status (assumes each order has a ->status property or attribute)
+        $statusLabels = [
+            'pending' => 'Awaiting Payment',
+            'in_production' => 'In Progress',
+            'processing' => 'In Progress',
+            'confirmed' => 'Out for Delivery',
+            'completed' => 'Completed',
+            'cancelled' => 'Cancelled',
+            'return_requested' => 'Return Requested',
+            'refund_in_review' => 'Refund in Review',
+            'refunded' => 'Refunded',
+        ];
+
+        $statusToCategory = [
+            'pending' => 'to_pay',
+            'awaiting_payment' => 'to_pay',
+            'processing' => 'to_ship',
+            'in_production' => 'to_ship',
+            'confirmed' => 'to_receive',
+            'ready_to_ship' => 'to_receive',
+            'completed' => 'completed',
+            'delivered' => 'completed',
+            'cancelled' => 'cancelled',
+            'void' => 'cancelled',
+            'return_requested' => 'return_refund',
+            'refund_in_review' => 'return_refund',
+            'refunded' => 'return_refund',
+        ];
+
+        $statusBadgeClasses = [
+            'pending' => 'bg-yellow-100 text-yellow-700',
+            'processing' => 'bg-blue-100 text-blue-700',
+            'in_production' => 'bg-blue-100 text-blue-700',
+            'confirmed' => 'bg-sky-100 text-sky-700',
+            'completed' => 'bg-green-100 text-green-700',
+            'cancelled' => 'bg-red-100 text-red-600',
+            'return_requested' => 'bg-amber-100 text-amber-700',
+            'refund_in_review' => 'bg-amber-100 text-amber-700',
+            'refunded' => 'bg-emerald-100 text-emerald-700',
+        ];
+
+        $formatCurrency = function ($value) {
+            if ($value === null || $value === '') {
+                return '0.00';
+            }
+            if (is_numeric($value)) {
+                return number_format((float) $value, 2);
+            }
+            $numeric = preg_replace('/[^0-9.\-]/', '', (string) $value);
+            return $numeric === '' ? '0.00' : number_format((float) $numeric, 2);
+        };
+
+        $describeAddons = function ($addons) use ($formatCurrency) {
+            if (!$addons) {
+                return 'None';
+            }
+
+            $normalize = function ($item) use (&$normalize) {
+                if ($item instanceof \Illuminate\Support\Collection) {
+                    return $item->toArray();
+                }
+                if (is_object($item)) {
+                    return json_decode(json_encode($item), true);
+                }
+                if (is_string($item)) {
+                    $decoded = json_decode($item, true);
+                    return json_last_error() === JSON_ERROR_NONE ? $decoded : $item;
+                }
+                return $item;
+            };
+
+            $addons = $normalize($addons);
+
+            $formatAddon = function ($addon) use ($formatCurrency, $normalize) {
+                if ($addon === null || $addon === '') {
+                    return null;
+                }
+
+                if (is_string($addon)) {
+                    return $addon;
+                }
+
+                if (!is_array($addon)) {
+                    $addon = $normalize($addon);
+                }
+
+                if (!is_array($addon)) {
+                    return null;
+                }
+
+                $label = $addon['name'] ?? $addon['label'] ?? $addon['title'] ?? $addon['value'] ?? null;
+                $price = $addon['price'] ?? $addon['amount'] ?? $addon['total'] ?? $addon['addon_price'] ?? null;
+
+                if (!$label) {
+                    return null;
+                }
+
+                if ($price === null || $price === '' || (float) $price === 0.0) {
+                    return $label . ' — Included';
+                }
+
+                return $label . ' — ₱' . $formatCurrency($price);
+            };
+
+            if (is_array($addons)) {
+                $labels = array_filter(array_map($formatAddon, $addons));
+                return $labels ? implode(', ', $labels) : 'None';
+            }
+
+            return $formatAddon($addons) ?? 'None';
+        };
+
+        $fallbackImage = asset('customerimages/image/weddinginvite.png');
+
         $grouped = [];
-        foreach ($ordersList as $o) {
-            $s = $o->status ?? ($o['status'] ?? 'to_pay');
-            $grouped[$s][] = $o;
+        foreach ($ordersList as $orderItem) {
+            $rawStatus = strtolower((string) data_get($orderItem, 'status', 'pending'));
+            $categoryKey = $statusToCategory[$rawStatus] ?? (($statusCategories[$rawStatus] ?? null) ? $rawStatus : 'to_pay');
+            $grouped[$categoryKey][] = $orderItem;
         }
     @endphp
 
-    @foreach($statusMap as $statusKey => $statusLabel)
+    @foreach($statusCategories as $statusKey => $statusLabel)
         <section class="mb-6">
             <h3 class="text-lg font-semibold mb-3">{{ $statusLabel }}</h3>
             @if(!empty($grouped[$statusKey]))
                 <div class="space-y-4">
                     @foreach($grouped[$statusKey] as $order)
                         @php
-                            $formatAddonPrice = function ($value) {
-                                if ($value === null || $value === '') {
-                                    return null;
-                                }
+                            $rawStatus = strtolower((string) data_get($order, 'status', 'pending'));
+                            $customerStatusLabel = $statusLabels[$rawStatus] ?? ucfirst(str_replace('_', ' ', $rawStatus));
+                            $badgeClass = $statusBadgeClasses[$rawStatus] ?? 'bg-gray-100 text-gray-600';
 
-                                if (is_numeric($value)) {
-                                    return (float) $value;
-                                }
+                            $orderId = data_get($order, 'id');
+                            $orderNumber = data_get($order, 'order_number', ($orderId ? 'ORD-' . str_pad((string) $orderId, 5, '0', STR_PAD_LEFT) : 'Order'));
+                            $placedAtRaw = data_get($order, 'order_date', data_get($order, 'created_at'));
+                            try {
+                                $placedAtDisplay = $placedAtRaw ? \Illuminate\Support\Carbon::parse($placedAtRaw)->format('M j, Y') : '—';
+                            } catch (\Throwable $e) {
+                                $placedAtDisplay = '—';
+                            }
 
-                                if (is_string($value)) {
-                                    $numeric = preg_replace('/[^0-9.\-]/', '', $value);
-                                    return $numeric === '' ? null : (float) $numeric;
-                                }
+                            $items = collect(data_get($order, 'items', []));
+                            $primaryItem = $items->first();
+                            $productName = data_get($primaryItem, 'name', data_get($order, 'product_name', 'Custom invitation'));
+                            $previewImage = data_get($primaryItem, 'preview_images.0', data_get($primaryItem, 'images.0', $fallbackImage));
+                            $quantityValue = data_get($primaryItem, 'quantity', data_get($order, 'items_count', 0));
+                            $quantityLabel = $quantityValue ? (int) $quantityValue . ' pcs' : '—';
 
-                                return null;
-                            };
+                            $paperOption = data_get($primaryItem, 'options.paper_stock', data_get($order, 'paper', 'Standard'));
+                            if (is_array($paperOption)) {
+                                $paperOption = implode(', ', array_filter($paperOption));
+                            }
+                            $paperLabel = $paperOption ?: 'Standard';
 
-                            $formatAddonLabel = function ($addon) use ($formatAddonPrice) {
-                                $label = null;
-                                $price = null;
+                            $addonsDisplay = $describeAddons(data_get($primaryItem, 'options.addons', data_get($order, 'addons', [])));
 
-                                if (is_array($addon)) {
-                                    $label = $addon['name'] ?? $addon['label'] ?? $addon['title'] ?? $addon['value'] ?? null;
-                                    $price = $formatAddonPrice($addon['price'] ?? $addon['amount'] ?? $addon['total'] ?? null);
-        
+                            $totalAmountRaw = data_get($order, 'grand_total', data_get($order, 'total_amount', data_get($order, 'subtotal', 0)));
+                            $totalAmount = '₱' . $formatCurrency($totalAmountRaw);
+
+                            $trackingNumber = data_get($order, 'metadata.tracking_number', data_get($order, 'tracking_number'));
+
+                            $cancelableStatuses = ['pending', 'awaiting_payment'];
+                            $canCancel = $orderId && in_array($rawStatus, $cancelableStatuses, true);
+                        @endphp
+
+                        <div class="bg-white border rounded-xl shadow-sm" data-customer-order-card data-order-id="{{ $orderId }}">
+                            <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between px-4 py-3 border-b">
+                                <div class="text-sm text-gray-500">
+                                    <span class="font-semibold text-gray-700">{{ $orderNumber }}</span>
+                                    <span class="ml-2">Placed {{ $placedAtDisplay }}</span>
+                                    @if($trackingNumber)
+                                        <span class="ml-2">· Tracking # {{ $trackingNumber }}</span>
+                                    @endif
                                 </div>
+                                <span class="inline-flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-full {{ $badgeClass }}">
+                                    {{ $customerStatusLabel }}
+                                </span>
                             </div>
+
                             <div class="flex flex-col md:flex-row items-start md:items-center px-4 py-4 gap-4">
-                                <img src="{{ $previewImage }}" alt="Invitation Design" class="w-24 h-24 object-cover rounded-lg border">
+                                <img src="{{ $previewImage }}" alt="Order Preview" class="w-24 h-24 object-cover rounded-lg border">
                                 <div class="flex-1">
                                     <div class="font-semibold text-lg text-[#a6b7ff]">{{ $productName }}</div>
-                                    <div class="text-sm text-gray-500">Theme: {{ $order->theme ?? ($order['theme'] ?? 'N/A') }}</div>
-                                    <div class="text-sm text-gray-500">Quantity: {{ $quantity }} pcs</div>
-                                    <div class="text-sm text-gray-500">Paper: {{ $paper }}</div>
-                                    <div class="text-sm text-gray-500">Add-ons: {{ $addonsDisplay }}</div>
+                                    <dl class="mt-2 space-y-1 text-sm text-gray-500">
+                                        <div class="flex gap-2">
+                                            <dt class="min-w-[88px]">Theme:</dt>
+                                            <dd>{{ data_get($order, 'theme', 'N/A') }}</dd>
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <dt class="min-w-[88px]">Quantity:</dt>
+                                            <dd>{{ $quantityLabel }}</dd>
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <dt class="min-w-[88px]">Paper:</dt>
+                                            <dd>{{ $paperLabel }}</dd>
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <dt class="min-w-[88px]">Add-ons:</dt>
+                                            <dd>{{ $addonsDisplay }}</dd>
+                                        </div>
+                                    </dl>
                                 </div>
                                 <div class="text-right">
-                                    <div class="text-lg font-bold text-gray-700">₱{{ number_format($totalAmount, 2) }}</div>
+                                    <div class="text-xs uppercase tracking-wide text-gray-400">Total</div>
+                                    <div class="text-lg font-bold text-gray-700">{{ $totalAmount }}</div>
                                 </div>
                             </div>
+
                             <div class="flex flex-col md:flex-row items-center justify-between px-4 py-3 bg-[#f7f8fa] rounded-b-xl">
                                 <div class="text-sm text-gray-500 mb-2 md:mb-0">
-                                    Order Total: <span class="text-[#a6b7ff] font-bold text-lg">₱{{ number_format($totalAmount, 2) }}</span>
+                                    Thank you for shopping with InkWise! Need help? Contact us anytime.
                                 </div>
-                                <div class="flex gap-2">
-                                    <button class="bg-[#a6b7ff] hover:bg-[#bce6ff] text-white px-6 py-2 rounded font-semibold transition-colors duration-150">Order Again</button>
-                                    <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white hover:bg-[#bce6ff] hover:text-white transition-colors duration-150">Contact Shop</button>
-                                    <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white hover:bg-[#bce6ff] hover:text-white transition-colors duration-150">View Shop Rating</button>
+                                <div class="flex flex-wrap gap-2">
+                                    @if($canCancel)
+                                        <form method="POST" action="{{ route('customer.orders.cancel', $orderId) }}" class="inline-flex" onsubmit="return confirm('Cancel this order? This cannot be undone.');">
+                                            @csrf
+                                            <button class="border border-red-200 text-red-600 hover:text-white hover:bg-red-500 px-5 py-2 rounded font-semibold transition-colors duration-150" type="submit">Cancel Order</button>
+                                        </form>
+                                    @endif
+                                    <button class="bg-[#a6b7ff] hover:bg-[#8f9ef5] text-white px-5 py-2 rounded font-semibold transition-colors duration-150" type="button">Order Again</button>
+                                    <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white hover:bg-[#e6edff] transition-colors duration-150" type="button">Contact Shop</button>
+                                    <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white hover:bg-[#e6edff] transition-colors duration-150" type="button">View Shop Rating</button>
                                 </div>
                             </div>
                         </div>
                     @endforeach
                 </div>
             @else
-                @if($statusKey === 'completed')
-                    <!-- Sample Completed card (fallback) -->
-                    <div class="bg-white border rounded-xl mb-4 shadow-sm">
-                        <div class="flex items-center justify-between px-4 py-3 border-b">
-                            <div></div>
-                            <div class="flex items-center gap-2">
-                                <span class="text-green-600 flex items-center text-xs">
-                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2l4-4"/></svg>
-                                    Parcel has been delivered
-                                </span>
-                                <span class="text-[#f4511e] text-xs font-semibold">RATED</span>
-                            </div>
-                        </div>
-                        <div class="flex flex-col md:flex-row items-start md:items-center px-4 py-4 gap-4">
-                            <img src="{{ asset('customerimages/image/weddinginvite.png') }}" alt="Invitation Design" class="w-24 h-24 object-cover rounded-lg border">
-                            <div class="flex-1">
-                                <div class="font-semibold text-lg text-[#a6b7ff]">Elegant Wedding Invitation</div>
-                                <div class="text-sm text-gray-500">Theme: Rustic Floral</div>
-                                <div class="text-sm text-gray-500">Quantity: 50 pcs</div>
-                                <div class="text-sm text-gray-500">Paper: Premium Matte</div>
-                                <div class="text-sm text-gray-500">Add-ons: Wax Seal, Envelope</div>
-                            </div>
-                            <div class="text-right">
-                                <div class="text-lg font-bold text-gray-700">₱2,500</div>
-                            </div>
-                        </div>
-                        <div class="flex flex-col md:flex-row items-center justify-between px-4 py-3 bg-[#f7f8fa] rounded-b-xl">
-                            <div class="text-sm text-gray-500 mb-2 md:mb-0">
-                                Order Total: <span class="text-[#a6b7ff] font-bold text-lg">₱2,500</span>
-                            </div>
-                            <div class="flex gap-2">
-                                <button class="bg-[#a6b7ff] hover:bg-[#bce6ff] text-white px-6 py-2 rounded font-semibold transition-colors duration-150">Order Again</button>
-                                <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white hover:bg-[#bce6ff] hover:text-white transition-colors duration-150">Contact Shop</button>
-                                <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white hover:bg-[#bce6ff] hover:text-white transition-colors duration-150">View Shop Rating</button>
-                            </div>
-                        </div>
-                    </div>
-                @else
-                    <div class="text-sm text-gray-500">No orders in this category.</div>
-                @endif
+                <div class="text-sm text-gray-500">No orders in this category.</div>
             @endif
         </section>
     @endforeach

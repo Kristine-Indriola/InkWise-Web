@@ -16,6 +16,8 @@ class OrderItemAddon extends Model
 
     protected $casts = [
         'addon_price' => 'float',
+        'quantity' => 'integer',
+        'pricing_metadata' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

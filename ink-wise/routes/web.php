@@ -29,7 +29,7 @@ use App\Http\Controllers\Auth\RoleLoginController;
 use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\MaterialsController;
 use App\Http\Controllers\Admin\SiteContentController;
-use App\Http\Controllers\customerProfileController;
+use App\Http\Controllers\CustomerProfileController;
 use App\Http\Controllers\Owner\OwnerStaffController;
 use App\Http\Controllers\Auth\CustomerAuthController;
 
@@ -120,6 +120,10 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     })->name('orders.index');
 
     // Delete an order (AJAX / API-friendly)
+    Route::get('/orders/{order}/status', [\App\Http\Controllers\Admin\OrderController::class, 'editStatus'])
+        ->name('orders.status.edit');
+    Route::put('/orders/{order}/status', [\App\Http\Controllers\Admin\OrderController::class, 'updateStatus'])
+        ->name('orders.status.update');
     Route::delete('/orders/{order}', [\App\Http\Controllers\Admin\OrderController::class, 'destroy'])
         ->name('orders.destroy');
 
@@ -394,6 +398,9 @@ Route::get('/customer/my-orders/toreceive', fn () => view('customer.profile.purc
 Route::get('/customer/my-orders/completed', fn () => view('customer.profile.purchase.completed'))->name('customer.my_purchase.completed');
 Route::get('/customer/my-orders/cancelled', fn () => view('customer.profile.purchase.cancelled'))->name('customer.my_purchase.cancelled');
 Route::get('/customer/my-orders/return-refund', fn () => view('customer.profile.purchase.return_refund'))->name('customer.my_purchase.return_refund');
+
+Route::middleware('auth')->post('/customer/orders/{order}/cancel', [CustomerProfileController::class, 'cancelOrder'])
+    ->name('customer.orders.cancel');
 
 
 /** Profile & Addresses (Protected) */
