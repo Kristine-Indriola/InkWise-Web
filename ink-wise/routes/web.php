@@ -321,11 +321,11 @@ Route::get('/auth/google/callback', function () {
 */
 
 /**Dashboard & Home*/
-Route::get('/', fn () => view('customer.dashboard'))->name('dashboard');  // Public
+Route::get('/', fn () => view('customer.dashboard'))->name('dashboard');
 Route::middleware('auth')->get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');  // Protected
-Route::get('/search', function (\Illuminate\Http\Request $request) {
-    return 'Search for: ' . e($request->query('query', ''));
-})->name('search');  
+ Route::get('/search', function (\Illuminate\Http\Request $request) {
+     return 'Search for: ' . e($request->query('query', ''));
+ })->name('search');
 
 /** Auth (Register/Login/Logout) */
 Route::get('/customer/register', [CustomerAuthController::class, 'showRegister'])->name('customer.register.form');
@@ -334,8 +334,6 @@ Route::post('/customer/register/send-code', [CustomerAuthController::class, 'sen
 Route::get('/customer/login', [CustomerAuthController::class, 'showLogin'])->name('customer.login.form');
 Route::post('/customer/login', [CustomerAuthController::class, 'login'])->name('customer.login');
 Route::post('/customer/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
-
-Route::get('/customer/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -666,7 +664,7 @@ if (interface_exists('Laravel\\Socialite\\Contracts\\Factory')) {
     })->name('google.callback');
 }
 
-Route::middleware('auth')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
+Route::middleware('auth')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.show');
 
 require __DIR__.'/auth.php';
 
