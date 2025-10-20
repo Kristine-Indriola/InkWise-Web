@@ -19,6 +19,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class OrderFlowController extends Controller
@@ -38,6 +39,9 @@ class OrderFlowController extends Controller
         $product = $this->orderFlow->resolveProduct($product, $productId);
         $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
 
+        $frontSvg = $this->readInlineSvg($product?->template->front_image ?? null);
+        $backSvg = $this->readInlineSvg($product?->template->back_image ?? null);
+
         return view('customer.Invitations.editing', [
             'product' => $product,
             'frontImage' => $images['front'],
@@ -48,6 +52,8 @@ class OrderFlowController extends Controller
                 ['side' => 'back', 'default' => $product->template->back_image ?? null],
             ] : [],
             'defaultQuantity' => $product ? $this->orderFlow->defaultQuantityFor($product) : 50,
+            'frontSvg' => $frontSvg,
+            'backSvg' => $backSvg,
         ]);
     }
 
@@ -1429,9 +1435,113 @@ class OrderFlowController extends Controller
         session()->put(static::SESSION_SUMMARY_KEY, $summary);
     }
 
+    private function readInlineSvg(?string $path): ?string
+    {
+        if (!$path || !Str::endsWith(Str::lower($path), '.svg')) {
+            return null;
+        }
+
+        $raw = null;
+
+        if (Str::startsWith($path, ['http://', 'https://'])) {
+            try {
+                $raw = @file_get_contents($path);
+            } catch (\Throwable $e) {
+                return null;
+            }
+        } else {
+            $normalized = str_replace('\\', '/', $path);
+            $variants = [
+                $normalized,
+                ltrim($normalized, '/'),
+            ];
+
+            if (Str::contains($normalized, 'ink-wise/')) {
+                $variants[] = Str::after($normalized, 'ink-wise/');
+            }
+            if (Str::contains($normalized, 'public/')) {
+                $variants[] = Str::after($normalized, 'public/');
+            }
+            if (Str::contains($normalized, 'storage/')) {
+                $variants[] = Str::after($normalized, 'storage/');
+            }
+
+            $variants = array_filter(array_unique($variants), static fn ($value) => is_string($value) && $value !== '');
+            $candidates = [];
+
+            foreach ($variants as $variant) {
+                if (Storage::disk('public')->exists($variant)) {
+                    $candidates[] = Storage::disk('public')->path($variant);
+                }
+
+                $candidates[] = public_path($variant);
+                $candidates[] = public_path('storage/' . ltrim($variant, '/'));
+                $candidates[] = base_path($variant);
+            }
+
+            foreach ($candidates as $candidate) {
+                if (is_string($candidate) && is_file($candidate)) {
+                    $raw = @file_get_contents($candidate);
+                    if ($raw !== false) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!$raw) {
+            return null;
+        }
+
+        $raw = preg_replace('/<\?xml[^>]*\?>/i', '', $raw);
+        $raw = preg_replace('/<!DOCTYPE[^>]*>/i', '', $raw);
+        $raw = trim($raw ?? '');
+
+        if ($raw === '') {
+            return null;
+        }
+
+        $previous = libxml_use_internal_errors(true);
+
+        $dom = new \DOMDocument();
+        $loaded = $dom->loadXML($raw, LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_NONET);
+
+        if (!$loaded) {
+            libxml_use_internal_errors($previous);
+            libxml_clear_errors();
+            return $raw;
+        }
+
+        $svg = $dom->documentElement;
+        if ($svg && $svg->nodeName === 'svg') {
+            $scripts = [];
+            foreach ($svg->getElementsByTagName('script') as $script) {
+                $scripts[] = $script;
+            }
+            foreach ($scripts as $script) {
+                if ($script->parentNode) {
+                    $script->parentNode->removeChild($script);
+                }
+            }
+
+            if (!$svg->hasAttribute('data-inline-template')) {
+                $svg->setAttribute('data-inline-template', 'true');
+            }
+
+            $raw = $dom->saveXML($svg) ?: $raw;
+            $raw = preg_replace('/<\?xml[^>]*\?>/i', '', $raw);
+        }
+
+        libxml_use_internal_errors($previous);
+        libxml_clear_errors();
+
+        return trim($raw);
+    }
+
     private function redirectToCatalog(): RedirectResponse
     {
         return redirect()->route('templates.wedding.invitations')
             ->with('status', 'Start a new invitation to continue through the order flow.');
     }
+
 }
