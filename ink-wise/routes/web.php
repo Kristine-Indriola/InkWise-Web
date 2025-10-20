@@ -29,7 +29,7 @@ use App\Http\Controllers\Auth\RoleLoginController;
 use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\MaterialsController;
 use App\Http\Controllers\Admin\SiteContentController;
-use App\Http\Controllers\customerProfileController;
+use App\Http\Controllers\CustomerProfileController;
 use App\Http\Controllers\Owner\OwnerStaffController;
 use App\Http\Controllers\Auth\CustomerAuthController;
 
@@ -120,6 +120,10 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     })->name('orders.index');
 
     // Delete an order (AJAX / API-friendly)
+    Route::get('/orders/{order}/status', [\App\Http\Controllers\Admin\OrderController::class, 'editStatus'])
+        ->name('orders.status.edit');
+    Route::put('/orders/{order}/status', [\App\Http\Controllers\Admin\OrderController::class, 'updateStatus'])
+        ->name('orders.status.update');
     Route::delete('/orders/{order}', [\App\Http\Controllers\Admin\OrderController::class, 'destroy'])
         ->name('orders.destroy');
 
@@ -317,11 +321,11 @@ Route::get('/auth/google/callback', function () {
 */
 
 /**Dashboard & Home*/
-Route::get('/', fn () => view('customer.dashboard'))->name('dashboard');  // Public
+Route::get('/', fn () => view('customer.dashboard'))->name('dashboard');
 Route::middleware('auth')->get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');  // Protected
-Route::get('/search', function (\Illuminate\Http\Request $request) {
-    return 'Search for: ' . e($request->query('query', ''));
-})->name('search');
+ Route::get('/search', function (\Illuminate\Http\Request $request) {
+     return 'Search for: ' . e($request->query('query', ''));
+ })->name('search');
 
 /** Auth (Register/Login/Logout) */
 Route::get('/customer/register', [CustomerAuthController::class, 'showRegister'])->name('customer.register.form');
@@ -397,6 +401,9 @@ Route::get('/customer/my-orders/completed', fn () => view('customer.profile.purc
 Route::get('/customer/my-orders/cancelled', fn () => view('customer.profile.purchase.cancelled'))->name('customer.my_purchase.cancelled');
 Route::get('/customer/my-orders/return-refund', fn () => view('customer.profile.purchase.return_refund'))->name('customer.my_purchase.return_refund');
 
+Route::middleware('auth')->post('/customer/orders/{order}/cancel', [CustomerProfileController::class, 'cancelOrder'])
+    ->name('customer.orders.cancel');
+
 
 /** Profile & Addresses (Protected) */
 /*Route::middleware(['auth:customer'])->prefix('customer/profile')->name('customer.profile.')->group(function () {
@@ -431,10 +438,16 @@ Route::middleware('auth')->prefix('customer/profile')->name('customer.profile.')
 
 });*/
 
+
+
+    
+
 // Profile update (protected)
 /*Route::middleware(['auth:customer'])->group(function () {
     Route::put('/customer/profile/update', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
 });*/
+
+
 
 
 /** Templates (Category Home & Invitations/Giveaways)*/
@@ -653,7 +666,10 @@ if (interface_exists('Laravel\\Socialite\\Contracts\\Factory')) {
     })->name('google.callback');
 }
 
-Route::middleware('auth')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
+
+
+Route::middleware('auth')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.show');
+
 
 require __DIR__.'/auth.php';
 

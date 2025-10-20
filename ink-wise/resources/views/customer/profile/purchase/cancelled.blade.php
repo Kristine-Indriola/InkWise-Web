@@ -15,36 +15,40 @@
     </div>
 
     @php
-        if (!empty($orders) && is_iterable($orders)) {
-            $ordersList = $orders;
-        } else {
-            $ordersList = [
-                (object)[
-                    'id' => 4001,
-                    'product_name' => 'Cancelled Invitation Order',
-                    'quantity' => 80,
-                    'image' => asset('customerimages/image/invitation.png'),
-                    'total_amount' => 1600.00,
-                    'cancelled_date' => now()->subDays(3)->format('M d, Y'),
-                    'reason' => 'Customer requested cancellation'
-                ],
-            ];
-        }
+        $ordersList = collect($orders ?? []);
     @endphp
 
     <div class="space-y-4">
-        @foreach($ordersList as $order)
+        @forelse($ordersList as $order)
+            @php
+                $productName = data_get($order, 'product_name', 'Order');
+                $quantity = (int) data_get($order, 'quantity', 0);
+                $cancelledDate = data_get($order, 'cancelled_date');
+                if (!$cancelledDate && $timestamp = data_get($order, 'updated_at')) {
+                    try {
+                        $cancelledDate = \Illuminate\Support\Carbon::parse($timestamp)->format('M d, Y');
+                    } catch (\Throwable $e) {
+                        $cancelledDate = null;
+                    }
+                }
+                $reason = data_get($order, 'reason', 'Cancelled by customer');
+                $image = data_get($order, 'image', asset('images/placeholder.png'));
+                $totalAmount = data_get($order, 'total_amount', 0);
+            @endphp
+
             <div class="bg-white border rounded-xl p-4 shadow-sm flex items-center gap-4">
-                <img src="{{ $order->image ?? asset('images/placeholder.png') }}" alt="{{ $order->product_name }}" class="w-24 h-24 object-cover rounded-lg">
+                <img src="{{ $image }}" alt="{{ $productName }}" class="w-24 h-24 object-cover rounded-lg">
                 <div class="flex-1">
-                    <div class="font-semibold text-lg">{{ $order->product_name }}</div>
-                    <div class="text-sm text-gray-500">Qty: {{ $order->quantity }} pcs</div>
-                    <div class="text-sm text-gray-500">Cancelled: <span class="font-medium">{{ $order->cancelled_date }}</span></div>
-                    <div class="text-sm text-gray-500">Reason: {{ $order->reason }}</div>
+                    <div class="font-semibold text-lg">{{ $productName }}</div>
+                    <div class="text-sm text-gray-500">Qty: {{ $quantity ?: '—' }} pcs</div>
+                    <div class="text-sm text-gray-500">Cancelled: <span class="font-medium">{{ $cancelledDate ?? 'Not available' }}</span></div>
+                    <div class="text-sm text-gray-500">Reason: {{ $reason }}</div>
                 </div>
-                <div class="text-gray-700 font-bold">₱{{ number_format($order->total_amount,2) }}</div>
+                <div class="text-gray-700 font-bold">₱{{ number_format($totalAmount, 2) }}</div>
             </div>
-        @endforeach
+        @empty
+            <div class="text-sm text-gray-500">No cancelled orders.</div>
+        @endforelse
     </div>
 </div>
 

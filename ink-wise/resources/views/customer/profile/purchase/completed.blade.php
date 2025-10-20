@@ -15,57 +15,47 @@
      </div>
 
     @php
-        if (!empty($orders) && is_iterable($orders)) {
-            $ordersList = $orders;
-        } else {
-            $ordersList = [
-                (object)[
-                    'id' => 3001,
-                    'product_id' => 701,
-                    'product_name' => 'Elegant Wedding Invite',
-                    'quantity' => 150,
-                    'image' => asset('customerimages/image/invitation.png'),
-                    'total_amount' => 3750.00,
-                    'completed_date' => now()->subDays(5)->format('M d, Y'),
-                    'order_number' => 'ORD-3001'
-                ],
-                (object)[
-                    'id' => 3002,
-                    'product_id' => 702,
-                    'product_name' => 'Corporate Giveaway Kit',
-                    'quantity' => 200,
-                    'image' => asset('customerimages/image/giveaway.png'),
-                    'total_amount' => 4800.00,
-                    'completed_date' => now()->subDays(12)->format('M d, Y'),
-                    'order_number' => 'ORD-3002'
-                ],
-            ];
-        }
+        $ordersList = collect($orders ?? []);
     @endphp
 
     <div class="space-y-4">
-        @foreach($ordersList as $order)
+        @forelse($ordersList as $order)
+            @php
+                $productName = data_get($order, 'product_name', 'Completed order');
+                $orderNumber = data_get($order, 'order_number', data_get($order, 'id'));
+                $quantity = (int) data_get($order, 'quantity', 0);
+                $image = data_get($order, 'image', asset('images/placeholder.png'));
+                $totalAmount = data_get($order, 'total_amount', 0);
+                $completedDate = data_get($order, 'completed_date');
+                if (!$completedDate && $timestamp = data_get($order, 'updated_at')) {
+                    try {
+                        $completedDate = \Illuminate\Support\Carbon::parse($timestamp)->format('M d, Y');
+                    } catch (\Throwable $e) {
+                        $completedDate = null;
+                    }
+                }
+
+                $previewUrl = '#';
+                try {
+                    if ($productId = data_get($order, 'product_id')) {
+                        $previewUrl = route('product.preview', $productId);
+                    }
+                } catch (\Throwable $e) {
+                    $previewUrl = '#';
+                }
+                $rateUrl = Route::has('chatbot') ? route('chatbot') : '#';
+            @endphp
+
             <div class="bg-white border rounded-xl p-4 shadow-sm flex items-center gap-4">
-                <img src="{{ $order->image ?? asset('images/placeholder.png') }}" alt="{{ $order->product_name }}" class="w-24 h-24 object-cover rounded-lg">
+                <img src="{{ $image }}" alt="{{ $productName }}" class="w-24 h-24 object-cover rounded-lg">
                 <div class="flex-1">
-                    <div class="font-semibold text-lg">{{ $order->product_name }}</div>
-                    <div class="text-sm text-gray-500">Order: {{ $order->order_number ?? $order->id }}</div>
-                    <div class="text-sm text-gray-500">Qty: {{ $order->quantity }} pcs</div>
-                    <div class="text-sm text-gray-500">Completed: <span class="font-medium">{{ $order->completed_date }}</span></div>
+                    <div class="font-semibold text-lg">{{ $productName }}</div>
+                    <div class="text-sm text-gray-500">Order: {{ $orderNumber }}</div>
+                    <div class="text-sm text-gray-500">Qty: {{ $quantity ?: '—' }} pcs</div>
+                    <div class="text-sm text-gray-500">Completed: <span class="font-medium">{{ $completedDate ?? 'Not available' }}</span></div>
                 </div>
                 <div class="flex flex-col items-end gap-2">
-                    <div class="text-gray-700 font-bold">₱{{ number_format($order->total_amount,2) }}</div>
-                    @php
-                        $previewUrl = '#';
-                        try {
-                            if (isset($order->product_id)) {
-                                $previewUrl = route('product.preview', $order->product_id);
-                            }
-                        } catch (	hrowable $e) {
-                            $previewUrl = '#';
-                        }
-                        $rateUrl = Route::has('chatbot') ? route('chatbot') : '#';
-                    @endphp
+                    <div class="text-gray-700 font-bold">₱{{ number_format($totalAmount, 2) }}</div>
                     <div class="flex gap-2">
                         <a href="#" class="px-4 py-2 bg-[#e6f7fb] text-[#044e86] rounded font-semibold">View Invoice</a>
                         <a href="{{ $previewUrl }}" class="px-4 py-2 bg-white border text-[#044e86] rounded font-semibold">Order Again</a>
@@ -73,7 +63,9 @@
                     </div>
                 </div>
             </div>
-        @endforeach
+        @empty
+            <div class="text-sm text-gray-500">No completed orders yet.</div>
+        @endforelse
     </div>
 </div>
 

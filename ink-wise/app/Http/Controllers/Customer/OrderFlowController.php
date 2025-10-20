@@ -26,8 +26,8 @@ class OrderFlowController extends Controller
 {
     private const SESSION_ORDER_ID = 'current_order_id';
     private const SESSION_SUMMARY_KEY = 'order_summary_payload';
-    private const DEFAULT_TAX_RATE = 0.12;
-    private const DEFAULT_SHIPPING_FEE = 250;
+    private const DEFAULT_TAX_RATE = 0.0;
+    private const DEFAULT_SHIPPING_FEE = 0.0;
 
     public function __construct(private readonly OrderFlowService $orderFlow)
     {

@@ -969,7 +969,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
                 <!-- Back (Image) -->
                 <div class="flip-card-back bg-white shadow-lg rounded-2xl overflow-hidden">
-                    <img src="{{ asset('customerimages/image/invitation.png') }}" alt="Invitation Design" class="w-full h-64 md:h-96 object-cover">
+                    <img src="{{ asset('Customerimages/image/invitation.png') }}" alt="Invitation Design" class="w-full h-64 md:h-96 object-cover">
                 </div>
             </div>
         </div>

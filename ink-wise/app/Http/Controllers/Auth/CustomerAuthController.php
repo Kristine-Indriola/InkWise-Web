@@ -18,12 +18,12 @@ class CustomerAuthController extends Controller
 {
     public function showRegister()
     {
-        return view('customer.register');
+        return view('auth.customer.register');
     }
 
     public function showLogin()
     {
-        return view('customer.login');
+        return view('auth.customer.login');
     }
 
     public function register(Request $request)
@@ -188,8 +188,9 @@ class CustomerAuthController extends Controller
 
     public function dashboard()
     {
+
         return view('customer.dashboard', [
-            'customer' => Auth::user()?->customer, // safe access
+            'customer' => Auth::user()->customer ?? null, // safe access
         ]);
     }
 
