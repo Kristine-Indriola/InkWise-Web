@@ -275,6 +275,10 @@
             'letter_spacing' => $field['letter_spacing'] ?? null,
         ];
     })->toArray();
+
+    if (!empty($frontSvg) || !empty($backSvg)) {
+        $textFieldPresets = [];
+    }
 @endphp
 
     <!-- TOP BAR -->
@@ -317,12 +321,6 @@
                 <div class="toolbar-item font-size-control" data-dropdown-open="false">
                     <label for="toolbarFontSizeInput" class="sr-only">Font size</label>
                     <input id="toolbarFontSizeInput" class="toolbar-fontsize-input" type="number" min="6" max="200" step="1" value="16" aria-label="Font size input">
-                    <button id="toolbarFontSizeToggle" class="toolbar-fontsize-btn" type="button" aria-label="Open font size options">
-                        <!-- Inline SVG chevron (guaranteed to display) -->
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                            <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </button>
                     <div class="font-size-dropdown" role="listbox" aria-hidden="true">
                         <button type="button" class="font-size-option">8</button>
                         <button type="button" class="font-size-option">10</button>
@@ -347,18 +345,57 @@
                 <button class="toolbar-btn" type="button" data-tool="bold" aria-label="Bold text">
                     <i class="fa-solid fa-bold" aria-hidden="true"></i>
                 </button>
-                <button class="toolbar-btn" type="button" data-tool="align" aria-label="Text alignment">
-                    <i class="fa-solid fa-align-justify" aria-hidden="true"></i>
-                </button>
-                <button class="toolbar-btn" type="button" data-tool="list" aria-label="List formatting">
-                    <i class="fa-solid fa-list-ul" aria-hidden="true"></i>
-                </button>
-                <div class="toolbar-item">
-                    <select class="toolbar-select" aria-label="Text transform">
-                        <option value="">Format</option>
-                        <option value="uppercase">Uppercase</option>
-                        <option value="lowercase">Lowercase</option>
-                    </select>
+                <div class="toolbar-item align-dropdown">
+                    <button id="toolbarAlignBtn" class="toolbar-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Text alignment">
+                        <i class="fa-solid fa-align-justify" aria-hidden="true"></i>
+                    </button>
+                    <div class="align-dropdown-menu" aria-hidden="true" role="menu" aria-label="Alignment options">
+                        <button type="button" class="align-option" data-align="left" role="menuitem" title="Align left">
+                            <i class="fa-solid fa-align-left" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" class="align-option" data-align="center" role="menuitem" title="Align center">
+                            <i class="fa-solid fa-align-center" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" class="align-option" data-align="right" role="menuitem" title="Align right">
+                            <i class="fa-solid fa-align-right" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" class="align-option" data-align="justify" role="menuitem" title="Justify">
+                            <i class="fa-solid fa-align-justify" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="toolbar-item list-dropdown">
+                    <button id="toolbarListBtn" class="toolbar-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="List formatting">
+                        <i class="fa-solid fa-list-ul" aria-hidden="true"></i>
+                    </button>
+                    <div class="list-dropdown-menu" aria-hidden="true" role="menu" aria-label="List options">
+                        <button type="button" class="list-option" data-list="ul" role="menuitem" title="Bulleted list">
+                            <i class="fa-solid fa-list-ul" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" class="list-option" data-list="ol" role="menuitem" title="Numbered list">
+                            <i class="fa-solid fa-list-ol" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" class="list-option" data-list="none" role="menuitem" title="Remove list">
+                            <i class="fa-solid fa-ban" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="toolbar-item format-dropdown">
+                    <button id="toolbarFormatBtn" class="toolbar-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Format">
+                        Format
+                    </button>
+                    <div class="format-dropdown-menu" aria-hidden="true" role="menu" aria-label="Format options">
+                        <!-- Uppercase button -->
+                        <button id="uppercaseBtn" class="format-option" type="button" data-format="uppercase" title="Uppercase" role="menuitem">
+                            <i class="fa-solid fa-a" aria-hidden="true"></i>
+                            <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
+                        </button>
+                        <!-- Lowercase button (small 'a' icon) -->
+                        <button id="lowercaseBtn" class="format-option" type="button" data-format="lowercase" title="Lowercase" role="menuitem">
+                            <span class="small-a" aria-hidden="true">a</span>
+                            <i class="fa-solid fa-arrow-down" aria-hidden="true"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
             <!-- Font selection modal (hidden) -->
@@ -385,32 +422,57 @@
                         <button id="colorClose" class="color-close" aria-label="Close">×</button>
                     </div>
                     <div class="color-modal-body">
-                        <div class="color-preview-row">
-                            <div class="color-sample" id="colorSample" aria-hidden="true"></div>
-                            <input id="colorNative" type="color" class="color-native" value="#1f2933" aria-label="Native color picker">
-                            <input id="colorHexInput" class="color-hex-input" value="#1f2933" aria-label="Hex color input">
-                        </div>
-                        <div class="color-section">
-                            <div class="section-title">Recent colors</div>
-                            <div id="recentColors" class="recent-colors">
-                                <div class="recent-list">No recent colors</div>
+                        <div class="color-picker-grid">
+                            <div class="color-picker-left">
+                                <div class="color-gradient" id="colorGradient" aria-label="Color gradient" role="application">
+                                    <div class="color-gradient-pointer" id="colorGradientPointer" aria-hidden="true"></div>
+                                </div>
+                                <div class="hue-row">
+                                    <div class="hue-slider" id="hueSlider" aria-label="Hue slider">
+                                        <div class="hue-pointer" id="huePointer" aria-hidden="true"></div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                        <div class="color-section">
-                            <div class="section-title">Pre-set colors</div>
-                            <div class="preset-swatches">
-                                <!-- a handful of presets -->
-                                <button type="button" class="swatch" data-color="#FFFFFF" style="background:#FFFFFF"></button>
-                                <button type="button" class="swatch" data-color="#6BC8A6" style="background:#6BC8A6"></button>
-                                <button type="button" class="swatch" data-color="#A7E6FF" style="background:#A7E6FF"></button>
-                                <button type="button" class="swatch" data-color="#FFD59E" style="background:#FFD59E"></button>
-                                <button type="button" class="swatch" data-color="#F6B1B1" style="background:#F6B1B1"></button>
-                                <button type="button" class="swatch" data-color="#000000" style="background:#000000"></button>
-                                <button type="button" class="swatch" data-color="#1f2933" style="background:#1f2933"></button>
-                                <button type="button" class="swatch" data-color="#2563EB" style="background:#2563EB"></button>
-                                <button type="button" class="swatch" data-color="#059669" style="background:#059669"></button>
-                                <button type="button" class="swatch" data-color="#D97706" style="background:#D97706"></button>
-                                <button type="button" class="swatch" data-color="#DB2777" style="background:#DB2777"></button>
+                            <div class="color-picker-right">
+                                <div class="hex-row">
+                                    <div class="hex-input" style="width:100%; display:flex; gap:8px; align-items:center;">
+                                        <input id="colorHexInput" class="color-hex-input" value="#1f2933" aria-label="Hex color input">
+                                        <button id="eyedropperBtn" class="eyedropper-btn" type="button" title="Eyedropper">
+                                            <i class="fa-solid fa-eye-dropper" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="color-tabs">
+                                    <button type="button" class="tab active" data-tab="swatches">Swatches</button>
+                                    <button type="button" class="tab" data-tab="cmyk">CMYK</button>
+                                </div>
+
+                                <div class="tab-panels">
+                                    <div class="tab-panel" data-panel="swatches">
+                                        <div class="section-title">Recent colors</div>
+                                        <div id="recentColors" class="recent-colors">
+                                            <div class="recent-list">
+                                                <button type="button" class="swatch" data-color="#FFFFFF" style="background:#FFFFFF"></button>
+                                                <button type="button" class="swatch" data-color="#000000" style="background:#000000"></button>
+                                            </div>
+                                        </div>
+
+                                        <div class="section-title">Pre-set colors</div>
+                                        <div class="preset-swatches grid-5x5" id="presetSwatches">
+                                            <!-- 5x5 grid of preset swatches generated inline -->
+                                        </div>
+                                    </div>
+                                    <div class="tab-panel" data-panel="cmyk" style="display:none;">
+                                        <div class="section-title">CMYK</div>
+                                        <div class="cmyk-controls">
+                                            <label> C <input type="number" min="0" max="100" class="cmyk-input" data-cmyk="c" value="0">%</label>
+                                            <label> M <input type="number" min="0" max="100" class="cmyk-input" data-cmyk="m" value="0">%</label>
+                                            <label> Y <input type="number" min="0" max="100" class="cmyk-input" data-cmyk="y" value="0">%</label>
+                                            <label> K <input type="number" min="0" max="100" class="cmyk-input" data-cmyk="k" value="0">%</label>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -532,8 +594,6 @@
         <div class="right-panel">
             <div class="product-summary">
                 <h2>{{ $productName }}</h2>
-                <p>{{ $productTheme }}</p>
-                <p class="summary-note">Quantity preset: {{ $presetQuantity }} invitations</p>
             </div>
 
             <div class="view-toggle">
@@ -573,40 +633,55 @@
                     </div>
                 </section>
 
-                <section class="editor-panel" data-panel="images">
-                    <div class="image-panel">
-                        <h3>Images</h3>
-                        <p class="panel-note">Replace the invitation backgrounds with your own images. Supported formats: JPG, PNG, WEBP.</p>
+                <!-- legacy images panel removed; new Canva-style Images sidebar inserted below -->
 
-                        <div class="image-control" data-image-side="front">
-                            <div class="image-control-header">
-                                <span>Front background</span>
-                                <button class="reset-image-btn" type="button" data-reset-image="front">Reset</button>
-                            </div>
-                            <div class="image-preview">
-                                <img src="{{ $frontPreview }}" alt="Front preview" data-image-preview="front" data-default-src="{{ $frontDefault }}">
-                            </div>
-                            <label class="image-upload">
-                                <span class="upload-label">Choose image</span>
-                                <input type="file" accept="image/*" data-image-input="front">
-                            </label>
-                        </div>
+                                    <!-- Images Sidebar (Canva-style) -->
+                                    <section class="editor-panel" data-panel="images" id="imagesPanel">
+                                        <div class="images-sidebar" aria-labelledby="imagesTitle">
+                                            <div class="images-header">
+                                                <h3 id="imagesTitle">Images</h3>
+                                            </div>
+                                            <div class="images-tabs" role="tablist" aria-label="Images tabs" style="margin-top:8px;">
+                                                <button class="images-tab active" data-tab="upload" role="tab" aria-selected="true">Upload</button>
+                                                <button class="images-tab" data-tab="discover" role="tab" aria-selected="false">Discover</button>
+                                            </div>
 
-                        <div class="image-control" data-image-side="back">
-                            <div class="image-control-header">
-                                <span>Back background</span>
-                                <button class="reset-image-btn" type="button" data-reset-image="back">Reset</button>
-                            </div>
-                            <div class="image-preview">
-                                <img src="{{ $backPreview }}" alt="Back preview" data-image-preview="back" data-default-src="{{ $backDefault }}">
-                            </div>
-                            <label class="image-upload">
-                                <span class="upload-label">Choose image</span>
-                                <input type="file" accept="image/*" data-image-input="back">
-                            </label>
-                        </div>
-                    </div>
-                </section>
+                                            <div class="images-body">
+                                                <div class="images-panel upload-panel" data-panel="upload">
+                                                    <p class="accepted-formats">Accepted formats: .jpg, .jpeg, .jfif, .bmp, .png, .gif, .heic, .svg, .webp, .pdf, .psd, .ai, .eps, .ait, .ppt, .pptx, .tif, .tiff</p>
+
+                                                    <div class="images-actions">
+                                                        <button type="button" class="btn-upload-primary" id="btnUploadFiles">Upload files</button>
+                                                        <!-- phone upload removed -->
+                                                        <input type="file" id="imagesFileInput" multiple accept="image/*,.pdf,.psd,.ai,.eps,.ppt,.pptx,.tif,.tiff" style="display:none" />
+                                                    </div>
+
+                                                    <div class="recent-section">
+                                                        <h4>Recently uploaded</h4>
+                                                        <div class="recent-grid" id="recentUploads" aria-live="polite">
+                                                            <!-- thumbnails inserted here -->
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="images-panel discover-panel" data-panel="discover" style="display:none">
+                                                    <div class="discover-search">
+                                                        <label for="discoverSearchInput" class="sr-only">Search images</label>
+                                                        <div style="display:flex; gap:8px;">
+                                                            <input id="discoverSearchInput" type="search" placeholder="Search images (Unsplash)…" aria-label="Search images" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                                                            <button id="discoverSearchBtn" type="button" class="btn-upload-primary">Search</button>
+                                                        </div>
+                                                    </div>
+                                                    <div class="discover-results" id="discoverResults">
+                                                        <!-- results rendered here -->
+                                                    </div>
+                                                    <div id="discoverSpinner" class="discover-spinner" aria-hidden="true" style="display:none;">
+                                                        <div class="spinner" role="status" aria-hidden="true"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </section>
 
                 <section class="editor-panel" data-panel="graphics">
                     <div class="panel-placeholder">
