@@ -3703,33 +3703,6 @@ document.addEventListener("DOMContentLoaded", () => {
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list.slice(0, 40))); } catch(e) {}
     }
 
-    // Helper: run an image-apply action while preserving any active text input/inline editor focus
-    function applyImagePreserveFocus(fn) {
-      try {
-        const active = document.activeElement;
-        const wasInline = !!inlineEditor;
-        const activeIsTextInput = active && active.matches && active.matches('input[data-text-node]');
-        // run apply action
-        try { fn(); } catch (e) { console.debug('applyImage action failed', e); }
-        // restore focus shortly after DOM changes
-        setTimeout(() => {
-          try {
-            if (wasInline && inlineEditor) {
-              try { inlineEditor.focus({ preventScroll: true }); } catch (e) { try { inlineEditor.focus(); } catch (e) {} }
-            } else if (activeIsTextInput && active && typeof active.focus === 'function') {
-              try { active.focus({ preventScroll: true }); } catch (e) { try { active.focus(); } catch (e) {} }
-            }
-            // show toolbar if appropriate
-            try {
-              const el = document.activeElement;
-              if (el && el.matches && el.matches('input[data-text-node]')) showTextToolbar(el);
-              else if (inlineEditor) showTextToolbar(inlineEditorNode || inlineEditor);
-            } catch (e) {}
-          } catch (e) {}
-        }, 30);
-      } catch (e) { try { fn(); } catch (err) {} }
-    }
-
     function renderRecent(list) {
       if (!recentGrid) return;
       recentGrid.innerHTML = '';
@@ -3746,15 +3719,8 @@ document.addEventListener("DOMContentLoaded", () => {
         img.src = item.data;
         btn.appendChild(img);
         btn.addEventListener('click', () => {
-          applyImagePreserveFocus(() => {
-            const isSelectedImage = selectedElementNode && selectedElementNode.tagName && selectedElementNode.tagName.toLowerCase() === 'image';
-            const targetSide = isSelectedImage ? selectedElementSide : (currentView || 'front');
-            if (isSelectedImage) {
-              try { setImageElementSource(selectedElementNode, item.data); updatePreviewFromSvg(targetSide); } catch (e) { console.debug('setImageElementSource failed', e); applyImage(targetSide, item.data); }
-            } else {
-              applyImage(targetSide, item.data);
-            }
-          });
+          // on click, apply image to current view as background via existing applyImage
+          try { applyImage(currentView || 'front', item.data); } catch(e) { console.debug('applyImage failed', e); }
         });
 
         const del = document.createElement('button');
@@ -3800,21 +3766,6 @@ document.addEventListener("DOMContentLoaded", () => {
           }
           storeList(uniq);
           renderRecent(uniq);
-          // Automatically apply the first uploaded image to the selected image slot or current view
-          applyImagePreserveFocus(() => {
-            try {
-              const isSelectedImage = selectedElementNode && selectedElementNode.tagName && selectedElementNode.tagName.toLowerCase() === 'image';
-              const targetSide = isSelectedImage ? selectedElementSide : (currentView || 'front');
-              // apply only the first file in the overall files list (reader runs per-file)
-              if (files && files[0] === f) {
-                if (isSelectedImage) {
-                  try { setImageElementSource(selectedElementNode, data); updatePreviewFromSvg(targetSide); } catch (e) { console.debug('setImageElementSource failed', e); applyImage(targetSide, data); }
-                } else {
-                  applyImage(targetSide, data);
-                }
-              }
-            } catch (e) { console.debug('auto-apply upload failed', e); }
-          });
         };
         // read as data URL for previews (and for applyImage)
         try { reader.readAsDataURL(f); } catch (e) { console.error('readFile failed', e); }
@@ -3870,18 +3821,7 @@ document.addEventListener("DOMContentLoaded", () => {
           img.loading = 'lazy';
           btn.appendChild(img);
           btn.addEventListener('click', () => {
-            applyImagePreserveFocus(() => {
-              try {
-                const url = it.urls && (it.urls.full || it.urls.regular || it.urls.small);
-                const isSelectedImage = selectedElementNode && selectedElementNode.tagName && selectedElementNode.tagName.toLowerCase() === 'image';
-                const targetSide = isSelectedImage ? selectedElementSide : (currentView || 'front');
-                if (isSelectedImage) {
-                  try { setImageElementSource(selectedElementNode, url); updatePreviewFromSvg(targetSide); } catch (e) { console.debug('setImageElementSource failed', e); applyImage(targetSide, url); }
-                } else {
-                  applyImage(targetSide, url);
-                }
-              } catch(e) { console.debug('applyImage failed', e); }
-            });
+            try { applyImage(currentView || 'front', it.urls && it.urls.full || it.urls && it.urls.regular || it.urls && it.urls.small); } catch(e) { console.debug('applyImage failed', e); }
           });
           resultsGrid.appendChild(btn);
         });
