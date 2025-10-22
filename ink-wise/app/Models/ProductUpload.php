@@ -7,15 +7,24 @@ use Illuminate\Database\Eloquent\Model;
 class ProductUpload extends Model
 {
     protected $fillable = [
-        'product_id',
-        'filename',
-        'original_name',
-        'mime_type',
-        'size',
+        'template_id',
+        'template_name',
+        'description',
+        'product_type',
+        'event_type',
+        'theme_style',
+        'front_image',
+        'back_image',
+        'preview_image',
+        'design_data',
     ];
 
-    public function product()
+    protected $casts = [
+        'design_data' => 'array',
+    ];
+
+    public function template()
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(Template::class);
     }
 }

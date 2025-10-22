@@ -7,10 +7,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" referrerpolicy="no-referrer">
     <link rel="stylesheet" href="{{ asset('css/customer/editing.css') }}">
     <script src="{{ asset('js/customer/editing.js') }}" defer></script>
-    <style>
-        /* Hide the in-editor image debug panel output for production/editor view */
-        .editor-debug-panel { display: none !important; visibility: hidden !important; }
-    </style>
 </head>
 <body>
 @php
@@ -29,154 +25,13 @@
     $backDefault = isset($backSlot['default']) && $backSlot['default'] !== ''
         ? asset($backSlot['default'])
         : $frontDefault;
-    // Resolve preview URLs robustly: accept absolute URLs, '/...' paths, storage disk keys, or existing public paths
-    // Normalize common incorrect filesystem paths (for example: "ink-wise/public/storage/templates/..")
-    $resolvePreview = function ($raw, $fallback) {
-        $raw = $raw ?? null;
-        if (empty($raw)) return $fallback;
-    $raw = trim($raw);
-    // normalize windows backslashes to slashes
-    $raw = str_replace('\\', '/', $raw);
-    $pathOnly = parse_url($raw, PHP_URL_PATH) ?: $raw;
-        // absolute URL
-        if (preg_match('#^https?://#i', $raw)) return $raw;
-        // public/storage full paths or paths that include an application folder (e.g. ink-wise/public/storage/...)
-        if (stripos($raw, 'public/storage') !== false || stripos($raw, '/storage/templates/') !== false || stripos($raw, 'storage/templates') !== false) {
-            // try to extract the path after 'public' or 'storage' and prefer public templates when available
-            $after = preg_split('#public#i', $raw);
-            $candidate = end($after);
-            $candidate = ltrim($candidate, '/\\');
-            // if candidate starts with storage/, keep it; if it starts with storage/templates, prefer templates public folder
-            $base = basename($pathOnly);
-            if ($base && file_exists(public_path('templates/' . $base))) {
-                return asset('templates/' . $base);
-            }
-            if ($candidate) {
-                // ensure we return a /storage/... URL
-                if (stripos($candidate, 'storage/') === 0) {
-                    return asset($candidate);
-                }
-                return asset('storage/' . ltrim($candidate, '/'));
-            }
-        }
-        // explicit /storage/templates path -> prefer public/templates when available
-        if (str_contains($pathOnly, '/storage/templates/')) {
-            $base = basename($pathOnly);
-            if ($base && file_exists(public_path('templates/' . $base))) {
-                return asset('templates/' . $base);
-            }
-            // otherwise map to /storage/templates/<base>
-            return asset('storage/templates/' . $base);
-        }
-        // leading slash -> asset
-        if (str_starts_with($raw, '/')) {
-            if (str_starts_with($pathOnly, '/storage/templates/')) {
-                $base = basename($pathOnly);
-                if ($base && file_exists(public_path('templates/' . $base))) {
-                    return asset('templates/' . $base);
-                }
-            }
-            return asset(ltrim($raw, '/'));
-        }
-        // already storage/ prefix
-        if (str_starts_with($raw, 'storage/')) {
-            if (str_starts_with($raw, 'storage/templates/')) {
-                $base = basename($pathOnly);
-                if ($base && file_exists(public_path('templates/' . $base))) {
-                    return asset('templates/' . $base);
-                }
-            }
-            return asset($raw);
-        }
-        // templates/ relative stored path -> map to storage/templates/
-        if (str_starts_with($raw, 'templates/')) {
-            $base = basename($pathOnly);
-            if ($base && file_exists(public_path('templates/' . $base))) {
-                return asset('templates/' . $base);
-            }
-            return asset('storage/' . ltrim($raw, '/'));
-        }
-        // public disk stored path (stored via Storage::disk('public')->put)
-        try {
-            if (\Illuminate\Support\Facades\Storage::disk('public')->exists(ltrim($raw, '/'))) {
-                return asset('storage/' . ltrim($raw, '/'));
-            }
-        } catch (\Throwable $e) {
-            // ignore and continue to file check
-        }
-        // If raw looks like an absolute OS path (Windows C:/ or Unix /var/...), try to map by basename into storage/templates
-        if (preg_match('#^[A-Za-z]:/#', $raw) || preg_match('#^/#', $raw)) {
-            $base = basename($pathOnly);
-            if ($base) {
-                try {
-                    if (\Illuminate\Support\Facades\Storage::disk('public')->exists('templates/' . $base)) {
-                        if (file_exists(public_path('templates/' . $base))) {
-                            return asset('templates/' . $base);
-                        }
-                        return asset('storage/templates/' . $base);
-                    }
-                } catch (\Throwable $e) {}
-                if (file_exists(public_path('storage/templates/' . $base))) {
-                    return asset('storage/templates/' . $base);
-                }
-                if (file_exists(public_path('templates/' . $base))) {
-                    return asset('templates/' . $base);
-                }
-            }
-        }
-        // raw path relative to public
-        if (file_exists(public_path($raw))) return asset($raw);
-        // fallback
-        return $fallback;
-    };
+    use App\Support\TemplatePreview;
 
-    $frontPreview = $resolvePreview($frontImage ?? ($frontSlot['default'] ?? null), $frontDefault);
-    $backPreview = $resolvePreview($backImage ?? ($backSlot['default'] ?? null), $backDefault);
+    $frontPreview = TemplatePreview::resolvePreview($frontImage ?? ($frontSlot['default'] ?? null), $frontDefault);
+    $backPreview = TemplatePreview::resolvePreview($backImage ?? ($backSlot['default'] ?? null), $backDefault);
 
-    // Additional normalization: if a preview was returned as an absolute filesystem path
-    // (for example when stored paths include the project folder: "ink-wise/public/storage/…" or "C:/xampp/…/public/…"),
-    // convert it to a root-relative URL so the browser can fetch it (e.g. "/storage/..." or "/templates/...").
-    $normalizeToWebUrl = function ($u) {
-        if (empty($u)) return $u;
-        $u = str_replace('\\', '/', $u);
-        // if it already looks like a URL or root-relative path, return as-is
-        if (preg_match('#^https?://#i', $u) || str_starts_with($u, '/')) return $u;
-        // if it contains '/public/' return the portion after public as a root-relative path
-        if (stripos($u, '/public/') !== false) {
-            $parts = preg_split('#/public/#i', $u);
-            $after = end($parts);
-            return '/' . ltrim(str_replace('\\', '/', $after), '/');
-        }
-        // if it contains "public\\" windows style
-        if (stripos($u, 'public/') !== false) {
-            $parts = preg_split('#public/#i', $u);
-            $after = end($parts);
-            return '/' . ltrim(str_replace('\\', '/', $after), '/');
-        }
-        // if it contains the storage/templates folder anywhere, prefer /storage/templates/
-        if (stripos($u, 'storage/templates/') !== false) {
-            $idx = stripos($u, 'storage/templates/');
-            return '/' . ltrim(substr($u, $idx), '/\\');
-        }
-        // fallback: if path contains 'templates/' try mapping to /storage/templates/<basename> first
-        if (stripos($u, 'templates/') !== false) {
-            $base = basename($u);
-            if ($base) {
-                // prefer storage/templates when present
-                if (file_exists(public_path('storage/templates/' . $base))) {
-                    return '/storage/templates/' . $base;
-                }
-                // if it exists under public/templates, return that
-                if (file_exists(public_path('templates/' . $base))) {
-                    return '/templates/' . $base;
-                }
-            }
-        }
-        return $u;
-    };
-
-    $frontPreview = $normalizeToWebUrl($frontPreview);
-    $backPreview = $normalizeToWebUrl($backPreview);
+    $frontPreview = TemplatePreview::normalizeToWebUrl($frontPreview);
+    $backPreview = TemplatePreview::normalizeToWebUrl($backPreview);
     $presetQuantity = $defaultQuantity ?? 50;
     $frontSvg = isset($frontSvg) ? trim($frontSvg) : null;
     if ($frontSvg === '') {
@@ -287,6 +142,7 @@
             <button class="save-btn" type="button">Save</button>
             <button class="undo-btn" type="button">↶ Undo</button>
             <button class="redo-btn" type="button">↷ Redo</button>
+            <button id="editModeToggle" class="edit-mode-btn" type="button" title="Toggle Edit Mode">Edit Mode</button>
         </div>
         <div class="right-tools">
             <a href="{{ route('templates.wedding.invitations') }}" class="change-template">Change template</a>
@@ -603,16 +459,33 @@
 
             <div class="editor-panels">
                 <section class="editor-panel active" data-panel="text">
-                    <div class="text-editor">
-                        <h3>Placeholder text</h3>
-                        <div id="textFields">
+                    <div class="text-editor-panel">
+                        <!-- Panel Header -->
+                        <div class="panel-header">
+                            <h3 class="panel-title">Text</h3>
+                            <button class="expand-btn" type="button" title="Expand panel">
+                                <span class="expand-icon">↗</span>
+                            </button>
+                        </div>
+
+                        <!-- Helper Text -->
+                        <p class="helper-text">
+                            Edit your text below, or click on the field you'd like to edit directly on your design.
+                        </p>
+
+                        <!-- Text Fields Container -->
+                        <div class="text-fields-container">
                             @foreach($textFieldPresets as $field)
                                 @php
                                     $inputValue = old('text_fields.' . $field['node'], $field['value']);
                                 @endphp
-                                <div class="text-field" data-card-side="{{ $field['side'] }}" data-text-node="{{ $field['node'] }}">
+                                <div class="text-input-wrapper" data-text-node="{{ $field['node'] }}" data-card-side="{{ $field['side'] }}">
+                                    @php $inputId = 'text_' . $field['node']; @endphp
+                                    <label class="sr-only" for="{{ $inputId }}">{{ $field['placeholder'] ?? 'Text field' }}</label>
                                     <input
+                                        id="{{ $inputId }}"
                                         type="text"
+                                        class="text-input"
                                         name="text_fields[{{ $field['node'] }}]"
                                         value="{{ $inputValue }}"
                                         placeholder="{{ $field['placeholder'] ?? '' }}"
@@ -625,13 +498,261 @@
                                         @if(!empty($field['font_size'])) data-font-size="{{ $field['font_size'] }}" @endif
                                         @if(!empty($field['letter_spacing'])) data-letter-spacing="{{ $field['letter_spacing'] }}" @endif
                                     >
-                                    <button class="delete-text" type="button" aria-label="Remove text field">🗑</button>
                                 </div>
                             @endforeach
                         </div>
-                        <button id="addTextField" class="add-btn" type="button">+ New Text Field</button>
+
+                        <!-- Add New Field Button -->
+                        <div class="add-field-container">
+                            <button id="addTextField" class="new-text-btn" type="button">
+                                New Text Field
+                            </button>
+                        </div>
                     </div>
                 </section>
+
+                <script>
+                    (function(){
+                        // Basic helpers to find the active SVG canvas for the current side
+                        function getActiveSvg() {
+                            // prefer existing selectors in page
+                            var front = document.querySelector('#cardFront svg');
+                            var back = document.querySelector('#cardBack svg');
+                            return front || back || document.querySelector('svg');
+                        }
+
+                        function insertSvgStringToCanvas(svgString) {
+                            try {
+                                var parser = new DOMParser();
+                                var doc = parser.parseFromString(svgString, 'image/svg+xml');
+                                var node = doc.documentElement;
+                                var svg = getActiveSvg();
+                                if (!svg) return;
+                                // import node into canvas SVG
+                                var imported = document.importNode(node, true);
+                                // wrap in a group so transforms don't conflict
+                                var g = document.createElementNS('http://www.w3.org/2000/svg','g');
+                                g.setAttribute('transform','translate(40,40)');
+                                g.appendChild(imported);
+                                svg.appendChild(g);
+                            } catch (e) { console.error(e); }
+                        }
+
+                        function insertImageToCanvas(url) {
+                            var svg = getActiveSvg();
+                            if (!svg) return;
+                            var img = document.createElementNS('http://www.w3.org/2000/svg','image');
+                            img.setAttributeNS(null,'href', url);
+                            img.setAttribute('x','20');
+                            img.setAttribute('y','20');
+                            img.setAttribute('width','140');
+                            img.setAttribute('height','90');
+                            svg.appendChild(img);
+                        }
+
+                        // Wire grid item clicks
+                        document.addEventListener('click', function(e){
+                            var btn = e.target.closest('.graphic-item');
+                            if (!btn) return;
+                            var type = btn.getAttribute('data-type');
+                            if (type === 'image' || type === 'illustration') {
+                                var src = btn.getAttribute('data-src');
+                                if (src) insertImageToCanvas(src);
+                                return;
+                            }
+                            if (type === 'shape') {
+                                var shape = btn.getAttribute('data-shape');
+                                var svg = getActiveSvg();
+                                if (!svg) return;
+                                if (shape === 'square') {
+                                    var r = document.createElementNS('http://www.w3.org/2000/svg','rect');
+                                    r.setAttribute('x',20); r.setAttribute('y',20); r.setAttribute('width',80); r.setAttribute('height',80); r.setAttribute('fill','#111');
+                                    svg.appendChild(r);
+                                } else if (shape === 'circle') {
+                                    var c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+                                    c.setAttribute('cx',60); c.setAttribute('cy',60); c.setAttribute('r',40); c.setAttribute('fill','#111');
+                                    svg.appendChild(c);
+                                } else if (shape === 'triangle') {
+                                    var p = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+                                    p.setAttribute('points','60,20 100,100 20,100'); p.setAttribute('fill','#111');
+                                    svg.appendChild(p);
+                                }
+                                return;
+                            }
+                        });
+
+                        // SVGRepo search: fetch icons and populate iconsGrid
+                        var iconsGrid = document.getElementById('iconsGrid');
+                        var searchInput = document.getElementById('graphicsSearchInput');
+
+                        // Use server-side proxy to avoid CORS/key exposure
+                        var svgRepoEndpoint = function(q){ return '/graphics/svgrepo?q=' + encodeURIComponent(q) + '&limit=12'; };
+
+                        function renderSvgRepoResults(items) {
+                            if (!iconsGrid) return;
+                            iconsGrid.innerHTML = '';
+                            items.forEach(function(it, idx){
+                                try {
+                                    var cell = document.createElement('button');
+                                    cell.className = 'graphic-item';
+                                    cell.setAttribute('aria-label', it.title || 'icon');
+                                    cell.setAttribute('data-type','icon');
+                                    cell.setAttribute('data-idx', String(idx));
+                                    // roving tabindex: only first is 0
+                                    cell.setAttribute('tabindex', idx === 0 ? '0' : '-1');
+                                    // prefer raw svg content
+                                    var svgContent = it.svg && it.svg.replace(/^\s+|\s+$/g, '');
+                                    if (svgContent) {
+                                        var wrapper = document.createElement('div');
+                                        wrapper.style.width = '100%'; wrapper.style.height='64px'; wrapper.style.display='flex'; wrapper.style.alignItems='center'; wrapper.style.justifyContent='center';
+                                        wrapper.innerHTML = svgContent;
+                                        cell.appendChild(wrapper);
+                                        cell.__svg = svgContent;
+                                    } else {
+                                        cell.textContent = it.title || 'icon';
+                                    }
+                                    // click handler
+                                    cell.addEventListener('click', function(ev){
+                                        ev.preventDefault();
+                                        if (cell.__svg) insertSvgStringToCanvas(cell.__svg);
+                                    });
+                                    // keyboard handler (Enter to insert)
+                                    cell.addEventListener('keydown', function(ev){
+                                        if (ev.key === 'Enter' || ev.key === ' ') {
+                                            ev.preventDefault();
+                                            if (cell.__svg) insertSvgStringToCanvas(cell.__svg);
+                                        }
+                                    });
+                                    iconsGrid.appendChild(cell);
+                                } catch (e) { console.error('render item', e); }
+                            });
+
+                            // set aria-live summary for screen readers
+                            var live = document.getElementById('graphicsIconsLive');
+                            if (live) live.textContent = items.length + ' icons available';
+                            // ensure none are aria-selected by default
+                            var first = iconsGrid.querySelector('.graphic-item');
+                            if (first) first.setAttribute('aria-selected','false');
+                        }
+
+                        var lastTimer;
+                        function doSvgRepoSearch(q) {
+                            if (!q || q.length < 2) { iconsGrid.innerHTML = '' ; return; }
+                            // debounce
+                            clearTimeout(lastTimer);
+                            lastTimer = setTimeout(function(){
+                                var url = svgRepoEndpoint(q);
+                                fetch(url).then(function(r){ return r.json(); }).then(function(json){
+                                    if (!json || !json.results) { iconsGrid.innerHTML = ''; return; }
+                                    // results contain objects with svg property
+                                    renderSvgRepoResults(json.results);
+                                }).catch(function(err){
+                                    console.error('SVGRepo search error', err);
+                                });
+                            }, 250);
+                        }
+
+                        if (searchInput) {
+                            searchInput.addEventListener('input', function(e){
+                                var v = (e.target.value || '').trim();
+                                doSvgRepoSearch(v);
+                            });
+                        }
+
+                        // keyboard navigation for icons grid: arrow keys to move focus
+                        (function wireIconGridKeyboard() {
+                            var currentFocus = -1;
+                            iconsGrid && iconsGrid.addEventListener('keydown', function(e){
+                                var cols = 3; // matches CSS grid columns
+                                var items = Array.from(iconsGrid.querySelectorAll('.graphic-item'));
+                                if (!items.length) return;
+                                if (e.key === 'ArrowRight') {
+                                    e.preventDefault(); currentFocus = Math.min(items.length - 1, currentFocus + 1);
+                                    items[currentFocus].focus();
+                                } else if (e.key === 'ArrowLeft') {
+                                    e.preventDefault(); currentFocus = Math.max(0, currentFocus - 1);
+                                    items[currentFocus].focus();
+                                } else if (e.key === 'ArrowDown') {
+                                    e.preventDefault(); currentFocus = Math.min(items.length - 1, currentFocus + cols);
+                                    items[currentFocus].focus();
+                                } else if (e.key === 'ArrowUp') {
+                                    e.preventDefault(); currentFocus = Math.max(0, currentFocus - cols);
+                                    items[currentFocus].focus();
+                                }
+                            });
+                            // clicking items should update currentFocus
+                            iconsGrid && iconsGrid.addEventListener('click', function(e){
+                                var b = e.target.closest('.graphic-item');
+                                if (!b) return; var items = Array.from(iconsGrid.querySelectorAll('.graphic-item')); currentFocus = items.indexOf(b);
+                            });
+                        })();
+
+                        // Scroll fade toggles
+                        (function wireScrollFades() {
+                            var pane = document.querySelector('.graphics-panel .overflow-y-auto');
+                            if (!pane) return;
+                            function update() {
+                                var top = pane.scrollTop > 8;
+                                var bottom = (pane.scrollHeight - pane.clientHeight - pane.scrollTop) > 8;
+                                pane.classList.toggle('has-scroll-top', top);
+                                pane.classList.toggle('has-scroll-bottom', bottom);
+                            }
+                            pane.addEventListener('scroll', update);
+                            // call once to initialize
+                            setTimeout(update, 120);
+                        })();
+
+                        // load an initial set of popular icons on panel open
+                        (function loadInitialIcons(){
+                            var popular = ['star','heart','leaf','gift','calendar','camera','envelope','bell','map','clock','user','phone'];
+                            // query svgrepo for "star" to populate initially
+                            doSvgRepoSearch(popular.join(' '));
+                        })();
+
+                        // Handle section expansion arrows
+                        (function setupSectionExpansion() {
+                            document.addEventListener('click', function(e) {
+                                var btn = e.target.closest('.expand-section-btn');
+                                if (!btn) return;
+
+                                var section = btn.getAttribute('data-section');
+                                var expandedGrid = document.querySelector('.' + section + '-expanded');
+                                var isExpanded = !expandedGrid.classList.contains('hidden');
+
+                                if (isExpanded) {
+                                    // Collapse
+                                    expandedGrid.classList.add('hidden');
+                                    btn.textContent = '→';
+                                    btn.setAttribute('aria-expanded', 'false');
+                                    btn.setAttribute('title', 'Show all ' + section);
+                                } else {
+                                    // Expand
+                                    expandedGrid.classList.remove('hidden');
+                                    btn.textContent = '↓';
+                                    btn.setAttribute('aria-expanded', 'true');
+                                    btn.setAttribute('title', 'Hide ' + section);
+                                }
+                            });
+                        })();
+
+                        // allow pressing Enter to run a broader Unsplash search for images
+                        if (searchInput) {
+                            searchInput.addEventListener('keydown', function(e){
+                                if (e.key === 'Enter') {
+                                    var term = (e.target.value||'').trim();
+                                    if (!term) return;
+                                    // attempt to trigger existing images search flow if available
+                                    var btn = document.getElementById('graphicsSearchBtn');
+                                    if (btn) {
+                                        var input = document.getElementById('graphicsImageSearch');
+                                        if (input) { input.value = term; btn.click(); }
+                                    }
+                                }
+                            });
+                        }
+
+                    })();
+                </script>
 
                 <!-- legacy images panel removed; new Canva-style Images sidebar inserted below -->
 
@@ -684,9 +805,175 @@
                                     </section>
 
                 <section class="editor-panel" data-panel="graphics">
-                    <div class="panel-placeholder">
-                        <h3>Graphics</h3>
-                        <p>Graphic elements customization is coming soon.</p>
+                    <div class="graphics-panel p-4 flex flex-col h-full" style="height:100%;">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-semibold">Graphics</h3>
+                        </div>
+
+                        <!-- Search bar -->
+                        <div class="mb-3">
+                            <label for="graphicsSearchInput" class="sr-only">Search for content</label>
+                            <div class="relative">
+                                <input id="graphicsSearchInput" class="w-full pr-3 py-2 rounded-lg border text-sm" placeholder="Search for content" autocomplete="off" />
+                            </div>
+                        </div>
+
+                        <div class="overflow-y-auto" style="flex:1;">
+                            <!-- Shapes Section -->
+                            <div class="mb-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="font-medium">Shapes</div>
+                                    <button type="button" class="text-gray-400 hover:text-blue-500 transition-colors expand-section-btn" data-section="shapes" title="Show all shapes" aria-label="Expand shapes section">
+                                        →
+                                    </button>
+                                </div>
+                                <div class="shapes-grid grid grid-cols-3 gap-3">
+                                    <button class="graphic-item rounded-lg p-3 bg-white shadow-sm hover:shadow-md" data-type="shape" data-shape="square" aria-label="Insert square">
+                                        <div class="w-full h-16 flex items-center justify-center text-black">
+                                            <div style="width:40px;height:40px;background:#111;border-radius:4px;"></div>
+                                        </div>
+                                    </button>
+                                    <button class="graphic-item rounded-lg p-3 bg-white shadow-sm hover:shadow-md" data-type="shape" data-shape="circle" aria-label="Insert circle">
+                                        <div class="w-full h-16 flex items-center justify-center text-black">
+                                            <div style="width:40px;height:40px;background:#111;border-radius:9999px;"></div>
+                                        </div>
+                                    </button>
+                                    <button class="graphic-item rounded-lg p-3 bg-white shadow-sm hover:shadow-md" data-type="shape" data-shape="triangle" aria-label="Insert triangle">
+                                        <div class="w-full h-16 flex items-center justify-center text-black">
+                                            <svg width="40" height="40" viewBox="0 0 100 100"><polygon points="50,10 90,90 10,90" fill="#111"/></svg>
+                                        </div>
+                                    </button>
+                                </div>
+                                <div class="shapes-expanded hidden mt-3 grid grid-cols-3 gap-3">
+                                    <button class="graphic-item rounded-lg p-3 bg-white shadow-sm hover:shadow-md" data-type="shape" data-shape="rectangle" aria-label="Insert rectangle">
+                                        <div class="w-full h-16 flex items-center justify-center text-black">
+                                            <div style="width:60px;height:30px;background:#111;border-radius:4px;"></div>
+                                        </div>
+                                    </button>
+                                    <button class="graphic-item rounded-lg p-3 bg-white shadow-sm hover:shadow-md" data-type="shape" data-shape="oval" aria-label="Insert oval">
+                                        <div class="w-full h-16 flex items-center justify-center text-black">
+                                            <div style="width:50px;height:35px;background:#111;border-radius:50%;"></div>
+                                        </div>
+                                    </button>
+                                    <button class="graphic-item rounded-lg p-3 bg-white shadow-sm hover:shadow-md" data-type="shape" data-shape="diamond" aria-label="Insert diamond">
+                                        <div class="w-full h-16 flex items-center justify-center text-black">
+                                            <div style="width:40px;height:40px;background:#111;transform:rotate(45deg);border-radius:4px;"></div>
+                                        </div>
+                                    </button>
+                                    <button class="graphic-item rounded-lg p-3 bg-white shadow-sm hover:shadow-md" data-type="shape" data-shape="star" aria-label="Insert star">
+                                        <div class="w-full h-16 flex items-center justify-center text-black">
+                                            <svg width="40" height="40" viewBox="0 0 100 100"><polygon points="50,5 61,35 95,35 68,57 79,91 50,70 21,91 32,57 5,35 39,35" fill="#111"/></svg>
+                                        </div>
+                                    </button>
+                                    <button class="graphic-item rounded-lg p-3 bg-white shadow-sm hover:shadow-md" data-type="shape" data-shape="hexagon" aria-label="Insert hexagon">
+                                        <div class="w-full h-16 flex items-center justify-center text-black">
+                                            <svg width="40" height="40" viewBox="0 0 100 100"><polygon points="50,5 90,25 90,75 50,95 10,75 10,25" fill="#111"/></svg>
+                                        </div>
+                                    </button>
+                                    <button class="graphic-item rounded-lg p-3 bg-white shadow-sm hover:shadow-md" data-type="shape" data-shape="pentagon" aria-label="Insert pentagon">
+                                        <div class="w-full h-16 flex items-center justify-center text-black">
+                                            <svg width="40" height="40" viewBox="0 0 100 100"><polygon points="50,5 90,40 75,90 25,90 10,40" fill="#111"/></svg>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Images Section -->
+                            <div class="mb-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="font-medium">Images</div>
+                                    <button type="button" class="text-gray-400 hover:text-blue-500 transition-colors expand-section-btn" data-section="images" title="Show all images" aria-label="Expand images section">
+                                        →
+                                    </button>
+                                </div>
+                                <div class="images-grid grid grid-cols-3 gap-3">
+                                    <button class="graphic-item rounded-lg p-0 bg-white shadow-sm hover:shadow-md" data-type="image" data-src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=400&auto=format&fit=crop&crop=faces">
+                                        <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=400&auto=format&fit=crop&crop=faces" alt="sample" class="w-full h-20 object-cover rounded-lg" />
+                                    </button>
+                                    <button class="graphic-item rounded-lg p-0 bg-white shadow-sm hover:shadow-md" data-type="image" data-src="https://images.unsplash.com/photo-1529516540096-5b5f30b9b8d4?q=80&w=400&auto=format&fit=crop&crop=faces">
+                                        <img src="https://images.unsplash.com/photo-1529516540096-5b5f30b9b8d4?q=80&w=400&auto=format&fit=crop&crop=faces" alt="sample" class="w-full h-20 object-cover rounded-lg" />
+                                    </button>
+                                    <button class="graphic-item rounded-lg p-0 bg-white shadow-sm hover:shadow-md" data-type="image" data-src="https://images.unsplash.com/photo-1469474968028-56623f02e42e?q=80&w=400&auto=format&fit=crop&crop=faces">
+                                        <img src="https://images.unsplash.com/photo-1469474968028-56623f02e42e?q=80&w=400&auto=format&fit=crop&crop=faces" alt="sample" class="w-full h-20 object-cover rounded-lg" />
+                                    </button>
+                                </div>
+                                <div class="images-expanded hidden mt-3 grid grid-cols-3 gap-3">
+                                    <button class="graphic-item rounded-lg p-0 bg-white shadow-sm hover:shadow-md" data-type="image" data-src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=400&auto=format&fit=crop">
+                                        <img src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=400&auto=format&fit=crop" alt="nature" class="w-full h-20 object-cover rounded-lg" />
+                                    </button>
+                                    <button class="graphic-item rounded-lg p-0 bg-white shadow-sm hover:shadow-md" data-type="image" data-src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?q=80&w=400&auto=format&fit=crop">
+                                        <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?q=80&w=400&auto=format&fit=crop" alt="mountains" class="w-full h-20 object-cover rounded-lg" />
+                                    </button>
+                                    <button class="graphic-item rounded-lg p-0 bg-white shadow-sm hover:shadow-md" data-type="image" data-src="https://images.unsplash.com/photo-1518837695005-2083093ee35b?q=80&w=400&auto=format&fit=crop">
+                                        <img src="https://images.unsplash.com/photo-1518837695005-2083093ee35b?q=80&w=400&auto=format&fit=crop" alt="city" class="w-full h-20 object-cover rounded-lg" />
+                                    </button>
+                                    <button class="graphic-item rounded-lg p-0 bg-white shadow-sm hover:shadow-md" data-type="image" data-src="https://images.unsplash.com/photo-1547036967-23d11aacaee0?q=80&w=400&auto=format&fit=crop">
+                                        <img src="https://images.unsplash.com/photo-1547036967-23d11aacaee0?q=80&w=400&auto=format&fit=crop" alt="ocean" class="w-full h-20 object-cover rounded-lg" />
+                                    </button>
+                                    <button class="graphic-item rounded-lg p-0 bg-white shadow-sm hover:shadow-md" data-type="image" data-src="https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=400&auto=format&fit=crop">
+                                        <img src="https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=400&auto=format&fit=crop" alt="sky" class="w-full h-20 object-cover rounded-lg" />
+                                    </button>
+                                    <button class="graphic-item rounded-lg p-0 bg-white shadow-sm hover:shadow-md" data-type="image" data-src="https://images.unsplash.com/photo-1501594907352-04cda38ebc29?q=80&w=400&auto=format&fit=crop">
+                                        <img src="https://images.unsplash.com/photo-1501594907352-04cda38ebc29?q=80&w=400&auto=format&fit=crop" alt="flowers" class="w-full h-20 object-cover rounded-lg" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Icons Section -->
+                            <div class="mb-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="font-medium">Icons</div>
+                                    <a href="https://www.svgrepo.com/" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-blue-500 transition-colors" title="Browse SVGRepo for more icons" aria-label="Visit SVGRepo website (opens in new tab)">
+                                        <i class="fas fa-external-link-alt" aria-hidden="true"></i>
+                                    </a>
+                                </div>
+                                <div id="iconsGrid" class="grid grid-cols-3 gap-3" role="list">
+                                    <!-- icons will be populated here by SVGRepo search -->
+                                </div>
+                                <div id="graphicsIconsLive" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+                            </div>
+
+                            <!-- Illustrations Section -->
+                            <div class="mb-6">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="font-medium">Illustrations</div>
+                                    <button type="button" class="text-gray-400 hover:text-blue-500 transition-colors expand-section-btn" data-section="illustrations" title="Show all illustrations" aria-label="Expand illustrations section">
+                                        →
+                                    </button>
+                                </div>
+                                <div class="illustrations-grid grid grid-cols-3 gap-3">
+                                    <button class="graphic-item rounded-lg p-0 bg-white shadow-sm hover:shadow-md" data-type="illustration" data-src="https://images.unsplash.com/photo-1526318472351-c75fcf070b04?q=80&w=400&auto=format&fit=crop">
+                                        <img src="https://images.unsplash.com/photo-1526318472351-c75fcf070b04?q=80&w=400&auto=format&fit=crop" alt="illus" class="w-full h-20 object-cover rounded-lg" />
+                                    </button>
+                                    <button class="graphic-item rounded-lg p-0 bg-white shadow-sm hover:shadow-md" data-type="illustration" data-src="https://images.unsplash.com/photo-1526318489415-4d6f9a2b0f3d?q=80&w=400&auto=format&fit=crop">
+                                        <img src="https://images.unsplash.com/photo-1526318489415-4d6f9a2b0f3d?q=80&w=400&auto=format&fit=crop" alt="illus" class="w-full h-20 object-cover rounded-lg" />
+                                    </button>
+                                    <button class="graphic-item rounded-lg p-0 bg-white shadow-sm hover:shadow-md" data-type="illustration" data-src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=400&auto=format&fit=crop">
+                                        <img src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=400&auto=format&fit=crop" alt="illus" class="w-full h-20 object-cover rounded-lg" />
+                                    </button>
+                                </div>
+                                <div class="illustrations-expanded hidden mt-3 grid grid-cols-3 gap-3">
+                                    <button class="graphic-item rounded-lg p-0 bg-white shadow-sm hover:shadow-md" data-type="illustration" data-src="https://images.unsplash.com/photo-1559028006-448665bd7c7f?q=80&w=400&auto=format&fit=crop">
+                                        <img src="https://images.unsplash.com/photo-1559028006-448665bd7c7f?q=80&w=400&auto=format&fit=crop" alt="abstract art" class="w-full h-20 object-cover rounded-lg" />
+                                    </button>
+                                    <button class="graphic-item rounded-lg p-0 bg-white shadow-sm hover:shadow-md" data-type="illustration" data-src="https://images.unsplash.com/photo-1578662996442-48f60103fc96?q=80&w=400&auto=format&fit=crop">
+                                        <img src="https://images.unsplash.com/photo-1578662996442-48f60103fc96?q=80&w=400&auto=format&fit=crop" alt="geometric" class="w-full h-20 object-cover rounded-lg" />
+                                    </button>
+                                    <button class="graphic-item rounded-lg p-0 bg-white shadow-sm hover:shadow-md" data-type="illustration" data-src="https://images.unsplash.com/photo-1541961017774-22349e4a1262?q=80&w=400&auto=format&fit=crop">
+                                        <img src="https://images.unsplash.com/photo-1541961017774-22349e4a1262?q=80&w=400&auto=format&fit=crop" alt="minimalist" class="w-full h-20 object-cover rounded-lg" />
+                                    </button>
+                                    <button class="graphic-item rounded-lg p-0 bg-white shadow-sm hover:shadow-md" data-type="illustration" data-src="https://images.unsplash.com/photo-1578321272176-b7bbc0679853?q=80&w=400&auto=format&fit=crop">
+                                        <img src="https://images.unsplash.com/photo-1578321272176-b7bbc0679853?q=80&w=400&auto=format&fit=crop" alt="watercolor" class="w-full h-20 object-cover rounded-lg" />
+                                    </button>
+                                    <button class="graphic-item rounded-lg p-0 bg-white shadow-sm hover:shadow-md" data-type="illustration" data-src="https://images.unsplash.com/photo-1578662996442-48f60103fc96?q=80&w=400&auto=format&fit=crop">
+                                        <img src="https://images.unsplash.com/photo-1578662996442-48f60103fc96?q=80&w=400&auto=format&fit=crop" alt="pattern" class="w-full h-20 object-cover rounded-lg" />
+                                    </button>
+                                    <button class="graphic-item rounded-lg p-0 bg-white shadow-sm hover:shadow-md" data-type="illustration" data-src="https://images.unsplash.com/photo-1557804506-669a67965ba0?q=80&w=400&auto=format&fit=crop">
+                                        <img src="https://images.unsplash.com/photo-1557804506-669a67965ba0?q=80&w=400&auto=format&fit=crop" alt="digital art" class="w-full h-20 object-cover rounded-lg" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
@@ -708,7 +995,313 @@
     </div>
 
     <script>
+        // --- Graphics panel wiring (Unsplash search + insert shapes/icons) ---
+        (function wireGraphicsPanel() {
+
+            function $(sel, ctx) { return (ctx || document).querySelector(sel); }
+            function $all(sel, ctx) { return Array.from((ctx || document).querySelectorAll(sel)); }
+
+            // Tab switching
+            $all('.graphics-tab').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const tab = btn.dataset.tab;
+                    $all('.graphics-tab').forEach(b => b.classList.toggle('active', b === btn));
+                    $all('.graphics-panel-pane').forEach(p => p.style.display = (p.dataset.panel === tab) ? '' : 'none');
+                });
+            });
+
+            // Unsplash search
+            const searchInput = $('#graphicsImageSearch');
+            const searchBtn = $('#graphicsSearchBtn');
+            const resultsEl = $('#graphicsResults');
+            const spinner = $('#graphicsSpinner');
+
+            // Use server proxy for Unsplash (keeps access key on server)
+            async function doSearch(q) {
+                if (!q || q.trim().length === 0) return;
+                resultsEl.innerHTML = '';
+                spinner.style.display = '';
+                try {
+                    const res = await fetch(`/graphics/unsplash?q=${encodeURIComponent(q)}&per_page=24`);
+                    if (!res.ok) throw new Error('Unsplash proxy fetch failed ' + res.status);
+                    const data = await res.json();
+                    const items = data.results || [];
+                    renderResults(items);
+                } catch (err) {
+                    console.warn('Graphics search failed', err);
+                    resultsEl.innerHTML = '<div class="panel-placeholder">Failed to search images.</div>';
+                } finally {
+                    spinner.style.display = 'none';
+                }
+            }
+
+            function renderResults(items) {
+                resultsEl.innerHTML = '';
+                if (!items || items.length === 0) {
+                    resultsEl.innerHTML = '<div class="panel-placeholder">No images found.</div>';
+                    return;
+                }
+                items.forEach(it => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'thumb';
+                    btn.style.padding = '0';
+                    btn.style.border = 'none';
+                    btn.style.background = 'transparent';
+                    btn.style.margin = '6px';
+                    btn.style.width = '120px';
+                    btn.style.height = '84px';
+                    btn.style.overflow = 'hidden';
+                    const img = document.createElement('img');
+                    img.alt = it.alt_description || it.description || 'Image';
+                    img.src = it.urls && (it.urls.small || it.urls.thumb) || '';
+                    img.style.width = '100%';
+                    img.style.height = '100%';
+                    img.style.objectFit = 'cover';
+                    btn.appendChild(img);
+                    btn.addEventListener('click', () => {
+                        // insert full size (regular) into current view as SVG <image>
+                        const url = it.urls && (it.urls.regular || it.urls.full || it.urls.small);
+                        if (url) insertImageToCanvas(url);
+                    });
+                    resultsEl.appendChild(btn);
+                });
+            }
+
+            function insertImageToCanvas(url) {
+                try {
+                    const currentView = (window.currentView || 'front');
+                    const svg = document.querySelector(currentView === 'front' ? '#cardFront svg' : '#cardBack svg');
+                    if (!svg) {
+                        alert('Canvas not available');
+                        return;
+                    }
+                    // create an <image> element that covers the card and is editable
+                    const ns = 'http://www.w3.org/2000/svg';
+                    const img = document.createElementNS(ns, 'image');
+                    img.setAttribute('href', url);
+                    img.setAttribute('x', '0');
+                    img.setAttribute('y', '0');
+                    img.setAttribute('width', '100%');
+                    img.setAttribute('height', '100%');
+                    img.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+                    img.setAttribute('data-uploaded', 'true');
+                    // insert as first child so text stays above
+                    if (svg.firstChild) svg.insertBefore(img, svg.firstChild);
+                    else svg.appendChild(img);
+                    // apply preview update if preview panel exists
+                    try { if (typeof updatePreviewFromSvg === 'function') updatePreviewFromSvg(currentView); } catch (e) {}
+                } catch (err) {
+                    console.error('Insert image failed', err);
+                }
+            }
+
+            if (searchBtn && searchInput) {
+                searchBtn.addEventListener('click', () => doSearch(searchInput.value));
+                searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doSearch(searchInput.value); } });
+            }
+
+            // shapes insertion
+            $all('.shape-btn').forEach(b => b.addEventListener('click', () => {
+                const shape = b.dataset.shape;
+                const currentView = (window.currentView || 'front');
+                const svg = document.querySelector(currentView === 'front' ? '#cardFront svg' : '#cardBack svg');
+                if (!svg) return;
+                const ns = 'http://www.w3.org/2000/svg';
+                let el = null;
+                if (shape === 'rect') {
+                    el = document.createElementNS(ns, 'rect');
+                    el.setAttribute('x', 100); el.setAttribute('y', 120); el.setAttribute('width', 300); el.setAttribute('height', 200); el.setAttribute('fill', '#ffffff'); el.setAttribute('stroke', '#d1d5db'); el.setAttribute('rx', 12);
+                } else if (shape === 'circle') {
+                    el = document.createElementNS(ns, 'circle');
+                    el.setAttribute('cx', 250); el.setAttribute('cy', 250); el.setAttribute('r', 80); el.setAttribute('fill', '#fff'); el.setAttribute('stroke', '#d1d5db');
+                } else if (shape === 'triangle') {
+                    el = document.createElementNS(ns, 'path');
+                    el.setAttribute('d', 'M250 140 L330 320 L170 320 Z'); el.setAttribute('fill', '#fff'); el.setAttribute('stroke', '#d1d5db');
+                } else if (shape === 'star') {
+                    el = document.createElementNS(ns, 'path');
+                    el.setAttribute('d', 'M250 150 L270 220 L340 220 L290 260 L310 330 L250 290 L190 330 L210 260 L160 220 L230 220 Z'); el.setAttribute('fill', '#fff'); el.setAttribute('stroke', '#d1d5db');
+                }
+                if (el) svg.appendChild(el);
+            }));
+
+            // icons insertion (simple text-based fallback using <text> elements or small SVG groups)
+            $all('.icon-btn').forEach(b => b.addEventListener('click', () => {
+                const icon = b.dataset.icon;
+                const currentView = (window.currentView || 'front');
+                const svg = document.querySelector(currentView === 'front' ? '#cardFront svg' : '#cardBack svg');
+                if (!svg) return;
+                const ns = 'http://www.w3.org/2000/svg';
+                const g = document.createElementNS(ns, 'g');
+                const txt = document.createElementNS(ns, 'text');
+                txt.setAttribute('x', '250'); txt.setAttribute('y', '250'); txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('dominant-baseline', 'middle'); txt.setAttribute('font-size', '48'); txt.textContent = icon === 'fa-heart' ? '❤' : icon === 'fa-star' ? '★' : icon === 'fa-leaf' ? '🍃' : '★';
+                g.appendChild(txt);
+                svg.appendChild(g);
+            }));
+
+        })();
         window.sessionStorage.removeItem('inkwise-finalstep');
+
+        // Edit Mode Toggle
+        document.addEventListener('DOMContentLoaded', function() {
+            const editModeToggle = document.getElementById('editModeToggle');
+            const editorContainer = document.querySelector('.editor-container');
+            const rightPanel = document.querySelector('.right-panel');
+            const canvasArea = document.querySelector('.canvas-area');
+
+            if (editModeToggle && editorContainer) {
+                editModeToggle.addEventListener('click', function() {
+                    const isEditMode = editorContainer.classList.toggle('edit-mode');
+                    editModeToggle.textContent = isEditMode ? 'Panel Mode' : 'Edit Mode';
+                    editModeToggle.title = isEditMode ? 'Show sidebar panels' : 'Hide sidebar for full canvas editing';
+                    editModeToggle.classList.toggle('active', isEditMode);
+                    // Optionally adjust canvas area width
+                    if (canvasArea) {
+                        canvasArea.style.width = isEditMode ? '100%' : '';
+                    }
+                });
+            }
+
+            // Text Editor Enhancements
+            initializeTextEditor();
+        });
+
+        function initializeTextEditor() {
+            // Group toggle functionality
+            document.querySelectorAll('.group-toggle').forEach(button => {
+                button.addEventListener('click', function() {
+                    const group = this.closest('.text-fields-group');
+                    const content = group.querySelector('.group-content');
+                    const isActive = this.classList.toggle('active');
+
+                    content.classList.toggle('active', isActive);
+                    updateFieldCounts();
+                });
+            });
+
+            // Enhanced delete functionality
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('.delete-text')) {
+                    e.preventDefault();
+                    const fieldElement = e.target.closest('.text-field');
+                    const placeholder = fieldElement.querySelector('.field-placeholder').textContent;
+
+                    if (confirm(`Are you sure you want to delete "${placeholder}"? This action cannot be undone.`)) {
+                        fieldElement.remove();
+                        updateFieldCounts();
+                        clearActiveField();
+                    }
+                }
+            });
+
+            // Field selection and canvas connection
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('.text-field')) {
+                    const fieldElement = e.target.closest('.text-field');
+                    const textNode = fieldElement.dataset.textNode;
+                    const placeholder = fieldElement.querySelector('.field-placeholder').textContent;
+
+                    // Remove active state from all fields
+                    document.querySelectorAll('.text-field').forEach(field => {
+                        field.classList.remove('is-active');
+                    });
+
+                    // Add active state to clicked field
+                    fieldElement.classList.add('is-active');
+
+                    // Update active field indicator
+                    showActiveField(placeholder);
+
+                    // Highlight corresponding text on canvas
+                    highlightCanvasText(textNode);
+                }
+            });
+
+            // Canvas text click handler (would be connected to canvas text elements)
+            document.addEventListener('canvasTextClick', function(e) {
+                const textNode = e.detail.textNode;
+                selectFieldByTextNode(textNode);
+            });
+
+            // Sync with canvas button
+            document.getElementById('syncCanvas').addEventListener('click', function() {
+                syncWithCanvas();
+            });
+
+            // Initialize
+            updateFieldCounts();
+        }
+
+        function updateFieldCounts() {
+            // Update front side count
+            const frontCount = document.querySelectorAll('#frontFields .text-field').length;
+            document.getElementById('front-count').textContent = frontCount;
+
+            // Update back side count
+            const backCount = document.querySelectorAll('#backFields .text-field').length;
+            document.getElementById('back-count').textContent = backCount;
+
+            // Update total count
+            const totalCount = frontCount + backCount;
+            document.getElementById('total-fields').textContent = totalCount;
+        }
+
+        function showActiveField(fieldName) {
+            const indicator = document.getElementById('activeFieldIndicator');
+            const nameElement = document.getElementById('activeFieldName');
+
+            nameElement.textContent = fieldName;
+            indicator.style.display = 'flex';
+        }
+
+        function clearActiveField() {
+            const indicator = document.getElementById('activeFieldIndicator');
+            indicator.style.display = 'none';
+
+            // Remove active state from all fields
+            document.querySelectorAll('.text-field').forEach(field => {
+                field.classList.remove('is-active');
+            });
+        }
+
+        function selectFieldByTextNode(textNode) {
+            const fieldElement = document.querySelector(`[data-text-node="${textNode}"]`);
+            if (fieldElement) {
+                // Remove active state from all fields
+                document.querySelectorAll('.text-field').forEach(field => {
+                    field.classList.remove('is-active');
+                });
+
+                // Add active state to matching field
+                fieldElement.classList.add('is-active');
+
+                // Update active field indicator
+                const placeholder = fieldElement.querySelector('.field-placeholder').textContent;
+                showActiveField(placeholder);
+
+                // Scroll field into view
+                fieldElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
+        function highlightCanvasText(textNode) {
+            // This would integrate with the canvas to highlight the corresponding text
+            // For now, we'll dispatch a custom event that the canvas can listen to
+            const event = new CustomEvent('highlightTextNode', {
+                detail: { textNode: textNode }
+            });
+            document.dispatchEvent(event);
+        }
+
+        function syncWithCanvas() {
+            // This would sync the panel state with the current canvas selection
+            // For now, we'll just clear any active field
+            clearActiveField();
+
+            // Dispatch sync event for canvas integration
+            const event = new CustomEvent('syncTextPanel');
+            document.dispatchEvent(event);
+        }
     </script>
 </body>
 </html>

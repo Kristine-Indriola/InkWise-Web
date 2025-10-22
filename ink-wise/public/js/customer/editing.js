@@ -1673,7 +1673,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     // sync sidebar input
     const nodeKeyActual = node.getAttribute('data-text-node') || nodeKey;
-    syncInputValue(nodeKeyActual, side, getSvgNodeValue(node));
+    syncPanelInputValue(nodeKeyActual, side, getSvgNodeValue(node));
     try { updatePreviewFromSvg(side); } catch (e) {}
   }
 
@@ -1683,6 +1683,22 @@ document.addEventListener("DOMContentLoaded", () => {
     history.push(item);
     historyIndex = history.length - 1;
     updateUndoRedoButtons();
+  }
+
+  // helper: returns true if a given node/side currently has an active history capture
+  function historyCaptureActive(node, side) {
+    try {
+      if (!node) return false;
+      const key = node.getAttribute && node.getAttribute('data-text-node');
+      if (!key) return false;
+      // rely on a capture map if present, else inspect inlineEditor flags
+      if (typeof window.__iw_history_capture === 'object' && window.__iw_history_capture) {
+        return !!window.__iw_history_capture[`${key}::${side}`];
+      }
+    } catch (e) {}
+    // fallback: if inlineEditorNode is the node and it's set, assume active
+    try { if (inlineEditorNode === node) return true; } catch (e) {}
+    return false;
   }
 
   function updateUndoRedoButtons() {
@@ -1791,14 +1807,211 @@ document.addEventListener("DOMContentLoaded", () => {
     return textFieldsContainer.querySelector(`input[data-text-node="${safeKey}"][data-card-side="${side}"]`);
   }
 
-  function syncInputValue(nodeKey, side, value) {
-    const input = findTextFieldInput(nodeKey, side);
-    if (!input) return;
-    if (input.value !== value) {
-      input.value = value;
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-      input.dispatchEvent(new Event("change", { bubbles: true }));
+  // Initialize text editor panel
+  function initializeTextEditorPanel() {
+    const textEditorPanel = document.querySelector('.text-editor-panel');
+    if (!textEditorPanel) return;
+
+    // Set up new text field button
+    const newTextBtn = textEditorPanel.querySelector('.new-text-btn');
+    if (newTextBtn) {
+      newTextBtn.addEventListener('click', () => {
+        addNewTextField();
+      });
     }
+
+    // Set up existing text inputs for real-time syncing
+    const textInputs = textEditorPanel.querySelectorAll('.text-input');
+    textInputs.forEach(input => {
+      setupTextInputSync(input);
+    });
+  }
+
+  // Add new text field functionality
+  function addNewTextField() {
+    const textFieldsContainer = document.querySelector('.text-fields-container');
+    if (!textFieldsContainer) return;
+
+    // Create new text input wrapper
+    const wrapper = document.createElement('div');
+    wrapper.className = 'text-input-wrapper';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'text-input';
+    input.value = 'New Text';
+    input.placeholder = 'Enter text here...';
+    input.dataset.textNode = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+    input.dataset.cardSide = currentView || 'front';
+
+    wrapper.appendChild(input);
+    textFieldsContainer.appendChild(wrapper);
+
+    // Set up syncing for the new input
+    setupTextInputSync(input);
+
+    // create delete button above the input for convenience (accessible)
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'delete-text';
+    delBtn.setAttribute('aria-label', 'Delete text field');
+    delBtn.innerHTML = '<span class="sr-only">Delete text field</span><i class="fa-solid fa-trash-can" aria-hidden="true"></i>';
+    delBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const key = input.dataset.textNode;
+      const side = input.dataset.cardSide || currentView || 'front';
+      if (key) removeSvgNode(key, side);
+      wrapper.remove();
+    });
+    wrapper.appendChild(delBtn);
+
+    // Create corresponding SVG node
+    const side = currentView || 'front';
+    const node = ensureSvgNodeForInput(input);
+    if (node) {
+      setSvgNodeText(node, input.value);
+      // Position in center of canvas
+      const svg = getSvgRoot(side);
+      if (svg) {
+        const metrics = parseViewBox(svg);
+        const x = metrics.x + (metrics.width || 500) * 0.5;
+        const y = metrics.y + (metrics.height || 700) * 0.5;
+        updateNodePosition(node, side, x, y);
+      }
+      prepareSvgNode(node, side);
+      try { updatePreviewFromSvg(side); } catch(e){}
+    }
+
+    // Focus the new input
+    setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 10);
+  }
+
+  // Set up real-time syncing for a text input
+  function setupTextInputSync(input) {
+    if (!input) return;
+
+    // Sync from input to SVG
+    input.addEventListener('input', () => {
+      const side = input.dataset.cardSide || currentView || 'front';
+      const nodeKey = input.dataset.textNode;
+      if (!nodeKey) return;
+
+      const node = svgTextCache[side]?.get(nodeKey);
+      if (node) {
+        setSvgNodeText(node, input.value);
+        try { updatePreviewFromSvg(side); } catch(e){}
+        createBoundingBoxDebounced(node, side);
+      }
+    });
+
+    // Sync from SVG to input (for canvas edits)
+    const side = input.dataset.cardSide || currentView || 'front';
+    const nodeKey = input.dataset.textNode;
+    if (nodeKey && svgTextCache[side]?.has(nodeKey)) {
+      const node = svgTextCache[side].get(nodeKey);
+      if (node) {
+        // Initial sync
+        const currentValue = getSvgNodeValue(node);
+        if (currentValue !== input.value) {
+          input.value = currentValue;
+        }
+      }
+    }
+  }
+
+  // Enhanced syncInputValue to handle panel inputs
+  function syncPanelInputValue(nodeKey, side, value) {
+    if (!nodeKey) return;
+    // Update any panel inputs specifically in the text editor panel
+    try {
+      const selector = `.text-editor-panel .text-input[data-text-node="${CSS && CSS.escape ? CSS.escape(nodeKey) : nodeKey}"][data-card-side="${side}"]`;
+      const panelInput = document.querySelector(selector);
+      if (panelInput && panelInput.value !== value) {
+        panelInput.value = value;
+        panelInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    } catch (e) {}
+
+    // Also update any other legacy inputs that might reference this node
+    try {
+      const allInputs = Array.from(document.querySelectorAll(`input[data-text-node="${nodeKey}"]`));
+      allInputs.forEach(inp => {
+        try {
+          const cardSide = (inp.dataset.cardSide || inp.dataset.cardSide || inp.getAttribute('data-card-side') || inp.getAttribute('data-card-side')) || '';
+          // only update if different value
+          if ((inp.value || '') !== (value || '')) {
+            inp.value = value || '';
+            inp.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        } catch (err) {}
+      });
+    } catch (e) {}
+  }
+
+  // Populate the text fields panel with an input for every SVG <text> node
+  function populateTextFieldsFromSvg() {
+    const container = document.querySelector('.text-fields-container');
+    if (!container) return;
+    ['front', 'back'].forEach(side => {
+      const svg = getSvgRoot(side);
+      if (!svg) return;
+      const nodes = Array.from(svg.querySelectorAll('text'));
+      nodes.forEach(node => {
+        try {
+          // ensure node has a key
+          const key = ensureTextNodeKey(node, side);
+          // avoid duplicate inputs
+          const existing = container.querySelector(`.text-input-wrapper[data-text-node="${key}"][data-card-side="${side}"]`);
+          if (existing) return;
+
+          const value = getSvgNodeValue(node) || '';
+          const pos = computePercentPosition(node, side);
+
+          const wrapper = document.createElement('div');
+          wrapper.className = 'text-input-wrapper';
+          wrapper.setAttribute('data-text-node', key);
+          wrapper.setAttribute('data-card-side', side);
+
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'text-input';
+          input.value = value;
+          input.placeholder = '';
+          input.setAttribute('data-text-node', key);
+          input.setAttribute('data-card-side', side);
+          input.setAttribute('data-top-percent', pos.top);
+          input.setAttribute('data-left-percent', pos.left);
+          // copy font metadata if present
+          try { const fs = node.getAttribute('font-size') || node.dataset.fontSize; if (fs) input.dataset.fontSize = fs; } catch(e) {}
+          try { const ls = node.getAttribute('letter-spacing') || node.dataset.letterSpacing; if (ls) input.dataset.letterSpacing = ls; } catch(e) {}
+          try { const ff = extractFontFamily(node) || node.dataset.fontFamily; if (ff) { input.dataset.fontFamily = ff; input.style.fontFamily = ff; } } catch(e) {}
+
+          wrapper.appendChild(input);
+          // optional delete button for convenience (accessible)
+          const del = document.createElement('button');
+          del.type = 'button';
+          del.className = 'delete-text';
+          del.setAttribute('aria-label', 'Delete text field');
+          // use Font Awesome trash icon with sr-only label for screen readers
+          del.innerHTML = '<span class="sr-only">Delete text field</span><i class="fa-solid fa-trash-can" aria-hidden="true"></i>';
+          wrapper.appendChild(del);
+
+          container.appendChild(wrapper);
+
+          // wire up sync and deletion
+          setupTextInputSync(input);
+          del.addEventListener('click', (e) => {
+            e.preventDefault();
+            // remove svg node and input
+            removeSvgNode(key, side);
+            wrapper.remove();
+          });
+        } catch (e) {}
+      });
+    });
   }
 
   function updateFieldPositionFromNode(node, side, x, y) {
@@ -1861,6 +2074,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const svg = getSvgRoot(side);
     if (!svg) return null;
 
+    // Always insert the image as the very first child so it is below all text nodes
     let layer = svg.querySelector(`image[data-editable-image="${side}"]`);
     if (!layer) {
       layer = document.createElementNS(SVG_NS, 'image');
@@ -1872,10 +2086,9 @@ document.addEventListener("DOMContentLoaded", () => {
       layer.setAttribute('preserveAspectRatio', 'xMidYMid slice');
       layer.style.display = 'none';
 
-      // insert the new image before the first editable text node so text stays on top
-      const firstTextNode = Array.from(svg.children).find(node => node.hasAttribute && node.hasAttribute('data-text-node'));
-      if (firstTextNode) {
-        svg.insertBefore(layer, firstTextNode);
+      // Insert as the first child so all text nodes are above
+      if (svg.firstChild) {
+        svg.insertBefore(layer, svg.firstChild);
       } else {
         svg.appendChild(layer);
       }
@@ -2110,38 +2323,114 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const normalizedDisplaySrc = normalizeToWebPath(displaySrc);
 
-  // If the target is an external SVG, fetch it and use a blob URL to avoid embedding quirks
-  const isSvg = typeof normalizedDisplaySrc === 'string' && /\.svg(\?|$)/i.test(normalizedDisplaySrc);
-  if (isSvg && normalizedDisplaySrc) {
-    // revoke previous blob if any
-    try { if (imageBlobUrls[side]) { URL.revokeObjectURL(imageBlobUrls[side]); imageBlobUrls[side] = null; } } catch(e){}
-    // attempt to fetch the SVG text and create a blob URL
-    fetch(normalizedDisplaySrc, { credentials: 'same-origin' }).then(res => {
-      if (!res.ok) throw new Error('fetch failed ' + res.status + ' for ' + normalizedDisplaySrc);
-      return res.text();
-    }).then(svgText => {
-      try {
-        const blob = new Blob([svgText], { type: 'image/svg+xml' });
-        const blobUrl = URL.createObjectURL(blob);
-        imageBlobUrls[side] = blobUrl;
-        // set blob URL on svg <image> and fallback <img>
-    setImageElementSource(layer, blobUrl);
-    const fallbackLayer = ensureFallbackImage(side);
-    if (fallbackLayer) setImageElementSource(fallbackLayer, blobUrl);
-        updateDebugPanel({ event: 'applyImage', side, fetched: true, blobUrl });
-      } catch (e) {
-        console.warn('[applyImage] failed to inline svg, falling back to direct href', e);
-    setImageElementSource(layer, normalizedDisplaySrc);
-    const fallbackLayer = ensureFallbackImage(side);
-    if (fallbackLayer) setImageElementSource(fallbackLayer, normalizedDisplaySrc);
-      }
-    }).catch(err => {
-      console.warn('[applyImage] fetch svg failed, using direct src', err);
-      setImageElementSource(layer, normalizedDisplaySrc || displaySrc);
+  // revoke previous blob if any (always safe to clear before creating a new one)
+  try { if (imageBlobUrls[side]) { URL.revokeObjectURL(imageBlobUrls[side]); imageBlobUrls[side] = null; } } catch(e){}
+
+  // helper: convert data: URLs to Blob
+  function dataURLToBlob(dataURL) {
+    // data:[<mediatype>][;base64],<data>
+    const parts = dataURL.split(',');
+    if (!parts || parts.length < 2) return null;
+    const meta = parts[0];
+    const data = parts.slice(1).join(',');
+    const isBase64 = /;base64/i.test(meta);
+    let byteString;
+    try {
+      byteString = isBase64 ? atob(data) : decodeURIComponent(data);
+    } catch (e) {
+      try { byteString = atob(data); } catch (err) { byteString = null; }
+    }
+    if (byteString == null) return null;
+    // build array
+    const ia = new Uint8Array(byteString.length);
+    for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+    const mimeMatch = meta.match(/data:([^;]+)[;]?/i);
+    const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+    return new Blob([ia], { type: mime });
+  }
+
+  // If the source is raw SVG text, a data URL containing SVG, or an SVG file URL,
+  // convert to a blob URL so the SVG renders reliably inside an <image> element.
+  const isRawSvgText = typeof displaySrc === 'string' && displaySrc.trim().startsWith('<svg');
+  const isDataUrl = typeof normalizedDisplaySrc === 'string' && normalizedDisplaySrc.trim().startsWith('data:');
+  const isSvgUrl = typeof normalizedDisplaySrc === 'string' && /\.svg(\?|$)/i.test(normalizedDisplaySrc);
+
+  if (isRawSvgText) {
+    try {
+      const blob = new Blob([displaySrc], { type: 'image/svg+xml' });
+      const blobUrl = URL.createObjectURL(blob);
+      imageBlobUrls[side] = blobUrl;
+      setImageElementSource(layer, blobUrl);
       const fallbackLayer = ensureFallbackImage(side);
-      if (fallbackLayer) setImageElementSource(fallbackLayer, normalizedDisplaySrc || displaySrc);
-    });
+      if (fallbackLayer) setImageElementSource(fallbackLayer, blobUrl);
+      updateDebugPanel({ event: 'applyImage', side, inlined: true });
+    } catch (e) {
+      console.warn('[applyImage] failed to inline raw svg, falling back to direct src', e);
+      setImageElementSource(layer, displaySrc);
+      const fallbackLayer = ensureFallbackImage(side);
+      if (fallbackLayer) setImageElementSource(fallbackLayer, displaySrc);
+    }
+  } else if (isDataUrl) {
+    // try to convert SVG data URLs into blobs
+    try {
+      const blob = dataURLToBlob(normalizedDisplaySrc);
+      if (blob) {
+        // if the mime indicates svg or decoded content looks like svg, use blob
+        const mime = blob.type || '';
+        if (/svg/i.test(mime)) {
+          const blobUrl = URL.createObjectURL(blob);
+          imageBlobUrls[side] = blobUrl;
+          setImageElementSource(layer, blobUrl);
+          const fallbackLayer = ensureFallbackImage(side);
+          if (fallbackLayer) setImageElementSource(fallbackLayer, blobUrl);
+          updateDebugPanel({ event: 'applyImage', side, dataUrl: true });
+        } else {
+          // not an svg data URL; set directly (e.g., PNG/JPEG data URLs)
+          setImageElementSource(layer, normalizedDisplaySrc);
+          const fallbackLayer = ensureFallbackImage(side);
+          if (fallbackLayer) setImageElementSource(fallbackLayer, normalizedDisplaySrc);
+        }
+      } else {
+        setImageElementSource(layer, normalizedDisplaySrc);
+        const fallbackLayer = ensureFallbackImage(side);
+        if (fallbackLayer) setImageElementSource(fallbackLayer, normalizedDisplaySrc);
+      }
+    } catch (e) {
+      console.warn('[applyImage] data url handling failed', e);
+      setImageElementSource(layer, normalizedDisplaySrc);
+      const fallbackLayer = ensureFallbackImage(side);
+      if (fallbackLayer) setImageElementSource(fallbackLayer, normalizedDisplaySrc);
+    }
+  } else if (isSvgUrl) {
+    // remote or same-origin SVG URL: fetch and inline as blob
+    if (normalizedDisplaySrc) {
+      fetch(normalizedDisplaySrc, { credentials: 'same-origin' }).then(res => {
+        if (!res.ok) throw new Error('fetch failed ' + res.status + ' for ' + normalizedDisplaySrc);
+        return res.text();
+      }).then(svgText => {
+        try {
+          const blob = new Blob([svgText], { type: 'image/svg+xml' });
+          const blobUrl = URL.createObjectURL(blob);
+          imageBlobUrls[side] = blobUrl;
+          setImageElementSource(layer, blobUrl);
+          const fallbackLayer = ensureFallbackImage(side);
+          if (fallbackLayer) setImageElementSource(fallbackLayer, blobUrl);
+          updateDebugPanel({ event: 'applyImage', side, fetched: true, blobUrl });
+        } catch (e) {
+          console.warn('[applyImage] failed to inline svg, falling back to direct href', e);
+          setImageElementSource(layer, normalizedDisplaySrc);
+          const fallbackLayer = ensureFallbackImage(side);
+          if (fallbackLayer) setImageElementSource(fallbackLayer, normalizedDisplaySrc);
+        }
+      }).catch(err => {
+        console.warn('[applyImage] fetch svg failed, using direct src', err);
+        setImageElementSource(layer, normalizedDisplaySrc || displaySrc);
+        const fallbackLayer = ensureFallbackImage(side);
+        if (fallbackLayer) setImageElementSource(fallbackLayer, normalizedDisplaySrc || displaySrc);
+      });
+    }
   } else {
+    // non-SVG images (PNG/JPEG/WEBP etc.) — set directly on svg <image> and fallback <img>
     setImageElementSource(layer, normalizedDisplaySrc || displaySrc);
     const fallbackLayer = ensureFallbackImage(side);
     if (fallbackLayer) {
@@ -2409,11 +2698,12 @@ document.addEventListener("DOMContentLoaded", () => {
       input.style.fontFamily = "'" + fontFamily + "', system-ui, sans-serif";
     }
 
-    const delBtn = document.createElement("button");
-    delBtn.type = "button";
-    delBtn.className = "delete-text";
-    delBtn.setAttribute("aria-label", "Remove text field");
-    delBtn.textContent = "\uD83D\uDDD1"; // trash can emoji
+  const delBtn = document.createElement("button");
+  delBtn.type = "button";
+  delBtn.className = "delete-text";
+  delBtn.setAttribute("aria-label", "Remove text field");
+  // use Font Awesome trash icon
+  delBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
 
     wrapper.appendChild(input);
     wrapper.appendChild(delBtn);
@@ -2489,7 +2779,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const finalValue = commit ? editor.value : inlineEditorOriginalValue;
     if (node && nodeKey && typeof finalValue === 'string') {
       setSvgNodeText(node, finalValue);
-      syncInputValue(nodeKey, side, finalValue);
+      syncPanelInputValue(nodeKey, side, finalValue);
       try { updatePreviewFromSvg(side); } catch (e) {}
     }
     inlineEditorOriginalValue = "";
@@ -2520,27 +2810,46 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const editor = document.createElement('textarea');
     editor.className = 'inline-text-editor';
+    editor.setAttribute('aria-label', 'Edit canvas text');
     editor.value = inlineEditorOriginalValue;
     editor.style.position = 'absolute';
-  editor.style.left = `${nodeRect.left - hostRect.left}px`;
-  editor.style.top = `${nodeRect.top - hostRect.top}px`;
-    const minWidth = Math.max(nodeRect.width, 140);
-    const minHeight = Math.max(nodeRect.height, 32);
+    editor.style.left = `${nodeRect.left - hostRect.left}px`;
+    editor.style.top = `${nodeRect.top - hostRect.top}px`;
+
+    // initial sizing: at least as big as node bbox, otherwise readable minimums
+    const minWidth = Math.max(nodeRect.width, 120);
+    const minHeight = Math.max(nodeRect.height, 28);
     editor.style.width = `${minWidth}px`;
     editor.style.height = `${minHeight}px`;
-    editor.style.padding = '6px 10px';
-    editor.style.border = '1px solid rgba(59, 130, 246, 0.6)';
+
+    // visual: minimal by default, focus shows strong ring; caret color should match SVG fill
+    editor.style.padding = '6px 8px';
+    editor.style.border = 'none';
     editor.style.borderRadius = '6px';
     editor.style.background = 'rgba(255,255,255,0.98)';
-    editor.style.boxShadow = '0 4px 12px rgba(15, 23, 42, 0.15)';
-  const rawFontSize = node.getAttribute('font-size') || window.getComputedStyle(node).fontSize || '18px';
-  const normalizedFontSize = /px$/i.test(rawFontSize) ? rawFontSize : `${rawFontSize}px`;
-  editor.style.fontSize = normalizedFontSize;
+    editor.style.boxShadow = '0 4px 12px rgba(15, 23, 42, 0.08)';
+    const rawFontSize = node.getAttribute('font-size') || window.getComputedStyle(node).fontSize || '18px';
+    const normalizedFontSize = /px$/i.test(rawFontSize) ? rawFontSize : `${rawFontSize}px`;
+    editor.style.fontSize = normalizedFontSize;
     editor.style.lineHeight = '1.2';
     editor.style.fontFamily = node.dataset.fontFamily ? `'${node.dataset.fontFamily}', system-ui, sans-serif` : window.getComputedStyle(node).fontFamily;
-    editor.style.color = node.getAttribute('fill') || '#1f2933';
+    // caret color — use SVG fill when available
+    const svgFill = node.getAttribute('fill') || node.style.fill || '#1f2933';
+    editor.style.color = svgFill;
+    editor.style.caretColor = svgFill;
     editor.style.resize = 'none';
-  editor.style.zIndex = '35';
+    editor.style.zIndex = '35';
+
+    // autosize helper: resize textarea height to fit content
+    function autosize() {
+      try {
+        editor.style.height = '1px';
+        const scrollH = Math.max(editor.scrollHeight, minHeight);
+        editor.style.height = (scrollH) + 'px';
+      } catch (e) {}
+    }
+    // run once to ensure initial fit
+    setTimeout(autosize, 0);
 
   host.appendChild(editor);
 
@@ -2554,10 +2863,51 @@ document.addEventListener("DOMContentLoaded", () => {
   // populate toolbar with node state
   populateToolbarForNode(node, side);
 
+    // sync styles from SVG node to textarea so typing visually matches
+    try {
+      const ls = node.getAttribute('letter-spacing') || node.dataset.letterSpacing || '';
+      if (ls) editor.style.letterSpacing = typeof ls === 'string' && ls.endsWith('px') ? ls : `${ls}px`;
+    } catch (e) {}
+    try {
+      const anchor = (node.getAttribute('text-anchor') || 'middle').toLowerCase();
+      // map SVG text-anchor to CSS text-align
+      editor.style.textAlign = anchor === 'start' ? 'left' : anchor === 'end' ? 'right' : 'center';
+    } catch (e) {}
+    try {
+      const fs = node.getAttribute('font-size') || window.getComputedStyle(node).fontSize || '';
+      if (fs) editor.style.fontSize = /px$/i.test(fs) ? fs : `${fs}px`;
+    } catch (e) {}
+  // composition state for IME (prevent Enter from committing during composition)
+  let composing = false;
+  // typing debounce to group rapid input into a single history entry
+  let typingTimer = null;
+  const TYPING_DEBOUNCE_MS = 600;
+    editor.addEventListener('compositionstart', () => { composing = true; });
+    editor.addEventListener('compositionend', (ev) => { composing = false; /* propagate final input */
+      // after IME composition finishes, ensure SVG reflects the committed text
+      setSvgNodeText(node, editor.value);
+      syncPanelInputValue(nodeKey, side, editor.value);
+      try { updatePreviewFromSvg(side); } catch (e) {}
+      autosize();
+    });
+
     editor.addEventListener('input', () => {
       setSvgNodeText(node, editor.value);
-      syncInputValue(nodeKey, side, editor.value);
+      syncPanelInputValue(nodeKey, side, editor.value);
       try { updatePreviewFromSvg(side); } catch (e) {}
+      autosize();
+      // manage history capture: start on first keystroke if not already capturing
+      try {
+        if (!historyCaptureActive(node, side)) {
+          beginHistoryCapture(node, side);
+        }
+      } catch (e) {}
+      // debounce endHistoryCapture so typing bursts create a single history item
+      if (typingTimer) clearTimeout(typingTimer);
+      typingTimer = setTimeout(() => {
+        try { endHistoryCapture(node, side); } catch (e) {}
+        typingTimer = null;
+      }, TYPING_DEBOUNCE_MS);
     });
 
     editor.addEventListener('keydown', (event) => {
@@ -2565,12 +2915,18 @@ document.addEventListener("DOMContentLoaded", () => {
         event.preventDefault();
         closeInlineEditor(false);
       } else if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey) {
+        if (composing) {
+          // during IME composition, allow Enter to finish composition without closing editor
+          return;
+        }
         event.preventDefault();
         closeInlineEditor(true);
       }
     });
 
     editor.addEventListener('blur', () => {
+      // if composition is active, delay closing until compositionend
+      if (composing) return;
       closeInlineEditor(true);
     });
 
@@ -2605,7 +2961,11 @@ document.addEventListener("DOMContentLoaded", () => {
     node.setAttribute("spellcheck", "false");
     node.setAttribute("tabindex", "0");
     if (!node.hasAttribute("aria-label")) {
-      node.setAttribute("aria-label", "Edit canvas text");
+      try {
+        const nodeKey = node.getAttribute('data-text-node') || node.getAttribute('id') || '';
+        const label = nodeKey ? `Edit text: ${nodeKey}` : (node.textContent && node.textContent.trim()) || 'Edit canvas text';
+        node.setAttribute('aria-label', label);
+      } catch (e) { node.setAttribute('aria-label', 'Edit canvas text'); }
     }
 
     node.addEventListener("focus", () => {
@@ -2706,7 +3066,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const nodeKey = node.getAttribute("data-text-node") || "";
     const value = getSvgNodeValue(node);
 
-    syncInputValue(nodeKey, side, value);
+    syncPanelInputValue(nodeKey, side, value);
     const svg = getSvgRoot(side);
     const x = Number.parseFloat(node.getAttribute("x") || node.dataset.originalX || "0");
     const y = Number.parseFloat(node.getAttribute("y") || node.dataset.originalY || "0");
@@ -2898,7 +3258,7 @@ document.addEventListener("DOMContentLoaded", () => {
           } catch (e) {}
         }
         const nodeKey = resizeState.node.getAttribute('data-text-node') || '';
-        if (nodeKey && resizeState.side) syncInputValue(nodeKey, resizeState.side, getSvgNodeValue(resizeState.node));
+        if (nodeKey && resizeState.side) syncPanelInputValue(nodeKey, resizeState.side, getSvgNodeValue(resizeState.node));
         try { updatePreviewFromSvg(resizeState.side); } catch(e){}
       }
     });
@@ -3075,8 +3435,20 @@ document.addEventListener("DOMContentLoaded", () => {
   function createBoundingBox(node, side) {
     const svg = getSvgRoot(side);
     if (!svg || !node) return;
-  // remove existing bounding box and handles
-  removeBoundingBox(side);
+    // remove existing bounding box and handles for this specific node to avoid duplicates
+    try {
+      const nodeKey = node.getAttribute && node.getAttribute('data-text-node') || '';
+      if (nodeKey) {
+        // remove any existing elements previously tagged for this node
+        const existing = Array.from(svg.querySelectorAll(`[data-iw-target-node="${nodeKey}"]`));
+        existing.forEach(el => { try { el.remove(); } catch(e){} });
+      } else {
+        // fallback: remove all before creating if nodeKey not present
+        removeBoundingBox(side);
+      }
+    } catch (e) {
+      try { removeBoundingBox(side); } catch (err) {}
+    }
     // get local bbox
     let bbox = { x:0,y:0,width:0,height:0 };
     try { bbox = node.getBBox(); } catch(e) {}
@@ -3090,6 +3462,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // create rect in the same container as the node so it inherits transforms
     const rect = document.createElementNS(SVG_NS, 'rect');
     rect.classList.add('text-bounding-box');
+  // tag rect with the nodeKey so duplicates can be detected/removed
+  try { const nk = node.getAttribute && node.getAttribute('data-text-node') || ''; if (nk) rect.setAttribute('data-iw-target-node', nk); } catch(e){}
     rect.setAttribute('x', rx);
     rect.setAttribute('y', ry);
     rect.setAttribute('width', rw);
@@ -3121,6 +3495,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const g = document.createElementNS(SVG_NS, 'g');
       g.classList.add('bounding-box-handle');
       g.setAttribute('data-handle-type', type);
+  // tag handle group with target node key
+  try { if (node && node.getAttribute) { const nk = node.getAttribute('data-text-node') || ''; if (nk) g.setAttribute('data-iw-target-node', nk); } } catch(e){}
       try { g.dataset.targetNodeKey = node.getAttribute && node.getAttribute('data-text-node') || ''; } catch(e) {}
       try { g.style.cursor = cursor; } catch(e) {}
 
@@ -3194,6 +3570,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const rotG = document.createElementNS(SVG_NS, 'g');
     rotG.classList.add('bounding-box-handle');
     rotG.setAttribute('data-handle-type', 'rotate');
+  try { const nk = node.getAttribute && node.getAttribute('data-text-node') || ''; if (nk) rotG.setAttribute('data-iw-target-node', nk); } catch(e){}
     try { rotG.dataset.targetNodeKey = node.getAttribute && node.getAttribute('data-text-node') || ''; } catch(e) {}
     try { rotG.style.cursor = 'grab'; } catch(e) {}
 
@@ -3250,26 +3627,81 @@ document.addEventListener("DOMContentLoaded", () => {
   function removeBoundingBox(side) {
     const svg = getSvgRoot(side);
     if (!svg) return;
+    // Determine which node's bounding box to keep (prefer currently selected element)
+    let keepKey = '';
+    try {
+      // If a selectedElementNode exists and matches the given side, keep its boxes
+      if (selectedElementNode && selectedElementSide === side) {
+        keepKey = selectedElementNode.getAttribute && (selectedElementNode.getAttribute('data-text-node') || '') || '';
+      }
+    } catch (e) { keepKey = ''; }
+
     // remove any rects/handles either in svg root or inside iw wrappers
-    const boxes = Array.from(svg.querySelectorAll('.text-bounding-box'));
-    boxes.forEach(b => b.remove());
-    const handles = Array.from(svg.querySelectorAll('.bounding-box-handle'));
-    handles.forEach(h => h.remove());
-    // also clear from top-level handles layer if present
+    try {
+      const boxes = Array.from(svg.querySelectorAll('.text-bounding-box'));
+      boxes.forEach(b => {
+        try {
+          const target = b.getAttribute('data-iw-target-node') || '';
+          if (keepKey && target === keepKey) return; // preserve current node's box
+        } catch (e) {}
+        try { b.remove(); } catch (e) {}
+      });
+    } catch (e) {}
+
+    try {
+      const handles = Array.from(svg.querySelectorAll('.bounding-box-handle'));
+      handles.forEach(h => {
+        try {
+          const target = h.getAttribute('data-iw-target-node') || '';
+          if (keepKey && target === keepKey) return; // preserve current node's handles
+        } catch (e) {}
+        try { h.remove(); } catch (e) {}
+      });
+    } catch (e) {}
+
+    // also clear from top-level handles layer if present (preserve handles for keepKey)
     try {
       const layer = svg.querySelector('g[data-iw-handles-layer]');
-      if (layer) Array.from(layer.querySelectorAll('.bounding-box-handle')).forEach(h=>h.remove());
+      if (layer) {
+        Array.from(layer.querySelectorAll('.bounding-box-handle')).forEach(h => {
+          try {
+            const target = h.getAttribute('data-iw-target-node') || '';
+            if (keepKey && target === keepKey) return;
+          } catch (e) {}
+          try { h.remove(); } catch (e) {}
+        });
+      }
     } catch(e) {}
-    // also remove inside wrapper groups
-    Array.from(svg.querySelectorAll('g[data-iw-wrapper]')).forEach(w => {
-      Array.from(w.querySelectorAll('.text-bounding-box, .bounding-box-handle')).forEach(el => el.remove());
-    });
-    // also hide overlay handles (resize/rotate) if present
+
+    // also remove inside wrapper groups, but preserve items matching keepKey
     try {
-      if (resizeHandle) resizeHandle.classList.remove('is-visible');
+      Array.from(svg.querySelectorAll('g[data-iw-wrapper]')).forEach(w => {
+        Array.from(w.querySelectorAll('.text-bounding-box, .bounding-box-handle')).forEach(el => {
+          try {
+            const target = el.getAttribute && el.getAttribute('data-iw-target-node') || '';
+            if (keepKey && target === keepKey) return;
+          } catch (e) {}
+          try { el.remove(); } catch (e) {}
+        });
+      });
+    } catch(e) {}
+
+    // also hide overlay handles (resize/rotate) if present -- but only if they are not for the kept node
+    try {
+      if (resizeHandle) {
+        try {
+          const nodeKey = resizeState.node && resizeState.node.getAttribute && resizeState.node.getAttribute('data-text-node') || '';
+          if (!keepKey || nodeKey !== keepKey) resizeHandle.classList.remove('is-visible');
+        } catch (e) { resizeHandle.classList.remove('is-visible'); }
+      }
     } catch (e) {}
     try {
-      if (rotateHandle) rotateHandle.classList.remove('is-visible');
+      if (rotateHandle) {
+        try {
+          const nodeKey = rotateState.node && rotateState.node.getAttribute && rotateState.node.getAttribute('data-text-node') || '';
+          if (!keepKey || nodeKey !== keepKey) rotateHandle.classList.remove('is-visible');
+        } catch (e) { rotateHandle.classList.remove('is-visible'); }
+      }
     } catch (e) {}
   }
 
@@ -3495,6 +3927,118 @@ document.addEventListener("DOMContentLoaded", () => {
 
   cacheSvgNodes(cardFront, "front");
   cacheSvgNodes(cardBack, "back");
+  // Normalize embedded SVG text nodes: some uploaded template SVGs may have
+  // tspan/x/text-anchor values that cause visual misalignment when inserted
+  // into our editor. Fix common issues by ensuring each <text> has an explicit
+  // x and text-anchor and that its child <tspan> elements inherit the same x
+  // so browser rendering lines up with our computed bounding boxes.
+  (function normalizeAndScaleSvgTemplates() {
+    function getSvgScale(svg) {
+      // Use viewBox and width/height to determine scale
+      const vb = svg.getAttribute('viewBox');
+      const w = parseFloat(svg.getAttribute('width')) || 500;
+      const h = parseFloat(svg.getAttribute('height')) || 700;
+      if (!vb) return 1;
+      const parts = vb.trim().split(/\s+/).map(Number);
+      if (parts.length === 4 && parts[2] && parts[3]) {
+        // scale = rendered width / viewBox width
+        return w / parts[2];
+      }
+      return 1;
+    }
+    function scaleCanvasToSvg(card, svg) {
+      // Set canvas size to match SVG template
+      if (!svg || !card) return;
+      const w = parseFloat(svg.getAttribute('width')) || 500;
+      const h = parseFloat(svg.getAttribute('height')) || 700;
+      card.style.width = w + 'px';
+      card.style.height = h + 'px';
+      card.parentNode.style.width = w + 'px';
+      card.parentNode.style.height = h + 'px';
+    }
+    function normalizeTextNodes(svg) {
+      // Map all text/tspan x/y and font metrics to SVG viewBox coordinates and sync overlays
+      const vb = svg.getAttribute('viewBox');
+      let vbX = 0, vbY = 0, vbW = 500, vbH = 700;
+      if (vb) {
+        const parts = vb.trim().split(/\s+/).map(Number);
+        if (parts.length === 4) {
+          vbX = parts[0]; vbY = parts[1]; vbW = parts[2]; vbH = parts[3];
+        }
+      }
+      const nodes = svg.querySelectorAll('text');
+      nodes.forEach(node => {
+        if (node.hasAttribute('data-text-node')) return;
+        // Use SVG's own x/y, font-family, font-size, letter-spacing, anchor, baseline
+        let x = parseFloat(node.getAttribute('x'));
+        let y = parseFloat(node.getAttribute('y'));
+        if (!isFinite(x) || x < vbX || x > vbX + vbW) x = vbX + vbW / 2;
+        if (!isFinite(y) || y < vbY || y > vbY + vbH) y = vbY + vbH / 2;
+        node.setAttribute('x', String(x));
+        node.setAttribute('y', String(y));
+        node.dataset.originalX = String(x);
+        node.dataset.originalY = String(y);
+        // Respect original anchor and baseline if present
+        const anchor = node.getAttribute('text-anchor') || 'middle';
+        node.setAttribute('text-anchor', anchor);
+        const baseline = node.getAttribute('dominant-baseline') || 'middle';
+        node.setAttribute('dominant-baseline', baseline);
+        // Sync font metrics
+        const fontSize = node.getAttribute('font-size') || window.getComputedStyle(node).fontSize || '16';
+        node.setAttribute('font-size', fontSize);
+        const letterSpacing = node.getAttribute('letter-spacing') || window.getComputedStyle(node).letterSpacing || '';
+        if (letterSpacing) node.setAttribute('letter-spacing', letterSpacing);
+        const fontFamily = node.getAttribute('font-family') || (node.style && node.style.fontFamily) || window.getComputedStyle(node).fontFamily || '';
+        if (fontFamily) node.setAttribute('style', `font-family: ${fontFamily};`);
+        // Center all tspans and sync font metrics
+        const tspans = node.querySelectorAll('tspan');
+        if (tspans.length > 0) {
+          tspans.forEach((tspan, i) => {
+            tspan.setAttribute('x', String(x));
+            if (i === 0) tspan.setAttribute('y', String(y));
+            if (fontSize) tspan.setAttribute('font-size', fontSize);
+            if (letterSpacing) tspan.setAttribute('letter-spacing', letterSpacing);
+            if (fontFamily) tspan.setAttribute('style', `font-family: ${fontFamily};`);
+          });
+        }
+        // Sync to input overlays if present
+        const nodeKey = node.getAttribute('id') || node.getAttribute('name') || '';
+        if (nodeKey) {
+          const input = document.querySelector(`input[data-text-node="${nodeKey}"]`);
+          if (input) {
+            input.dataset.leftPercent = ((x - vbX) / vbW * 100).toFixed(2);
+            input.dataset.topPercent = ((y - vbY) / vbH * 100).toFixed(2);
+            input.dataset.fontSize = fontSize;
+            input.dataset.letterSpacing = letterSpacing;
+            input.dataset.fontFamily = fontFamily;
+            input.style.fontFamily = fontFamily;
+            input.style.fontSize = fontSize + 'px';
+            if (letterSpacing) input.style.letterSpacing = letterSpacing;
+          }
+        }
+      });
+    }
+    function runNormalizationAndScaling() {
+      ['front','back'].forEach(side => {
+        const card = side === 'front' ? cardFront : cardBack;
+        const svg = getSvgRoot(side);
+        if (!svg || !card) return;
+        scaleCanvasToSvg(card, svg);
+        normalizeTextNodes(svg);
+      });
+      cacheSvgNodes(cardFront, 'front');
+      cacheSvgNodes(cardBack, 'back');
+      refreshPositions();
+      // populate panel inputs now that SVG nodes are cached
+      try { populateTextFieldsFromSvg(); } catch (e) {}
+      try { updatePreviewFromSvg('front'); updatePreviewFromSvg('back'); } catch(e) {}
+    }
+    if (window.document.fonts && window.document.fonts.ready) {
+      window.document.fonts.ready.then(runNormalizationAndScaling);
+    } else {
+      setTimeout(runNormalizationAndScaling, 200);
+    }
+  })();
   if (allowImageEditing) {
     // Try to apply images. If SVG <image> can't render for any reason, ensure the card shows the server-provided default as a background so the user sees a preview.
     applyImage("front", imageState.front.currentSrc, { skipPreview: false });
@@ -3552,8 +4096,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const delBtn = document.createElement("button");
       delBtn.classList.add("delete-text");
       delBtn.type = "button";
-      delBtn.setAttribute("aria-label", "Delete text field");
-      delBtn.textContent = "🗑";
+  delBtn.setAttribute("aria-label", "Delete text field");
+  delBtn.innerHTML = '<i class="fa-solid fa-trash-can" aria-hidden="true"></i>';
 
       wrapper.appendChild(input);
       wrapper.appendChild(delBtn);
@@ -3727,7 +4271,7 @@ document.addEventListener("DOMContentLoaded", () => {
         del.type = 'button';
         del.className = 'thumb-delete';
         del.setAttribute('aria-label', 'Delete uploaded image');
-  del.innerHTML = '<i class="fa-solid fa-trash" aria-hidden="true"></i>';
+  del.innerHTML = '<i class="fa-solid fa-trash-can" aria-hidden="true"></i>';
         del.addEventListener('click', (ev) => {
           ev.stopPropagation();
           try {
@@ -3888,4 +4432,5 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     } catch (e) { /* non-fatal */ }
   })();
+  initializeTextEditorPanel();
 });

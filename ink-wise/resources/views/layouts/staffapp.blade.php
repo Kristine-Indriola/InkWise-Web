@@ -584,6 +584,9 @@
       <li class="{{ request()->routeIs('staff.dashboard') ? 'active' : '' }}">
         <a href="{{ route('staff.dashboard') }}"><i class="fi fi-sr-house-chimney"></i> <span class="label">Dashboard</span></a>
       </li>
+      <li class="{{ request()->routeIs('staff.templates.*') ? 'active' : '' }}">
+        <a href="{{ route('staff.templates.uploaded') }}"><i class="fa-solid fa-images"></i> <span class="label">Templates</span></a>
+      </li>
       <li class="{{ request()->routeIs('staff.assigned.orders') ? 'active' : '' }}">
         <a href="{{ route('staff.assigned.orders') }}"><i class="fa-solid fa-clipboard-list"></i> <span class="label">Assigned Orders</span></a>
       </li>
