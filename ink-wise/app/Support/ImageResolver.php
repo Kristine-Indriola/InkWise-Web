@@ -13,7 +13,8 @@ class ImageResolver
      */
     public static function url($path)
     {
-        $placeholder = asset('images/no-image.png');
+    // prefer root-relative placeholder so the browser uses the same host/port as the page
+    $placeholder = '/' . ltrim('images/no-image.png', '/');
 
         if (is_array($path)) {
             $fallbackValue = null;
@@ -24,6 +25,16 @@ class ImageResolver
                 }
             }
             $path = $path['path'] ?? $path['url'] ?? $fallbackValue;
+        }
+
+        if (is_string($path)) {
+            $trimmedJson = trim($path);
+            if ($trimmedJson !== '' && ($trimmedJson[0] === '{' || $trimmedJson[0] === '[')) {
+                $decoded = json_decode($trimmedJson, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    return self::url($decoded);
+                }
+            }
         }
 
         if (empty($path)) {
@@ -40,10 +51,10 @@ class ImageResolver
             return $path;
         }
 
-    $normalized = str_replace('\\', '/', $path);
+        $normalized = str_replace('\\', '/', $path);
 
-    $publicRoot = str_replace('\\', '/', public_path());
-    $storageRoot = str_replace('\\', '/', storage_path('app/public'));
+        $publicRoot = str_replace('\\', '/', public_path());
+        $storageRoot = str_replace('\\', '/', storage_path('app/public'));
 
         if (Str::startsWith($normalized, $publicRoot)) {
             $normalized = ltrim(Str::after($normalized, $publicRoot), '/');
@@ -54,31 +65,45 @@ class ImageResolver
         }
 
         // Normalize common prefixes: remove leading 'storage/' if present
-    $normalized = preg_replace('#^/?storage/#i', '', $normalized) ?? $normalized;
+        $normalized = preg_replace('#^/?storage/#i', '', $normalized) ?? $normalized;
 
-    // Remove leading public/ if still present
-    $normalized = preg_replace('#^/?public/#i', '', $normalized) ?? $normalized;
+        // Remove leading public/ if still present
+        $normalized = preg_replace('#^/?public/#i', '', $normalized) ?? $normalized;
 
         try {
             // check storage public disk (common Laravel setup uses public disk symlinked to public/storage)
             if (Storage::disk('public')->exists($normalized)) {
-                return asset('storage/' . ltrim($normalized, '/'));
+                // return root-relative path so the browser uses the same host/port as the page
+                return '/' . ltrim('storage/' . ltrim($normalized, '/'), '/');
             }
         } catch (\Throwable $e) {
             // ignore and fallback to public path
         }
 
+        // Dedicated disk lookup ensures invites stored on invitation_templates show correctly.
+        if (config('filesystems.disks.invitation_templates')) {
+            $invitationPath = ltrim(preg_replace('#^invitation_templates/#i', '', $normalized) ?? $normalized, '/');
+            if ($invitationPath !== '' && $invitationPath !== $normalized) {
+                try {
+                    if (Storage::disk('invitation_templates')->exists($invitationPath)) {
+                        return '/' . ltrim('storage/invitation_templates/' . ltrim($invitationPath, '/'), '/');
+                    }
+                } catch (\Throwable $e) {
+                    // ignore and continue
+                }
+            }
+        }
+
         // if file exists in public/ directory
         if (file_exists(public_path($normalized))) {
-            return asset($normalized);
+            return '/' . ltrim($normalized, '/');
         }
 
         // Common pattern: sometimes images are stored under storage/app/public and
         // the caller provided a path without 'storage/' prefix. Try with storage/ prefix.
         if (file_exists(public_path('storage/' . ltrim($normalized, '/')))) {
-            return asset('storage/' . ltrim($normalized, '/'));
+            return '/' . ltrim('storage/' . ltrim($normalized, '/'), '/');
         }
-
         return $placeholder;
     }
 }

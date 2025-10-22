@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fontisto@3.0.4/css/fontisto/fontisto.min.css">
     <script src="https://sdk.canva.com/designbutton/v2/api.js"></script>
-    
+
     <!-- Added: force sidebar left and make all buttons white -->
     <style>
     /* Layout: ensure sidebar is on the left */
@@ -128,7 +128,7 @@
     .editor-canvas.flipping .flip-inner { transform: rotateY(180deg); }
     .editor-canvas .flip-inner canvas { backface-visibility: hidden; transform-style: preserve-3d; }
     </style>
-    
+
 </head>
 <body>
 
@@ -171,8 +171,8 @@
     <div class="editor-panel">
         <div class="editor-topbar" role="banner">
             <div class="nav-links">
-                <a href="{{ route('admin.templates.index') }}" class="btn secondary">Back to Templates</a>
-                <a href="{{ route('admin.templates.create') }}" class="btn secondary">Create New</a>
+                <a href="{{ route('staff.templates.index') }}" class="btn secondary">Back to Templates</a>
+                <a href="{{ route('staff.templates.create') }}" class="btn secondary">Create New</a>
             </div>
             <div class="project-name">
                 {{ $template->name ?? 'Untitled' }}
@@ -249,8 +249,8 @@
 <script>
 window.TEMPLATE_ID = {{ $template->id }};
 window.CSRF_TOKEN = "{{ csrf_token() }}";
-window.TEMPLATES_INDEX_URL = "{{ route('admin.templates.index') }}";
-window.UPLOAD_PREVIEW_URL = "{{ route('admin.templates.uploadPreview', $template->id) }}";
+window.TEMPLATES_INDEX_URL = "{{ route('staff.templates.index') }}";
+window.ASSETS_SEARCH_URL = "{{ route('staff.templates.searchAssets', $template->id) }}";
 </script>
 
 <script>
@@ -261,8 +261,8 @@ const colorPickerInput = document.getElementById("colorPickerInput");
 if (textColorToolbar && colorPickerDropdown && colorPickerInput) {
     textColorToolbar.addEventListener("click", function(e) {
         e.stopPropagation();
-        colorPickerDropdown.style.display = 
-            (colorPickerDropdown.style.display === "none" || colorPickerDropdown.style.display === "") 
+        colorPickerDropdown.style.display =
+            (colorPickerDropdown.style.display === "none" || colorPickerDropdown.style.display === "")
             ? "block" : "none";
     });
 
@@ -474,7 +474,7 @@ document.addEventListener("DOMContentLoaded", function() {
         var q = (input && input.value) ? input.value : '';
         var t = (typeSelect && typeSelect.value) ? typeSelect.value : 'image';
         results.innerHTML = '<div style="color:#fff">Searching...</div>';
-        fetch('{{ url("/admin/templates") }}/' + templateId + '/assets/search?type=' + encodeURIComponent(t) + '&q=' + encodeURIComponent(q), {
+        fetch(window.ASSETS_SEARCH_URL + '?type=' + encodeURIComponent(t) + '&q=' + encodeURIComponent(q), {
             headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
         }).then(function(r){ return r.json(); }).then(function(json){
             if (json && json.success) renderAssets(json.data || []);
@@ -561,7 +561,7 @@ document.addEventListener("DOMContentLoaded", function() {
 +(function(){
 +    var sidebarBtn = document.getElementById('sidebarColorBtn');
 +    var sidebarModal = document.getElementById('sidebarColorModal');
-+    var sidebarColorInput = document.getElementById('sidebarThemeColor');
++ var sidebarColorInput = document.getElementById('sidebarThemeColor');
 +    var presetEls = document.querySelectorAll('#sidebarPresetColors .preset-color');
 +    var applyBtn = document.getElementById('sidebarColorApply');
 +    var cancelBtn = document.getElementById('sidebarColorCancel');
@@ -575,48 +575,48 @@ document.addEventListener("DOMContentLoaded", function() {
 +    }
 +    function closeModal(){
 +        sidebarModal.style.display = 'none';
-+        sidebarModal.setAttribute('aria-hidden','true');
-+        sidebarBtn.setAttribute('aria-expanded','false');
-+    }
-+
-+    sidebarBtn.addEventListener('click', function(e){
-+        e.stopPropagation();
-+        if (sidebarModal.style.display === 'block') closeModal(); else openModal();
-+    });
-+
-+    // clicking outside closes modal
-+    document.addEventListener('click', function(e){
-+        if (!sidebarModal.contains(e.target) && e.target !== sidebarBtn) closeModal();
-+    });
-+
-+    // preset colors
-+    presetEls.forEach(function(el){
-+        el.addEventListener('click', function(){
-+            var c = el.getAttribute('data-color');
-+            sidebarColorInput.value = c;
-+        });
-+    });
-+
-+    // apply: set CSS variable --accent and update small preview
-+    applyBtn.addEventListener('click', function(){
-+        var val = sidebarColorInput.value || '#2563eb';
-+        document.documentElement.style.setProperty('--accent', val);
-+        // update preview swatch inside button
-+        var sw = sidebarBtn.querySelector('span');
-+        if (sw) sw.style.background = val;
-+        // update any components that referenced var(--accent)
-+        var dz = document.getElementById('imageDropZone');
-+        if (dz) dz.style.borderColor = val;
-+        closeModal();
-+    });
-+    // cancel / close
-+    cancelBtn.addEventListener('click', function(){ closeModal(); });
-+
-+    // keyboard: Esc to close
-+    document.addEventListener('keydown', function(e){
-+        if (e.key === 'Escape') closeModal();
-+    });
-+})();
+        sidebarModal.setAttribute('aria-hidden','true');
+        sidebarBtn.setAttribute('aria-expanded','false');
+    }
+
+    sidebarBtn.addEventListener('click', function(e){
+        e.stopPropagation();
+        if (sidebarModal.style.display === 'block') closeModal(); else openModal();
+    });
+
+    // clicking outside closes modal
+    document.addEventListener('click', function(e){
+        if (!sidebarModal.contains(e.target) && e.target !== sidebarBtn) closeModal();
+    });
+
+    // preset colors
+    presetEls.forEach(function(el){
+        el.addEventListener('click', function(){
+            var c = el.getAttribute('data-color');
+            sidebarColorInput.value = c;
+        });
+    });
+
+    // apply: set CSS variable --accent and update small preview
+    applyBtn.addEventListener('click', function(){
+        var val = sidebarColorInput.value || '#2563eb';
+        document.documentElement.style.setProperty('--accent', val);
+        // update preview swatch inside button
+        var sw = sidebarBtn.querySelector('span');
+        if (sw) sw.style.background = val;
+        // update any components that referenced var(--accent)
+        var dz = document.getElementById('imageDropZone');
+        if (dz) dz.style.borderColor = val;
+        closeModal();
+    });
+    // cancel / close
+    cancelBtn.addEventListener('click', function(){ closeModal(); });
+
+    // keyboard: Esc to close
+    document.addEventListener('keydown', function(e){
+        if (e.key === 'Escape') closeModal();
+    });
+})();
 </script>
 
 <script>
@@ -655,3 +655,6 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 </script>
 
+
+</body>
+</html>

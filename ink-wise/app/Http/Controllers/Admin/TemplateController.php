@@ -4,38 +4,125 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Models\ProductUpload;
 use App\Models\Template;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use App\Notifications\TemplateUploadedNotification;
 
 class TemplateController extends Controller
 {
     // Show all templates
     public function index()
     {
-        $templates = Template::paginate(12); // Show 12 per page
-        return view('admin.templates.index', compact('templates'));
+        $type = request('type');
+        $query = Template::query();
+
+        if ($type && in_array($type, ['invitation', 'giveaway', 'envelope'])) {
+            $query->where('product_type', ucfirst($type));
+        }
+
+        // Exclude templates that have been uploaded (status = 'uploaded')
+        $query->where('status', '!=', 'uploaded');
+
+        $templates = $query->paginate(12); // Show 12 per page
+
+        // Determine if this is admin or staff route
+        $prefix = request()->route()->getPrefix();
+        $isStaff = str_contains($prefix, 'staff');
+
+        // TEMPORARY: Force staff views for debugging
+        $isStaff = true;
+
+        // Debug: log the prefix and isStaff value
+        Log::info('TemplateController::index - Prefix: ' . $prefix . ', isStaff: ' . ($isStaff ? 'true' : 'false'));
+
+        return view('staff.templates.index', compact('templates', 'type'));
+    }
+
+    // Show uploaded templates
+    public function uploaded()
+    {
+        $type = request('type');
+        $query = Template::where('status', 'uploaded');
+
+        if ($type && in_array($type, ['invitation', 'giveaway', 'envelope'])) {
+            $query->where('product_type', ucfirst($type));
+        }
+
+        $templates = $query->paginate(12); // Show 12 per page
+
+        // Determine if this is admin or staff route
+        $isStaff = str_contains(request()->route()->getPrefix(), 'staff');
+
+        // TEMPORARY: Force staff views for debugging
+        $isStaff = true;
+
+        return view('staff.templates.uploaded', compact('templates', 'type'));
     }
 
     // Show create form
     public function create()
     {
-        return view('admin.templates.create');
+        $type = request('type', 'invitation');
+
+        // Determine if this is admin or staff route
+        $isStaff = str_contains(request()->route()->getPrefix(), 'staff');
+
+        // TEMPORARY: Force staff views for debugging
+        $isStaff = true;
+
+        if ($type === 'giveaway') {
+            return view('staff.templates.create-giveaway');
+        }
+
+        if ($type === 'envelope') {
+            return view('staff.templates.create-envelope');
+        }
+
+        return view('staff.templates.create');
     }
 
-    // Store new template
-    public function store(Request $request)
+    // Show edit form
+    public function edit($id)
     {
-        $validated = $request->validate([
+        $template = Template::findOrFail($id);
+
+        // Determine if this is admin or staff route
+        $isStaff = str_contains(request()->route()->getPrefix(), 'staff');
+
+        // TEMPORARY: Force staff views for debugging
+        $isStaff = true;
+
+        return view('staff.templates.edit', compact('template'));
+    }
+
+    // Update template
+    public function update(Request $request, $id)
+    {
+        $template = Template::findOrFail($id);
+
+        $rules = [
             'name' => 'required|string|max:255',
             'event_type' => 'nullable|string|max:255',
-            'product_type' => 'nullable|string|max:255',
             'theme_style' => 'nullable|string|max:255',
             'description' => 'nullable|string',
-            'front_image' => 'required|file|mimes:jpeg,png,jpg,gif,svg|max:5120',
-            'back_image' => 'required|file|mimes:jpeg,png,jpg,gif,svg|max:5120',
-        ]);
+        ];
+
+        // Handle file uploads based on template type
+        if ($request->hasFile('front_image')) {
+            $rules['front_image'] = 'file|mimes:jpeg,png,jpg,gif,svg|max:5120';
+        }
+
+        if ($request->hasFile('back_image')) {
+            $rules['back_image'] = 'file|mimes:jpeg,png,jpg,gif,svg|max:5120';
+        }
+
+        $validated = $request->validate($rules);
 
         // Handle front image upload
         if ($request->hasFile('front_image')) {
@@ -49,24 +136,106 @@ class TemplateController extends Controller
             $validated['back_image'] = $backImagePath;
         }
 
-        $template = \App\Models\Template::create($validated);
+        $template->update($validated);
 
         if ($request->expectsJson() || $request->ajax()) {
+            // Determine if this is admin or staff route
+            $isStaff = str_contains(request()->route()->getPrefix(), 'staff');
+            // TEMPORARY: Force staff routes for debugging
+            $isStaff = true;
+            $redirectRoute = $isStaff ? 'staff.templates.index' : 'admin.templates.index';
+
             return response()->json([
                 'success' => true,
-                'template_id' => $template->id,
-                'redirect' => route('admin.templates.index'),
+                'redirect' => route($redirectRoute),
             ]);
         }
 
-        return redirect()->route('admin.templates.index')->with('success', 'Template created successfully!');
+        // Determine if this is admin or staff route
+        $isStaff = str_contains(request()->route()->getPrefix(), 'staff');
+        // TEMPORARY: Force staff routes for debugging
+        $isStaff = true;
+        $redirectRoute = $isStaff ? 'staff.templates.index' : 'admin.templates.index';
+
+        return redirect()->route($redirectRoute)->with('success', 'Updated successfully');
+    }
+
+    // Store new template
+    public function store(Request $request)
+    {
+        // Determine required file inputs based on type (invitation vs giveaway/envelope)
+        $type = $request->input('product_type') ?: $request->query('type', 'invitation');
+
+        $rules = [
+            'name' => 'required|string|max:255',
+            'event_type' => 'nullable|string|max:255',
+            'product_type' => 'nullable|string|max:255',
+            'theme_style' => 'nullable|string|max:255',
+            'description' => 'nullable|string',
+        ];
+
+        // Invitations require both front and back images; giveaways/envelopes only front_image
+        if ($type === 'invitation') {
+            $rules['front_image'] = 'required|file|mimes:jpeg,png,jpg,gif,svg|max:5120';
+            $rules['back_image'] = 'required|file|mimes:jpeg,png,jpg,gif,svg|max:5120';
+        } else {
+            $rules['front_image'] = 'required|file|mimes:svg,svg+xml,image/svg+xml,svgz|max:5120';
+        }
+
+        $validated = $request->validate($rules);
+
+        // Handle front image upload
+        if ($request->hasFile('front_image')) {
+            $frontImagePath = $request->file('front_image')->store('templates', 'public');
+            $validated['front_image'] = $frontImagePath;
+        }
+
+        // Handle back image upload
+        if ($request->hasFile('back_image')) {
+            $backImagePath = $request->file('back_image')->store('templates', 'public');
+            $validated['back_image'] = $backImagePath;
+        } else {
+            // For giveaway/envelope, back_image may be absent; keep it null
+            $validated['back_image'] = $validated['back_image'] ?? null;
+        }
+
+        $template = \App\Models\Template::create($validated);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            // Determine if this is admin or staff route
+            $isStaff = str_contains(request()->route()->getPrefix(), 'staff');
+            // TEMPORARY: Force staff routes for debugging
+            $isStaff = true;
+            $redirectRoute = $isStaff ? 'staff.templates.index' : 'admin.templates.index';
+
+            return response()->json([
+                'success' => true,
+                'template_id' => $template->id,
+                'redirect' => route($redirectRoute),
+            ]);
+        }
+
+        // Determine if this is admin or staff route
+        $isStaff = str_contains(request()->route()->getPrefix(), 'staff');
+        // TEMPORARY: Force staff routes for debugging
+        $isStaff = true;
+        $redirectRoute = $isStaff ? 'staff.templates.index' : 'admin.templates.index';
+
+        return redirect()->route($redirectRoute)->with('success', 'Created successfully');
     }
 
     // Show editor page for a template
     public function editor($id)
     {
         $template = Template::findOrFail($id);
-        return view('admin.templates.editor', compact('template'));
+
+        // Determine if this is admin or staff route
+        $isStaff = str_contains(request()->route()->getPrefix(), 'staff');
+
+        // TEMPORARY: Force staff views for debugging
+        $isStaff = true;
+
+        return view('staff.templates.editor', compact('template'));
     }
    
 public function destroy($id)
@@ -74,7 +243,15 @@ public function destroy($id)
     $template = Template::findOrFail($id);
     $template->delete();
 
-    return redirect()->route('admin.templates.index')->with('success', 'Template deleted successfully.');
+    // Determine if this is admin or staff route
+    $isStaff = str_contains(request()->route()->getPrefix(), 'staff');
+
+    // TEMPORARY: Force staff routes for debugging
+    $isStaff = true;
+
+    $redirectRoute = $isStaff ? 'staff.templates.index' : 'admin.templates.index';
+
+    return redirect()->route($redirectRoute)->with('success', 'Deleted successfully');
 }
 
 public function saveCanvas(Request $request, $id)
@@ -176,7 +353,13 @@ public function uploadPreview(Request $request, $id)
             ]);
         }
 
-        return redirect()->route('admin.templates.index')->with('success', 'Custom template uploaded.');
+        // Determine if this is admin or staff route
+        $isStaff = str_contains(request()->route()->getPrefix(), 'staff');
+        // TEMPORARY: Force staff routes for debugging
+        $isStaff = true;
+        $redirectRoute = $isStaff ? 'staff.templates.index' : 'admin.templates.index';
+
+        return redirect()->route($redirectRoute)->with('success', 'Custom template uploaded.');
     }
 
 public function uploadToProduct(Request $request, $id)
@@ -332,5 +515,46 @@ public function uploadToProduct(Request $request, $id)
         })->values();
 
         return response()->json(['success' => true, 'data' => $results]);
+    }
+
+    // Upload template (create record in product_uploads table)
+    public function uploadTemplate(Request $request, $id)
+    {
+        $template = Template::findOrFail($id);
+
+        // Check if already uploaded to product_uploads
+        $existing = ProductUpload::where('template_id', $template->id)->first();
+        if ($existing) {
+            return redirect()->back()->with('success', 'Template already uploaded to products');
+        }
+
+        // Create record in product_uploads table
+        $productUpload = ProductUpload::create([
+            'template_id' => $template->id,
+            'template_name' => $template->name,
+            'description' => $template->description,
+            'product_type' => $template->product_type,
+            'event_type' => $template->event_type,
+            'theme_style' => $template->theme_style,
+            'front_image' => $template->front_image,
+            'back_image' => $template->back_image,
+            'preview_image' => $template->preview,
+            'design_data' => $template->design,
+        ]);
+
+        // Update template status to uploaded
+        $template->update([
+            'status' => 'uploaded'
+        ]);
+
+        // Send notification to all admin users
+        $admins = User::where('role', 'admin')->get();
+        $staff = Auth::user(); // Get the current authenticated user (staff who uploaded)
+
+        foreach ($admins as $admin) {
+            $admin->notify(new TemplateUploadedNotification($template, $staff));
+        }
+
+        return redirect()->back()->with('success', 'Template uploaded to products successfully');
     }
 }

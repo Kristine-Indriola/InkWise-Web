@@ -174,11 +174,11 @@ class ProductController extends Controller
     // Add: Method to show the create invitation form
     public function createInvitation(Request $request)
     {
-        $templates = \App\Models\Template::all();
+        $templates = \App\Models\ProductUpload::all();
         $materials = \App\Models\Material::all();
         $selectedTemplate = null;
         if ($request->has('template_id')) {
-            $selectedTemplate = \App\Models\Template::find($request->input('template_id'));
+            $selectedTemplate = \App\Models\ProductUpload::find($request->input('template_id'));
         }
         return view('admin.products.create-invitation', compact('templates', 'materials', 'selectedTemplate'));
     }
@@ -190,11 +190,11 @@ class ProductController extends Controller
             $product = Product::with(['template', 'addons', 'colors', 'bulkOrders'])->find($request->input('product_id'));
         }
 
-        $templates = Template::all();
+        $templates = ProductUpload::all();
         $materials = Material::all();
         $selectedTemplate = null;
         if ($request->has('template_id')) {
-            $selectedTemplate = Template::find($request->input('template_id'));
+            $selectedTemplate = ProductUpload::find($request->input('template_id'));
         }
 
         return view('admin.products.create-giveaways', compact('product', 'templates', 'materials', 'selectedTemplate'));
@@ -203,7 +203,7 @@ class ProductController extends Controller
     // Add: Method to show the create envelope form
     public function createEnvelope(Request $request)
     {
-        $templates = \App\Models\Template::all();
+        $templates = \App\Models\ProductUpload::all();
         $materials = \App\Models\Material::all();
         $materialTypes = \App\Models\Material::distinct()->pluck('material_type')->filter()->values();
         $envelopeMaterials = \App\Models\Material::where('material_type', 'like', '%envelope%')
@@ -215,7 +215,7 @@ class ProductController extends Controller
         $envelope = null;
 
         if ($request->has('template_id')) {
-            $selectedTemplate = \App\Models\Template::find($request->input('template_id'));
+            $selectedTemplate = \App\Models\ProductUpload::find($request->input('template_id'));
         }
 
         // Check if editing an existing envelope product

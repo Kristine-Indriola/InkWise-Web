@@ -2,207 +2,317 @@
 {{-- Page 1: Templates --}}
 @php
     $templatesCollection = $templates instanceof \Illuminate\Support\Collection ? $templates : collect($templates);
-    $invitationTemplates = $templatesCollection->filter(function($template) {
-        return strtolower($template->product_type ?? '') === 'invitation';
-    });
-    $giveawayTemplates = $templatesCollection->filter(function($template) {
-        return strtolower($template->product_type ?? '') === 'giveaway';
-    });
-    $otherTemplates = $templatesCollection->filter(function($template) {
-        $type = strtolower($template->product_type ?? '');
-        return $type !== 'invitation' && $type !== 'giveaway';
-    });
+
+    // Determine which templates to show based on current route
+    $currentRoute = request()->route()->getName();
+    $showOnlyType = null;
+
+    if (str_contains($currentRoute, 'invitation')) {
+        $showOnlyType = 'invitation';
+    } elseif (str_contains($currentRoute, 'giveaway')) {
+        $showOnlyType = 'giveaway';
+    } elseif (str_contains($currentRoute, 'envelope')) {
+        $showOnlyType = 'envelope';
+    }
+
+    if ($showOnlyType) {
+        $filteredTemplates = $templatesCollection->filter(function($template) use ($showOnlyType) {
+            return strtolower($template->product_type ?? '') === $showOnlyType;
+        });
+    } else {
+        // Fallback to showing all templates if route detection fails
+        $invitationTemplates = $templatesCollection->filter(function($template) {
+            return strtolower($template->product_type ?? '') === 'invitation';
+        });
+        $giveawayTemplates = $templatesCollection->filter(function($template) {
+            return strtolower($template->product_type ?? '') === 'giveaway';
+        });
+        $otherTemplates = $templatesCollection->filter(function($template) {
+            $type = strtolower($template->product_type ?? '');
+            return $type !== 'invitation' && $type !== 'giveaway';
+        });
+    }
 @endphp
 
 <div class="page page1" data-page="0">
     <div class="templates-hero">
         <div>
-            <h2 class="templates-title">Choose a template to start your build</h2>
-            <p class="templates-subtitle">Browse curated invitations and giveaways. Pick one to pre-fill product details instantly.</p>
+            @if($showOnlyType === 'invitation')
+                <h2 class="templates-title">Choose an invitation template</h2>
+                <p class="templates-subtitle">Browse curated invitation templates. Pick one to pre-fill your invitation details instantly.</p>
+            @elseif($showOnlyType === 'giveaway')
+                <h2 class="templates-title">Choose a giveaway template</h2>
+                <p class="templates-subtitle">Browse curated giveaway templates. Pick one to pre-fill your giveaway details instantly.</p>
+            @elseif($showOnlyType === 'envelope')
+                <h2 class="templates-title">Choose an envelope template</h2>
+                <p class="templates-subtitle">Browse curated envelope templates. Pick one to pre-fill your envelope details instantly.</p>
+            @else
+                <h2 class="templates-title">Choose a template to start your build</h2>
+                <p class="templates-subtitle">Browse curated invitations and giveaways. Pick one to pre-fill product details instantly.</p>
+            @endif
         </div>
     </div>
 
     <div class="templates-container">
-        <section class="template-section" aria-labelledby="invitation-templates-heading">
-            <div class="template-section-header">
-                <div>
-                    <h3 id="invitation-templates-heading">Invitation Templates</h3>
-                    <p>Elegant invites for weddings, celebrations, and corporate events.</p>
-                </div>
-                <span class="template-count">{{ $invitationTemplates->count() }} templates</span>
-            </div>
-            @if($invitationTemplates->isNotEmpty())
-                <div class="templates-grid">
-                    @foreach($invitationTemplates as $template)
-                        <div class="template-card" tabindex="0" role="button" data-template-id="{{ $template->id }}">
-                            <div class="template-image-container">
-                                @php
-                                    $frontImg = $template->front_image ?? $template->preview;
-                                    $backImg = $template->back_image ?? null;
-                                @endphp
-                                @if($frontImg)
-                                    <img src="@imageUrl($frontImg)" alt="{{ $template->name }}" class="template-img">
-                                @else
-                                    <span>No preview</span>
-                                @endif
-                                @if($backImg)
-                                    <img src="@imageUrl($backImg)" alt="Back of {{ $template->name }}" class="back-thumb">
-                                @endif
-                            </div>
-                            <div class="card-overlay">
-                                <h3>{{ $template->name }}</h3>
-                                <p>{{ $template->description }}</p>
-                                <div class="card-meta">
-                                    <span class="meta-pill">{{ $template->event_type ?? '—' }}</span>
-                                    <span class="meta-pill">{{ $template->theme_style ?? '—' }}</span>
-                                </div>
-                                <div class="card-actions">
-                                    <button type="button" class="btn continue-btn"
-                                        data-template-id="{{ $template->id }}"
-                                        data-template-name="{{ $template->name }}"
-                                        data-template-description="{{ $template->description }}"
-                                        data-template-event_type="{{ $template->event_type }}"
-                                        data-template-product_type="{{ $template->product_type }}"
-                                        data-template-theme_style="{{ $template->theme_style }}"
-                                        data-template-preview="{{ $template->preview }}"
-                                    >Use template</button>
-                                    <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->name }}">Delete</button>
-                                    @if(!empty($template->front_image))
-                                        <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
-                                    @endif
-                                    @if(!empty($template->back_image))
-                                        <button type="button" class="btn view-back-btn" data-back-url="{{ \App\Support\ImageResolver::url($template->back_image) }}">View Back</button>
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-            @else
-                <div class="templates-empty">
-                    <p>No invitation templates available yet. Create a new template to get started.</p>
-                </div>
-            @endif
-        </section>
-
-        <section class="template-section" aria-labelledby="giveaway-templates-heading">
-            <div class="template-section-header">
-                <div>
-                    <h3 id="giveaway-templates-heading">Giveaway Templates</h3>
-                    <p>Thoughtful keepsakes and corporate gifts ready for quick customization.</p>
-                </div>
-                <span class="template-count">{{ $giveawayTemplates->count() }} templates</span>
-            </div>
-            @if($giveawayTemplates->isNotEmpty())
-                <div class="templates-grid">
-                    @foreach($giveawayTemplates as $template)
-                        <div class="template-card" tabindex="0" role="button" data-template-id="{{ $template->id }}">
-                            <div class="template-image-container">
-                                @php
-                                    $frontImg = $template->front_image ?? $template->preview;
-                                    $backImg = $template->back_image ?? null;
-                                @endphp
-                                @if($frontImg)
-                                    <img src="@imageUrl($frontImg)" alt="{{ $template->name }}" class="template-img">
-                                @else
-                                    <span>No preview</span>
-                                @endif
-                                @if($backImg)
-                                    <img src="@imageUrl($backImg)" alt="Back of {{ $template->name }}" class="back-thumb">
-                                @endif
-                            </div>
-                            <div class="card-overlay">
-                                <h3>{{ $template->name }}</h3>
-                                <p>{{ $template->description }}</p>
-                                <div class="card-meta">
-                                    <span class="meta-pill">{{ $template->event_type ?? '—' }}</span>
-                                    <span class="meta-pill">{{ $template->theme_style ?? '—' }}</span>
-                                </div>
-                                <div class="card-actions">
-                                    <button type="button" class="btn continue-btn"
-                                        data-template-id="{{ $template->id }}"
-                                        data-template-name="{{ $template->name }}"
-                                        data-template-description="{{ $template->description }}"
-                                        data-template-event_type="{{ $template->event_type }}"
-                                        data-template-product_type="{{ $template->product_type }}"
-                                        data-template-theme_style="{{ $template->theme_style }}"
-                                        data-template-preview="{{ $template->preview }}"
-                                    >Use template</button>
-                                    <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->name }}">Delete</button>
-                                    @if(!empty($template->front_image))
-                                        <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
-                                    @endif
-                                    @if(!empty($template->back_image))
-                                        <button type="button" class="btn view-back-btn" data-back-url="{{ \App\Support\ImageResolver::url($template->back_image) }}">View Back</button>
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-            @else
-                <div class="templates-empty">
-                    <p>No giveaway templates yet. Upload a giveaway concept to populate this section.</p>
-                </div>
-            @endif
-        </section>
-
-        @if($otherTemplates->isNotEmpty())
-            <section class="template-section" aria-labelledby="other-templates-heading">
+        @if($showOnlyType)
+            {{-- Show only the relevant template type --}}
+            @php
+                $templateTypeLabel = ucfirst($showOnlyType);
+                $templateDescription = match($showOnlyType) {
+                    'invitation' => 'Elegant invites for weddings, celebrations, and corporate events.',
+                    'giveaway' => 'Thoughtful keepsakes and corporate gifts ready for quick customization.',
+                    'envelope' => 'Elegant envelopes to complement your invitations.',
+                    default => 'Templates for your products.'
+                };
+            @endphp
+            <section class="template-section" aria-labelledby="{{ $showOnlyType }}-templates-heading">
                 <div class="template-section-header">
                     <div>
-                        <h3 id="other-templates-heading">Other Templates</h3>
-                        <p>Templates with custom product types.</p>
+                        <h3 id="{{ $showOnlyType }}-templates-heading">{{ $templateTypeLabel }} Templates</h3>
+                        <p>{{ $templateDescription }}</p>
                     </div>
-                    <span class="template-count">{{ $otherTemplates->count() }} templates</span>
+                    <span class="template-count">{{ $filteredTemplates->count() }} templates</span>
                 </div>
-                <div class="templates-grid">
-                    @foreach($otherTemplates as $template)
-                        <div class="template-card" tabindex="0" role="button" data-template-id="{{ $template->id }}">
-                            <div class="template-image-container">
-                                @php
-                                    $frontImg = $template->front_image ?? $template->preview;
-                                    $backImg = $template->back_image ?? null;
-                                @endphp
-                                @if($frontImg)
-                                    <img src="@imageUrl($frontImg)" alt="{{ $template->name }}" class="template-img">
-                                @else
-                                    <span>No preview</span>
-                                @endif
-                                @if($backImg)
-                                    <img src="@imageUrl($backImg)" alt="Back of {{ $template->name }}" class="back-thumb">
-                                @endif
-                            </div>
-                            <div class="card-overlay">
-                                <h3>{{ $template->name }}</h3>
-                                <p>{{ $template->description }}</p>
-                                <div class="card-meta">
-                                    <span class="meta-pill">{{ $template->product_type ?? '—' }}</span>
-                                    <span class="meta-pill">{{ $template->theme_style ?? '—' }}</span>
-                                </div>
-                                <div class="card-actions">
-                                    <button type="button" class="btn continue-btn"
-                                        data-template-id="{{ $template->id }}"
-                                        data-template-name="{{ $template->name }}"
-                                        data-template-description="{{ $template->description }}"
-                                        data-template-event_type="{{ $template->event_type }}"
-                                        data-template-product_type="{{ $template->product_type }}"
-                                        data-template-theme_style="{{ $template->theme_style }}"
-                                        data-template-preview="{{ $template->preview }}"
-                                    >Use template</button>
-                                    <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->name }}">Delete</button>
-                                    @if(!empty($template->front_image))
-                                        <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
+                @if($filteredTemplates->isNotEmpty())
+                    <div class="templates-grid">
+                        @foreach($filteredTemplates as $template)
+                            <div class="template-card" tabindex="0" role="button" data-template-id="{{ $template->id }}">
+                                <div class="template-image-container">
+                                    @php
+                                        $frontImg = $template->front_image ?? $template->preview_image;
+                                        $backImg = $template->back_image ?? null;
+                                    @endphp
+                                    @if($frontImg)
+                                        <img src="@imageUrl($frontImg)" alt="{{ $template->template_name }}" class="template-img">
+                                    @else
+                                        <span>No preview</span>
                                     @endif
-                                    @if(!empty($template->back_image))
-                                        <button type="button" class="btn view-back-btn" data-back-url="{{ \App\Support\ImageResolver::url($template->back_image) }}">View Back</button>
+                                    @if($backImg)
+                                        <img src="@imageUrl($backImg)" alt="Back of {{ $template->template_name }}" class="back-thumb">
                                     @endif
                                 </div>
+                                <div class="card-overlay">
+                                    <h3>{{ $template->template_name }}</h3>
+                                    <p>{{ $template->description }}</p>
+                                    <div class="card-meta">
+                                        <span class="meta-pill">{{ $template->event_type ?? '—' }}</span>
+                                        <span class="meta-pill">{{ $template->theme_style ?? '—' }}</span>
+                                    </div>
+                                    <div class="card-actions">
+                                        <button type="button" class="btn continue-btn"
+                                            data-template-id="{{ $template->id }}"
+                                            data-template-name="{{ $template->template_name }}"
+                                            data-template-description="{{ $template->description }}"
+                                            data-template-event_type="{{ $template->event_type }}"
+                                            data-template-product_type="{{ $template->product_type }}"
+                                            data-template-theme_style="{{ $template->theme_style }}"
+                                            data-template-preview="{{ $template->preview_image }}"
+                                            data-front-url="{{ $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : '' }}"
+                                        >Use template</button>
+                                        <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->template_name }}">Delete</button>
+                                        @if(!empty($template->front_image))
+                                            <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
+                                        @endif
+                                        @if(!empty($template->back_image))
+                                            <button type="button" class="btn view-back-btn" data-back-url="{{ \App\Support\ImageResolver::url($template->back_image) }}">View Back</button>
+                                        @endif
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    @endforeach
-                </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="templates-empty">
+                        <p>No {{ $showOnlyType }} templates available yet. Create a new template to get started.</p>
+                    </div>
+                @endif
             </section>
+        @else
+            {{-- Fallback: Show all template types (original behavior) --}}
+            <section class="template-section" aria-labelledby="invitation-templates-heading">
+                <div class="template-section-header">
+                    <div>
+                        <h3 id="invitation-templates-heading">Invitation Templates</h3>
+                        <p>Elegant invites for weddings, celebrations, and corporate events.</p>
+                    </div>
+                    <span class="template-count">{{ $invitationTemplates->count() }} templates</span>
+                </div>
+                @if($invitationTemplates->isNotEmpty())
+                    <div class="templates-grid">
+                        @foreach($invitationTemplates as $template)
+                            <div class="template-card" tabindex="0" role="button" data-template-id="{{ $template->id }}">
+                                <div class="template-image-container">
+                                    @php
+                                        $frontImg = $template->front_image ?? $template->preview_image;
+                                        $backImg = $template->back_image ?? null;
+                                    @endphp
+                                    @if($frontImg)
+                                        <img src="@imageUrl($frontImg)" alt="{{ $template->template_name }}" class="template-img">
+                                    @else
+                                        <span>No preview</span>
+                                    @endif
+                                    @if($backImg)
+                                        <img src="@imageUrl($backImg)" alt="Back of {{ $template->template_name }}" class="back-thumb">
+                                    @endif
+                                </div>
+                                <div class="card-overlay">
+                                    <h3>{{ $template->template_name }}</h3>
+                                    <p>{{ $template->description }}</p>
+                                    <div class="card-meta">
+                                        <span class="meta-pill">{{ $template->event_type ?? '—' }}</span>
+                                        <span class="meta-pill">{{ $template->theme_style ?? '—' }}</span>
+                                    </div>
+                                    <div class="card-actions">
+                                        <button type="button" class="btn continue-btn"
+                                            data-template-id="{{ $template->id }}"
+                                            data-template-name="{{ $template->template_name }}"
+                                            data-template-description="{{ $template->description }}"
+                                            data-template-event_type="{{ $template->event_type }}"
+                                            data-template-product_type="{{ $template->product_type }}"
+                                            data-template-theme_style="{{ $template->theme_style }}"
+                                            data-template-preview="{{ $template->preview_image }}"
+                                            data-front-url="{{ $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : '' }}"
+                                        >Use template</button>
+                                        <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->template_name }}">Delete</button>
+                                        @if(!empty($template->front_image))
+                                            <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
+                                        @endif
+                                        @if(!empty($template->back_image))
+                                            <button type="button" class="btn view-back-btn" data-back-url="{{ \App\Support\ImageResolver::url($template->back_image) }}">View Back</button>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="templates-empty">
+                        <p>No invitation templates available yet. Create a new template to get started.</p>
+                    </div>
+                @endif
+            </section>
+
+            <section class="template-section" aria-labelledby="giveaway-templates-heading">
+                <div class="template-section-header">
+                    <div>
+                        <h3 id="giveaway-templates-heading">Giveaway Templates</h3>
+                        <p>Thoughtful keepsakes and corporate gifts ready for quick customization.</p>
+                    </div>
+                    <span class="template-count">{{ $giveawayTemplates->count() }} templates</span>
+                </div>
+                @if($giveawayTemplates->isNotEmpty())
+                    <div class="templates-grid">
+                        @foreach($giveawayTemplates as $template)
+                            <div class="template-card" tabindex="0" role="button" data-template-id="{{ $template->id }}">
+                                <div class="template-image-container">
+                                    @php
+                                        $frontImg = $template->front_image ?? $template->preview_image;
+                                        $backImg = $template->back_image ?? null;
+                                    @endphp
+                                    @if($frontImg)
+                                        <img src="@imageUrl($frontImg)" alt="{{ $template->template_name }}" class="template-img">
+                                    @else
+                                        <span>No preview</span>
+                                    @endif
+                                    @if($backImg)
+                                        <img src="@imageUrl($backImg)" alt="Back of {{ $template->template_name }}" class="back-thumb">
+                                    @endif
+                                </div>
+                                <div class="card-overlay">
+                                    <h3>{{ $template->template_name }}</h3>
+                                    <p>{{ $template->description }}</p>
+                                    <div class="card-meta">
+                                        <span class="meta-pill">{{ $template->event_type ?? '—' }}</span>
+                                        <span class="meta-pill">{{ $template->theme_style ?? '—' }}</span>
+                                    </div>
+                                    <div class="card-actions">
+                                        <button type="button" class="btn continue-btn"
+                                            data-template-id="{{ $template->id }}"
+                                            data-template-name="{{ $template->template_name }}"
+                                            data-template-description="{{ $template->description }}"
+                                            data-template-event_type="{{ $template->event_type }}"
+                                            data-template-product_type="{{ $template->product_type }}"
+                                            data-template-theme_style="{{ $template->theme_style }}"
+                                            data-template-preview="{{ $template->preview_image }}"
+                                            data-front-url="{{ $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : '' }}"
+                                        >Use template</button>
+                                        <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->template_name }}">Delete</button>
+                                        @if(!empty($template->front_image))
+                                            <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
+                                        @endif
+                                        @if(!empty($template->back_image))
+                                            <button type="button" class="btn view-back-btn" data-back-url="{{ \App\Support\ImageResolver::url($template->back_image) }}">View Back</button>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="templates-empty">
+                        <p>No giveaway templates yet. Upload a giveaway concept to populate this section.</p>
+                    </div>
+                @endif
+            </section>
+
+            @if($otherTemplates->isNotEmpty())
+                <section class="template-section" aria-labelledby="other-templates-heading">
+                    <div class="template-section-header">
+                        <div>
+                            <h3 id="other-templates-heading">Other Templates</h3>
+                            <p>Templates with custom product types.</p>
+                        </div>
+                        <span class="template-count">{{ $otherTemplates->count() }} templates</span>
+                    </div>
+                    <div class="templates-grid">
+                        @foreach($otherTemplates as $template)
+                            <div class="template-card" tabindex="0" role="button" data-template-id="{{ $template->id }}">
+                                <div class="template-image-container">
+                                    @php
+                                        $frontImg = $template->front_image ?? $template->preview_image;
+                                        $backImg = $template->back_image ?? null;
+                                    @endphp
+                                    @if($frontImg)
+                                        <img src="@imageUrl($frontImg)" alt="{{ $template->template_name }}" class="template-img">
+                                    @else
+                                        <span>No preview</span>
+                                    @endif
+                                    @if($backImg)
+                                        <img src="@imageUrl($backImg)" alt="Back of {{ $template->template_name }}" class="back-thumb">
+                                    @endif
+                                </div>
+                                <div class="card-overlay">
+                                    <h3>{{ $template->template_name }}</h3>
+                                    <p>{{ $template->description }}</p>
+                                    <div class="card-meta">
+                                        <span class="meta-pill">{{ $template->product_type ?? '—' }}</span>
+                                        <span class="meta-pill">{{ $template->theme_style ?? '—' }}</span>
+                                    </div>
+                                    <div class="card-actions">
+                                        <button type="button" class="btn continue-btn"
+                                            data-template-id="{{ $template->id }}"
+                                            data-template-name="{{ $template->template_name }}"
+                                            data-template-description="{{ $template->description }}"
+                                            data-template-event_type="{{ $template->event_type }}"
+                                            data-template-product_type="{{ $template->product_type }}"
+                                            data-template-theme_style="{{ $template->theme_style }}"
+                                            data-template-preview="{{ $template->preview_image }}"
+                                            data-front-url="{{ $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : '' }}"
+                                        >Use template</button>
+                                        <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->template_name }}">Delete</button>
+                                        @if(!empty($template->front_image))
+                                            <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
+                                        @endif
+                                        @if(!empty($template->back_image))
+                                            <button type="button" class="btn view-back-btn" data-back-url="{{ \App\Support\ImageResolver::url($template->back_image) }}">View Back</button>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
         @endif
 
     </div>

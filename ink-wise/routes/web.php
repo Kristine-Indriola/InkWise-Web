@@ -59,6 +59,7 @@ use Illuminate\Notifications\DatabaseNotification;
 use App\Http\Controllers\Auth\VerifyEmailController;
 
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\GraphicsProxyController;
 
 
 
@@ -132,8 +133,12 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     // Templates 
     Route::prefix('templates')->name('templates.')->group(function () { 
         Route::get('/', [AdminTemplateController::class, 'index'])->name('index'); 
+        Route::get('/uploaded', [AdminTemplateController::class, 'uploaded'])->name('uploaded');
         Route::get('/create', [AdminTemplateController::class, 'create'])->name('create'); 
+        Route::get('/create/invitation', [AdminTemplateController::class, 'create'])->name('create.invitation');
         Route::post('/', [AdminTemplateController::class, 'store'])->name('store'); 
+        Route::get('/{id}/edit', [AdminTemplateController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [AdminTemplateController::class, 'update'])->name('update');
         Route::get('/editor/{id?}', [AdminTemplateController::class, 'editor'])->name('editor');
         Route::delete('/{id}', [AdminTemplateController::class, 'destroy'])->name('destroy');
         // Move these two lines inside this group and fix the path:
@@ -147,7 +152,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::get('{id}/upload-to-product', function ($id) {
             return redirect()->route('admin.products.create.invitation', ['template_id' => $id]);
         });
-        Route::post('{id}/upload-to-product', [AdminTemplateController::class, 'uploadToProduct'])->name('uploadToProduct');
+        Route::post('{id}/upload-to-product-uploads', [AdminTemplateController::class, 'uploadTemplate'])->name('uploadToProductUploads');
     // Custom upload via the templates UI (front/back images)
     Route::post('custom-upload', [AdminTemplateController::class, 'customUpload'])->name('customUpload');
         // Asset search API: images, videos, elements
@@ -646,6 +651,36 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
         Route::put('/{id}', [StaffMaterialController::class, 'update'])->name('update');
         Route::delete('/{id}', [StaffMaterialController::class, 'destroy'])->name('destroy');
     });
+
+    // Staff Templates routes
+    Route::prefix('templates')->name('templates.')->group(function () { 
+        Route::get('/', [AdminTemplateController::class, 'index'])->name('index'); 
+        Route::get('/uploaded', [AdminTemplateController::class, 'uploaded'])->name('uploaded');
+        Route::get('/create', [AdminTemplateController::class, 'create'])->name('create'); 
+        Route::get('/create/invitation', [AdminTemplateController::class, 'create'])->name('create.invitation');
+        Route::post('/', [AdminTemplateController::class, 'store'])->name('store'); 
+        Route::get('/{id}/edit', [AdminTemplateController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [AdminTemplateController::class, 'update'])->name('update');
+        Route::get('/editor/{id?}', [AdminTemplateController::class, 'editor'])->name('editor');
+        Route::delete('/{id}', [AdminTemplateController::class, 'destroy'])->name('destroy');
+        // Move these two lines inside this group and fix the path:
+        Route::post('{id}/save-canvas', [AdminTemplateController::class, 'saveCanvas'])->name('saveCanvas');
+        Route::post('{id}/upload-preview', [AdminTemplateController::class, 'uploadPreview'])->name('uploadPreview');
+        // Add new API routes
+        Route::get('{id}/load-design', [AdminTemplateController::class, 'loadDesign'])->name('loadDesign');
+        Route::delete('{id}/delete-element', [AdminTemplateController::class, 'deleteElement'])->name('deleteElement');
+        Route::post('{id}/save-version', [AdminTemplateController::class, 'saveVersion'])->name('saveVersion');
+        // Allow GET to redirect (avoid MethodNotAllowed when link is accidentally visited)
+        Route::get('{id}/upload-to-product', function ($id) {
+            return redirect()->route('admin.products.create.invitation', ['template_id' => $id]);
+        });
+        Route::post('{id}/upload-to-product-uploads', [AdminTemplateController::class, 'uploadTemplate'])->name('uploadToProductUploads');
+    // Custom upload via the templates UI (front/back images)
+    Route::post('custom-upload', [AdminTemplateController::class, 'customUpload'])->name('customUpload');
+        // Asset search API: images, videos, elements
+        Route::get('{id}/assets/search', [AdminTemplateController::class, 'searchAssets'])->name('searchAssets');
+        Route::post('{id}/canvas-settings', [AdminTemplateController::class, 'updateCanvasSettings'])->name('updateCanvasSettings');
+    }); 
 });
 
 /*
@@ -672,6 +707,10 @@ Route::middleware('auth')->get('/customer/profile', [CustomerProfileController::
 
 
 require __DIR__.'/auth.php';
+
+// Graphics proxy routes (search endpoints used by client-side graphics panel)
+Route::get('/graphics/svgrepo', [GraphicsProxyController::class, 'svgrepo'])->name('graphics.svgrepo');
+Route::get('/graphics/unsplash', [GraphicsProxyController::class, 'unsplash'])->name('graphics.unsplash');
 
 
 

@@ -91,8 +91,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
-            if (!confirm('Send this template to the Products page?')) return;
-
             // disable button to prevent double submits
             btn.classList.add('disabled');
             btn.setAttribute('aria-disabled', 'true');
@@ -122,12 +120,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 const card = btn.closest('.template-card');
                 if (card) card.remove();
 
-                if (data && data.success) {
-                    showToast('Template sent to Products');
+                if (data.success) {
+                    showToast('Sent');
                 } else if (data && data.existing) {
-                    showToast('Template already exists in Products');
+                    showToast('Already exists');
                 } else {
-                    showToast('Template sent to Products');
+                    showToast('Sent');
                 }
 
             }).catch(err => {
@@ -152,6 +150,73 @@ document.addEventListener("DOMContentLoaded", function () {
         toast.classList.toggle('error', !!isError);
         toast.classList.add('visible');
         setTimeout(() => toast.classList.remove('visible'), 3000);
+    }
+});
+
+// Create Template Dropdown Functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const dropdownContainer = document.querySelector('.create-dropdown-container');
+    const dropdownToggle = document.querySelector('.dropdown-toggle');
+    const dropdownMenu = document.querySelector('.create-dropdown-menu');
+
+    if (dropdownContainer && dropdownToggle && dropdownMenu) {
+        let hoverTimeout;
+
+        // Hover to open dropdown
+        dropdownContainer.addEventListener('mouseenter', function() {
+            clearTimeout(hoverTimeout);
+            dropdownToggle.setAttribute('aria-expanded', 'true');
+            dropdownMenu.setAttribute('aria-hidden', 'false');
+        });
+
+        // Hover to close dropdown (with delay)
+        dropdownContainer.addEventListener('mouseleave', function() {
+            hoverTimeout = setTimeout(() => {
+                dropdownToggle.setAttribute('aria-expanded', 'false');
+                dropdownMenu.setAttribute('aria-hidden', 'true');
+            }, 300); // 300ms delay before closing
+        });
+
+        // Click to toggle (for mobile/touch devices)
+        dropdownToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const isExpanded = dropdownToggle.getAttribute('aria-expanded') === 'true';
+            clearTimeout(hoverTimeout); // Clear any pending close timeout
+
+            dropdownToggle.setAttribute('aria-expanded', !isExpanded);
+            dropdownMenu.setAttribute('aria-hidden', isExpanded);
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!dropdownContainer.contains(e.target)) {
+                clearTimeout(hoverTimeout);
+                dropdownToggle.setAttribute('aria-expanded', 'false');
+                dropdownMenu.setAttribute('aria-hidden', 'true');
+            }
+        });
+
+        // Close dropdown on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && dropdownToggle.getAttribute('aria-expanded') === 'true') {
+                clearTimeout(hoverTimeout);
+                dropdownToggle.setAttribute('aria-expanded', 'false');
+                dropdownMenu.setAttribute('aria-hidden', 'true');
+            }
+        });
+
+        // Handle dropdown item clicks
+        dropdownMenu.addEventListener('click', function(e) {
+            const item = e.target.closest('.dropdown-item');
+            if (item) {
+                // Close dropdown after selection
+                clearTimeout(hoverTimeout);
+                dropdownToggle.setAttribute('aria-expanded', 'false');
+                dropdownMenu.setAttribute('aria-hidden', 'true');
+            }
+        });
     }
 });
 
