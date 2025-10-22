@@ -90,6 +90,11 @@
 			color: #15803d;
 		}
 
+		.order-stage-chip--to-receive {
+			background: #f1f5f9;
+			color: #0f172a;
+		}
+
 		.order-stage-chip--completed {
 			background: #e0f2fe;
 			color: #0369a1;
@@ -390,10 +395,11 @@
 		'pending' => 'Order Received',
 		'in_production' => 'In Progress',
 		'confirmed' => 'To Ship',
+		'to_receive' => 'To Receive',
 		'completed' => 'Completed',
 		'cancelled' => 'Cancelled',
 	];
-	$statusFlow = ['pending', 'in_production', 'confirmed', 'completed'];
+	$statusFlow = ['pending', 'in_production', 'confirmed', 'to_receive', 'completed'];
 	$currentStatus = strtolower((string) data_get($order, 'status', 'pending'));
 	$flowIndex = array_search($currentStatus, $statusFlow, true);
 	$currentChipModifier = str_replace('_', '-', $currentStatus);
@@ -533,6 +539,9 @@
 									@break
 								@case('confirmed')
 									Packaged and ready for courier hand-off.
+									@break
+								@case('to_receive')
+									Order is in transit to the customer.
 									@break
 								@case('completed')
 									Delivered and closed out.

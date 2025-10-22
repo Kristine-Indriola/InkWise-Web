@@ -56,7 +56,7 @@
         <!-- Switch to Register -->
         <p class="text-center text-sm text-gray-600 mt-4">
             Don’t have an account? 
-            <a href="#" id="openRegisterFromLogin" class="text-indigo-600 hover:underline">Register</a>
+            <a href="{{ route('customer.register') }}" id="openRegisterFromLogin" class="text-indigo-600 hover:underline">Register</a>
         </p>
     </div>
 </div>

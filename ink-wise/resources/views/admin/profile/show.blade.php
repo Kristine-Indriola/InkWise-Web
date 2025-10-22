@@ -3,13 +3,20 @@
 @section('title', 'Admin Profile')
 
 @section('content')
+@php use Illuminate\Support\Facades\Storage; @endphp
 <link rel="stylesheet" href="{{ asset('css/admin-profile.css') }}">
 
 <div class="profile-container">
     {{-- Avatar Section --}}
+    @php
+        $staff = optional($admin)->staff;
+        $profileImage = $staff && $staff->profile_pic
+            ? Storage::disk('public')->url($staff->profile_pic)
+            : asset('images/no-image.png');
+    @endphp
     <div class="text-center">
-        <img src="https://ui-avatars.com/api/?name={{ urlencode(optional($admin->staff)->first_name . ' ' . optional($admin->staff)->last_name ?? $admin->email) }}&background=4F46E5&color=fff&bold=true" 
-             alt="Admin Avatar" 
+        <img src="{{ $profileImage }}"
+             alt="Admin Avatar"
              class="profile-avatar">
 
         <h2>

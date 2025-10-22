@@ -41,4 +41,21 @@ class Order extends Model
 	{
 		return $this->hasMany(OrderItem::class);
 	}
+
+	public function payments(): HasMany
+	{
+		return $this->hasMany(Payment::class);
+	}
+
+	public function totalPaid(): float
+	{
+		return (float) $this->payments
+			->where('status', 'paid')
+			->sum(fn (Payment $payment) => (float) $payment->amount);
+	}
+
+	public function balanceDue(): float
+	{
+		return max((float) ($this->total_amount ?? 0) - $this->totalPaid(), 0.0);
+	}
 }

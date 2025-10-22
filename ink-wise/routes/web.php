@@ -400,6 +400,7 @@ Route::get('/customer/favorites', fn () => view('customer.profile.favorite'))->n
 Route::get('/customer/my-orders', fn () => view('customer.profile.my_purchase'))->name('customer.my_purchase');
 // To Pay tab (lists orders pending payment)
 Route::get('/customer/my-orders/topay', fn () => view('customer.profile.purchase.topay'))->name('customer.my_purchase.topay');
+Route::get('/customer/my-orders/inproduction', fn () => view('customer.profile.purchase.inproduction'))->name('customer.my_purchase.inproduction');
 Route::get('/customer/my-orders/toship', fn () => view('customer.profile.purchase.toship'))->name('customer.my_purchase.toship');
 Route::get('/customer/my-orders/toreceive', fn () => view('customer.profile.purchase.toreceive'))->name('customer.my_purchase.toreceive');
 Route::get('/customer/my-orders/completed', fn () => view('customer.profile.purchase.completed'))->name('customer.my_purchase.completed');
@@ -408,6 +409,9 @@ Route::get('/customer/my-orders/return-refund', fn () => view('customer.profile.
 
 Route::middleware('auth')->post('/customer/orders/{order}/cancel', [CustomerProfileController::class, 'cancelOrder'])
     ->name('customer.orders.cancel');
+
+Route::middleware('auth')->post('/customer/orders/{order}/confirm-received', [CustomerProfileController::class, 'confirmReceived'])
+    ->name('customer.orders.confirm_received');
 
 
 /** Profile & Addresses (Protected) */

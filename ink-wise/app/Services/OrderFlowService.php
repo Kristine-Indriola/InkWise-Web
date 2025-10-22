@@ -1449,6 +1449,22 @@ class OrderFlowService
         $metadataPayload = $payload['metadata'] ?? [];
         $previewSelections = $payload['preview_selections'] ?? [];
 
+        if (is_array($metadataPayload)) {
+            if (isset($metadataPayload['payment_preferences']) && is_array($metadataPayload['payment_preferences'])) {
+                $existingPreferences = $meta['payment_preferences'] ?? [];
+                if (!is_array($existingPreferences)) {
+                    $existingPreferences = [];
+                }
+                $meta['payment_preferences'] = array_merge($existingPreferences, $metadataPayload['payment_preferences']);
+            }
+
+            if (isset($metadataPayload['payment_plan']) && is_array($metadataPayload['payment_plan'])) {
+                $meta['payment_plan'] = $metadataPayload['payment_plan'];
+            }
+
+            unset($metadataPayload['payment_preferences'], $metadataPayload['payment_plan']);
+        }
+
         $addonQuantitiesPayload = collect($payload['addon_quantities'] ?? [])
             ->mapWithKeys(function ($value, $key) {
                 $id = null;

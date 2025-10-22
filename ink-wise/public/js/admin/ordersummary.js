@@ -11,9 +11,10 @@
     'ready',
     'shipped',
     'in_production',
-    'confirmed',
-    'completed',
-    'to_ship'
+  'confirmed',
+  'to_receive',
+  'completed',
+  'to_ship'
   ];
 
   const currencyFormatter = new Intl.NumberFormat('en-PH', {

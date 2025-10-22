@@ -10,6 +10,8 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductEnvelope;
+use App\Models\User;
+use App\Notifications\NewOrderPlaced;
 use App\Services\OrderFlowService;
 use Illuminate\Contracts\View\View as ViewContract;
 use Illuminate\Http\JsonResponse;
@@ -19,6 +21,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -300,6 +303,7 @@ class OrderFlowController extends Controller
     public function saveFinalStep(FinalizeOrderRequest $request): JsonResponse
     {
         $order = $this->currentOrder();
+        $orderJustCreated = false;
         if (!$order) {
             $summary = session(static::SESSION_SUMMARY_KEY);
             if (!$summary || !is_array($summary) || empty($summary['productId'])) {
@@ -308,7 +312,7 @@ class OrderFlowController extends Controller
                 ], 404);
             }
 
-            DB::transaction(function () use (&$order, $summary) {
+            DB::transaction(function () use (&$order, $summary, &$orderJustCreated) {
                 $customerOrder = $this->orderFlow->createCustomerOrder(Auth::user());
                 $metadata = $this->orderFlow->buildInitialOrderMetadata($summary);
 
@@ -328,6 +332,8 @@ class OrderFlowController extends Controller
                     'summary_snapshot' => null,
                     'metadata' => $metadata,
                 ]);
+
+                $orderJustCreated = true;
 
                 $order = $this->orderFlow->initializeOrderFromSummary($order, $summary);
                 $this->orderFlow->recalculateOrderTotals($order);
@@ -373,6 +379,10 @@ class OrderFlowController extends Controller
 
         // remove the one-time allowance to prevent other pages from reusing it
         session()->forget('order_checkout_allowed_for');
+
+        if ($orderJustCreated && $order) {
+            $this->notifyTeamOfNewOrder($order);
+        }
 
         // Return admin redirect URL so the client (GCash button) can redirect to admin order summary
         try {
@@ -970,6 +980,7 @@ class OrderFlowController extends Controller
     public function checkout(): RedirectResponse|ViewContract
     {
         $order = $this->currentOrder();
+        $orderJustCreated = false;
 
         // If there is no persisted Order yet, but we have a session summary,
         // persist the Order now because Checkout is the place where we commit
@@ -980,7 +991,7 @@ class OrderFlowController extends Controller
                 return $this->redirectToCatalog();
             }
 
-            DB::transaction(function () use (&$order, $summary) {
+            DB::transaction(function () use (&$order, $summary, &$orderJustCreated) {
                 $this->clearExistingOrder();
 
                 $customerOrder = $this->orderFlow->createCustomerOrder(Auth::user());
@@ -1002,6 +1013,8 @@ class OrderFlowController extends Controller
                     'summary_snapshot' => null,
                     'metadata' => $metadata,
                 ]);
+
+                $orderJustCreated = true;
 
                 $order = $this->orderFlow->initializeOrderFromSummary($order, $summary);
 
@@ -1048,6 +1061,10 @@ class OrderFlowController extends Controller
 
         $order->refresh();
         $this->updateSessionSummary($order);
+
+        if ($orderJustCreated) {
+            $this->notifyTeamOfNewOrder($order);
+        }
 
         return view('customer.orderflow.checkout', [
             'order' => $order->loadMissing(['items.product', 'items.addons', 'customerOrder']),
@@ -1433,6 +1450,54 @@ class OrderFlowController extends Controller
         $summary['summaryUrl'] = route('order.summary');
 
         session()->put(static::SESSION_SUMMARY_KEY, $summary);
+    }
+
+    private function notifyTeamOfNewOrder(Order $order): void
+    {
+        try {
+            $order->loadMissing(['customerOrder', 'customer', 'user']);
+        } catch (\Throwable $e) {
+            // Ignore load failures and proceed with available data.
+        }
+
+        $customerName = trim((string) ($order->customerOrder->name ?? ''));
+
+        if ($customerName === '') {
+            $customerName = trim(implode(' ', array_filter([
+                $order->customer->first_name ?? null,
+                $order->customer->last_name ?? null,
+            ])));
+        }
+
+        if ($customerName === '' && $order->user) {
+            $customerName = (string) ($order->user->name ?? '');
+        }
+
+        if ($customerName === '') {
+            $customerName = 'Customer';
+        }
+
+        try {
+            $orderSummaryUrl = route('admin.ordersummary.index', ['order' => $order->order_number ?? $order->id]);
+        } catch (\Throwable $e) {
+            $orderSummaryUrl = url('/admin/ordersummary/' . ($order->order_number ?? $order->id));
+        }
+
+        $recipients = User::query()
+            ->whereIn('role', ['admin', 'owner'])
+            ->where('status', 'active')
+            ->get();
+
+        if ($recipients->isEmpty()) {
+            return;
+        }
+
+        $totalAmount = (float) ($order->total_amount ?? 0);
+
+        Notification::send(
+            $recipients,
+            new NewOrderPlaced($order->id, $order->order_number, $customerName, $totalAmount, $orderSummaryUrl)
+        );
     }
 
     private function readInlineSvg(?string $path): ?string
