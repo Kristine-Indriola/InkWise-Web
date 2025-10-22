@@ -957,7 +957,7 @@ body.dark-mode .btn-warning {
         </div>
         <!-- Admin Profile Dropdown -->
         <div class="profile-dropdown" style="position: relative; display:flex; align-items:center; gap:6px;">
-          <a href="{{ route('admin.profile.edit') }}" id="profileImageLink" style="display:flex; align-items:center; text-decoration:none; color:inherit;">
+          <a href="{{ route('admin.profile.show') }}" id="profileImageLink" style="display:flex; align-items:center; text-decoration:none; color:inherit;">
             <img src="/adminimage/LEANNE.jpg"
                  alt="Admin Profile"
                  style="border-radius:50%; width:36px; height:36px; border:2px solid #6a2ebc; object-fit:cover;">

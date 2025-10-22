@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -304,6 +305,7 @@ class AdminController extends Controller
             'last_name'      => 'required|string|max:100',
             'contact_number' => 'required|string|max:20',
             'password'       => 'nullable|min:6|confirmed', // expects password_confirmation
+            'profile_pic'    => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             // Address validation
             'street'         => 'nullable|string|max:255',
             'barangay'       => 'nullable|string|max:255',
@@ -321,13 +323,31 @@ class AdminController extends Controller
         $admin->update($updateData);
 
         // ✅ Update staff table
+        $staffPayload = [
+            'first_name'     => $request->first_name,
+            'middle_name'    => $request->middle_name,
+            'last_name'      => $request->last_name,
+            'contact_number' => $request->contact_number,
+        ];
+
+        if ($request->hasFile('profile_pic')) {
+            $newPath = $request->file('profile_pic')->store('staff/profile_pics', 'public');
+
+            if ($admin->staff && $admin->staff->profile_pic) {
+                Storage::disk('public')->delete($admin->staff->profile_pic);
+            }
+
+            $staffPayload['profile_pic'] = $newPath;
+        }
+
         if ($admin->staff) {
-            $admin->staff->update([
-                'first_name'     => $request->first_name,
-                'middle_name'    => $request->middle_name,
-                'last_name'      => $request->last_name,
-                'contact_number' => $request->contact_number,
-            ]);
+            $admin->staff->update($staffPayload);
+        } else {
+            $admin->staff()->create(array_merge($staffPayload, [
+                'user_id' => $admin->user_id,
+                'role'    => $admin->role,
+                'status'  => $admin->status ?? 'approved',
+            ]));
         }
 
         // ✅ Update or create address table

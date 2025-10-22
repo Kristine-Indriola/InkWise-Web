@@ -518,6 +518,12 @@
 
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
+    @if (request('modal') === 'login')
+        <script>
+            window.__OPEN_MODAL__ = 'login';
+        </script>
+    @endif
+
     <!-- Custom CSS -->
 
     <link rel="stylesheet" href="{{ asset('css/customer/customer.css') }}">
@@ -977,10 +983,8 @@ document.addEventListener('DOMContentLoaded', function () {
     </div>
 </main>
 
-{{-- include modals --}}
-{{-- Login and Register Modals --}}
+{{-- Login modal --}}
 @include('auth.customer.login')
-@include('auth.customer.register')
 
 {{-- Templates Section --}}
 <div class="layout-stack">

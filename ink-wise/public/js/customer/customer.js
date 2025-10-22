@@ -15,12 +15,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const hide = el => el && el.classList.add("hidden");
 
     // Modal openers
-    openLogin && openLogin.addEventListener("click", e => {
+    openLogin && loginModal && openLogin.addEventListener("click", e => {
         e.preventDefault();
         show(loginModal);
         hide(registerModal);
     });
-    openRegister && openRegister.addEventListener("click", e => {
+    openRegister && registerModal && openRegister.addEventListener("click", e => {
         e.preventDefault();
         show(registerModal);
         hide(loginModal);
@@ -31,12 +31,12 @@ document.addEventListener("DOMContentLoaded", () => {
     closeRegister && closeRegister.addEventListener("click", () => hide(registerModal));
 
     // Switchers
-    openLoginFromRegister && openLoginFromRegister.addEventListener("click", e => {
+    openLoginFromRegister && loginModal && registerModal && openLoginFromRegister.addEventListener("click", e => {
         e.preventDefault();
         show(loginModal);
         hide(registerModal);
     });
-    openRegisterFromLogin && openRegisterFromLogin.addEventListener("click", e => {
+    openRegisterFromLogin && loginModal && registerModal && openRegisterFromLogin.addEventListener("click", e => {
         e.preventDefault();
         show(registerModal);
         hide(loginModal);
@@ -74,8 +74,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Auto-open modals (from backend)
     const open = (typeof window.__OPEN_MODAL__ === 'string') ? window.__OPEN_MODAL__ : null;
-    if (open === 'login') show(loginModal), hide(registerModal);
-    if (open === 'register') show(registerModal), hide(loginModal);
+    if (open === 'login' && loginModal) show(loginModal), hide(registerModal);
+    if (open === 'register' && registerModal) show(registerModal), hide(loginModal);
 
     // Auto-close modals after auth
     if (window.__IS_AUTHENTICATED__) {

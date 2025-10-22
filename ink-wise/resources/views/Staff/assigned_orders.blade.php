@@ -12,8 +12,9 @@
     $ordersCollection = method_exists($orders, 'getCollection') ? $orders->getCollection() : collect($orders);
     $statusOptions = [
         'pending' => 'Pending',
-        'confirmed' => 'Confirmed',
         'in_production' => 'In Production',
+        'confirmed' => 'Confirmed',
+        'to_receive' => 'To Receive',
         'completed' => 'Completed',
         'cancelled' => 'Cancelled',
     ];
@@ -91,6 +92,7 @@
                             $statusMeta = [
                                 'pending' => ['label' => 'Pending', 'class' => 'status-pending'],
                                 'confirmed' => ['label' => 'Confirmed', 'class' => 'status-confirmed'],
+                                'to_receive' => ['label' => 'To Receive', 'class' => 'status-confirmed'],
                                 'in_production' => ['label' => 'In Production', 'class' => 'status-production'],
                                 'completed' => ['label' => 'Completed', 'class' => 'status-completed'],
                                 'cancelled' => ['label' => 'Cancelled', 'class' => 'status-cancelled'],
@@ -124,7 +126,7 @@
                                         <button type="submit" class="btn btn-primary btn-sm">Update</button>
                                     </form>
 
-                                    @if($order->status !== 'confirmed' && $order->status !== 'completed')
+                                    @if(!in_array($order->status, ['confirmed', 'to_receive', 'completed'], true))
                                         <form action="{{ route('staff.orders.confirm', $order) }}" method="POST" class="staff-confirm-form">
                                             @csrf
                                             <button type="submit" class="btn btn-success btn-sm">Confirm</button>

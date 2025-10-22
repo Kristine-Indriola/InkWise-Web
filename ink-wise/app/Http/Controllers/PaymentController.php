@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Models\Payment;
+use Illuminate\Support\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response as HttpResponse;
@@ -449,7 +451,32 @@ class PaymentController extends Controller
     private function summarizePayments(Order $order, ?array $metadata = null): array
     {
         $metadata ??= $order->metadata ?? [];
-        $payments = collect(Arr::get($metadata, 'payments', []));
+
+        $paymentRecords = $order->relationLoaded('payments')
+            ? $order->payments
+            : $order->payments()->get();
+
+        if ($paymentRecords->isNotEmpty()) {
+            $payments = $paymentRecords
+                ->sortByDesc(fn (Payment $payment) => $payment->recorded_at ?? $payment->created_at)
+                ->map(function (Payment $payment) {
+                    return [
+                        'provider' => $payment->provider,
+                        'provider_id' => $payment->provider_payment_id,
+                        'intent_id' => $payment->intent_id,
+                        'method' => $payment->method,
+                        'mode' => $payment->mode,
+                        'amount' => (float) $payment->amount,
+                        'status' => $payment->status,
+                        'recorded_at' => optional($payment->recorded_at ?? $payment->created_at)->toIso8601String(),
+                        'raw' => $payment->raw_payload,
+                    ];
+                });
+
+            $metadata['payments'] = $payments->values()->all();
+        } else {
+            $payments = collect(Arr::get($metadata, 'payments', []));
+        }
 
         $successful = $payments->filter(fn ($payment) => Arr::get($payment, 'status') === 'paid');
         $totalPaid = round($successful->sum(fn ($payment) => (float) Arr::get($payment, 'amount', 0)), 2);
@@ -470,38 +497,76 @@ class PaymentController extends Controller
     private function applyPaymentToOrder(Order $order, array $payload, string $status = 'paid'): Order
     {
         $metadata = $order->metadata ?? [];
-        $payments = collect(Arr::get($metadata, 'payments', []));
-
         $paymentId = Arr::get($payload, 'payment_id');
-        if ($paymentId) {
-            $payments = $payments->reject(fn ($payment) => Arr::get($payment, 'provider') === static::PROVIDER
-                && Arr::get($payment, 'provider_id') === $paymentId);
+        $intentId = Arr::get($payload, 'intent_id');
+        $amount = round((float) Arr::get($payload, 'amount', 0), 2);
+
+        $recordedAt = Arr::get($payload, 'recorded_at');
+        if ($recordedAt && ! $recordedAt instanceof \DateTimeInterface) {
+            $recordedAt = Carbon::parse($recordedAt);
         }
 
-        $payments->push([
+        $attributes = [
+            'customer_id' => $order->customer_id,
             'provider' => static::PROVIDER,
-            'provider_id' => $paymentId,
-            'intent_id' => Arr::get($payload, 'intent_id'),
-            'method' => 'gcash',
+            'recorded_by' => optional(Auth::user())->user_id,
+            'intent_id' => $intentId,
+            'method' => Arr::get($payload, 'method', 'gcash'),
             'mode' => Arr::get($payload, 'mode', 'half'),
-            'amount' => round((float) Arr::get($payload, 'amount', 0), 2),
+            'amount' => $amount,
+            'currency' => 'PHP',
             'status' => $status,
-            'recorded_at' => now()->toIso8601String(),
-            'raw' => Arr::get($payload, 'raw'),
-        ]);
+            'raw_payload' => Arr::get($payload, 'raw'),
+        ];
 
-        $metadata['payments'] = $payments->values()->all();
+        if ($recordedAt instanceof \DateTimeInterface) {
+            $attributes['recorded_at'] = Carbon::instance($recordedAt);
+        } elseif ($status === 'paid') {
+            $attributes['recorded_at'] = now();
+        }
+
+        $payment = Payment::updateOrCreate(
+            [
+                'order_id' => $order->id,
+                'provider' => static::PROVIDER,
+                'provider_payment_id' => $paymentId,
+            ],
+            $attributes
+        );
+
+        $order->unsetRelation('payments');
+        $order->load('payments');
+
+        $metadata['payments'] = $order->payments
+            ->sortByDesc(fn (Payment $payment) => $payment->recorded_at ?? $payment->created_at)
+            ->map(function (Payment $payment) {
+                return [
+                    'provider' => $payment->provider,
+                    'provider_id' => $payment->provider_payment_id,
+                    'intent_id' => $payment->intent_id,
+                    'method' => $payment->method,
+                    'mode' => $payment->mode,
+                    'amount' => (float) $payment->amount,
+                    'status' => $payment->status,
+                    'recorded_at' => optional($payment->recorded_at ?? $payment->created_at)->toIso8601String(),
+                    'raw' => $payment->raw_payload,
+                ];
+            })
+            ->values()
+            ->all();
+
         $metadata['paymongo'] = array_merge($metadata['paymongo'] ?? [], [
-            'intent_id' => Arr::get($payload, 'intent_id') ?? Arr::get($metadata, 'paymongo.intent_id'),
+            'intent_id' => $intentId ?? Arr::get($metadata, 'paymongo.intent_id'),
             'status' => Arr::get($payload, 'intent_status', $status),
             'last_payment_id' => $paymentId ?? Arr::get($metadata, 'paymongo.last_payment_id'),
             'last_paid_at' => now()->toIso8601String(),
+            'last_payment_record_id' => $payment->id,
         ]);
 
         $summary = $this->summarizePayments($order, $metadata);
 
         $attributes = [
-            'metadata' => $metadata,
+            'metadata' => $summary['metadata'],
             'payment_status' => $summary['balance'] <= 0 ? 'paid' : ($summary['total_paid'] > 0 ? 'partial' : $order->payment_status),
         ];
 
@@ -511,7 +576,7 @@ class PaymentController extends Controller
 
         $order->forceFill($attributes)->save();
 
-        return $order->fresh();
+        return $order->fresh(['payments']);
     }
 
     private function verifyWebhookSignature(Request $request): bool

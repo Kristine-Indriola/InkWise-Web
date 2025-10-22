@@ -5,9 +5,10 @@
 @section('content')
 <div class="bg-white rounded-2xl shadow p-6">
          <div class="flex border-b text-base font-semibold mb-4">
-     <a href="{{ route('customer.my_purchase') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab" data-route="all">All</a>
-     <a href="{{ route('customer.my_purchase.topay') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Pay</a>
-     <a href="{{ route('customer.my_purchase.toship') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Ship</a>
+    <a href="{{ route('customer.my_purchase') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab" data-route="all">All</a>
+    <a href="{{ route('customer.my_purchase.topay') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Pay</a>
+    <a href="{{ route('customer.my_purchase.inproduction') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">In Production</a>
+    <a href="{{ route('customer.my_purchase.toship') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Ship</a>
      <a href="{{ route('customer.my_purchase.toreceive') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Receive</a>
      <a href="{{ route('customer.my_purchase.completed') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Completed</a>
      <a href="{{ route('customer.my_purchase.cancelled') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Cancelled</a>
@@ -15,7 +16,48 @@
      </div>
 
     @php
-        $ordersList = collect($orders ?? []);
+        $statusOptions = [
+            'pending' => 'Order Received',
+            'in_production' => 'In Progress',
+            'confirmed' => 'To Ship',
+            'to_receive' => 'To Receive',
+            'completed' => 'Completed',
+            'cancelled' => 'Cancelled',
+        ];
+        $statusFlow = ['pending', 'in_production', 'confirmed', 'to_receive', 'completed'];
+        $normalizeMetadata = function ($metadata) {
+            if (is_array($metadata)) {
+                return $metadata;
+            }
+            if ($metadata instanceof \JsonSerializable) {
+                return (array) $metadata;
+            }
+            if (is_string($metadata) && $metadata !== '') {
+                $decoded = json_decode($metadata, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    return $decoded;
+                }
+            }
+            return [];
+        };
+        $formatDate = function ($value, $format = 'M d, Y') {
+            try {
+                if ($value instanceof \Illuminate\Support\Carbon) {
+                    return $value->format($format);
+                }
+                if ($value) {
+                    return \Illuminate\Support\Carbon::parse($value)->format($format);
+                }
+            } catch (\Throwable $e) {
+                return null;
+            }
+            return null;
+        };
+        $ordersSource = $orders ?? optional(auth()->user())->customer->orders ?? [];
+        $ordersList = collect($ordersSource)->filter(function ($order) {
+            $status = data_get($order, 'status', 'pending');
+            return $status === 'completed';
+        })->values();
     @endphp
 
     <div class="space-y-4">
@@ -35,6 +77,11 @@
                     }
                 }
 
+                $metadata = $normalizeMetadata(data_get($order, 'metadata', []));
+                $trackingNumber = $metadata['tracking_number'] ?? null;
+                $statusNote = $metadata['status_note'] ?? null;
+                $statusKey = data_get($order, 'status', 'completed');
+                $statusLabel = $statusOptions[$statusKey] ?? ucfirst(str_replace('_', ' ', $statusKey));
                 $previewUrl = '#';
                 try {
                     if ($productId = data_get($order, 'product_id')) {
@@ -53,6 +100,13 @@
                     <div class="text-sm text-gray-500">Order: {{ $orderNumber }}</div>
                     <div class="text-sm text-gray-500">Qty: {{ $quantity ?: '—' }} pcs</div>
                     <div class="text-sm text-gray-500">Completed: <span class="font-medium">{{ $completedDate ?? 'Not available' }}</span></div>
+                    <div class="text-sm text-gray-500">Status: <span class="text-[#a6b7ff] font-semibold">{{ $statusLabel }}</span></div>
+                    @if($trackingNumber)
+                        <div class="text-sm text-gray-500">Tracking: {{ $trackingNumber }}</div>
+                    @endif
+                    @if($statusNote)
+                        <div class="text-xs text-gray-400 mt-1">Note: {{ $statusNote }}</div>
+                    @endif
                 </div>
                 <div class="flex flex-col items-end gap-2">
                     <div class="text-gray-700 font-bold">₱{{ number_format($totalAmount, 2) }}</div>

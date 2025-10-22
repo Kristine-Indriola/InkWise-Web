@@ -95,6 +95,11 @@
         color: #15803d;
     }
 
+    .order-stage-chip--to-receive {
+        background: #f1f5f9;
+        color: #0f172a;
+    }
+
     .order-stage-chip--completed {
         background: #e0f2fe;
         color: #0369a1;
@@ -650,6 +655,9 @@
                                     @break
                                 @case('confirmed')
                                     Items are packed and ready to ship or arrange for pickup.
+                                    @break
+                                @case('to_receive')
+                                    Order is on the way to the customer. Share tracking updates if available.
                                     @break
                                 @case('completed')
                                     Order delivered and marked as finished.

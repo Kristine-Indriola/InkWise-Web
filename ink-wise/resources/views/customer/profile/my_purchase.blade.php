@@ -8,6 +8,7 @@
     <div class="flex border-b text-base font-semibold mb-4">
     <a href="{{ route('customer.my_purchase') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab" data-route="all">All</a>
     <a href="{{ route('customer.my_purchase.topay') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Pay</a>
+    <a href="{{ route('customer.my_purchase.inproduction') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">In Production</a>
     <a href="{{ route('customer.my_purchase.toship') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Ship</a>
     <a href="{{ route('customer.my_purchase.toreceive') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Receive</a>
     <a href="{{ route('customer.my_purchase.completed') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Completed</a>
@@ -19,6 +20,7 @@
 
         $statusCategories = [
             'to_pay' => 'To Pay',
+            'in_production' => 'In Production',
             'to_ship' => 'To Ship',
             'to_receive' => 'To Receive',
             'completed' => 'Completed',
@@ -28,9 +30,10 @@
 
         $statusLabels = [
             'pending' => 'Awaiting Payment',
-            'in_production' => 'In Progress',
-            'processing' => 'In Progress',
-            'confirmed' => 'Out for Delivery',
+            'in_production' => 'In Production',
+            'processing' => 'In Production',
+            'confirmed' => 'Ready to Ship',
+            'to_receive' => 'In Transit',
             'completed' => 'Completed',
             'cancelled' => 'Cancelled',
             'return_requested' => 'Return Requested',
@@ -41,10 +44,11 @@
         $statusToCategory = [
             'pending' => 'to_pay',
             'awaiting_payment' => 'to_pay',
-            'processing' => 'to_ship',
-            'in_production' => 'to_ship',
-            'confirmed' => 'to_receive',
-            'ready_to_ship' => 'to_receive',
+            'processing' => 'in_production',
+            'in_production' => 'in_production',
+            'confirmed' => 'to_ship',
+            'ready_to_ship' => 'to_ship',
+            'to_receive' => 'to_receive',
             'completed' => 'completed',
             'delivered' => 'completed',
             'cancelled' => 'cancelled',
@@ -59,6 +63,7 @@
             'processing' => 'bg-blue-100 text-blue-700',
             'in_production' => 'bg-blue-100 text-blue-700',
             'confirmed' => 'bg-sky-100 text-sky-700',
+            'to_receive' => 'bg-indigo-100 text-indigo-700',
             'completed' => 'bg-green-100 text-green-700',
             'cancelled' => 'bg-red-100 text-red-600',
             'return_requested' => 'bg-amber-100 text-amber-700',

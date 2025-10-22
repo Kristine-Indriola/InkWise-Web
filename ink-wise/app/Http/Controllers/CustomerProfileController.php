@@ -170,4 +170,44 @@ class CustomerProfileController extends Controller
 
         return redirect()->back()->with('status', 'Order cancelled successfully.');
     }
+
+    public function confirmReceived(Request $request, Order $order): RedirectResponse
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return redirect()->route('customer.login.form');
+        }
+
+        $customer = $user->customer;
+        if (!$customer) {
+            abort(403);
+        }
+
+        $ownsOrder = ((int) $order->customer_id === (int) $customer->customer_id)
+            || ((int) $order->user_id === (int) $user->id);
+
+        if (!$ownsOrder) {
+            abort(403);
+        }
+
+        if ($order->status === 'completed') {
+            return redirect()->back()->with('status', 'Thanks! This order is already marked as completed.');
+        }
+
+        if (!in_array($order->status, ['to_receive', 'confirmed'], true)) {
+            return redirect()->back()->with('error', 'This order cannot be marked as received yet.');
+        }
+
+        $metadata = $order->metadata ?? [];
+        $metadata['customer_confirmed_received_at'] = now()->toIso8601String();
+        $metadata['customer_confirmed_received_by'] = $user->getAuthIdentifier();
+
+        $order->update([
+            'status' => 'completed',
+            'metadata' => $metadata,
+        ]);
+
+        return redirect()->back()->with('status', 'Thank you! The order is now marked as completed.');
+    }
 }

@@ -5,9 +5,10 @@
 @section('content')
 <div class="bg-white rounded-2xl shadow p-6">
          <div class="flex border-b text-base font-semibold mb-4">
-     <a href="{{ route('customer.my_purchase') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab" data-route="all">All</a>
-     <a href="{{ route('customer.my_purchase.topay') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Pay</a>
-     <a href="{{ route('customer.my_purchase.toship') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Ship</a>
+    <a href="{{ route('customer.my_purchase') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab" data-route="all">All</a>
+    <a href="{{ route('customer.my_purchase.topay') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Pay</a>
+    <a href="{{ route('customer.my_purchase.inproduction') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">In Production</a>
+    <a href="{{ route('customer.my_purchase.toship') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Ship</a>
      <a href="{{ route('customer.my_purchase.toreceive') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Receive</a>
      <a href="{{ route('customer.my_purchase.completed') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Completed</a>
      <a href="{{ route('customer.my_purchase.cancelled') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Cancelled</a>
@@ -15,34 +16,36 @@
      </div>
 
     @php
-        if (!empty($requests) && is_iterable($requests)) {
-            $requestsList = $requests;
-        } else {
-            $requestsList = [
-                (object)[
-                    'id' => 5001,
-                    'order_id' => 'ORD-5001',
-                    'product_name' => 'Defective Giveaway Item',
-                    'requested_date' => now()->subDays(2)->format('M d, Y'),
-                    'status' => 'Pending',
-                    'amount_refund' => 250.00
-                ],
-            ];
-        }
+        $requestsList = collect($requests ?? []);
     @endphp
 
     <div class="space-y-4">
-        @foreach($requestsList as $r)
+        @forelse($requestsList as $r)
+            @php
+                $productName = data_get($r, 'product_name', 'Product');
+                $orderCode = data_get($r, 'order_id', '—');
+                $status = data_get($r, 'status', 'Pending');
+                $amount = (float) data_get($r, 'amount_refund', 0);
+                $requestedRaw = data_get($r, 'requested_date');
+                try {
+                    $requestedAt = $requestedRaw ? \Illuminate\Support\Carbon::parse($requestedRaw)->format('M d, Y') : '—';
+                } catch (\Throwable $e) {
+                    $requestedAt = $requestedRaw ?: '—';
+                }
+            @endphp
+
             <div class="bg-white border rounded-xl p-4 shadow-sm flex items-center gap-4">
                 <div class="flex-1">
-                    <div class="font-semibold text-lg">{{ $r->product_name }}</div>
-                    <div class="text-sm text-gray-500">Order: {{ $r->order_id }}</div>
-                    <div class="text-sm text-gray-500">Requested: <span class="font-medium">{{ $r->requested_date }}</span></div>
-                    <div class="text-sm text-gray-500">Status: <span class="font-semibold">{{ $r->status }}</span></div>
+                    <div class="font-semibold text-lg">{{ $productName }}</div>
+                    <div class="text-sm text-gray-500">Order: {{ $orderCode }}</div>
+                    <div class="text-sm text-gray-500">Requested: <span class="font-medium">{{ $requestedAt }}</span></div>
+                    <div class="text-sm text-gray-500">Status: <span class="font-semibold">{{ $status }}</span></div>
                 </div>
-                <div class="text-gray-700 font-bold">₱{{ number_format($r->amount_refund,2) }}</div>
+                <div class="text-gray-700 font-bold">₱{{ number_format($amount, 2) }}</div>
             </div>
-        @endforeach
+        @empty
+            <div class="text-sm text-gray-500">No return or refund requests found.</div>
+        @endforelse
     </div>
 </div>
 
