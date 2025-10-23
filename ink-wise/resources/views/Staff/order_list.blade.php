@@ -22,7 +22,7 @@
     <header class="page-header">
         <div>
             <h1 class="page-title">Order List</h1>
-            <p class="page-subtitle">Track and manage customer orders, including status updates and fulfillment.</p>
+            <p class="page-subtitle">Track and manage customer orders.</p>
         </div>
     </header>
 
