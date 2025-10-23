@@ -5,6 +5,271 @@
 @push('styles')
 	<link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
 	<link rel="stylesheet" href="{{ asset('css/admin-css/ordersummary.css') }}">
+	<style>
+		.status-progress-card {
+			margin-top: 24px;
+			background: #ffffff;
+			border: 1px solid #e5e7eb;
+			border-radius: 12px;
+			padding: 24px;
+			box-shadow: 0 8px 16px rgba(108, 127, 172, 0.04);
+		}
+
+		.status-progress-card__header {
+			display: flex;
+			align-items: flex-start;
+			justify-content: space-between;
+			gap: 16px;
+			margin-bottom: 24px;
+		}
+
+		.status-progress-card__header h2 {
+			margin: 0;
+			font-size: 18px;
+			font-weight: 600;
+			color: #111827;
+		}
+
+		.status-progress-card__header p {
+			margin: 6px 0 0;
+			color: #6b7280;
+			font-size: 13px;
+			line-height: 1.5;
+		}
+
+		.status-progress-card__actions {
+			display: flex;
+			align-items: center;
+			gap: 12px;
+			flex-wrap: wrap;
+		}
+
+		.status-progress-manage-link {
+			font-size: 14px;
+			font-weight: 600;
+			color: #4f46e5;
+			text-decoration: none;
+		}
+
+		.status-progress-manage-link:hover {
+			text-decoration: underline;
+		}
+
+		.order-stage-chip {
+			display: inline-flex;
+			align-items: center;
+			gap: 8px;
+			padding: 8px 16px;
+			border-radius: 9999px;
+			font-weight: 600;
+			font-size: 13px;
+			letter-spacing: 0.04em;
+			text-transform: uppercase;
+		}
+
+		.order-stage-chip::before {
+			content: '';
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+			background: currentColor;
+		}
+
+		.order-stage-chip--pending {
+			background: #eef2ff;
+			color: #3730a3;
+		}
+
+		.order-stage-chip--in-production {
+			background: #fef3c7;
+			color: #b45309;
+		}
+
+		.order-stage-chip--confirmed {
+			background: #dcfce7;
+			color: #15803d;
+		}
+
+		.order-stage-chip--to-receive {
+			background: #f1f5f9;
+			color: #0f172a;
+		}
+
+		.order-stage-chip--completed {
+			background: #e0f2fe;
+			color: #0369a1;
+		}
+
+		.order-stage-chip--cancelled {
+			background: #fee2e2;
+			color: #b91c1c;
+		}
+
+		.status-tracker {
+			list-style: none;
+			display: flex;
+			justify-content: space-between;
+			gap: 0;
+			padding: 0 4px;
+			margin: 0;
+		}
+
+		.status-tracker__item {
+			position: relative;
+			flex: 1;
+			text-align: center;
+			padding: 0 12px;
+		}
+
+		.status-tracker__marker {
+			width: 56px;
+			height: 56px;
+			border-radius: 50%;
+			border: 3px solid #d1d5db;
+			background: #ffffff;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-weight: 700;
+			font-size: 16px;
+			margin: 0 auto 12px;
+			color: #6b7280;
+			position: relative;
+			z-index: 2;
+		}
+
+		.status-tracker__number {
+			font-size: 16px;
+		}
+
+		.status-tracker__icon {
+			font-size: 20px;
+			line-height: 1;
+		}
+
+		.status-tracker__line {
+			position: absolute;
+			top: 27px;
+			left: calc(50% + 28px);
+			width: calc(100% - 56px);
+			height: 3px;
+			background: #e5e7eb;
+			z-index: 1;
+			border-radius: 999px;
+		}
+
+		.status-tracker__item:last-child .status-tracker__line {
+			display: none;
+		}
+
+		.status-tracker__title {
+			font-size: 15px;
+			font-weight: 600;
+			margin: 0 0 6px;
+			color: #111827;
+		}
+
+		.status-tracker__content {
+			margin-top: 12px;
+		}
+
+		.status-tracker__subtitle {
+			margin: 0;
+			font-size: 13px;
+			color: #6b7280;
+			line-height: 1.6;
+		}
+
+		.status-tracker__item--done .status-tracker__marker {
+			background: #22c55e;
+			border-color: #22c55e;
+			color: #ffffff;
+		}
+
+		.status-tracker__item--done .status-tracker__line {
+			background: #22c55e;
+		}
+
+		.status-tracker__item--current .status-tracker__marker {
+			border-color: #6366f1;
+			background: #eef2ff;
+			color: #4338ca;
+		}
+
+		.status-tracker__item--current .status-tracker__line {
+			background: linear-gradient(90deg, #6366f1 0%, #e5e7eb 100%);
+		}
+
+		.status-tracker__item--disabled .status-tracker__marker,
+		.status-tracker__item--upcoming .status-tracker__marker {
+			background: #f3f4f6;
+			border-color: #d1d5db;
+			color: #9ca3af;
+		}
+
+		.status-info-grid {
+			display: grid;
+			gap: 16px;
+			margin-top: 24px;
+		}
+
+		@media (min-width: 900px) {
+			.status-info-grid {
+				grid-template-columns: 2fr 1fr;
+			}
+		}
+
+		.status-info-card {
+			background: #f9fafb;
+			border: 1px solid #e5e7eb;
+			border-radius: 10px;
+			padding: 20px;
+		}
+
+		.status-info-card__title {
+			margin: 0 0 12px;
+			font-size: 16px;
+			font-weight: 600;
+			color: #111827;
+		}
+
+		.status-info-card dl {
+			margin: 0;
+			display: grid;
+			gap: 12px;
+		}
+
+		.status-info-card dt {
+			font-size: 12px;
+			text-transform: uppercase;
+			letter-spacing: 0.04em;
+			color: #6b7280;
+			font-weight: 600;
+			margin-bottom: 4px;
+		}
+
+		.status-info-card dd {
+			margin: 0;
+			font-size: 14px;
+			font-weight: 600;
+			color: #111827;
+			word-break: break-word;
+		}
+
+		.status-info-card__text {
+			margin: 0;
+			color: #374151;
+			font-size: 14px;
+			line-height: 1.6;
+		}
+
+		.status-info-card__empty {
+			color: #9ca3af;
+			font-size: 14px;
+			line-height: 1.6;
+			margin: 0;
+		}
+	</style>
 @endpush
 
 @section('content')
@@ -119,6 +384,55 @@
 	} catch (\Throwable $e) {
 		$ordersIndexUrl = url('/admin/orders');
 	}
+
+	try {
+		$statusManageUrl = $order ? route('admin.orders.status.edit', ['order' => data_get($order, 'id')]) : null;
+	} catch (\Throwable $e) {
+		$statusManageUrl = null;
+	}
+
+	$statusOptions = [
+		'pending' => 'Order Received',
+		'in_production' => 'In Progress',
+		'confirmed' => 'To Ship',
+		'to_receive' => 'To Receive',
+		'completed' => 'Completed',
+		'cancelled' => 'Cancelled',
+	];
+	$statusFlow = ['pending', 'in_production', 'confirmed', 'to_receive', 'completed'];
+	$currentStatus = strtolower((string) data_get($order, 'status', 'pending'));
+	$flowIndex = array_search($currentStatus, $statusFlow, true);
+	$currentChipModifier = str_replace('_', '-', $currentStatus);
+	$currentStatusLabel = $statusOptions[$currentStatus] ?? ucfirst(str_replace('_', ' ', $currentStatus));
+	$formatDateTime = function ($value) {
+		try {
+			if ($value instanceof \Illuminate\Support\Carbon) {
+				return $value->format('M j, Y g:i A');
+			}
+			if ($value) {
+				return \Illuminate\Support\Carbon::parse($value)->format('M j, Y g:i A');
+			}
+		} catch (\Throwable $e) {
+			return null;
+		}
+		return null;
+	};
+
+	$metadataRaw = data_get($order, 'metadata');
+	if (is_string($metadataRaw) && $metadataRaw !== '') {
+		$decodedMetadata = json_decode($metadataRaw, true);
+		$metadata = json_last_error() === JSON_ERROR_NONE && is_array($decodedMetadata) ? $decodedMetadata : [];
+	} elseif (is_array($metadataRaw)) {
+		$metadata = $metadataRaw;
+	} else {
+		$metadata = [];
+	}
+
+	$trackingNumber = $metadata['tracking_number'] ?? null;
+	$statusNote = $metadata['status_note'] ?? null;
+	$nextStatusKey = $flowIndex !== false && $flowIndex < count($statusFlow) - 1 ? $statusFlow[$flowIndex + 1] : null;
+	$nextStatusLabel = $nextStatusKey ? ($statusOptions[$nextStatusKey] ?? ucfirst(str_replace('_', ' ', $nextStatusKey))) : null;
+	$lastUpdatedDisplay = $formatDateTime(data_get($order, 'updated_at'));
 @endphp
 
 <main
@@ -127,6 +441,9 @@
 	data-order-number="{{ $orderNumber }}"
 	data-export-url="{{ $exportUrl }}"
 	data-print-url="{{ $printUrl }}"
+	data-current-status="{{ $currentStatus }}"
+	data-status-labels='@json($statusOptions)'
+	data-status-flow='@json($statusFlow)'
 >
 	<header class="page-header ordersummary-page-header">
 		<div>
@@ -137,6 +454,9 @@
 		</div>
 		<div class="page-header__quick-actions">
 			<a href="{{ $ordersIndexUrl }}" class="pill-link" title="Return to order list">Back to orders</a>
+			@if($statusManageUrl)
+				<a href="{{ $statusManageUrl }}" class="btn btn-outline" title="Update order status">Manage status</a>
+			@endif
 			<button type="button" class="btn btn-secondary" data-order-action="export">
 				<i class="fi fi-rr-download" aria-hidden="true"></i> Export PDF
 			</button>
@@ -162,6 +482,108 @@
 			<span class="ordersummary-banner__date">
 				<strong>Placed:</strong> {{ $placedAt }}
 			</span>
+		</div>
+	</section>
+
+	<section class="status-progress-card" data-status-card>
+		<header class="status-progress-card__header">
+			<div>
+				<h2>Order progress</h2>
+				<p>Follow the Shopee-style milestones your customer sees from checkout to completion.</p>
+			</div>
+			<div class="status-progress-card__actions">
+				<span class="order-stage-chip order-stage-chip--{{ $currentChipModifier }}" data-status-chip>
+					{{ $currentStatusLabel }}
+				</span>
+				@if($statusManageUrl)
+					<a href="{{ $statusManageUrl }}" class="status-progress-manage-link">Update status</a>
+				@endif
+			</div>
+		</header>
+		<ol class="status-tracker" aria-label="Order progress">
+			@foreach($statusFlow as $index => $statusKey)
+				@php
+					$stateClass = 'status-tracker__item--upcoming';
+					if ($currentStatus === 'cancelled') {
+						$stateClass = 'status-tracker__item--disabled';
+					} elseif ($flowIndex !== false) {
+						if ($index < $flowIndex) {
+							$stateClass = 'status-tracker__item--done';
+						} elseif ($index === $flowIndex) {
+							$stateClass = 'status-tracker__item--current';
+						}
+					}
+				@endphp
+				<li class="status-tracker__item {{ $stateClass }}" data-status-step="{{ $statusKey }}">
+					<div class="status-tracker__marker">
+						@if($stateClass === 'status-tracker__item--done')
+							<span class="status-tracker__icon">✓</span>
+						@else
+							<span class="status-tracker__number">{{ $index + 1 }}</span>
+						@endif
+					</div>
+					@if(!$loop->last)
+						<span class="status-tracker__line" aria-hidden="true"></span>
+					@endif
+					<div class="status-tracker__content">
+						<p class="status-tracker__title">
+							{{ $statusOptions[$statusKey] ?? ucfirst(str_replace('_', ' ', $statusKey)) }}
+						</p>
+						<p class="status-tracker__subtitle">
+							@switch($statusKey)
+								@case('pending')
+									Order received and awaiting confirmation.
+									@break
+								@case('in_production')
+									Production team is preparing the items.
+									@break
+								@case('confirmed')
+									Packaged and ready for courier hand-off.
+									@break
+								@case('to_receive')
+									Order is in transit to the customer.
+									@break
+								@case('completed')
+									Delivered and closed out.
+									@break
+								@default
+									Status update in progress.
+									@break
+							@endswitch
+						</p>
+					</div>
+				</li>
+			@endforeach
+		</ol>
+
+		<div class="status-info-grid">
+			<article class="status-info-card">
+				<h2 class="status-info-card__title">Customer-facing update</h2>
+				<dl>
+					<div>
+						<dt>Tracking number</dt>
+						<dd>{{ $trackingNumber ?: '— Not provided yet' }}</dd>
+					</div>
+					<div>
+						<dt>Next milestone</dt>
+						<dd data-next-status>{{ $nextStatusLabel ?? 'All steps complete' }}</dd>
+					</div>
+					<div>
+						<dt>Last updated</dt>
+						<dd>{{ $lastUpdatedDisplay ?? 'Not available' }}</dd>
+					</div>
+				</dl>
+			</article>
+			<article class="status-info-card">
+				<h2 class="status-info-card__title">Internal note</h2>
+				@if(filled($statusNote))
+					<p class="status-info-card__text">{{ $statusNote }}</p>
+				@else
+					<p class="status-info-card__empty">
+						No notes yet. Hit “Update status” to leave instructions for the team.
+					</p>
+				@endif
+			</article>
 		</div>
 	</section>
 

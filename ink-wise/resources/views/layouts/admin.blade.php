@@ -827,9 +827,6 @@ body.dark-mode .btn-warning {
       <li class="{{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
         <a href="{{ route('admin.dashboard') }}"><i class="fi fi-rr-house-chimney"></i> <span class="label">Dashboard</span></a>
       </li>
-      <li class="{{ request()->routeIs('admin.templates.*') ? 'active' : '' }}">
-        <a href="{{ route('admin.templates.index') }}"><i class="fi fi-rr-template"></i> <span class="label">Templates</span></a>
-      </li>
       <li class="{{ request()->routeIs('admin.products.*') ? 'active' : '' }}">
         <a href="{{ route('admin.products.index') }}"><i class="fi fi-rr-boxes"></i> <span class="label">Products</span></a>
       </li>
@@ -917,7 +914,7 @@ body.dark-mode .btn-warning {
       <div class="logo">InkWise</div>
       <div class="icons" style="display: flex; align-items: center; gap: 24px; margin-left: auto; justify-content: center;">
         <!-- Notification Bell -->
-    <a href="{{ route('admin.notifications') }}" class="nav-link notif-btn" style="display:flex; align-items:center; justify-content:center;">
+    <a href="{{ route('admin.notifications') }}" class="nav-link notif-btn" title="Notifications" aria-label="Notifications" style="display:flex; align-items:center; justify-content:center;">
       <i class="fi fi-ss-bell" style="font-size:22px;"></i>
       @php
         /** @var \App\Models\User|null $adminUser */
@@ -957,7 +954,7 @@ body.dark-mode .btn-warning {
         </div>
         <!-- Admin Profile Dropdown -->
         <div class="profile-dropdown" style="position: relative; display:flex; align-items:center; gap:6px;">
-          <a href="{{ route('admin.profile.edit') }}" id="profileImageLink" style="display:flex; align-items:center; text-decoration:none; color:inherit;">
+          <a href="{{ route('admin.profile.show') }}" id="profileImageLink" style="display:flex; align-items:center; text-decoration:none; color:inherit;">
             <img src="/adminimage/LEANNE.jpg"
                  alt="Admin Profile"
                  style="border-radius:50%; width:36px; height:36px; border:2px solid #6a2ebc; object-fit:cover;">
@@ -1127,5 +1124,37 @@ body.dark-mode .btn-warning {
   {{-- First render any @push("scripts") stacks (preferred), then support older @section('scripts') uses. --}}
   @stack('scripts')
   @yield('scripts')
+
+  <script>
+    // Accessibility helper: ensure hidden submenus don't expose focusable items
+    (function(){
+      function updateSubmenuFocus(submenu){
+        var hidden = submenu.getAttribute('aria-hidden') === 'true';
+        var focusables = submenu.querySelectorAll('a, button, input, [tabindex]');
+        focusables.forEach(function(el){
+          if (hidden) {
+            if (!el.hasAttribute('data-prev-tabindex')) el.setAttribute('data-prev-tabindex', el.getAttribute('tabindex') ?? '');
+            el.setAttribute('tabindex', '-1');
+          } else {
+            var prev = el.getAttribute('data-prev-tabindex');
+            if (prev !== null) {
+              if (prev === '') el.removeAttribute('tabindex'); else el.setAttribute('tabindex', prev);
+              el.removeAttribute('data-prev-tabindex');
+            } else {
+              el.removeAttribute('tabindex');
+            }
+          }
+        });
+      }
+
+      document.addEventListener('DOMContentLoaded', function(){
+        document.querySelectorAll('.submenu').forEach(function(sm){ updateSubmenuFocus(sm); });
+        var obs = new MutationObserver(function(muts){
+          muts.forEach(function(m){ if (m.type === 'attributes' && m.attributeName === 'aria-hidden') updateSubmenuFocus(m.target); });
+        });
+        document.querySelectorAll('.submenu').forEach(function(sm){ obs.observe(sm, { attributes: true }); });
+      });
+    })();
+  </script>
 </body>
 </html>

@@ -38,7 +38,11 @@ document.addEventListener('DOMContentLoaded', () => {
         container.addEventListener('click', event => {
             if (event.target.classList.contains('add-row')) {
                 event.preventDefault();
-                const rows = container.querySelectorAll(':scope > div');
+                const rowClass = container.classList.contains('paper-stock-rows') ? '.paper-stock-row' :
+                                container.classList.contains('addon-rows') ? '.addon-row' :
+                                container.classList.contains('color-rows') ? '.color-row' :
+                                container.classList.contains('bulk-order-rows') ? '.bulk-order-row' : 'div';
+                const rows = container.querySelectorAll(rowClass);
                 if (!rows.length) return;
                 const lastRow = rows[rows.length - 1];
                 const newRow = lastRow.cloneNode(true);
@@ -94,9 +98,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (event.target.classList.contains('remove-row')) {
                 event.preventDefault();
-                const rows = container.querySelectorAll(':scope > div');
+                const rowClass = container.classList.contains('paper-stock-rows') ? '.paper-stock-row' :
+                                container.classList.contains('addon-rows') ? '.addon-row' :
+                                container.classList.contains('color-rows') ? '.color-row' :
+                                container.classList.contains('bulk-order-rows') ? '.bulk-order-row' : 'div';
+                const rows = container.querySelectorAll(rowClass);
                 if (rows.length <= 1) return;
-                const row = event.target.closest(':scope > div');
+                const row = event.target.closest(rowClass);
                 if (row) row.remove();
             }
         });

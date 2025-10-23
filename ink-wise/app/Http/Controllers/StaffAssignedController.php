@@ -57,7 +57,7 @@ class StaffAssignedController extends Controller
     public function updateStatus(Request $request, Order $order)
     {
         $validated = $request->validate([
-            'status' => 'required|string|in:pending,confirmed,in_production,completed,cancelled',
+            'status' => 'required|string|in:pending,in_production,confirmed,to_receive,completed,cancelled',
         ]);
 
         $order->update(['status' => $validated['status']]);

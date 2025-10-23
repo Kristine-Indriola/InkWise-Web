@@ -16,15 +16,46 @@
             const materialTypeSelect = document.getElementById('materialTypeSelect');
             const defaultFields = document.getElementById('default-fields');
             const inkFields = document.getElementById('ink-fields');
+            const defaultInputs = defaultFields.querySelectorAll('input, select, textarea');
+            const inkInputs = inkFields.querySelectorAll('input, select, textarea');
+
+            function recordOriginalRequirement(inputs) {
+                inputs.forEach(input => {
+                    input.dataset.originalRequired = input.hasAttribute('required') ? 'true' : 'false';
+                });
+            }
+
+            function setGroupState(inputs, enable) {
+                inputs.forEach(input => {
+                    if (enable) {
+                        input.disabled = false;
+                        if (input.dataset.originalRequired === 'true') {
+                            input.setAttribute('required', 'required');
+                        } else {
+                            input.removeAttribute('required');
+                        }
+                    } else {
+                        input.disabled = true;
+                        input.removeAttribute('required');
+                    }
+                });
+            }
+
+            recordOriginalRequirement(defaultInputs);
+            recordOriginalRequirement(inkInputs);
 
             function toggleFields() {
                 const selectedType = materialTypeSelect.value;
                 if (selectedType === 'ink') {
                     defaultFields.style.display = 'none';
                     inkFields.style.display = 'block';
+                    setGroupState(defaultInputs, false);
+                    setGroupState(inkInputs, true);
                 } else {
                     defaultFields.style.display = 'block';
                     inkFields.style.display = 'none';
+                    setGroupState(defaultInputs, true);
+                    setGroupState(inkInputs, false);
                 }
             }
 

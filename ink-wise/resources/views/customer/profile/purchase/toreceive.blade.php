@@ -7,6 +7,7 @@
        <div class="flex border-b text-base font-semibold mb-4">
     <a href="{{ route('customer.my_purchase') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab" data-route="all">All</a>
     <a href="{{ route('customer.my_purchase.topay') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Pay</a>
+    <a href="{{ route('customer.my_purchase.inproduction') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">In Production</a>
     <a href="{{ route('customer.my_purchase.toship') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Ship</a>
     <a href="{{ route('customer.my_purchase.toreceive') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Receive</a>
     <a href="{{ route('customer.my_purchase.completed') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Completed</a>
@@ -14,57 +15,121 @@
     <a href="{{ route('customer.my_purchase.return_refund') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Return/Refund</a>
     </div>
     @php
-        if (!empty($orders) && is_iterable($orders)) {
-            $ordersList = $orders;
-        } else {
-            $ordersList = [
-                (object)[
-                    'id' => 2001,
-                    'product_id' => 601,
-                    'product_name' => 'Classic RSVP Invitation',
-                    'quantity' => 50,
-                    'image' => asset('customerimages/image/invitation.png'),
-                    'total_amount' => 1200.00,
-                    'tracking_number' => 'TRK-20251012-01',
-                    'carrier' => 'Inkwise Logistics',
-                    'status' => 'Out for delivery',
-                    'expected_date' => now()->addDays(1)->format('M d, Y'),
-                ],
-                (object)[
-                    'id' => 2002,
-                    'product_id' => 602,
-                    'product_name' => 'Corporate Giveaway Set',
-                    'quantity' => 30,
-                    'image' => asset('customerimages/image/giveaway.png'),
-                    'total_amount' => 1750.00,
-                    'tracking_number' => 'TRK-20251012-02',
-                    'carrier' => 'Local Courier',
-                    'status' => 'In transit',
-                    'expected_date' => now()->addDays(2)->format('M d, Y'),
-                ],
-            ];
-        }
+        $statusOptions = [
+            'pending' => 'Order Received',
+            'in_production' => 'In Production',
+            'confirmed' => 'To Ship',
+            'to_receive' => 'To Receive',
+            'completed' => 'Completed',
+            'cancelled' => 'Cancelled',
+        ];
+        $statusFlow = ['pending', 'in_production', 'confirmed', 'to_receive', 'completed'];
+        $normalizeMetadata = function ($metadata) {
+            if (is_array($metadata)) {
+                return $metadata;
+            }
+            if ($metadata instanceof \JsonSerializable) {
+                return (array) $metadata;
+            }
+            if (is_string($metadata) && $metadata !== '') {
+                $decoded = json_decode($metadata, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    return $decoded;
+                }
+            }
+            return [];
+        };
+        $formatDate = function ($value, $format = 'M d, Y') {
+            try {
+                if ($value instanceof \Illuminate\Support\Carbon) {
+                    return $value->format($format);
+                }
+                if ($value) {
+                    return \Illuminate\Support\Carbon::parse($value)->format($format);
+                }
+            } catch (\Throwable $e) {
+                return null;
+            }
+            return null;
+        };
+        $ordersSource = $orders ?? optional(auth()->user())->customer->orders ?? [];
+        $ordersList = collect($ordersSource)->filter(function ($order) use ($normalizeMetadata) {
+            $status = data_get($order, 'status', 'pending');
+            if (!in_array($status, ['to_receive', 'confirmed'], true)) {
+                return false;
+            }
+
+            $metadata = $normalizeMetadata(data_get($order, 'metadata', []));
+            $trackingNumber = $metadata['tracking_number'] ?? data_get($order, 'tracking_number');
+
+            if (empty($trackingNumber) && $status !== 'to_receive') {
+                return false;
+            }
+
+            return true;
+        })->values();
     @endphp
 
+    @if(session('status'))
+        <div class="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+            {{ session('status') }}
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div class="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+            {{ session('error') }}
+        </div>
+    @endif
+
     <div class="space-y-4">
-        @foreach($ordersList as $order)
+        @forelse($ordersList as $order)
+            @php
+                $productName = data_get($order, 'product_name', 'Order in transit');
+                $quantity = (int) data_get($order, 'quantity', 0);
+                $image = data_get($order, 'image', asset('images/placeholder.png'));
+                $metadata = $normalizeMetadata(data_get($order, 'metadata', []));
+                $trackingNumber = $metadata['tracking_number'] ?? data_get($order, 'tracking_number');
+                $statusNote = $metadata['status_note'] ?? null;
+                $statusKey = data_get($order, 'status', 'pending');
+                $statusLabel = $statusOptions[$statusKey] ?? ucfirst(str_replace('_', ' ', $statusKey));
+                $flowIndex = array_search($statusKey, $statusFlow, true);
+                $nextStatusKey = $flowIndex !== false && $flowIndex < count($statusFlow) - 1 ? $statusFlow[$flowIndex + 1] : null;
+                $nextStatusLabel = $nextStatusKey ? ($statusOptions[$nextStatusKey] ?? ucfirst(str_replace('_', ' ', $nextStatusKey))) : null;
+                $carrier = data_get($order, 'carrier', '—');
+                $expectedDate = data_get($order, 'expected_date');
+                $expectedDate = $expectedDate ?: data_get($order, 'expected_delivery_at');
+                $expectedDate = $formatDate($expectedDate);
+                $totalAmount = data_get($order, 'total_amount', 0);
+                $orderId = data_get($order, 'id');
+            @endphp
+
             <div class="bg-white border rounded-xl p-4 shadow-sm flex items-center gap-4">
-                <img src="{{ $order->image ?? asset('images/placeholder.png') }}" alt="{{ $order->product_name }}" class="w-24 h-24 object-cover rounded-lg">
+                <img src="{{ $image }}" alt="{{ $productName }}" class="w-24 h-24 object-cover rounded-lg">
                 <div class="flex-1">
-                    <div class="font-semibold text-lg">{{ $order->product_name }}</div>
-                    <div class="text-sm text-gray-500">Qty: {{ $order->quantity }} pcs</div>
-                    <div class="text-sm text-gray-500 mt-2">Tracking: <span class="font-medium">{{ $order->tracking_number }}</span> — {{ $order->carrier }}</div>
-                    <div class="text-sm text-gray-500">Status: <span class="text-[#a6b7ff] font-semibold">{{ $order->status }}</span></div>
-                    <div class="text-sm text-gray-500">Expected: {{ $order->expected_date }}</div>
+                    <div class="font-semibold text-lg">{{ $productName }}</div>
+                    <div class="text-sm text-gray-500">Qty: {{ $quantity ?: '—' }} pcs</div>
+                    <div class="text-sm text-gray-500 mt-2">Tracking: <span class="font-medium">{{ $trackingNumber ?? 'Pending' }}</span> — {{ $carrier }}</div>
+                    <div class="text-sm text-gray-500">Status: <span class="text-[#a6b7ff] font-semibold">{{ $statusLabel }}</span></div>
+                    <div class="text-sm text-gray-500">Next step: {{ $nextStatusLabel ?? 'All steps complete' }}</div>
+                    <div class="text-sm text-gray-500">Expected: {{ $expectedDate ?? 'To be announced' }}</div>
+                    @if($statusNote)
+                        <div class="text-xs text-gray-400 mt-1">Note: {{ $statusNote }}</div>
+                    @endif
                 </div>
                 <div class="flex flex-col gap-2">
-                    <form method="POST" action="#" onsubmit="return false;">
-                        <button type="button" class="bg-[#a6b7ff] text-white px-4 py-2 rounded font-semibold js-confirm-received" data-order-id="{{ $order->id }}">Confirm Received</button>
-                    </form>
-                    <div class="text-gray-600 text-sm">₱{{ number_format($order->total_amount,2) }}</div>
+                    @if($orderId)
+                        <form method="POST" action="{{ route('customer.orders.confirm_received', $orderId) }}" class="js-confirm-received-form">
+                            @csrf
+                            <button type="submit" class="bg-[#a6b7ff] text-white px-4 py-2 rounded font-semibold js-confirm-received" data-order-id="{{ $orderId }}">Confirm Received</button>
+                        </form>
+                    @endif
+                    <div class="text-gray-600 text-sm">₱{{ number_format($totalAmount, 2) }}</div>
                 </div>
             </div>
-        @endforeach
+        @empty
+            <div class="text-sm text-gray-500">No orders are currently on their way.</div>
+        @endforelse
     </div>
 
 <script>
@@ -155,14 +220,20 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const buttons = Array.from(document.querySelectorAll('.js-confirm-received'));
-    buttons.forEach(btn => {
-        btn.addEventListener('click', function () {
-            const id = btn.dataset.orderId;
-            if (!confirm('Mark order #' + id + ' as received?')) return;
-            const card = btn.closest('.bg-white.border.rounded-xl');
-            if (card) card.remove();
-            // TODO: call server endpoint to confirm receipt and update order status
+    const forms = Array.from(document.querySelectorAll('.js-confirm-received-form'));
+    forms.forEach(form => {
+        form.addEventListener('submit', function (event) {
+            const button = form.querySelector('button.js-confirm-received');
+            const id = button ? button.dataset.orderId : 'this';
+            if (!confirm('Mark order #' + id + ' as received?')) {
+                event.preventDefault();
+                return;
+            }
+
+            if (button) {
+                button.disabled = true;
+                button.classList.add('opacity-60', 'cursor-not-allowed');
+            }
         });
     });
 });

@@ -21,8 +21,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const envelopeUrl = addToCartBtn?.dataset?.envelopeUrl ?? shell?.dataset?.envelopeUrl ?? '/order/envelope';
   const allowFallbackSamples = shell?.dataset?.fallbackSamples === 'true';
   const finalStepSaveUrl = shell?.dataset?.saveUrl ?? null;
-  const DEFAULT_TAX_RATE = 0.12;
-  const DEFAULT_SHIPPING_FEE = 250;
+  const DEFAULT_TAX_RATE = 0;
+  const DEFAULT_SHIPPING_FEE = 0;
   const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
   let toastTimeout = null;
   let computedTotals = {
@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     addons: 0,
     subtotal: 0,
     tax: 0,
-    shipping: DEFAULT_SHIPPING_FEE,
+  shipping: DEFAULT_SHIPPING_FEE,
     total: 0
   };
 
@@ -74,6 +74,27 @@ document.addEventListener('DOMContentLoaded', () => {
           .filter((id) => Number.isInteger(id) && id > 0)
       : [];
 
+    const normalizedAddonQuantities = {};
+    if (summary.addonQuantities && typeof summary.addonQuantities === 'object') {
+      Object.entries(summary.addonQuantities).forEach(([key, value]) => {
+        const numericId = toNumericOrNull(key);
+        const numericQuantity = toNumericOrNull(value);
+        if (!Number.isInteger(numericId) || numericId <= 0) return;
+        if (!Number.isInteger(numericQuantity) || numericQuantity < 1) return;
+        normalizedAddonQuantities[numericId] = numericQuantity;
+      });
+    }
+
+    const orderQuantity = Number.isFinite(Number(summary.quantity)) && Number(summary.quantity) > 0
+      ? Number(summary.quantity)
+      : null;
+
+    if (!Object.keys(normalizedAddonQuantities).length && addonIdsForApi.length && orderQuantity) {
+      addonIdsForApi.forEach((id) => {
+        normalizedAddonQuantities[id] = orderQuantity;
+      });
+    }
+
     const metadataPayload = {};
     if (summary.extras) metadataPayload.extras = summary.extras;
     if (summary.productName) metadataPayload.product_name = summary.productName;
@@ -95,6 +116,10 @@ document.addEventListener('DOMContentLoaded', () => {
       metadata: metadataPayload,
       preview_selections: summary.previewSelections ?? null
     };
+
+    if (Object.keys(normalizedAddonQuantities).length) {
+      payload.addon_quantities = normalizedAddonQuantities;
+    }
 
     if (!payload.paper_stock_id) delete payload.paper_stock_id;
     if (payload.paper_stock_price === null || Number.isNaN(payload.paper_stock_price)) delete payload.paper_stock_price;
@@ -701,6 +726,19 @@ document.addEventListener('DOMContentLoaded', () => {
     ]));
     summary.addons = mergedAddons;
     if (mergedAddons.length) summary.addonItems = mergedAddons;
+
+    const orderQuantityValue = Number.isFinite(summary.quantity) && summary.quantity > 0 ? summary.quantity : null;
+    if (orderQuantityValue && Array.isArray(summary.addonIds) && summary.addonIds.length) {
+      const addonQuantities = {};
+      summary.addonIds.forEach((id) => {
+        if (!Number.isFinite(Number(id))) return;
+        addonQuantities[String(id)] = orderQuantityValue;
+      });
+
+      if (Object.keys(addonQuantities).length) {
+        summary.addonQuantities = addonQuantities;
+      }
+    }
 
     if (productNameMeta) summary.productName = productNameMeta;
     if (previewSources.length) {

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Address;
+use App\Models\Order;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -125,4 +127,87 @@ class CustomerProfileController extends Controller
         'label'       => 'required|string|max:50',
     ]);
 }
+
+    public function cancelOrder(Request $request, Order $order): RedirectResponse
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return redirect()->route('customer.login.form');
+        }
+
+        $customer = $user->customer;
+        if (!$customer) {
+            abort(403);
+        }
+
+        $ownsOrder = ((int) $order->customer_id === (int) $customer->customer_id)
+            || ((int) $order->user_id === (int) $user->id);
+
+        if (!$ownsOrder) {
+            abort(403);
+        }
+
+        $cancellableStatuses = ['pending', 'awaiting_payment'];
+
+        if (!in_array($order->status, $cancellableStatuses, true)) {
+            return redirect()->back()->with('error', 'Order can no longer be cancelled once it is in progress.');
+        }
+
+        $metadata = $order->metadata ?? [];
+        $metadata['cancelled_by'] = 'customer';
+        $metadata['cancelled_at'] = now()->toIso8601String();
+
+        if ($request->filled('cancel_reason')) {
+            $metadata['cancel_reason'] = trim((string) $request->input('cancel_reason'));
+        }
+
+        $order->update([
+            'status' => 'cancelled',
+            'payment_status' => 'cancelled',
+            'metadata' => $metadata,
+        ]);
+
+        return redirect()->back()->with('status', 'Order cancelled successfully.');
+    }
+
+    public function confirmReceived(Request $request, Order $order): RedirectResponse
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return redirect()->route('customer.login.form');
+        }
+
+        $customer = $user->customer;
+        if (!$customer) {
+            abort(403);
+        }
+
+        $ownsOrder = ((int) $order->customer_id === (int) $customer->customer_id)
+            || ((int) $order->user_id === (int) $user->id);
+
+        if (!$ownsOrder) {
+            abort(403);
+        }
+
+        if ($order->status === 'completed') {
+            return redirect()->back()->with('status', 'Thanks! This order is already marked as completed.');
+        }
+
+        if (!in_array($order->status, ['to_receive', 'confirmed'], true)) {
+            return redirect()->back()->with('error', 'This order cannot be marked as received yet.');
+        }
+
+        $metadata = $order->metadata ?? [];
+        $metadata['customer_confirmed_received_at'] = now()->toIso8601String();
+        $metadata['customer_confirmed_received_by'] = $user->getAuthIdentifier();
+
+        $order->update([
+            'status' => 'completed',
+            'metadata' => $metadata,
+        ]);
+
+        return redirect()->back()->with('status', 'Thank you! The order is now marked as completed.');
+    }
 }

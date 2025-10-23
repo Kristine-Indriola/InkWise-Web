@@ -29,7 +29,7 @@ use App\Http\Controllers\Auth\RoleLoginController;
 use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\MaterialsController;
 use App\Http\Controllers\Admin\SiteContentController;
-use App\Http\Controllers\customerProfileController;
+use App\Http\Controllers\CustomerProfileController;
 use App\Http\Controllers\Owner\OwnerStaffController;
 use App\Http\Controllers\Auth\CustomerAuthController;
 
@@ -59,6 +59,7 @@ use Illuminate\Notifications\DatabaseNotification;
 use App\Http\Controllers\Auth\VerifyEmailController;
 
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\GraphicsProxyController;
 
 
 
@@ -120,6 +121,10 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     })->name('orders.index');
 
     // Delete an order (AJAX / API-friendly)
+    Route::get('/orders/{order}/status', [\App\Http\Controllers\Admin\OrderController::class, 'editStatus'])
+        ->name('orders.status.edit');
+    Route::put('/orders/{order}/status', [\App\Http\Controllers\Admin\OrderController::class, 'updateStatus'])
+        ->name('orders.status.update');
     Route::delete('/orders/{order}', [\App\Http\Controllers\Admin\OrderController::class, 'destroy'])
         ->name('orders.destroy');
 
@@ -128,8 +133,12 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     // Templates 
     Route::prefix('templates')->name('templates.')->group(function () { 
         Route::get('/', [AdminTemplateController::class, 'index'])->name('index'); 
+        Route::get('/uploaded', [AdminTemplateController::class, 'uploaded'])->name('uploaded');
         Route::get('/create', [AdminTemplateController::class, 'create'])->name('create'); 
+        Route::get('/create/invitation', [AdminTemplateController::class, 'create'])->name('create.invitation');
         Route::post('/', [AdminTemplateController::class, 'store'])->name('store'); 
+        Route::get('/{id}/edit', [AdminTemplateController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [AdminTemplateController::class, 'update'])->name('update');
         Route::get('/editor/{id?}', [AdminTemplateController::class, 'editor'])->name('editor');
         Route::delete('/{id}', [AdminTemplateController::class, 'destroy'])->name('destroy');
         // Move these two lines inside this group and fix the path:
@@ -143,7 +152,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::get('{id}/upload-to-product', function ($id) {
             return redirect()->route('admin.products.create.invitation', ['template_id' => $id]);
         });
-        Route::post('{id}/upload-to-product', [AdminTemplateController::class, 'uploadToProduct'])->name('uploadToProduct');
+        Route::post('{id}/upload-to-product-uploads', [AdminTemplateController::class, 'uploadTemplate'])->name('uploadToProductUploads');
     // Custom upload via the templates UI (front/back images)
     Route::post('custom-upload', [AdminTemplateController::class, 'customUpload'])->name('customUpload');
         // Asset search API: images, videos, elements
@@ -331,6 +340,8 @@ Route::get('/customer/login', [CustomerAuthController::class, 'showLogin'])->nam
 Route::post('/customer/login', [CustomerAuthController::class, 'login'])->name('customer.login');
 Route::post('/customer/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
 
+Route::get('/customer/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard.guest');
+
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -389,11 +400,18 @@ Route::get('/customer/favorites', fn () => view('customer.profile.favorite'))->n
 Route::get('/customer/my-orders', fn () => view('customer.profile.my_purchase'))->name('customer.my_purchase');
 // To Pay tab (lists orders pending payment)
 Route::get('/customer/my-orders/topay', fn () => view('customer.profile.purchase.topay'))->name('customer.my_purchase.topay');
+Route::get('/customer/my-orders/inproduction', fn () => view('customer.profile.purchase.inproduction'))->name('customer.my_purchase.inproduction');
 Route::get('/customer/my-orders/toship', fn () => view('customer.profile.purchase.toship'))->name('customer.my_purchase.toship');
 Route::get('/customer/my-orders/toreceive', fn () => view('customer.profile.purchase.toreceive'))->name('customer.my_purchase.toreceive');
 Route::get('/customer/my-orders/completed', fn () => view('customer.profile.purchase.completed'))->name('customer.my_purchase.completed');
 Route::get('/customer/my-orders/cancelled', fn () => view('customer.profile.purchase.cancelled'))->name('customer.my_purchase.cancelled');
 Route::get('/customer/my-orders/return-refund', fn () => view('customer.profile.purchase.return_refund'))->name('customer.my_purchase.return_refund');
+
+Route::middleware('auth')->post('/customer/orders/{order}/cancel', [CustomerProfileController::class, 'cancelOrder'])
+    ->name('customer.orders.cancel');
+
+Route::middleware('auth')->post('/customer/orders/{order}/confirm-received', [CustomerProfileController::class, 'confirmReceived'])
+    ->name('customer.orders.confirm_received');
 
 
 /** Profile & Addresses (Protected) */
@@ -637,6 +655,36 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
         Route::put('/{id}', [StaffMaterialController::class, 'update'])->name('update');
         Route::delete('/{id}', [StaffMaterialController::class, 'destroy'])->name('destroy');
     });
+
+    // Staff Templates routes
+    Route::prefix('templates')->name('templates.')->group(function () { 
+        Route::get('/', [AdminTemplateController::class, 'index'])->name('index'); 
+        Route::get('/uploaded', [AdminTemplateController::class, 'uploaded'])->name('uploaded');
+        Route::get('/create', [AdminTemplateController::class, 'create'])->name('create'); 
+        Route::get('/create/invitation', [AdminTemplateController::class, 'create'])->name('create.invitation');
+        Route::post('/', [AdminTemplateController::class, 'store'])->name('store'); 
+        Route::get('/{id}/edit', [AdminTemplateController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [AdminTemplateController::class, 'update'])->name('update');
+        Route::get('/editor/{id?}', [AdminTemplateController::class, 'editor'])->name('editor');
+        Route::delete('/{id}', [AdminTemplateController::class, 'destroy'])->name('destroy');
+        // Move these two lines inside this group and fix the path:
+        Route::post('{id}/save-canvas', [AdminTemplateController::class, 'saveCanvas'])->name('saveCanvas');
+        Route::post('{id}/upload-preview', [AdminTemplateController::class, 'uploadPreview'])->name('uploadPreview');
+        // Add new API routes
+        Route::get('{id}/load-design', [AdminTemplateController::class, 'loadDesign'])->name('loadDesign');
+        Route::delete('{id}/delete-element', [AdminTemplateController::class, 'deleteElement'])->name('deleteElement');
+        Route::post('{id}/save-version', [AdminTemplateController::class, 'saveVersion'])->name('saveVersion');
+        // Allow GET to redirect (avoid MethodNotAllowed when link is accidentally visited)
+        Route::get('{id}/upload-to-product', function ($id) {
+            return redirect()->route('admin.products.create.invitation', ['template_id' => $id]);
+        });
+        Route::post('{id}/upload-to-product-uploads', [AdminTemplateController::class, 'uploadTemplate'])->name('uploadToProductUploads');
+    // Custom upload via the templates UI (front/back images)
+    Route::post('custom-upload', [AdminTemplateController::class, 'customUpload'])->name('customUpload');
+        // Asset search API: images, videos, elements
+        Route::get('{id}/assets/search', [AdminTemplateController::class, 'searchAssets'])->name('searchAssets');
+        Route::post('{id}/canvas-settings', [AdminTemplateController::class, 'updateCanvasSettings'])->name('updateCanvasSettings');
+    }); 
 });
 
 /*
@@ -657,9 +705,16 @@ if (interface_exists('Laravel\\Socialite\\Contracts\\Factory')) {
     })->name('google.callback');
 }
 
+
+
 Route::middleware('auth')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.show');
 
+
 require __DIR__.'/auth.php';
+
+// Graphics proxy routes (search endpoints used by client-side graphics panel)
+Route::get('/graphics/svgrepo', [GraphicsProxyController::class, 'svgrepo'])->name('graphics.svgrepo');
+Route::get('/graphics/unsplash', [GraphicsProxyController::class, 'unsplash'])->name('graphics.unsplash');
 
 
 

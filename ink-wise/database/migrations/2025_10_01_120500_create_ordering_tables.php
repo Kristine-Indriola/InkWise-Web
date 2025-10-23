@@ -94,6 +94,7 @@ return new class extends Migration
             $table->string('image_path')->nullable();
             $table->timestamps();
         });
+
     }
 
     public function down(): void

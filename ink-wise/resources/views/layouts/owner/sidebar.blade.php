@@ -242,15 +242,6 @@
           @endforelse
         </ul>
       </div>
-      <!-- Theme Toggle -->
-      <div id="theme-toggle-switch" class="theme-toggle-switch" title="Toggle dark/light mode" style="margin:0;">
-        <span class="theme-toggle-label" id="theme-toggle-label">DAY</span>
-        <span class="theme-toggle-knob" id="theme-toggle-knob">
-          <span class="theme-toggle-icon" id="theme-toggle-icon">
-            <i class="fi fi-rr-brightness"></i>
-          </span>
-        </span>
-      </div>
       <!-- Profile Dropdown -->
       <div class="profile-dropdown" style="position: relative;">
         <a href="{{ route('owner.profile.show') }}" id="profileImageLink" style="display:flex; align-items:center; text-decoration:none; color:inherit;">

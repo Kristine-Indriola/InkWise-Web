@@ -7,6 +7,7 @@
        <div class="flex border-b text-base font-semibold mb-4">
     <a href="{{ route('customer.my_purchase') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab" data-route="all">All</a>
     <a href="{{ route('customer.my_purchase.topay') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Pay</a>
+    <a href="{{ route('customer.my_purchase.inproduction') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">In Production</a>
     <a href="{{ route('customer.my_purchase.toship') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Ship</a>
     <a href="{{ route('customer.my_purchase.toreceive') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Receive</a>
     <a href="{{ route('customer.my_purchase.completed') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Completed</a>
@@ -15,15 +16,60 @@
     </div>
 
     @php
-        // Get orders that are confirmed and ready to ship
-        $ordersList = auth()->user()->customer->orders ?? collect();
-        $toshipOrders = $ordersList->filter(function($order) {
-            return in_array($order->status, ['confirmed', 'in_production']);
-        });
+        $statusOptions = [
+            'pending' => 'Order Received',
+            'in_production' => 'In Production',
+            'confirmed' => 'To Ship',
+            'to_receive' => 'To Receive',
+            'completed' => 'Completed',
+            'cancelled' => 'Cancelled',
+        ];
+        $statusFlow = ['pending', 'in_production', 'confirmed', 'to_receive', 'completed'];
+        $normalizeMetadata = function ($metadata) {
+            if (is_array($metadata)) {
+                return $metadata;
+            }
+            if ($metadata instanceof \JsonSerializable) {
+                return (array) $metadata;
+            }
+            if (is_string($metadata) && $metadata !== '') {
+                $decoded = json_decode($metadata, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    return $decoded;
+                }
+            }
+            return [];
+        };
+        $formatDate = function ($value, $format = 'M d, Y') {
+            try {
+                if ($value instanceof \Illuminate\Support\Carbon) {
+                    return $value->format($format);
+                }
+                if ($value) {
+                    return \Illuminate\Support\Carbon::parse($value)->format($format);
+                }
+            } catch (\Throwable $e) {
+                return null;
+            }
+            return null;
+        };
+        $ordersSource = $orders ?? optional(auth()->user())->customer->orders ?? [];
+        $ordersCollection = collect($ordersSource);
+        $toshipOrders = $ordersCollection->filter(function ($order) use ($normalizeMetadata) {
+            $status = data_get($order, 'status', 'pending');
+            if ($status !== 'confirmed') {
+                return false;
+            }
+
+            $metadata = $normalizeMetadata(data_get($order, 'metadata', []));
+
+            $trackingNumber = $metadata['tracking_number'] ?? data_get($order, 'tracking_number');
+            return empty($trackingNumber);
+        })->values();
     @endphp
 
     <div class="space-y-4">
-        @foreach($toshipOrders as $order)
+        @forelse($toshipOrders as $order)
             @php
                 // Build a lightweight summary object compatible with ordersummary.js expectations.
                 $summary = [
@@ -37,6 +83,14 @@
                     'originalTotal' => $order->total_amount ?? null,
                     'editUrl' => (function(){ try { return route('order.finalstep'); } catch (\Throwable $e) { return url('/order/finalstep'); } })()
                 ];
+                $statusKey = data_get($order, 'status', 'pending');
+                $statusLabel = $statusOptions[$statusKey] ?? ucfirst(str_replace('_', ' ', $statusKey));
+                $metadata = $normalizeMetadata(data_get($order, 'metadata', []));
+                $trackingNumber = $metadata['tracking_number'] ?? null;
+                $statusNote = $metadata['status_note'] ?? null;
+                $flowIndex = array_search($statusKey, $statusFlow, true);
+                $nextStatusKey = $flowIndex !== false && $flowIndex < count($statusFlow) - 1 ? $statusFlow[$flowIndex + 1] : null;
+                $nextStatusLabel = $nextStatusKey ? ($statusOptions[$nextStatusKey] ?? ucfirst(str_replace('_', ' ', $nextStatusKey))) : null;
             @endphp
 
             <div class="bg-white border rounded-xl mb-4 shadow-sm">
@@ -47,7 +101,7 @@
                             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                             </svg>
-                            Ready to Ship
+                            {{ $statusLabel }}
                         </span>
                     </div>
                 </div>
@@ -143,6 +197,14 @@
                             }
                         @endphp
                         <div class="text-sm text-gray-500">Add-ons: {{ $addonsDisplay }}</div>
+                        <div class="text-sm text-gray-500">Status: <span class="font-semibold text-[#a6b7ff]">{{ $statusLabel }}</span></div>
+                        <div class="text-sm text-gray-500">Next step: {{ $nextStatusLabel ?? 'All steps complete' }}</div>
+                        @if($trackingNumber)
+                            <div class="text-sm text-gray-500">Tracking: {{ $trackingNumber }}</div>
+                        @endif
+                        @if($statusNote)
+                            <div class="text-xs text-gray-400 mt-1">Note: {{ $statusNote }}</div>
+                        @endif
                     </div>
                     <div class="text-right">
                         <div class="text-lg font-bold text-gray-700">₱{{ number_format($order->total_amount, 2) }}</div>
@@ -159,7 +221,9 @@
                     </div>
                 </div>
             </div>
-        @endforeach
+        @empty
+            <div class="text-sm text-gray-500">No orders are awaiting shipment.</div>
+        @endforelse
     </div>
 </div>
 

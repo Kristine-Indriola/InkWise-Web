@@ -21,8 +21,8 @@ use Illuminate\Support\Str;
 
 class OrderFlowService
 {
-    public const DEFAULT_TAX_RATE = 0.12;
-    public const DEFAULT_SHIPPING_FEE = 250;
+    public const DEFAULT_TAX_RATE = 0.0;
+    public const DEFAULT_SHIPPING_FEE = 0.0;
 
     public function resolveProduct(?Product $product, ?int $productId = null): ?Product
     {
@@ -398,6 +398,38 @@ class OrderFlowService
             $paperStockPrice = Arr::get($summary, 'metadata.final_step.paper_stock_price');
         }
 
+        $summaryQuantity = Arr::get($summary, 'quantity');
+        if (!is_numeric($summaryQuantity) || (int) $summaryQuantity < 1) {
+            $summaryQuantity = $orderItem->quantity ?? 1;
+        }
+        $summaryQuantity = max(1, (int) $summaryQuantity);
+
+        $finalStepAddonQuantities = Arr::get($summary, 'metadata.final_step.addon_quantities', []);
+        if (!is_array($finalStepAddonQuantities)) {
+            $finalStepAddonQuantities = [];
+        }
+
+        $sessionAddonQuantities = Arr::get($summary, 'addonQuantities', []);
+        if (!is_array($sessionAddonQuantities)) {
+            $sessionAddonQuantities = [];
+        }
+
+        $addonQuantityHints = [];
+
+        foreach ([$finalStepAddonQuantities, $sessionAddonQuantities] as $source) {
+            foreach ($source as $key => $value) {
+                if (!is_numeric($value)) {
+                    continue;
+                }
+
+                if (!is_numeric($key) && !(is_string($key) && is_numeric($key))) {
+                    continue;
+                }
+
+                $addonQuantityHints[(int) $key] = max(1, (int) $value);
+            }
+        }
+
         if (is_array($previewSelections)) {
             $previewPaper = Arr::get($previewSelections, 'paper_stock');
             if (is_array($previewPaper)) {
@@ -451,7 +483,7 @@ class OrderFlowService
                 ->all();
         }
 
-        $normaliseAddon = static function ($addon) use ($castMoney) {
+        $normaliseAddon = static function ($addon) use ($castMoney, $summaryQuantity, $addonQuantityHints) {
             if (!is_array($addon)) {
                 return null;
             }
@@ -474,11 +506,44 @@ class OrderFlowService
             $price = $addon['price'] ?? $addon['amount'] ?? $addon['total'] ?? null;
             $price = $castMoney($price) ?? 0.0;
 
+            $rawQuantity = $addon['quantity'] ?? $addon['qty'] ?? $addon['count'] ?? null;
+            if ($rawQuantity === null && isset($addon['pricing_metadata']) && is_array($addon['pricing_metadata'])) {
+                $rawQuantity = $addon['pricing_metadata']['quantity'] ?? null;
+            }
+            if ($rawQuantity === null && isset($addon['metadata']) && is_array($addon['metadata'])) {
+                $rawQuantity = $addon['metadata']['quantity'] ?? null;
+            }
+
+            $quantity = is_numeric($rawQuantity) ? (int) $rawQuantity : null;
+            if (($quantity === null || $quantity < 1) && $id !== null && isset($addonQuantityHints[$id])) {
+                $candidate = $addonQuantityHints[$id];
+                if (is_numeric($candidate)) {
+                    $quantity = (int) $candidate;
+                }
+            }
+            if ($quantity === null || $quantity < 1) {
+                $quantity = $summaryQuantity;
+            }
+
+            $pricingMetadata = [];
+            if (isset($addon['pricing_metadata']) && is_array($addon['pricing_metadata'])) {
+                $pricingMetadata = $addon['pricing_metadata'];
+            } elseif (isset($addon['metadata']) && is_array($addon['metadata'])) {
+                $pricingMetadata = $addon['metadata'];
+            }
+
+            $pricingMetadata['quantity'] = $quantity;
+
+            $pricingMode = $addon['pricing_mode'] ?? $addon['mode'] ?? null;
+
             return [
                 'id' => $id,
                 'type' => $type,
                 'name' => $name,
                 'price' => $price,
+                'quantity' => $quantity,
+                'pricing_metadata' => $pricingMetadata,
+                'pricing_mode' => $pricingMode,
             ];
         };
 
@@ -551,11 +616,26 @@ class OrderFlowService
                 continue;
             }
 
+            $addonQuantity = isset($addon['quantity']) && is_numeric($addon['quantity'])
+                ? max(1, (int) $addon['quantity'])
+                : $summaryQuantity;
+
+            $pricingMetadata = [];
+            if (isset($addon['pricing_metadata']) && is_array($addon['pricing_metadata'])) {
+                $pricingMetadata = $addon['pricing_metadata'];
+            }
+            $pricingMetadata['quantity'] = $addonQuantity;
+
+            $pricingMode = $addon['pricing_mode'] ?? null;
+
             $orderItem->addons()->create([
                 'addon_id' => $addon['id'] ?? null,
                 'addon_type' => $addon['type'] ?? null,
                 'addon_name' => $addon['name'] ?? 'Add-on',
                 'addon_price' => isset($addon['price']) ? (float) $addon['price'] : 0,
+                'quantity' => $addonQuantity,
+                'pricing_mode' => $pricingMode,
+                'pricing_metadata' => $pricingMetadata,
             ]);
         }
     }
@@ -1369,6 +1449,56 @@ class OrderFlowService
         $metadataPayload = $payload['metadata'] ?? [];
         $previewSelections = $payload['preview_selections'] ?? [];
 
+        if (is_array($metadataPayload)) {
+            if (isset($metadataPayload['payment_preferences']) && is_array($metadataPayload['payment_preferences'])) {
+                $existingPreferences = $meta['payment_preferences'] ?? [];
+                if (!is_array($existingPreferences)) {
+                    $existingPreferences = [];
+                }
+                $meta['payment_preferences'] = array_merge($existingPreferences, $metadataPayload['payment_preferences']);
+            }
+
+            if (isset($metadataPayload['payment_plan']) && is_array($metadataPayload['payment_plan'])) {
+                $meta['payment_plan'] = $metadataPayload['payment_plan'];
+            }
+
+            unset($metadataPayload['payment_preferences'], $metadataPayload['payment_plan']);
+        }
+
+        $addonQuantitiesPayload = collect($payload['addon_quantities'] ?? [])
+            ->mapWithKeys(function ($value, $key) {
+                $id = null;
+                $quantity = null;
+
+                if (is_array($value)) {
+                    if (isset($value['addon_id']) && is_numeric($value['addon_id'])) {
+                        $id = (int) $value['addon_id'];
+                    }
+
+                    if (isset($value['quantity']) && is_numeric($value['quantity'])) {
+                        $quantity = (int) $value['quantity'];
+                    } elseif (isset($value['qty']) && is_numeric($value['qty'])) {
+                        $quantity = (int) $value['qty'];
+                    } elseif (isset($value['value']) && is_numeric($value['value'])) {
+                        $quantity = (int) $value['value'];
+                    }
+                }
+
+                if ($id === null && (is_numeric($key) || (is_string($key) && is_numeric($key)))) {
+                    $id = (int) $key;
+                }
+
+                if ($quantity === null && !is_array($value) && is_numeric($value)) {
+                    $quantity = (int) $value;
+                }
+
+                if ($id === null || $quantity === null || $quantity < 1) {
+                    return [];
+                }
+
+                return [$id => $quantity];
+            });
+
         $unitPrice = $this->unitPriceForQuantity($product, $quantity, $item->unit_price);
         $item->fill([
             'quantity' => $quantity,
@@ -1387,17 +1517,29 @@ class OrderFlowService
             $item->paperStockSelection()->delete();
         }
 
+        $existingAddonRecords = $item->addons->keyBy('addon_id');
+
         $item->addons()->whereNotIn('addon_id', $addonIds->all())->delete();
 
         if ($addonIds->isNotEmpty()) {
             $addons = ProductAddon::query()->whereIn('id', $addonIds)->get();
             foreach ($addons as $addon) {
+                $requestedQuantity = max(1, (int) ($addonQuantitiesPayload->get($addon->id, $quantity)));
+
+                $metadata = $existingAddonRecords->get($addon->id)?->pricing_metadata ?? [];
+                if (!is_array($metadata)) {
+                    $metadata = [];
+                }
+                $metadata['quantity'] = $requestedQuantity;
+
                 $item->addons()->updateOrCreate(
                     ['addon_id' => $addon->id],
                     [
                         'addon_type' => $addon->addon_type,
                         'addon_name' => $addon->name ?? 'Add-on',
                         'addon_price' => $addon->price ?? 0,
+                        'quantity' => $requestedQuantity,
+                        'pricing_metadata' => $metadata,
                     ]
                 );
             }
@@ -1416,6 +1558,10 @@ class OrderFlowService
             'paper_stock_name' => $item->paperStockSelection?->paper_stock_name,
             'paper_stock_price' => $item->paperStockSelection?->price,
             'addon_ids' => $item->addons->pluck('addon_id')->filter()->values()->all(),
+            'addon_quantities' => $item->addons
+                ->filter(fn ($addon) => $addon->addon_id !== null)
+                ->mapWithKeys(fn ($addon) => [$addon->addon_id => max(1, (int) ($addon->quantity ?? 1))])
+                ->all(),
             'bulk' => $bulkSelection ? [
                 'product_bulk_order_id' => $bulkSelection->product_bulk_order_id,
                 'qty_selected' => $bulkSelection->qty_selected,
@@ -1509,6 +1655,9 @@ class OrderFlowService
         $order->refresh();
         $this->recalculateOrderTotals($order);
 
+        $order->refresh();
+        $this->syncMaterialUsage($order);
+
         return $order->fresh([
             'items.product',
             'items.addons',
@@ -1572,6 +1721,9 @@ class OrderFlowService
         $order->refresh();
         $this->recalculateOrderTotals($order);
 
+        $order->refresh();
+        $this->syncMaterialUsage($order);
+
         return $order->fresh([
             'items.product',
             'items.addons',
@@ -1592,6 +1744,9 @@ class OrderFlowService
 
         $this->recalculateOrderTotals($order);
 
+        $order->refresh();
+        $this->syncMaterialUsage($order);
+
         return $order->fresh([
             'items.product',
             'items.addons',
@@ -1611,6 +1766,9 @@ class OrderFlowService
         $order->refresh();
 
         $this->recalculateOrderTotals($order);
+
+        $order->refresh();
+        $this->syncMaterialUsage($order);
 
         return $order->fresh([
             'items.product',
@@ -1635,7 +1793,8 @@ class OrderFlowService
 
     /**
      * Sync inventory levels with the material usage implied by the current order configuration.
-     * Applies differential adjustments so materials are only deducted once and restored on changes.
+     * Persists the per-order material requirements in the `product_materials` table and applies
+     * differential stock adjustments so materials are only deducted once and restored on changes.
      */
     public function syncMaterialUsage(Order $order): void
     {
@@ -1651,6 +1810,26 @@ class OrderFlowService
         $envelopeCache = [];
         $addonCache = [];
         $materialNameCache = [];
+
+        $existingUsageRecords = ProductMaterial::query()
+            ->where('order_id', $order->id)
+            ->where('source_type', 'custom')
+            ->get()
+            ->keyBy(fn (ProductMaterial $row) => (int) $row->material_id);
+
+        $existingDetailRecords = ProductMaterial::query()
+            ->where('order_id', $order->id)
+            ->whereIn('source_type', ['product', 'paper_stock', 'envelope', 'addon'])
+            ->get();
+
+        $detailRecordIndex = $existingDetailRecords->keyBy(function (ProductMaterial $row) {
+            return implode(':', [
+                (int) $row->material_id,
+                (string) ($row->order_item_id ?? 'null'),
+                (string) ($row->source_type ?? 'product'),
+                (string) ($row->source_id ?? 'null'),
+            ]);
+        });
 
         $resolveMaterialByName = function (?string $name) use (&$materialNameCache) {
             if (!$name) {
@@ -1730,10 +1909,12 @@ class OrderFlowService
         };
 
         foreach ($order->items as $item) {
+            $productMaterialUsageFound = false;
             if ($item->product_id) {
                 $productMaterials = ProductMaterial::query()
                     ->with(['material.inventory'])
                     ->where('product_id', $item->product_id)
+                    ->whereNull('order_id')
                     ->get();
 
                 foreach ($productMaterials as $productMaterial) {
@@ -1742,10 +1923,74 @@ class OrderFlowService
                         continue;
                     }
 
-                    $accumulateMaterial($item, $productMaterial->material, $perUnitQty, [
+                    $linkedMaterial = $productMaterial->material;
+
+                    if (!$linkedMaterial && $productMaterial->material_id) {
+                        $linkedMaterial = $materialCache[$productMaterial->material_id] ??=
+                            Material::query()->with('inventory')->find($productMaterial->material_id);
+                    }
+
+                    if (!$linkedMaterial && $productMaterial->item) {
+                        $linkedMaterial = $resolveMaterialByName($productMaterial->item);
+                    }
+
+                    if (!$linkedMaterial) {
+                        continue;
+                    }
+
+                    $accumulateMaterial($item, $linkedMaterial, $perUnitQty, [
                         'product_material_id' => $productMaterial->id,
                         'source' => 'product_material',
+                        'quantity_mode' => match ($productMaterial->quantity_mode) {
+                            'per_order' => 'per_order',
+                            default => 'per_unit',
+                        },
+                        'item' => $productMaterial->item,
+                        'type' => $productMaterial->type,
                     ]);
+
+                    $productMaterialUsageFound = true;
+                }
+            }
+
+            if (!$productMaterialUsageFound) {
+                $productType = Str::lower((string) ($item->product?->product_type
+                    ?? Arr::get($item->design_metadata ?? [], 'product_type', '')));
+
+                $eligibleForFallback = in_array($item->line_type, [OrderItem::LINE_TYPE_GIVEAWAY], true)
+                    || in_array($productType, ['giveaway', 'souvenir', 'souvenirs'], true);
+
+                if ($eligibleForFallback) {
+                    $fallbackNames = array_filter([
+                        $item->product?->name,
+                        Arr::get($item->design_metadata ?? [], 'name'),
+                        Arr::get($item->design_metadata ?? [], 'material_name'),
+                        Arr::get($order->metadata, 'giveaway.name'),
+                        Arr::get($order->metadata, 'giveaway.material'),
+                        $item->product_name ?? null,
+                    ], fn ($name) => is_string($name) && trim($name) !== '');
+
+                    $perUnitOverride = Arr::get($item->design_metadata ?? [], 'material_qty_per_unit');
+                    if (!is_numeric($perUnitOverride) || (float) $perUnitOverride <= 0) {
+                        $perUnitOverride = 1.0;
+                    } else {
+                        $perUnitOverride = (float) $perUnitOverride;
+                    }
+
+                    foreach ($fallbackNames as $candidateName) {
+                        $fallbackMaterial = $resolveMaterialByName($candidateName);
+                        if (!$fallbackMaterial) {
+                            continue;
+                        }
+
+                        $accumulateMaterial($item, $fallbackMaterial, $perUnitOverride, [
+                            'source' => 'product_fallback',
+                            'fallback_name' => $candidateName,
+                        ]);
+
+                        $productMaterialUsageFound = true;
+                        break;
+                    }
                 }
             }
 
@@ -1779,15 +2024,41 @@ class OrderFlowService
                 }
             }
 
-            if ($item->line_type === OrderItem::LINE_TYPE_ENVELOPE && $item->product_id) {
-                $envelope = $envelopeCache[$item->product_id] ??= ProductEnvelope::query()
-                    ->with(['material.inventory'])
-                    ->where('product_id', $item->product_id)
-                    ->first();
+            if ($item->line_type === OrderItem::LINE_TYPE_ENVELOPE) {
+                $envelope = null;
+                if ($item->product_id) {
+                    $envelope = $envelopeCache[$item->product_id] ??= ProductEnvelope::query()
+                        ->with(['material.inventory'])
+                        ->where('product_id', $item->product_id)
+                        ->first();
+                }
 
-                if ($envelope && $envelope->material) {
-                    $accumulateMaterial($item, $envelope->material, 1.0, [
-                        'envelope_id' => $envelope->id,
+                $envelopeMaterial = $envelope?->material;
+
+                if (!$envelopeMaterial && $envelope?->material_id) {
+                    $envelopeMaterial = $materialCache[$envelope->material_id] ??=
+                        Material::query()->with('inventory')->find($envelope->material_id);
+                }
+
+                if (!$envelopeMaterial) {
+                    $candidateNames = array_filter([
+                        $envelope?->envelope_material_name,
+                        Arr::get($item->design_metadata ?? [], 'material'),
+                        Arr::get($order->metadata ?? [], 'envelope.material'),
+                        $item->product_name,
+                    ], fn ($value) => is_string($value) && trim($value) !== '');
+
+                    foreach ($candidateNames as $candidateName) {
+                        $envelopeMaterial = $resolveMaterialByName($candidateName);
+                        if ($envelopeMaterial) {
+                            break;
+                        }
+                    }
+                }
+
+                if ($envelopeMaterial) {
+                    $accumulateMaterial($item, $envelopeMaterial, 1.0, [
+                        'envelope_id' => $envelope?->id,
                         'source' => 'envelope',
                     ]);
                 }
@@ -1797,19 +2068,36 @@ class OrderFlowService
                 foreach ($item->addons as $addonSelection) {
                     $addon = null;
                     if ($addonSelection->addon_id) {
-                        $addon = $addonCache[$addonSelection->addon_id] ??= ProductAddon::query()->find($addonSelection->addon_id);
+                        $addon = $addonCache[$addonSelection->addon_id] ??=
+                            ProductAddon::query()
+                                ->with(['material.inventory'])
+                                ->find($addonSelection->addon_id);
                     }
 
                     $addonName = $addon?->name ?? $addonSelection->addon_name ?? null;
-                    $material = $resolveMaterialByName($addonName);
+
+                    $material = null;
+                    if ($addon && $addon->material) {
+                        $material = $addon->material;
+                    } elseif ($addon && $addon->material_id) {
+                        $material = $materialCache[$addon->material_id] ??=
+                            Material::query()->with('inventory')->find($addon->material_id);
+                    }
+
+                    if (!$material) {
+                        $material = $resolveMaterialByName($addonName);
+                    }
 
                     if (!$material) {
                         continue;
                     }
 
-                    $accumulateMaterial($item, $material, 1.0, [
+                    $addonQuantity = max(1, (int) ($addonSelection->quantity ?? data_get($addonSelection->pricing_metadata, 'quantity', 1)));
+
+                    $accumulateMaterial($item, $material, (float) $addonQuantity, [
                         'addon_id' => $addonSelection->addon_id,
                         'addon_name' => $addonName,
+                        'addon_quantity' => $addonQuantity,
                         'source' => 'addon',
                         'quantity_mode' => 'per_order',
                     ]);
@@ -1817,38 +2105,31 @@ class OrderFlowService
             }
         }
 
-        $metadata = $order->metadata ?? [];
-        $previousUsage = Arr::get($metadata, 'materials.usage', []);
-        $now = now()->toIso8601String();
+        $now = now();
 
         if (empty($materialTotals)) {
-            if (!empty($previousUsage)) {
-                foreach ($previousUsage as $materialId => $usage) {
-                    $previousTotal = (float) Arr::get($usage, 'total_used', 0);
-                    if ($previousTotal <= 0) {
-                        continue;
-                    }
-
+            if ($existingUsageRecords->isNotEmpty()) {
+                foreach ($existingUsageRecords as $record) {
                     $material = Material::query()
                         ->with('inventory')
-                        ->whereKey($materialId)
-                        ->first();
+                        ->find($record->material_id);
 
-                    if ($material) {
-                        $this->adjustMaterialStock($material, -$previousTotal);
+                    if ($material && (float) $record->quantity_used > 0) {
+                        $this->adjustMaterialStock($material, -1 * (float) $record->quantity_used);
                     }
+
+                    $record->delete();
                 }
             }
 
-            if (isset($metadata['materials'])) {
-                unset($metadata['materials']);
-                $order->update(['metadata' => $metadata]);
+            if ($detailRecordIndex->isNotEmpty()) {
+                foreach ($detailRecordIndex as $detailRecord) {
+                    $detailRecord->delete();
+                }
             }
 
             return;
         }
-
-        $updatedUsage = [];
 
         foreach ($materialTotals as $materialId => $aggregate) {
             /** @var Material $material */
@@ -1857,13 +2138,15 @@ class OrderFlowService
                 $material->loadMissing('inventory');
             }
 
-            $previousTotal = (float) Arr::get($previousUsage, $materialId . '.total_used', 0);
-            $requiredTotal = (float) $aggregate['required'];
-            $diff = $requiredTotal - $previousTotal;
+            $previousRecord = $existingUsageRecords->get((int) $materialId);
+            $previousUsed = $previousRecord ? (float) $previousRecord->quantity_used : 0.0;
+
+            $requiredTotal = round((float) $aggregate['required'], 4);
+            $diff = $requiredTotal - $previousUsed;
 
             $adjustment = [
                 'applied' => 0.0,
-                'shortage' => (float) Arr::get($previousUsage, $materialId . '.pending_shortage', 0),
+                'shortage' => 0.0,
                 'remaining_stock' => [
                     'inventory' => $material->inventory?->stock_level,
                     'material' => $material->stock_qty,
@@ -1874,53 +2157,248 @@ class OrderFlowService
                 $adjustment = $this->adjustMaterialStock($material, $diff);
             }
 
-            $updatedUsage[$materialId] = [
-                'material_id' => $material->getKey(),
-                'material_name' => $material->material_name ?? null,
-                'sku' => $material->sku ?? null,
-                'qty_per_unit' => $aggregate['per_unit_qty'],
-                'total_used' => $requiredTotal,
-                'components' => $aggregate['components'],
-                'pending_shortage' => $adjustment['shortage'] ?? 0,
-                'remaining_stock' => $adjustment['remaining_stock'] ?? [
-                    'inventory' => $material->inventory?->stock_level,
-                    'material' => $material->stock_qty,
+            $applied = (float) ($adjustment['applied'] ?? $diff);
+            $newUsed = max(0.0, round($previousUsed + $applied, 4));
+            $pendingShortage = max(0.0, round($requiredTotal - $newUsed, 4));
+            $quantityReserved = max(0.0, round(min($requiredTotal, $newUsed), 4));
+
+            $quantityModes = collect($aggregate['components'])
+                ->pluck('quantity_mode')
+                ->map(function ($mode) {
+                    return $mode === 'per_item' ? 'per_unit' : $mode;
+                })
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            $orderQuantities = collect($aggregate['components'])
+                ->pluck('order_quantity')
+                ->filter(fn ($value) => $value !== null)
+                ->map(fn ($value) => (int) $value)
+                ->sum();
+
+            $quantityModeValue = (!empty($quantityModes) && count($quantityModes) === 1 && $quantityModes[0] === 'per_order')
+                ? 'per_order'
+                : 'per_unit';
+
+            $reservedAt = $quantityReserved > 0
+                ? ($previousRecord?->reserved_at ?? $now)
+                : null;
+
+            $deductedAt = $newUsed > 0
+                ? ($previousRecord?->deducted_at ?? $now)
+                : null;
+
+            ProductMaterial::updateOrCreate(
+                [
+                    'order_id' => $order->id,
+                    'material_id' => $materialId,
+                    'source_type' => 'custom',
+                    'source_id' => null,
+                    'order_item_id' => null,
                 ],
-                'applied_delta' => $diff,
-                'synced_at' => $now,
-            ];
-        }
+                [
+                    'customer_id' => $order->customer_id,
+                    'product_id' => null,
+                    'item' => $material->material_name ?? null,
+                    'type' => $material->material_type ?? null,
+                    'color' => $material->color ?? null,
+                    'unit' => $material->unit ?? null,
+                    'weight' => $material->weight_gsm ?? null,
+                    'qty' => round((float) $aggregate['per_unit_qty'], 4),
+                    'quantity_mode' => $quantityModeValue,
+                    'order_quantity' => $orderQuantities !== 0 ? $orderQuantities : null,
+                    'quantity_required' => $requiredTotal,
+                    'quantity_reserved' => $quantityReserved,
+                    'quantity_used' => $newUsed,
+                    'reserved_at' => $reservedAt,
+                    'deducted_at' => $deductedAt,
+                    'metadata' => [
+                        'components' => $aggregate['components'],
+                        'pending_shortage' => $pendingShortage,
+                        'remaining_stock' => $adjustment['remaining_stock'] ?? null,
+                        'last_diff' => round($diff, 4),
+                        'last_applied' => round($applied, 4),
+                        'quantity_modes' => $quantityModes,
+                    ],
+                ]
+            );
 
-        foreach ($previousUsage as $materialId => $usage) {
-            if (isset($updatedUsage[$materialId])) {
-                continue;
+            $allocationScale = ($requiredTotal > 0 && $newUsed > 0)
+                ? min(1.0, $newUsed / $requiredTotal)
+                : 0.0;
+
+            $detailGroups = [];
+            foreach ($aggregate['components'] as $component) {
+                $orderItemId = $component['order_item_id'] ?? null;
+                $componentSource = $component['source'] ?? 'product';
+                $sourceType = match ($componentSource) {
+                    'product_material' => 'product',
+                    'paper_stock' => 'paper_stock',
+                    'envelope' => 'envelope',
+                    'addon' => 'addon',
+                    default => 'product',
+                };
+
+                $sourceId = match ($sourceType) {
+                    'product' => $component['product_material_id'] ?? null,
+                    'paper_stock' => $component['paper_stock_id'] ?? null,
+                    'envelope' => $component['envelope_id'] ?? null,
+                    'addon' => $component['addon_id'] ?? null,
+                    default => null,
+                };
+                $sourceId = $sourceId !== null ? (int) $sourceId : null;
+
+                $detailKey = implode(':', [
+                    (int) $materialId,
+                    (string) (($orderItemId ?? 'null')),
+                    $sourceType,
+                    (string) ($sourceId ?? 'null'),
+                ]);
+
+                if (!isset($detailGroups[$detailKey])) {
+                    $detailGroups[$detailKey] = [
+                        'order_item_id' => $orderItemId !== null ? (int) $orderItemId : null,
+                        'product_id' => $component['product_id'] ?? null,
+                        'source_type' => $sourceType,
+                        'source_id' => $sourceId,
+                        'quantity_modes' => [],
+                        'per_unit_qty' => 0.0,
+                        'required_qty' => 0.0,
+                        'order_quantity' => null,
+                        'components' => [],
+                        'source_label' => $component['addon_name'] ?? ($component['source'] ?? null),
+                    ];
+                }
+
+                $detailGroups[$detailKey]['quantity_modes'][] = $component['quantity_mode'] ?? 'per_item';
+                $detailGroups[$detailKey]['per_unit_qty'] = max(
+                    $detailGroups[$detailKey]['per_unit_qty'],
+                    (float) ($component['per_unit_qty'] ?? 0)
+                );
+                $detailGroups[$detailKey]['required_qty'] += (float) ($component['required_qty'] ?? 0);
+
+                if (isset($component['order_quantity'])) {
+                    $incomingQuantity = (int) $component['order_quantity'];
+                    $currentQuantity = $detailGroups[$detailKey]['order_quantity'];
+                    $detailGroups[$detailKey]['order_quantity'] = $currentQuantity === null
+                        ? $incomingQuantity
+                        : max((int) $currentQuantity, $incomingQuantity);
+                }
+
+                $detailGroups[$detailKey]['components'][] = $component;
             }
 
-            $previousTotal = (float) Arr::get($usage, 'total_used', 0);
-            if ($previousTotal <= 0) {
-                continue;
+            if (!empty($detailGroups)) {
+                $detailKeys = array_keys($detailGroups);
+                $detailCount = count($detailKeys);
+                $remainingUsedForAllocation = $newUsed;
+
+                foreach ($detailKeys as $index => $detailKey) {
+                    $group = $detailGroups[$detailKey];
+                    $componentRequired = round($group['required_qty'], 4);
+
+                    $componentUsed = 0.0;
+                    if ($componentRequired > 0) {
+                        if ($index === $detailCount - 1) {
+                            $componentUsed = min($componentRequired, max(0.0, round($remainingUsedForAllocation, 4)));
+                        } else {
+                            $componentUsed = round(min($componentRequired, $componentRequired * $allocationScale), 4);
+                            if ($componentUsed > $remainingUsedForAllocation) {
+                                $componentUsed = $remainingUsedForAllocation;
+                            }
+                            $componentUsed = max(0.0, round($componentUsed, 4));
+                        }
+                    }
+
+                    $remainingUsedForAllocation = max(0.0, round($remainingUsedForAllocation - $componentUsed, 4));
+
+                    $componentReserved = $componentUsed;
+                    $componentShortage = max(0.0, round($componentRequired - $componentUsed, 4));
+
+                    $detailModeList = collect($group['quantity_modes'])
+                        ->map(fn ($mode) => $mode === 'per_item' ? 'per_unit' : $mode)
+                        ->filter()
+                        ->unique()
+                        ->values()
+                        ->all();
+
+                    $detailQuantityModeValue = (!empty($detailModeList) && count($detailModeList) === 1 && $detailModeList[0] === 'per_order')
+                        ? 'per_order'
+                        : 'per_unit';
+
+                    $detailAttributes = [
+                        'order_id' => $order->id,
+                        'order_item_id' => $group['order_item_id'],
+                        'material_id' => $materialId,
+                        'source_type' => $group['source_type'],
+                        'source_id' => $group['source_id'],
+                    ];
+
+                    $existingDetail = $detailRecordIndex->get($detailKey);
+
+                    $detailReservedAt = $componentReserved > 0
+                        ? ($existingDetail?->reserved_at ?? $reservedAt ?? $now)
+                        : null;
+
+                    $detailDeductedAt = $componentUsed > 0
+                        ? ($existingDetail?->deducted_at ?? $now)
+                        : null;
+
+                    ProductMaterial::updateOrCreate(
+                        $detailAttributes,
+                        [
+                            'customer_id' => $order->customer_id,
+                            'product_id' => $group['product_id'] !== null ? (int) $group['product_id'] : null,
+                            'item' => $material->material_name ?? null,
+                            'type' => $material->material_type ?? null,
+                            'color' => $material->color ?? null,
+                            'unit' => $material->unit ?? null,
+                            'weight' => $material->weight_gsm ?? null,
+                            'qty' => round($group['per_unit_qty'], 4),
+                            'quantity_mode' => $detailQuantityModeValue,
+                            'order_quantity' => $group['order_quantity'] !== null ? (int) $group['order_quantity'] : null,
+                            'quantity_required' => $componentRequired,
+                            'quantity_reserved' => $componentReserved,
+                            'quantity_used' => $componentUsed,
+                            'reserved_at' => $detailReservedAt,
+                            'deducted_at' => $detailDeductedAt,
+                            'metadata' => [
+                                'components' => $group['components'],
+                                'pending_shortage' => $componentShortage,
+                                'allocation_scale' => $allocationScale,
+                                'source_label' => $group['source_label'],
+                            ],
+                        ]
+                    );
+
+                    $detailRecordIndex->forget($detailKey);
+                }
             }
 
-            $material = Material::query()
-                ->with('inventory')
-                ->whereKey($materialId)
-                ->first();
+            $existingUsageRecords->forget((int) $materialId);
+        }
 
-            if ($material) {
-                $this->adjustMaterialStock($material, -$previousTotal);
+        if ($detailRecordIndex->isNotEmpty()) {
+            foreach ($detailRecordIndex as $detailRecord) {
+                $detailRecord->delete();
             }
         }
 
-        if (!empty($updatedUsage)) {
-            $metadata['materials'] = [
-                'usage' => $updatedUsage,
-                'last_synced_at' => $now,
-            ];
-        } else {
-            unset($metadata['materials']);
-        }
+        if ($existingUsageRecords->isNotEmpty()) {
+            foreach ($existingUsageRecords as $record) {
+                $material = Material::query()
+                    ->with('inventory')
+                    ->find($record->material_id);
 
-        $order->update(['metadata' => $metadata]);
+                if ($material && (float) $record->quantity_used > 0) {
+                    $this->adjustMaterialStock($material, -1 * (float) $record->quantity_used);
+                }
+
+                $record->delete();
+            }
+        }
     }
 
     /**
@@ -1970,8 +2448,10 @@ class OrderFlowService
         $material->stock_qty = (int) round($newMaterialStock);
         $material->save();
 
+        $applied = $currentMaterialStock - $newMaterialStock;
+
         return [
-            'applied' => $delta,
+            'applied' => $applied,
             'shortage' => $shortage,
             'remaining_stock' => [
                 'inventory' => $inventory ? (int) round($newInventoryLevel) : null,

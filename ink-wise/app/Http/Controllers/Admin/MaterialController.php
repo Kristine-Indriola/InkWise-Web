@@ -10,6 +10,8 @@ use App\Models\Ink; // <-- Add this import
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Notifications\StockNotification;
+use App\Notifications\MaterialRestockedNotification;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
 
@@ -237,32 +239,74 @@ class MaterialController extends Controller
 
     public function update(Request $request, $id)
     {
-        $request->validate([
+        $material = Material::with('inventory')->findOrFail($id);
+
+        $currentType = $request->input('material_type', $material->material_type);
+        $request->merge(['material_type' => $currentType]);
+        $isInk = $currentType === 'ink';
+
+        if ($isInk) {
+            $inputQty = $request->input('stock_qty');
+            $fallbackQty = $material->stock_qty ?? optional($material->inventory)->stock_level ?? 0;
+            if ($inputQty !== null) {
+                $request->merge([
+                    'stock_level' => $inputQty,
+                    'stock_qty' => $inputQty,
+                ]);
+            } elseif ($request->filled('stock_level')) {
+                $request->merge(['stock_qty' => $request->input('stock_level')]);
+            } else {
+                $request->merge([
+                    'stock_level' => $fallbackQty,
+                    'stock_qty' => $fallbackQty,
+                ]);
+            }
+
+            if (!$request->filled('reorder_level')) {
+                $request->merge([
+                    'reorder_level' => optional($material->inventory)->reorder_level ?? $material->reorder_point ?? 0,
+                ]);
+            }
+
+            if (!$request->filled('unit_cost') && $material->unit_cost !== null) {
+                $request->merge(['unit_cost' => $material->unit_cost]);
+            }
+        }
+
+        $rules = [
             'material_name' => [
                 'required','string','max:255',
                 // Ignore current id and scope uniqueness to material_type
-                Rule::unique('materials')->where(function ($query) use ($request) {
-                    return $query->where('material_type', $request->input('material_type'));
-                })->ignore($id),
+                Rule::unique('materials', 'material_name')
+                    ->where(function ($query) use ($request) {
+                        return $query->where('material_type', $request->input('material_type'));
+                    })
+                    ->ignore($id, 'material_id'),
             ],
             'material_type' => 'nullable|string|max:50',  // ✅ Made nullable
             'unit'           => 'required|string|max:50',
-            'unit_cost'      => 'required|numeric|min:0',
+            'unit_cost'      => $isInk ? 'nullable|numeric|min:0' : 'required|numeric|min:0',
             'stock_level'    => 'required|integer|min:0',
             'reorder_level'  => 'required|integer|min:0',
             // removed remarks validation since it's automatic
-        ]);
+        ];
+
+        $rules['stock_qty'] = $isInk ? 'required|integer|min:0' : 'nullable|integer|min:0';
+
+        $request->validate($rules);
 
         // ✅ Update Material (now includes stock fields)
-        $material = Material::findOrFail($id);
+        $previousStock = !$isInk
+            ? (optional($material->inventory)->stock_level ?? $material->stock_qty ?? 0)
+            : ($material->stock_qty ?? optional($material->inventory)->stock_level ?? 0);
+
         $material->update([
             'material_name' => $request->material_name,
             'material_type' => $request->material_type,
             'unit'          => $request->unit,
-            'unit_cost'     => $request->unit_cost,
+            'unit_cost'     => $request->unit_cost ?? $material->unit_cost,
             'stock_qty'     => $request->stock_level,  // ✅ Added: Update stock_qty
             'reorder_point' => $request->reorder_level, // ✅ Added: Update reorder_point
-            'volume_ml'     => $request->stock_level,   // ✅ Added: Update volume_ml (for ink types)
             'date_updated'  => now(),
         ]);
 
@@ -278,34 +322,45 @@ class MaterialController extends Controller
             $remarks = 'Low Stock';
         }
 
-        // ✅ Update or create Inventory (only for non-ink materials)
-        if ($request->material_type !== 'ink') {
-            if ($material->inventory) {
-                $material->inventory->update([
-                    'stock_level'   => $stockLevel,
-                    'reorder_level' => $reorderLevel,
-                    'remarks'       => $remarks,
-                ]);
-            } else {
-                $material->inventory()->create([
-                    'stock_level'   => $stockLevel,
-                    'reorder_level' => $reorderLevel,
-                    'remarks'       => $remarks,
-                ]);
+        $inventoryData = [
+            'stock_level'   => $stockLevel,
+            'reorder_level' => $reorderLevel,
+            'remarks'       => $remarks,
+        ];
+
+        if ($material->inventory) {
+            $material->inventory->update($inventoryData);
+        } else {
+            $material->inventory()->create($inventoryData);
+        }
+
+        $material->load('inventory');
+        $currentStock = optional($material->inventory)->stock_level;
+        if ($currentStock === null) {
+            $currentStock = $material->stock_qty ?? 0;
+        }
+        $stockDelta = $currentStock - $previousStock;
+
+        if ($stockDelta > 0) {
+            $owners = User::where('role', 'owner')->get();
+            if ($owners->isNotEmpty()) {
+                Notification::send($owners, new MaterialRestockedNotification(
+                    $material,
+                    $stockDelta,
+                    Auth::user()
+                ));
+            }
+        }
+
+        if (in_array($remarks, ['Low Stock', 'Out of Stock'], true)) {
+            $admins = User::where('role', 'admin')->get();
+            if ($admins->isNotEmpty()) {
+                Notification::send($admins, new StockNotification($material, $remarks));
             }
         }
 
         return redirect()->route('admin.materials.index')
                          ->with('success', 'Material updated successfully with inventory.');
-    
-
-     if ($remarks === 'Low Stock' || $remarks === 'Out of Stock') {
-        $admins = User::where('role', 'admin')->get();
-        Notification::send($admins, new StockNotification($material, $remarks));
-    }
-
-    return redirect()->route('admin.materials.index')
-                     ->with('success', 'Material updated successfully with inventory.');
 
     }
 

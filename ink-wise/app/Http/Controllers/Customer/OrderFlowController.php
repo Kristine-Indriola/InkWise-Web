@@ -10,6 +10,8 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductEnvelope;
+use App\Models\User;
+use App\Notifications\NewOrderPlaced;
 use App\Services\OrderFlowService;
 use Illuminate\Contracts\View\View as ViewContract;
 use Illuminate\Http\JsonResponse;
@@ -19,14 +21,16 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class OrderFlowController extends Controller
 {
     private const SESSION_ORDER_ID = 'current_order_id';
     private const SESSION_SUMMARY_KEY = 'order_summary_payload';
-    private const DEFAULT_TAX_RATE = 0.12;
-    private const DEFAULT_SHIPPING_FEE = 250;
+    private const DEFAULT_TAX_RATE = 0.0;
+    private const DEFAULT_SHIPPING_FEE = 0.0;
 
     public function __construct(private readonly OrderFlowService $orderFlow)
     {
@@ -38,6 +42,9 @@ class OrderFlowController extends Controller
         $product = $this->orderFlow->resolveProduct($product, $productId);
         $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
 
+        $frontSvg = $this->readInlineSvg($product?->template->front_image ?? null);
+        $backSvg = $this->readInlineSvg($product?->template->back_image ?? null);
+
         return view('customer.Invitations.editing', [
             'product' => $product,
             'frontImage' => $images['front'],
@@ -48,6 +55,8 @@ class OrderFlowController extends Controller
                 ['side' => 'back', 'default' => $product->template->back_image ?? null],
             ] : [],
             'defaultQuantity' => $product ? $this->orderFlow->defaultQuantityFor($product) : 50,
+            'frontSvg' => $frontSvg,
+            'backSvg' => $backSvg,
         ]);
     }
 
@@ -294,6 +303,7 @@ class OrderFlowController extends Controller
     public function saveFinalStep(FinalizeOrderRequest $request): JsonResponse
     {
         $order = $this->currentOrder();
+        $orderJustCreated = false;
         if (!$order) {
             $summary = session(static::SESSION_SUMMARY_KEY);
             if (!$summary || !is_array($summary) || empty($summary['productId'])) {
@@ -302,7 +312,7 @@ class OrderFlowController extends Controller
                 ], 404);
             }
 
-            DB::transaction(function () use (&$order, $summary) {
+            DB::transaction(function () use (&$order, $summary, &$orderJustCreated) {
                 $customerOrder = $this->orderFlow->createCustomerOrder(Auth::user());
                 $metadata = $this->orderFlow->buildInitialOrderMetadata($summary);
 
@@ -322,6 +332,8 @@ class OrderFlowController extends Controller
                     'summary_snapshot' => null,
                     'metadata' => $metadata,
                 ]);
+
+                $orderJustCreated = true;
 
                 $order = $this->orderFlow->initializeOrderFromSummary($order, $summary);
                 $this->orderFlow->recalculateOrderTotals($order);
@@ -367,6 +379,10 @@ class OrderFlowController extends Controller
 
         // remove the one-time allowance to prevent other pages from reusing it
         session()->forget('order_checkout_allowed_for');
+
+        if ($orderJustCreated && $order) {
+            $this->notifyTeamOfNewOrder($order);
+        }
 
         // Return admin redirect URL so the client (GCash button) can redirect to admin order summary
         try {
@@ -964,6 +980,7 @@ class OrderFlowController extends Controller
     public function checkout(): RedirectResponse|ViewContract
     {
         $order = $this->currentOrder();
+        $orderJustCreated = false;
 
         // If there is no persisted Order yet, but we have a session summary,
         // persist the Order now because Checkout is the place where we commit
@@ -974,7 +991,7 @@ class OrderFlowController extends Controller
                 return $this->redirectToCatalog();
             }
 
-            DB::transaction(function () use (&$order, $summary) {
+            DB::transaction(function () use (&$order, $summary, &$orderJustCreated) {
                 $this->clearExistingOrder();
 
                 $customerOrder = $this->orderFlow->createCustomerOrder(Auth::user());
@@ -996,6 +1013,8 @@ class OrderFlowController extends Controller
                     'summary_snapshot' => null,
                     'metadata' => $metadata,
                 ]);
+
+                $orderJustCreated = true;
 
                 $order = $this->orderFlow->initializeOrderFromSummary($order, $summary);
 
@@ -1042,6 +1061,10 @@ class OrderFlowController extends Controller
 
         $order->refresh();
         $this->updateSessionSummary($order);
+
+        if ($orderJustCreated) {
+            $this->notifyTeamOfNewOrder($order);
+        }
 
         return view('customer.orderflow.checkout', [
             'order' => $order->loadMissing(['items.product', 'items.addons', 'customerOrder']),
@@ -1429,9 +1452,161 @@ class OrderFlowController extends Controller
         session()->put(static::SESSION_SUMMARY_KEY, $summary);
     }
 
+    private function notifyTeamOfNewOrder(Order $order): void
+    {
+        try {
+            $order->loadMissing(['customerOrder', 'customer', 'user']);
+        } catch (\Throwable $e) {
+            // Ignore load failures and proceed with available data.
+        }
+
+        $customerName = trim((string) ($order->customerOrder->name ?? ''));
+
+        if ($customerName === '') {
+            $customerName = trim(implode(' ', array_filter([
+                $order->customer->first_name ?? null,
+                $order->customer->last_name ?? null,
+            ])));
+        }
+
+        if ($customerName === '' && $order->user) {
+            $customerName = (string) ($order->user->name ?? '');
+        }
+
+        if ($customerName === '') {
+            $customerName = 'Customer';
+        }
+
+        try {
+            $orderSummaryUrl = route('admin.ordersummary.index', ['order' => $order->order_number ?? $order->id]);
+        } catch (\Throwable $e) {
+            $orderSummaryUrl = url('/admin/ordersummary/' . ($order->order_number ?? $order->id));
+        }
+
+        $recipients = User::query()
+            ->whereIn('role', ['admin', 'owner'])
+            ->where('status', 'active')
+            ->get();
+
+        if ($recipients->isEmpty()) {
+            return;
+        }
+
+        $totalAmount = (float) ($order->total_amount ?? 0);
+
+        Notification::send(
+            $recipients,
+            new NewOrderPlaced($order->id, $order->order_number, $customerName, $totalAmount, $orderSummaryUrl)
+        );
+    }
+
+    private function readInlineSvg(?string $path): ?string
+    {
+        if (!$path || !Str::endsWith(Str::lower($path), '.svg')) {
+            return null;
+        }
+
+        $raw = null;
+
+        if (Str::startsWith($path, ['http://', 'https://'])) {
+            try {
+                $raw = @file_get_contents($path);
+            } catch (\Throwable $e) {
+                return null;
+            }
+        } else {
+            $normalized = str_replace('\\', '/', $path);
+            $variants = [
+                $normalized,
+                ltrim($normalized, '/'),
+            ];
+
+            if (Str::contains($normalized, 'ink-wise/')) {
+                $variants[] = Str::after($normalized, 'ink-wise/');
+            }
+            if (Str::contains($normalized, 'public/')) {
+                $variants[] = Str::after($normalized, 'public/');
+            }
+            if (Str::contains($normalized, 'storage/')) {
+                $variants[] = Str::after($normalized, 'storage/');
+            }
+
+            $variants = array_filter(array_unique($variants), static fn ($value) => is_string($value) && $value !== '');
+            $candidates = [];
+
+            foreach ($variants as $variant) {
+                if (Storage::disk('public')->exists($variant)) {
+                    $candidates[] = Storage::disk('public')->path($variant);
+                }
+
+                $candidates[] = public_path($variant);
+                $candidates[] = public_path('storage/' . ltrim($variant, '/'));
+                $candidates[] = base_path($variant);
+            }
+
+            foreach ($candidates as $candidate) {
+                if (is_string($candidate) && is_file($candidate)) {
+                    $raw = @file_get_contents($candidate);
+                    if ($raw !== false) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!$raw) {
+            return null;
+        }
+
+        $raw = preg_replace('/<\?xml[^>]*\?>/i', '', $raw);
+        $raw = preg_replace('/<!DOCTYPE[^>]*>/i', '', $raw);
+        $raw = trim($raw ?? '');
+
+        if ($raw === '') {
+            return null;
+        }
+
+        $previous = libxml_use_internal_errors(true);
+
+        $dom = new \DOMDocument();
+        $loaded = $dom->loadXML($raw, LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_NONET);
+
+        if (!$loaded) {
+            libxml_use_internal_errors($previous);
+            libxml_clear_errors();
+            return $raw;
+        }
+
+        $svg = $dom->documentElement;
+        if ($svg && $svg->nodeName === 'svg') {
+            $scripts = [];
+            foreach ($svg->getElementsByTagName('script') as $script) {
+                $scripts[] = $script;
+            }
+            foreach ($scripts as $script) {
+                if ($script->parentNode) {
+                    $script->parentNode->removeChild($script);
+                }
+            }
+
+            if (!$svg->hasAttribute('data-inline-template')) {
+                $svg->setAttribute('data-inline-template', 'true');
+            }
+
+            $raw = $dom->saveXML($svg) ?: $raw;
+            $raw = preg_replace('/<\?xml[^>]*\?>/i', '', $raw);
+        }
+
+        libxml_use_internal_errors($previous);
+        libxml_clear_errors();
+
+        return trim($raw);
+    }
+
     private function redirectToCatalog(): RedirectResponse
     {
         return redirect()->route('templates.wedding.invitations')
             ->with('status', 'Start a new invitation to continue through the order flow.');
     }
+
 }

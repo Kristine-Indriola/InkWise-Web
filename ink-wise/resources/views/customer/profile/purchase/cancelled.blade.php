@@ -7,6 +7,7 @@
     <div class="flex border-b text-base font-semibold mb-4">
         <a href="{{ route('customer.my_purchase') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab" data-route="all">All</a>
         <a href="{{ route('customer.my_purchase.topay') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Pay</a>
+        <a href="{{ route('customer.my_purchase.inproduction') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">In Production</a>
         <a href="{{ route('customer.my_purchase.toship') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Ship</a>
         <a href="{{ route('customer.my_purchase.toreceive') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Receive</a>
         <a href="{{ route('customer.my_purchase.completed') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Completed</a>
@@ -15,36 +16,83 @@
     </div>
 
     @php
-        if (!empty($orders) && is_iterable($orders)) {
-            $ordersList = $orders;
-        } else {
-            $ordersList = [
-                (object)[
-                    'id' => 4001,
-                    'product_name' => 'Cancelled Invitation Order',
-                    'quantity' => 80,
-                    'image' => asset('customerimages/image/invitation.png'),
-                    'total_amount' => 1600.00,
-                    'cancelled_date' => now()->subDays(3)->format('M d, Y'),
-                    'reason' => 'Customer requested cancellation'
-                ],
-            ];
-        }
+        $statusOptions = [
+            'pending' => 'Order Received',
+            'in_production' => 'In Progress',
+            'confirmed' => 'To Ship',
+            'to_receive' => 'To Receive',
+            'completed' => 'Completed',
+            'cancelled' => 'Cancelled',
+        ];
+        $normalizeMetadata = function ($metadata) {
+            if (is_array($metadata)) {
+                return $metadata;
+            }
+            if ($metadata instanceof \JsonSerializable) {
+                return (array) $metadata;
+            }
+            if (is_string($metadata) && $metadata !== '') {
+                $decoded = json_decode($metadata, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    return $decoded;
+                }
+            }
+            return [];
+        };
+        $formatDate = function ($value, $format = 'M d, Y') {
+            try {
+                if ($value instanceof \Illuminate\Support\Carbon) {
+                    return $value->format($format);
+                }
+                if ($value) {
+                    return \Illuminate\Support\Carbon::parse($value)->format($format);
+                }
+            } catch (\Throwable $e) {
+                return null;
+            }
+            return null;
+        };
+        $ordersSource = $orders ?? optional(auth()->user())->customer->orders ?? [];
+        $ordersList = collect($ordersSource)->filter(function ($order) {
+            return data_get($order, 'status') === 'cancelled';
+        })->values();
     @endphp
 
     <div class="space-y-4">
-        @foreach($ordersList as $order)
+        @forelse($ordersList as $order)
+            @php
+                $productName = data_get($order, 'product_name', 'Order');
+                $quantity = (int) data_get($order, 'quantity', 0);
+                $cancelledDate = $formatDate(data_get($order, 'cancelled_date'));
+                if (!$cancelledDate) {
+                    $cancelledDate = $formatDate(data_get($order, 'updated_at'));
+                }
+                $reason = data_get($order, 'reason', 'Cancelled by customer');
+                $image = data_get($order, 'image', asset('images/placeholder.png'));
+                $totalAmount = data_get($order, 'total_amount', 0);
+                $metadata = $normalizeMetadata(data_get($order, 'metadata', []));
+                $statusNote = $metadata['status_note'] ?? null;
+                $statusKey = data_get($order, 'status', 'cancelled');
+                $statusLabel = $statusOptions[$statusKey] ?? ucfirst(str_replace('_', ' ', $statusKey));
+            @endphp
+
             <div class="bg-white border rounded-xl p-4 shadow-sm flex items-center gap-4">
-                <img src="{{ $order->image ?? asset('images/placeholder.png') }}" alt="{{ $order->product_name }}" class="w-24 h-24 object-cover rounded-lg">
+                <img src="{{ $image }}" alt="{{ $productName }}" class="w-24 h-24 object-cover rounded-lg">
                 <div class="flex-1">
-                    <div class="font-semibold text-lg">{{ $order->product_name }}</div>
-                    <div class="text-sm text-gray-500">Qty: {{ $order->quantity }} pcs</div>
-                    <div class="text-sm text-gray-500">Cancelled: <span class="font-medium">{{ $order->cancelled_date }}</span></div>
-                    <div class="text-sm text-gray-500">Reason: {{ $order->reason }}</div>
+                    <div class="font-semibold text-lg">{{ $productName }}</div>
+                    <div class="text-sm text-gray-500">Qty: {{ $quantity ?: '—' }} pcs</div>
+                    <div class="text-sm text-gray-500">Cancelled: <span class="font-medium">{{ $cancelledDate ?? 'Not available' }}</span></div>
+                    <div class="text-sm text-gray-500">Reason: {{ $reason }}</div>
+                    <div class="text-sm text-gray-500">Status: <span class="text-[#a6b7ff] font-semibold">{{ $statusLabel }}</span></div>
+                    @if($statusNote)
+                        <div class="text-xs text-gray-400 mt-1">Note: {{ $statusNote }}</div>
+                    @endif
                 </div>
-                <div class="text-gray-700 font-bold">₱{{ number_format($order->total_amount,2) }}</div>
+                <div class="text-gray-700 font-bold">₱{{ number_format($totalAmount, 2) }}</div>
             </div>
-        @endforeach
+        @empty
+            <div class="text-sm text-gray-500">No cancelled orders.</div>
+        @endforelse
     </div>
 </div>
 

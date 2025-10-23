@@ -17,6 +17,7 @@ class Template extends Model
         'description',
         'front_image',
         'back_image',
+        'status',
     ];
 
     public function products()

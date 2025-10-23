@@ -9,7 +9,12 @@
     'success',
     'void',
     'ready',
-    'shipped'
+    'shipped',
+    'in_production',
+  'confirmed',
+  'to_receive',
+  'completed',
+  'to_ship'
   ];
 
   const currencyFormatter = new Intl.NumberFormat('en-PH', {
@@ -42,7 +47,11 @@
       case 'shipped':
         return 'Shipped';
       default:
-        return base.charAt(0).toUpperCase() + base.slice(1);
+        return base
+          .split('_')
+          .filter(Boolean)
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(' ');
     }
   };
 
@@ -153,6 +162,57 @@
     if (!page) return;
     const sidebar = page.querySelector('[data-order-sidebar]');
     const toastEl = document.querySelector('[data-toast]');
+    const STATUS_STORAGE_KEY = 'inkwiseOrderStatusUpdate';
+    const STATUS_CONSUMER_ID = 'order-summary';
+    const KNOWN_STATUS_CONSUMERS = ['orders-table', 'order-summary'];
+    const hasLocalStorage = (() => {
+      try {
+        const testKey = '__inkwise_status_probe__';
+        window.localStorage.setItem(testKey, '1');
+        window.localStorage.removeItem(testKey);
+        return true;
+      } catch (error) {
+        return false;
+      }
+    })();
+    const safeJsonParse = (value, fallback) => {
+      if (!value) return fallback;
+      try {
+        return JSON.parse(value);
+      } catch (error) {
+        return fallback;
+      }
+    };
+    const toKey = (value) => (value || '').toString().toLowerCase();
+    const fallbackStatusLabel = (status) => {
+      const normalized = toKey(status);
+      if (!normalized) return 'Pending';
+      return normalized
+        .split('_')
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
+    };
+    const statusLabels = safeJsonParse(page.dataset.statusLabels, {});
+    const statusFlow = safeJsonParse(page.dataset.statusFlow, []);
+    const orderId = (page.dataset.orderId || '').toString();
+    const statusCard = page.querySelector('[data-status-card]');
+    const statusChip = page.querySelector('[data-status-chip]');
+    const trackerItems = Array.from(page.querySelectorAll('[data-status-step]'));
+    const nextStatusNode = page.querySelector('[data-next-status]');
+    const trackerStateClasses = [
+      'status-tracker__item--done',
+      'status-tracker__item--current',
+      'status-tracker__item--upcoming',
+      'status-tracker__item--disabled'
+    ];
+    const chipClassPrefix = 'order-stage-chip--';
+    page.dataset.currentStatus = toKey(page.dataset.currentStatus || 'pending');
+    const getStatusLabelFor = (status) => {
+      const normalized = toKey(status);
+      return statusLabels[normalized] || fallbackStatusLabel(normalized);
+    };
+    let setFulfillmentStatusFn = null;
 
     page.querySelectorAll('[data-money]').forEach(formatMoneyNode);
 
@@ -205,6 +265,8 @@
           markFulfilledBtn.textContent = isComplete ? 'Fulfilled' : 'Mark as fulfilled';
         }
       };
+
+      setFulfillmentStatusFn = setFulfillmentStatus;
 
       setPaymentStatus(sidebar.dataset.paymentStatus || 'pending');
       setFulfillmentStatus(sidebar.dataset.fulfillmentStatus || 'processing');
@@ -355,6 +417,144 @@
             break;
           default:
             break;
+        }
+      });
+    }
+
+    const markPayloadConsumed = (payload) => {
+      const consumed = Array.isArray(payload.consumedBy) ? payload.consumedBy.slice() : [];
+      if (!consumed.includes(STATUS_CONSUMER_ID)) {
+        consumed.push(STATUS_CONSUMER_ID);
+      }
+      payload.consumedBy = consumed;
+      const allConsumed = KNOWN_STATUS_CONSUMERS.every((id) => consumed.includes(id));
+      if (allConsumed) {
+        if (hasLocalStorage) {
+          localStorage.removeItem(STATUS_STORAGE_KEY);
+        }
+      } else {
+        if (hasLocalStorage) {
+          try {
+            localStorage.setItem(STATUS_STORAGE_KEY, JSON.stringify(payload));
+          } catch (error) {
+            console.warn('Unable to persist order status sync payload for summary view.', error);
+          }
+        }
+      }
+    };
+
+    const updateProgressStatus = (status, providedLabel) => {
+      const normalized = toKey(status || page.dataset.currentStatus || 'pending');
+      const label = providedLabel || getStatusLabelFor(normalized);
+      page.dataset.currentStatus = normalized;
+      if (statusCard) {
+        statusCard.dataset.currentStatus = normalized;
+      }
+
+      if (statusChip) {
+        const classesToRemove = Array.from(statusChip.classList).filter((cls) => cls.startsWith(chipClassPrefix));
+        classesToRemove.forEach((cls) => statusChip.classList.remove(cls));
+        statusChip.classList.add(`${chipClassPrefix}${normalized.replace(/_/g, '-')}`);
+        statusChip.textContent = label;
+      }
+
+      const flowIndex = statusFlow.indexOf(normalized);
+      const isCancelled = normalized === 'cancelled';
+
+      trackerItems.forEach((item, index) => {
+        trackerStateClasses.forEach((stateClass) => item.classList.remove(stateClass));
+        let nextClass = 'status-tracker__item--upcoming';
+        if (isCancelled) {
+          nextClass = 'status-tracker__item--disabled';
+        } else if (flowIndex !== -1) {
+          if (index < flowIndex) {
+            nextClass = 'status-tracker__item--done';
+          } else if (index === flowIndex) {
+            nextClass = 'status-tracker__item--current';
+          }
+        }
+        item.classList.add(nextClass);
+
+        const marker = item.querySelector('.status-tracker__marker');
+        if (!marker) return;
+        if (nextClass === 'status-tracker__item--done') {
+          marker.innerHTML = '<span class="status-tracker__icon">✓</span>';
+        } else {
+          const stepNumber = index + 1;
+          marker.innerHTML = `<span class="status-tracker__number">${stepNumber}</span>`;
+        }
+      });
+
+      let nextLabel = 'All steps complete';
+      if (isCancelled) {
+        nextLabel = 'Order cancelled';
+      } else if (flowIndex !== -1 && flowIndex < statusFlow.length - 1) {
+        const nextKey = statusFlow[flowIndex + 1];
+        nextLabel = getStatusLabelFor(nextKey);
+      }
+
+      if (nextStatusNode) {
+        nextStatusNode.textContent = nextLabel;
+      }
+
+      if (sidebar) {
+        sidebar.dataset.fulfillmentStatus = normalized;
+      }
+
+      if (typeof setFulfillmentStatusFn === 'function') {
+        setFulfillmentStatusFn(normalized);
+      }
+    };
+
+    const applyStatusUpdateFromStorage = () => {
+      if (!hasLocalStorage) return;
+      const raw = localStorage.getItem(STATUS_STORAGE_KEY);
+      if (!raw) return;
+
+      let payload;
+      try {
+        payload = JSON.parse(raw);
+      } catch (error) {
+        localStorage.removeItem(STATUS_STORAGE_KEY);
+        return;
+      }
+
+      if (!payload || !payload.orderId || !payload.status) {
+        localStorage.removeItem(STATUS_STORAGE_KEY);
+        return;
+      }
+
+      const maxAgeMs = 10 * 60 * 1000; // 10 minutes
+      if (payload.timestamp && Date.now() - payload.timestamp > maxAgeMs) {
+        localStorage.removeItem(STATUS_STORAGE_KEY);
+        return;
+      }
+
+      if (String(payload.orderId) !== orderId) {
+        return;
+      }
+
+      const consumedBy = Array.isArray(payload.consumedBy) ? payload.consumedBy : [];
+      if (consumedBy.includes(STATUS_CONSUMER_ID)) {
+        return;
+      }
+
+      const normalized = toKey(payload.status);
+      const label = payload.statusLabel || getStatusLabelFor(normalized);
+      updateProgressStatus(normalized, label);
+      markPayloadConsumed(payload);
+    };
+
+    if (hasLocalStorage) {
+      applyStatusUpdateFromStorage();
+
+      window.addEventListener('pageshow', () => {
+        applyStatusUpdateFromStorage();
+      });
+
+      window.addEventListener('storage', (event) => {
+        if (event.key === STATUS_STORAGE_KEY) {
+          applyStatusUpdateFromStorage();
         }
       });
     }
