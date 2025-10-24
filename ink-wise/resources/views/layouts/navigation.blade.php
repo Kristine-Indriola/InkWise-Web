@@ -56,7 +56,7 @@
                            class="text-gray-700 px-4 py-2 rounded-md hover:bg-gray-100">
                            Login
                         </a>
-                        <a href="{{ route('register') }}" 
+                                <a href="{{ route('customer.register.form') }}" 
                            class="text-white px-5 py-2 font-semibold"
                            style="background: linear-gradient(90deg, #8c52ff, #5ce1e6); border-radius: 65px; font-family: 'Playfair Display', serif;">
                            Sign Up
