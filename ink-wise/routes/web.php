@@ -380,8 +380,12 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');  // Protected
 
-    // Customer Favorites (render favorites page)
-    Route::get('/customer/favorites', fn () => view('customer.profile.favorite'))->name('customer.favorites');
+   Route::get('/', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
+    Route::get('/profile', [CustomerProfileController::class, 'edit'])->name('customer.profile.edit');
+    Route::put('/profile', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
+// Other pages
+Route::get('/settings', fn () => view('customer.profile.settings'))->name('customer.profile.settings');
+Route::get('/order', fn () => view('customer.profile.orderform'))->name('custome.rprofile.orderform');
 
     // My Purchases
     Route::get('/customer/my-orders', fn () => view('customer.profile.my_purchase'))->name('customer.my_purchase');
@@ -398,7 +402,6 @@ Route::get('/customer/my-orders/inproduction', fn () => view('customer.profile.p
 Route::get('/customer/my-orders/toship', fn () => view('customer.profile.purchase.toship'))->name('customer.my_purchase.toship');
 Route::get('/customer/my-orders/toreceive', fn () => view('customer.profile.purchase.toreceive'))->name('customer.my_purchase.toreceive');
 Route::get('/customer/my-orders/completed', fn () => view('customer.profile.purchase.completed'))->name('customer.my_purchase.completed');
-Route::get('/customer/my-orders/rate', [CustomerProfileController::class, 'rate'])->middleware('auth')->name('customer.my_purchase.rate');
 Route::get('/customer/my-orders/cancelled', fn () => view('customer.profile.purchase.cancelled'))->name('customer.my_purchase.cancelled');
 Route::get('/customer/my-orders/return-refund', fn () => view('customer.profile.purchase.return_refund'))->name('customer.my_purchase.return_refund');
 
@@ -407,9 +410,6 @@ Route::middleware('auth')->post('/customer/orders/{order}/cancel', [CustomerProf
 
 Route::middleware('auth')->post('/customer/orders/{order}/confirm-received', [CustomerProfileController::class, 'confirmReceived'])
     ->name('customer.orders.confirm_received');
-
-Route::middleware('auth')->post('/customer/order-ratings', [CustomerProfileController::class, 'storeRating'])
-    ->name('customer.order-ratings.store');
 
 
 /** Profile & Addresses (Protected) */
@@ -583,7 +583,6 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/inventory', [OwnerInventoryController::class, 'index'])->name('inventory.index');
     Route::get('/inventory/track', [OwnerInventoryController::class, 'track'])->name('inventory-track');
     Route::get('/products', [OwnerProductsController::class, 'index'])->name('products.index');
-    Route::get('/products/{product}', [OwnerProductsController::class, 'show'])->name('products.show');
     Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
     Route::get('/reports', fn () => view('owner.owner-reports'))->name('reports');
 
@@ -609,7 +608,13 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
 
 Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
     // Staff routes - updated for order list functionality
-    Route::get('/dashboard', fn () => view('staff.dashboard'))->name('dashboard');
+    Route::get('/dashboard', function () {
+        if (\Illuminate\Support\Facades\View::exists('staff.dashboard')) {
+            return view('staff.dashboard');
+        } else {
+            return response('View staff.dashboard does not exist on the server. Please check deployment.', 500);
+        }
+    })->name('dashboard');
     Route::get('/assigned-orders', [StaffAssignedController::class, 'index'])->name('assigned.orders');
     Route::get('/order-list', [StaffOrderController::class, 'index'])->name('order_list.index');
     Route::get('/order-list/{id}', [StaffOrderController::class, 'show'])->name('order_list.show');
