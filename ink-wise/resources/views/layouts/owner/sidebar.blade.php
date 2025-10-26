@@ -125,7 +125,7 @@
               <path d="m12 6 4 6h-8l4 6" />
             </svg>
           </span>
-          <span class="text">Order Workflow</span>
+          <span class="text">Orders</span>
         </button>
       </a>
     </li>
@@ -190,7 +190,12 @@
 
   @php
     $owner = auth()->user();
-    $ownerName = $owner->name ?? 'Owner';
+
+    if (!$owner && auth('owner')->check()) {
+      $owner = auth('owner')->user();
+    }
+
+    $ownerName = $owner?->name ?? 'Owner';
     $ownerInitials = collect(explode(' ', $ownerName))
       ->filter(fn ($segment) => strlen($segment) > 0)
       ->map(fn ($segment) => \Illuminate\Support\Str::substr($segment, 0, 1))
@@ -199,7 +204,16 @@
       $ownerInitials = \Illuminate\Support\Str::substr($ownerName, 0, 1);
     }
     $ownerInitials = \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr($ownerInitials, 0, 2));
-    $unreadNotifications = $owner?->unreadNotifications ?? collect();
+
+    $unreadNotifications = collect();
+    if ($owner && method_exists($owner, 'unreadNotifications')) {
+      try {
+        $unreadNotifications = $owner->unreadNotifications()->latest()->get();
+      } catch (\Throwable $notificationError) {
+        $unreadNotifications = collect();
+      }
+    }
+
     $unreadCount = $unreadNotifications->count();
     $ownerAvatarRelativePath = 'ownerimage/KRISTINE.png';
     $ownerAvatarUrl = file_exists(public_path($ownerAvatarRelativePath)) ? asset($ownerAvatarRelativePath) : null;

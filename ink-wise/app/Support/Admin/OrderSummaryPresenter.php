@@ -41,6 +41,7 @@ class OrderSummaryPresenter
             'order_number' => $order->order_number,
             'created_at' => $order->order_date ?? $order->created_at,
             'updated_at' => $order->updated_at,
+            'status' => Str::lower((string) $order->status ?: 'pending'),
             'payment_status' => Str::lower((string) $order->payment_status ?: 'pending'),
             'fulfillment_status' => Str::lower((string) $order->status ?: 'processing'),
             'subtotal' => static::toFloat($order->subtotal_amount),

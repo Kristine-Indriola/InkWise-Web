@@ -30,6 +30,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Dancing+Script&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="{{ asset('adminimage/ink.png') }}">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    @stack('styles')
 </head>
 
 <body class="bg-gray-50 text-gray-800">
@@ -549,6 +550,6 @@ window.addEventListener('mouseup', function() {
     window.addEventListener('beforeunload', () => clearInterval(pollInterval));
 })();
 </script>
-
+@stack('scripts')
 </body>
 </html>

@@ -386,7 +386,7 @@ Route::prefix('customerprofile')->group(function () {
     Route::put('/profile', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
 // Other pages
 Route::get('/settings', fn () => view('customer.profile.settings'))->name('customer.profile.settings');
-Route::get('/order', fn () => view('customer.profile.orderform'))->name('custome.rprofile.orderform');
+Route::get('/order', fn () => view('customer.profile.orderform'))->name('customer.profile.orderform');
 
 });
 
@@ -404,6 +404,7 @@ Route::get('/customer/my-orders/inproduction', fn () => view('customer.profile.p
 Route::get('/customer/my-orders/toship', fn () => view('customer.profile.purchase.toship'))->name('customer.my_purchase.toship');
 Route::get('/customer/my-orders/toreceive', fn () => view('customer.profile.purchase.toreceive'))->name('customer.my_purchase.toreceive');
 Route::get('/customer/my-orders/completed', fn () => view('customer.profile.purchase.completed'))->name('customer.my_purchase.completed');
+Route::get('/customer/my-orders/rate', [CustomerProfileController::class, 'rate'])->middleware('auth')->name('customer.my_purchase.rate');
 Route::get('/customer/my-orders/cancelled', fn () => view('customer.profile.purchase.cancelled'))->name('customer.my_purchase.cancelled');
 Route::get('/customer/my-orders/return-refund', fn () => view('customer.profile.purchase.return_refund'))->name('customer.my_purchase.return_refund');
 
@@ -412,6 +413,9 @@ Route::middleware('auth')->post('/customer/orders/{order}/cancel', [CustomerProf
 
 Route::middleware('auth')->post('/customer/orders/{order}/confirm-received', [CustomerProfileController::class, 'confirmReceived'])
     ->name('customer.orders.confirm_received');
+
+Route::middleware('auth')->post('/customer/order-ratings', [CustomerProfileController::class, 'storeRating'])
+    ->name('customer.order-ratings.store');
 
 
 /** Profile & Addresses (Protected) */
@@ -585,6 +589,7 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/inventory', [OwnerInventoryController::class, 'index'])->name('inventory.index');
     Route::get('/inventory/track', [OwnerInventoryController::class, 'track'])->name('inventory-track');
     Route::get('/products', [OwnerProductsController::class, 'index'])->name('products.index');
+    Route::get('/products/{product}', [OwnerProductsController::class, 'show'])->name('products.show');
     Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
     Route::get('/reports', fn () => view('owner.owner-reports'))->name('reports');
 

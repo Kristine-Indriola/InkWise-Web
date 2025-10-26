@@ -253,6 +253,241 @@
             font-size: 0.85rem;
         }
 
+        .invitation-card__rating {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0.5rem 0;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: opacity 0.2s ease;
+        }
+
+        .invitation-card__rating:hover {
+            opacity: 0.8;
+        }
+
+        .invitation-card__stars {
+            display: flex;
+            gap: 1px;
+        }
+
+        .invitation-card__star {
+            font-size: 0.9rem;
+            color: #ddd;
+        }
+
+        .invitation-card__star.filled {
+            color: #f59e0b;
+        }
+
+        .invitation-card__rating-text {
+            color: var(--invite-muted);
+            font-weight: 500;
+        }
+
+        /* Rating Modal Styles */
+        .rating-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .rating-modal-overlay.is-visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .rating-modal {
+            background: #ffffff;
+            border-radius: 24px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 28px 55px rgba(79, 70, 229, 0.25);
+            transform: scale(0.9) translateY(20px);
+            transition: transform 0.3s ease;
+        }
+
+        .rating-modal-overlay.is-visible .rating-modal {
+            transform: scale(1) translateY(0);
+        }
+
+        .rating-modal-header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid rgba(166, 183, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .rating-modal-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #111827;
+            margin: 0;
+        }
+
+        .rating-modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--invite-muted);
+            cursor: pointer;
+            padding: 0.25rem;
+            border-radius: 50%;
+            transition: background 0.2s ease, color 0.2s ease;
+        }
+
+        .rating-modal-close:hover {
+            background: rgba(166, 183, 255, 0.1);
+            color: #4338ca;
+        }
+
+        .rating-modal-body {
+            padding: 1.5rem 2rem;
+        }
+
+        .rating-modal-summary {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid rgba(166, 183, 255, 0.2);
+        }
+
+        .rating-modal-stars {
+            display: flex;
+            justify-content: center;
+            gap: 2px;
+            margin: 0.5rem 0;
+        }
+
+        .rating-modal-star {
+            font-size: 1.5rem;
+            color: #ddd;
+        }
+
+        .rating-modal-star.filled {
+            color: #f59e0b;
+        }
+
+        .rating-modal-average {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #111827;
+            margin: 0.25rem 0;
+        }
+
+        .rating-modal-count {
+            color: var(--invite-muted);
+            font-size: 0.9rem;
+        }
+
+        .rating-modal-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .rating-modal-item {
+            border-bottom: 1px solid rgba(166, 183, 255, 0.1);
+            padding: 1.5rem 0;
+        }
+
+        .rating-modal-item:last-child {
+            border-bottom: none;
+        }
+
+        .rating-modal-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+            gap: 1rem;
+        }
+
+        .rating-modal-item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            flex: 1;
+        }
+
+        .rating-modal-item-customer {
+            font-weight: 600;
+            color: #111827;
+            font-size: 0.9rem;
+        }
+
+        .rating-modal-item-stars {
+            display: flex;
+            gap: 1px;
+        }
+
+        .rating-modal-item-star {
+            font-size: 1rem;
+            color: #ddd;
+        }
+
+        .rating-modal-item-star.filled {
+            color: #f59e0b;
+        }
+
+        .rating-modal-item-date {
+            font-size: 0.85rem;
+            color: var(--invite-muted);
+        }
+
+        .rating-modal-item-review {
+            margin: 0.75rem 0;
+            line-height: 1.5;
+            color: #374151;
+        }
+
+        .rating-modal-item-photos {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            gap: 8px;
+            margin-top: 0.75rem;
+            padding: 0.5rem;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .rating-modal-item-photo {
+            width: 100%;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
+        }
+
+        .rating-modal-item-photo:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .rating-modal-empty {
+            text-align: center;
+            color: var(--invite-muted);
+            padding: 2rem;
+        }
+
         .invitation-card__actions {
             margin-top: auto;
             display: flex;
@@ -379,6 +614,107 @@
             } else {
                 document.querySelectorAll('.invitation-card').forEach((card) => card.classList.add('is-visible'));
             }
+
+            // Rating Modal Functionality
+            const ratingModal = document.getElementById('ratingModal');
+            const ratingModalClose = document.getElementById('ratingModalClose');
+            const ratingModalTitle = document.getElementById('ratingModalTitle');
+            const ratingModalBody = document.getElementById('ratingModalBody');
+
+            // Store ratings data globally (populated from PHP)
+            window.productRatings = @json($ratingsData);
+
+            function showRatingModal(productId) {
+                const productData = window.productRatings[productId];
+                if (!productData) return;
+
+                ratingModalTitle.textContent = `Reviews for ${productData.name}`;
+
+                let modalContent = '';
+
+                if (productData.rating_count > 0) {
+                    // Summary
+                    modalContent += `
+                        <div class="rating-modal-summary">
+                            <div class="rating-modal-stars">
+                                ${Array.from({length: 5}, (_, i) =>
+                                    `<span class="rating-modal-star ${i < Math.round(productData.average_rating) ? 'filled' : ''}">★</span>`
+                                ).join('')}
+                            </div>
+                            <p class="rating-modal-average">${productData.average_rating.toFixed(1)} out of 5</p>
+                            <p class="rating-modal-count">Based on ${productData.rating_count} review${productData.rating_count > 1 ? 's' : ''}</p>
+                        </div>
+                    `;
+
+                    // Individual reviews
+                    modalContent += '<ul class="rating-modal-list">';
+                    productData.ratings.forEach(rating => {
+                        modalContent += `
+                            <li class="rating-modal-item">
+                                <div class="rating-modal-item-header">
+                                    <div class="rating-modal-item-info">
+                                        <strong class="rating-modal-item-customer">${rating.customer_name}</strong>
+                                        <div class="rating-modal-item-stars">
+                                            ${Array.from({length: 5}, (_, i) =>
+                                                `<span class="rating-modal-item-star ${i < rating.rating ? 'filled' : ''}">★</span>`
+                                            ).join('')}
+                                        </div>
+                                    </div>
+                                    <span class="rating-modal-item-date">${rating.submitted_at || 'Recent'}</span>
+                                </div>
+                                ${rating.review ? `<p class="rating-modal-item-review">${rating.review}</p>` : ''}
+                                ${rating.photos && rating.photos.length > 0 ? `
+                                    <div class="rating-modal-item-photos">
+                                        ${rating.photos.map(photo => {
+                                            const photoUrl = photo.startsWith('http') ? photo : `/storage/${photo}`;
+                                            return `<img src="${photoUrl}" alt="Rating photo" class="rating-modal-item-photo" onclick="window.open('${photoUrl}', '_blank')">`;
+                                        }).join('')}
+                                    </div>
+                                ` : ''}
+                            </li>
+                        `;
+                    });
+                    modalContent += '</ul>';
+                } else {
+                    modalContent = '<div class="rating-modal-empty">No reviews yet for this product.</div>';
+                }
+
+                ratingModalBody.innerHTML = modalContent;
+                ratingModal.classList.add('is-visible');
+                ratingModal.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
+            }
+
+            function hideRatingModal() {
+                ratingModal.classList.remove('is-visible');
+                ratingModal.setAttribute('aria-hidden', 'true');
+                document.body.style.overflow = '';
+            }
+
+            // Event listeners
+            document.addEventListener('click', (e) => {
+                if (e.target.classList.contains('rating-trigger') || e.target.closest('.rating-trigger')) {
+                    const trigger = e.target.classList.contains('rating-trigger') ? e.target : e.target.closest('.rating-trigger');
+                    const productId = trigger.dataset.productId;
+                    if (productId) {
+                        showRatingModal(productId);
+                    }
+                }
+            });
+
+            ratingModalClose.addEventListener('click', hideRatingModal);
+            ratingModal.addEventListener('click', (e) => {
+                if (e.target === ratingModal) {
+                    hideRatingModal();
+                }
+            });
+
+            // Keyboard support
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && ratingModal.classList.contains('is-visible')) {
+                    hideRatingModal();
+                }
+            });
         });
     </script>
 @endpush
@@ -432,6 +768,10 @@
                         $eventLabel = $product->event_type ?? 'Invitation';
                         $themeLabel = $product->theme_style ?? 'Custom theme';
                         $previewUrl = route('product.preview', $product->id);
+
+                        $ratings = $product->ratings ?? collect();
+                        $averageRating = $ratings->avg('rating');
+                        $ratingCount = $ratings->count();
                     @endphp
                     <article class="invitation-card" role="listitem" data-product-id="{{ $product->id }}">
                         <div class="invitation-card__preview">
@@ -460,6 +800,21 @@
                                 <p class="invitation-card__price">Starting at ₱{{ number_format($priceValue, 2) }}</p>
                             @else
                                 <p class="invitation-card__muted">Pricing available on request</p>
+                            @endif
+                            @if($ratingCount > 0)
+                                <div class="invitation-card__rating rating-trigger"
+                                     data-product-id="{{ $product->id }}"
+                                     data-product-name="{{ $product->name }}"
+                                     role="button"
+                                     tabindex="0"
+                                     aria-label="View {{ $ratingCount }} review{{ $ratingCount > 1 ? 's' : '' }} for {{ $product->name }}">
+                                    <div class="invitation-card__stars">
+                                        @for($i = 1; $i <= 5; $i++)
+                                            <span class="invitation-card__star {{ $i <= round($averageRating) ? 'filled' : '' }}">★</span>
+                                        @endfor
+                                    </div>
+                                    <span class="invitation-card__rating-text">{{ number_format($averageRating, 1) }} ({{ $ratingCount }})</span>
+                                </div>
                             @endif
                             <div class="invitation-card__actions">
                                 <button type="button"
@@ -494,6 +849,21 @@
         </div>
         <div class="preview-frame-body">
             <iframe id="productPreviewFrame" title="Product preview"></iframe>
+        </div>
+    </div>
+</div>
+
+<!-- Rating Modal -->
+<div id="ratingModal" class="rating-modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="rating-modal">
+        <div class="rating-modal-header">
+            <h3 class="rating-modal-title" id="ratingModalTitle">Customer Reviews</h3>
+            <button type="button" class="rating-modal-close" id="ratingModalClose" aria-label="Close reviews">
+                ×
+            </button>
+        </div>
+        <div class="rating-modal-body" id="ratingModalBody">
+            <!-- Content will be populated by JavaScript -->
         </div>
     </div>
 </div>
