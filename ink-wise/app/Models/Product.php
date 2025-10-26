@@ -31,11 +31,11 @@ class Product extends Model
 
     /**
      * Relationship: A product can belong to a template.
-     * Assumes you have a Template model and a foreign key 'template_id' in the products table.
+     * Assumes you have a ProductUpload model and a foreign key 'template_id' in the products table.
      */
     public function template()
     {
-        return $this->belongsTo(Template::class);
+        return $this->belongsTo(ProductUpload::class, 'template_id');
     }
 
     /**

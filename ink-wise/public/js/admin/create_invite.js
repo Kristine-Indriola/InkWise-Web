@@ -576,3 +576,246 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+
+// Global functions for template auto-population
+window.addPaperStockEntry = function(data = null, index = null) {
+    const container = document.querySelector('.paper-stock-rows');
+    if (!container) return;
+
+    const rows = container.querySelectorAll('.paper-stock-row');
+    const newIndex = index !== null ? index : rows.length;
+
+    // Clone the last row or create a new one
+    const templateRow = rows.length > 0 ? rows[rows.length - 1] : null;
+    if (!templateRow) return;
+
+    const newRow = templateRow.cloneNode(true);
+
+    // Update names and ids
+    newRow.querySelectorAll('[name]').forEach(element => {
+        element.name = element.name.replace(/\[\d+\]/, `[${newIndex}]`);
+    });
+    newRow.querySelectorAll('[id]').forEach(element => {
+        element.id = element.id.replace(/_(\d+)(?=_[^_]+$)/, `_${newIndex}`);
+        element.id = element.id.replace(/_(\d+)$/, `_${newIndex}`);
+    });
+
+    // Clear input values and set data if provided
+    newRow.querySelectorAll('input, textarea, select').forEach(input => {
+        if (input.type === 'file') {
+            const clone = input.cloneNode();
+            clone.value = '';
+            input.parentNode.replaceChild(clone, input);
+        } else if (input.type === 'checkbox' || input.type === 'radio') {
+            input.checked = false;
+        } else if (input.tagName === 'SELECT') {
+            input.selectedIndex = 0;
+        } else {
+            input.value = '';
+        }
+        if (input.dataset) delete input.dataset.autofill;
+    });
+
+    newRow.querySelectorAll('.existing-file').forEach(el => el.remove());
+
+    // Set data if provided
+    if (data) {
+        if (data.name) {
+            const select = newRow.querySelector('.paper-stock-name-select');
+            if (select) {
+                // Find option with matching text
+                const option = Array.from(select.options).find(opt => opt.text.trim() === data.name.trim());
+                if (option) {
+                    select.value = option.value;
+                }
+            }
+        }
+        if (data.price) {
+            const priceInput = newRow.querySelector('input[name$="[price]"]');
+            if (priceInput) priceInput.value = data.price;
+        }
+        if (data.material_id) {
+            const hidden = newRow.querySelector('.paper-stock-material-id');
+            if (hidden) hidden.value = data.material_id;
+        }
+    }
+
+    container.appendChild(newRow);
+    syncPaperStockRow(newRow);
+};
+
+window.addAddonEntry = function(data = null, index = null) {
+    const container = document.querySelector('.addon-rows');
+    if (!container) return;
+
+    const rows = container.querySelectorAll('.addon-row');
+    const newIndex = index !== null ? index : rows.length;
+
+    const templateRow = rows.length > 0 ? rows[rows.length - 1] : null;
+    if (!templateRow) return;
+
+    const newRow = templateRow.cloneNode(true);
+
+    // Update names and ids
+    newRow.querySelectorAll('[name]').forEach(element => {
+        element.name = element.name.replace(/\[\d+\]/, `[${newIndex}]`);
+    });
+    newRow.querySelectorAll('[id]').forEach(element => {
+        element.id = element.id.replace(/_(\d+)(?=_[^_]+$)/, `_${newIndex}`);
+        element.id = element.id.replace(/_(\d+)$/, `_${newIndex}`);
+    });
+
+    // Clear input values and set data if provided
+    newRow.querySelectorAll('input, textarea, select').forEach(input => {
+        if (input.type === 'file') {
+            const clone = input.cloneNode();
+            clone.value = '';
+            input.parentNode.replaceChild(clone, input);
+        } else if (input.type === 'checkbox' || input.type === 'radio') {
+            input.checked = false;
+        } else if (input.tagName === 'SELECT') {
+            input.selectedIndex = 0;
+        } else {
+            input.value = '';
+        }
+        if (input.dataset) delete input.dataset.autofill;
+    });
+
+    newRow.querySelectorAll('.existing-file').forEach(el => el.remove());
+
+    // Set data if provided
+    if (data) {
+        if (data.addon_type) {
+            const typeSelect = newRow.querySelector('select[name$="[addon_type]"]');
+            if (typeSelect) typeSelect.value = data.addon_type;
+        }
+        if (data.name) {
+            const nameInput = newRow.querySelector('.addon-name-input');
+            if (nameInput) nameInput.value = data.name;
+        }
+        if (data.price) {
+            const priceInput = newRow.querySelector('input[name$="[price]"]');
+            if (priceInput) priceInput.value = data.price;
+        }
+        if (data.material_id) {
+            const hidden = newRow.querySelector('.addon-material-id');
+            if (hidden) hidden.value = data.material_id;
+        }
+    }
+
+    container.appendChild(newRow);
+    toggleAddonInputs(newRow);
+    syncAddonRow(newRow);
+};
+
+window.addColorEntry = function(data = null, index = null) {
+    const container = document.querySelector('.color-rows');
+    if (!container) return;
+
+    const rows = container.querySelectorAll('.color-row');
+    const newIndex = index !== null ? index : rows.length;
+
+    const templateRow = rows.length > 0 ? rows[rows.length - 1] : null;
+    if (!templateRow) return;
+
+    const newRow = templateRow.cloneNode(true);
+
+    // Update names and ids
+    newRow.querySelectorAll('[name]').forEach(element => {
+        element.name = element.name.replace(/\[\d+\]/, `[${newIndex}]`);
+    });
+    newRow.querySelectorAll('[id]').forEach(element => {
+        element.id = element.id.replace(/_(\d+)(?=_[^_]+$)/, `_${newIndex}`);
+        element.id = element.id.replace(/_(\d+)$/, `_${newIndex}`);
+    });
+
+    // Clear input values and set data if provided
+    newRow.querySelectorAll('input, textarea, select').forEach(input => {
+        if (input.type === 'file') {
+            const clone = input.cloneNode();
+            clone.value = '';
+            input.parentNode.replaceChild(clone, input);
+        } else if (input.type === 'checkbox' || input.type === 'radio') {
+            input.checked = false;
+        } else if (input.tagName === 'SELECT') {
+            input.selectedIndex = 0;
+        } else {
+            input.value = '';
+        }
+        if (input.dataset) delete input.dataset.autofill;
+    });
+
+    newRow.querySelectorAll('.existing-file').forEach(el => el.remove());
+
+    // Set data if provided
+    if (data) {
+        if (data.name) {
+            const nameInput = newRow.querySelector('input[name$="[name]"]');
+            if (nameInput) nameInput.value = data.name;
+        }
+        if (data.color_code) {
+            const colorInput = newRow.querySelector('input[name$="[color_code]"]');
+            if (colorInput) colorInput.value = data.color_code;
+        }
+    }
+
+    container.appendChild(newRow);
+};
+
+window.addBulkOrderEntry = function(data = null, index = null) {
+    const container = document.querySelector('.bulk-order-rows');
+    if (!container) return;
+
+    const rows = container.querySelectorAll('.bulk-order-row');
+    const newIndex = index !== null ? index : rows.length;
+
+    const templateRow = rows.length > 0 ? rows[rows.length - 1] : null;
+    if (!templateRow) return;
+
+    const newRow = templateRow.cloneNode(true);
+
+    // Update names and ids
+    newRow.querySelectorAll('[name]').forEach(element => {
+        element.name = element.name.replace(/\[\d+\]/, `[${newIndex}]`);
+    });
+    newRow.querySelectorAll('[id]').forEach(element => {
+        element.id = element.id.replace(/_(\d+)(?=_[^_]+$)/, `_${newIndex}`);
+        element.id = element.id.replace(/_(\d+)$/, `_${newIndex}`);
+    });
+
+    // Clear input values and set data if provided
+    newRow.querySelectorAll('input, textarea, select').forEach(input => {
+        if (input.type === 'file') {
+            const clone = input.cloneNode();
+            clone.value = '';
+            input.parentNode.replaceChild(clone, input);
+        } else if (input.type === 'checkbox' || input.type === 'radio') {
+            input.checked = false;
+        } else if (input.tagName === 'SELECT') {
+            input.selectedIndex = 0;
+        } else {
+            input.value = '';
+        }
+        if (input.dataset) delete input.dataset.autofill;
+    });
+
+    newRow.querySelectorAll('.existing-file').forEach(el => el.remove());
+
+    // Set data if provided
+    if (data) {
+        if (data.min_qty !== undefined) {
+            const minQtyInput = newRow.querySelector('input[name$="[min_qty]"]');
+            if (minQtyInput) minQtyInput.value = data.min_qty || '';
+        }
+        if (data.max_qty !== undefined) {
+            const maxQtyInput = newRow.querySelector('input[name$="[max_qty]"]');
+            if (maxQtyInput) maxQtyInput.value = data.max_qty || '';
+        }
+        if (data.price_per_unit !== undefined) {
+            const priceInput = newRow.querySelector('input[name$="[price_per_unit]"]');
+            if (priceInput) priceInput.value = data.price_per_unit || '';
+        }
+    }
+
+    container.appendChild(newRow);
+};

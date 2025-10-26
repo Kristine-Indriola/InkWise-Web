@@ -45,7 +45,12 @@ class OrderFlowController extends Controller
         $frontSvg = $this->readInlineSvg($product?->template->front_image ?? null);
         $backSvg = $this->readInlineSvg($product?->template->back_image ?? null);
 
-        return view('customer.Invitations.editing', [
+        // Determine the correct view based on product type
+        $viewName = $product && strtolower($product->product_type ?? '') === 'giveaway'
+            ? 'customer.Giveaways.editing'
+            : 'customer.Invitations.editing';
+
+        return view($viewName, [
             'product' => $product,
             'frontImage' => $images['front'],
             'backImage' => $images['back'],

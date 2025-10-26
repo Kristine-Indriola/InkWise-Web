@@ -1,13 +1,13 @@
 @extends('layouts.admin')
 
 @php
-    $templateType = 'envelope';
+    $templateType = 'giveaway';
     $productTypeMap = [
         'invitation' => 'Invitation',
         'giveaway' => 'Giveaway',
         'envelope' => 'Envelope'
     ];
-    $selectedProductType = $productTypeMap[$templateType] ?? 'Envelope';
+    $selectedProductType = $productTypeMap[$templateType] ?? 'Giveaway';
 @endphp
 
 @push('styles')
@@ -21,6 +21,7 @@
 @endpush
 
 @push('scripts')
+    <script src="{{ asset('js/admin/template/template.js') }}" defer></script>
     <script>
         function getCsrfToken() {
             const meta = document.querySelector('meta[name="csrf-token"]');
@@ -86,24 +87,14 @@
                 });
             }
 
-            // Handle form submission
             form.addEventListener('submit', function(e) {
                 e.preventDefault();
                 const formData = new FormData(form);
 
-                // For envelope we require name and front_image
+                // For giveaway we require name and front_image
                 if (!formData.get('name') || !formData.get('front_image')) {
                     alert('Please provide a name and an SVG file.');
                     return;
-                }
-
-                // Set design data for envelope
-                const designInput = document.getElementById('design');
-                if (designInput) {
-                    designInput.value = JSON.stringify({
-                        text: "Envelope Design",
-                        type: "envelope"
-                    });
                 }
 
                 fetch(form.getAttribute('action'), {
@@ -123,8 +114,8 @@
                     return res.json();
                 }).then(json => {
                     if (json && json.success) {
-                        alert('Envelope template uploaded successfully');
-                        window.location = json.redirect || '{{ route('staff.templates.index') }}';
+                        alert('Giveaway template uploaded successfully');
+                        window.location = json.redirect || '{{ route('admin.templates.index') }}';
                     }
                 }).catch(err => {
                     console.error(err);
@@ -139,11 +130,11 @@
 <main class="dashboard-container templates-page" role="main">
     <section class="create-container" aria-labelledby="create-template-heading">
         <div>
-            <h2 id="create-template-heading">Create New Envelope Template</h2>
-            <p class="create-subtitle">Upload a single SVG to create an envelope template</p>
+            <h2 id="create-template-heading">Create New Giveaway Template</h2>
+            <p class="create-subtitle">Upload a single SVG to create a giveaway template</p>
         </div>
 
-        <form action="{{ route('staff.templates.store') }}" method="POST" class="create-form" enctype="multipart/form-data">
+        <form action="{{ route('admin.templates.store') }}" method="POST" class="create-form" enctype="multipart/form-data">
             @csrf
 
             <input type="hidden" name="design" id="design" value="{}">
@@ -202,8 +193,8 @@
             </div>
 
             <div class="create-actions">
-                <a href="{{ route('staff.templates.index') }}" class="btn-cancel">Cancel</a>
-                <button type="submit" class="btn-submit">Create Template</button>
+                <a href="{{ route('admin.templates.index') }}" class="btn-cancel">Cancel</a>
+                <button type="submit" class="btn-submit">Create Giveaway Template</button>
             </div>
         </form>
     </section>
