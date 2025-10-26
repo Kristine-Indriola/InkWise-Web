@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -498,8 +498,8 @@
     <div class="editor-topbar">
         <div class="left-tools">
             <div class="undo-redo-controls">
-                <button class="undo-btn" id="canvasUndo" type="button" title="Undo last action" disabled>↶</button>
-                <button class="redo-btn" id="canvasRedo" type="button" title="Redo last action" disabled>↷</button>
+                <button class="undo-btn" id="canvasUndo" type="button" title="Undo last action" disabled>â†¶</button>
+                <button class="redo-btn" id="canvasRedo" type="button" title="Redo last action" disabled>â†·</button>
             </div>
             <button id="editModeToggle" class="edit-mode-btn" type="button" title="Toggle Edit Mode">Edit Mode</button>
             <button id="showLayers" class="layers-btn" type="button" title="Show layers panel">Layers</button>
@@ -508,7 +508,6 @@
         <div class="right-tools">
             <a href="{{ route('templates.wedding.invitations') }}" class="change-template">Change template</a>
             <button class="preview-btn" type="button">Preview</button>
-            <button id="changeImageBtn" class="change-image-btn" type="button" title="Change background image">Change Image</button>
             <input type="file" id="backgroundFileInput" accept="image/*" style="display:none" />
             <form method="POST" action="{{ route('order.cart.add') }}" class="next-form">
                 @csrf
@@ -537,7 +536,7 @@
             <div class="canvas-layers-panel" id="layersPanel">
                 <div class="layers-header">
                     <span>Layers</span>
-                    <button id="toggleLayers" type="button" title="Toggle layers panel">×</button>
+                    <button id="toggleLayers" type="button" title="Toggle layers panel">Ã—</button>
                 </div>
                 <div id="layersList" class="layers-list">
                     <!-- Layer items will be populated here -->
@@ -639,14 +638,14 @@
                 <div class="font-modal-card">
                     <div class="font-modal-header">
                         <input id="fontSearch" class="font-search" placeholder="Search fonts...">
-                        <button id="fontClose" class="font-close" aria-label="Close">×</button>
+                        <button id="fontClose" class="font-close" aria-label="Close">Ã—</button>
                     </div>
                     <div id="recentFonts" class="recent-fonts" aria-hidden="true">
                         <div class="recent-title">Recent</div>
                         <div class="recent-list">No recent fonts</div>
                     </div>
                     <div id="fontList" class="font-list">
-                        <div class="font-list-loading">Loading fonts…</div>
+                        <div class="font-list-loading">Loading fontsâ€¦</div>
                     </div>
                 </div>
             </div>
@@ -655,7 +654,7 @@
                 <div class="color-modal-card">
                     <div class="color-modal-header">
                         <div class="color-title">Text color</div>
-                        <button id="colorClose" class="color-close" aria-label="Close">×</button>
+                        <button id="colorClose" class="color-close" aria-label="Close">Ã—</button>
                     </div>
                     <div class="color-modal-body">
                         <div class="color-picker-grid">
@@ -784,46 +783,6 @@
                         <canvas id="fabricFront" width="500" height="700" style="display:block; width:500px; height:700px;"></canvas>
                     @endif
                 </div>
-                @if($hasBackDesign)
-                    <div id="cardBack" class="card" data-card="back" data-default-image="{{ $backPreview }}" role="img" aria-label="Back design preview">
-                        @if(!empty($backSvg))
-                            {!! $backSvg !!}
-                        @else
-                            <svg viewBox="0 0 500 700" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-labelledby="backTitle">
-                                <title id="backTitle">Editable back invitation preview</title>
-                                <rect x="0" y="0" width="500" height="700" fill="#fdfcfa" rx="24" data-background-layer="true"/>
-                <image data-editable-image="back"
-                                   x="0"
-                                   y="0"
-                                   width="500"
-                                   height="700"
-                                   preserveAspectRatio="xMidYMid slice"
-                    href="{{ $backPreview }}"
-                    xlink:href="{{ $backPreview }}"
-                                   data-default-src="{{ $backPreview }}"
-                                   @if(empty($backPreview)) style="display:none;" @endif
-                            />
-                            <text data-text-node="back-heading"
-                                  x="250"
-                                  y="180"
-                                  text-anchor="middle"
-                                  dominant-baseline="middle"
-                        font-size="26"
-                        fill="#1f2933"></text>
-                            <text data-text-node="back-body"
-                                  x="250"
-                                  y="300"
-                                  text-anchor="middle"
-                                  dominant-baseline="middle"
-                                  font-size="16"
-                                                                    letter-spacing="0.05"
-                                              fill="#4b5563"></text>
-                        </svg>
-                        <!-- Fabric canvas overlay for editable SVG (back) -->
-                        <canvas id="fabricBack" width="500" height="700" style="display:block; width:500px; height:700px;"></canvas>
-                    @endif
-                </div>
-                @endif
             </div>
             <div class="zoom-controls">
                 <button id="zoomOut" type="button">-</button>
@@ -831,13 +790,6 @@
                 <button id="zoomIn" type="button">+</button>
                 <button id="zoomFit" type="button" title="Zoom to fit">Fit</button>
             </div>
-        </div>
-
-        <!-- Canvas Status Bar -->
-        <div class="canvas-status-bar">
-            <span id="statusZoom">Zoom: 100%</span>
-            <span id="statusSelection">Selected: None</span>
-            <span id="statusDimensions">Canvas: 500x700px</span>
         </div>
 
         <!-- RIGHT PANEL (Front/Back toggle + text fields) -->
@@ -848,9 +800,6 @@
 
             <div class="view-toggle">
                 <button id="showFront" class="active" type="button">Front</button>
-                @if($hasBackDesign)
-                    <button id="showBack" type="button">Back</button>
-                @endif
             </div>
 
             <div class="editor-panels">
@@ -860,7 +809,7 @@
                         <div class="panel-header">
                             <h3 class="panel-title">Text</h3>
                             <button class="expand-btn" type="button" title="Expand panel">
-                                <span class="expand-icon">↗</span>
+                                <span class="expand-icon">â†—</span>
                             </button>
                         </div>
 
@@ -911,10 +860,8 @@
                     (function(){
                         // Basic helpers to find the active SVG canvas for the current side
                         function getActiveSvg() {
-                            // prefer existing selectors in page
-                            var front = document.querySelector('#cardFront svg');
-                            var back = document.querySelector('#cardBack svg');
-                            return front || back || document.querySelector('svg');
+                            // Only front view for giveaways
+                            return document.querySelector('#cardFront svg');
                         }
 
                         function insertSvgStringToCanvas(svgString) {
@@ -1118,13 +1065,13 @@
                                 if (isExpanded) {
                                     // Collapse
                                     expandedGrid.classList.add('hidden');
-                                    btn.textContent = '→';
+                                    btn.textContent = 'â†’';
                                     btn.setAttribute('aria-expanded', 'false');
                                     btn.setAttribute('title', 'Show all ' + section);
                                 } else {
                                     // Expand
                                     expandedGrid.classList.remove('hidden');
-                                    btn.textContent = '↓';
+                                    btn.textContent = 'â†“';
                                     btn.setAttribute('aria-expanded', 'true');
                                     btn.setAttribute('title', 'Hide ' + section);
                                 }
@@ -1185,7 +1132,7 @@
                                                     <div class="discover-search">
                                                         <label for="discoverSearchInput" class="sr-only">Search images</label>
                                                         <div style="display:flex; gap:8px;">
-                                                            <input id="discoverSearchInput" type="search" placeholder="Search images (Unsplash)…" aria-label="Search images" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                                                            <input id="discoverSearchInput" type="search" placeholder="Search images (Unsplash)â€¦" aria-label="Search images" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:6px;">
                                                             <button id="discoverSearchBtn" type="button" class="btn-upload-primary">Search</button>
                                                         </div>
                                                     </div>
@@ -1220,7 +1167,7 @@
                                 <div class="flex items-center justify-between mb-2">
                                     <div class="font-medium">Shapes</div>
                                     <button type="button" class="text-gray-400 hover:text-blue-500 transition-colors expand-section-btn" data-section="shapes" title="Show all shapes" aria-label="Expand shapes section">
-                                        →
+                                        â†’
                                     </button>
                                 </div>
                                 <div class="shapes-grid grid grid-cols-3 gap-3">
@@ -1279,7 +1226,7 @@
                                 <div class="flex items-center justify-between mb-2">
                                     <div class="font-medium">Images</div>
                                     <button type="button" class="text-gray-400 hover:text-blue-500 transition-colors expand-section-btn" data-section="images" title="Show all images" aria-label="Expand images section">
-                                        →
+                                        â†’
                                     </button>
                                 </div>
                                 <div class="images-grid grid grid-cols-3 gap-3">
@@ -1334,7 +1281,7 @@
                                 <div class="flex items-center justify-between mb-2">
                                     <div class="font-medium">Illustrations</div>
                                     <button type="button" class="text-gray-400 hover:text-blue-500 transition-colors expand-section-btn" data-section="illustrations" title="Show all illustrations" aria-label="Expand illustrations section">
-                                        →
+                                        â†’
                                     </button>
                                 </div>
                                 <div class="illustrations-grid grid grid-cols-3 gap-3">
@@ -1390,9 +1337,15 @@
         </div>
     </div>
 
+    <!-- Canvas Status Bar -->
+    <div class="canvas-status-bar">
+        <span id="statusZoom">Zoom: 100%</span>
+        <span id="statusSelection">Selected: None</span>
+        <span id="statusDimensions">Canvas: 500x700px</span>
+    </div>
+
     <!-- Hidden fields for exported SVGs (populated on Save) -->
     <input type="hidden" id="exportFrontSvg" name="front_svg" />
-    <input type="hidden" id="exportBackSvg" name="back_svg" />
 
     <script>
         // --- Graphics panel wiring (Unsplash search + insert shapes/icons) ---
@@ -1468,35 +1421,17 @@
                 });
             }
 
-            function insertImageToCanvas(url) {
-                try {
-                    const currentView = (window.currentView || 'front');
-                    const svg = document.querySelector(currentView === 'front' ? '#cardFront svg' : '#cardBack svg');
-                    if (!svg) {
-                        alert('Canvas not available');
-                        return;
-                    }
-                    // create an <image> element that covers the card and is editable
-                    const ns = 'http://www.w3.org/2000/svg';
-                    const img = document.createElementNS(ns, 'image');
-                    img.setAttribute('href', url);
-                    img.setAttribute('x', '0');
-                    img.setAttribute('y', '0');
-                    img.setAttribute('width', '100%');
-                    img.setAttribute('height', '100%');
-                    img.setAttribute('preserveAspectRatio', 'xMidYMid slice');
-                    img.setAttribute('data-uploaded', 'true');
-                    // insert as first child so text stays above
-                    if (svg.firstChild) svg.insertBefore(img, svg.firstChild);
-                    else svg.appendChild(img);
-                    // apply preview update if preview panel exists
-                    try { if (typeof updatePreviewFromSvg === 'function') updatePreviewFromSvg(currentView); } catch (e) {}
-                } catch (err) {
-                    console.error('Insert image failed', err);
-                }
-            }
-
-            if (searchBtn && searchInput) {
+                        function insertImageToCanvas(url) {
+                            var svg = getActiveSvg();
+                            if (!svg) return;
+                            var img = document.createElementNS('http://www.w3.org/2000/svg','image');
+                            img.setAttributeNS(null,'href', url);
+                            img.setAttribute('x','20');
+                            img.setAttribute('y','20');
+                            img.setAttribute('width','140');
+                            img.setAttribute('height','90');
+                            svg.appendChild(img);
+                        }            if (searchBtn && searchInput) {
                 searchBtn.addEventListener('click', () => doSearch(searchInput.value));
                 searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doSearch(searchInput.value); } });
             }
@@ -1504,8 +1439,7 @@
             // shapes insertion
             $all('.shape-btn').forEach(b => b.addEventListener('click', () => {
                 const shape = b.dataset.shape;
-                const currentView = (window.currentView || 'front');
-                const svg = document.querySelector(currentView === 'front' ? '#cardFront svg' : '#cardBack svg');
+                const svg = document.querySelector('#cardFront svg');
                 if (!svg) return;
                 const ns = 'http://www.w3.org/2000/svg';
                 let el = null;
@@ -1528,13 +1462,12 @@
             // icons insertion (simple text-based fallback using <text> elements or small SVG groups)
             $all('.icon-btn').forEach(b => b.addEventListener('click', () => {
                 const icon = b.dataset.icon;
-                const currentView = (window.currentView || 'front');
-                const svg = document.querySelector(currentView === 'front' ? '#cardFront svg' : '#cardBack svg');
+                const svg = document.querySelector('#cardFront svg');
                 if (!svg) return;
                 const ns = 'http://www.w3.org/2000/svg';
                 const g = document.createElementNS(ns, 'g');
                 const txt = document.createElementNS(ns, 'text');
-                txt.setAttribute('x', '250'); txt.setAttribute('y', '250'); txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('dominant-baseline', 'middle'); txt.setAttribute('font-size', '48'); txt.textContent = icon === 'fa-heart' ? '❤' : icon === 'fa-star' ? '★' : icon === 'fa-leaf' ? '🍃' : '★';
+                txt.setAttribute('x', '250'); txt.setAttribute('y', '250'); txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('dominant-baseline', 'middle'); txt.setAttribute('font-size', '48'); txt.textContent = icon === 'fa-heart' ? 'â¤' : icon === 'fa-star' ? 'â˜…' : icon === 'fa-leaf' ? 'ðŸƒ' : 'â˜…';
                 g.appendChild(txt);
                 svg.appendChild(g);
             }));
@@ -1722,8 +1655,8 @@
                 var canvases = { front: null, back: null };
 
                 // Undo/Redo System
-                var history = { front: [], back: [] };
-                var historyIndex = { front: -1, back: -1 };
+                var history = { front: [] };
+                var historyIndex = { front: -1 };
                 var maxHistorySize = 50;
 
                 function saveCanvasState(canvas, view) {
@@ -1815,7 +1748,7 @@
                         layerItem.className = 'layer-item';
                         layerItem.dataset.objectIndex = i;
 
-                        var visibilityIcon = obj.visible ? '👁' : '🙈';
+                        var visibilityIcon = obj.visible ? 'ðŸ‘' : 'ðŸ™ˆ';
                         var typeIcon = getObjectTypeIcon(obj.type);
                         var objectName = getObjectDisplayName(obj, i);
 
@@ -1846,19 +1779,19 @@
                     switch (type) {
                         case 'i-text':
                         case 'textbox':
-                            return '📝';
+                            return 'ðŸ“';
                         case 'image':
-                            return '🖼️';
+                            return 'ðŸ–¼ï¸';
                         case 'rect':
-                            return '▭';
+                            return 'â–­';
                         case 'circle':
-                            return '○';
+                            return 'â—‹';
                         case 'triangle':
-                            return '△';
+                            return 'â–³';
                         case 'path':
-                            return '✏️';
+                            return 'âœï¸';
                         default:
-                            return '📄';
+                            return 'ðŸ“„';
                     }
                 }
 
@@ -2576,23 +2509,14 @@
 
                 // create canvases
                 canvases.front = createFabricCanvasForCard('cardFront','fabricFront');
-                canvases.back  = createFabricCanvasForCard('cardBack','fabricBack');
 
                 // Resize canvases if custom SVGs are provided
                 var frontSvg = document.querySelector('#cardFront svg');
-                var backSvg = document.querySelector('#cardBack svg');
 
                 if (canvases.front && frontSvg) {
                     var frontDimensions = getSvgDimensions(frontSvg);
                     if (frontDimensions.width !== 500 || frontDimensions.height !== 700) {
                         resizeCanvasToSvg(canvases.front, frontSvg, 'cardFront');
-                    }
-                }
-
-                if (canvases.back && backSvg) {
-                    var backDimensions = getSvgDimensions(backSvg);
-                    if (backDimensions.width !== 500 || backDimensions.height !== 700) {
-                        resizeCanvasToSvg(canvases.back, backSvg, 'cardBack');
                     }
                 }
 
@@ -2609,53 +2533,39 @@
                     canvases.front.on('object:modified', function() {
                         saveCanvasState(canvases.front, 'front');
                     });
-                }
 
-                if (canvases.back) {
-                    canvases.back.on('object:added', function() {
-                        saveCanvasState(canvases.back, 'back');
-                        updateLayersPanel(canvases.back);
-                    });
-                    canvases.back.on('object:removed', function() {
-                        saveCanvasState(canvases.back, 'back');
-                        updateLayersPanel(canvases.back);
-                    });
-                    canvases.back.on('object:modified', function() {
-                        saveCanvasState(canvases.back, 'back');
+                    // Add background click to change image
+                    canvases.front.on('mouse:down', function(options) {
+                        if (!options.target) {
+                            // Clicked on background, trigger file picker
+                            document.getElementById('backgroundFileInput').click();
+                        }
                     });
                 }
 
                 // wire view toggle buttons to set currentView and show/hide canvases
                 var showFrontBtn = document.getElementById('showFront');
-                var showBackBtn = document.getElementById('showBack');
                 function showView(requestedView){
-                    var hasBack = !!document.getElementById('cardBack');
-                    var view = (requestedView === 'back' && !hasBack) ? 'front' : requestedView;
+                    // Giveaways only have front view
+                    var view = 'front';
 
                     window.currentView = view;
 
                     document.querySelectorAll('.card').forEach(function(c){ c.classList.remove('active'); });
 
-                    var activeCardId = view === 'front' ? 'cardFront' : 'cardBack';
-                    var activeCard = document.getElementById(activeCardId);
+                    var activeCard = document.getElementById('cardFront');
                     if (activeCard) {
                         activeCard.classList.add('active');
                     }
 
                     var fabricFront = document.getElementById('fabricFront');
                     if (fabricFront) {
-                        fabricFront.style.display = (view === 'front') ? 'block' : 'none';
-                    }
-
-                    var fabricBack = document.getElementById('fabricBack');
-                    if (fabricBack) {
-                        fabricBack.style.display = (view === 'back') ? 'block' : 'none';
+                        fabricFront.style.display = 'block';
                     }
 
                     return view;
                 }
                 if (showFrontBtn) showFrontBtn.addEventListener('click', function(){ showView('front'); });
-                if (showBackBtn) showBackBtn.addEventListener('click', function(){ showView('back'); });
                 // start showing front
                 showView(window.currentView);
 
@@ -2706,9 +2616,9 @@
                                 if (activeObject.text.length > 25) text += '...';
                                 info += ' "' + text + '"';
                             } else if (type === 'image') {
-                                info += ' (' + Math.round(activeObject.width * activeObject.scaleX) + '×' + Math.round(activeObject.height * activeObject.scaleY) + ')';
+                                info += ' (' + Math.round(activeObject.width * activeObject.scaleX) + 'Ã—' + Math.round(activeObject.height * activeObject.scaleY) + ')';
                             } else if (type === 'rect') {
-                                info += ' (' + Math.round(activeObject.width) + '×' + Math.round(activeObject.height) + ')';
+                                info += ' (' + Math.round(activeObject.width) + 'Ã—' + Math.round(activeObject.height) + ')';
                             }
 
                             statusSelectionEl.textContent = 'Selected: ' + info;
@@ -2773,8 +2683,7 @@
                     }
 
                     // Get the canvas container
-                    var cardId = window.currentView === 'front' ? 'cardFront' : 'cardBack';
-                    var card = document.getElementById(cardId);
+                    var card = document.getElementById('cardFront');
                     var canvasContainer = card ? card.querySelector('.canvas') : null;
 
                     if (!canvasContainer) {
@@ -2818,8 +2727,7 @@
 
                 // Initialize status bar with dynamic dimensions and shape
                 var currentCanvas = canvases[window.currentView];
-                var currentCardId = window.currentView === 'front' ? 'cardFront' : 'cardBack';
-                var currentSvg = document.querySelector('#' + currentCardId + ' svg');
+                var currentSvg = document.querySelector('#cardFront svg');
                 var currentShape = currentSvg ? detectSvgShape(currentSvg) : 'rectangle';
 
                 if (currentCanvas && statusDimensionsEl) {
@@ -2895,9 +2803,7 @@
                     updateUndoRedoButtons(activeView);
 
                     if (statusDimensionsEl && activeCanvas) {
-                        var hasBackCard = !!document.getElementById('cardBack');
-                        var activeCardId = (activeView === 'back' && hasBackCard) ? 'cardBack' : 'cardFront';
-                        var activeSvg = document.querySelector('#' + activeCardId + ' svg');
+                        var activeSvg = document.querySelector('#cardFront svg');
                         var activeShape = activeSvg ? detectSvgShape(activeSvg) : 'rectangle';
 
                         statusDimensionsEl.textContent = 'Canvas: ' + Math.round(activeCanvas.width) + 'x' + Math.round(activeCanvas.height) + 'px (' + activeShape + ')';
@@ -2911,11 +2817,9 @@
                 if (zoomOutBtn) zoomOutBtn.addEventListener('click', function() { zoomCanvas(0.8); });
                 if (zoomFitBtn) zoomFitBtn.addEventListener('click', function() { zoomToFit(); });
 
-                // Change Image button flow
-                var changeBtn = document.getElementById('changeImageBtn');
+                // Background image change flow
                 var fileInput = document.getElementById('backgroundFileInput');
-                if (changeBtn && fileInput) {
-                    changeBtn.addEventListener('click', function(){ fileInput.click(); });
+                if (fileInput) {
                     fileInput.addEventListener('change', function(e){
                         var f = e.target.files && e.target.files[0];
                         if (!f) return;
@@ -3069,11 +2973,10 @@
 
                             // Update canvas dimensions if needed
                             if (targetObj.width && targetObj.height) {
-                                var cardId = view === 'front' ? 'cardFront' : 'cardBack';
-                                var svg = document.querySelector('#' + cardId + ' svg');
+                                var svg = document.querySelector('#cardFront svg');
                                 if (svg) {
                                     svg.setAttribute('viewBox', '0 0 ' + targetObj.width + ' ' + targetObj.height);
-                                    resizeCanvasToSvg(canvas, svg, cardId);
+                                    resizeCanvasToSvg(canvas, svg, 'cardFront');
                                 }
                             }
                         }, {
@@ -3099,20 +3002,16 @@
                             saveBtn.disabled = true;
 
                             var frontSvg = canvases.front ? canvases.front.toSVG() : '';
-                            var backSvg  = canvases.back  ? canvases.back.toSVG()  : '';
                             var frontInput = document.getElementById('exportFrontSvg');
-                            var backInput  = document.getElementById('exportBackSvg');
 
                             if (frontInput) frontInput.value = frontSvg;
-                            if (backInput)  backInput.value  = backSvg;
 
                             // Validate SVG content
-                            if (!frontSvg && !backSvg) {
+                            if (!frontSvg) {
                                 throw new Error('No canvas content to save');
                             }
 
                             console.log('Front SVG length:', frontSvg.length);
-                            console.log('Back SVG length:', backSvg.length);
 
                             // Create download links for preview
                             if (frontSvg) {

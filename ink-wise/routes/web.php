@@ -228,6 +228,8 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::post('/store', [ProductController::class, 'store'])->name('store');
     Route::get('/{id}/edit', [ProductController::class, 'edit'])->name('edit');
     Route::delete('/{id}', [ProductController::class, 'destroy'])->name('destroy');
+    // Add route for getting template data
+    Route::get('/template/{id}/data', [ProductController::class, 'getTemplateData'])->name('template.data');
     });
 
     Route::prefix('customers')->name('customers.')->group(function () {
@@ -270,6 +272,19 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::get('site-content', [SiteContentController::class, 'edit'])->name('site-content.edit');
         Route::put('site-content', [SiteContentController::class, 'update'])->name('site-content.update');
+    });
+
+    // Font Management Routes
+    Route::prefix('fonts')->name('fonts.')->group(function () {
+        Route::get('/', [App\Http\Controllers\FontController::class, 'index'])->name('index');
+        Route::post('/', [App\Http\Controllers\FontController::class, 'store'])->name('store');
+        Route::get('/{font}', [App\Http\Controllers\FontController::class, 'show'])->name('show');
+        Route::put('/{font}', [App\Http\Controllers\FontController::class, 'update'])->name('update');
+        Route::delete('/{font}', [App\Http\Controllers\FontController::class, 'destroy'])->name('destroy');
+        Route::post('/sync-google-fonts', [App\Http\Controllers\FontController::class, 'syncGoogleFonts'])->name('sync-google');
+        Route::get('/categories', [App\Http\Controllers\FontController::class, 'categories'])->name('categories');
+        Route::post('/{font}/usage', [App\Http\Controllers\FontController::class, 'recordUsage'])->name('usage');
+        Route::get('/popular', [App\Http\Controllers\FontController::class, 'popular'])->name('popular');
     });
 
 }); // closes the admin group

@@ -414,7 +414,7 @@
 
             <div class="form-buttons">
                 <button type="submit" class="btn-save" id="submit-btn">
-                    <span class="btn-text">Upload</span>
+                    <span class="btn-text">Create Invitation</span>
                     <span class="loading-spinner" style="display: none;"><i class="fas fa-spinner fa-spin"></i> Saving...</span>
                 </button>
             </div>
