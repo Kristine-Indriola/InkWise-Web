@@ -611,7 +611,15 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
 
 
 
-  
+  Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
+    // Staff routes - updated for order list functionality
+    Route::get('/dashboard', function () {
+        if (\Illuminate\Support\Facades\View::exists('staff.dashboard')) {
+            return view('staff.dashboard');
+        } else {
+            return response('View staff.dashboard does not exist on the server. Please check deployment.', 500);
+        }
+    })->name('dashboard');
 
 Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
     // Staff routes - updated for order list functionality
