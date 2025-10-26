@@ -52,7 +52,7 @@
 	<header class="page-header reports-page-header">
 		<div>
 			<h1 class="page-title">Sales analytics</h1>
-			<p class="page-subtitle">Visualize order momentum, revenue growth, and Shopee-style KPIs.</p>
+			<p class="page-subtitle">Visualize order momentum, revenue growth, and  KPIs.</p>
 		</div>
 		<div class="page-header__quick-actions">
 			<a href="{{ route('admin.reports.inventory') }}" class="pill-link">
@@ -141,7 +141,6 @@
 		<header class="reports-panel__header">
 			<div>
 				<h2>Sales performance</h2>
-				<p>Track revenue movement across multiple timeframes similar to Shopee analytics.</p>
 				@if ($salesRangeLabel)
 					<p class="reports-subtext" data-sales-range>Showing {{ $salesRangeLabel }}</p>
 				@else

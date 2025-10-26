@@ -28,6 +28,18 @@ class Customer extends Model
         'user_id',
     ];
 
+    // Accessors
+    public function getNameAttribute()
+    {
+        $nameParts = array_filter([
+            $this->first_name,
+            $this->middle_name,
+            $this->last_name
+        ]);
+
+        return implode(' ', $nameParts) ?: 'Customer';
+    }
+
     // Relationships
     public function user()
     {

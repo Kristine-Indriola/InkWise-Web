@@ -12,12 +12,25 @@
     $threadRouteName = $threadRouteName ?? 'admin.messages.thread';
     $replyRouteName = $replyRouteName ?? 'admin.messages.reply';
     $legacyThreads = $messages->where('sender_type', '!=', 'user')->unique('email');
+    $messagesIndexRouteName = $messagesIndexRouteName ?? 'admin.messages.index';
+    $dashboardRouteName = $dashboardRouteName ?? 'admin.dashboard';
+    $unreadCountRouteName = $unreadCountRouteName ?? 'admin.messages.unread-count';
+
+    $messagesIndexUrl = \Illuminate\Support\Facades\Route::has($messagesIndexRouteName)
+        ? route($messagesIndexRouteName)
+        : route('admin.messages.index');
+
     $backUrl = url()->previous();
-    $messagesIndexUrl = route('admin.messages.index');
 
     if (!$backUrl || \Illuminate\Support\Str::contains($backUrl, $messagesIndexUrl)) {
-        $backUrl = route('admin.dashboard');
+        $backUrl = \Illuminate\Support\Facades\Route::has($dashboardRouteName)
+            ? route($dashboardRouteName)
+            : route('admin.dashboard');
     }
+
+    $unreadCountUrl = \Illuminate\Support\Facades\Route::has($unreadCountRouteName)
+        ? route($unreadCountRouteName)
+        : null;
 
     $hasSeenAtColumn = \Illuminate\Support\Facades\Schema::hasColumn('messages', 'seen_at');
     $hasIsReadColumn = ! $hasSeenAtColumn && \Illuminate\Support\Facades\Schema::hasColumn('messages', 'is_read');

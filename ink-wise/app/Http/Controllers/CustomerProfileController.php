@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Address;
 use App\Models\Order;
+use App\Models\OrderRating;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class CustomerProfileController extends Controller
@@ -209,5 +211,84 @@ class CustomerProfileController extends Controller
         ]);
 
         return redirect()->back()->with('status', 'Thank you! The order is now marked as completed.');
+    }
+
+    public function rate()
+    {
+        $user = Auth::user();
+        $customer = $user?->customer;
+
+        if (!$customer) {
+            return view('customer.profile.purchase.rate', ['orders' => collect()]);
+        }
+
+        $orders = Order::query()
+            ->with('rating')
+            ->where('customer_id', $customer->getKey())
+            ->where('status', 'completed')
+            ->orderByDesc('updated_at')
+            ->get();
+
+        return view('customer.profile.purchase.rate', compact('orders'));
+    }
+
+    public function storeRating(Request $request)
+    {
+        $request->validate([
+            'order_id' => 'required|exists:orders,id',
+            'rating' => 'required|integer|min:1|max:5',
+            'review' => 'nullable|string|max:600',
+            'photos' => 'nullable|array',
+            'photos.*' => 'image|max:2048',
+        ]);
+
+        $user = Auth::user();
+        $customer = $user?->customer;
+
+        if (!$customer) {
+            return redirect()->back()->withErrors(['order' => 'Unable to locate your customer record.']);
+        }
+
+        $order = Order::query()
+            ->with('rating')
+            ->where('id', $request->order_id)
+            ->where('customer_id', $customer->getKey())
+            ->where('status', 'completed')
+            ->firstOrFail();
+
+        if ($order->rating) {
+            return redirect()->back()->withErrors(['order' => 'This order has already been rated.']);
+        }
+
+        $photos = [];
+
+        if ($request->hasFile('photos')) {
+            foreach ($request->file('photos') as $photo) {
+                $photos[] = $photo->store('ratings', 'public');
+            }
+        }
+
+        DB::transaction(function () use ($order, $customer, $user, $request, $photos) {
+            $rating = OrderRating::create([
+                'order_id' => $order->id,
+                'customer_id' => $customer->getKey(),
+                'submitted_by' => $user->getAuthIdentifier(),
+                'rating' => (int) $request->rating,
+                'review' => $request->review,
+                'photos' => $photos ?: null,
+                'metadata' => null,
+                'submitted_at' => now(),
+            ]);
+
+            $metadata = $order->metadata ?? [];
+            $metadata['rating'] = $rating->rating;
+            $metadata['review'] = $rating->review;
+            $metadata['rating_photos'] = $photos;
+            $metadata['rating_submitted_at'] = optional($rating->submitted_at)->toIso8601String();
+
+            $order->update(['metadata' => $metadata]);
+        });
+
+        return redirect()->back()->with('status', 'Thank you for your rating!');
     }
 }

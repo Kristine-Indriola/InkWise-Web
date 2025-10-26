@@ -85,6 +85,11 @@
         color: #3730a3;
     }
 
+    .order-stage-chip--processing {
+        background: #ede9fe;
+        color: #7c3aed;
+    }
+
     .order-stage-chip--in-production {
         background: #fef3c7;
         color: #b45309;
@@ -382,6 +387,91 @@
         padding: 24px;
     }
 
+
+    .rating-summary {
+        display: grid;
+        gap: 12px;
+    }
+
+    .rating-summary__stars {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: #d1d5db;
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .rating-summary__stars span {
+        display: inline-flex;
+        color: inherit;
+    }
+
+    .rating-summary__stars span.is-filled {
+        color: #f59e0b;
+    }
+
+    .rating-summary__stars svg {
+        width: 22px;
+        height: 22px;
+    }
+
+    .rating-summary__stars strong {
+        color: #111827;
+    }
+
+    .rating-summary__timestamp {
+        color: #6b7280;
+        font-size: 12px;
+    }
+
+    .rating-summary__comment {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #1f2937;
+        background: #f9fafb;
+        border-radius: 10px;
+        padding: 12px 14px;
+        border: 1px solid #e5e7eb;
+    }
+
+    .rating-summary__tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .rating-summary__tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: #eef2ff;
+        color: #3730a3;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .rating-summary__media {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .rating-summary__media a {
+        display: inline-flex;
+    }
+
+    .rating-summary__media img {
+        width: 64px;
+        height: 64px;
+        object-fit: cover;
+        border-radius: 12px;
+        box-shadow: 0 6px 12px -10px rgba(15, 23, 42, 0.45);
+        border: 1px solid #e5e7eb;
+    }
     .status-form {
         display: grid;
         gap: 20px;
@@ -507,6 +597,26 @@
 
 @section('content')
 @php
+    $normalizeToArray = function ($value) {
+        if ($value instanceof \Illuminate\Support\Collection) {
+            $value = $value->toArray();
+        } elseif ($value instanceof \Illuminate\Contracts\Support\Arrayable) {
+            $value = $value->toArray();
+        } elseif ($value instanceof \JsonSerializable) {
+            $value = $value->jsonSerialize();
+        }
+
+        if (is_string($value) && $value !== '') {
+            $decoded = json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $value = $decoded;
+            }
+        }
+
+        return is_array($value) ? $value : [];
+    };
+
+    $metadata = $normalizeToArray($metadata ?? []);
     $statusLabels = $statusOptions;
     $currentStatus = old('status', data_get($order, 'status', 'pending'));
     $flowIndex = array_search($currentStatus, $statusFlow, true);
@@ -540,12 +650,55 @@
         ?? 'Guest customer';
     $placedDateDisplay = $formatDateTime(data_get($order, 'order_date'));
     $lastUpdatedDisplay = $formatDateTime(data_get($order, 'updated_at'));
+    $ratingRecord = data_get($order, 'rating');
+    $ratingValue = null;
+    $ratingValueDisplay = null;
+    $ratingReview = '';
+    $ratingTags = [];
+    $ratingMedia = [];
+    $ratingSubmittedDisplay = null;
+
+    if ($ratingRecord) {
+        $ratingRaw = data_get($ratingRecord, 'rating');
+        if (is_numeric($ratingRaw)) {
+            $ratingValue = max(0, min(5, (float) $ratingRaw));
+            $ratingValueDisplay = rtrim(rtrim(number_format($ratingValue, 1), '0'), '.');
+        }
+
+        $ratingReview = trim((string) data_get($ratingRecord, 'review', ''));
+        $ratingMedia = collect(data_get($ratingRecord, 'photos', []))
+            ->filter(fn ($url) => is_string($url) && trim($url) !== '')
+            ->values()
+            ->all();
+        $ratingSubmittedDisplay = $formatDateTime(
+            data_get($ratingRecord, 'submitted_at', data_get($ratingRecord, 'created_at'))
+        );
+    } elseif (!empty($metadata)) {
+        $ratingRaw = $metadata['rating'] ?? null;
+        if (is_numeric($ratingRaw)) {
+            $ratingValue = max(0, min(5, (float) $ratingRaw));
+            $ratingValueDisplay = rtrim(rtrim(number_format($ratingValue, 1), '0'), '.');
+        }
+
+        $ratingReview = trim((string) ($metadata['review'] ?? ''));
+        $ratingTags = array_values(array_filter(array_map(function ($tag) {
+            return trim(is_string($tag) ? $tag : (string) $tag);
+        }, $normalizeToArray($metadata['review_tags'] ?? [])), function ($tag) {
+            return $tag !== '';
+        }));
+        $ratingMedia = array_values(array_filter(array_map(function ($url) {
+            return trim(is_string($url) ? $url : (string) $url);
+        }, $normalizeToArray($metadata['review_media'] ?? [])), function ($url) {
+            return $url !== '';
+        }));
+        $ratingSubmittedDisplay = $formatDateTime($metadata['reviewed_at'] ?? ($metadata['rating_submitted_at'] ?? null));
+    }
 @endphp
 
 <main class="order-status-shell">
     <a href="{{ $previousUrl }}" class="back-link">
         <span aria-hidden="true">&larr;</span>
-        Back to orders
+        Back to order
     </a>
 
     <section class="order-status-card">
@@ -553,7 +706,7 @@
             <div>
                 <h1>Manage order status</h1>
                 <p class="order-status-card__subtitle">
-                    Update each milestone so the owner and customer see a clear Shopee-style progress timeline.
+
                 </p>
             </div>
             <span class="order-stage-chip order-stage-chip--{{ $currentChipModifier }}">
@@ -608,7 +761,6 @@
         <header class="status-progress-card__header">
             <div>
                 <h2>Progress tracker</h2>
-                <p>Every update pushes the order along the same stages customers expect from Shopee.</p>
             </div>
             <div class="status-progress-card__actions">
                 <span class="order-stage-chip order-stage-chip--{{ $currentChipModifier }}">
@@ -650,6 +802,9 @@
                                 @case('pending')
                                     Order received and awaiting confirmation.
                                     @break
+                                @case('processing')
+                                    Team is preparing assets before full production starts.
+                                    @break
                                 @case('in_production')
                                     Team is preparing the invitation or giveaway items.
                                     @break
@@ -672,36 +827,6 @@
         </ol>
     </section>
 
-    <section class="status-info-grid">
-        <article class="status-info-card">
-            <h2 class="status-info-card__title">Customer-facing update</h2>
-            <dl>
-                <div>
-                    <dt>Tracking number</dt>
-                    <dd>{{ $trackingNumber !== '' ? $trackingNumber : '— Not provided yet' }}</dd>
-                </div>
-                <div>
-                    <dt>Next milestone</dt>
-                    <dd>{{ $nextStatusLabel ?? 'All steps complete' }}</dd>
-                </div>
-                <div>
-                    <dt>Last updated</dt>
-                    <dd>{{ $lastUpdatedDisplay ?? 'Not available' }}</dd>
-                </div>
-            </dl>
-        </article>
-        <article class="status-info-card">
-            <h2 class="status-info-card__title">Internal note</h2>
-            @if($statusNote !== '')
-                <p class="status-info-card__text">{{ $statusNote }}</p>
-            @else
-                <p class="status-info-card__empty">
-                    No internal notes yet. Save a note below to guide the fulfilment team.
-                </p>
-            @endif
-        </article>
-    </section>
-
     <form method="POST" action="{{ route('admin.orders.status.update', $order) }}" class="status-form-card status-form">
         @csrf
         @method('PUT')
@@ -720,32 +845,78 @@
             </div>
         </div>
 
-        <div class="form-row is-split">
-            <div>
-                <label for="tracking_number">Tracking or reference number <span class="hint">Optional</span></label>
-                <input id="tracking_number" type="text" name="tracking_number" value="{{ $trackingNumber }}" placeholder="Enter tracking number if available">
-                @error('tracking_number')
-                    <p class="error-text">{{ $message }}</p>
-                @enderror
-            </div>
-            <div>
-                <label>Current status label</label>
-                <input type="text" value="{{ $statusOptions[$currentStatus] ?? ucfirst(str_replace('_', ' ', $currentStatus)) }}" disabled>
-            </div>
-        </div>
-
-        <div class="form-row">
-            <div>
-                <label for="internal_note">Internal note <span class="hint">Optional &middot; visible only to the team</span></label>
-                <textarea id="internal_note" name="internal_note" rows="4" placeholder="Add context for this update">{{ $statusNote }}</textarea>
-                @error('internal_note')
-                    <p class="error-text">{{ $message }}</p>
-                @enderror
-            </div>
-        </div>
 
         <button type="submit">Save status update</button>
     </form>
+
+    
+    <section class="status-info-grid">
+        <article class="status-info-card">
+            <h2 class="status-info-card__title">Customer rating</h2>
+            @if($ratingValue !== null)
+                <div class="rating-summary">
+                    @php $filledStars = (int) floor($ratingValue); @endphp
+                    <div class="rating-summary__stars" aria-label="Customer rated this order {{ $ratingValueDisplay }}/5">
+                        @for($i = 1; $i <= 5; $i++)
+                            <span class="{{ $i <= $filledStars ? 'is-filled' : '' }}">
+                                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                    <path d="M12 3.75l2.35 4.76 5.26.77-3.8 3.7.9 5.22L12 15.97l-4.71 2.43.9-5.22-3.8-3.7 5.26-.77L12 3.75Z" />
+                                </svg>
+                            </span>
+                        @endfor
+                        <strong>{{ $ratingValueDisplay }}/5</strong>
+                    </div>
+                    @if($ratingSubmittedDisplay)
+                        <span class="rating-summary__timestamp">Submitted {{ $ratingSubmittedDisplay }}</span>
+                    @endif
+                    @if($ratingReview !== '')
+                        <p class="rating-summary__comment">{!! nl2br(e($ratingReview)) !!}</p>
+                    @endif
+                    @if(!empty($ratingTags))
+                        <div class="rating-summary__tags">
+                            @foreach($ratingTags as $tag)
+                                <span class="rating-summary__tag">{{ $tag }}</span>
+                            @endforeach
+                        </div>
+                    @endif
+                    @if(!empty($ratingMedia))
+                        <div class="rating-summary__media">
+                            @foreach($ratingMedia as $mediaUrl)
+                                <a href="{{ $mediaUrl }}" target="_blank" rel="noopener noreferrer">
+                                    <img src="{{ $mediaUrl }}" alt="Customer review photo">
+                                </a>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            @else
+                <p class="status-info-card__empty">No customer rating has been submitted yet.</p>
+            @endif
+        </article>
+        <article class="status-info-card">
+            <h2 class="status-info-card__title">Order details</h2>
+            <dl>
+                <dt>Order number</dt>
+                <dd>{{ $orderNumber }}</dd>
+                <dt>Customer</dt>
+                <dd>{{ $customerName }}</dd>
+                <dt>Placed on</dt>
+                <dd>{{ $placedDateDisplay ?? 'Not available' }}</dd>
+                <dt>Last updated</dt>
+                <dd>{{ $lastUpdatedDisplay ?? 'Not available' }}</dd>
+                @if($trackingNumber)
+                <dt>Tracking number</dt>
+                <dd>{{ $trackingNumber }}</dd>
+                @endif
+                @if($statusNote)
+                <dt>Internal note</dt>
+                <dd>{{ $statusNote }}</dd>
+                @endif
+            </dl>
+        </article>
+    </section>
+
+
 </main>
 @endsection
 

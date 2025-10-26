@@ -39,4 +39,9 @@ class Material extends Model
         return $this->belongsToMany(Product::class, 'product_materials', 'material_id', 'product_id')
             ->withPivot('item', 'type', 'color', 'weight', 'qty');
     }
+
+    public function stockMovements()
+    {
+        return $this->hasMany(StockMovement::class, 'material_id');
+    }
 }

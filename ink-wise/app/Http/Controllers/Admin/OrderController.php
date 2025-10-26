@@ -11,8 +11,10 @@ class OrderController extends Controller
 {
     public function editStatus(Order $order)
     {
-    $statusOptions = $this->statusOptions();
-    $statusFlow = ['pending', 'in_production', 'confirmed', 'to_receive', 'completed'];
+        $order->loadMissing('rating');
+
+        $statusOptions = $this->statusOptions();
+        $statusFlow = ['pending', 'processing', 'in_production', 'confirmed', 'to_receive', 'completed'];
         $metadata = $this->normalizeMetadata($order->metadata);
 
         return view('admin.orders.manage-status', [
