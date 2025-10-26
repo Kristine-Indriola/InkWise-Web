@@ -1,5 +1,8 @@
 @php
-    $materials = $materials ?? collect();
+  $inventoryItems = $inventoryItems ?? collect();
+  $counts = $counts ?? ['total' => 0, 'in' => 0, 'low' => 0, 'out' => 0];
+  $search = $search ?? request()->input('search');
+  $statusFilter = $statusFilter ?? request()->input('stock') ?? request()->input('status');
 @endphp
 
 @extends('layouts.owner.app')
@@ -212,43 +215,13 @@
     </div>
   </header>
   <div class="page-inner owner-dashboard-inner">
-      @php
-          // Compute counts using provided $materials when possible to avoid extra queries
-          $lowCount = 0; $outCount = 0; $totalMaterials = 0;
-          if (isset($materials) && $materials instanceof \Illuminate\Support\Collection) {
-              $totalMaterials = $materials->count();
-              foreach ($materials as $m) {
-                  $stock = $m->inventory->stock_level ?? 0;
-                  $reorder = $m->inventory->reorder_level ?? 0;
-                  if ($stock <= 0) { $outCount++; }
-                  elseif ($stock <= $reorder) { $lowCount++; }
-              }
-          } elseif (class_exists(\App\Models\Material::class)) {
-              try {
-                  $lowCount = \App\Models\Material::whereHas('inventory', function($q) {
-                      $q->whereColumn('stock_level', '<=', 'reorder_level')
-                        ->where('stock_level', '>', 0);
-                  })->count();
-
-                  $outCount = \App\Models\Material::whereHas('inventory', function($q) {
-                      $q->where('stock_level', '<=', 0);
-                  })->count();
-
-                  $totalMaterials = \App\Models\Material::count();
-              } catch (\Exception $e) {
-                  $lowCount = $outCount = $totalMaterials = 0;
-              }
-          }
-          $notifCount = $lowCount + $outCount;
-      @endphp
-
   <section class="summary-grid" aria-label="Inventory summary">
         <a href="{{ url()->current() }}" class="summary-card">
           <div class="summary-card-header">
             <div style="display:flex;align-items:center;gap:8px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 7h18M3 12h18M3 17h18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="summary-card-label">Total Items</span></div>
             <span class="summary-card-chip accent">All</span>
           </div>
-          <span class="summary-card-value">{{ number_format($totalMaterials) }}</span>
+          <span class="summary-card-value">{{ number_format($counts['total'] ?? 0) }}</span>
           <span class="summary-card-meta">Materials tracked</span>
         </a>
 
@@ -257,7 +230,7 @@
             <div style="display:flex;align-items:center;gap:8px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 20V10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 14l4-4 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="summary-card-label">In Stock</span></div>
             <span class="summary-card-chip accent">Available</span>
           </div>
-          <span class="summary-card-value">{{ number_format(max(0, $totalMaterials - $notifCount)) }}</span>
+          <span class="summary-card-value">{{ number_format($counts['in'] ?? 0) }}</span>
           <span class="summary-card-meta">Sufficient stock</span>
         </a>
 
@@ -266,7 +239,7 @@
             <div style="display:flex;align-items:center;gap:8px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 8v5l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="summary-card-label">Low Stock</span></div>
             <span class="summary-card-chip accent">Attention</span>
           </div>
-          <span class="summary-card-value">{{ number_format($lowCount) }}</span>
+          <span class="summary-card-value">{{ number_format($counts['low'] ?? 0) }}</span>
           <span class="summary-card-meta">Reorder recommended</span>
         </a>
 
@@ -275,7 +248,7 @@
             <div style="display:flex;align-items:center;gap:8px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 8v8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 12h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="summary-card-label">Out of Stock</span></div>
             <span class="summary-card-chip accent">Critical</span>
           </div>
-          <span class="summary-card-value">{{ number_format($outCount) }}</span>
+          <span class="summary-card-value">{{ number_format($counts['out'] ?? 0) }}</span>
           <span class="summary-card-meta">Requires immediate restock</span>
         </a>
       </section>
@@ -290,8 +263,11 @@
           <form method="GET" action="{{ url()->current() }}">
             <div class="search-input">
               <span class="search-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="8" stroke="#9aa6c2" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="#9aa6c2" stroke-width="2" stroke-linecap="round"/></svg></span>
-              <input class="form-control" type="text" name="search" placeholder="Search by item name or category..." value="{{ request()->input('search') }}" />
+              <input class="form-control" type="text" name="search" placeholder="Search by item name or category..." value="{{ $search }}" />
             </div>
+            @if($statusFilter)
+              <input type="hidden" name="stock" value="{{ $statusFilter }}">
+            @endif
             <button type="submit" class="btn btn-secondary">Search</button>
           </form>
         </div>
@@ -299,7 +275,7 @@
       </section>
 
 
-        @if(request()->has('search') && request()->input('search') != '')
+        @if(!empty($search))
           <div style="margin: 10px 0;">
             <a href="{{ route('owner.inventory-track') }}" 
               style="display:inline-flex; align-items:center; gap:6px;
@@ -328,26 +304,20 @@
           </tr>
         </thead>
         <tbody>
-          @forelse($materials as $material)
+          @forelse($inventoryItems as $item)
             @php
-              $stock = $material->inventory->stock_level ?? 0;
-              $reorder = $material->inventory->reorder_level ?? 0;
-
-              if ($stock <= 0) {
-                  $badgeClass = 'stock-critical';
-                  $statusText = 'Out of Stock';
-              } elseif ($stock <= $reorder) {
-                  $badgeClass = 'stock-low';
-                  $statusText = 'Low Stock';
-              } else {
-                  $badgeClass = 'stock-ok';
-                  $statusText = 'In Stock';
-              }
+              $status = $item['status']['slug'] ?? 'in';
+              $statusText = $item['status']['label'] ?? 'In Stock';
+              $badgeClass = match($status) {
+                  'out' => 'stock-critical',
+                  'low' => 'stock-low',
+                  default => 'stock-ok',
+              };
             @endphp
             <tr>
-              <td class="fw-bold">{{ $material->material_name }}</td>
-              <td>{{ $material->material_type }}</td>
-              <td>{{ $stock }}</td>
+              <td class="fw-bold">{{ $item['item_name'] }}</td>
+              <td>{{ $item['category'] }}</td>
+              <td>{{ $item['stock_level'] }}</td>
               <td><span class="badge {{ $badgeClass }}">{{ $statusText }}</span></td>
             </tr>
           @empty
