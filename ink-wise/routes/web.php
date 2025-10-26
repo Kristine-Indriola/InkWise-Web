@@ -350,54 +350,48 @@ Route::middleware('auth')->group(function () {
 
 Route::post('/messages', [MessageController::class, 'storeFromContact'])->name('messages.store');
 
+Route::middleware('auth')->group(function () {
     Route::get('customer/chat/thread', [MessageController::class, 'customerChatThread'])->name('customer.chat.thread');
     Route::post('customer/chat/send', [MessageController::class, 'customerChatSend'])->name('customer.chat.send');
-Route::get('customer/chat/unread-count', [MessageController::class, 'customerUnreadCount'])
+    Route::get('customer/chat/unread-count', [MessageController::class, 'customerUnreadCount'])
         ->name('customer.chat.unread');
-
     Route::post('customer/chat/mark-read', [MessageController::class, 'customerMarkRead'])
         ->name('customer.chat.markread');
 
+    /**Customer Profile Pages*/
+    Route::prefix('customerprofile')->group(function () {
+        // Addresses
+        Route::get('/addresses', [CustomerProfileController::class, 'addresses'])
+            ->name('customer.profile.addresses');
+        Route::post('/addresses', [CustomerProfileController::class, 'storeAddress'])
+            ->name('customer.profile.addresses.store');
+        Route::put('/addresses/{address}', [CustomerProfileController::class, 'updateAddress'])
+            ->name('customer.profile.addresses.update');
+        Route::delete('/addresses/{address}', [CustomerProfileController::class, 'destroyAddress'])
+            ->name('customer.profile.addresses.destroy');
 
-Route::get('/chatbot/qas', [ChatbotController::class, 'getQAs'])->name('chatbot.qas');
- Route::view('/chatbot', 'customer.chatbot')->name('chatbot');
- Route::post('/chatbot/reply', [App\Http\Controllers\ChatbotController::class, 'reply'])
-    ->name('chatbot.reply');
+        Route::get('/', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
+        Route::get('/profile', [CustomerProfileController::class, 'edit'])->name('customer.profile.edit');
+        Route::put('/profile', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
+        // Other pages
+        Route::get('/settings', fn () => view('customer.profile.settings'))->name('customer.profile.settings');
+        Route::get('/order', fn () => view('customer.profile.orderform'))->name('customer.profile.orderform');
+    });
 
-        
-/**Customer Profile Pages*/
-Route::prefix('customerprofile')->group(function () {
-    // Addresses
+    Route::get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');  // Protected
 
-    Route::get('/addresses', [CustomerProfileController::class, 'addresses'])
-        ->name('customer.profile.addresses');
+    // Customer Favorites (render favorites page)
+    Route::get('/customer/favorites', fn () => view('customer.profile.favorite'))->name('customer.favorites');
 
-    Route::post('/addresses', [CustomerProfileController::class, 'storeAddress'])
-        ->name('customer.profile.addresses.store');
-
-    Route::put('/addresses/{address}', [CustomerProfileController::class, 'updateAddress'])
-        ->name('customer.profile.addresses.update');
-
-    Route::delete('/addresses/{address}', [CustomerProfileController::class, 'destroyAddress'])
-        ->name('customer.profile.addresses.destroy');
-
-   Route::get('/', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
-    Route::get('/profile', [CustomerProfileController::class, 'edit'])->name('customer.profile.edit');
-    Route::put('/profile', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
-// Other pages
-Route::get('/settings', fn () => view('customer.profile.settings'))->name('customer.profile.settings');
-Route::get('/order', fn () => view('customer.profile.orderform'))->name('customer.profile.orderform');
-
+    // My Purchases
+    Route::get('/customer/my-orders', fn () => view('customer.profile.my_purchase'))->name('customer.my_purchase');
 });
 
-Route::middleware('auth')->get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');  // Protected
+Route::get('/chatbot/qas', [ChatbotController::class, 'getQAs'])->name('chatbot.qas');
+Route::view('/chatbot', 'customer.chatbot')->name('chatbot');
+Route::post('/chatbot/reply', [App\Http\Controllers\ChatbotController::class, 'reply'])
+    ->name('chatbot.reply');
 
-// Customer Favorites (render favorites page)
-Route::get('/customer/favorites', fn () => view('customer.profile.favorite'))->name('customer.favorites');
-
-
-// My Purchases
-Route::get('/customer/my-orders', fn () => view('customer.profile.my_purchase'))->name('customer.my_purchase');
 // To Pay tab (lists orders pending payment)
 Route::get('/customer/my-orders/topay', fn () => view('customer.profile.purchase.topay'))->name('customer.my_purchase.topay');
 Route::get('/customer/my-orders/inproduction', fn () => view('customer.profile.purchase.inproduction'))->name('customer.my_purchase.inproduction');
@@ -720,6 +714,9 @@ require __DIR__.'/auth.php';
 // Graphics proxy routes (search endpoints used by client-side graphics panel)
 Route::get('/graphics/svgrepo', [GraphicsProxyController::class, 'svgrepo'])->name('graphics.svgrepo');
 Route::get('/graphics/unsplash', [GraphicsProxyController::class, 'unsplash'])->name('graphics.unsplash');
+
+// Unauthorized access page
+Route::view('/unauthorized', 'errors.unauthorized')->name('unauthorized');
 
 
 
