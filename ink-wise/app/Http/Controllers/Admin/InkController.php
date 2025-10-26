@@ -4,7 +4,11 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Ink;
+use App\Models\User;
+use App\Notifications\InkRestockedNotification;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Notification;
 
 class InkController extends Controller
 {
@@ -87,6 +91,15 @@ class InkController extends Controller
             'reorder_level' => $reorderLevel,
         ]);
 
+        $quantityAdded = (int) ($base['stock_qty'] ?? 0);
+        if ($quantityAdded > 0) {
+            $owners = User::where('role', 'owner')->get();
+            if ($owners->isNotEmpty()) {
+                $ink->load('inventory');
+                Notification::send($owners, new InkRestockedNotification($ink, $quantityAdded, Auth::user()));
+            }
+        }
+
         return redirect()->route('admin.materials.index')->with('success', 'Inks added successfully.');
     }
 
@@ -113,6 +126,9 @@ class InkController extends Controller
                 $request->merge(['occasion' => $occs]);
             }
         }
+
+        $ink->loadMissing('inventory');
+        $previousStock = (int) ($ink->inventory->stock_level ?? $ink->stock_qty ?? 0);
 
         $validated = $request->validate([
             'material_name' => 'required|string|max:255|unique:inks,material_name,' . $ink->id,
@@ -176,6 +192,15 @@ class InkController extends Controller
                 'stock_level' => $stockLevel,
                 'reorder_level' => $reorderLevel,
             ]);
+        }
+
+        $ink->load('inventory');
+        $quantityAdded = $stockLevel - $previousStock;
+        if ($quantityAdded > 0) {
+            $owners = User::where('role', 'owner')->get();
+            if ($owners->isNotEmpty()) {
+                Notification::send($owners, new InkRestockedNotification($ink, $quantityAdded, Auth::user()));
+            }
         }
 
         return redirect()->route('admin.materials.index')->with('success', 'Ink updated successfully.');
