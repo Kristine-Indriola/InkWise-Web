@@ -386,7 +386,7 @@ Route::prefix('customerprofile')->group(function () {
     Route::put('/profile', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
 // Other pages
 Route::get('/settings', fn () => view('customer.profile.settings'))->name('customer.profile.settings');
-Route::get('/order', fn () => view('customer.profile.orderform'))->name('custome.rprofile.orderform');
+Route::get('/order', fn () => view('customer.profile.orderform'))->name('customer.profile.orderform');
 
 });
 
@@ -589,6 +589,7 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/inventory', [OwnerInventoryController::class, 'index'])->name('inventory.index');
     Route::get('/inventory/track', [OwnerInventoryController::class, 'track'])->name('inventory-track');
     Route::get('/products', [OwnerProductsController::class, 'index'])->name('products.index');
+    Route::get('/products/{product}', [OwnerProductsController::class, 'show'])->name('products.show');
     Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
     Route::get('/reports', fn () => view('owner.owner-reports'))->name('reports');
 

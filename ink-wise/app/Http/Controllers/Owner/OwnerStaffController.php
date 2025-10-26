@@ -94,20 +94,37 @@ public function approveStaff(Request $request, $staff_id)
     // ✅ Search staff by name or email
     public function search(Request $request)
     {
-        $query = $request->input('search');
+        $query = trim((string) $request->input('search', ''));
 
-        $staff = Staff::with('user')
-            ->where('first_name', 'like', "%$query%")
-            ->orWhere('last_name', 'like', "%$query%")
-            ->orWhereHas('user', function ($q) use ($query) {
-                $q->where('email', 'like', "%$query%");
+        if ($query === '') {
+            return redirect()->route('owner.staff.index');
+        }
+
+        $likeQuery = "%{$query}%";
+
+        $staffResults = Staff::with('user')
+            ->whereIn('status', ['approved', 'pending'])
+            ->where(function ($builder) use ($likeQuery) {
+                $builder->where('first_name', 'like', $likeQuery)
+                    ->orWhere('middle_name', 'like', $likeQuery)
+                    ->orWhere('last_name', 'like', $likeQuery)
+                    ->orWhere('staff_id', 'like', $likeQuery)
+                    ->orWhere('contact_number', 'like', $likeQuery)
+                    ->orWhereRaw("CONCAT_WS(' ', first_name, last_name) LIKE ?", [$likeQuery])
+                    ->orWhereRaw("CONCAT_WS(' ', first_name, middle_name, last_name) LIKE ?", [$likeQuery])
+                    ->orWhereHas('user', function ($userQuery) use ($likeQuery) {
+                        $userQuery->where('email', 'like', $likeQuery);
+                    });
             })
+            ->orderBy('status')
+            ->orderBy('first_name')
+            ->orderBy('last_name')
             ->get();
 
-        // ✅ Separate approved & pending staff
-        $approvedStaff = $staff->where('status', 'approved');
-        $pendingStaff  = $staff->where('status', 'pending');
+        $approvedStaff = $staffResults->where('status', 'approved')->values();
+        $pendingStaff = $staffResults->where('status', 'pending')->values();
 
-        return view('owner.staff.index', compact('approvedStaff', 'pendingStaff'));
+        return view('owner.staff.index', compact('approvedStaff', 'pendingStaff'))
+            ->with('search', $query);
     }
 }
