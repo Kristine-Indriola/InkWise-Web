@@ -188,6 +188,10 @@ class CustomerAuthController extends Controller
 
     public function dashboard()
     {
+        // Check if user is authenticated and has customer role
+        if (!Auth::check() || Auth::user()->role !== 'customer') {
+            return redirect('/unauthorized');
+        }
 
         return view('customer.dashboard', [
             'customer' => Auth::user()->customer ?? null, // safe access

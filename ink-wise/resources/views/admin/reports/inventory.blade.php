@@ -154,6 +154,48 @@
 			font-weight: 500;
 		}
 
+		/* Filter Bar Styles */
+		.reports-filter-bar {
+			background: #f8f9fa;
+			border: 1px solid #e9ecef;
+			border-radius: 8px;
+			padding: 1.5rem;
+			margin-bottom: 2rem;
+		}
+		.reports-filter-form {
+			display: flex;
+			align-items: end;
+			gap: 1rem;
+			flex-wrap: wrap;
+		}
+		.reports-filter-field {
+			display: flex;
+			flex-direction: column;
+			min-width: 150px;
+		}
+		.reports-filter-field label {
+			font-weight: 600;
+			font-size: 0.875rem;
+			margin-bottom: 0.5rem;
+			color: #495057;
+		}
+		.reports-filter-field input {
+			padding: 0.5rem;
+			border: 1px solid #ced4da;
+			border-radius: 4px;
+			font-size: 0.875rem;
+		}
+		.reports-filter-field input:focus {
+			outline: none;
+			border-color: #007bff;
+			box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+		}
+		.reports-filter-actions {
+			display: flex;
+			gap: 0.5rem;
+			align-items: center;
+		}
+
 		/* Enhanced Table Styles */
 		.reports-table th {
 			background-color: #f8f9fa;
@@ -354,6 +396,41 @@
 			</button>
 		</div>
 	</header>
+
+	<section class="reports-filter-bar" aria-label="Filter inventory by date range">
+		<form method="GET" class="reports-filter-form">
+			<div class="reports-filter-field">
+				<label for="filterStartDate">Start date</label>
+				<input
+					type="date"
+					id="filterStartDate"
+					name="start_date"
+					value="{{ $currentFilters['startDate'] ?? '' }}"
+					max="{{ now()->format('Y-m-d') }}"
+				>
+			</div>
+			<div class="reports-filter-field">
+				<label for="filterEndDate">End date</label>
+				<input
+					type="date"
+					id="filterEndDate"
+					name="end_date"
+					value="{{ $currentFilters['endDate'] ?? '' }}"
+					max="{{ now()->format('Y-m-d') }}"
+				>
+			</div>
+			<div class="reports-filter-actions">
+				<button type="submit" class="btn btn-primary">
+					<i class="fi fi-rr-filter" aria-hidden="true"></i> Apply
+				</button>
+				@if ($currentFilters['startDate'] || $currentFilters['endDate'])
+					<a href="{{ route('admin.reports.inventory') }}" class="pill-link">
+						<i class="fi fi-rr-refresh" aria-hidden="true"></i> Reset
+					</a>
+				@endif
+			</div>
+		</form>
+	</section>
 
 	<section class="reports-summary-grid" aria-label="Inventory highlights">
 		<article class="reports-summary-card">
@@ -568,9 +645,7 @@
 							<th scope="col" class="text-center">Ending Stock</th>
 							<th scope="col" class="text-end">Unit Cost</th>
 							<th scope="col" class="text-end">Total Value</th>
-							<th scope="col">Coverage</th>
 							<th scope="col">Status</th>
-							<th scope="col">Next Step</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -597,19 +672,11 @@
 							<td class="text-center">{{ number_format($snapshot['ending_stock']) }}</td>
 							<td class="text-end">₱{{ number_format($material->unit_cost ?? 0, 2) }}</td>
 							<td class="text-end">₱{{ number_format($snapshot['stock_value'], 2) }}</td>
-							<td>
-								@if($snapshot['coverage_percent'] !== null)
-									<span class="coverage-indicator coverage-indicator--{{ $snapshot['status_key'] }}">{{ $snapshot['coverage_label'] }} ({{ $snapshot['coverage_percent'] }}%)</span>
-								@else
-									<span class="coverage-indicator coverage-indicator--unknown">No target</span>
-								@endif
-							</td>
 							<td><span class="{{ $statusClass }}">{{ $snapshot['status'] }}</span></td>
-							<td>{{ $snapshot['action'] }}</td>
 						</tr>
 					@empty
 						<tr>
-							<td colspan="15" class="text-center">No materials found.</td>
+							<td colspan="14" class="text-center">No materials found.</td>
 						</tr>
 					@endforelse
 					</tbody>

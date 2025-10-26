@@ -13,9 +13,19 @@ use Illuminate\Support\Facades\Storage;
 
 class CustomerProfileController extends Controller
 {
+    private function checkCustomerRole()
+    {
+        if (!Auth::check() || Auth::user()->role !== 'customer') {
+            return redirect('/unauthorized');
+        }
+        return null;
+    }
+
     // --- Profile Methods ---
     public function index()
     {
+        if ($redirect = $this->checkCustomerRole()) return $redirect;
+        
         $user = Auth::user();
         $customer = $user->customer;
         return view('customer.profile.index', compact('customer'));
@@ -23,6 +33,8 @@ class CustomerProfileController extends Controller
 
     public function edit()
     {
+        if ($redirect = $this->checkCustomerRole()) return $redirect;
+        
         $user = Auth::user();
         $customer = $user->customer;
         $address = $user->address;
@@ -32,6 +44,8 @@ class CustomerProfileController extends Controller
 
     public function update(Request $request)
     {
+        if ($redirect = $this->checkCustomerRole()) return $redirect;
+        
         $user = Auth::user();
         $customer = $user->customer;
 
@@ -80,12 +94,16 @@ class CustomerProfileController extends Controller
     // --- Address Methods ---
     public function addresses()
     {
+        if ($redirect = $this->checkCustomerRole()) return $redirect;
+        
         $addresses = Address::where('user_id', Auth::id())->get();
         return view('customer.profile.addresses', compact('addresses'));
     }
 
     public function storeAddress(Request $request)
     {
+        if ($redirect = $this->checkCustomerRole()) return $redirect;
+        
         // Accept full_name and phone as optional inputs in the form; Address model doesn't have these columns yet.
         $data = $this->validateAddress($request);
 
@@ -98,18 +116,22 @@ class CustomerProfileController extends Controller
     }
 
     public function updateAddress(Request $request, Address $address)
-{
-    $data = $this->validateAddress($request);
+    {
+        if ($redirect = $this->checkCustomerRole()) return $redirect;
+        
+        $data = $this->validateAddress($request);
 
-    $address->update(array_merge($data, [
-        'country' => 'Philippines', // still force Philippines
-    ]));
+        $address->update(array_merge($data, [
+            'country' => 'Philippines', // still force Philippines
+        ]));
 
-    return redirect()->route('customer.profile.addresses')->with('success', 'Address updated successfully!');
-}
+        return redirect()->route('customer.profile.addresses')->with('success', 'Address updated successfully!');
+    }
 
     public function destroyAddress(Address $address)
     {
+        if ($redirect = $this->checkCustomerRole()) return $redirect;
+        
         $address->delete();
         return redirect()->route('customer.profile.addresses')->with('success', 'Address deleted!');
     }
