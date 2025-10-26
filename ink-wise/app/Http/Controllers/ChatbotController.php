@@ -106,41 +106,4 @@ class ChatbotController extends Controller
         }
         return redirect()->back()->with('success', 'Q&A deleted.');
     }
-
-    // Handle chatbot reply requests from customer widget
-    public function reply(Request $request)
-    {
-        $request->validate([
-            'message' => 'required|string|max:1000',
-        ]);
-
-        $userMessage = strtolower(trim($request->message));
-
-        // Find matching Q&A based on question similarity
-        $qas = ChatQA::all();
-        $bestMatch = null;
-        $bestScore = 0;
-
-        foreach ($qas as $qa) {
-            $question = strtolower($qa->question);
-            similar_text($userMessage, $question, $score);
-            
-            if ($score > $bestScore && $score > 60) { // 60% similarity threshold
-                $bestScore = $score;
-                $bestMatch = $qa;
-            }
-        }
-
-        if ($bestMatch) {
-            return response()->json([
-                'reply' => $bestMatch->answer,
-                'image_url' => $bestMatch->answer_image_path ? asset('storage/' . ltrim($bestMatch->answer_image_path, '/')) : null
-            ]);
-        }
-
-        // Default response if no match found
-        return response()->json([
-            'reply' => 'I\'m sorry, I don\'t have an answer for that question. Please contact our support team for assistance.'
-        ]);
-    }
 }

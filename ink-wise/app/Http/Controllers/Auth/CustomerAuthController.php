@@ -188,10 +188,6 @@ class CustomerAuthController extends Controller
 
     public function dashboard()
     {
-        // Check if user is authenticated and has customer role
-        if (!Auth::check() || Auth::user()->role !== 'customer') {
-            return redirect('/unauthorized');
-        }
 
         return view('customer.dashboard', [
             'customer' => Auth::user()->customer ?? null, // safe access
@@ -204,7 +200,7 @@ class CustomerAuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect('/'); // Redirect to home page after logout
+        return redirect()->route('dashboard'); // 👈 check if this route exists
     }
 
     public function uploadDesign(Request $request)
