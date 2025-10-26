@@ -33,10 +33,12 @@ class ReportsDashboardController extends Controller
 
     public function inventory(Request $request)
     {
-        $context = $this->buildReportContext();
+        [$startDate, $endDate] = $this->resolveDateRange($request);
+
+        $context = $this->buildReportContext($startDate, $endDate);
         $context['filters'] = [
-            'startDate' => null,
-            'endDate' => null,
+            'startDate' => $startDate?->format('Y-m-d'),
+            'endDate' => $endDate?->format('Y-m-d'),
         ];
 
         return view('admin.reports.inventory', $context);
