@@ -327,7 +327,7 @@ Route::get('/auth/google/callback', function () {
 
 /**Dashboard & Home*/
 Route::get('/', fn () => view('customer.dashboard'))->name('dashboard');
-Route::middleware('auth')->get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');  // Protected
+Route::middleware('role:customer')->get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');  // Protected
  Route::get('/search', function (\Illuminate\Http\Request $request) {
      return 'Search for: ' . e($request->query('query', ''));
  })->name('search');
@@ -350,66 +350,72 @@ Route::middleware('auth')->group(function () {
 
 Route::post('/messages', [MessageController::class, 'storeFromContact'])->name('messages.store');
 
-Route::middleware('auth')->group(function () {
     Route::get('customer/chat/thread', [MessageController::class, 'customerChatThread'])->name('customer.chat.thread');
     Route::post('customer/chat/send', [MessageController::class, 'customerChatSend'])->name('customer.chat.send');
-    Route::get('customer/chat/unread-count', [MessageController::class, 'customerUnreadCount'])
+Route::get('customer/chat/unread-count', [MessageController::class, 'customerUnreadCount'])
         ->name('customer.chat.unread');
+
     Route::post('customer/chat/mark-read', [MessageController::class, 'customerMarkRead'])
         ->name('customer.chat.markread');
 
-    /**Customer Profile Pages*/
-    Route::prefix('customerprofile')->group(function () {
-        // Addresses
-        Route::get('/addresses', [CustomerProfileController::class, 'addresses'])
-            ->name('customer.profile.addresses');
-        Route::post('/addresses', [CustomerProfileController::class, 'storeAddress'])
-            ->name('customer.profile.addresses.store');
-        Route::put('/addresses/{address}', [CustomerProfileController::class, 'updateAddress'])
-            ->name('customer.profile.addresses.update');
-        Route::delete('/addresses/{address}', [CustomerProfileController::class, 'destroyAddress'])
-            ->name('customer.profile.addresses.destroy');
 
-        Route::get('/', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
-        Route::get('/profile', [CustomerProfileController::class, 'edit'])->name('customer.profile.edit');
-        Route::put('/profile', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
-        // Other pages
-        Route::get('/settings', fn () => view('customer.profile.settings'))->name('customer.profile.settings');
-        Route::get('/order', fn () => view('customer.profile.orderform'))->name('customer.profile.orderform');
-    });
+Route::get('/chatbot/qas', [ChatbotController::class, 'getQAs'])->name('chatbot.qas');
+ Route::view('/chatbot', 'customer.chatbot')->name('chatbot');
+ Route::post('/chatbot/reply', [App\Http\Controllers\ChatbotController::class, 'reply'])
+    ->name('chatbot.reply');
 
-    Route::get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');  // Protected
+        
+/**Customer Profile Pages*/
+Route::prefix('customerprofile')->group(function () {
+    // Addresses
+
+    Route::get('/addresses', [CustomerProfileController::class, 'addresses'])
+        ->name('customer.profile.addresses');
+
+    Route::post('/addresses', [CustomerProfileController::class, 'storeAddress'])
+        ->name('customer.profile.addresses.store');
+
+    Route::put('/addresses/{address}', [CustomerProfileController::class, 'updateAddress'])
+        ->name('customer.profile.addresses.update');
+
+    Route::delete('/addresses/{address}', [CustomerProfileController::class, 'destroyAddress'])
+        ->name('customer.profile.addresses.destroy');
 
    Route::get('/', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
     Route::get('/profile', [CustomerProfileController::class, 'edit'])->name('customer.profile.edit');
     Route::put('/profile', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
 // Other pages
 Route::get('/settings', fn () => view('customer.profile.settings'))->name('customer.profile.settings');
-Route::get('/order', fn () => view('customer.profile.orderform'))->name('custome.rprofile.orderform');
+Route::get('/order', fn () => view('customer.profile.orderform'))->name('customer.profile.orderform');
 
-    // My Purchases
-    Route::get('/customer/my-orders', fn () => view('customer.profile.my_purchase'))->name('customer.my_purchase');
 });
 
-Route::get('/chatbot/qas', [ChatbotController::class, 'getQAs'])->name('chatbot.qas');
-Route::view('/chatbot', 'customer.chatbot')->name('chatbot');
-Route::post('/chatbot/reply', [App\Http\Controllers\ChatbotController::class, 'reply'])
-    ->name('chatbot.reply');
+Route::middleware('role:customer')->get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');  // Protected
 
+// Customer Favorites (render favorites page)
+Route::get('/customer/favorites', fn () => view('customer.profile.favorite'))->name('customer.favorites');
+
+
+// My Purchases
+Route::get('/customer/my-orders', fn () => view('customer.profile.my_purchase'))->name('customer.my_purchase');
 // To Pay tab (lists orders pending payment)
 Route::get('/customer/my-orders/topay', fn () => view('customer.profile.purchase.topay'))->name('customer.my_purchase.topay');
 Route::get('/customer/my-orders/inproduction', fn () => view('customer.profile.purchase.inproduction'))->name('customer.my_purchase.inproduction');
 Route::get('/customer/my-orders/toship', fn () => view('customer.profile.purchase.toship'))->name('customer.my_purchase.toship');
 Route::get('/customer/my-orders/toreceive', fn () => view('customer.profile.purchase.toreceive'))->name('customer.my_purchase.toreceive');
 Route::get('/customer/my-orders/completed', fn () => view('customer.profile.purchase.completed'))->name('customer.my_purchase.completed');
+Route::get('/customer/my-orders/rate', [CustomerProfileController::class, 'rate'])->middleware('role:customer')->name('customer.my_purchase.rate');
 Route::get('/customer/my-orders/cancelled', fn () => view('customer.profile.purchase.cancelled'))->name('customer.my_purchase.cancelled');
 Route::get('/customer/my-orders/return-refund', fn () => view('customer.profile.purchase.return_refund'))->name('customer.my_purchase.return_refund');
 
-Route::middleware('auth')->post('/customer/orders/{order}/cancel', [CustomerProfileController::class, 'cancelOrder'])
+Route::middleware('role:customer')->post('/customer/orders/{order}/cancel', [CustomerProfileController::class, 'cancelOrder'])
     ->name('customer.orders.cancel');
 
-Route::middleware('auth')->post('/customer/orders/{order}/confirm-received', [CustomerProfileController::class, 'confirmReceived'])
+Route::middleware('role:customer')->post('/customer/orders/{order}/confirm-received', [CustomerProfileController::class, 'confirmReceived'])
     ->name('customer.orders.confirm_received');
+
+Route::middleware('role:customer')->post('/customer/order-ratings', [CustomerProfileController::class, 'storeRating'])
+    ->name('customer.order-ratings.store');
 
 
 /** Profile & Addresses (Protected) */
@@ -418,12 +424,12 @@ Route::middleware('auth')->post('/customer/orders/{order}/confirm-received', [Cu
     Route::get('/', [CustomerProfileController::class, 'edit'])
         ->name('edit');
 
-Route::middleware('auth')->get('/customer/my-purchase', function () {
+Route::middleware('role:customer')->get('/customer/my-purchase', function () {
     return view('customer.profile.my_purchase');
 })->name('customer.my_purchase');
 
 // Settings (with optional tab)
-Route::middleware('auth')->get('/customer/profile/settings', function (\Illuminate\Http\Request $request) {
+Route::middleware('role:customer')->get('/customer/profile/settings', function (\Illuminate\Http\Request $request) {
     $tab = $request->query('tab', 'account');
     return view('customer.profile.settings', compact('tab'));
 })->name('customerprofile.settings');
@@ -432,7 +438,7 @@ Route::middleware('auth')->get('/customer/profile/settings', function (\Illumina
 // My Purchases
 
 
-Route::middleware('auth')->prefix('customer/profile')->name('customer.profile.')->group(function () {  // Protected group
+Route::middleware('role:customer')->prefix('customer/profile')->name('customer.profile.')->group(function () {  // Protected group
     // Profile routes
     Route::get('/', [CustomerProfileController::class, 'index'])->name('index'); 
     Route::get('/edit', [CustomerProfileController::class, 'edit'])->name('edit');  // Matches view
@@ -519,14 +525,14 @@ Route::get('/checkout', [OrderFlowController::class, 'checkout'])->name('custome
 Route::post('/checkout/complete', [OrderFlowController::class, 'completeCheckout'])->name('checkout.complete');
 Route::post('/checkout/cancel', [OrderFlowController::class, 'cancelCheckout'])->name('checkout.cancel');
 
-Route::middleware('auth')->group(function () {
+Route::middleware('role:customer')->group(function () {
     Route::post('/payments/gcash', [PaymentController::class, 'createGCashPayment'])->name('payment.gcash.create');
     Route::get('/payments/gcash/return', [PaymentController::class, 'handleGCashReturn'])->name('payment.gcash.return');
 });
 Route::post('/payments/gcash/webhook', [PaymentController::class, 'webhook'])->name('payment.gcash.webhook');
 
 /**Customer Upload Route*/
-Route::middleware('auth')->post('/customer/upload/design', [CustomerAuthController::class, 'uploadDesign'])->name('customer.upload.design');
+Route::middleware('role:customer')->post('/customer/upload/design', [CustomerAuthController::class, 'uploadDesign'])->name('customer.upload.design');
 
 /*
 |--------------------------------------------------------------------------|
@@ -583,6 +589,7 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/inventory', [OwnerInventoryController::class, 'index'])->name('inventory.index');
     Route::get('/inventory/track', [OwnerInventoryController::class, 'track'])->name('inventory-track');
     Route::get('/products', [OwnerProductsController::class, 'index'])->name('products.index');
+    Route::get('/products/{product}', [OwnerProductsController::class, 'show'])->name('products.show');
     Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
     Route::get('/reports', fn () => view('owner.owner-reports'))->name('reports');
 
@@ -608,13 +615,7 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
 
 Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
     // Staff routes - updated for order list functionality
-    Route::get('/dashboard', function () {
-        if (\Illuminate\Support\Facades\View::exists('staff.dashboard')) {
-            return view('staff.dashboard');
-        } else {
-            return response('View staff.dashboard does not exist on the server. Please check deployment.', 500);
-        }
-    })->name('dashboard');
+    Route::get('/dashboard', fn () => view('staff.dashboard'))->name('dashboard');
     Route::get('/assigned-orders', [StaffAssignedController::class, 'index'])->name('assigned.orders');
     Route::get('/order-list', [StaffOrderController::class, 'index'])->name('order_list.index');
     Route::get('/order-list/{id}', [StaffOrderController::class, 'show'])->name('order_list.show');
@@ -711,17 +712,18 @@ if (interface_exists('Laravel\\Socialite\\Contracts\\Factory')) {
 
 
 
-Route::middleware('auth')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.show');
+Route::middleware('role:customer')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.show');
 
+
+Route::get('/unauthorized', function () {
+    return view('errors.unauthorized');
+})->name('unauthorized');
 
 require __DIR__.'/auth.php';
 
 // Graphics proxy routes (search endpoints used by client-side graphics panel)
 Route::get('/graphics/svgrepo', [GraphicsProxyController::class, 'svgrepo'])->name('graphics.svgrepo');
 Route::get('/graphics/unsplash', [GraphicsProxyController::class, 'unsplash'])->name('graphics.unsplash');
-
-// Unauthorized access page
-Route::view('/unauthorized', 'errors.unauthorized')->name('unauthorized');
 
 
 

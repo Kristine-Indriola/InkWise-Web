@@ -204,7 +204,7 @@ class CustomerAuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('dashboard'); // 👈 check if this route exists
+        return redirect('/'); // Redirect to home page after logout
     }
 
     public function uploadDesign(Request $request)
