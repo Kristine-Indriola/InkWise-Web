@@ -404,6 +404,7 @@ Route::get('/customer/my-orders/inproduction', fn () => view('customer.profile.p
 Route::get('/customer/my-orders/toship', fn () => view('customer.profile.purchase.toship'))->name('customer.my_purchase.toship');
 Route::get('/customer/my-orders/toreceive', fn () => view('customer.profile.purchase.toreceive'))->name('customer.my_purchase.toreceive');
 Route::get('/customer/my-orders/completed', fn () => view('customer.profile.purchase.completed'))->name('customer.my_purchase.completed');
+Route::get('/customer/my-orders/rate', [CustomerProfileController::class, 'rate'])->middleware('auth')->name('customer.my_purchase.rate');
 Route::get('/customer/my-orders/cancelled', fn () => view('customer.profile.purchase.cancelled'))->name('customer.my_purchase.cancelled');
 Route::get('/customer/my-orders/return-refund', fn () => view('customer.profile.purchase.return_refund'))->name('customer.my_purchase.return_refund');
 
@@ -412,6 +413,9 @@ Route::middleware('auth')->post('/customer/orders/{order}/cancel', [CustomerProf
 
 Route::middleware('auth')->post('/customer/orders/{order}/confirm-received', [CustomerProfileController::class, 'confirmReceived'])
     ->name('customer.orders.confirm_received');
+
+Route::middleware('auth')->post('/customer/order-ratings', [CustomerProfileController::class, 'storeRating'])
+    ->name('customer.order-ratings.store');
 
 
 /** Profile & Addresses (Protected) */

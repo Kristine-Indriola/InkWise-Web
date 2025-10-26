@@ -5,6 +5,84 @@
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('css/admin-css/product-view.css') }}">
+    <style>
+        .rating-summary {
+            margin-bottom: 1rem;
+        }
+        .stars-display {
+            display: flex;
+            gap: 2px;
+            margin: 0.5rem 0;
+        }
+        .stars-display .star {
+            font-size: 1.2rem;
+            color: #ddd;
+        }
+        .stars-display .star.filled {
+            color: #f59e0b;
+        }
+        .ratings-list {
+            list-style: none;
+            padding: 0;
+        }
+        .rating-item {
+            border-bottom: 1px solid #eee;
+            padding: 1rem 0;
+        }
+        .rating-item:last-child {
+            border-bottom: none;
+        }
+        .rating-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.5rem;
+            gap: 1rem;
+        }
+        .rating-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            flex: 1;
+        }
+        .rating-customer {
+            font-weight: 600;
+            color: #111827;
+            font-size: 0.9rem;
+        }
+        .rating-date {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        .rating-review {
+            margin: 0.5rem 0;
+            font-style: italic;
+        }
+        .rating-photos {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            gap: 8px;
+            margin-top: 0.75rem;
+            padding: 0.5rem;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+        .rating-photo {
+            width: 100%;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
+        }
+        .rating-photo:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+    </style>
 @endpush
 
 @section('content')
@@ -158,6 +236,59 @@
                 </div>
             @endif
 
+            {{-- Ratings --}}
+            <div class="product-card">
+                <h2>Ratings</h2>
+                @php
+                    $ratings = $product->ratings ?? collect();
+                    $averageRating = $ratings->avg('rating');
+                @endphp
+                @if($ratings->isNotEmpty())
+                    <div class="rating-summary">
+                        <p><strong>Average Rating:</strong> {{ number_format($averageRating, 1) }} / 5 ({{ $ratings->count() }} review{{ $ratings->count() > 1 ? 's' : '' }})</p>
+                        <div class="stars-display">
+                            @foreach(range(1, 5) as $i)
+                                <span class="star {{ $i <= round($averageRating) ? 'filled' : '' }}">&#9733;</span>
+                            @endforeach
+                        </div>
+                    </div>
+                    <ul class="ratings-list">
+                        @foreach($ratings as $rating)
+                            <li class="rating-item">
+                                <div class="rating-header">
+                                    <div class="rating-info">
+                                        <strong class="rating-customer">{{ $rating->customer->name ?? 'Customer' }}</strong>
+                                        <div class="stars-display">
+                                            @foreach(range(1, 5) as $i)
+                                                <span class="star {{ $i <= $rating->rating ? 'filled' : '' }}">&#9733;</span>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                    <span class="rating-date">{{ optional($rating->submitted_at)->format('M d, Y') }}</span>
+                                </div>
+                                @if($rating->review)
+                                    <p class="rating-review">{{ $rating->review }}</p>
+                                @endif
+                                @if($rating->photos && count($rating->photos))
+                                    <div class="rating-photos">
+                                        @foreach($rating->photos as $photo)
+                                            @php
+                                                $photoUrl = \Illuminate\Support\Str::startsWith($photo, ['http://', 'https://'])
+                                                    ? $photo
+                                                    : \Illuminate\Support\Facades\Storage::disk('public')->url($photo);
+                                            @endphp
+                                            <img src="{{ $photoUrl }}" alt="Rating photo" class="rating-photo" onclick="window.open('{{ $photoUrl }}', '_blank')">
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                @else
+                    <p class="muted">No ratings yet.</p>
+                @endif
+            </div>
+
             @if($product->uploads && $product->uploads->count())
                 <div class="product-card uploads-card">
                     <div class="card-heading">
@@ -202,7 +333,6 @@
                     {!! $product->description ? nl2br(e($product->description)) : '<p>No description provided.</p>' !!}
                 </div>
             </div>
-
 
             
 
@@ -296,8 +426,8 @@
                     <p class="muted">No bulk order tiers defined.</p>
                 @endif
             </div>
-            </div>
-        </section>
+        </div>
+    </section>
     </div>
 </main>
 @endsection

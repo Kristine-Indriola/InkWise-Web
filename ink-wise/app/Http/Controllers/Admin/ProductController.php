@@ -553,6 +553,11 @@ class ProductController extends Controller
         ])->findOrFail($id);
         $this->hydrateLegacyAttributes($product);
 
+        // Load ratings for this product
+        $product->ratings = \App\Models\OrderRating::whereHas('order.items', function($query) use ($id) {
+            $query->where('product_id', $id);
+        })->with('customer')->get();
+
         // If request expects JSON or is AJAX, return the partial HTML for the slide panel
         if (request()->ajax() || request()->wantsJson() || request()->header('X-Requested-With') === 'XMLHttpRequest') {
             return view('admin.products.view', compact('product'));

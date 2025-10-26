@@ -90,7 +90,7 @@
                 } catch (\Throwable $e) {
                     $previewUrl = '#';
                 }
-                $rateUrl = Route::has('chatbot') ? route('chatbot') : '#';
+                $rateUrl = Route::has('customer.my_purchase.rate') ? route('customer.my_purchase.rate') : '#';
             @endphp
 
             <div class="bg-white border rounded-xl p-4 shadow-sm flex items-center gap-4">
