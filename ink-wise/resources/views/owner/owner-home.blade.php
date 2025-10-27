@@ -165,14 +165,14 @@
 
   <div class="page-inner owner-dashboard-inner">
   <section class="summary-grid" aria-label="Dashboard summary">
-      <div class="summary-card">
+      <a href="{{ route('owner.order.workflow') }}" class="summary-card" style="text-decoration:none; color:inherit;">
         <div class="summary-card-header">
           <span class="summary-card-label">New Orders</span>
           <span class="summary-card-chip">Orders</span>
         </div>
         <span class="summary-card-value">{{ number_format($newOrdersCount ?? 0) }}</span>
         <span class="summary-card-meta">Placed in the last 7 days</span>
-      </div>
+      </a>
 
       <a href="{{ route('owner.inventory-track', ['status' => 'low']) }}" class="summary-card" style="text-decoration:none; color:inherit;">
         <div class="summary-card-header">
@@ -186,14 +186,14 @@
         <span class="summary-card-meta">Items approaching reorder level</span>
       </a>
 
-      <div class="summary-card">
+      <a href="{{ route('owner.order.workflow', ['status' => 'pending']) }}" class="summary-card" style="text-decoration:none; color:inherit;">
         <div class="summary-card-header">
           <span class="summary-card-label">Pending Orders</span>
           <span class="summary-card-chip">Orders</span>
         </div>
         <span class="summary-card-value">{{ number_format($pendingOrdersCount ?? 0) }}</span>
         <span class="summary-card-meta">Awaiting processing</span>
-      </div>
+      </a>
 
       <div class="summary-card">
         <div class="summary-card-header">
