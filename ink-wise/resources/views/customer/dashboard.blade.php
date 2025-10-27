@@ -802,7 +802,7 @@
                 My Account
             </a>
             <!-- My Purchase (link to my_purchase) -->
-            <a href="{{ route('customer.my_purchase') }}" class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] transition-colors">
+            <a href="{{ route('customer.my_purchase.completed') }}" class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] transition-colors">
                 My Purchase
             </a>
             <!-- My Favorites (link to favorites) -->
@@ -819,7 +819,7 @@
     @endauth
 </div>
 </header>
-<!-- Add favorites & cart icons to match customerprofile layout -->
+        
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     // inject icons into header right-side (only on desktop)
@@ -828,6 +828,26 @@ document.addEventListener('DOMContentLoaded', function () {
         const searchIcons = document.querySelector('.search-icons');
         // check if icons already present anywhere
         if (!document.querySelector('.nav-icon-button')) {
+            const notifications = document.createElement('a');
+            notifications.className = 'nav-icon-button';
+            notifications.setAttribute('href', '{{ route('customer.notifications') }}');
+            notifications.setAttribute('aria-label', 'Notifications');
+            notifications.setAttribute('title', 'Notifications');
+            notifications.innerHTML = '<i class="fi fi-br-bell" aria-hidden="true"></i>';
+
+            // Add notification badge if there are unread notifications
+            @auth
+                @php
+                    $unreadCount = auth()->user()->unreadNotifications()->count();
+                @endphp
+                @if($unreadCount > 0)
+                    const badge = document.createElement('span');
+                    badge.className = 'notification-badge';
+                    badge.textContent = '{{ $unreadCount }}';
+                    notifications.appendChild(badge);
+                @endif
+            @endauth
+
             const fav = document.createElement('a');
             fav.className = 'nav-icon-button';
             fav.setAttribute('href', '{{ route('customer.favorites') }}');
@@ -848,6 +868,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (searchForm && searchForm.parentElement) {
                     const iconsWrap = document.createElement('div');
                     iconsWrap.className = 'hidden md:flex items-center gap-2 ml-3';
+                    iconsWrap.appendChild(notifications);
                     iconsWrap.appendChild(fav);
                     iconsWrap.appendChild(cart);
                     // insert after the search form element
@@ -855,6 +876,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 } else {
                     const container = document.createElement('div');
                     container.className = 'hidden md:flex items-center gap-2';
+                    container.appendChild(notifications);
                     container.appendChild(fav);
                     container.appendChild(cart);
                     headerRight.insertBefore(container, headerRight.firstChild);
@@ -909,6 +931,11 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (e) { /* ignore */ }
 
         icon.addEventListener('click', async (e) => {
+            // Skip order logic for notification bell icon
+            if (icon.querySelector('i.fi-br-bell')) {
+                return; // Let it go to the notifications page
+            }
+
             try {
                 e.preventDefault();
                 if (await serverHasOrder()) { window.location.href = '/order/summary'; return; }

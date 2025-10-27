@@ -127,8 +127,7 @@ class MessageController extends Controller
         $customerKey = (new \App\Models\Customer)->getKeyName();
         $userKey = (new \App\Models\User)->getKeyName();
 
-        $customers = \App\Models\Customer::whereIn($customerKey, $customerIds)
-            ->with('user')
+        $customers = \App\Models\Customer::with('user')
             ->get()
             ->keyBy($customerKey);
 
@@ -181,6 +180,43 @@ class MessageController extends Controller
         return view('admin.messages.chat', compact('messages', 'customer'));
     }
 
+    // Get customer chat data as JSON for AJAX requests
+    public function getCustomerChatJson($customerId)
+    {
+        $customer = Customer::with('user')->findOrFail($customerId);
+
+        $messages = Message::where(function ($q) use ($customerId) {
+                $q->where('sender_id', $customerId)->whereRaw('LOWER(sender_type) = ?', ['customer']);
+            })
+            ->orWhere(function ($q) use ($customerId) {
+                $q->where('receiver_id', $customerId)->whereRaw('LOWER(receiver_type) = ?', ['customer']);
+            })
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->map(function ($message) {
+                return [
+                    'id' => $message->id,
+                    'sender_type' => $message->sender_type,
+                    'sender_id' => $message->sender_id,
+                    'receiver_type' => $message->receiver_type,
+                    'receiver_id' => $message->receiver_id,
+                    'message' => $message->message,
+                    'attachment_path' => $message->attachment_path,
+                    'created_at' => $message->created_at,
+                    'updated_at' => $message->updated_at,
+                ];
+            });
+
+        return response()->json([
+            'customer' => [
+                'id' => $customer->customer_id,
+                'name' => $customer->name,
+                'email' => $customer->user?->email ?? $customer->contact_number,
+            ],
+            'messages' => $messages,
+        ]);
+    }
+
     // Admin sends message to customer
     public function sendToCustomer(Request $request, $customerId)
     {
@@ -192,7 +228,7 @@ class MessageController extends Controller
         $actor = $this->resolveMessageActor();
         abort_unless($actor, 403);
 
-        Message::create([
+        $message = Message::create([
             'sender_id'     => $actor['id'],
             'sender_type'   => $actor['type'],
             'receiver_id'   => $customer->getKey(),
@@ -201,6 +237,21 @@ class MessageController extends Controller
             'name'          => $actor['name'],
             'email'         => $actor['email'],
         ]);
+
+        // Mark as seen if sent by admin
+        if (in_array($actor['type'], ['user', 'admin', 'staff'])) {
+            $message->update(['seen_at' => now()]);
+        }
+
+        // Return JSON if requested, otherwise redirect
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Message sent successfully.',
+                'message_id' => $message->getKey(),
+                'thread_url' => route('admin.messages.thread', $message->getKey()),
+            ]);
+        }
 
         return redirect()->route('admin.messages.chat', $customer->getKey())->with('success', 'Message sent.');
     }

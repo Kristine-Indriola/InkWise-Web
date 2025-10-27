@@ -7,7 +7,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement("ALTER TABLE `orders` MODIFY COLUMN `status` ENUM('pending','in_production','confirmed','to_receive','completed','cancelled') NOT NULL DEFAULT 'pending'");
+        DB::statement("ALTER TABLE `orders` MODIFY COLUMN `status` ENUM('pending','processing','in_production','confirmed','to_receive','completed','cancelled') NOT NULL DEFAULT 'pending'");
     }
 
     public function down(): void
