@@ -147,7 +147,7 @@
             $lastMessageAt = $message->created_at->toIso8601String();
         }
 
-        $preparedThreads[$threadKey] = [
+    $preparedThreads[$threadKey] = [
             'id' => $message->getKey(),
             'thread_key' => $threadKey,
             'thread_type' => $threadType,
@@ -162,6 +162,47 @@
             'created_at_display' => $createdAtDisplay,
             'status_label' => $threadType === 'customer' ? 'Customer' : 'Guest',
         ];
+    }
+
+    // Add customers without conversations
+    if (isset($customers) && $customers instanceof \Illuminate\Support\Collection) {
+        foreach ($customers as $customerId => $customer) {
+            $threadKey = 'customer:' . $customerId;
+            if (isset($preparedThreads[$threadKey])) {
+                continue; // already has a conversation
+            }
+
+            $customerName = null;
+            $nameParts = array_filter([
+                trim((string) ($customer->first_name ?? '')),
+                trim((string) ($customer->middle_name ?? '')),
+                trim((string) ($customer->last_name ?? '')),
+            ], fn ($part) => $part !== '');
+            if (! empty($nameParts)) {
+                $customerName = implode(' ', $nameParts);
+            }
+
+            $displayLabel = $customerName ?: 'Customer #' . $customerId;
+            $avatarUrl = isset($customerAvatars[$customerId]) ? $customerAvatars[$customerId] : null;
+            $avatarInitial = strtoupper(substr($displayLabel, 0, 1));
+
+            $preparedThreads[$threadKey] = [
+                'id' => null,
+                'thread_key' => $threadKey,
+                'thread_type' => 'customer',
+                'sender_type' => 'customer',
+                'email' => $customer->email ?? '',
+                'name' => $displayLabel,
+                'preview' => 'Start a conversation',
+                'avatar_url' => $avatarUrl,
+                'avatar_initial' => $avatarInitial,
+                'is_unread' => false,
+                'last_message_at' => '',
+                'created_at_display' => '',
+                'status_label' => 'Customer',
+                'is_new' => true,
+            ];
+        }
     }
 
     $customerThreadItems = collect($preparedThreads)
@@ -822,7 +863,9 @@
                     @forelse($customerThreadItems as $thread)
                         <div class="conversation-item{{ $thread['is_unread'] ? ' is-unread' : '' }}"
 
-                            data-message-id="{{ $thread['id'] }}"
+                            data-message-id="{{ $thread['id'] ?? '' }}"
+
+                            data-is-new="{{ isset($thread['is_new']) && $thread['is_new'] ? 'true' : 'false' }}"
 
                             data-sender-type="{{ $thread['sender_type'] }}"
 
@@ -833,6 +876,8 @@
                             data-thread-key="{{ $thread['thread_key'] }}"
 
                             data-thread-type="{{ $thread['thread_type'] }}"
+
+                            data-customer-id="{{ str_replace('customer:', '', $thread['thread_key']) }}"
 
                             data-status="{{ $thread['status_label'] }}"
 
@@ -1125,7 +1170,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!replyButton) return;
         const hasMessage = replyMessage && replyMessage.value.trim().length > 0;
         const hasFile = hasSelectedAttachment();
-        replyButton.disabled = !currentMessageId || (!hasMessage && !hasFile);
+        replyButton.disabled = !hasMessage && !hasFile;
     }
 
     const TIMEZONE = 'Asia/Manila';
@@ -1436,18 +1481,126 @@ document.addEventListener('DOMContentLoaded', () => {
         clearPoll();
     }
 
+    async function startNewConversationInline(customerId, meta = null) {
+        try {
+            if (!meta) {
+                // Fetch customer data
+                const response = await fetch(`{{ url('admin/messages') }}/${customerId}/json`, {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load customer data');
+                }
+                
+                const data = await response.json();
+                
+                meta = {
+                    name: data.customer?.name || 'Customer',
+                    email: data.customer?.email || '',
+                    avatarUrl: '',
+                    status: 'active',
+                };
+            }
+            
+            // Update thread header with customer info
+            updateThreadHeader(meta);
+            
+            // Enable reply message input
+            if (replyMessage) {
+                replyMessage.disabled = false;
+                replyMessage.value = '';
+                replyMessage.focus();
+            }
+            clearAttachmentPreview();
+            updateSendButtonState();
+            
+            // Clear the thread and show empty state for new conversation
+            if (threadMessages) {
+                threadMessages.innerHTML = '';
+                const empty = document.createElement('div');
+                empty.className = 'thread-empty';
+                empty.textContent = 'Start a conversation with this customer.';
+                threadMessages.appendChild(empty);
+            }
+            
+            // Set up form for new conversation
+            if (replyForm) {
+                replyForm.action = `{{ url('admin/messages') }}/${customerId}`;
+            }
+            
+            // Set state for new conversation
+            currentMessageId = null; // No existing message thread
+            activeConversation = document.querySelector(`.conversation-item[data-customer-id="${customerId}"][data-is-new="true"]`);
+            if (activeConversation) {
+                setActiveConversation(activeConversation);
+            }
+            
+        } catch (error) {
+            console.error('Error starting new conversation:', error);
+            // Even if fetch fails, enable the input for new conversations
+            if (meta) {
+                updateThreadHeader(meta);
+                if (replyMessage) {
+                    replyMessage.disabled = false;
+                    replyMessage.value = '';
+                    replyMessage.focus();
+                }
+                clearAttachmentPreview();
+                updateSendButtonState();
+                
+                if (threadMessages) {
+                    threadMessages.innerHTML = '';
+                    const empty = document.createElement('div');
+                    empty.className = 'thread-empty';
+                    empty.textContent = 'Start a conversation with this customer.';
+                    threadMessages.appendChild(empty);
+                }
+                
+                if (replyForm) {
+                    replyForm.action = `{{ url('admin/messages') }}/${customerId}`;
+                }
+                
+                currentMessageId = null;
+                activeConversation = document.querySelector(`.conversation-item[data-customer-id="${customerId}"][data-is-new="true"]`);
+                if (activeConversation) {
+                    setActiveConversation(activeConversation);
+                }
+            } else {
+                setEmptyThread();
+                alert('Unable to start conversation with this customer. Please try again.');
+            }
+        }
+    }
+
     function handleConversationClick(item) {
         if (!item) return;
         const messageId = item.dataset.messageId;
-        if (!messageId) return;
-        const meta = {
-            name: item.dataset.name || item.querySelector('.conversation-name span')?.textContent.trim(),
-            email: item.dataset.email || '',
-            avatarUrl: item.dataset.avatarUrl || '',
-            status: item.dataset.status || '',
-        };
-        setActiveConversation(item);
-        openThread(messageId, meta);
+        const isNew = item.dataset.isNew === 'true';
+        const customerId = item.dataset.customerId;
+
+        if (isNew && customerId) {
+            const meta = {
+                name: item.dataset.name,
+                email: item.dataset.email,
+                avatarUrl: item.dataset.avatarUrl,
+                status: item.dataset.status,
+            };
+            startNewConversationInline(customerId, meta);
+        } else if (messageId) {
+            const meta = {
+                name: item.dataset.name || item.querySelector('.conversation-name span')?.textContent.trim(),
+                email: item.dataset.email || '',
+                avatarUrl: item.dataset.avatarUrl || '',
+                status: item.dataset.status || '',
+            };
+            setActiveConversation(item);
+            openThread(messageId, meta);
+        }
     }
 
     async function openThread(messageId, meta) {
@@ -1534,6 +1687,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     replyMessage?.addEventListener('input', updateSendButtonState);
+    replyMessage?.addEventListener('keyup', updateSendButtonState);
+    replyMessage?.addEventListener('change', updateSendButtonState);
 
     if (attachmentButton && replyAttachment) {
         attachmentButton.addEventListener('click', event => {
@@ -1561,11 +1716,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     replyForm?.addEventListener('submit', async event => {
         event.preventDefault();
-        if (!currentMessageId) {
-            alert('Select a conversation first');
-            return;
-        }
-
+        
         const messageText = replyMessage ? replyMessage.value.trim() : '';
         const hasFile = hasSelectedAttachment();
         if (!messageText && !hasFile) {
@@ -1573,7 +1724,26 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const url = replyUrlTemplate.replace('__ID__', currentMessageId);
+        let url;
+        
+        if (currentMessageId) {
+            // Reply to existing message
+            url = replyUrlTemplate.replace('__ID__', currentMessageId);
+        } else {
+            // Check if this is a new conversation (form action contains customer ID)
+            const formAction = replyForm?.action || '';
+            const customerMatch = formAction.match(/\/messages\/(\d+)(?:\?|#|$)/);
+            
+            if (customerMatch) {
+                // New conversation - send to customer
+                const customerId = customerMatch[1];
+                url = `{{ url('admin/messages') }}/${customerId}`;
+            } else {
+                alert('Unable to send message. Please select a conversation or ensure customer is set.');
+                return;
+            }
+        }
+
         const token = getCsrf();
         const formData = new FormData();
         formData.append('_token', token);
@@ -1617,18 +1787,47 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (replyMessage) replyMessage.value = '';
                 clearAttachmentPreview();
 
-                const { items } = await fetchThread(currentMessageId);
-                renderThread(items, { forceScroll: true });
+                if (currentMessageId) {
+                    // Existing conversation - refresh the thread
+                    const { items } = await fetchThread(currentMessageId);
+                    renderThread(items, { forceScroll: true });
 
-                if (activeConversation && items.length) {
-                    const latest = items.at(-1) ?? null;
-                    const snippet = activeConversation.querySelector('.conversation-snippet');
-                    if (snippet) {
-                        const preview = (latest?.message ?? '').trim();
-                        snippet.textContent = preview || 'Sent an attachment';
+                    if (activeConversation && items.length) {
+                        const latest = items.at(-1) ?? null;
+                        const snippet = activeConversation.querySelector('.conversation-snippet');
+                        if (snippet) {
+                            const preview = (latest?.message ?? '').trim();
+                            snippet.textContent = preview || 'Sent an attachment';
+                        }
+                        const lastTimestamp = latest?.created_at || latest?.createdAt || new Date().toISOString();
+                        updateConversationTime(activeConversation, lastTimestamp);
                     }
-                    const lastTimestamp = latest?.created_at || latest?.createdAt || new Date().toISOString();
-                    updateConversationTime(activeConversation, lastTimestamp);
+                } else {
+                    // New conversation - try to open the thread directly
+                    try {
+                        const data = await res.json();
+                        if (data && data.message_id) {
+                            // Open the new thread
+                            const meta = {
+                                name: activeConversation?.dataset.name || 'Customer',
+                                email: activeConversation?.dataset.email || '',
+                                avatarUrl: activeConversation?.dataset.avatarUrl || '',
+                                status: activeConversation?.dataset.status || '',
+                            };
+                            openThread(data.message_id, meta);
+                            // Update the conversation item to have the message ID
+                            if (activeConversation) {
+                                activeConversation.dataset.messageId = data.message_id;
+                                activeConversation.dataset.isNew = 'false';
+                            }
+                        } else {
+                            // Fallback to reload
+                            window.location.reload();
+                        }
+                    } catch (_) {
+                        // Fallback to reload
+                        window.location.reload();
+                    }
                 }
             }
         } catch (_) {
@@ -1643,10 +1842,29 @@ document.addEventListener('DOMContentLoaded', () => {
         .map(list => list.querySelector('.conversation-item'))
         .find(item => item !== null);
 
-    if (firstConversation) {
-        handleConversationClick(firstConversation);
-    } else {
-        setEmptyThread();
+    // Always show empty thread initially - let user select conversation manually
+    setEmptyThread();
+
+    // Check for start_conversation parameter and automatically start conversation
+    const urlParams = new URLSearchParams(window.location.search);
+    const startConversationId = urlParams.get('start_conversation');
+    
+    if (startConversationId) {
+        // Remove the parameter from URL to clean up the address bar
+        const newUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, document.title, newUrl);
+        
+        // Find existing conversation for this customer
+        const customerConversation = Array.from(document.querySelectorAll('.conversation-item[data-thread-type="customer"]'))
+            .find(item => item.getAttribute('data-customer-id') === startConversationId);
+        
+        if (customerConversation) {
+            // If conversation exists, open it
+            handleConversationClick(customerConversation);
+        } else {
+            // If no conversation exists, start a new one inline
+            startNewConversationInline(startConversationId);
+        }
     }
 
     syncSectionEmptyStates();

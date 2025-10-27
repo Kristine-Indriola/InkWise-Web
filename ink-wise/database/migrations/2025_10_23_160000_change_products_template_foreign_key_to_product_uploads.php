@@ -15,6 +15,9 @@ return new class extends Migration
         // First, set all template_id values to null to avoid constraint violations
         DB::table('products')->update(['template_id' => null]);
 
+        // Drop the existing foreign key
+        DB::statement('ALTER TABLE products DROP FOREIGN KEY products_template_id_foreign');
+
         // Use raw SQL to add the new foreign key to product_uploads
         DB::statement('ALTER TABLE products ADD CONSTRAINT products_template_id_foreign FOREIGN KEY (template_id) REFERENCES product_uploads(id) ON DELETE SET NULL');
     }

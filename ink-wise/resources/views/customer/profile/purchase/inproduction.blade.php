@@ -5,7 +5,6 @@
 @section('content')
 <div class="bg-white rounded-2xl shadow p-6">
        <div class="flex border-b text-base font-semibold mb-4">
-    <a href="{{ route('customer.my_purchase') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab" data-route="all">All</a>
     <a href="{{ route('customer.my_purchase.topay') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Pay</a>
     <a href="{{ route('customer.my_purchase.inproduction') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">In Production</a>
     <a href="{{ route('customer.my_purchase.toship') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Ship</a>
@@ -94,6 +93,23 @@
                 <div class="flex flex-col items-end gap-2">
                     <div class="text-gray-700 font-bold">₱{{ number_format($totalAmount, 2) }}</div>
                     <div class="flex gap-2">
+                        @php
+                            // Check if order has remaining balance to pay
+                            $hasRemainingBalance = false;
+                            $metadata = $normalizeMetadata(data_get($order, 'metadata', []));
+                            $payments = collect($metadata['payments'] ?? []);
+                            $paidAmount = $payments->filter(fn($payment) => ($payment['status'] ?? null) === 'paid')->sum(fn($payment) => (float)($payment['amount'] ?? 0));
+                            $remainingBalance = max(($totalAmount ?? 0) - $paidAmount, 0);
+                            $hasRemainingBalance = $remainingBalance > 0.01; // More than 1 cent remaining
+                        @endphp
+
+                        @if($hasRemainingBalance)
+                        <a href="{{ route('customer.pay.remaining.balance', ['order' => $order->id ?? $order['id']]) }}"
+                           class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-semibold transition-colors duration-200">
+                            Pay Remaining (₱{{ number_format($remainingBalance, 2) }})
+                        </a>
+                        @endif
+
                         <button class="px-4 py-2 bg-[#a6b7ff] text-white rounded font-semibold">View Design Proof</button>
                         <button class="px-4 py-2 border border-[#a6b7ff] text-[#a6b7ff] rounded font-semibold">Message Inkwise</button>
                     </div>

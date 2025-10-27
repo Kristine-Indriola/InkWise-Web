@@ -249,6 +249,7 @@ Route::prefix('users')->name('users.')->group(function () {
 
     Route::get('messages', [MessageController::class, 'index'])->name('messages.index');
     Route::get('messages/{customer}', [MessageController::class, 'chatWithCustomer'])->name('messages.chat');
+    Route::get('messages/{customer}/json', [MessageController::class, 'getCustomerChatJson'])->name('messages.chat.json');
     Route::post('messages/{customer}', [MessageController::class, 'sendToCustomer'])->name('messages.send');
      Route::post('messages/{message}/reply', [MessageController::class, 'replyToMessage'])
         ->name('messages.reply');
@@ -342,7 +343,7 @@ Route::get('/auth/google/callback', function () {
 
 /**Dashboard & Home*/
 Route::get('/', fn () => view('customer.dashboard'))->name('dashboard');
-Route::middleware('role:customer')->get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');  // Protected
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');  // Protected
  Route::get('/search', function (\Illuminate\Http\Request $request) {
      return 'Search for: ' . e($request->query('query', ''));
  })->name('search');
@@ -405,10 +406,30 @@ Route::get('/order', fn () => view('customer.profile.orderform'))->name('custome
 
 });
 
-Route::middleware('role:customer')->get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');  // Protected
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');  // Protected
 
 // Customer Favorites (render favorites page)
 Route::get('/customer/favorites', fn () => view('customer.profile.favorite'))->name('customer.favorites');
+
+// Customer Notifications
+Route::get('/customer/notifications', fn () => view('customer.profile.notifications'))->name('customer.notifications');
+Route::get('/customer/notifications/{id}/read', function ($id) {
+    $user = Auth::user();
+
+    $notification = DatabaseNotification::query()
+        ->where('notifiable_id', $user->id)
+        ->where('notifiable_type', AppUser::class)
+        ->findOrFail($id);
+
+    $notification->markAsRead();
+
+    $redirect = request('redirect');
+    if ($redirect) {
+        return redirect($redirect);
+    }
+
+    return back()->with('success', 'Notification marked as read.');
+})->middleware('auth')->name('customer.notifications.read');
 
 
 // My Purchases
@@ -419,17 +440,24 @@ Route::get('/customer/my-orders/inproduction', fn () => view('customer.profile.p
 Route::get('/customer/my-orders/toship', fn () => view('customer.profile.purchase.toship'))->name('customer.my_purchase.toship');
 Route::get('/customer/my-orders/toreceive', fn () => view('customer.profile.purchase.toreceive'))->name('customer.my_purchase.toreceive');
 Route::get('/customer/my-orders/completed', fn () => view('customer.profile.purchase.completed'))->name('customer.my_purchase.completed');
-Route::get('/customer/my-orders/rate', [CustomerProfileController::class, 'rate'])->middleware('role:customer')->name('customer.my_purchase.rate');
+Route::get('/customer/my-orders/rate', [CustomerProfileController::class, 'rate'])->middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->name('customer.my_purchase.rate');
 Route::get('/customer/my-orders/cancelled', fn () => view('customer.profile.purchase.cancelled'))->name('customer.my_purchase.cancelled');
 Route::get('/customer/my-orders/return-refund', fn () => view('customer.profile.purchase.return_refund'))->name('customer.my_purchase.return_refund');
+Route::get('/customer/pay-remaining-balance/{order}', function (\App\Models\Order $order) {
+    // Ensure the order belongs to the authenticated user
+    if (!$order || $order->customer_id !== auth()->user()->customer->id ?? null) {
+        abort(404);
+    }
+    return view('customer.orderflow.pay-remaining-balance', compact('order'));
+})->middleware('auth')->name('customer.pay.remaining.balance');
 
-Route::middleware('role:customer')->post('/customer/orders/{order}/cancel', [CustomerProfileController::class, 'cancelOrder'])
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->post('/customer/orders/{order}/cancel', [CustomerProfileController::class, 'cancelOrder'])
     ->name('customer.orders.cancel');
 
-Route::middleware('role:customer')->post('/customer/orders/{order}/confirm-received', [CustomerProfileController::class, 'confirmReceived'])
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->post('/customer/orders/{order}/confirm-received', [CustomerProfileController::class, 'confirmReceived'])
     ->name('customer.orders.confirm_received');
 
-Route::middleware('role:customer')->post('/customer/order-ratings', [CustomerProfileController::class, 'storeRating'])
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->post('/customer/order-ratings', [CustomerProfileController::class, 'storeRating'])
     ->name('customer.order-ratings.store');
 
 
@@ -439,12 +467,12 @@ Route::middleware('role:customer')->post('/customer/order-ratings', [CustomerPro
     Route::get('/', [CustomerProfileController::class, 'edit'])
         ->name('edit');
 
-Route::middleware('role:customer')->get('/customer/my-purchase', function () {
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/customer/my-purchase', function () {
     return view('customer.profile.my_purchase');
 })->name('customer.my_purchase');
 
 // Settings (with optional tab)
-Route::middleware('role:customer')->get('/customer/profile/settings', function (\Illuminate\Http\Request $request) {
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/customer/profile/settings', function (\Illuminate\Http\Request $request) {
     $tab = $request->query('tab', 'account');
     return view('customer.profile.settings', compact('tab'));
 })->name('customerprofile.settings');
@@ -453,7 +481,7 @@ Route::middleware('role:customer')->get('/customer/profile/settings', function (
 // My Purchases
 
 
-Route::middleware('role:customer')->prefix('customer/profile')->name('customer.profile.')->group(function () {  // Protected group
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->prefix('customer/profile')->name('customer.profile.')->group(function () {  // Protected group
     // Profile routes
     Route::get('/', [CustomerProfileController::class, 'index'])->name('index'); 
     Route::get('/edit', [CustomerProfileController::class, 'edit'])->name('edit');  // Matches view
@@ -539,15 +567,16 @@ Route::get('/order/birthday', fn () => view('customer.templates.birthday'))->nam
 Route::get('/checkout', [OrderFlowController::class, 'checkout'])->name('customer.checkout');
 Route::post('/checkout/complete', [OrderFlowController::class, 'completeCheckout'])->name('checkout.complete');
 Route::post('/checkout/cancel', [OrderFlowController::class, 'cancelCheckout'])->name('checkout.cancel');
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/order/{order}/pay-remaining-balance', [OrderFlowController::class, 'payRemainingBalance'])->name('order.pay.remaining.balance');
 
-Route::middleware('role:customer')->group(function () {
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->group(function () {
     Route::post('/payments/gcash', [PaymentController::class, 'createGCashPayment'])->name('payment.gcash.create');
     Route::get('/payments/gcash/return', [PaymentController::class, 'handleGCashReturn'])->name('payment.gcash.return');
 });
 Route::post('/payments/gcash/webhook', [PaymentController::class, 'webhook'])->name('payment.gcash.webhook');
 
 /**Customer Upload Route*/
-Route::middleware('role:customer')->post('/customer/upload/design', [CustomerAuthController::class, 'uploadDesign'])->name('customer.upload.design');
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->post('/customer/upload/design', [CustomerAuthController::class, 'uploadDesign'])->name('customer.upload.design');
 
 /*
 |--------------------------------------------------------------------------|
@@ -727,7 +756,7 @@ if (interface_exists('Laravel\\Socialite\\Contracts\\Factory')) {
 
 
 
-Route::middleware('role:customer')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.show');
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.show');
 
 
 Route::get('/unauthorized', function () {
