@@ -39,6 +39,7 @@ use App\Http\Controllers\Customer\OrderFlowController;
 use App\Http\Controllers\Customer\CustomerController;
 
 use App\Http\Controllers\Owner\OwnerProductsController;
+use App\Http\Controllers\Owner\OwnerOrderWorkflowController;
 use App\Http\Controllers\Staff\StaffCustomerController;
 use App\Http\Controllers\Staff\StaffOrderController;
 use App\Http\Controllers\Staff\StaffMaterialController;
@@ -581,10 +582,12 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
 
 
     // Other pagesgut
-    Route::get('/order/workflow', fn () => view('owner.order-workflow'))->name('order.workflow');
+    Route::get('/order/workflow', [OwnerOrderWorkflowController::class, 'index'])->name('order.workflow');
+    Route::get('/order/workflow/data', [OwnerOrderWorkflowController::class, 'data'])->name('order.workflow.data');
     Route::get('/inventory', [OwnerInventoryController::class, 'index'])->name('inventory.index');
     Route::get('/inventory/track', [OwnerInventoryController::class, 'track'])->name('inventory-track');
     Route::get('/products', [OwnerProductsController::class, 'index'])->name('products.index');
+    Route::get('/products/{product}', [OwnerProductsController::class, 'show'])->name('products.show');
     Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
     Route::get('/reports', fn () => view('owner.owner-reports'))->name('reports');
 
