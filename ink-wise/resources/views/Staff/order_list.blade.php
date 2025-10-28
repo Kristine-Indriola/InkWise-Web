@@ -128,7 +128,7 @@
     outline-offset: -2px;
   }
 
-  /* Status and Payment highlights */
+  
   .status-badge {
     display: inline-block;
     padding: 4px 8px;

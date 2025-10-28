@@ -8,7 +8,7 @@
 
 <style>
   .dashboard-alert {
-    background: rgba(16, 185, 129, 0.1); /* Transparent green background */
+    background: rgba(16, 185, 129, 0.1); 
     color: #065f46;
     padding: 12px 16px;
     border-radius: 8px;
