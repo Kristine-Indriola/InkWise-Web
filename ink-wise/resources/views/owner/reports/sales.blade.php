@@ -26,10 +26,10 @@
             'meta' => 'Per order',
         ],
         [
-            'label' => 'Revenue Growth',
-            'chip' => ['text' => 'Trend', 'accent' => true],
-            'value' => '+12.4%',
-            'meta' => 'vs last period',
+            'label' => 'Profit',
+            'chip' => ['text' => 'Profit', 'accent' => true],
+            'value' => '₱12,400',
+            'meta' => 'Net profit this period',
         ],
     ],
     'charts' => [
