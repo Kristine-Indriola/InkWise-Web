@@ -12,8 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('templates', function (Blueprint $table) {
-            $table->string('svg_path')->nullable()->after('preview');
-            $table->timestamp('processed_at')->nullable()->after('svg_path');
+            //
         });
     }
 
@@ -23,7 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('templates', function (Blueprint $table) {
-            $table->dropColumn(['svg_path', 'processed_at']);
+            //
         });
     }
 };

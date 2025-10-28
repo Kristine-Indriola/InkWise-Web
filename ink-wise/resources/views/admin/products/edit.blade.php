@@ -1,7 +1,7 @@
 {{-- filepath: c:\xampp\htdocs\InkWise-Web\ink-wise\resources\views\admin\products\edit.blade.php --}}
 @extends('layouts.admin')
 
-@section('title', 'Edit ' . ($product->product_type ?? 'Product'))
+@section('title', 'Edit ' . ($product->product_type ?? 'Product') . ': ' . $product->name)
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('css/admin-css/create_invite.css') }}">
@@ -91,7 +91,7 @@
 @endphp
 
 <main class="product-edit-container" role="main">
-    <h1>Edit Product</h1>
+    <h1>Edit Product: {{ $product->name }}</h1>
 
     @if(session('error'))<div class="alert alert-error">{{ session('error') }}</div>@endif
     @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
@@ -101,13 +101,16 @@
         @if(isset($product) && $product->id)
             <input type="hidden" name="product_id" value="{{ $product->id }}">
         @endif
+        @if($product && $product->template_id)
+            <input type="hidden" name="template_id" value="{{ $product->template_id }}">
+        @endif
 
         {{-- Basic Product Information --}}
         <div class="form-section">
-            <h2>Basic Information</h2>
+            <h2 id="basicInfoHeader">{{ $defaults['product_type'] }} Information</h2>
             <div class="form-grid grid-2-cols">
                 <div class="field">
-                    <label for="invitationName">Product Name *</label>
+                    <label for="invitationName" id="productNameLabel">{{ $defaults['product_type'] }} Name *</label>
                     <input type="text" id="invitationName" name="invitationName" required value="{{ $defaults['name'] }}">
                 </div>
 
@@ -154,23 +157,11 @@
                     <label for="description">Description</label>
                     <textarea id="description" name="description" rows="4">{{ $defaults['description'] }}</textarea>
                 </div>
-
-                <div class="field">
-                    <label for="image">Product Image</label>
-                    <input type="file" id="image" name="image" accept="image/*">
-                    <div class="image-preview" aria-live="polite">
-                        @if(!empty($product->image))
-                            <img src="{{ \App\Support\ImageResolver::url($product->image) }}" alt="Current image">
-                        @endif
-                    </div>
-                    @if(!empty($product->image))
-                        <div class="existing-file">Current: <a href="{{ \App\Support\ImageResolver::url($product->image) }}" target="_blank">View</a></div>
-                    @endif
-                </div>
             </div>
         </div>
 
         {{-- Paper Stocks Section --}}
+        @if($defaults['product_type'] !== 'Envelope' && $defaults['product_type'] !== 'Giveaway')
         <div class="form-section">
             <h2>Paper Stocks</h2>
             <div id="paper-stocks-container">
@@ -215,8 +206,10 @@
             </div>
             <button type="button" id="add-paper-stock" class="btn-add">Add Paper Stock</button>
         </div>
+        @endif
 
         {{-- Addons Section --}}
+        @if($defaults['product_type'] !== 'Envelope' && $defaults['product_type'] !== 'Giveaway')
         <div class="form-section">
             <h2>Addons</h2>
             <div id="addons-container">
@@ -259,6 +252,7 @@
             </div>
             <button type="button" id="add-addon" class="btn-add">Add Addon</button>
         </div>
+        @endif
 
         {{-- Colors Section --}}
         <div class="form-section">
@@ -320,66 +314,51 @@
             <button type="button" id="add-bulk-order" class="btn-add">Add Bulk Order</button>
         </div>
 
-        {{-- Envelope Section (only show for Envelope product type) --}}
-        <div class="form-section envelope-section" id="envelope-section" style="display: {{ $defaults['product_type'] == 'Envelope' ? 'block' : 'none' }}">
-            <h2>Envelope Details</h2>
-            <div class="form-grid grid-3-cols">
-                <div class="field">
-                    <label for="envelopeMaterial">Envelope Material *</label>
-                    <select id="envelopeMaterial" name="envelope_material_id">
-                        <option value="">Select material</option>
-                        @foreach($materials as $material)
-                            <option value="{{ $material->id }}" {{ ($envelopeDefaults['envelope_material_id'] ?? '') == $material->id ? 'selected' : '' }}>
-                                {{ $material->name }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="field">
-                    <label for="maxQty">Max Quantity *</label>
-                    <input type="number" id="maxQty" name="max_quantity" value="{{ $envelopeDefaults['max_quantity'] }}">
-                </div>
-                <div class="field">
-                    <label for="pricePerUnit">Price per Unit *</label>
-                    <input type="number" step="0.01" id="pricePerUnit" name="price_per_unit" value="{{ $envelopeDefaults['price_per_unit'] }}">
-                </div>
-            </div>
-        </div>
-
-        {{-- Uploads: additional files stored in product_uploads table --}}
+        {{-- Product Template Section --}}
         <div class="form-section">
-            <h2>Additional Files</h2>
-            <div class="field full-width">
-                <label for="productUploadFile">Upload Additional File (jpg, png, gif, pdf)</label>
-                <input type="file" id="productUploadFile" name="productUploadFile" accept="image/*,.pdf">
-                <div class="upload-actions">
-                    @if(isset($product) && $product->id)
-                        <button type="button" id="uploadBtn" class="btn-save">Upload</button>
-                        <span id="uploadStatus"></span>
-                    @else
-                        <button type="button" id="uploadBtn" class="btn-save" disabled>Upload (save product first)</button>
-                    @endif
+            <h2>Product Template</h2>
+            @if($product && $product->template)
+                <div class="template-preview">
+                    <h3>Selected Template: {{ $product->template->name }}</h3>
+                    <div class="template-svg-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 16px;">
+                        @if($product->template->front_image)
+                            <div class="template-svg-item">
+                                <h4>Front Design</h4>
+                                <div class="svg-container" style="width: 100%; height: 200px; border: 1px solid #eee; background: #fff; padding: 8px; border-radius: 4px;">
+                                    @php
+                                        $frontSvgPath = $product->template->front_image;
+                                        if (!preg_match('/^(https?:)?\/\//i', $frontSvgPath) && !str_starts_with($frontSvgPath, '/')) {
+                                            $frontSvgPath = \Illuminate\Support\Facades\Storage::url($frontSvgPath);
+                                        }
+                                    @endphp
+                                    <img src="{{ $frontSvgPath }}" alt="Front template" style="width: 100%; height: 100%; object-fit: contain;">
+                                </div>
+                            </div>
+                        @endif
+                        @if($product->template->back_image)
+                            <div class="template-svg-item">
+                                <h4>Back Design</h4>
+                                <div class="svg-container" style="width: 100%; height: 200px; border: 1px solid #eee; background: #fff; padding: 8px; border-radius: 4px;">
+                                    @php
+                                        $backSvgPath = $product->template->back_image;
+                                        if (!preg_match('/^(https?:)?\/\//i', $backSvgPath) && !str_starts_with($backSvgPath, '/')) {
+                                            $backSvgPath = \Illuminate\Support\Facades\Storage::url($backSvgPath);
+                                        }
+                                    @endphp
+                                    <img src="{{ $backSvgPath }}" alt="Back template" style="width: 100%; height: 100%; object-fit: contain;">
+                                </div>
+                            </div>
+                        @endif
+                    </div>
                 </div>
-
-                <div id="uploads-list">
-                    @if(isset($product) && $product->uploads && $product->uploads->count())
-                        <div><strong>Existing uploads:</strong></div>
-                        <ul>
-                            @foreach($product->uploads as $up)
-                                <li>
-                                    <a href="{{ asset('storage/uploads/products/' . $product->id . '/' . $up->filename) }}" target="_blank">{{ $up->original_name ?? $up->filename }}</a>
-                                    <small class="text-muted">({{ number_format($up->size/1024,2) }} KB)</small>
-                                </li>
-                            @endforeach
-                        </ul>
-                    @endif
-                </div>
-            </div>
+            @else
+                <p class="muted">No template selected for this product.</p>
+            @endif
         </div>
 
         <div class="form-section">
             <div class="field actions">
-                <button type="submit" class="btn-save">Save Product</button>
+                <button type="submit" class="btn-save">Update Product</button>
                 <a href="{{ route('admin.products.index') }}" class="btn-cancel">Cancel</a>
             </div>
         </div>

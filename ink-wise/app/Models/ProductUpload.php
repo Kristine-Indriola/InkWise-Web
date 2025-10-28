@@ -7,6 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 class ProductUpload extends Model
 {
     protected $fillable = [
+        'product_id',
+        'filename',
+        'original_name',
+        'mime_type',
+        'size',
         'template_id',
         'template_name',
         'description',
@@ -26,5 +31,10 @@ class ProductUpload extends Model
     public function template()
     {
         return $this->belongsTo(Template::class);
+    }
+
+    public function product()
+    {
+        return $this->belongsTo(Product::class);
     }
 }
