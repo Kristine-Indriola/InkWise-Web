@@ -105,7 +105,7 @@
             </div>
         </header>
         <div class="staff-quick-links">
-            <a href="{{ route('staff.assigned.orders') }}" class="staff-quick-link" data-link-card>
+            <a href="{{ route('staff.order_list.index') }}" class="staff-quick-link" data-link-card>
                 <span class="staff-quick-link__icon" aria-hidden="true"><i class="fi fi-rr-tasks-alt"></i></span>
                 <div class="staff-quick-link__copy">
                     <h3>Assigned Orders</h3>

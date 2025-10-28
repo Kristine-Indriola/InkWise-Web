@@ -44,6 +44,11 @@
                 <label for="remember" class="ml-2 text-sm text-gray-600">Remember me</label>
             </div>
 
+            <!-- Forgot Password -->
+            <div class="text-right">
+                <a href="{{ route('customer.password.request') }}" class="text-sm text-indigo-600 hover:underline">Forgot Password?</a>
+            </div>
+
             <!-- Submit -->
             <button type="submit"
                     class="w-full bg-gradient-to-r from-indigo-600 to-blue-500 hover:from-indigo-700 hover:to-blue-600 text-white font-medium py-2 px-4 rounded-lg shadow-md transition">
