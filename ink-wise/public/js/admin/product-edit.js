@@ -1,36 +1,22 @@
 document.addEventListener('DOMContentLoaded', function(){
-    // Product type change handler for envelope section
+    // Product type change handler for dynamic labels
     const productTypeSelect = document.getElementById('productType');
-    const envelopeSection = document.getElementById('envelope-section');
 
-    if(productTypeSelect && envelopeSection){
+    if(productTypeSelect){
         productTypeSelect.addEventListener('change', function(){
-            if(this.value === 'Envelope'){
-                envelopeSection.style.display = 'block';
-            } else {
-                envelopeSection.style.display = 'none';
+            const selectedType = this.value;
+            const productNameLabel = document.getElementById('productNameLabel');
+            const basicInfoHeader = document.getElementById('basicInfoHeader');
+
+            // Update product name label based on selected type
+            if(productNameLabel){
+                productNameLabel.textContent = selectedType + ' Name *';
             }
-        });
-    }
 
-    // Image preview for main product image
-    const imageInput = document.getElementById('image');
-    const previewContainer = document.querySelector('.image-preview');
-
-    if(imageInput){
-        imageInput.addEventListener('change', function(e){
-            const file = e.target.files && e.target.files[0];
-            if(!file) return;
-            const reader = new FileReader();
-            reader.onload = function(ev){
-                if(!previewContainer) return;
-                previewContainer.innerHTML = '';
-                const img = document.createElement('img');
-                img.src = ev.target.result;
-                img.alt = 'Preview';
-                previewContainer.appendChild(img);
-            };
-            reader.readAsDataURL(file);
+            // Update basic information header based on selected type
+            if(basicInfoHeader){
+                basicInfoHeader.textContent = selectedType + ' Information';
+            }
         });
     }
 
@@ -216,20 +202,6 @@ document.addEventListener('DOMContentLoaded', function(){
                 alert('Please fill required fields: Product Name, Event Type, Product Type and Theme/Style');
                 name.focus();
                 return;
-            }
-
-            // Additional validation for envelope fields if product type is Envelope
-            if(productType.value === 'Envelope'){
-                const envelopeMaterial = document.getElementById('envelopeMaterial');
-                const maxQty = document.getElementById('maxQty');
-                const pricePerUnit = document.getElementById('pricePerUnit');
-
-                if(!envelopeMaterial.value || !maxQty.value || !pricePerUnit.value){
-                    e.preventDefault();
-                    alert('Please fill all envelope fields: Material, Max Quantity, and Price per Unit');
-                    envelopeMaterial.focus();
-                    return;
-                }
             }
         });
     }

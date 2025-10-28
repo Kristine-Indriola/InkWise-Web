@@ -109,6 +109,7 @@
   array (
     'paths' => 
     array (
+
       0 => 'C:\\xampp\\htdocs\\InkWise-Web\\ink-wise\\resources\\views',
     ),
     'compiled' => 'C:\\xampp\\htdocs\\InkWise-Web\\ink-wise\\storage\\framework\\views',
@@ -119,6 +120,18 @@
     'env' => 'local',
     'debug' => true,
     'url' => 'http://localhost',
+
+      0 => 'C:\\xampp\\htdocs\\ink-wise\\InkWise-Web\\ink-wise\\resources\\views',
+    ),
+    'compiled' => 'C:\\xampp\\htdocs\\ink-wise\\InkWise-Web\\ink-wise\\storage\\framework\\views',
+  ),
+  'app' => 
+  array (
+    'name' => 'inkwise',
+    'env' => 'local',
+    'debug' => true,
+    'url' => 'http://127.0.0.1:8000',
+
     'frontend_url' => 'http://localhost:3000',
     'asset_url' => NULL,
     'timezone' => 'Asia/Manila',
@@ -126,7 +139,11 @@
     'fallback_locale' => 'en',
     'faker_locale' => 'en_US',
     'cipher' => 'AES-256-CBC',
+
     'key' => 'base64:cgVR2w1q86gsdu51M7BqitV8QDZKyQG8ADgLDutm0w8=',
+
+    'key' => 'base64:6rEkUgIBWu9YwFMZ3XBygEOzTTpnREoIim9CYbpj8hA=',
+
     'previous_keys' => 
     array (
     ),
@@ -303,7 +320,11 @@
   ),
   'cache' => 
   array (
+
     'default' => 'file',
+
+    'default' => 'database',
+
     'stores' => 
     array (
       'array' => 
@@ -322,8 +343,13 @@
       'file' => 
       array (
         'driver' => 'file',
+
         'path' => 'C:\\xampp\\htdocs\\InkWise-Web\\ink-wise\\storage\\framework/cache/data',
         'lock_path' => 'C:\\xampp\\htdocs\\InkWise-Web\\ink-wise\\storage\\framework/cache/data',
+
+        'path' => 'C:\\xampp\\htdocs\\ink-wise\\InkWise-Web\\ink-wise\\storage\\framework/cache/data',
+        'lock_path' => 'C:\\xampp\\htdocs\\ink-wise\\InkWise-Web\\ink-wise\\storage\\framework/cache/data',
+
       ),
       'memcached' => 
       array (
@@ -367,7 +393,11 @@
         'driver' => 'octane',
       ),
     ),
+
     'prefix' => 'laravel-cache-',
+
+    'prefix' => 'inkwise-cache-',
+
   ),
   'database' => 
   array (
@@ -378,7 +408,11 @@
       array (
         'driver' => 'sqlite',
         'url' => NULL,
+
         'database' => 'laravels',
+
+        'database' => 'laravel',
+
         'prefix' => '',
         'foreign_key_constraints' => true,
         'busy_timeout' => NULL,
@@ -389,9 +423,15 @@
       array (
         'driver' => 'mysql',
         'url' => NULL,
+
         'host' => '127.0.0.1',
         'port' => '3306',
         'database' => 'laravels',
+
+        'host' => 'localhost',
+        'port' => '3306',
+        'database' => 'laravel',
+
         'username' => 'root',
         'password' => '',
         'unix_socket' => '',
@@ -409,9 +449,15 @@
       array (
         'driver' => 'mariadb',
         'url' => NULL,
+
         'host' => '127.0.0.1',
         'port' => '3306',
         'database' => 'laravels',
+
+        'host' => 'localhost',
+        'port' => '3306',
+        'database' => 'laravel',
+
         'username' => 'root',
         'password' => '',
         'unix_socket' => '',
@@ -429,9 +475,15 @@
       array (
         'driver' => 'pgsql',
         'url' => NULL,
+
         'host' => '127.0.0.1',
         'port' => '3306',
         'database' => 'laravels',
+
+        'host' => 'localhost',
+        'port' => '3306',
+        'database' => 'laravel',
+
         'username' => 'root',
         'password' => '',
         'charset' => 'utf8',
@@ -444,9 +496,15 @@
       array (
         'driver' => 'sqlsrv',
         'url' => NULL,
+
         'host' => '127.0.0.1',
         'port' => '3306',
         'database' => 'laravels',
+
+        'host' => 'localhost',
+        'port' => '3306',
+        'database' => 'laravel',
+
         'username' => 'root',
         'password' => '',
         'charset' => 'utf8',
@@ -465,7 +523,11 @@
       'options' => 
       array (
         'cluster' => 'redis',
+
         'prefix' => 'laravel-database-',
+
+        'prefix' => 'inkwise-database-',
+
         'persistent' => false,
       ),
       'default' => 
@@ -496,7 +558,11 @@
       'local' => 
       array (
         'driver' => 'local',
+
         'root' => 'C:\\xampp\\htdocs\\InkWise-Web\\ink-wise\\storage\\app/private',
+
+        'root' => 'C:\\xampp\\htdocs\\ink-wise\\InkWise-Web\\ink-wise\\storage\\app/private',
+
         'serve' => true,
         'throw' => false,
         'report' => false,
@@ -504,8 +570,13 @@
       'public' => 
       array (
         'driver' => 'local',
+
         'root' => 'C:\\xampp\\htdocs\\InkWise-Web\\ink-wise\\storage\\app/public',
         'url' => 'http://localhost/storage',
+
+        'root' => 'C:\\xampp\\htdocs\\ink-wise\\InkWise-Web\\ink-wise\\storage\\app/public',
+        'url' => 'http://127.0.0.1:8000/storage',
+
         'visibility' => 'public',
         'throw' => false,
         'report' => false,
@@ -526,8 +597,13 @@
       'invitation_templates' => 
       array (
         'driver' => 'local',
+
         'root' => 'C:\\xampp\\htdocs\\InkWise-Web\\ink-wise\\storage\\app/public/invitation_templates',
         'url' => 'http://localhost/storage/invitation_templates',
+
+        'root' => 'C:\\xampp\\htdocs\\ink-wise\\InkWise-Web\\ink-wise\\storage\\app/public/invitation_templates',
+        'url' => 'http://127.0.0.1:8000/storage/invitation_templates',
+
         'visibility' => 'public',
         'throw' => false,
         'report' => false,
@@ -535,7 +611,11 @@
     ),
     'links' => 
     array (
+
       'C:\\xampp\\htdocs\\InkWise-Web\\ink-wise\\public\\storage' => 'C:\\xampp\\htdocs\\InkWise-Web\\ink-wise\\storage\\app/public',
+
+      'C:\\xampp\\htdocs\\ink-wise\\InkWise-Web\\ink-wise\\public\\storage' => 'C:\\xampp\\htdocs\\ink-wise\\InkWise-Web\\ink-wise\\storage\\app/public',
+
     ),
   ),
   'invitation_templates' => 1,
@@ -561,14 +641,22 @@
       'single' => 
       array (
         'driver' => 'single',
+
         'path' => 'C:\\xampp\\htdocs\\InkWise-Web\\ink-wise\\storage\\logs/laravel.log',
+
+        'path' => 'C:\\xampp\\htdocs\\ink-wise\\InkWise-Web\\ink-wise\\storage\\logs/laravel.log',
+
         'level' => 'debug',
         'replace_placeholders' => true,
       ),
       'daily' => 
       array (
         'driver' => 'daily',
+
         'path' => 'C:\\xampp\\htdocs\\InkWise-Web\\ink-wise\\storage\\logs/laravel.log',
+
+        'path' => 'C:\\xampp\\htdocs\\ink-wise\\InkWise-Web\\ink-wise\\storage\\logs/laravel.log',
+
         'level' => 'debug',
         'days' => 14,
         'replace_placeholders' => true,
@@ -633,7 +721,11 @@
       ),
       'emergency' => 
       array (
+
         'path' => 'C:\\xampp\\htdocs\\InkWise-Web\\ink-wise\\storage\\logs/laravel.log',
+
+        'path' => 'C:\\xampp\\htdocs\\ink-wise\\InkWise-Web\\ink-wise\\storage\\logs/laravel.log',
+
       ),
     ),
   ),
@@ -653,7 +745,11 @@
         'username' => 'InkwiseSystem@gmail.com',
         'password' => 'gremmvfadjavvdzo',
         'timeout' => NULL,
+
         'local_domain' => 'localhost',
+
+        'local_domain' => '127.0.0.1',
+
       ),
       'ses' => 
       array (
@@ -712,13 +808,21 @@
       'theme' => 'default',
       'paths' => 
       array (
+
         0 => 'C:\\xampp\\htdocs\\InkWise-Web\\ink-wise\\resources\\views/vendor/mail',
+
+        0 => 'C:\\xampp\\htdocs\\ink-wise\\InkWise-Web\\ink-wise\\resources\\views/vendor/mail',
+
       ),
     ),
   ),
   'queue' => 
   array (
+
     'default' => 'sync',
+
+    'default' => 'database',
+
     'connections' => 
     array (
       'sync' => 
@@ -818,7 +922,11 @@
     'lifetime' => 120,
     'expire_on_close' => false,
     'encrypt' => false,
+
     'files' => 'C:\\xampp\\htdocs\\InkWise-Web\\ink-wise\\storage\\framework/sessions',
+
+    'files' => 'C:\\xampp\\htdocs\\ink-wise\\InkWise-Web\\ink-wise\\storage\\framework/sessions',
+
     'connection' => NULL,
     'table' => 'sessions',
     'store' => NULL,
@@ -827,10 +935,17 @@
       0 => 2,
       1 => 100,
     ),
+
     'cookie' => 'laravel_session',
     'path' => '/',
     'domain' => NULL,
     'secure' => NULL,
+
+    'cookie' => 'inkwise_session',
+    'path' => '/',
+    'domain' => '',
+    'secure' => false,
+
     'http_only' => true,
     'same_site' => 'lax',
     'partitioned' => false,

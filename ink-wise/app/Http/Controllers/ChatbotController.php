@@ -25,7 +25,7 @@ class ChatbotController extends Controller
                 return [
                     'id' => $qa->id,
                     'question' => $qa->question,
-                    'answer' => $qa->answer,
+                    'answer' => $qa->answer, 
                     'answer_image_url' => $qa->answer_image_path ? asset('storage/' . ltrim($qa->answer_image_path, '/')) : null,
                 ];
             });

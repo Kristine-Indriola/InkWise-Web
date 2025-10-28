@@ -83,16 +83,16 @@
                                         $backImg = $template->back_image ?? null;
                                     @endphp
                                     @if($frontImg)
-                                        <img src="@imageUrl($frontImg)" alt="{{ $template->template_name }}" class="template-img">
+                                        <img src="@imageUrl($frontImg)" alt="{{ $template->name }}" class="template-img">
                                     @else
                                         <span>No preview</span>
                                     @endif
                                     @if($backImg)
-                                        <img src="@imageUrl($backImg)" alt="Back of {{ $template->template_name }}" class="back-thumb">
+                                        <img src="@imageUrl($backImg)" alt="Back of {{ $template->name }}" class="back-thumb">
                                     @endif
                                 </div>
                                 <div class="card-overlay">
-                                    <h3>{{ $template->template_name }}</h3>
+                                    <h3>{{ $template->name }}</h3>
                                     <p>{{ $template->description }}</p>
                                     <div class="card-meta">
                                         <span class="meta-pill">{{ $template->event_type ?? '—' }}</span>
@@ -101,7 +101,7 @@
                                     <div class="card-actions">
                                         <button type="button" class="btn continue-btn"
                                             data-template-id="{{ $template->id }}"
-                                            data-template-name="{{ $template->template_name }}"
+                                            data-template-name="{{ $template->name }}"
                                             data-template-description="{{ $template->description }}"
                                             data-template-event_type="{{ $template->event_type }}"
                                             data-template-product_type="{{ $template->product_type }}"
@@ -109,7 +109,7 @@
                                             data-template-preview="{{ $template->preview_image }}"
                                             data-front-url="{{ $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : '' }}"
                                         >Use template</button>
-                                        <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->template_name }}">Delete</button>
+                                        <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->name }}">Delete</button>
                                         @if(!empty($template->front_image))
                                             <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
                                         @endif
@@ -147,16 +147,16 @@
                                         $backImg = $template->back_image ?? null;
                                     @endphp
                                     @if($frontImg)
-                                        <img src="@imageUrl($frontImg)" alt="{{ $template->template_name }}" class="template-img">
+                                        <img src="@imageUrl($frontImg)" alt="{{ $template->name }}" class="template-img">
                                     @else
                                         <span>No preview</span>
                                     @endif
                                     @if($backImg)
-                                        <img src="@imageUrl($backImg)" alt="Back of {{ $template->template_name }}" class="back-thumb">
+                                        <img src="@imageUrl($backImg)" alt="Back of {{ $template->name }}" class="back-thumb">
                                     @endif
                                 </div>
                                 <div class="card-overlay">
-                                    <h3>{{ $template->template_name }}</h3>
+                                    <h3>{{ $template->name }}</h3>
                                     <p>{{ $template->description }}</p>
                                     <div class="card-meta">
                                         <span class="meta-pill">{{ $template->event_type ?? '—' }}</span>
@@ -165,7 +165,7 @@
                                     <div class="card-actions">
                                         <button type="button" class="btn continue-btn"
                                             data-template-id="{{ $template->id }}"
-                                            data-template-name="{{ $template->template_name }}"
+                                            data-template-name="{{ $template->name }}"
                                             data-template-description="{{ $template->description }}"
                                             data-template-event_type="{{ $template->event_type }}"
                                             data-template-product_type="{{ $template->product_type }}"
@@ -173,7 +173,7 @@
                                             data-template-preview="{{ $template->preview_image }}"
                                             data-front-url="{{ $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : '' }}"
                                         >Use template</button>
-                                        <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->template_name }}">Delete</button>
+                                        <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->name }}">Delete</button>
                                         @if(!empty($template->front_image))
                                             <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
                                         @endif
@@ -210,16 +210,16 @@
                                         $backImg = $template->back_image ?? null;
                                     @endphp
                                     @if($frontImg)
-                                        <img src="@imageUrl($frontImg)" alt="{{ $template->template_name }}" class="template-img">
+                                        <img src="@imageUrl($frontImg)" alt="{{ $template->name }}" class="template-img">
                                     @else
                                         <span>No preview</span>
                                     @endif
                                     @if($backImg)
-                                        <img src="@imageUrl($backImg)" alt="Back of {{ $template->template_name }}" class="back-thumb">
+                                        <img src="@imageUrl($backImg)" alt="Back of {{ $template->name }}" class="back-thumb">
                                     @endif
                                 </div>
                                 <div class="card-overlay">
-                                    <h3>{{ $template->template_name }}</h3>
+                                    <h3>{{ $template->name }}</h3>
                                     <p>{{ $template->description }}</p>
                                     <div class="card-meta">
                                         <span class="meta-pill">{{ $template->event_type ?? '—' }}</span>
@@ -228,7 +228,7 @@
                                     <div class="card-actions">
                                         <button type="button" class="btn continue-btn"
                                             data-template-id="{{ $template->id }}"
-                                            data-template-name="{{ $template->template_name }}"
+                                            data-template-name="{{ $template->name }}"
                                             data-template-description="{{ $template->description }}"
                                             data-template-event_type="{{ $template->event_type }}"
                                             data-template-product_type="{{ $template->product_type }}"
@@ -236,7 +236,7 @@
                                             data-template-preview="{{ $template->preview_image }}"
                                             data-front-url="{{ $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : '' }}"
                                         >Use template</button>
-                                        <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->template_name }}">Delete</button>
+                                        <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->name }}">Delete</button>
                                         @if(!empty($template->front_image))
                                             <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
                                         @endif
@@ -273,16 +273,16 @@
                                         $backImg = $template->back_image ?? null;
                                     @endphp
                                     @if($frontImg)
-                                        <img src="@imageUrl($frontImg)" alt="{{ $template->template_name }}" class="template-img">
+                                        <img src="@imageUrl($frontImg)" alt="{{ $template->name }}" class="template-img">
                                     @else
                                         <span>No preview</span>
                                     @endif
                                     @if($backImg)
-                                        <img src="@imageUrl($backImg)" alt="Back of {{ $template->template_name }}" class="back-thumb">
+                                        <img src="@imageUrl($backImg)" alt="Back of {{ $template->name }}" class="back-thumb">
                                     @endif
                                 </div>
                                 <div class="card-overlay">
-                                    <h3>{{ $template->template_name }}</h3>
+                                    <h3>{{ $template->name }}</h3>
                                     <p>{{ $template->description }}</p>
                                     <div class="card-meta">
                                         <span class="meta-pill">{{ $template->product_type ?? '—' }}</span>
@@ -291,7 +291,7 @@
                                     <div class="card-actions">
                                         <button type="button" class="btn continue-btn"
                                             data-template-id="{{ $template->id }}"
-                                            data-template-name="{{ $template->template_name }}"
+                                            data-template-name="{{ $template->name }}"
                                             data-template-description="{{ $template->description }}"
                                             data-template-event_type="{{ $template->event_type }}"
                                             data-template-product_type="{{ $template->product_type }}"
@@ -299,7 +299,7 @@
                                             data-template-preview="{{ $template->preview_image }}"
                                             data-front-url="{{ $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : '' }}"
                                         >Use template</button>
-                                        <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->template_name }}">Delete</button>
+                                        <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->name }}">Delete</button>
                                         @if(!empty($template->front_image))
                                             <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
                                         @endif
@@ -445,8 +445,8 @@
     function populateFormWithTemplateData(data) {
         // Populate basic info fields
         const invitationNameField = document.getElementById('invitationName');
-        if (invitationNameField && data.template_name) {
-            invitationNameField.value = data.template_name;
+        if (invitationNameField && data.name) {
+            invitationNameField.value = data.name;
         }
 
         const eventTypeField = document.getElementById('eventType');

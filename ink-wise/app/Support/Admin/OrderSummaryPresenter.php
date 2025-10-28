@@ -26,6 +26,7 @@ class OrderSummaryPresenter
             'items.paperStockSelection',
             'items.addons',
             'items.colors',
+            'rating',
         ]);
 
         $customerOrder = $order->customerOrder;
@@ -56,6 +57,7 @@ class OrderSummaryPresenter
             'payment_method' => $order->payment_method,
             'currency' => Arr::get($summary, 'currency', 'PHP'),
             'customer' => [
+                'id' => $customer?->customer_id,
                 'name' => $customerName,
                 'email' => $customerEmail,
                 'phone' => $customerPhone,
@@ -67,6 +69,11 @@ class OrderSummaryPresenter
             'items' => static::transformItems($order->items, $summary),
             'timeline' => static::buildTimeline($order),
             'admin_actions' => Arr::get($summary, 'admin_actions', []),
+            'rating' => $order->rating ? [
+                'rating' => (int) $order->rating->rating,
+                'comment' => $order->rating->comment,
+                'submitted_at' => $order->rating->created_at,
+            ] : null,
         ];
     }
 

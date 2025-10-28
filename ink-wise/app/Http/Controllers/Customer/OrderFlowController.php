@@ -464,6 +464,7 @@ class OrderFlowController extends Controller
         $giveaways = Product::query()
             ->with(['template', 'uploads', 'images', 'bulkOrders'])
             ->where('product_type', 'Giveaway')
+            ->whereHas('uploads')
             ->orderByDesc('updated_at')
             ->get()
             ->map(function (Product $product) use ($fallbackImage) {
@@ -499,6 +500,7 @@ class OrderFlowController extends Controller
         $giveaways = \App\Models\Product::query()
             ->with(['template', 'uploads', 'images'])
             ->where('product_type', 'Giveaway')
+            ->whereHas('uploads')
             ->orderByDesc('updated_at')
             ->get()
             ->map(function ($product) {
@@ -987,6 +989,20 @@ class OrderFlowController extends Controller
         $order = $this->currentOrder();
         $orderJustCreated = false;
 
+        // Check if order is already in production or completed - redirect to appropriate page
+        if ($order) {
+            if ($order->status === 'in_production') {
+                return redirect()->route('customer.my_purchase.inproduction');
+            }
+            if ($order->status === 'completed') {
+                return redirect()->route('customer.my_purchase.completed');
+            }
+            if ($order->status === 'cancelled') {
+                return redirect()->route('customer.my_purchase.cancelled');
+            }
+            // For other statuses like 'pending', continue with checkout
+        }
+
         // If there is no persisted Order yet, but we have a session summary,
         // persist the Order now because Checkout is the place where we commit
         // the user's selections to the database.
@@ -1098,7 +1114,7 @@ class OrderFlowController extends Controller
         ];
 
         $order->update([
-            'status' => 'completed',
+            'status' => 'processing',
             'payment_status' => 'paid',
             'metadata' => $metadata,
         ]);
@@ -1160,7 +1176,8 @@ class OrderFlowController extends Controller
 
         $productsQuery = Product::query()
             ->with(['template', 'uploads', 'images', 'materials.material', 'bulkOrders'])
-            ->where('product_type', 'Giveaway');
+            ->where('product_type', 'Giveaway')
+            ->whereHas('uploads');
 
         if ($selectedEvent && $selectedEvent !== 'all') {
             $productsQuery->where(function ($query) use ($selectedEvent) {
@@ -1614,4 +1631,42 @@ class OrderFlowController extends Controller
             ->with('status', 'Start a new invitation to continue through the order flow.');
     }
 
+    public function payRemainingBalance(Request $request, Order $order): ViewContract
+    {
+        // Ensure the order belongs to the authenticated user
+        if ($order->customer_id !== Auth::user()->customer_id) {
+            abort(403, 'Unauthorized access to order.');
+        }
+
+        // Check if the order is in a state where remaining balance can be paid
+        if (!in_array($order->status, ['processing', 'confirmed'])) {
+            return redirect()->route('customer.checkout')->with('error', 'This order is not eligible for remaining balance payment.');
+        }
+
+        // Calculate payment amounts
+        $metadata = $order->metadata ?? [];
+        $payments = collect($metadata['payments'] ?? []);
+        $paidAmount = round($payments
+            ->filter(fn ($payment) => ($payment['status'] ?? null) === 'paid')
+            ->sum(fn ($payment) => (float) ($payment['amount'] ?? 0)), 2);
+
+        $totalAmount = round($order->total_amount ?? 0, 2);
+        $balanceDue = round(max($totalAmount - $paidAmount, 0), 2);
+
+        // If no balance is due, redirect back
+        if ($balanceDue <= 0) {
+            return redirect()->route('customer.checkout')->with('status', 'No remaining balance due for this order.');
+        }
+
+        $paymongoMeta = $metadata['paymongo'] ?? [];
+
+        return view('customer.orderflow.pay-remaining-balance', [
+            'order' => $order->loadMissing(['items.product', 'items.addons', 'customerOrder']),
+            'paidAmount' => $paidAmount,
+            'balanceDue' => $balanceDue,
+            'totalAmount' => $totalAmount,
+            'paymentRecords' => $payments->values()->all(),
+            'paymongoMeta' => $paymongoMeta,
+        ]);
+    }
 }

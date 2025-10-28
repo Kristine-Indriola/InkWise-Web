@@ -345,8 +345,10 @@
         }
     </style>
     <script src="{{ asset('js/customer/editing.js') }}" defer></script>
+    <!-- SVG Template Editor for auto-parser enhanced editing -->
+    <script src="{{ asset('js/svg-template-editor.js') }}" defer></script>
     <!-- Fabric.js for SVG -> editable canvas support -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.2.4/fabric.min.js" defer integrity="sha512-3u4c1v8mX2r9qYH0oHH4xg0r2v2Gv9G2tr6+/6sQxG4f8Y3kI1k0QzFJ6a3R6T4qV3t6aF7Q1w8G4k3aY0RZA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.2.4/fabric.min.js" defer integrity="sha512-HkRNCiaZYxQAkHpLFYI90ObSzL0vaIXL8Xe3bM51vhdYI79RDFMLTAsmVH1xVPREmTlUWexgrQMk+c3RBTsLGw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
 @php
@@ -720,7 +722,7 @@
                     @if(!empty($frontSvg))
                         {!! $frontSvg !!}
                     @else
-                        <svg viewBox="0 0 500 700" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-labelledby="frontTitle">
+                        <svg viewBox="0 0 500 700" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-labelledby="frontTitle" data-svg-editor>
                             <title id="frontTitle">Editable front invitation preview</title>
                             <defs>
                                 <linearGradient id="frontGradient" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -985,12 +987,21 @@
                             clearTimeout(lastTimer);
                             lastTimer = setTimeout(function(){
                                 var url = svgRepoEndpoint(q);
-                                fetch(url).then(function(r){ return r.json(); }).then(function(json){
+                                fetch(url).then(function(r){
+                                    if (r.status === 404) {
+                                        console.warn('SVGRepo endpoint not available (404)');
+                                        iconsGrid.innerHTML = '<div style="padding:8px; color:#666; font-size:12px;">Icon search unavailable</div>';
+                                        return;
+                                    }
+                                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                                    return r.json();
+                                }).then(function(json){
                                     if (!json || !json.results) { iconsGrid.innerHTML = ''; return; }
                                     // results contain objects with svg property
                                     renderSvgRepoResults(json.results);
                                 }).catch(function(err){
                                     console.error('SVGRepo search error', err);
+                                    iconsGrid.innerHTML = '<div style="padding:8px; color:#666; font-size:12px;">Icon search failed</div>';
                                 });
                             }, 250);
                         }
@@ -1500,53 +1511,68 @@
         });
 
         function initializeTextEditor() {
-            // Group toggle functionality
-            document.querySelectorAll('.group-toggle').forEach(button => {
-                button.addEventListener('click', function() {
-                    const group = this.closest('.text-fields-group');
-                    const content = group.querySelector('.group-content');
-                    const isActive = this.classList.toggle('active');
-
-                    content.classList.toggle('active', isActive);
-                    updateFieldCounts();
+            // Group toggle functionality - only if elements exist
+            const groupToggles = document.querySelectorAll('.group-toggle');
+            if (groupToggles.length > 0) {
+                groupToggles.forEach(button => {
+                    button.addEventListener('click', function() {
+                        const group = this.closest('.text-fields-group');
+                        const content = group ? group.querySelector('.group-content') : null;
+                        if (content) {
+                            const isActive = this.classList.toggle('active');
+                            content.classList.toggle('active', isActive);
+                            updateFieldCounts();
+                        }
+                    });
                 });
-            });
+            }
 
-            // Enhanced delete functionality
+            // Enhanced delete functionality - only if elements exist
             document.addEventListener('click', function(e) {
-                if (e.target.closest('.delete-text')) {
+                const deleteBtn = e.target.closest('.delete-text');
+                if (deleteBtn) {
                     e.preventDefault();
-                    const fieldElement = e.target.closest('.text-field');
-                    const placeholder = fieldElement.querySelector('.field-placeholder').textContent;
-
-                    if (confirm(`Are you sure you want to delete "${placeholder}"? This action cannot be undone.`)) {
-                        fieldElement.remove();
-                        updateFieldCounts();
-                        clearActiveField();
+                    const fieldElement = deleteBtn.closest('.text-field');
+                    const placeholder = fieldElement ? fieldElement.querySelector('.field-placeholder') : null;
+                    if (fieldElement && placeholder) {
+                        const placeholderText = placeholder.textContent;
+                        if (confirm(`Are you sure you want to delete "${placeholderText}"? This action cannot be undone.`)) {
+                            fieldElement.remove();
+                            updateFieldCounts();
+                            clearActiveField();
+                        }
                     }
                 }
             });
 
-            // Field selection and canvas connection
+            // Field selection and canvas connection - only if elements exist
             document.addEventListener('click', function(e) {
-                if (e.target.closest('.text-field')) {
-                    const fieldElement = e.target.closest('.text-field');
+                const fieldElement = e.target.closest('.text-field');
+                if (fieldElement) {
                     const textNode = fieldElement.dataset.textNode;
-                    const placeholder = fieldElement.querySelector('.field-placeholder').textContent;
+                    const placeholder = fieldElement.querySelector('.field-placeholder');
+                    if (placeholder) {
+                        const placeholderText = placeholder.textContent;
 
-                    // Remove active state from all fields
-                    document.querySelectorAll('.text-field').forEach(field => {
-                        field.classList.remove('is-active');
-                    });
+                        // Remove active state from all fields
+                        document.querySelectorAll('.text-field').forEach(field => {
+                            field.classList.remove('is-active');
+                        });
 
-                    // Add active state to clicked field
-                    fieldElement.classList.add('is-active');
+                        // Add active state to clicked field
+                        fieldElement.classList.add('is-active');
 
-                    // Update active field indicator
-                    showActiveField(placeholder);
+                        // Update active field indicator if it exists
+                        const indicator = document.getElementById('activeFieldIndicator');
+                        const nameElement = document.getElementById('activeFieldName');
+                        if (indicator && nameElement) {
+                            nameElement.textContent = placeholderText;
+                            indicator.style.display = 'flex';
+                        }
 
-                    // Highlight corresponding text on canvas
-                    highlightCanvasText(textNode);
+                        // Highlight corresponding text on canvas
+                        highlightCanvasText(textNode);
+                    }
                 }
             });
 
@@ -1556,40 +1582,60 @@
                 selectFieldByTextNode(textNode);
             });
 
-            // Sync with canvas button
-            document.getElementById('syncCanvas').addEventListener('click', function() {
-                syncWithCanvas();
-            });
+            // Sync with canvas button - only if it exists
+            const syncBtn = document.getElementById('syncCanvas');
+            if (syncBtn) {
+                syncBtn.addEventListener('click', function() {
+                    syncWithCanvas();
+                });
+            }
 
             // Initialize
             updateFieldCounts();
         }
 
         function updateFieldCounts() {
-            // Update front side count
-            const frontCount = document.querySelectorAll('#frontFields .text-field').length;
-            document.getElementById('front-count').textContent = frontCount;
+            // Update front side count - only if elements exist
+            const frontFields = document.getElementById('frontFields');
+            const frontCountEl = document.getElementById('front-count');
+            if (frontFields && frontCountEl) {
+                const frontCount = frontFields.querySelectorAll('.text-field').length;
+                frontCountEl.textContent = frontCount;
+            }
 
-            // Update back side count
-            const backCount = document.querySelectorAll('#backFields .text-field').length;
-            document.getElementById('back-count').textContent = backCount;
+            // Update back side count - only if elements exist
+            const backFields = document.getElementById('backFields');
+            const backCountEl = document.getElementById('back-count');
+            if (backFields && backCountEl) {
+                const backCount = backFields.querySelectorAll('.text-field').length;
+                backCountEl.textContent = backCount;
+            }
 
-            // Update total count
-            const totalCount = frontCount + backCount;
-            document.getElementById('total-fields').textContent = totalCount;
+            // Update total count - only if element exists
+            const totalFieldsEl = document.getElementById('total-fields');
+            if (totalFieldsEl) {
+                const frontCount = frontFields ? frontFields.querySelectorAll('.text-field').length : 0;
+                const backCount = backFields ? backFields.querySelectorAll('.text-field').length : 0;
+                const totalCount = frontCount + backCount;
+                totalFieldsEl.textContent = totalCount;
+            }
         }
 
         function showActiveField(fieldName) {
             const indicator = document.getElementById('activeFieldIndicator');
             const nameElement = document.getElementById('activeFieldName');
 
-            nameElement.textContent = fieldName;
-            indicator.style.display = 'flex';
+            if (indicator && nameElement) {
+                nameElement.textContent = fieldName;
+                indicator.style.display = 'flex';
+            }
         }
 
         function clearActiveField() {
             const indicator = document.getElementById('activeFieldIndicator');
-            indicator.style.display = 'none';
+            if (indicator) {
+                indicator.style.display = 'none';
+            }
 
             // Remove active state from all fields
             document.querySelectorAll('.text-field').forEach(field => {
@@ -2036,59 +2082,6 @@
                         updateZoomDisplay(scale);
                     }
                 }
-                    var card = document.getElementById(cardId);
-                    if (!card) return;
-
-                    // Get the canvas container (the .canvas element)
-                    var canvasContainer = card.querySelector('.canvas');
-                    if (!canvasContainer) return;
-
-                    // Get viewport dimensions (accounting for padding and other elements)
-                    var viewportWidth = window.innerWidth;
-                    var viewportHeight = window.innerHeight;
-
-                    // Account for sidebar and other UI elements (approximate)
-                    var sidebarWidth = 320; // Approximate sidebar width
-                    var headerHeight = 80; // Approximate header height
-                    var statusBarHeight = 60; // Approximate status bar height
-                    var padding = 40; // Padding around canvas
-
-                    var availableWidth = viewportWidth - sidebarWidth - (padding * 2);
-                    var availableHeight = viewportHeight - headerHeight - statusBarHeight - (padding * 2);
-
-                    // Calculate scale to fit canvas within available space
-                    var scaleX = availableWidth / dimensions.width;
-                    var scaleY = availableHeight / dimensions.height;
-                    var scale = Math.min(scaleX, scaleY, 1); // Don't scale up beyond 100%
-
-                    // Apply minimum and maximum scale limits
-                    scale = Math.max(0.1, Math.min(1, scale));
-
-                    // Update container dimensions to fit scaled canvas
-                    var scaledWidth = dimensions.width * scale;
-                    var scaledHeight = dimensions.height * scale;
-
-                    canvasContainer.style.width = scaledWidth + 'px';
-                    canvasContainer.style.height = scaledHeight + 'px';
-                    canvasContainer.style.maxWidth = '100%';
-                    canvasContainer.style.maxHeight = '100%';
-
-                    // Ensure the canvas itself fits within the container
-                    var canvasEl = card.querySelector('canvas');
-                    if (canvasEl) {
-                        canvasEl.style.width = scaledWidth + 'px';
-                        canvasEl.style.height = scaledHeight + 'px';
-                        canvasEl.style.maxWidth = '100%';
-                        canvasEl.style.maxHeight = '100%';
-                    }
-
-                    // Update zoom level to reflect the scaling
-                    var currentCanvas = canvases[window.currentView];
-                    if (currentCanvas) {
-                        currentCanvas.setZoom(scale);
-                        updateZoomDisplay(scale);
-                    }
-                }
 
                 function resizeCanvasToSvg(canvas, svgElement, cardId) {
                     if (!canvas || !svgElement) return;
@@ -2241,6 +2234,8 @@
                             var h = parseFloat(node.getAttribute('height') || canvas.height);
                             var preserve = node.getAttribute('preserveAspectRatio') || 'xMidYMid slice';
                             var editableName = node.getAttribute('id') || node.getAttribute('data-editable-image') || null;
+                            var isChangeable = node.hasAttribute('data-changeable');
+                            var changeableId = node.getAttribute('data-changeable-id') || null;
 
                             // Skip if no valid href
                             if (!href || href.trim() === '') {
@@ -2261,8 +2256,12 @@
                                         top: y,
                                         originX: 'left',
                                         originY: 'top',
-                                        selectable: false,
-                                        evented: false
+                                        selectable: true, // Make images selectable
+                                        evented: true,    // Make images respond to events
+                                        hasControls: true, // Show resize handles
+                                        hasBorders: true,  // Show selection borders
+                                        lockUniScaling: false, // Allow free scaling
+                                        centeredRotation: true
                                     });
 
                                     // Enhanced scaling logic with aspect ratio preservation
@@ -2349,18 +2348,46 @@
                                         cacheKey: href // Use URL as cache key
                                     });
 
-                                    // Custom properties for identification
+                                    // Custom properties for identification and changeability
                                     if (editableName) {
                                         img.editableImageName = editableName;
+                                        // Force editable images to be selectable
+                                        img.set({
+                                            selectable: true,
+                                            evented: true,
+                                            hasControls: true,
+                                            hasBorders: true,
+                                            lockUniScaling: false,
+                                            centeredRotation: true
+                                        });
                                     }
 
-                                    // Layer management: send full-card images to back
+                                    // Handle changeable images
+                                    if (isChangeable) {
+                                        img.isChangeableImage = true;
+                                        img.changeableId = changeableId;
+                                        img.set({
+                                            selectable: true,
+                                            evented: true,
+                                            hasControls: true,
+                                            hasBorders: true,
+                                            hoverCursor: 'pointer',
+                                            moveCursor: 'pointer'
+                                        });
+
+                                        // Add double-click handler for image replacement
+                                        img.on('mousedblclick', function() {
+                                            showImageReplacementDialog(img);
+                                        });
+                                    }
+
+                                    // Layer management: send full-card images to back (but not editable images)
                                     var isFullCard = (x === 0 && y === 0) &&
                                         (widthAttr === '100%' || heightAttr === '100%' ||
                                          Math.abs(targetWidth - canvas.width) < 10 ||
                                          Math.abs(targetHeight - canvas.height) < 10);
 
-                                    if (isFullCard) {
+                                    if (isFullCard && !editableName && !isChangeable) {
                                         img.sendToBack();
                                     }
 
@@ -2373,7 +2400,12 @@
                                         src: href,
                                         position: { x: img.left, y: img.top },
                                         size: { width: scaledWidth, height: scaledHeight },
-                                        preserveAspectRatio: preserve
+                                        preserveAspectRatio: preserve,
+                                        selectable: img.selectable,
+                                        evented: img.evented,
+                                        editableImageName: img.editableImageName,
+                                        isChangeableImage: img.isChangeableImage,
+                                        changeableId: img.changeableId
                                     });
 
                                 }, {
@@ -2414,7 +2446,195 @@
                             var nodeName = node.getAttribute('data-text-node') || node.id || null;
                             if (nodeName) itext.textNodeName = nodeName;
                             canvas.add(itext);
-                        } else {
+                        } else if (tag === 'rect'){
+                            var x = parseFloat(node.getAttribute('x') || 0);
+                            var y = parseFloat(node.getAttribute('y') || 0);
+                            var w = parseFloat(node.getAttribute('width') || canvas.width);
+                            var h = parseFloat(node.getAttribute('height') || canvas.height);
+                            var fill = node.getAttribute('fill') || '#ffffff';
+                            var rx = parseFloat(node.getAttribute('rx') || 0); // border radius
+                            var editableName = node.getAttribute('id') || node.getAttribute('data-editable-image') || null;
+                            var isChangeable = node.hasAttribute('data-changeable');
+                            var changeableId = node.getAttribute('data-changeable-id') || null;
+
+                            // Check if this rect has a pattern fill (indicating it's an image placeholder)
+                            var isPatternFill = fill && fill.startsWith('url(#');
+
+                            if (isChangeable && isPatternFill) {
+                                // Extract pattern ID from fill attribute
+                                var patternId = fill.match(/url\(#([^)]+)\)/);
+                                if (patternId && patternId[1]) {
+                                    patternId = patternId[1];
+
+                                    // Find the pattern definition in the SVG
+                                    var svgRoot = node.ownerDocument.documentElement;
+                                    var pattern = svgRoot.querySelector('#' + patternId);
+                                    if (pattern) {
+                                        // Look for image reference in the pattern
+                                        var useElement = pattern.querySelector('use');
+                                        if (useElement) {
+                                            var imageHref = useElement.getAttributeNS('http://www.w3.org/1999/xlink', 'href') ||
+                                                           useElement.getAttribute('xlink:href') ||
+                                                           useElement.getAttribute('href');
+
+                                            if (imageHref && imageHref.startsWith('#')) {
+                                                // Find the actual image definition
+                                                var imageDef = svgRoot.querySelector(imageHref);
+                                                if (imageDef && imageDef.tagName === 'image') {
+                                                    var actualImageHref = imageDef.getAttributeNS('http://www.w3.org/1999/xlink', 'href') ||
+                                                                         imageDef.getAttribute('xlink:href') ||
+                                                                         imageDef.getAttribute('href');
+
+                                                    if (actualImageHref) {
+                                                        try {
+                                                            fabric.Image.fromURL(actualImageHref, function(img){
+                                                                if (!img || !img.getElement()) {
+                                                                    console.warn('Failed to load pattern image:', actualImageHref);
+                                                                    return;
+                                                                }
+
+                                                                // Set initial position and size
+                                                                img.set({
+                                                                    left: x,
+                                                                    top: y,
+                                                                    originX: 'left',
+                                                                    originY: 'top',
+                                                                    selectable: true,
+                                                                    evented: true,
+                                                                    hasControls: true,
+                                                                    hasBorders: true,
+                                                                    lockUniScaling: false,
+                                                                    centeredRotation: true
+                                                                });
+
+                                                                // Scale image to fit the rect dimensions
+                                                                var imgAspectRatio = img.width / img.height;
+                                                                var rectAspectRatio = w / h;
+
+                                                                if (imgAspectRatio > rectAspectRatio) {
+                                                                    // Image is wider - fit by width
+                                                                    img.scaleToWidth(w);
+                                                                } else {
+                                                                    // Image is taller - fit by height
+                                                                    img.scaleToHeight(h);
+                                                                }
+
+                                                                // Center the image within the rect
+                                                                var scaledWidth = img.getScaledWidth();
+                                                                var scaledHeight = img.getScaledHeight();
+                                                                var offsetX = (w - scaledWidth) / 2;
+                                                                var offsetY = (h - scaledHeight) / 2;
+
+                                                                img.set({
+                                                                    left: x + offsetX,
+                                                                    top: y + offsetY
+                                                                });
+
+                                                                // Add quality and performance optimizations
+                                                                var imgElement = img.getElement();
+                                                                if (imgElement) {
+                                                                    imgElement.style.imageRendering = 'auto';
+                                                                    imgElement.crossOrigin = 'anonymous';
+                                                                }
+
+                                                                // Set additional properties for better performance
+                                                                img.set({
+                                                                    objectCaching: true,
+                                                                    statefulCache: true,
+                                                                    cacheKey: actualImageHref
+                                                                });
+
+                                                                // Custom properties for identification and changeability
+                                                                if (editableName) {
+                                                                    img.editableImageName = editableName;
+                                                                }
+
+                                                                // Handle changeable images
+                                                                if (isChangeable) {
+                                                                    img.isChangeableImage = true;
+                                                                    img.changeableId = changeableId;
+                                                                    img.set({
+                                                                        selectable: true,
+                                                                        evented: true,
+                                                                        hasControls: true,
+                                                                        hasBorders: true,
+                                                                        hoverCursor: 'pointer',
+                                                                        moveCursor: 'pointer'
+                                                                    });
+
+                                                                    // Add double-click handler for image replacement
+                                                                    img.on('mousedblclick', function() {
+                                                                        showImageReplacementDialog(img);
+                                                                    });
+                                                                }
+
+                                                                // Add to canvas and render
+                                                                canvas.add(img);
+                                                                canvas.requestRenderAll();
+
+                                                                // Log successful image load for debugging
+                                                                console.log('Pattern-based image loaded successfully:', {
+                                                                    src: actualImageHref,
+                                                                    position: { x: img.left, y: img.top },
+                                                                    size: { width: scaledWidth, height: scaledHeight },
+                                                                    rect: { x: x, y: y, width: w, height: h },
+                                                                    selectable: img.selectable,
+                                                                    evented: img.evented,
+                                                                    isChangeableImage: img.isChangeableImage,
+                                                                    changeableId: img.changeableId
+                                                                });
+
+                                                            }, {
+                                                                crossOrigin: 'anonymous',
+                                                                onError: function() {
+                                                                    console.error('Pattern image failed to load:', actualImageHref);
+                                                                }
+                                                            });
+                                                        } catch (e) {
+                                                            console.error('Pattern image processing error for:', actualImageHref, e);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } else if (isChangeable && !isPatternFill) {
+                                // Handle changeable rects that are not pattern-based (solid color placeholders)
+                                var rect = new fabric.Rect({
+                                    left: x,
+                                    top: y,
+                                    width: w,
+                                    height: h,
+                                    fill: fill,
+                                    rx: rx,
+                                    selectable: true,
+                                    evented: true,
+                                    hasControls: true,
+                                    hasBorders: true,
+                                    hoverCursor: 'pointer',
+                                    moveCursor: 'pointer',
+                                    originX: 'left',
+                                    originY: 'top'
+                                });
+
+                                // Custom properties for changeability
+                                rect.isChangeableImage = true;
+                                rect.changeableId = changeableId;
+
+                                // Add double-click handler for image replacement
+                                rect.on('mousedblclick', function() {
+                                    showImageReplacementDialog(rect);
+                                });
+
+                                canvas.add(rect);
+                                console.log('Changeable rect added:', {
+                                    position: { x: rect.left, y: rect.top },
+                                    size: { width: w, height: h },
+                                    fill: fill,
+                                    isChangeableImage: rect.isChangeableImage
+                                });
+                            }
                             // for other tags, try to import their outerHTML as an image snapshot fallback
                             // skip for now
                         }
@@ -2422,6 +2642,38 @@
 
                     // ensure text objects are on top
                     canvas.getObjects().forEach(function(o){ if (o.type && (o.type.indexOf('text')!==-1 || o instanceof fabric.IText)) o.bringToFront(); });
+
+                    // Force all images with editableImageName to be selectable
+                    canvas.getObjects().forEach(function(o) {
+                        if (o.type === 'image' && o.editableImageName) {
+                            o.set({
+                                selectable: true,
+                                evented: true,
+                                hasControls: true,
+                                hasBorders: true
+                            });
+                            console.log('Forced image to be selectable:', o.editableImageName);
+                        }
+                    });
+
+                    // Also force selectability after a short delay to ensure async images are loaded
+                    setTimeout(function() {
+                        canvas.getObjects().forEach(function(o) {
+                            if ((o.type === 'image' || o.type === 'rect') && (o.editableImageName || o.isChangeableImage)) {
+                                o.set({
+                                    selectable: true,
+                                    evented: true,
+                                    hasControls: true,
+                                    hasBorders: true,
+                                    hoverCursor: 'pointer',
+                                    moveCursor: 'pointer'
+                                });
+                                console.log('Delayed force object to be selectable:', o.type, o.editableImageName || o.changeableId, 'selectable:', o.selectable, 'evented:', o.evented);
+                            }
+                        });
+                        canvas.requestRenderAll();
+                    }, 1000);
+
                     canvas.requestRenderAll();
 
                         // Enhanced double-click to edit text with better UX
@@ -2434,6 +2686,32 @@
                                 // Focus the canvas for keyboard events
                                 canvasEl.focus();
                             }
+                        });
+
+                        // Debug: Log mouse events
+                        canvas.on('mouse:down', function(e) {
+                            console.log('Canvas mouse down:', e.target ? e.target.type : 'canvas', e.target);
+                            if (e.target && (e.target.type === 'image' || e.target.type === 'rect')) {
+                                console.log('Object clicked - selectable:', e.target.selectable, 'evented:', e.target.evented, 'hasControls:', e.target.hasControls);
+                            }
+                        });
+
+                        // Add canvas click handler for debugging
+                        canvas.on('mouse:up', function(e) {
+                            console.log('Canvas mouse up - active object:', canvas.getActiveObject());
+                        });
+
+                        // Add selection event handlers for debugging
+                        canvas.on('selection:created', function(e) {
+                            console.log('Selection created:', e.selected);
+                        });
+
+                        canvas.on('selection:updated', function(e) {
+                            console.log('Selection updated:', e.selected);
+                        });
+
+                        canvas.on('selection:cleared', function() {
+                            console.log('Selection cleared');
                         });
 
                         // Add keyboard shortcuts for better UX
@@ -2509,6 +2787,21 @@
 
                 // create canvases
                 canvases.front = createFabricCanvasForCard('cardFront','fabricFront');
+
+                // Initialize SVG Template Editor BEFORE the canvas hides the SVG
+                document.addEventListener('DOMContentLoaded', function() {
+                    // Initialize SvgTemplateEditor for SVG elements with auto-parser data
+                    const svgElements = document.querySelectorAll('svg[data-svg-editor]');
+                    svgElements.forEach(svgElement => {
+                        try {
+                            // Actually initialize the SVG template editor
+                            console.log('Initializing SVG template editor for:', svgElement);
+                            new SvgTemplateEditor(svgElement);
+                        } catch (error) {
+                            console.error('Failed to initialize SVG editor:', error);
+                        }
+                    });
+                });
 
                 // Resize canvases if custom SVGs are provided
                 var frontSvg = document.querySelector('#cardFront svg');
@@ -3077,6 +3370,150 @@
                     }, 3000);
                 }
 
+                // Function to show image replacement dialog for changeable images
+                function showImageReplacementDialog(fabricObject) {
+                    // Create file input
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.style.display = 'none';
+
+                    input.addEventListener('change', function(e) {
+                        const file = e.target.files[0];
+                        if (file) {
+                            handleImageReplacement(file, fabricImage);
+                        }
+                        document.body.removeChild(input);
+                    });
+
+                    document.body.appendChild(input);
+                    input.click();
+                }
+
+                // Function to handle image replacement
+                function handleImageReplacement(file, fabricObject) {
+                    const reader = new FileReader();
+
+                    reader.onload = function(e) {
+                        const imageUrl = e.target.result;
+
+                        // Show loading state
+                        showNotification('Replacing image...', 'info');
+
+                        if (fabricObject.type === 'image') {
+                            // Replace the image source
+                            fabricObject.setSrc(imageUrl, function() {
+                                // Ensure the image remains selectable and interactive
+                                fabricObject.set({
+                                    selectable: true,
+                                    evented: true,
+                                    hasControls: true,
+                                    hasBorders: true,
+                                    hoverCursor: 'pointer',
+                                    moveCursor: 'pointer'
+                                });
+
+                                // Re-render the canvas
+                                fabricObject.canvas.requestRenderAll();
+
+                                // Trigger change event
+                                const event = new CustomEvent('fabricImageReplaced', {
+                                    detail: {
+                                        fabricImage: fabricObject,
+                                        imageUrl: imageUrl,
+                                        file: file
+                                    }
+                                });
+                                fabricObject.canvas.getElement().dispatchEvent(event);
+
+                                showNotification('Image replaced successfully!', 'success');
+                            });
+                        } else if (fabricObject.type === 'rect') {
+                            // For rect objects, we need to create a new image object to replace it
+                            fabric.Image.fromURL(imageUrl, function(newImg) {
+                                if (!newImg || !newImg.getElement()) {
+                                    showNotification('Failed to load replacement image', 'error');
+                                    return;
+                                }
+
+                                // Position the new image where the rect was
+                                newImg.set({
+                                    left: fabricObject.left,
+                                    top: fabricObject.top,
+                                    originX: fabricObject.originX,
+                                    originY: fabricObject.originY,
+                                    selectable: true,
+                                    evented: true,
+                                    hasControls: true,
+                                    hasBorders: true,
+                                    hoverCursor: 'pointer',
+                                    moveCursor: 'pointer',
+                                    lockUniScaling: false,
+                                    centeredRotation: true
+                                });
+
+                                // Scale to fit the rect dimensions
+                                var rectWidth = fabricObject.width * fabricObject.scaleX;
+                                var rectHeight = fabricObject.height * fabricObject.scaleY;
+                                var imgAspectRatio = newImg.width / newImg.height;
+                                var rectAspectRatio = rectWidth / rectHeight;
+
+                                if (imgAspectRatio > rectAspectRatio) {
+                                    newImg.scaleToWidth(rectWidth);
+                                } else {
+                                    newImg.scaleToHeight(rectHeight);
+                                }
+
+                                // Center within the original rect bounds
+                                var scaledWidth = newImg.getScaledWidth();
+                                var scaledHeight = newImg.getScaledHeight();
+                                var offsetX = (rectWidth - scaledWidth) / 2;
+                                var offsetY = (rectHeight - scaledHeight) / 2;
+
+                                newImg.set({
+                                    left: fabricObject.left + offsetX,
+                                    top: fabricObject.top + offsetY
+                                });
+
+                                // Set changeable properties
+                                newImg.isChangeableImage = true;
+                                newImg.changeableId = fabricObject.changeableId;
+
+                                // Add double-click handler for further replacement
+                                newImg.on('mousedblclick', function() {
+                                    showImageReplacementDialog(newImg);
+                                });
+
+                                // Replace the rect with the image
+                                var canvas = fabricObject.canvas;
+                                canvas.remove(fabricObject);
+                                canvas.add(newImg);
+                                canvas.requestRenderAll();
+
+                                // Trigger change event
+                                const event = new CustomEvent('fabricImageReplaced', {
+                                    detail: {
+                                        fabricImage: newImg,
+                                        imageUrl: imageUrl,
+                                        file: file,
+                                        replacedRect: fabricObject
+                                    }
+                                });
+                                canvas.getElement().dispatchEvent(event);
+
+                                showNotification('Image replaced successfully!', 'success');
+                            }, {
+                                crossOrigin: 'anonymous',
+                                onError: function() {
+                                    showNotification('Failed to load replacement image', 'error');
+                                }
+                            });
+                        }
+                    };
+
+                    reader.readAsDataURL(file);
+                }
+
                 // Add notification CSS animations
                 if (!document.getElementById('notification-styles')) {
                     var style = document.createElement('style');
@@ -3095,6 +3532,7 @@
                 }
 
             }); // whenReady
+
         })();
     </script>
 </body>
