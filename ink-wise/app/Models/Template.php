@@ -18,6 +18,12 @@ class Template extends Model
         'front_image',
         'back_image',
         'status',
+        'metadata',
+        'svg_path',
+    ];
+
+    protected $casts = [
+        'metadata' => 'array',
     ];
 
     public function products()
@@ -25,4 +31,3 @@ class Template extends Model
         return $this->hasMany(Product::class, 'template_id');
     }
 }
-
