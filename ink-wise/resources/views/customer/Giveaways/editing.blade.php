@@ -2704,14 +2704,20 @@
                         // Add selection event handlers for debugging
                         canvas.on('selection:created', function(e) {
                             console.log('Selection created:', e.selected);
+                            updateSelectionDisplay(canvas);
+                            showChangeImageButton(canvas.getActiveObject());
                         });
 
                         canvas.on('selection:updated', function(e) {
                             console.log('Selection updated:', e.selected);
+                            updateSelectionDisplay(canvas);
+                            showChangeImageButton(canvas.getActiveObject());
                         });
 
                         canvas.on('selection:cleared', function() {
                             console.log('Selection cleared');
+                            updateSelectionDisplay(canvas);
+                            hideChangeImageButton();
                         });
 
                         // Add keyboard shortcuts for better UX
@@ -2825,6 +2831,14 @@
                     });
                     canvases.front.on('object:modified', function() {
                         saveCanvasState(canvases.front, 'front');
+                    });
+
+                    // Update change image button position on viewport changes
+                    canvases.front.on('after:render', function() {
+                        const activeObject = canvases.front.getActiveObject();
+                        if (activeObject && (activeObject.type === 'image' || (activeObject.type === 'rect' && activeObject.isChangeableImage))) {
+                            showChangeImageButton(activeObject);
+                        }
                     });
 
                     // Add background click to change image
@@ -3372,27 +3386,39 @@
 
                 // Function to show image replacement dialog for changeable images
                 function showImageReplacementDialog(fabricObject) {
-                    // Create file input
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = 'image/*';
-                    input.style.display = 'none';
-
-                    input.addEventListener('change', function(e) {
-                        const file = e.target.files[0];
-                        if (file) {
-                            handleImageReplacement(file, fabricImage);
-                        }
-                        document.body.removeChild(input);
-                    });
-
-                    document.body.appendChild(input);
-                    input.click();
+                    showEnhancedImageDialog(fabricObject);
                 }
 
                 // Function to handle image replacement
                 function handleImageReplacement(file, fabricObject) {
+                    // Validate file
+                    if (!file) {
+                        showNotification('No file selected', 'error');
+                        return;
+                    }
+
+                    if (!file.type.startsWith('image/')) {
+                        showNotification('Please select a valid image file', 'error');
+                        return;
+                    }
+
+                    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+                        showNotification('File size too large (max 10MB)', 'error');
+                        return;
+                    }
+
                     const reader = new FileReader();
+
+                    reader.onloadstart = function() {
+                        showNotification('Loading image...', 'info');
+                    };
+
+                    reader.onprogress = function(e) {
+                        if (e.lengthComputable) {
+                            const percent = Math.round((e.loaded / e.total) * 100);
+                            showNotification(`Loading image... ${percent}%`, 'info');
+                        }
+                    };
 
                     reader.onload = function(e) {
                         const imageUrl = e.target.result;
@@ -3400,10 +3426,523 @@
                         // Show loading state
                         showNotification('Replacing image...', 'info');
 
+                        try {
+                            if (fabricObject.type === 'image') {
+                                // Replace the image source
+                                fabricObject.setSrc(imageUrl, function() {
+                                    // Ensure the image remains selectable and interactive
+                                    fabricObject.set({
+                                        selectable: true,
+                                        evented: true,
+                                        hasControls: true,
+                                        hasBorders: true,
+                                        hoverCursor: 'pointer',
+                                        moveCursor: 'pointer'
+                                    });
+
+                                    // Re-render the canvas
+                                    fabricObject.canvas.requestRenderAll();
+
+                                    // Save state for undo/redo
+                                    saveCanvasState(fabricObject.canvas, 'front');
+
+                                    // Trigger change event
+                                    const event = new CustomEvent('fabricImageReplaced', {
+                                        detail: {
+                                            fabricImage: fabricObject,
+                                            imageUrl: imageUrl,
+                                            file: file
+                                        }
+                                    });
+                                    fabricObject.canvas.getElement().dispatchEvent(event);
+
+                                    showNotification('Image replaced successfully!', 'success');
+                                }, {
+                                    crossOrigin: 'anonymous'
+                                });
+                            } else if (fabricObject.type === 'rect') {
+                                // For rect objects, we need to create a new image object to replace it
+                                fabric.Image.fromURL(imageUrl, function(newImg) {
+                                    if (!newImg || !newImg.getElement()) {
+                                        showNotification('Failed to load replacement image', 'error');
+                                        return;
+                                    }
+
+                                    // Position the new image where the rect was
+                                    newImg.set({
+                                        left: fabricObject.left,
+                                        top: fabricObject.top,
+                                        originX: fabricObject.originX,
+                                        originY: fabricObject.originY,
+                                        selectable: true,
+                                        evented: true,
+                                        hasControls: true,
+                                        hasBorders: true,
+                                        hoverCursor: 'pointer',
+                                        moveCursor: 'pointer',
+                                        lockUniScaling: false,
+                                        centeredRotation: true
+                                    });
+
+                                    // Scale to fit the rect dimensions
+                                    var rectWidth = fabricObject.width * fabricObject.scaleX;
+                                    var rectHeight = fabricObject.height * fabricObject.scaleY;
+                                    var imgAspectRatio = newImg.width / newImg.height;
+                                    var rectAspectRatio = rectWidth / rectHeight;
+
+                                    if (imgAspectRatio > rectAspectRatio) {
+                                        newImg.scaleToWidth(rectWidth);
+                                    } else {
+                                        newImg.scaleToHeight(rectHeight);
+                                    }
+
+                                    // Center within the original rect bounds
+                                    var scaledWidth = newImg.getScaledWidth();
+                                    var scaledHeight = newImg.getScaledHeight();
+                                    var offsetX = (rectWidth - scaledWidth) / 2;
+                                    var offsetY = (rectHeight - scaledHeight) / 2;
+
+                                    newImg.set({
+                                        left: fabricObject.left + offsetX,
+                                        top: fabricObject.top + offsetY
+                                    });
+
+                                    // Set changeable properties
+                                    newImg.isChangeableImage = true;
+                                    newImg.changeableId = fabricObject.changeableId;
+
+                                    // Add double-click handler for further replacement
+                                    newImg.on('mousedblclick', function() {
+                                        showEnhancedImageDialog(newImg);
+                                    });
+
+                                    // Replace the rect with the image
+                                    var canvas = fabricObject.canvas;
+                                    canvas.remove(fabricObject);
+                                    canvas.add(newImg);
+                                    canvas.requestRenderAll();
+
+                                    // Save state for undo/redo
+                                    saveCanvasState(canvas, 'front');
+
+                                    // Trigger change event
+                                    const event = new CustomEvent('fabricImageReplaced', {
+                                        detail: {
+                                            fabricImage: newImg,
+                                            imageUrl: imageUrl,
+                                            file: file,
+                                            replacedRect: fabricObject
+                                        }
+                                    });
+                                    canvas.getElement().dispatchEvent(event);
+
+                                    showNotification('Image replaced successfully!', 'success');
+                                }, {
+                                    crossOrigin: 'anonymous',
+                                    onError: function() {
+                                        showNotification('Failed to load replacement image', 'error');
+                                    }
+                                });
+                            }
+                        } catch (error) {
+                            console.error('Image replacement error:', error);
+                            showNotification('Failed to replace image: ' + error.message, 'error');
+                        }
+                    };
+
+                    reader.onerror = function() {
+                        showNotification('Failed to read file', 'error');
+                    };
+
+                    reader.readAsDataURL(file);
+                }
+
+                // Function to show/hide the change image button
+                let changeImageButton = null;
+
+                function showChangeImageButton(activeObject) {
+                    if (!activeObject || (activeObject.type !== 'image' && activeObject.type !== 'rect')) {
+                        hideChangeImageButton();
+                        return;
+                    }
+
+                    // Only show for changeable images or regular images
+                    if (activeObject.type === 'rect' && !activeObject.isChangeableImage) {
+                        hideChangeImageButton();
+                        return;
+                    }
+
+                    // Create button if it doesn't exist
+                    if (!changeImageButton) {
+                        changeImageButton = document.createElement('button');
+                        changeImageButton.id = 'changeImageButton';
+                        changeImageButton.innerHTML = '🖼️ Change Image';
+                        changeImageButton.style.cssText = `
+                            position: absolute;
+                            background: #3b82f6;
+                            color: white;
+                            border: none;
+                            padding: 8px 12px;
+                            border-radius: 6px;
+                            font-size: 12px;
+                            font-weight: 500;
+                            cursor: pointer;
+                            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+                            z-index: 1000;
+                            transition: all 0.2s ease;
+                            display: none;
+                            pointer-events: auto;
+                        `;
+                        changeImageButton.addEventListener('click', function() {
+                            const canvas = activeObject.canvas;
+                            const currentObject = canvas.getActiveObject();
+                            if (currentObject) {
+                                showEnhancedImageDialog(currentObject);
+                            }
+                        });
+                        document.body.appendChild(changeImageButton);
+                    }
+
+                    // Position the button near the selected object, accounting for zoom and pan
+                    const canvasElement = activeObject.canvas.getElement();
+                    const canvasRect = canvasElement.getBoundingClientRect();
+
+                    // Get object bounds in canvas coordinates
+                    const objectBounds = activeObject.getBoundingRect();
+                    const objectCenterX = objectBounds.left + objectBounds.width / 2;
+                    const objectTop = objectBounds.top;
+
+                    // Convert to screen coordinates
+                    const zoom = activeObject.canvas.getZoom();
+                    const vpt = activeObject.canvas.viewportTransform;
+                    const screenX = canvasRect.left + (objectCenterX * zoom) + vpt[4];
+                    const screenY = canvasRect.top + (objectTop * zoom) + vpt[5] - 45;
+
+                    changeImageButton.style.left = Math.max(10, Math.min(window.innerWidth - 120, screenX - 60)) + 'px';
+                    changeImageButton.style.top = Math.max(10, screenY) + 'px';
+                    changeImageButton.style.display = 'block';
+                }
+
+                function hideChangeImageButton() {
+                    if (changeImageButton) {
+                        changeImageButton.style.display = 'none';
+                    }
+                }
+
+                // Enhanced image replacement dialog
+                function showEnhancedImageDialog(fabricObject) {
+                    // Remove existing dialog if present
+                    const existingDialog = document.getElementById('enhancedImageDialog');
+                    if (existingDialog) {
+                        existingDialog.remove();
+                    }
+
+                    // Create modal dialog
+                    const dialog = document.createElement('div');
+                    dialog.id = 'enhancedImageDialog';
+                    dialog.style.cssText = `
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0, 0, 0, 0.5);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        z-index: 10000;
+                    `;
+
+                    dialog.innerHTML = `
+                        <div style="
+                            background: white;
+                            border-radius: 12px;
+                            width: 90%;
+                            max-width: 600px;
+                            max-height: 80vh;
+                            overflow: hidden;
+                            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+                        ">
+                            <div style="
+                                padding: 20px 24px;
+                                border-bottom: 1px solid #e5e7eb;
+                                display: flex;
+                                justify-content: space-between;
+                                align-items: center;
+                            ">
+                                <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #111;">Change Image</h3>
+                                <button id="closeDialogBtn" style="
+                                    background: none;
+                                    border: none;
+                                    font-size: 24px;
+                                    cursor: pointer;
+                                    color: #6b7280;
+                                    padding: 0;
+                                    width: 32px;
+                                    height: 32px;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    border-radius: 4px;
+                                ">&times;</button>
+                            </div>
+
+                            <div style="padding: 24px;">
+                                <div style="display: flex; gap: 16px; margin-bottom: 20px;">
+                                    <button class="image-source-btn active" data-source="upload">
+                                        📁 Upload
+                                    </button>
+                                    <button class="image-source-btn" data-source="recent">
+                                        🕒 Recent
+                                    </button>
+                                    <button class="image-source-btn" data-source="unsplash">
+                                        🔍 Unsplash
+                                    </button>
+                                </div>
+
+                                <div id="imageContentArea">
+                                    <!-- Content will be loaded here -->
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    // Add styles for buttons
+                    const style = document.createElement('style');
+                    style.textContent = `
+                        .image-source-btn {
+                            padding: 8px 16px;
+                            border: 2px solid #e5e7eb;
+                            background: white;
+                            border-radius: 8px;
+                            font-size: 14px;
+                            font-weight: 500;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                            flex: 1;
+                        }
+                        .image-source-btn.active {
+                            border-color: #3b82f6;
+                            background: #3b82f6;
+                            color: white;
+                        }
+                        .image-source-btn:hover:not(.active) {
+                            border-color: #9ca3af;
+                        }
+                        .image-grid {
+                            display: grid;
+                            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+                            gap: 12px;
+                            max-height: 300px;
+                            overflow-y: auto;
+                        }
+                        .image-item {
+                            aspect-ratio: 1;
+                            border-radius: 8px;
+                            overflow: hidden;
+                            cursor: pointer;
+                            border: 2px solid transparent;
+                            transition: all 0.2s ease;
+                        }
+                        .image-item:hover {
+                            border-color: #3b82f6;
+                            transform: scale(1.02);
+                        }
+                        .image-item img {
+                            width: 100%;
+                            height: 100%;
+                            object-fit: cover;
+                        }
+                        .upload-area {
+                            border: 2px dashed #d1d5db;
+                            border-radius: 8px;
+                            padding: 40px 20px;
+                            text-align: center;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                        }
+                        .upload-area:hover {
+                            border-color: #3b82f6;
+                            background: #f0f9ff;
+                        }
+                        .upload-area.dragover {
+                            border-color: #10b981;
+                            background: #f0fdf4;
+                        }
+                    `;
+                    document.head.appendChild(style);
+
+                    document.body.appendChild(dialog);
+
+                    // Event listeners
+                    const closeBtn = dialog.querySelector('#closeDialogBtn');
+                    closeBtn.addEventListener('click', () => dialog.remove());
+
+                    dialog.addEventListener('click', (e) => {
+                        if (e.target === dialog) {
+                            dialog.remove();
+                        }
+                    });
+
+                    // Tab switching
+                    const sourceBtns = dialog.querySelectorAll('.image-source-btn');
+                    sourceBtns.forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            sourceBtns.forEach(b => b.classList.remove('active'));
+                            btn.classList.add('active');
+                            loadImageSource(btn.dataset.source, fabricObject);
+                        });
+                    });
+
+                    // Load initial content (upload tab)
+                    loadImageSource('upload', fabricObject);
+                }
+
+                function loadImageSource(source, fabricObject) {
+                    const contentArea = document.getElementById('imageContentArea');
+
+                    switch (source) {
+                        case 'upload':
+                            contentArea.innerHTML = `
+                                <div class="upload-area" id="uploadArea">
+                                    <div style="font-size: 48px; margin-bottom: 16px;">📁</div>
+                                    <div style="font-size: 16px; font-weight: 500; margin-bottom: 8px;">Drop images here or click to browse</div>
+                                    <div style="font-size: 14px; color: #6b7280;">Supported formats: JPG, PNG, GIF, SVG, WebP</div>
+                                    <input type="file" id="dialogFileInput" multiple accept="image/*" style="display: none;">
+                                </div>
+                            `;
+
+                            const uploadArea = contentArea.querySelector('#uploadArea');
+                            const fileInput = contentArea.querySelector('#dialogFileInput');
+
+                            uploadArea.addEventListener('click', () => fileInput.click());
+                            fileInput.addEventListener('change', (e) => {
+                                const files = Array.from(e.target.files);
+                                if (files.length > 0) {
+                                    handleImageReplacement(files[0], fabricObject);
+                                    document.getElementById('enhancedImageDialog').remove();
+                                }
+                            });
+
+                            // Drag and drop
+                            uploadArea.addEventListener('dragover', (e) => {
+                                e.preventDefault();
+                                uploadArea.classList.add('dragover');
+                            });
+                            uploadArea.addEventListener('dragleave', () => {
+                                uploadArea.classList.remove('dragover');
+                            });
+                            uploadArea.addEventListener('drop', (e) => {
+                                e.preventDefault();
+                                uploadArea.classList.remove('dragover');
+                                const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+                                if (files.length > 0) {
+                                    handleImageReplacement(files[0], fabricObject);
+                                    document.getElementById('enhancedImageDialog').remove();
+                                }
+                            });
+                            break;
+
+                        case 'recent':
+                            contentArea.innerHTML = '<div style="text-align: center; padding: 40px;">Loading recent images...</div>';
+                            loadRecentImages(fabricObject);
+                            break;
+
+                        case 'unsplash':
+                            contentArea.innerHTML = `
+                                <div style="margin-bottom: 16px;">
+                                    <input type="text" id="unsplashSearch" placeholder="Search for images..." style="
+                                        width: 100%;
+                                        padding: 8px 12px;
+                                        border: 1px solid #d1d5db;
+                                        border-radius: 6px;
+                                        font-size: 14px;
+                                    ">
+                                    <button id="unsplashSearchBtn" style="
+                                        margin-top: 8px;
+                                        padding: 8px 16px;
+                                        background: #3b82f6;
+                                        color: white;
+                                        border: none;
+                                        border-radius: 6px;
+                                        cursor: pointer;
+                                    ">Search</button>
+                                </div>
+                                <div id="unsplashResults" class="image-grid">
+                                    <div style="text-align: center; grid-column: 1 / -1; padding: 20px;">Enter a search term above</div>
+                                </div>
+                            `;
+
+                            const searchInput = contentArea.querySelector('#unsplashSearch');
+                            const searchBtn = contentArea.querySelector('#unsplashSearchBtn');
+
+                            searchBtn.addEventListener('click', () => {
+                                const query = searchInput.value.trim();
+                                if (query) {
+                                    searchUnsplashImages(query, fabricObject);
+                                }
+                            });
+
+                            searchInput.addEventListener('keypress', (e) => {
+                                if (e.key === 'Enter') {
+                                    searchBtn.click();
+                                }
+                            });
+                            break;
+                    }
+                }
+
+                function loadRecentImages(fabricObject) {
+                    // This would load recently uploaded images from the server
+                    // For now, show a placeholder
+                    const contentArea = document.getElementById('imageContentArea');
+                    contentArea.innerHTML = `
+                        <div class="image-grid" id="recentImagesGrid">
+                            <div style="text-align: center; grid-column: 1 / -1; padding: 40px; color: #6b7280;">
+                                Recent images feature coming soon
+                            </div>
+                        </div>
+                    `;
+                }
+
+                function searchUnsplashImages(query, fabricObject) {
+                    const resultsEl = document.getElementById('unsplashResults');
+                    resultsEl.innerHTML = '<div style="text-align: center; grid-column: 1 / -1; padding: 20px;">Searching...</div>';
+
+                    // Use the existing Unsplash proxy endpoint
+                    fetch(`/graphics/unsplash?q=${encodeURIComponent(query)}&per_page=12`)
+                        .then(response => response.json())
+                        .then(data => {
+                            const items = data.results || [];
+                            if (items.length === 0) {
+                                resultsEl.innerHTML = '<div style="text-align: center; grid-column: 1 / -1; padding: 20px;">No images found</div>';
+                                return;
+                            }
+
+                            resultsEl.innerHTML = '';
+                            items.forEach(item => {
+                                const imgDiv = document.createElement('div');
+                                imgDiv.className = 'image-item';
+                                imgDiv.innerHTML = `<img src="${item.urls.thumb}" alt="${item.alt_description || 'Unsplash image'}">`;
+                                imgDiv.addEventListener('click', () => {
+                                    handleImageReplacementFromUrl(item.urls.regular, fabricObject);
+                                    document.getElementById('enhancedImageDialog').remove();
+                                });
+                                resultsEl.appendChild(imgDiv);
+                            });
+                        })
+                        .catch(error => {
+                            console.error('Unsplash search failed:', error);
+                            resultsEl.innerHTML = '<div style="text-align: center; grid-column: 1 / -1; padding: 20px; color: #ef4444;">Search failed</div>';
+                        });
+                }
+
+                function handleImageReplacementFromUrl(imageUrl, fabricObject) {
+                    showNotification('Replacing image...', 'info');
+
+                    try {
                         if (fabricObject.type === 'image') {
-                            // Replace the image source
                             fabricObject.setSrc(imageUrl, function() {
-                                // Ensure the image remains selectable and interactive
                                 fabricObject.set({
                                     selectable: true,
                                     evented: true,
@@ -3412,31 +3951,19 @@
                                     hoverCursor: 'pointer',
                                     moveCursor: 'pointer'
                                 });
-
-                                // Re-render the canvas
                                 fabricObject.canvas.requestRenderAll();
-
-                                // Trigger change event
-                                const event = new CustomEvent('fabricImageReplaced', {
-                                    detail: {
-                                        fabricImage: fabricObject,
-                                        imageUrl: imageUrl,
-                                        file: file
-                                    }
-                                });
-                                fabricObject.canvas.getElement().dispatchEvent(event);
-
+                                saveCanvasState(fabricObject.canvas, 'front');
                                 showNotification('Image replaced successfully!', 'success');
+                            }, {
+                                crossOrigin: 'anonymous'
                             });
                         } else if (fabricObject.type === 'rect') {
-                            // For rect objects, we need to create a new image object to replace it
                             fabric.Image.fromURL(imageUrl, function(newImg) {
                                 if (!newImg || !newImg.getElement()) {
-                                    showNotification('Failed to load replacement image', 'error');
+                                    showNotification('Failed to load image', 'error');
                                     return;
                                 }
 
-                                // Position the new image where the rect was
                                 newImg.set({
                                     left: fabricObject.left,
                                     top: fabricObject.top,
@@ -3452,7 +3979,6 @@
                                     centeredRotation: true
                                 });
 
-                                // Scale to fit the rect dimensions
                                 var rectWidth = fabricObject.width * fabricObject.scaleX;
                                 var rectHeight = fabricObject.height * fabricObject.scaleY;
                                 var imgAspectRatio = newImg.width / newImg.height;
@@ -3464,7 +3990,6 @@
                                     newImg.scaleToHeight(rectHeight);
                                 }
 
-                                // Center within the original rect bounds
                                 var scaledWidth = newImg.getScaledWidth();
                                 var scaledHeight = newImg.getScaledHeight();
                                 var offsetX = (rectWidth - scaledWidth) / 2;
@@ -3475,43 +4000,31 @@
                                     top: fabricObject.top + offsetY
                                 });
 
-                                // Set changeable properties
                                 newImg.isChangeableImage = true;
                                 newImg.changeableId = fabricObject.changeableId;
 
-                                // Add double-click handler for further replacement
                                 newImg.on('mousedblclick', function() {
-                                    showImageReplacementDialog(newImg);
+                                    showEnhancedImageDialog(newImg);
                                 });
 
-                                // Replace the rect with the image
                                 var canvas = fabricObject.canvas;
                                 canvas.remove(fabricObject);
                                 canvas.add(newImg);
                                 canvas.requestRenderAll();
-
-                                // Trigger change event
-                                const event = new CustomEvent('fabricImageReplaced', {
-                                    detail: {
-                                        fabricImage: newImg,
-                                        imageUrl: imageUrl,
-                                        file: file,
-                                        replacedRect: fabricObject
-                                    }
-                                });
-                                canvas.getElement().dispatchEvent(event);
+                                saveCanvasState(canvas, 'front');
 
                                 showNotification('Image replaced successfully!', 'success');
                             }, {
                                 crossOrigin: 'anonymous',
                                 onError: function() {
-                                    showNotification('Failed to load replacement image', 'error');
+                                    showNotification('Failed to load image', 'error');
                                 }
                             });
                         }
-                    };
-
-                    reader.readAsDataURL(file);
+                    } catch (error) {
+                        console.error('Image replacement error:', error);
+                        showNotification('Failed to replace image: ' + error.message, 'error');
+                    }
                 }
 
                 // Add notification CSS animations
