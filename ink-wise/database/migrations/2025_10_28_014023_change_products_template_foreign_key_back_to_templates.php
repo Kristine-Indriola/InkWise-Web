@@ -22,8 +22,8 @@ return new class extends Migration
             // Foreign key doesn't exist, continue
         }
 
-        // Use raw SQL to add the new foreign key to product_uploads
-        DB::statement('ALTER TABLE products ADD CONSTRAINT products_template_id_foreign FOREIGN KEY (template_id) REFERENCES product_uploads(id) ON DELETE SET NULL');
+        // Use raw SQL to add the new foreign key to templates
+        DB::statement('ALTER TABLE products ADD CONSTRAINT products_template_id_foreign FOREIGN KEY (template_id) REFERENCES templates(id) ON DELETE SET NULL');
     }
 
     /**
@@ -32,11 +32,11 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('products', function (Blueprint $table) {
-            // Drop the foreign key to product_uploads
+            // Drop the foreign key to templates
             $table->dropForeign(['template_id']);
 
-            // Restore the foreign key to templates
-            $table->foreign('template_id')->references('id')->on('templates')->onDelete('set null');
+            // Restore the foreign key to product_uploads
+            $table->foreign('template_id')->references('id')->on('product_uploads')->onDelete('set null');
         });
     }
 };

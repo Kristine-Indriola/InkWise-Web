@@ -12,6 +12,7 @@ class InvitationController extends Controller
     {
         $products = Product::where('event_type', 'Wedding')
                           ->where('product_type', 'Invitation')
+                          ->whereHas('uploads') // Only show products that have been uploaded/published
                           ->with('materials') // if needed
                           ->get();
 
@@ -50,6 +51,7 @@ class InvitationController extends Controller
         $products = Product::query()
             ->with(['template', 'uploads', 'images', 'materials', 'bulkOrders'])
             ->where('product_type', 'Giveaway')
+            ->whereHas('uploads') // Only show products that have been uploaded/published
             ->where(function ($query) {
                 $query->where('event_type', 'Wedding')
                       ->orWhereNull('event_type')

@@ -8,6 +8,19 @@
         'envelope' => 'Envelope'
     ];
     $selectedProductType = $productTypeMap[$templateType] ?? 'Invitation';
+
+    // Check if editing a preview
+    $editPreviewId = request('edit_preview');
+    $previewData = null;
+    if ($editPreviewId) {
+        $previews = session('preview_templates', []);
+        foreach ($previews as $preview) {
+            if (isset($preview['id']) && $preview['id'] === $editPreviewId) {
+                $previewData = $preview;
+                break;
+            }
+        }
+    }
 @endphp
 
 @push('styles')
@@ -33,6 +46,10 @@
             const hidden = document.querySelector('input[name="_token"]');
             return hidden ? hidden.value : '';
         }
+
+        // Figma integration variables
+        let figmaAnalyzedData = null;
+        let selectedFrames = [];
 
         // SVG preview handling for front and back
         function setupPreview(fileInputId, previewId) {
@@ -88,6 +105,151 @@
 
         setupPreview('custom_front_image', 'front-preview');
         setupPreview('custom_back_image', 'back-preview');
+
+        // Figma integration functions
+        async function analyzeFigmaUrl() {
+            const figmaUrl = document.getElementById('figma_url').value.trim();
+            const analyzeBtn = document.getElementById('analyze-figma-btn');
+            const resultsDiv = document.getElementById('figma-results');
+
+            if (!figmaUrl) {
+                alert('Please enter a Figma URL');
+                return;
+            }
+
+            // Show loading
+            analyzeBtn.disabled = true;
+            analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Analyzing...';
+            resultsDiv.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Analyzing Figma file...</div>';
+
+            try {
+                const response = await fetch('{{ route("staff.figma.analyze") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': getCsrfToken(),
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ figma_url: figmaUrl })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    figmaAnalyzedData = data;
+                    displayFigmaResults(data);
+                } else {
+                    resultsDiv.innerHTML = '<div class="alert alert-danger">' + (data.message || 'Failed to analyze Figma file') + '</div>';
+                }
+            } catch (error) {
+                console.error('Figma analysis error:', error);
+                resultsDiv.innerHTML = '<div class="alert alert-danger">Error analyzing Figma file: ' + error.message + '</div>';
+            } finally {
+                analyzeBtn.disabled = false;
+                analyzeBtn.innerHTML = '<i class="fas fa-search me-1"></i>Analyze Figma File';
+            }
+        }
+
+        function displayFigmaResults(data) {
+            const resultsDiv = document.getElementById('figma-results');
+
+            if (!data.frames || data.frames.length === 0) {
+                resultsDiv.innerHTML = '<div class="alert alert-warning">No eligible frames found in this Figma file. Looking for frames named "Template", "Invitation", "Giveaway", or "Envelope".</div>';
+                return;
+            }
+
+            let html = '<div class="alert alert-success">Found ' + data.frames.length + ' eligible frame(s):</div>';
+            html += '<div class="frames-list mt-3">';
+
+            data.frames.forEach(frame => {
+                const frameId = 'frame_' + frame.id;
+                html += `
+                    <div class="frame-item border rounded p-3 mb-2">
+                        <div class="form-check">
+                            <input class="form-check-input frame-checkbox" type="checkbox"
+                                   id="${frameId}" value="${frame.id}"
+                                   data-frame='${JSON.stringify(frame).replace(/'/g, "&apos;")}'>
+                            <label class="form-check-label" for="${frameId}">
+                                <strong>${frame.name}</strong> (${frame.type})
+                                <br><small class="text-muted">Size: ${frame.bounds.width}x${frame.bounds.height}</small>
+                            </label>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            html += '<button type="button" class="btn btn-primary mt-3" onclick="importSelectedFrames()">Import Selected Frames</button>';
+
+            resultsDiv.innerHTML = html;
+        }
+
+        async function importSelectedFrames() {
+            const checkedBoxes = document.querySelectorAll('.frame-checkbox:checked');
+            if (checkedBoxes.length === 0) {
+                alert('Please select at least one frame to import');
+                return;
+            }
+
+            const frames = Array.from(checkedBoxes).map(checkbox => {
+                return JSON.parse(checkbox.getAttribute('data-frame').replace(/&apos;/g, "'"));
+            });
+
+            const importBtn = document.querySelector('button[onclick="importSelectedFrames()"]');
+            importBtn.disabled = true;
+            importBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Importing...';
+
+            try {
+                const response = await fetch('{{ route("staff.figma.import") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': getCsrfToken(),
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        file_key: figmaAnalyzedData.file_key,
+                        frames: frames,
+                        figma_url: document.getElementById('figma_url').value
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('Successfully imported ' + data.imported.length + ' template(s)!');
+                    if (data.imported.length === 1) {
+                        // Redirect to edit the imported template
+                        window.location.href = '{{ route("staff.templates.edit", ":id") }}'.replace(':id', data.imported[0].id);
+                    } else {
+                        window.location.href = '{{ route("staff.templates.index") }}';
+                    }
+                } else {
+                    alert('Import failed: ' + (data.message || 'Unknown error'));
+                    console.error('Import errors:', data.errors);
+                }
+            } catch (error) {
+                console.error('Import error:', error);
+                alert('Import failed: ' + error.message);
+            } finally {
+                importBtn.disabled = false;
+                importBtn.innerHTML = 'Import Selected Frames';
+            }
+        }
+
+        // Toggle between manual upload and Figma import
+        function toggleImportMethod(method) {
+            const manualUpload = document.getElementById('manual-upload-section');
+            const figmaImport = document.getElementById('figma-import-section');
+
+            if (method === 'figma') {
+                manualUpload.style.display = 'none';
+                figmaImport.style.display = 'block';
+            } else {
+                manualUpload.style.display = 'block';
+                figmaImport.style.display = 'none';
+            }
+        }
     </script>
 @endpush
 
@@ -99,24 +261,27 @@
             <p class="create-subtitle">Fill in the details to craft a new {{ $templateType }} template</p>
         </div>
 
-        <form action="{{ route('staff.templates.store') }}" method="POST" class="create-form" enctype="multipart/form-data">
+    <form action="{{ route('staff.templates.preview') }}" method="POST" class="create-form" enctype="multipart/form-data">
             @csrf
 
-            <input type="hidden" name="design" id="design" value="{}">
+            <input type="hidden" name="design" id="design" value="{{ $previewData['design'] ?? '{}' }}">
+            @if($editPreviewId)
+                <input type="hidden" name="edit_preview_id" value="{{ $editPreviewId }}">
+            @endif
 
             <div class="create-row">
                 <div class="create-group flex-1">
                     <label for="name">Template Name</label>
-                    <input type="text" id="name" name="name" placeholder="Enter template name" required>
+                    <input type="text" id="name" name="name" placeholder="Enter template name" value="{{ $previewData['name'] ?? '' }}" required>
                 </div>
                 <div class="create-group flex-1">
                     <label for="event_type">Event Type</label>
                     <select id="event_type" name="event_type">
                         <option value="">Select event type</option>
-                        <option value="Wedding">Wedding</option>
-                        <option value="Birthday">Birthday</option>
-                        <option value="Baptism">Baptism</option>
-                        <option value="Corporate">Corporate</option>
+                        <option value="Wedding" {{ ($previewData['event_type'] ?? '') === 'Wedding' ? 'selected' : '' }}>Wedding</option>
+                        <option value="Birthday" {{ ($previewData['event_type'] ?? '') === 'Birthday' ? 'selected' : '' }}>Birthday</option>
+                        <option value="Baptism" {{ ($previewData['event_type'] ?? '') === 'Baptism' ? 'selected' : '' }}>Baptism</option>
+                        <option value="Corporate" {{ ($previewData['event_type'] ?? '') === 'Corporate' ? 'selected' : '' }}>Corporate</option>
                     </select>
                 </div>
             </div>
@@ -131,40 +296,72 @@
                 </div>
                 <div class="create-group flex-1">
                     <label for="theme_style">Theme/Style</label>
-                    <input type="text" id="theme_style" name="theme_style" placeholder="e.g. Minimalist, Floral">
+                    <input type="text" id="theme_style" name="theme_style" placeholder="e.g. Minimalist, Floral" value="{{ $previewData['theme_style'] ?? '' }}">
                 </div>
             </div>
 
             <div class="create-group">
                 <label for="description">Design Description</label>
-                <textarea id="description" name="description" rows="4" placeholder="Describe the template design, style, and intended use..."></textarea>
+                <textarea id="description" name="description" rows="4" placeholder="Describe the template design, style, and intended use...">{{ $previewData['description'] ?? '' }}</textarea>
             </div>
 
-            <div class="create-row">
-                <div class="create-group flex-1">
-                    <label for="custom_front_image">Front Image *</label>
-                    <input type="file" id="custom_front_image" name="front_image" accept="image/*" required>
-                </div>
-                <div class="create-group flex-1">
-                    <label for="custom_back_image">Back Image *</label>
-                    <input type="file" id="custom_back_image" name="back_image" accept="image/*" required>
+            <!-- Import Method Selection -->
+            <div class="create-group">
+                <label>Import Method</label>
+                <div class="btn-group w-100" role="group" aria-label="Import method">
+                    <input type="radio" class="btn-check" name="import_method" id="manual-import" autocomplete="off" checked onclick="toggleImportMethod('manual')">
+                    <label class="btn btn-outline-primary" for="manual-import">Manual Upload</label>
+                    <input type="radio" class="btn-check" name="import_method" id="figma-import" autocomplete="off" onclick="toggleImportMethod('figma')">
+                    <label class="btn btn-outline-primary" for="figma-import">Import from Figma</label>
                 </div>
             </div>
 
-            <div class="create-row">
-                <div class="create-group flex-1">
-                    <div class="preview-box" aria-live="polite">
-                        <div class="preview-label">Front SVG Preview</div>
-                        <div id="front-preview" class="svg-preview" style="width:100%;aspect-ratio:1/1;border:1px solid #d1d5db;padding:12px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:auto">
-                            <span class="muted">No SVG selected</span>
-                        </div>
+            <!-- Figma Import Section -->
+            <div id="figma-import-section" style="display: none;">
+                <div class="create-group">
+                    <label for="figma_url">Figma File URL</label>
+                    <div class="input-group">
+                        <input type="url" id="figma_url" class="form-control" placeholder="https://www.figma.com/design/... or https://www.figma.com/file/..." required>
+                        <button type="button" id="analyze-figma-btn" class="btn btn-outline-primary" onclick="analyzeFigmaUrl()">
+                            <i class="fas fa-search me-1"></i>Analyze Figma File
+                        </button>
+                    </div>
+                    <small class="form-text text-muted">Enter the shareable link to your Figma design file</small>
+                </div>
+
+                <div id="figma-results" class="create-group">
+                    <!-- Figma analysis results will appear here -->
+                </div>
+            </div>
+
+            <!-- Manual Upload Section -->
+            <div id="manual-upload-section">
+                <div class="create-row">
+                    <div class="create-group flex-1">
+                        <label for="custom_front_image">Front Image *</label>
+                        <input type="file" id="custom_front_image" name="front_image" accept="image/*" required>
+                    </div>
+                    <div class="create-group flex-1">
+                        <label for="custom_back_image">Back Image *</label>
+                        <input type="file" id="custom_back_image" name="back_image" accept="image/*" required>
                     </div>
                 </div>
-                <div class="create-group flex-1">
-                    <div class="preview-box" aria-live="polite">
-                        <div class="preview-label">Back SVG Preview</div>
-                        <div id="back-preview" class="svg-preview" style="width:100%;aspect-ratio:1/1;border:1px solid #d1d5db;padding:12px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:auto">
-                            <span class="muted">No SVG selected</span>
+
+                <div class="create-row">
+                    <div class="create-group flex-1">
+                        <div class="preview-box" aria-live="polite">
+                            <div class="preview-label">Front SVG Preview</div>
+                            <div id="front-preview" class="svg-preview" style="width:100%;aspect-ratio:1/1;border:1px solid #d1d5db;padding:12px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:auto">
+                                <span class="muted">No SVG selected</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="create-group flex-1">
+                        <div class="preview-box" aria-live="polite">
+                            <div class="preview-label">Back SVG Preview</div>
+                            <div id="back-preview" class="svg-preview" style="width:100%;aspect-ratio:1/1;border:1px solid #d1d5db;padding:12px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:auto">
+                                <span class="muted">No SVG selected</span>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -464,6 +464,7 @@ class OrderFlowController extends Controller
         $giveaways = Product::query()
             ->with(['template', 'uploads', 'images', 'bulkOrders'])
             ->where('product_type', 'Giveaway')
+            ->whereHas('uploads')
             ->orderByDesc('updated_at')
             ->get()
             ->map(function (Product $product) use ($fallbackImage) {
@@ -499,6 +500,7 @@ class OrderFlowController extends Controller
         $giveaways = \App\Models\Product::query()
             ->with(['template', 'uploads', 'images'])
             ->where('product_type', 'Giveaway')
+            ->whereHas('uploads')
             ->orderByDesc('updated_at')
             ->get()
             ->map(function ($product) {
@@ -1160,7 +1162,8 @@ class OrderFlowController extends Controller
 
         $productsQuery = Product::query()
             ->with(['template', 'uploads', 'images', 'materials.material', 'bulkOrders'])
-            ->where('product_type', 'Giveaway');
+            ->where('product_type', 'Giveaway')
+            ->whereHas('uploads');
 
         if ($selectedEvent && $selectedEvent !== 'all') {
             $productsQuery->where(function ($query) use ($selectedEvent) {

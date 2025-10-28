@@ -18,6 +18,17 @@ class Template extends Model
         'front_image',
         'back_image',
         'status',
+        'svg_path',
+        'back_svg_path',
+        'design',
+        'preview',
+        'processed_at',
+        'figma_file_key',
+        'figma_node_id',
+        'figma_url',
+        'figma_metadata',
+        'figma_synced_at',
+        'has_back_design',
     ];
 
     public function products()
