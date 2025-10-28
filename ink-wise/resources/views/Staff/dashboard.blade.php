@@ -9,12 +9,12 @@
 <style>
   .dashboard-alert {
     background: rgba(16, 185, 129, 0.1); /* Transparent green background */
-    color: #065f46; /* Dark green text */
+    color: #065f46;
     padding: 12px 16px;
     border-radius: 8px;
     margin: 16px 0 8px 0;
     font-weight: 600;
-    text-align: left; /* Align text to the left */
+    text-align: left; 
     opacity: 0;
     animation: fadeInOut 4s ease-in-out;
   }
@@ -105,7 +105,7 @@
             </div>
         </header>
         <div class="staff-quick-links">
-            <a href="{{ route('staff.assigned.orders') }}" class="staff-quick-link" data-link-card>
+            <a href="{{ route('staff.order_list.index') }}" class="staff-quick-link" data-link-card>
                 <span class="staff-quick-link__icon" aria-hidden="true"><i class="fi fi-rr-tasks-alt"></i></span>
                 <div class="staff-quick-link__copy">
                     <h3>Assigned Orders</h3>

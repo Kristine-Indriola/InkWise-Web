@@ -18,6 +18,14 @@ class Template extends Model
         'front_image',
         'back_image',
         'status',
+
+        'metadata',
+        'svg_path',
+    ];
+
+    protected $casts = [
+        'metadata' => 'array',
+
         'svg_path',
         'back_svg_path',
         'design',
@@ -29,6 +37,7 @@ class Template extends Model
         'figma_metadata',
         'figma_synced_at',
         'has_back_design',
+
     ];
 
     public function products()
@@ -36,4 +45,3 @@ class Template extends Model
         return $this->hasMany(Product::class, 'template_id');
     }
 }
-

@@ -291,31 +291,4 @@ class CustomerProfileController extends Controller
 
         return redirect()->back()->with('status', 'Thank you for your rating!');
     }
-
-    // --- Notification Methods ---
-    public function notifications(Request $request)
-    {
-        $user = Auth::user();
-
-        // Handle AJAX request for unread count
-        if ($request->wantsJson()) {
-            $unreadCount = $user->unreadNotifications()->count();
-            return response()->json(['unread_count' => $unreadCount]);
-        }
-
-        // Get all notifications for the user
-        $notifications = $user->notifications()->orderBy('created_at', 'desc')->paginate(20);
-
-        return view('customer.profile.notifications', compact('notifications'));
-    }
-
-    public function markNotificationRead($id)
-    {
-        $user = Auth::user();
-        $notification = $user->notifications()->findOrFail($id);
-
-        $notification->markAsRead();
-
-        return response()->json(['success' => true]);
-    }
 }

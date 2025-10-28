@@ -40,9 +40,11 @@ use App\Http\Controllers\Customer\CustomerController;
 
 use App\Http\Controllers\Owner\OwnerProductsController;
 use App\Http\Controllers\Owner\OwnerOrderWorkflowController;
+use App\Http\Controllers\Owner\OwnerTransactionsController;
 use App\Http\Controllers\Staff\StaffCustomerController;
 use App\Http\Controllers\Staff\StaffOrderController;
 use App\Http\Controllers\Staff\StaffMaterialController;
+use App\Http\Controllers\Owner\OwnerRatingsController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Owner\OwnerInventoryController;
 use App\Http\Controllers\Staff\StaffInventoryController;
@@ -363,6 +365,11 @@ Route::get('/customer/login', [CustomerAuthController::class, 'showLogin'])->nam
 Route::post('/customer/login', [CustomerAuthController::class, 'login'])->name('customer.login');
 Route::post('/customer/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
 
+Route::get('/customer/forgot-password', [App\Http\Controllers\Auth\CustomerPasswordResetController::class, 'create'])->name('customer.password.request');
+Route::post('/customer/forgot-password', [App\Http\Controllers\Auth\CustomerPasswordResetController::class, 'store'])->name('customer.password.email');
+Route::get('/customer/reset-password', [App\Http\Controllers\Auth\CustomerNewPasswordController::class, 'create'])->name('customer.password.reset');
+Route::post('/customer/reset-password', [App\Http\Controllers\Auth\CustomerNewPasswordController::class, 'store'])->name('customer.password.store');
+
 Route::get('/customer/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard.guest');
 
 Route::middleware('auth')->group(function () {
@@ -642,7 +649,8 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/inventory/track', [OwnerInventoryController::class, 'track'])->name('inventory-track');
     Route::get('/products', [OwnerProductsController::class, 'index'])->name('products.index');
     Route::get('/products/{product}', [OwnerProductsController::class, 'show'])->name('products.show');
-    Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
+    Route::get('/transactions/view', [OwnerTransactionsController::class, 'index'])->name('transactions-view');
+    Route::get('/ratings', [OwnerRatingsController::class, 'index'])->name('ratings.index');
 
     Route::prefix('reports')->name('reports.')->group(function () {
         Route::get('/', fn () => redirect()->route('owner.reports.sales'))->name('index');
@@ -677,6 +685,9 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
     Route::get('/order-list', [StaffOrderController::class, 'index'])->name('order_list.index');
     Route::get('/order-list/{id}', [StaffOrderController::class, 'show'])->name('order_list.show');
     Route::put('/order-list/{id}', [StaffOrderController::class, 'update'])->name('order_list.update');
+    Route::get('/orders/{id}/summary', [StaffOrderController::class, 'summary'])->name('orders.summary');
+    Route::get('/orders/{id}/status', [StaffOrderController::class, 'editStatus'])->name('orders.status.edit');
+    Route::put('/orders/{id}/status', [StaffOrderController::class, 'updateStatus'])->name('orders.status.update');
     Route::get('/notify-customers', fn () => view('staff.notify_customers'))->name('notify.customers');
     Route::get('/profile/edit', [StaffProfileController::class, 'edit'])->name('profile.edit');
     Route::post('/profile/update', [StaffProfileController::class, 'update'])->name('profile.update');
