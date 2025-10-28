@@ -336,6 +336,40 @@
 
             // Handle upload template button clicks using event delegation
             document.addEventListener('click', function(e) {
+                // Handle remove preview (AJAX)
+                if (e.target && e.target.classList.contains('remove-preview')) {
+                    e.preventDefault();
+                    const btn = e.target;
+                    const form = btn.closest('.remove-preview-form');
+                    const previewId = form ? form.getAttribute('data-preview-id') : null;
+                    if (!previewId) return;
+
+                    btn.disabled = true;
+                    btn.textContent = 'Removing...';
+
+                    fetch(`{{ url('staff/templates/preview') }}/${previewId}/remove`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                            'Accept': 'application/json'
+                        }
+                    }).then(r => r.json()).then(data => {
+                        if (data && data.success) {
+                            const card = btn.closest('.template-card');
+                            if (card) card.remove();
+                            showToast('Preview removed', 'info');
+                        } else {
+                            showToast('Failed to remove preview', 'error');
+                            btn.disabled = false;
+                            btn.textContent = 'Remove';
+                        }
+                    }).catch(err => {
+                        console.error(err);
+                        showToast('Failed to remove preview', 'error');
+                        btn.disabled = false;
+                        btn.textContent = 'Remove';
+                    });
+                }
                 if (e.target && e.target.classList.contains('upload-template-btn')) {
                     e.preventDefault(); // Prevent any default behavior
                     
@@ -378,9 +412,17 @@
                     });
 
                     confirmBtn.addEventListener('click', () => {
-                        // Remove confirmation dialog
-                        confirmDialog.classList.remove('show');
-                        setTimeout(() => confirmDialog.remove(), 300);
+                        // Disable buttons and show uploading state
+                        cancelBtn.disabled = true;
+                        confirmBtn.disabled = true;
+                        confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+                        
+                        // Update dialog content to show progress
+                        const dialogBody = confirmDialog.querySelector('.confirm-dialog-body');
+                        dialogBody.innerHTML = `
+                            <p>Uploading <strong>"${templateName}"</strong>...</p>
+                            <p class="confirm-info">Please wait while we process your template.</p>
+                        `;
 
                         const originalText = button.textContent;
 
@@ -394,9 +436,6 @@
                         if (templateCard) {
                             templateCard.classList.add('uploading');
                         }
-
-                        // Show initial loading toast
-                        const loadingToast = showToast('Uploading', 'info', 0);
 
                         // Make AJAX request to upload template
                         const uploadUrl = button.getAttribute('data-upload-url');
@@ -415,69 +454,85 @@
                             return response.json();
                         })
                         .then(data => {
-                            // Remove loading toast
-                            if (loadingToast) {
-                                loadingToast.remove();
-                            }
+                            // Update dialog for success
+                            dialogBody.innerHTML = `
+                                <p><strong>"${templateName}"</strong> uploaded successfully!</p>
+                                <p class="confirm-info">The template has been published.</p>
+                            `;
+                            confirmDialog.querySelector('.confirm-dialog-header').style.background = 'linear-gradient(135deg, #d1fae5, #a7f3d0)';
+                            confirmDialog.querySelector('.confirm-dialog-header').style.color = '#065f46';
+                            confirmDialog.querySelector('.confirm-dialog-header i').className = 'fas fa-check-circle';
+                            confirmDialog.querySelector('.confirm-dialog-header i').style.color = '#065f46';
+                            
+                            // Change button to close
+                            confirmBtn.disabled = false;
+                            confirmBtn.innerHTML = 'Close';
+                            confirmBtn.style.background = '#10b981';
+                            confirmBtn.addEventListener('click', () => {
+                                confirmDialog.classList.remove('show');
+                                setTimeout(() => confirmDialog.remove(), 300);
 
-                            if (data.success) {
-                                // Show success toast with more detailed message
-                                showToast('Uploaded successfully', 'success', 3000);
-
-                                // Smoothly remove the template card with animation
-                                if (templateCard) {
-                                    templateCard.classList.add('removing');
-                                    setTimeout(() => {
-                                        templateCard.remove();
-
-                                        // Check if there are any templates left
-                                        const remainingTemplates = document.querySelectorAll('.template-card');
-                                        if (remainingTemplates.length === 0) {
-                                            // Show empty state with smooth animation
-                                            const templatesGrid = document.querySelector('.templates-grid');
-                                            if (templatesGrid) {
-                                                const emptyState = document.createElement('div');
-                                                emptyState.className = 'empty-state mt-gap fade-in';
-                                                emptyState.innerHTML = `
-                                                    <div class="empty-state-icon">
-                                                        <i class="fas fa-paint-brush"></i>
-                                                    </div>
-                                                    <h3 class="empty-state-title">All uploaded</h3>
-                                                    <p class="empty-state-description">Check uploaded templates page for your published designs.</p>
-                                                `;
-                                                templatesGrid.innerHTML = '';
-                                                templatesGrid.appendChild(emptyState);
-                                            }
+                                // Redirect to provided route (uploaded page) or reload
+                                setTimeout(() => {
+                                    try {
+                                        if (data && data.redirect) {
+                                            window.location = data.redirect;
+                                        } else {
+                                            window.location.reload();
                                         }
-                                    }, 300);
-                                }
-                            } else {
-                                // Show error toast with more helpful message
-                                const errorMsg = data.message || 'Upload failed';
-                                showToast(errorMsg, 'error', 4000);
+                                    } catch (e) {
+                                        window.location.reload();
+                                    }
+                                }, 500);
+                            });
 
-                                // Reset button state
-                                button.disabled = false;
-                                button.innerHTML = originalText;
-                                button.classList.remove('btn-loading');
+                            // Smoothly remove the template card with animation
+                            if (templateCard) {
+                                templateCard.classList.add('removing');
+                                setTimeout(() => {
+                                    templateCard.remove();
 
-                                // Remove uploading state from card
-                                if (templateCard) {
-                                    templateCard.classList.remove('uploading');
-                                }
+                                    // Check if there are any templates left
+                                    const remainingTemplates = document.querySelectorAll('.template-card');
+                                    if (remainingTemplates.length === 0) {
+                                        // Show empty state with smooth animation
+                                        const templatesGrid = document.querySelector('.templates-grid');
+                                        if (templatesGrid) {
+                                            const emptyState = document.createElement('div');
+                                            emptyState.className = 'empty-state mt-gap fade-in';
+                                            emptyState.innerHTML = `
+                                                <div class="empty-state-icon">
+                                                    <i class="fas fa-paint-brush"></i>
+                                                </div>
+                                                <h3 class="empty-state-title">All uploaded</h3>
+                                                <p class="empty-state-description">Check uploaded templates page for your published designs.</p>
+                                            `;
+                                            templatesGrid.innerHTML = '';
+                                            templatesGrid.appendChild(emptyState);
+                                        }
+                                    }
+                                }, 300);
                             }
                         })
                         .catch(error => {
                             console.error('Upload error:', error);
-
-                            // Remove loading toast
-                            if (loadingToast) {
-                                loadingToast.remove();
-                            }
-
-                            // Show error toast with network-specific message
-                            showToast('Upload failed', 'error', 3000);
-
+                            
+                            // Update dialog for error
+                            dialogBody.innerHTML = `
+                                <p>Failed to upload <strong>"${templateName}"</strong></p>
+                                <p class="confirm-info">Please try again or contact support if the problem persists.</p>
+                            `;
+                            confirmDialog.querySelector('.confirm-dialog-header').style.background = 'linear-gradient(135deg, #fee2e2, #fecaca)';
+                            confirmDialog.querySelector('.confirm-dialog-header').style.color = '#dc2626';
+                            confirmDialog.querySelector('.confirm-dialog-header i').className = 'fas fa-exclamation-triangle';
+                            confirmDialog.querySelector('.confirm-dialog-header i').style.color = '#dc2626';
+                            
+                            // Reset buttons
+                            cancelBtn.disabled = false;
+                            confirmBtn.disabled = false;
+                            confirmBtn.innerHTML = 'Try Again';
+                            confirmBtn.style.background = '#dc2626';
+                            
                             // Reset button state
                             button.disabled = false;
                             button.innerHTML = originalText;
@@ -490,63 +545,6 @@
                         });
                     });
                 }
-            });            // Handle delete button clicks with smooth confirmation
-            document.querySelectorAll('.btn-delete').forEach(button => {
-                button.addEventListener('click', function(e) {
-                    e.preventDefault();
-
-                    const form = this.closest('form');
-                    const templateCard = this.closest('.template-card');
-                    const templateName = templateCard ? templateCard.querySelector('.template-title').textContent : 'this template';
-
-                    // Create custom confirmation dialog for delete
-                    const confirmDialog = document.createElement('div');
-                    confirmDialog.className = 'confirm-dialog-overlay';
-                    confirmDialog.innerHTML = `
-                        <div class="confirm-dialog">
-                            <div class="confirm-dialog-header">
-                                <i class="fas fa-trash-alt"></i>
-                                <h3>Delete</h3>
-                            </div>
-                            <div class="confirm-dialog-body">
-                                <p>Delete <strong>"${templateName}"</strong>?</p>
-                                <p class="confirm-warning">This cannot be undone.</p>
-                            </div>
-                            <div class="confirm-dialog-actions">
-                                <button class="btn-cancel">Cancel</button>
-                                <button class="btn-confirm">Delete</button>
-                            </div>
-                        </div>
-                    `;
-
-                    document.body.appendChild(confirmDialog);
-
-                    // Animate in
-                    setTimeout(() => confirmDialog.classList.add('show'), 10);
-
-                    // Handle button clicks
-                    const cancelBtn = confirmDialog.querySelector('.btn-cancel');
-                    const confirmBtn = confirmDialog.querySelector('.btn-confirm');
-
-                    cancelBtn.addEventListener('click', () => {
-                        confirmDialog.classList.remove('show');
-                        setTimeout(() => confirmDialog.remove(), 300);
-                    });
-
-                    confirmBtn.addEventListener('click', () => {
-                        // Add loading state
-                        confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting';
-                        confirmBtn.disabled = true;
-
-                        // Show loading toast
-                        const loadingToast = showToast('Deleting', 'info', 0);
-
-                        // Submit form after a brief delay for visual feedback
-                        setTimeout(() => {
-                            form.submit();
-                        }, 500);
-                    });
-                });
             });
         });
     </script>
@@ -612,16 +610,60 @@
             </div>
         @endif
 
-        @if($templates->isEmpty())
+    @if((empty($previewTemplates) || count($previewTemplates) === 0) && $templates->isEmpty())
             <div class="empty-state mt-gap">
                 <div class="empty-state-icon">
                     <i class="fas fa-paint-brush"></i>
                 </div>
                 <h3 class="empty-state-title">No drafts</h3>
-                <p class="empty-state-description">All templates uploaded. Check uploaded templates page.</p>
+                <p class="empty-state-description">Create a template to preview it here. Use Upload to persist the preview to the templates table.</p>
             </div>
         @else
             <div class="templates-grid mt-gap" role="list">
+                {{-- Render any session previews first --}}
+                @if(isset($previewTemplates) && count($previewTemplates))
+                    @foreach($previewTemplates as $preview)
+                        <article class="template-card" role="listitem">
+                            <div class="template-preview">
+                                @if(!empty($preview['front_image']))
+                                    <img src="{{ \App\Support\ImageResolver::url($preview['front_image']) }}" alt="Preview of {{ $preview['name'] }}">
+                                @else
+                                    <span>No preview</span>
+                                @endif
+                                @if(!empty($preview['back_image']))
+                                    <img src="{{ \App\Support\ImageResolver::url($preview['back_image']) }}" alt="Back of {{ $preview['name'] }}" class="back-thumb">
+                                @endif
+                            </div>
+                            <div class="template-info">
+                                <div class="template-meta">
+                                    <span class="template-category">{{ $preview['product_type'] ?? 'Uncategorized' }}</span>
+                                    <span class="template-date">Preview</span>
+                                </div>
+                                <h3 class="template-title">{{ $preview['name'] }}</h3>
+                                @if(!empty($preview['description']))
+                                    <p class="template-description">{{ $preview['description'] }}</p>
+                                @endif
+                            </div>
+                            <div class="template-actions">
+                                <div class="action-buttons">
+                                    <a href="{{ route('staff.templates.create', ['type' => strtolower($preview['product_type'] ?? 'invitation'), 'edit_preview' => $preview['id']]) }}" class="btn-action btn-edit" title="Edit Template Details">Edit</a>
+                                    <button type="button" class="btn-action btn-upload upload-template-btn" 
+                                            data-template-id="{{ $preview['id'] }}"
+                                            data-template-name="{{ $preview['name'] }}"
+                                            data-upload-url="{{ route('staff.templates.preview.save', ['preview' => $preview['id']]) }}"
+                                            title="Upload Template">
+                                        Upload
+                                    </button>
+                                </div>
+                                <form action="#" method="POST" class="delete-form remove-preview-form" data-preview-id="{{ $preview['id'] }}">
+                                    @csrf
+                                    <button type="button" class="btn-action btn-delete remove-preview" title="Remove Preview">Remove</button>
+                                </form>
+                            </div>
+                        </article>
+                    @endforeach
+                @endif
+
                 @foreach($templates as $template)
                     <article class="template-card" role="listitem">
                         <div class="template-preview">

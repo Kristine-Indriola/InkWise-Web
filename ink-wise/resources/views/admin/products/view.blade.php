@@ -1,7 +1,7 @@
 {{-- resources/views/admin/products/view.blade.php --}}
 @extends('layouts.admin')
 
-@section('title', 'View Product: ' . $product->name)
+@section('title', 'View Product: ' . ($product->product_type === 'Giveaway' && $product->materials && $product->materials->first() && $product->materials->first()->material ? $product->materials->first()->material->material_name : $product->name))
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('css/admin-css/product-view.css') }}">
@@ -93,7 +93,13 @@
                 <i class="fi fi-rr-angle-left"></i>
                 Back to Products
             </a>
-            <h1>{{ $product->name }}</h1>
+            <h1>
+                @if($product->product_type === 'Giveaway' && $product->materials && $product->materials->first() && $product->materials->first()->material)
+                    {{ $product->materials->first()->material->material_name }}
+                @else
+                    {{ $product->name }}
+                @endif
+            </h1>
             @php $taglineParts = collect([$product->theme_style, $product->event_type])->filter(); @endphp
             @if($taglineParts->isNotEmpty())
                 <p class="product-tagline">{{ $taglineParts->implode(' • ') }}</p>
@@ -177,40 +183,77 @@
             <div class="product-card media-card">
                 <div class="media-card__image">
                     @php
-                        $sideFront = '';
-                        $sideBack = '';
+                        $displayImages = [];
                         $imgRecord = $product->images ?? $product->product_images ?? null;
+
+                        // First priority: Product images (front/back/preview)
                         if ($imgRecord) {
-                            $sideFront = \App\Support\ImageResolver::url($imgRecord->front ?? null);
-                            $sideBack = \App\Support\ImageResolver::url($imgRecord->back ?? null);
+                            if (!empty($imgRecord->front)) {
+                                $displayImages['front'] = [
+                                    'url' => \App\Support\ImageResolver::url($imgRecord->front),
+                                    'alt' => $product->name . ' front preview'
+                                ];
+                            }
+                            if (!empty($imgRecord->back)) {
+                                $displayImages['back'] = [
+                                    'url' => \App\Support\ImageResolver::url($imgRecord->back),
+                                    'alt' => $product->name . ' back preview'
+                                ];
+                            }
+                            if (!empty($imgRecord->preview) && empty($displayImages)) {
+                                $displayImages['preview'] = [
+                                    'url' => \App\Support\ImageResolver::url($imgRecord->preview),
+                                    'alt' => $product->name . ' preview'
+                                ];
+                            }
                         }
+
+                        // Second priority: Template images (for envelope products)
                         $templateRef = $product->template ?? null;
-                        if ((!$sideFront || !$sideBack) && $templateRef) {
+                        if (empty($displayImages) && $templateRef) {
                             $tFront = $templateRef->front_image ?? $templateRef->preview_front ?? null;
                             $tBack = $templateRef->back_image ?? $templateRef->preview_back ?? null;
-                            if (!$sideFront && $tFront) {
-                                $sideFront = preg_match('/^(https?:)?\/\//i', $tFront) || strpos($tFront, '/') === 0
-                                    ? $tFront
-                                    : \Illuminate\Support\Facades\Storage::url($tFront);
+
+                            if ($tFront) {
+                                $displayImages['front'] = [
+                                    'url' => preg_match('/^(https?:)?\/\//i', $tFront) || strpos($tFront, '/') === 0
+                                        ? $tFront
+                                        : \Illuminate\Support\Facades\Storage::url($tFront),
+                                    'alt' => $product->name . ' template front'
+                                ];
                             }
-                            if (!$sideBack && $tBack) {
-                                $sideBack = preg_match('/^(https?:)?\/\//i', $tBack) || strpos($tBack, '/') === 0
-                                    ? $tBack
-                                    : \Illuminate\Support\Facades\Storage::url($tBack);
+                            if ($tBack) {
+                                $displayImages['back'] = [
+                                    'url' => preg_match('/^(https?:)?\/\//i', $tBack) || strpos($tBack, '/') === 0
+                                        ? $tBack
+                                        : \Illuminate\Support\Facades\Storage::url($tBack),
+                                    'alt' => $product->name . ' template back'
+                                ];
                             }
                         }
+
+                        // Fallback: Main product image
+                        if (empty($displayImages) && !empty($product->image)) {
+                            $displayImages['main'] = [
+                                'url' => \App\Support\ImageResolver::url($product->image),
+                                'alt' => $product->name . ' preview'
+                            ];
+                        }
+
+                        $imageCount = count($displayImages);
                     @endphp
-                    <div style="display:flex; gap:8px; align-items:center;">
-                        @if($sideFront)
-                            <img src="{{ $sideFront }}" alt="{{ $product->name }} front preview" style="max-width:48%; max-height:140px; height:auto; object-fit:contain;">
-                        @endif
-                        @if($sideBack)
-                            <img src="{{ $sideBack }}" alt="{{ $product->name }} back preview" style="max-width:48%; max-height:140px; height:auto; object-fit:contain;">
-                        @endif
-                        @if(!$sideFront && !$sideBack)
-                            <img src="{{ \App\Support\ImageResolver::url($product->image) }}" alt="{{ $product->name }} preview" style="max-width:100%; max-height:140px; height:auto; object-fit:contain;">
-                        @endif
-                    </div>
+
+                    @if($imageCount > 0)
+                        <div style="display: grid; grid-template-columns: repeat({{ $imageCount }}, 1fr); gap: 8px; align-items: center;">
+                            @foreach($displayImages as $key => $image)
+                                <img src="{{ $image['url'] }}" alt="{{ $image['alt'] }}" style="width: 100%; max-height: 140px; height: auto; object-fit: contain; {{ $imageCount === 1 ? 'max-width: 100%;' : 'max-width: 48%;' }}">
+                            @endforeach
+                        </div>
+                    @else
+                        <div style="width: 100%; height: 140px; background: #f3f4f6; border: 2px dashed #d1d5db; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #6b7280;">
+                            <span>No images available</span>
+                        </div>
+                    @endif
                 </div>
                 <div class="media-card__meta">
                     <span class="meta-pill">Stock: {{ $product->stock_availability ?? '—' }}</span>
@@ -289,7 +332,7 @@
                 @endif
             </div>
 
-            @if($product->uploads && $product->uploads->count())
+            @if($product->uploads && $product->uploads->count() && !in_array($product->product_type, ['Envelope', 'Giveaway']))
                 <div class="product-card uploads-card">
                     <div class="card-heading">
                         <h2>Uploaded Assets</h2>
@@ -316,9 +359,15 @@
 
         <section class="product-details">
             <div class="product-card">
-                <h2>Basic Information</h2>
+                <h2>{{ $product->product_type ?? 'Product' }} Information</h2>
                 <dl class="info-grid">
-                    <div><dt>Name</dt><dd>{{ $product->name }}</dd></div>
+                    <div><dt>{{ $product->product_type ?? 'Product' }} Name</dt><dd>
+                        @if($product->product_type === 'Giveaway' && $product->materials && $product->materials->first() && $product->materials->first()->material)
+                            {{ $product->materials->first()->material->material_name }}
+                        @else
+                            {{ $product->name }}
+                        @endif
+                    </dd></div>
                     <div><dt>Theme / Style</dt><dd>{{ $product->theme_style ?? '—' }}</dd></div>
                     <div><dt>Event Type</dt><dd>{{ $product->event_type ?? '—' }}</dd></div>
                     <div><dt>Product Type</dt><dd>{{ $product->product_type ?? '—' }}</dd></div>
@@ -334,9 +383,6 @@
                 </div>
             </div>
 
-            
-
-            {{-- Paper Stocks --}}
             <div class="product-card">
                 <h2>Paper Stocks</h2>
                 @php $paperStocks = $product->paper_stocks ?? $product->paperStocks ?? collect(); @endphp
@@ -360,6 +406,7 @@
             </div>
 
             {{-- Addons --}}
+            @if($product->product_type !== 'Envelope' && $product->product_type !== 'Giveaway')
             <div class="product-card">
                 <h2>Addons</h2>
                 @php $addons = $product->addons ?? $product->product_addons ?? $product->addOns ?? collect(); @endphp
@@ -381,6 +428,7 @@
                     <p class="muted">No addons defined.</p>
                 @endif
             </div>
+            @endif
 
             {{-- Colors --}}
             <div class="two-column-row">
