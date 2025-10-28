@@ -6,7 +6,347 @@
     <title>Edit Design - Inkwise</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" referrerpolicy="no-referrer">
     <link rel="stylesheet" href="{{ asset('css/customer/editing.css') }}">
+    <style>
+        .canvas-status-bar {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-top: 2px solid #dee2e6;
+            padding: 12px 20px;
+            font-size: 13px;
+            color: #495057;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        .canvas-status-bar:hover {
+            background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+        }
+        .canvas-status-bar span {
+            margin: 0 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.7);
+            transition: all 0.2s ease;
+        }
+        .canvas-status-bar span:hover {
+            background: rgba(255, 255, 255, 0.9);
+            transform: translateY(-1px);
+        }
+        .canvas-area {
+            position: relative;
+            background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
+            border: 2px solid #e1e5e9;
+            border-radius: 12px;
+            box-shadow:
+                0 8px 32px rgba(0, 0, 0, 0.12),
+                0 2px 8px rgba(0, 0, 0, 0.08),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .canvas-area:hover {
+            box-shadow:
+                0 12px 40px rgba(0, 0, 0, 0.15),
+                0 4px 12px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
+            transform: translateY(-1px);
+        }
+        /* Shape-specific styles */
+        .canvas-area.shape-circle {
+            border-radius: 50%;
+            width: var(--canvas-width, 500px);
+            height: var(--canvas-height, 500px);
+        }
+        .canvas-area.shape-circle .canvas {
+            border-radius: 50%;
+            overflow: hidden;
+        }
+        .canvas-area.shape-ellipse {
+            border-radius: 50%;
+            width: var(--canvas-width, 500px);
+            height: var(--canvas-height, 500px);
+        }
+        .canvas-area.shape-ellipse .canvas {
+            border-radius: 50%;
+            overflow: hidden;
+        }
+        .canvas-area.shape-rounded-rectangle {
+            border-radius: 25px;
+        }
+        .canvas-area.shape-rounded-rectangle .canvas {
+            border-radius: 23px; /* Slightly less than container for visual effect */
+            overflow: hidden;
+        }
+        .canvas-area.shape-custom {
+            /* Custom shapes can be extended here */
+            border-radius: 12px;
+        }
+        .canvas-area.shape-custom .canvas {
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .canvas {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 400px; /* Reduced from 720px to be more flexible */
+            max-height: 1000px; /* Add max height constraint */
+            background:
+                radial-gradient(circle at 25% 25%, rgba(0, 0, 0, 0.02) 0%, transparent 50%),
+                radial-gradient(circle at 75% 75%, rgba(0, 0, 0, 0.02) 0%, transparent 50%),
+                linear-gradient(45deg, #f5f5f5 25%, transparent 25%),
+                linear-gradient(-45deg, #f5f5f5 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #f5f5f5 75%),
+                linear-gradient(-45deg, transparent 75%, #f5f5f5 75%);
+            background-size: 20px 20px, 20px 20px, 20px 20px, 20px 20px, 20px 20px, 20px 20px;
+            background-position:
+                0 0, 0 0,
+                0 10px, 0 10px,
+                10px -10px, 10px -10px;
+            transition: all 0.3s ease;
+            /* Removed overflow: auto to prevent scrolling */
+        }
+        .zoom-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow:
+                0 8px 32px rgba(0, 0, 0, 0.12),
+                0 2px 8px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            z-index: 1000;
+            max-width: 200px; /* Prevent overflow on small screens */
+        }
+        .zoom-controls:hover {
+            transform: translateY(-2px);
+            box-shadow:
+                0 12px 40px rgba(0, 0, 0, 0.15),
+                0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .zoom-controls button {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: 600;
+            color: #374151;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        .zoom-controls button:hover {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .zoom-controls button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        .zoom-controls #zoomLevel {
+            font-size: 14px;
+            font-weight: 600;
+            min-width: 55px;
+            text-align: center;
+            color: #374151;
+            background: rgba(0, 0, 0, 0.05);
+            padding: 6px 8px;
+            border-radius: 6px;
+        }
+        .grid-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 1;
+        }
+        .safety-area {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            bottom: 20px;
+            border: 2px dashed rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            pointer-events: none;
+            z-index: 2;
+        }
+        .bleed-line {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            border-radius: 4px;
+            pointer-events: none;
+            z-index: 2;
+        }
+        @media (max-width: 768px) {
+            .canvas-area {
+                margin: 0 12px;
+                border-radius: 8px;
+            }
+            .canvas {
+                min-height: 300px; /* Smaller minimum height for mobile */
+                max-height: 600px; /* Smaller maximum height for mobile */
+            }
+            .zoom-controls {
+                top: 12px;
+                right: 12px;
+                padding: 8px;
+                border-radius: 8px;
+                max-width: 160px; /* Smaller max width for mobile */
+            }
+            .zoom-controls button {
+                width: 32px;
+                height: 32px;
+                font-size: 16px;
+            }
+            .canvas-status-bar {
+                padding: 8px 12px;
+                font-size: 12px;
+                flex-wrap: wrap; /* Allow wrapping on small screens */
+            }
+            .canvas-status-bar span {
+                margin: 0 4px 2px 0; /* Reduced margins and added bottom margin for wrapping */
+                padding: 2px 6px;
+            }
+            .safety-area {
+                top: 10px; /* Smaller margins for mobile */
+                left: 10px;
+                right: 10px;
+                bottom: 10px;
+            }
+            .bleed-line {
+                top: 5px; /* Smaller margins for mobile */
+                left: 5px;
+                right: 5px;
+                bottom: 5px;
+            }
+        }
+        .undo-redo-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-right: 16px;
+        }
+        .undo-redo-controls button {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 16px;
+            color: #374151;
+            transition: all 0.2s ease;
+        }
+        .undo-redo-controls button:hover:not(:disabled) {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .undo-redo-controls button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .canvas-layers-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            padding: 12px;
+            min-width: 200px;
+            max-height: 300px;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+            z-index: 1000;
+            display: none;
+        }
+        .canvas-layers-panel.show {
+            display: block;
+        }
+        .layers-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .layer-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .layer-item:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+        .layer-item.active {
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 3px solid #3b82f6;
+        }
+        .layer-visibility, .layer-icon {
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+        .layer-name {
+            flex: 1;
+            font-size: 12px;
+            color: #374151;
+        }
+        .canvas-stats {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 11px;
+            color: #6b7280;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            display: none;
+        }
+        .canvas-stats.show {
+            display: block;
+        }
+    </style>
     <script src="{{ asset('js/customer/editing.js') }}" defer></script>
+    <!-- Fabric.js for SVG -> editable canvas support -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.2.4/fabric.min.js" defer integrity="sha512-3u4c1v8mX2r9qYH0oHH4xg0r2v2Gv9G2tr6+/6sQxG4f8Y3kI1k0QzFJ6a3R6T4qV3t6aF7Q1w8G4k3aY0RZA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
 @php
@@ -32,6 +372,16 @@
 
     $frontPreview = TemplatePreview::normalizeToWebUrl($frontPreview);
     $backPreview = TemplatePreview::normalizeToWebUrl($backPreview);
+
+    $backSlotDefault = data_get($backSlot, 'default');
+    $backSlotPreviewMedia = data_get($backSlot, 'preview');
+    $backSlotImage = data_get($backSlot, 'image');
+    $hasBackDesign = !empty($backSvg)
+        || !empty($backImage ?? null)
+        || !empty($backSlotDefault)
+        || !empty($backSlotPreviewMedia)
+        || !empty($backSlotImage);
+
     $presetQuantity = $defaultQuantity ?? 50;
     $frontSvg = isset($frontSvg) ? trim($frontSvg) : null;
     if ($frontSvg === '') {
@@ -115,7 +465,7 @@
         ];
     }
 
-    $textFieldPresets = collect($providedPresets)->map(function ($field) {
+    $textFieldCollection = collect($providedPresets)->map(function ($field) {
         $default = $field['default'] ?? ($field['value'] ?? '');
         return [
             'node' => $field['node'] ?? uniqid('field-', true),
@@ -129,7 +479,15 @@
             'font_size' => $field['font_size'] ?? null,
             'letter_spacing' => $field['letter_spacing'] ?? null,
         ];
-    })->toArray();
+    });
+
+    if (!$hasBackDesign) {
+        $textFieldCollection = $textFieldCollection->filter(function ($field) {
+            return ($field['side'] ?? 'front') !== 'back';
+        });
+    }
+
+    $textFieldPresets = $textFieldCollection->values()->toArray();
 
     if (!empty($frontSvg) || !empty($backSvg)) {
         $textFieldPresets = [];
@@ -139,14 +497,19 @@
     <!-- TOP BAR -->
     <div class="editor-topbar">
         <div class="left-tools">
-            <button class="save-btn" type="button">Save</button>
-            <button class="undo-btn" type="button">↶ Undo</button>
-            <button class="redo-btn" type="button">↷ Redo</button>
+            <div class="undo-redo-controls">
+                <button class="undo-btn" id="canvasUndo" type="button" title="Undo last action" disabled>↶</button>
+                <button class="redo-btn" id="canvasRedo" type="button" title="Redo last action" disabled>↷</button>
+            </div>
             <button id="editModeToggle" class="edit-mode-btn" type="button" title="Toggle Edit Mode">Edit Mode</button>
+            <button id="showLayers" class="layers-btn" type="button" title="Show layers panel">Layers</button>
+            <button id="showStats" class="stats-btn" type="button" title="Show canvas stats">Stats</button>
         </div>
         <div class="right-tools">
             <a href="{{ route('templates.wedding.invitations') }}" class="change-template">Change template</a>
             <button class="preview-btn" type="button">Preview</button>
+            <button id="changeImageBtn" class="change-image-btn" type="button" title="Change background image">Change Image</button>
+            <input type="file" id="backgroundFileInput" accept="image/*" style="display:none" />
             <form method="POST" action="{{ route('order.cart.add') }}" class="next-form">
                 @csrf
                 <input type="hidden" name="product_id" value="{{ $selectedProduct?->id }}">
@@ -170,6 +533,23 @@
 
         <!-- MIDDLE CANVAS -->
         <div class="canvas-area">
+            <!-- Canvas Layers Panel -->
+            <div class="canvas-layers-panel" id="layersPanel">
+                <div class="layers-header">
+                    <span>Layers</span>
+                    <button id="toggleLayers" type="button" title="Toggle layers panel">×</button>
+                </div>
+                <div id="layersList" class="layers-list">
+                    <!-- Layer items will be populated here -->
+                </div>
+            </div>
+
+            <!-- Canvas Stats -->
+            <div class="canvas-stats" id="canvasStats">
+                <span id="statsObjects">Objects: 0</span> |
+                <span id="statsMemory">Memory: 0MB</span> |
+                <span id="statsFps">FPS: 60</span>
+            </div>
             <div id="textToolbar" class="text-toolbar" role="dialog" aria-hidden="true">
                 <button class="toolbar-btn" type="button" data-tool="font" aria-label="Font family">
                     <i class="fa-solid fa-font" aria-hidden="true"></i>
@@ -400,15 +780,18 @@
                         letter-spacing="0.1"
                         fill="#4b5563"></text>
                         </svg>
+                        <!-- Fabric canvas overlay for editable SVG (front) -->
+                        <canvas id="fabricFront" width="500" height="700" style="display:block; width:500px; height:700px;"></canvas>
                     @endif
                 </div>
-                <div id="cardBack" class="card" data-card="back" data-default-image="{{ $backPreview }}" role="img" aria-label="Back design preview">
-                    @if(!empty($backSvg))
-                        {!! $backSvg !!}
-                    @else
-                        <svg viewBox="0 0 500 700" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-labelledby="backTitle">
-                            <title id="backTitle">Editable back invitation preview</title>
-                            <rect x="0" y="0" width="500" height="700" fill="#fdfcfa" rx="24" data-background-layer="true"/>
+                @if($hasBackDesign)
+                    <div id="cardBack" class="card" data-card="back" data-default-image="{{ $backPreview }}" role="img" aria-label="Back design preview">
+                        @if(!empty($backSvg))
+                            {!! $backSvg !!}
+                        @else
+                            <svg viewBox="0 0 500 700" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-labelledby="backTitle">
+                                <title id="backTitle">Editable back invitation preview</title>
+                                <rect x="0" y="0" width="500" height="700" fill="#fdfcfa" rx="24" data-background-layer="true"/>
                 <image data-editable-image="back"
                                    x="0"
                                    y="0"
@@ -436,14 +819,25 @@
                                                                     letter-spacing="0.05"
                                               fill="#4b5563"></text>
                         </svg>
+                        <!-- Fabric canvas overlay for editable SVG (back) -->
+                        <canvas id="fabricBack" width="500" height="700" style="display:block; width:500px; height:700px;"></canvas>
                     @endif
                 </div>
+                @endif
             </div>
             <div class="zoom-controls">
                 <button id="zoomOut" type="button">-</button>
                 <span id="zoomLevel">100%</span>
                 <button id="zoomIn" type="button">+</button>
+                <button id="zoomFit" type="button" title="Zoom to fit">Fit</button>
             </div>
+        </div>
+
+        <!-- Canvas Status Bar -->
+        <div class="canvas-status-bar">
+            <span id="statusZoom">Zoom: 100%</span>
+            <span id="statusSelection">Selected: None</span>
+            <span id="statusDimensions">Canvas: 500x700px</span>
         </div>
 
         <!-- RIGHT PANEL (Front/Back toggle + text fields) -->
@@ -454,7 +848,9 @@
 
             <div class="view-toggle">
                 <button id="showFront" class="active" type="button">Front</button>
-                <button id="showBack" type="button">Back</button>
+                @if($hasBackDesign)
+                    <button id="showBack" type="button">Back</button>
+                @endif
             </div>
 
             <div class="editor-panels">
@@ -994,6 +1390,10 @@
         </div>
     </div>
 
+    <!-- Hidden fields for exported SVGs (populated on Save) -->
+    <input type="hidden" id="exportFrontSvg" name="front_svg" />
+    <input type="hidden" id="exportBackSvg" name="back_svg" />
+
     <script>
         // --- Graphics panel wiring (Unsplash search + insert shapes/icons) ---
         (function wireGraphicsPanel() {
@@ -1302,6 +1702,1501 @@
             const event = new CustomEvent('syncTextPanel');
             document.dispatchEvent(event);
         }
+    </script>
+
+    <script>
+        // Fabric-based SVG -> editable canvas support
+        (function(){
+            // wait until DOM + fabric available
+            function whenReady(cb){
+                if (document.readyState === 'complete' && window.fabric) return cb();
+                document.addEventListener('DOMContentLoaded', function(){
+                    var wait = function(){ if (window.fabric) cb(); else setTimeout(wait, 50); };
+                    wait();
+                });
+            }
+
+            whenReady(function(){
+                // Globals
+                window.currentView = window.currentView || 'front';
+                var canvases = { front: null, back: null };
+
+                // Undo/Redo System
+                var history = { front: [], back: [] };
+                var historyIndex = { front: -1, back: -1 };
+                var maxHistorySize = 50;
+
+                function saveCanvasState(canvas, view) {
+                    var state = JSON.stringify(canvas.toJSON());
+                    var viewHistory = history[view];
+                    var viewIndex = historyIndex[view];
+
+                    // Remove any history after current index
+                    viewHistory.splice(viewIndex + 1);
+
+                    // Add new state
+                    viewHistory.push(state);
+
+                    // Limit history size
+                    if (viewHistory.length > maxHistorySize) {
+                        viewHistory.shift();
+                    } else {
+                        viewIndex++;
+                    }
+
+                    historyIndex[view] = viewIndex;
+                    updateUndoRedoButtons(view);
+                }
+
+                function undoCanvas(view) {
+                    var viewHistory = history[view];
+                    var viewIndex = historyIndex[view];
+
+                    if (viewIndex > 0) {
+                        viewIndex--;
+                        historyIndex[view] = viewIndex;
+                        loadCanvasState(canvases[view], viewHistory[viewIndex]);
+                        updateUndoRedoButtons(view);
+                        showNotification('Action undone', 'info');
+                    }
+                }
+
+                function redoCanvas(view) {
+                    var viewHistory = history[view];
+                    var viewIndex = historyIndex[view];
+
+                    if (viewIndex < viewHistory.length - 1) {
+                        viewIndex++;
+                        historyIndex[view] = viewIndex;
+                        loadCanvasState(canvases[view], viewHistory[viewIndex]);
+                        updateUndoRedoButtons(view);
+                        showNotification('Action redone', 'info');
+                    }
+                }
+
+                function loadCanvasState(canvas, stateJson) {
+                    try {
+                        var state = JSON.parse(stateJson);
+                        canvas.loadFromJSON(state, function() {
+                            canvas.requestRenderAll();
+                            updateSelectionDisplay(canvas);
+                            updateLayersPanel(canvas);
+                        });
+                    } catch (error) {
+                        console.error('Failed to load canvas state:', error);
+                        showNotification('Failed to undo/redo action', 'error');
+                    }
+                }
+
+                function updateUndoRedoButtons(view) {
+                    var undoBtn = document.getElementById('canvasUndo');
+                    var redoBtn = document.getElementById('canvasRedo');
+
+                    if (undoBtn) {
+                        undoBtn.disabled = historyIndex[view] <= 0;
+                    }
+                    if (redoBtn) {
+                        redoBtn.disabled = historyIndex[view] >= history[view].length - 1;
+                    }
+                }
+
+                // Layers Panel System
+                function updateLayersPanel(canvas) {
+                    var layersList = document.getElementById('layersList');
+                    if (!layersList) return;
+
+                    layersList.innerHTML = '';
+                    var objects = canvas.getObjects();
+
+                    // Add layers in reverse order (top to bottom)
+                    for (var i = objects.length - 1; i >= 0; i--) {
+                        var obj = objects[i];
+                        var layerItem = document.createElement('div');
+                        layerItem.className = 'layer-item';
+                        layerItem.dataset.objectIndex = i;
+
+                        var visibilityIcon = obj.visible ? '👁' : '🙈';
+                        var typeIcon = getObjectTypeIcon(obj.type);
+                        var objectName = getObjectDisplayName(obj, i);
+
+                        layerItem.innerHTML = `
+                            <span class="layer-visibility">${visibilityIcon}</span>
+                            <span class="layer-icon">${typeIcon}</span>
+                            <span class="layer-name">${objectName}</span>
+                        `;
+
+                        if (canvas.getActiveObject() === obj) {
+                            layerItem.classList.add('active');
+                        }
+
+                        layerItem.addEventListener('click', function() {
+                            var index = parseInt(this.dataset.objectIndex);
+                            var targetObj = canvas.getObjects()[index];
+                            canvas.setActiveObject(targetObj);
+                            canvas.requestRenderAll();
+                            updateSelectionDisplay(canvas);
+                            updateLayersPanel(canvas);
+                        });
+
+                        layersList.appendChild(layerItem);
+                    }
+                }
+
+                function getObjectTypeIcon(type) {
+                    switch (type) {
+                        case 'i-text':
+                        case 'textbox':
+                            return '📝';
+                        case 'image':
+                            return '🖼️';
+                        case 'rect':
+                            return '▭';
+                        case 'circle':
+                            return '○';
+                        case 'triangle':
+                            return '△';
+                        case 'path':
+                            return '✏️';
+                        default:
+                            return '📄';
+                    }
+                }
+
+                function getObjectDisplayName(obj, index) {
+                    if (obj.textNodeName) {
+                        return obj.textNodeName;
+                    }
+                    if (obj.text) {
+                        return obj.text.substring(0, 15) + (obj.text.length > 15 ? '...' : '');
+                    }
+                    return obj.type + ' ' + (index + 1);
+                }
+
+                // Canvas Stats System
+                var statsUpdateInterval;
+                var lastFrameTime = performance.now();
+                var frameCount = 0;
+                var fps = 60;
+
+                function startStatsMonitoring(canvas) {
+                    if (statsUpdateInterval) clearInterval(statsUpdateInterval);
+
+                    statsUpdateInterval = setInterval(function() {
+                        updateCanvasStats(canvas);
+                    }, 1000);
+
+                    // FPS monitoring
+                    function updateFPS() {
+                        var now = performance.now();
+                        frameCount++;
+                        if (now - lastFrameTime >= 1000) {
+                            fps = Math.round((frameCount * 1000) / (now - lastFrameTime));
+                            frameCount = 0;
+                            lastFrameTime = now;
+                        }
+                        requestAnimationFrame(updateFPS);
+                    }
+                    updateFPS();
+                }
+
+                function updateCanvasStats(canvas) {
+                    var statsObjects = document.getElementById('statsObjects');
+                    var statsMemory = document.getElementById('statsMemory');
+                    var statsFps = document.getElementById('statsFps');
+
+                    if (statsObjects) {
+                        statsObjects.textContent = 'Objects: ' + canvas.getObjects().length;
+                    }
+
+                    if (statsMemory) {
+                        // Estimate memory usage (rough calculation)
+                        var objectCount = canvas.getObjects().length;
+                        var estimatedMemory = Math.round((objectCount * 0.5) + (canvas.width * canvas.height * 4 / 1024 / 1024));
+                        statsMemory.textContent = 'Memory: ~' + estimatedMemory + 'MB';
+                    }
+
+                    if (statsFps) {
+                        statsFps.textContent = 'FPS: ' + fps;
+                    }
+                }
+
+                function getSvgDimensions(svgElement) {
+                    if (!svgElement) return { width: 500, height: 700 };
+
+                    // Try to get dimensions from viewBox first
+                    var viewBox = svgElement.getAttribute('viewBox');
+                    if (viewBox) {
+                        var parts = viewBox.split(/\s+/);
+                        if (parts.length >= 4) {
+                            var width = parseFloat(parts[2]);
+                            var height = parseFloat(parts[3]);
+                            if (!isNaN(width) && !isNaN(height) && width > 0 && height > 0) {
+                                return { width: width, height: height };
+                            }
+                        }
+                    }
+
+                    // Fallback to width/height attributes
+                    var width = parseFloat(svgElement.getAttribute('width'));
+                    var height = parseFloat(svgElement.getAttribute('height'));
+
+                    if (!isNaN(width) && !isNaN(height) && width > 0 && height > 0) {
+                        return { width: width, height: height };
+                    }
+
+                    // Final fallback to default dimensions
+                    return { width: 500, height: 700 };
+                }
+
+                function detectSvgShape(svgElement) {
+                    if (!svgElement) return 'rectangle';
+
+                    // Look for shape-defining elements
+                    var circles = svgElement.querySelectorAll('circle');
+                    var ellipses = svgElement.querySelectorAll('ellipse');
+                    var rects = svgElement.querySelectorAll('rect');
+                    var paths = svgElement.querySelectorAll('path');
+
+                    // Check for circular shapes
+                    if (circles.length > 0) {
+                        // Check if there's a large circle that covers most of the SVG
+                        var svgRect = svgElement.getBoundingClientRect();
+                        var circle = circles[0];
+                        var cx = parseFloat(circle.getAttribute('cx') || 0);
+                        var cy = parseFloat(circle.getAttribute('cy') || 0);
+                        var r = parseFloat(circle.getAttribute('r') || 0);
+
+                        // If circle covers most of the viewBox, consider it circular
+                        var viewBox = svgElement.getAttribute('viewBox');
+                        if (viewBox) {
+                            var parts = viewBox.split(/\s+/);
+                            if (parts.length >= 4) {
+                                var vbWidth = parseFloat(parts[2]);
+                                var vbHeight = parseFloat(parts[3]);
+                                // If circle radius is close to half the smaller dimension, it's likely a circle template
+                                var minDim = Math.min(vbWidth, vbHeight);
+                                if (r >= minDim * 0.4) {
+                                    return 'circle';
+                                }
+                            }
+                        }
+                    }
+
+                    // Check for elliptical shapes
+                    if (ellipses.length > 0) {
+                        var ellipse = ellipses[0];
+                        var rx = parseFloat(ellipse.getAttribute('rx') || 0);
+                        var ry = parseFloat(ellipse.getAttribute('ry') || 0);
+
+                        if (rx !== ry && rx > 0 && ry > 0) {
+                            return 'ellipse';
+                        }
+                    }
+
+                    // Check for paths that might be custom shapes
+                    if (paths.length > 0) {
+                        var path = paths[0];
+                        var d = path.getAttribute('d') || '';
+
+                        // Simple heuristic: if path contains arc commands, might be circular
+                        if (d.includes('A') || d.includes('a')) {
+                            return 'custom';
+                        }
+                    }
+
+                    // Check for rounded rectangles
+                    if (rects.length > 0) {
+                        var rect = rects[0];
+                        var rx = rect.getAttribute('rx');
+                        var ry = rect.getAttribute('ry');
+
+                        if (rx || ry) {
+                            var rxVal = parseFloat(rx || ry || 0);
+                            var ryVal = parseFloat(ry || rx || 0);
+
+                            // If rounded corners are significant, consider it rounded
+                            var width = parseFloat(rect.getAttribute('width') || 0);
+                            var height = parseFloat(rect.getAttribute('height') || 0);
+
+                            if (rxVal > Math.min(width, height) * 0.1 || ryVal > Math.min(width, height) * 0.1) {
+                                return 'rounded-rectangle';
+                            }
+                        }
+                    }
+
+                    // Default to rectangle
+                    return 'rectangle';
+                }
+
+                function updateCanvasAreaShape(cardId, shape) {
+                    var card = document.getElementById(cardId);
+                    if (!card) return;
+
+                    var canvasArea = card.querySelector('.canvas-area');
+                    if (!canvasArea) return;
+
+                    // Remove all shape classes
+                    canvasArea.classList.remove('shape-circle', 'shape-ellipse', 'shape-rounded-rectangle', 'shape-custom');
+
+                    // Add the appropriate shape class
+                    if (shape !== 'rectangle') {
+                        canvasArea.classList.add('shape-' + shape);
+                    }
+
+                    // Update CSS custom properties for dynamic styling
+                    var dimensions = getSvgDimensions(card.querySelector('svg'));
+                    canvasArea.style.setProperty('--canvas-width', dimensions.width + 'px');
+                    canvasArea.style.setProperty('--canvas-height', dimensions.height + 'px');
+                }
+
+                function updateCanvasContainerDimensions(cardId, dimensions) {
+                    var card = document.getElementById(cardId);
+                    if (!card) return;
+
+                    // Get the canvas container (the .canvas element)
+                    var canvasContainer = card.querySelector('.canvas');
+                    if (!canvasContainer) return;
+
+                    // Get viewport dimensions (accounting for padding and other elements)
+                    var viewportWidth = window.innerWidth;
+                    var viewportHeight = window.innerHeight;
+
+                    // Account for sidebar and other UI elements (approximate)
+                    var sidebarWidth = 320; // Approximate sidebar width
+                    var headerHeight = 80; // Approximate header height
+                    var statusBarHeight = 60; // Approximate status bar height
+                    var padding = 40; // Padding around canvas
+
+                    var availableWidth = viewportWidth - sidebarWidth - (padding * 2);
+                    var availableHeight = viewportHeight - headerHeight - statusBarHeight - (padding * 2);
+
+                    // Calculate scale to fit canvas within available space
+                    var scaleX = availableWidth / dimensions.width;
+                    var scaleY = availableHeight / dimensions.height;
+                    var scale = Math.min(scaleX, scaleY, 1); // Don't scale up beyond 100%
+
+                    // Apply minimum and maximum scale limits
+                    scale = Math.max(0.1, Math.min(1, scale));
+
+                    // Update container dimensions to fit scaled canvas
+                    var scaledWidth = dimensions.width * scale;
+                    var scaledHeight = dimensions.height * scale;
+
+                    canvasContainer.style.width = scaledWidth + 'px';
+                    canvasContainer.style.height = scaledHeight + 'px';
+                    canvasContainer.style.maxWidth = '100%';
+                    canvasContainer.style.maxHeight = '100%';
+
+                    // Ensure the canvas itself fits within the container
+                    var canvasEl = card.querySelector('canvas');
+                    if (canvasEl) {
+                        canvasEl.style.width = scaledWidth + 'px';
+                        canvasEl.style.height = scaledHeight + 'px';
+                        canvasEl.style.maxWidth = '100%';
+                        canvasEl.style.maxHeight = '100%';
+                    }
+
+                    // Update zoom level to reflect the scaling
+                    var currentCanvas = canvases[window.currentView];
+                    if (currentCanvas) {
+                        currentCanvas.setZoom(scale);
+                        updateZoomDisplay(scale);
+                    }
+                }
+                    var card = document.getElementById(cardId);
+                    if (!card) return;
+
+                    // Get the canvas container (the .canvas element)
+                    var canvasContainer = card.querySelector('.canvas');
+                    if (!canvasContainer) return;
+
+                    // Get viewport dimensions (accounting for padding and other elements)
+                    var viewportWidth = window.innerWidth;
+                    var viewportHeight = window.innerHeight;
+
+                    // Account for sidebar and other UI elements (approximate)
+                    var sidebarWidth = 320; // Approximate sidebar width
+                    var headerHeight = 80; // Approximate header height
+                    var statusBarHeight = 60; // Approximate status bar height
+                    var padding = 40; // Padding around canvas
+
+                    var availableWidth = viewportWidth - sidebarWidth - (padding * 2);
+                    var availableHeight = viewportHeight - headerHeight - statusBarHeight - (padding * 2);
+
+                    // Calculate scale to fit canvas within available space
+                    var scaleX = availableWidth / dimensions.width;
+                    var scaleY = availableHeight / dimensions.height;
+                    var scale = Math.min(scaleX, scaleY, 1); // Don't scale up beyond 100%
+
+                    // Apply minimum and maximum scale limits
+                    scale = Math.max(0.1, Math.min(1, scale));
+
+                    // Update container dimensions to fit scaled canvas
+                    var scaledWidth = dimensions.width * scale;
+                    var scaledHeight = dimensions.height * scale;
+
+                    canvasContainer.style.width = scaledWidth + 'px';
+                    canvasContainer.style.height = scaledHeight + 'px';
+                    canvasContainer.style.maxWidth = '100%';
+                    canvasContainer.style.maxHeight = '100%';
+
+                    // Ensure the canvas itself fits within the container
+                    var canvasEl = card.querySelector('canvas');
+                    if (canvasEl) {
+                        canvasEl.style.width = scaledWidth + 'px';
+                        canvasEl.style.height = scaledHeight + 'px';
+                        canvasEl.style.maxWidth = '100%';
+                        canvasEl.style.maxHeight = '100%';
+                    }
+
+                    // Update zoom level to reflect the scaling
+                    var currentCanvas = canvases[window.currentView];
+                    if (currentCanvas) {
+                        currentCanvas.setZoom(scale);
+                        updateZoomDisplay(scale);
+                    }
+                }
+
+                function resizeCanvasToSvg(canvas, svgElement, cardId) {
+                    if (!canvas || !svgElement) return;
+
+                    var dimensions = getSvgDimensions(svgElement);
+                    var shape = detectSvgShape(svgElement);
+
+                    // Update canvas area shape
+                    updateCanvasAreaShape(cardId, shape);
+
+                    // Update canvas dimensions
+                    canvas.setWidth(dimensions.width);
+                    canvas.setHeight(dimensions.height);
+
+                    // Update canvas element styles
+                    var canvasEl = canvas.getElement();
+                    if (canvasEl) {
+                        canvasEl.style.width = dimensions.width + 'px';
+                        canvasEl.style.height = dimensions.height + 'px';
+                    }
+
+                    // Update container dimensions
+                    updateCanvasContainerDimensions(cardId, dimensions);
+
+                    // Update status bar
+                    var statusDimensionsEl = document.getElementById('statusDimensions');
+                    if (statusDimensionsEl) {
+                        statusDimensionsEl.textContent = 'Canvas: ' + Math.round(dimensions.width) + 'x' + Math.round(dimensions.height) + 'px (' + shape + ')';
+                    }
+
+                    // Re-render canvas
+                    canvas.requestRenderAll();
+
+                    // Update grid background
+                    addGridBackground(canvas);
+                }
+
+                function addGridBackground(canvas) {
+                    var gridSize = 20; // pixels
+                    var ctx = canvas.getContext('2d');
+                    var width = canvas.width;
+                    var height = canvas.height;
+
+                    // Create a pattern for the grid with enhanced styling
+                    var patternCanvas = document.createElement('canvas');
+                    patternCanvas.width = gridSize;
+                    patternCanvas.height = gridSize;
+                    var patternCtx = patternCanvas.getContext('2d');
+
+                    // Clear pattern canvas
+                    patternCtx.clearRect(0, 0, gridSize, gridSize);
+
+                    // Create subtle gradient for grid lines
+                    var gradient = patternCtx.createLinearGradient(0, 0, gridSize, gridSize);
+                    gradient.addColorStop(0, 'rgba(0, 0, 0, 0.04)');
+                    gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.08)');
+                    gradient.addColorStop(1, 'rgba(0, 0, 0, 0.04)');
+
+                    // Draw main grid lines
+                    patternCtx.strokeStyle = gradient;
+                    patternCtx.lineWidth = 1;
+                    patternCtx.beginPath();
+                    patternCtx.moveTo(0, 0);
+                    patternCtx.lineTo(gridSize, 0);
+                    patternCtx.moveTo(0, 0);
+                    patternCtx.lineTo(0, gridSize);
+                    patternCtx.stroke();
+
+                    // Add subtle secondary grid lines (every 5 units)
+                    patternCtx.strokeStyle = 'rgba(0, 0, 0, 0.02)';
+                    patternCtx.lineWidth = 0.5;
+                    patternCtx.beginPath();
+                    patternCtx.moveTo(gridSize/2, 0);
+                    patternCtx.lineTo(gridSize/2, gridSize);
+                    patternCtx.moveTo(0, gridSize/2);
+                    patternCtx.lineTo(gridSize, gridSize/2);
+                    patternCtx.stroke();
+
+                    // Add tiny dots at intersections for better alignment
+                    patternCtx.fillStyle = 'rgba(0, 0, 0, 0.03)';
+                    patternCtx.beginPath();
+                    patternCtx.arc(0, 0, 0.8, 0, 2 * Math.PI);
+                    patternCtx.arc(gridSize/2, gridSize/2, 0.5, 0, 2 * Math.PI);
+                    patternCtx.fill();
+
+                    // Create pattern and set as background
+                    var pattern = ctx.createPattern(patternCanvas, 'repeat');
+                    canvas.setBackgroundColor(pattern, function() {
+                        canvas.renderAll();
+                    });
+                }
+
+                function createFabricCanvasForCard(cardId, canvasId){
+                    var card = document.getElementById(cardId);
+                    if (!card) return null;
+                    var svg = card.querySelector('svg');
+                    var canvasEl = document.getElementById(canvasId);
+                    if (!svg || !canvasEl) return null;
+
+                    // Get SVG dimensions and shape dynamically
+                    var dimensions = getSvgDimensions(svg);
+                    var shape = detectSvgShape(svg);
+
+                    // Update container dimensions and shape
+                    updateCanvasContainerDimensions(cardId, dimensions);
+                    updateCanvasAreaShape(cardId, shape);
+
+                    // hide the original svg (we keep it for source reference)
+                    svg.style.display = 'none';
+
+                    var canvas = new fabric.Canvas(canvasId, {
+                        selection: true,
+                        preserveObjectStacking: true,
+                        enableRetinaScaling: false, // Better performance
+                        renderOnAddRemove: false, // Manual rendering for performance
+                        skipOffscreen: true // Performance optimization
+                    });
+
+                    // Set dynamic canvas dimensions
+                    canvas.setWidth(dimensions.width);
+                    canvas.setHeight(dimensions.height);
+
+                    // Update canvas element styles to match
+                    canvasEl.style.width = dimensions.width + 'px';
+                    canvasEl.style.height = dimensions.height + 'px';
+
+                    // Add grid background
+                    addGridBackground(canvas);
+
+                    // parse only simple known elements: rect (background), image, text
+                    // iterate in DOM order and add objects to canvas in same order so stacking preserved
+                    Array.from(svg.childNodes).forEach(function(node){
+                        if (node.nodeType !== 1) return; // element
+                        var tag = node.tagName.toLowerCase();
+                        if (tag === 'defs' || tag === 'title') return; // skip
+                        if (tag === 'rect'){
+                            var x = parseFloat(node.getAttribute('x') || 0);
+                            var y = parseFloat(node.getAttribute('y') || 0);
+                            var w = parseFloat(node.getAttribute('width') || canvas.width);
+                            var h = parseFloat(node.getAttribute('height') || canvas.height);
+                            var fill = node.getAttribute('fill') || '#ffffff';
+                            var selectable = node.getAttribute('data-background-layer') ? false : false;
+                            var rect = new fabric.Rect({ left: x, top: y, width: w, height: h, fill: fill, selectable: selectable, evented: false, originX: 'left', originY: 'top' });
+                            canvas.add(rect);
+                        } else if (tag === 'image'){
+                            var href = getSvgHref(node);
+                            var x = parseFloat(node.getAttribute('x') || 0);
+                            var y = parseFloat(node.getAttribute('y') || 0);
+                            var w = parseFloat(node.getAttribute('width') || canvas.width);
+                            var h = parseFloat(node.getAttribute('height') || canvas.height);
+                            var preserve = node.getAttribute('preserveAspectRatio') || 'xMidYMid slice';
+                            var editableName = node.getAttribute('id') || node.getAttribute('data-editable-image') || null;
+
+                            // Skip if no valid href
+                            if (!href || href.trim() === '') {
+                                console.warn('Image element missing href attribute');
+                                return;
+                            }
+
+                            try {
+                                fabric.Image.fromURL(href, function(img){
+                                    if (!img || !img.getElement()) {
+                                        console.warn('Failed to load image:', href);
+                                        return;
+                                    }
+
+                                    // Set initial position
+                                    img.set({
+                                        left: x,
+                                        top: y,
+                                        originX: 'left',
+                                        originY: 'top',
+                                        selectable: false,
+                                        evented: false
+                                    });
+
+                                    // Enhanced scaling logic with aspect ratio preservation
+                                    var targetWidth = w;
+                                    var targetHeight = h;
+                                    var imgAspectRatio = img.width / img.height;
+                                    var targetAspectRatio = targetWidth / targetHeight;
+
+                                    // Handle percentage-based dimensions
+                                    var widthAttr = node.getAttribute('width') || '';
+                                    var heightAttr = node.getAttribute('height') || '';
+
+                                    if (widthAttr.indexOf('%') !== -1 || widthAttr === '100%') {
+                                        targetWidth = canvas.width;
+                                    }
+                                    if (heightAttr.indexOf('%') !== -1 || heightAttr === '100%') {
+                                        targetHeight = canvas.height;
+                                    }
+
+                                    // Apply preserveAspectRatio logic
+                                    var preserveMode = preserve.split(' ')[1] || 'slice';
+                                    var alignMode = preserve.split(' ')[0] || 'xMidYMid';
+
+                                    if (preserveMode === 'meet') {
+                                        // Fit entire image within bounds
+                                        if (imgAspectRatio > targetAspectRatio) {
+                                            // Image is wider than target - fit by height
+                                            img.scaleToHeight(targetHeight);
+                                        } else {
+                                            // Image is taller than target - fit by width
+                                            img.scaleToWidth(targetWidth);
+                                        }
+                                    } else if (preserveMode === 'slice') {
+                                        // Fill entire bounds, cropping if necessary
+                                        if (imgAspectRatio > targetAspectRatio) {
+                                            // Image is wider than target - fill by width
+                                            img.scaleToWidth(targetWidth);
+                                        } else {
+                                            // Image is taller than target - fill by height
+                                            img.scaleToHeight(targetHeight);
+                                        }
+                                    } else {
+                                        // Default: stretch to fit
+                                        img.scaleToWidth(targetWidth);
+                                        img.scaleToHeight(targetHeight);
+                                    }
+
+                                    // Apply alignment based on preserveAspectRatio
+                                    var scaledWidth = img.getScaledWidth();
+                                    var scaledHeight = img.getScaledHeight();
+                                    var offsetX = 0;
+                                    var offsetY = 0;
+
+                                    if (alignMode.includes('xMid')) {
+                                        offsetX = (targetWidth - scaledWidth) / 2;
+                                    } else if (alignMode.includes('xMax')) {
+                                        offsetX = targetWidth - scaledWidth;
+                                    }
+
+                                    if (alignMode.includes('YMid')) {
+                                        offsetY = (targetHeight - scaledHeight) / 2;
+                                    } else if (alignMode.includes('YMax')) {
+                                        offsetY = targetHeight - scaledHeight;
+                                    }
+
+                                    img.set({
+                                        left: x + offsetX,
+                                        top: y + offsetY
+                                    });
+
+                                    // Add quality and performance optimizations
+                                    var imgElement = img.getElement();
+                                    if (imgElement) {
+                                        // Enable image smoothing for better quality
+                                        imgElement.style.imageRendering = 'auto';
+                                        // Add crossOrigin for CORS compliance
+                                        imgElement.crossOrigin = 'anonymous';
+                                    }
+
+                                    // Set additional properties for better performance
+                                    img.set({
+                                        objectCaching: true,
+                                        statefulCache: true,
+                                        cacheKey: href // Use URL as cache key
+                                    });
+
+                                    // Custom properties for identification
+                                    if (editableName) {
+                                        img.editableImageName = editableName;
+                                    }
+
+                                    // Layer management: send full-card images to back
+                                    var isFullCard = (x === 0 && y === 0) &&
+                                        (widthAttr === '100%' || heightAttr === '100%' ||
+                                         Math.abs(targetWidth - canvas.width) < 10 ||
+                                         Math.abs(targetHeight - canvas.height) < 10);
+
+                                    if (isFullCard) {
+                                        img.sendToBack();
+                                    }
+
+                                    // Add to canvas and render
+                                    canvas.add(img);
+                                    canvas.requestRenderAll();
+
+                                    // Log successful image load for debugging
+                                    console.log('Image loaded successfully:', {
+                                        src: href,
+                                        position: { x: img.left, y: img.top },
+                                        size: { width: scaledWidth, height: scaledHeight },
+                                        preserveAspectRatio: preserve
+                                    });
+
+                                }, {
+                                    crossOrigin: 'anonymous',
+                                    // Add error handling options
+                                    onError: function() {
+                                        console.error('Image failed to load:', href);
+                                        // Could add fallback placeholder image here
+                                    }
+                                });
+                            } catch (e) {
+                                console.error('Image processing error for:', href, e);
+                            }
+
+                        } else if (tag === 'text'){
+                            var txt = node.textContent || '';
+                            var x = parseFloat(node.getAttribute('x') || 0);
+                            var y = parseFloat(node.getAttribute('y') || 0);
+                            var fontSize = parseFloat(node.getAttribute('font-size') || 16);
+                            var fill = node.getAttribute('fill') || '#000000';
+                            var anchor = node.getAttribute('text-anchor') || 'start';
+                            var align = anchor === 'middle' ? 'center' : (anchor === 'end' ? 'right' : 'left');
+                            var letterSpacing = parseFloat(node.getAttribute('letter-spacing') || 0);
+
+                            var itext = new fabric.IText(txt, {
+                                left: x,
+                                top: y,
+                                fontSize: fontSize,
+                                fill: fill,
+                                originX: anchor === 'middle' ? 'center' : 'left',
+                                originY: 'middle',
+                                textAlign: align,
+                                editable: true,
+                                selectable: true,
+                                evented: true
+                            });
+                            // store node-id mapping so we can sync back later if needed
+                            var nodeName = node.getAttribute('data-text-node') || node.id || null;
+                            if (nodeName) itext.textNodeName = nodeName;
+                            canvas.add(itext);
+                        } else {
+                            // for other tags, try to import their outerHTML as an image snapshot fallback
+                            // skip for now
+                        }
+                    });
+
+                    // ensure text objects are on top
+                    canvas.getObjects().forEach(function(o){ if (o.type && (o.type.indexOf('text')!==-1 || o instanceof fabric.IText)) o.bringToFront(); });
+                    canvas.requestRenderAll();
+
+                        // Enhanced double-click to edit text with better UX
+                        canvas.on('mouse:dblclick', function(e){
+                            var target = e.target;
+                            if (!target) return;
+                            if (target.isType('i-text') || target.isType('textbox') || target instanceof fabric.IText) {
+                                target.enterEditing();
+                                target.selectAll();
+                                // Focus the canvas for keyboard events
+                                canvasEl.focus();
+                            }
+                        });
+
+                        // Add keyboard shortcuts for better UX
+                        canvas.on('key:down', function(e) {
+                            var key = e.e.key;
+
+                            // Delete selected objects with Delete or Backspace
+                            if ((key === 'Delete' || key === 'Backspace') && canvas.getActiveObject()) {
+                                var activeObject = canvas.getActiveObject();
+                                if (activeObject && activeObject.selectable) {
+                                    canvas.remove(activeObject);
+                                    canvas.requestRenderAll();
+                                    updateSelectionDisplay(canvas);
+                                }
+                                e.e.preventDefault();
+                            }
+
+                            // Escape to deselect
+                            if (key === 'Escape') {
+                                canvas.discardActiveObject();
+                                canvas.requestRenderAll();
+                                updateSelectionDisplay(canvas);
+                                e.e.preventDefault();
+                            }
+
+                            // Ctrl+A to select all text objects
+                            if (e.e.ctrlKey && key === 'a') {
+                                var textObjects = canvas.getObjects().filter(function(obj) {
+                                    return obj.isType('i-text') || obj.isType('textbox') || obj instanceof fabric.IText;
+                                });
+                                if (textObjects.length > 0) {
+                                    var selection = new fabric.ActiveSelection(textObjects, { canvas: canvas });
+                                    canvas.setActiveObject(selection);
+                                    canvas.requestRenderAll();
+                                    updateSelectionDisplay(canvas);
+                                }
+                                e.e.preventDefault();
+                            }
+                        });                    // Enhanced mouse wheel zoom with smooth animation
+                    canvas.on('mouse:wheel', function(opt) {
+                        var delta = opt.e.deltaY;
+                        var zoom = canvas.getZoom();
+                        var newZoom = zoom * Math.pow(0.999, delta);
+
+                        // Apply zoom limits with smooth clamping
+                        newZoom = Math.max(0.01, Math.min(20, newZoom));
+
+                        // Smooth zoom animation
+                        var zoomStep = (newZoom - zoom) / 10;
+                        var stepCount = 0;
+
+                        function animateZoom() {
+                            stepCount++;
+                            var currentZoom = zoom + (zoomStep * stepCount);
+
+                            if (stepCount < 10) {
+                                canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, currentZoom);
+                                updateZoomDisplay(currentZoom);
+                                requestAnimationFrame(animateZoom);
+                            } else {
+                                canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, newZoom);
+                                updateZoomDisplay(newZoom);
+                            }
+                        }
+
+                        animateZoom();
+                        opt.e.preventDefault();
+                        opt.e.stopPropagation();
+                    });
+
+                    return canvas;
+                }
+
+                // create canvases
+                canvases.front = createFabricCanvasForCard('cardFront','fabricFront');
+                canvases.back  = createFabricCanvasForCard('cardBack','fabricBack');
+
+                // Resize canvases if custom SVGs are provided
+                var frontSvg = document.querySelector('#cardFront svg');
+                var backSvg = document.querySelector('#cardBack svg');
+
+                if (canvases.front && frontSvg) {
+                    var frontDimensions = getSvgDimensions(frontSvg);
+                    if (frontDimensions.width !== 500 || frontDimensions.height !== 700) {
+                        resizeCanvasToSvg(canvases.front, frontSvg, 'cardFront');
+                    }
+                }
+
+                if (canvases.back && backSvg) {
+                    var backDimensions = getSvgDimensions(backSvg);
+                    if (backDimensions.width !== 500 || backDimensions.height !== 700) {
+                        resizeCanvasToSvg(canvases.back, backSvg, 'cardBack');
+                    }
+                }
+
+                // Add history tracking to canvases
+                if (canvases.front) {
+                    canvases.front.on('object:added', function() {
+                        saveCanvasState(canvases.front, 'front');
+                        updateLayersPanel(canvases.front);
+                    });
+                    canvases.front.on('object:removed', function() {
+                        saveCanvasState(canvases.front, 'front');
+                        updateLayersPanel(canvases.front);
+                    });
+                    canvases.front.on('object:modified', function() {
+                        saveCanvasState(canvases.front, 'front');
+                    });
+                }
+
+                if (canvases.back) {
+                    canvases.back.on('object:added', function() {
+                        saveCanvasState(canvases.back, 'back');
+                        updateLayersPanel(canvases.back);
+                    });
+                    canvases.back.on('object:removed', function() {
+                        saveCanvasState(canvases.back, 'back');
+                        updateLayersPanel(canvases.back);
+                    });
+                    canvases.back.on('object:modified', function() {
+                        saveCanvasState(canvases.back, 'back');
+                    });
+                }
+
+                // wire view toggle buttons to set currentView and show/hide canvases
+                var showFrontBtn = document.getElementById('showFront');
+                var showBackBtn = document.getElementById('showBack');
+                function showView(requestedView){
+                    var hasBack = !!document.getElementById('cardBack');
+                    var view = (requestedView === 'back' && !hasBack) ? 'front' : requestedView;
+
+                    window.currentView = view;
+
+                    document.querySelectorAll('.card').forEach(function(c){ c.classList.remove('active'); });
+
+                    var activeCardId = view === 'front' ? 'cardFront' : 'cardBack';
+                    var activeCard = document.getElementById(activeCardId);
+                    if (activeCard) {
+                        activeCard.classList.add('active');
+                    }
+
+                    var fabricFront = document.getElementById('fabricFront');
+                    if (fabricFront) {
+                        fabricFront.style.display = (view === 'front') ? 'block' : 'none';
+                    }
+
+                    var fabricBack = document.getElementById('fabricBack');
+                    if (fabricBack) {
+                        fabricBack.style.display = (view === 'back') ? 'block' : 'none';
+                    }
+
+                    return view;
+                }
+                if (showFrontBtn) showFrontBtn.addEventListener('click', function(){ showView('front'); });
+                if (showBackBtn) showBackBtn.addEventListener('click', function(){ showView('back'); });
+                // start showing front
+                showView(window.currentView);
+
+                // Zoom controls
+                var zoomLevelEl = document.getElementById('zoomLevel');
+                var statusZoomEl = document.getElementById('statusZoom');
+                var statusSelectionEl = document.getElementById('statusSelection');
+                var statusDimensionsEl = document.getElementById('statusDimensions');
+                var zoomInBtn = document.getElementById('zoomIn');
+                var zoomOutBtn = document.getElementById('zoomOut');
+                var zoomFitBtn = document.getElementById('zoomFit');
+
+                function updateZoomDisplay(zoom) {
+                    if (typeof zoom !== 'number' || isNaN(zoom)) {
+                        console.warn('Invalid zoom value:', zoom);
+                        return;
+                    }
+
+                    var zoomPercent = Math.round(zoom * 100) + '%';
+                    var zoomLevelEl = document.getElementById('zoomLevel');
+                    var statusZoomEl = document.getElementById('statusZoom');
+
+                    if (zoomLevelEl) {
+                        zoomLevelEl.textContent = zoomPercent;
+                        // Add visual feedback for zoom level
+                        zoomLevelEl.style.color = zoom > 2 ? '#ef4444' : zoom < 0.5 ? '#f59e0b' : '#374151';
+                    }
+                    if (statusZoomEl) {
+                        statusZoomEl.textContent = 'Zoom: ' + zoomPercent;
+                    }
+                }
+
+                function updateSelectionDisplay(canvas) {
+                    if (!canvas) return;
+
+                    try {
+                        var activeObject = canvas.getActiveObject();
+                        var statusSelectionEl = document.getElementById('statusSelection');
+
+                        if (!statusSelectionEl) return;
+
+                        if (activeObject) {
+                            var type = activeObject.type || 'Unknown';
+                            var info = type.charAt(0).toUpperCase() + type.slice(1);
+
+                            if (activeObject.text) {
+                                var text = activeObject.text.substring(0, 25);
+                                if (activeObject.text.length > 25) text += '...';
+                                info += ' "' + text + '"';
+                            } else if (type === 'image') {
+                                info += ' (' + Math.round(activeObject.width * activeObject.scaleX) + '×' + Math.round(activeObject.height * activeObject.scaleY) + ')';
+                            } else if (type === 'rect') {
+                                info += ' (' + Math.round(activeObject.width) + '×' + Math.round(activeObject.height) + ')';
+                            }
+
+                            statusSelectionEl.textContent = 'Selected: ' + info;
+                            statusSelectionEl.style.fontWeight = '600';
+                        } else {
+                            statusSelectionEl.textContent = 'Selected: None';
+                            statusSelectionEl.style.fontWeight = 'normal';
+                        }
+                    } catch (error) {
+                        console.error('Error updating selection display:', error);
+                        var statusSelectionEl = document.getElementById('statusSelection');
+                        if (statusSelectionEl) {
+                            statusSelectionEl.textContent = 'Selected: Error';
+                        }
+                    }
+                }
+
+                function zoomCanvas(factor, animate = true) {
+                    var canvas = canvases[window.currentView];
+                    if (!canvas) {
+                        console.warn('Canvas not available for zoom');
+                        return;
+                    }
+
+                    var currentZoom = canvas.getZoom();
+                    var newZoom = currentZoom * factor;
+
+                    // Apply zoom limits
+                    newZoom = Math.max(0.01, Math.min(20, newZoom));
+
+                    if (animate) {
+                        // Smooth zoom animation
+                        var zoomStep = (newZoom - currentZoom) / 8;
+                        var stepCount = 0;
+
+                        function animateZoom() {
+                            stepCount++;
+                            var stepZoom = currentZoom + (zoomStep * stepCount);
+
+                            if (stepCount < 8) {
+                                canvas.setZoom(stepZoom);
+                                updateZoomDisplay(stepZoom);
+                                requestAnimationFrame(animateZoom);
+                            } else {
+                                canvas.setZoom(newZoom);
+                                updateZoomDisplay(newZoom);
+                            }
+                        }
+
+                        animateZoom();
+                    } else {
+                        canvas.setZoom(newZoom);
+                        updateZoomDisplay(newZoom);
+                    }
+                }
+
+                function zoomToFit() {
+                    var canvas = canvases[window.currentView];
+                    if (!canvas) {
+                        console.warn('Canvas not available for zoom to fit');
+                        return;
+                    }
+
+                    // Get the canvas container
+                    var cardId = window.currentView === 'front' ? 'cardFront' : 'cardBack';
+                    var card = document.getElementById(cardId);
+                    var canvasContainer = card ? card.querySelector('.canvas') : null;
+
+                    if (!canvasContainer) {
+                        console.warn('Canvas container not found');
+                        return;
+                    }
+
+                    // Get container dimensions
+                    var containerRect = canvasContainer.getBoundingClientRect();
+
+                    // Calculate scale to fit canvas in container
+                    var scaleX = containerRect.width / canvas.width;
+                    var scaleY = containerRect.height / canvas.height;
+                    var scale = Math.min(scaleX, scaleY, 1); // Don't scale up beyond 100%
+
+                    // Apply minimum and maximum zoom limits
+                    scale = Math.max(0.1, Math.min(2, scale));
+
+                    // Smooth animation to target zoom
+                    var currentZoom = canvas.getZoom();
+                    var zoomStep = (scale - currentZoom) / 10;
+                    var stepCount = 0;
+
+                    function animateToFit() {
+                        stepCount++;
+                        var stepZoom = currentZoom + (zoomStep * stepCount);
+
+                        if (stepCount < 10) {
+                            canvas.setZoom(stepZoom);
+                            updateZoomDisplay(stepZoom);
+                            requestAnimationFrame(animateToFit);
+                        } else {
+                            canvas.setZoom(scale);
+                            canvas.setViewportTransform([scale, 0, 0, scale, 0, 0]);
+                            updateZoomDisplay(scale);
+                        }
+                    }
+
+                    animateToFit();
+                }
+
+                // Initialize status bar with dynamic dimensions and shape
+                var currentCanvas = canvases[window.currentView];
+                var currentCardId = window.currentView === 'front' ? 'cardFront' : 'cardBack';
+                var currentSvg = document.querySelector('#' + currentCardId + ' svg');
+                var currentShape = currentSvg ? detectSvgShape(currentSvg) : 'rectangle';
+
+                if (currentCanvas && statusDimensionsEl) {
+                    statusDimensionsEl.textContent = 'Canvas: ' + Math.round(currentCanvas.width) + 'x' + Math.round(currentCanvas.height) + 'px (' + currentShape + ')';
+                } else if (statusDimensionsEl) {
+                    statusDimensionsEl.textContent = 'Canvas: 500x700px (rectangle)'; // fallback
+                }
+
+                // Add UI control event listeners
+                var canvasUndoBtn = document.getElementById('canvasUndo');
+                var canvasRedoBtn = document.getElementById('canvasRedo');
+                var showLayersBtn = document.getElementById('showLayers');
+                var showStatsBtn = document.getElementById('showStats');
+                var toggleLayersBtn = document.getElementById('toggleLayers');
+                var layersPanel = document.getElementById('layersPanel');
+                var canvasStats = document.getElementById('canvasStats');
+
+                // Undo/Redo event listeners
+                if (canvasUndoBtn) {
+                    canvasUndoBtn.addEventListener('click', function() {
+                        undoCanvas(window.currentView);
+                    });
+                }
+                if (canvasRedoBtn) {
+                    canvasRedoBtn.addEventListener('click', function() {
+                        redoCanvas(window.currentView);
+                    });
+                }
+
+                // Layers panel toggle
+                if (showLayersBtn) {
+                    showLayersBtn.addEventListener('click', function() {
+                        if (layersPanel) {
+                            layersPanel.classList.toggle('show');
+                            updateLayersPanel(canvases[window.currentView]);
+                        }
+                    });
+                }
+                if (toggleLayersBtn) {
+                    toggleLayersBtn.addEventListener('click', function() {
+                        if (layersPanel) {
+                            layersPanel.classList.remove('show');
+                        }
+                    });
+                }
+
+                // Stats panel toggle
+                if (showStatsBtn) {
+                    showStatsBtn.addEventListener('click', function() {
+                        if (canvasStats) {
+                            canvasStats.classList.toggle('show');
+                            if (canvasStats.classList.contains('show')) {
+                                startStatsMonitoring(canvases[window.currentView]);
+                            } else {
+                                if (statsUpdateInterval) {
+                                    clearInterval(statsUpdateInterval);
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Update layers and stats when switching views
+                var originalShowView = showView;
+                showView = function(v) {
+                    var activeView = originalShowView(v) || window.currentView || 'front';
+                    var activeCanvas = canvases[activeView] || canvases.front || null;
+
+                    if (layersPanel && layersPanel.classList.contains('show') && activeCanvas) {
+                        updateLayersPanel(activeCanvas);
+                    }
+
+                    updateUndoRedoButtons(activeView);
+
+                    if (statusDimensionsEl && activeCanvas) {
+                        var hasBackCard = !!document.getElementById('cardBack');
+                        var activeCardId = (activeView === 'back' && hasBackCard) ? 'cardBack' : 'cardFront';
+                        var activeSvg = document.querySelector('#' + activeCardId + ' svg');
+                        var activeShape = activeSvg ? detectSvgShape(activeSvg) : 'rectangle';
+
+                        statusDimensionsEl.textContent = 'Canvas: ' + Math.round(activeCanvas.width) + 'x' + Math.round(activeCanvas.height) + 'px (' + activeShape + ')';
+                    }
+                };
+
+                // Initialize undo/redo buttons for current view
+                updateUndoRedoButtons(window.currentView);
+
+                if (zoomInBtn) zoomInBtn.addEventListener('click', function() { zoomCanvas(1.2); });
+                if (zoomOutBtn) zoomOutBtn.addEventListener('click', function() { zoomCanvas(0.8); });
+                if (zoomFitBtn) zoomFitBtn.addEventListener('click', function() { zoomToFit(); });
+
+                // Change Image button flow
+                var changeBtn = document.getElementById('changeImageBtn');
+                var fileInput = document.getElementById('backgroundFileInput');
+                if (changeBtn && fileInput) {
+                    changeBtn.addEventListener('click', function(){ fileInput.click(); });
+                    fileInput.addEventListener('change', function(e){
+                        var f = e.target.files && e.target.files[0];
+                        if (!f) return;
+                        var reader = new FileReader();
+                        reader.onload = function(evt){
+                            var dataUrl = evt.target.result;
+                            applyBackgroundReplacement(dataUrl, window.currentView);
+                        };
+                        reader.readAsDataURL(f);
+                    });
+                }
+
+                function applyBackgroundReplacement(dataUrl, view){
+                    var canvas = canvases[view];
+                    if (!canvas) {
+                        showNotification('Canvas not ready for image replacement', 'error');
+                        return;
+                    }
+
+                    try {
+                        // Show loading state
+                        showNotification('Replacing background image...', 'info');
+
+                        // find candidate image object: prefer object with editableImageName === view OR svgId === 'backgroundImage'
+                        var targetObj = null;
+                        canvas.getObjects().forEach(function(o){
+                            if (!o || o.type !== 'image') return;
+                            if (o.editableImageName && (o.editableImageName === view || o.editableImageName === 'backgroundImage')) targetObj = o;
+                            if (!targetObj && (o.editableImageName && o.editableImageName.indexOf('background')!==-1)) targetObj = o;
+                            // fallback: an image that covers the full canvas
+                            if (!targetObj && o.left === 0 && o.top === 0 && (Math.abs((o.width*o.scaleX) - canvas.width) < 4 || Math.abs((o.height*o.scaleY) - canvas.height) < 4)) targetObj = o;
+                        });
+
+                        if (!targetObj) {
+                            // if no image object, create a new full-bleed image and send to back
+                            fabric.Image.fromURL(dataUrl, function(img){
+                                if (!img || !img.getElement()) {
+                                    showNotification('Failed to load image', 'error');
+                                    return;
+                                }
+
+                                // Enhanced image setup for background replacement
+                                img.set({
+                                    left: 0,
+                                    top: 0,
+                                    originX: 'left',
+                                    originY: 'top',
+                                    selectable: false,
+                                    evented: false,
+                                    objectCaching: true,
+                                    statefulCache: true
+                                });
+
+                                // Scale to fill canvas while preserving aspect ratio
+                                var canvasAspectRatio = canvas.width / canvas.height;
+                                var imgAspectRatio = img.width / img.height;
+
+                                if (imgAspectRatio > canvasAspectRatio) {
+                                    // Image is wider - scale to height and center horizontally
+                                    img.scaleToHeight(canvas.height);
+                                    var scaledWidth = img.getScaledWidth();
+                                    img.set({ left: (canvas.width - scaledWidth) / 2 });
+                                } else {
+                                    // Image is taller - scale to width and center vertically
+                                    img.scaleToWidth(canvas.width);
+                                    var scaledHeight = img.getScaledHeight();
+                                    img.set({ top: (canvas.height - scaledHeight) / 2 });
+                                }
+
+                                // Quality optimization
+                                var imgElement = img.getElement();
+                                if (imgElement) {
+                                    imgElement.style.imageRendering = 'auto';
+                                    imgElement.crossOrigin = 'anonymous';
+                                }
+
+                                canvas.add(img);
+                                img.sendToBack();
+
+                                // Ensure texts remain on top
+                                canvas.getObjects().forEach(function(o){
+                                    if (o.type && (o.type.indexOf('text') !== -1 || o instanceof fabric.IText)) {
+                                        o.bringToFront();
+                                    }
+                                });
+
+                                canvas.requestRenderAll();
+                                showNotification('Background image replaced successfully!', 'success');
+                            }, {
+                                crossOrigin: 'anonymous',
+                                onError: function() {
+                                    showNotification('Failed to load replacement image', 'error');
+                                }
+                            });
+                            return;
+                        }
+
+                        // Replace existing image with enhanced logic
+                        targetObj.setSrc(dataUrl, function(){
+                            if (!targetObj || !targetObj.getElement()) {
+                                showNotification('Failed to replace image', 'error');
+                                return;
+                            }
+
+                            // Lock background properties
+                            targetObj.set({
+                                selectable: false,
+                                evented: false,
+                                objectCaching: true,
+                                statefulCache: true
+                            });
+
+                            // Enhanced scaling for background images
+                            var isBackgroundImage = targetObj.left === 0 && targetObj.top === 0;
+                            if (isBackgroundImage) {
+                                var canvasAspectRatio = canvas.width / canvas.height;
+                                var imgAspectRatio = targetObj.width / targetObj.height;
+
+                                if (imgAspectRatio > canvasAspectRatio) {
+                                    // Image is wider - scale to height and center horizontally
+                                    targetObj.scaleToHeight(canvas.height);
+                                    var scaledWidth = targetObj.getScaledWidth();
+                                    targetObj.set({ left: (canvas.width - scaledWidth) / 2 });
+                                } else {
+                                    // Image is taller - scale to width and center vertically
+                                    targetObj.scaleToWidth(canvas.width);
+                                    var scaledHeight = targetObj.getScaledHeight();
+                                    targetObj.set({ top: (canvas.height - scaledHeight) / 2 });
+                                }
+                            }
+
+                            // Quality optimization
+                            var imgElement = targetObj.getElement();
+                            if (imgElement) {
+                                imgElement.style.imageRendering = 'auto';
+                                imgElement.crossOrigin = 'anonymous';
+                            }
+
+                            // Ensure proper layering
+                            targetObj.sendToBack();
+
+                            // Keep text objects on top
+                            canvas.getObjects().forEach(function(o){
+                                if (o.type && (o.type.indexOf('text') !== -1 || o instanceof fabric.IText)) {
+                                    o.bringToFront();
+                                }
+                            });
+
+                            canvas.requestRenderAll();
+                            showNotification('Background image replaced successfully!', 'success');
+
+                            // Update canvas dimensions if needed
+                            if (targetObj.width && targetObj.height) {
+                                var cardId = view === 'front' ? 'cardFront' : 'cardBack';
+                                var svg = document.querySelector('#' + cardId + ' svg');
+                                if (svg) {
+                                    svg.setAttribute('viewBox', '0 0 ' + targetObj.width + ' ' + targetObj.height);
+                                    resizeCanvasToSvg(canvas, svg, cardId);
+                                }
+                            }
+                        }, {
+                            crossOrigin: 'anonymous',
+                            onError: function() {
+                                showNotification('Failed to replace image', 'error');
+                            }
+                        });
+                    } catch (err) {
+                        console.error('Replace image failed:', err);
+                        showNotification('Failed to replace background image', 'error');
+                    }
+                }
+
+                // Enhanced Save handler with better error handling and user feedback
+                var saveBtn = document.querySelector('.save-btn');
+                if (saveBtn) {
+                    saveBtn.addEventListener('click', function(){
+                        try {
+                            // Show loading state
+                            var originalText = saveBtn.textContent;
+                            saveBtn.textContent = 'Saving...';
+                            saveBtn.disabled = true;
+
+                            var frontSvg = canvases.front ? canvases.front.toSVG() : '';
+                            var backSvg  = canvases.back  ? canvases.back.toSVG()  : '';
+                            var frontInput = document.getElementById('exportFrontSvg');
+                            var backInput  = document.getElementById('exportBackSvg');
+
+                            if (frontInput) frontInput.value = frontSvg;
+                            if (backInput)  backInput.value  = backSvg;
+
+                            // Validate SVG content
+                            if (!frontSvg && !backSvg) {
+                                throw new Error('No canvas content to save');
+                            }
+
+                            console.log('Front SVG length:', frontSvg.length);
+                            console.log('Back SVG length:', backSvg.length);
+
+                            // Create download links for preview
+                            if (frontSvg) {
+                                var frontDl = document.createElement('a');
+                                frontDl.href = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(frontSvg);
+                                frontDl.download = 'front-design.svg';
+                                frontDl.style.display = 'none';
+                                document.body.appendChild(frontDl);
+                                frontDl.click();
+                                frontDl.remove();
+                            }
+
+                            // Reset button state
+                            saveBtn.textContent = originalText;
+                            saveBtn.disabled = false;
+
+                            // Show success message
+                            showNotification('Design saved successfully!', 'success');
+
+                        } catch (e) {
+                            console.error('Export failed:', e);
+                            saveBtn.textContent = originalText;
+                            saveBtn.disabled = false;
+                            showNotification('Failed to save design: ' + e.message, 'error');
+                        }
+                    });
+                }
+
+                // Helper function to show notifications
+                function showNotification(message, type) {
+                    // Remove existing notifications
+                    var existingNotifications = document.querySelectorAll('.canvas-notification');
+                    existingNotifications.forEach(function(notif) {
+                        notif.remove();
+                    });
+
+                    // Create new notification
+                    var notification = document.createElement('div');
+                    notification.className = 'canvas-notification ' + (type || 'info');
+                    notification.textContent = message;
+                    notification.style.cssText = `
+                        position: fixed;
+                        top: 20px;
+                        right: 20px;
+                        background: ${type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#3b82f6'};
+                        color: white;
+                        padding: 12px 20px;
+                        border-radius: 8px;
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                        z-index: 10000;
+                        font-weight: 500;
+                        animation: slideIn 0.3s ease-out;
+                    `;
+
+                    document.body.appendChild(notification);
+
+                    // Auto-remove after 3 seconds
+                    setTimeout(function() {
+                        notification.style.animation = 'slideOut 0.3s ease-in';
+                        setTimeout(function() {
+                            notification.remove();
+                        }, 300);
+                    }, 3000);
+                }
+
+                // Add notification CSS animations
+                if (!document.getElementById('notification-styles')) {
+                    var style = document.createElement('style');
+                    style.id = 'notification-styles';
+                    style.textContent = `
+                        @keyframes slideIn {
+                            from { transform: translateX(100%); opacity: 0; }
+                            to { transform: translateX(0); opacity: 1; }
+                        }
+                        @keyframes slideOut {
+                            from { transform: translateX(0); opacity: 1; }
+                            to { transform: translateX(100%); opacity: 0; }
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
+
+            }); // whenReady
+        })();
     </script>
 </body>
 </html>

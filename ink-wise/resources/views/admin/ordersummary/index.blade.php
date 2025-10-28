@@ -294,6 +294,47 @@
 			color: #b91c1c;
 		}
 	</style>
+	<style>
+		.ordersummary-card__header {
+			display: flex;
+			justify-content: space-between;
+			align-items: flex-start;
+			margin-bottom: 20px;
+		}
+
+		.ordersummary-card__header h2 {
+			margin: 0;
+			font-size: 18px;
+			font-weight: 600;
+			color: #111827;
+		}
+
+		.ordersummary-card__actions {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+		}
+
+		.ordersummary-card__actions .btn {
+			font-size: 14px;
+			padding: 6px 12px;
+			border-radius: 6px;
+			border: 1px solid #d1d5db;
+			background: #f9fafb;
+			color: #374151;
+			cursor: pointer;
+			transition: all 0.2s ease;
+		}
+
+		.ordersummary-card__actions .btn:hover {
+			background: #f3f4f6;
+			border-color: #9ca3af;
+		}
+
+		.ordersummary-card__actions .btn i {
+			margin-right: 6px;
+		}
+	</style>
 @endpush
 
 @section('content')
@@ -329,6 +370,7 @@
 	$customerName = trim((string) (data_get($customer, 'full_name')
 		?? trim((data_get($customer, 'first_name') ?? '') . ' ' . (data_get($customer, 'last_name') ?? ''))))
 		?: (data_get($customer, 'name') ?? 'Guest customer');
+	$customerId = data_get($customer, 'id');
 	$customerEmail = data_get($customer, 'email');
 	$customerPhone = data_get($customer, 'phone');
 	$customerCompany = data_get($customer, 'company');
@@ -517,8 +559,10 @@
 				<span class="order-stage-chip order-stage-chip--{{ $currentChipModifier }}" data-status-chip>
 					{{ $currentStatusLabel }}
 				</span>
-				@if($statusManageUrl && $paymentStatus !== 'pending')
+				@if($statusManageUrl && $paymentStatus !== 'pending' && $currentStatus !== 'completed')
 					<a href="{{ $statusManageUrl }}" class="status-progress-manage-link">Update status</a>
+				@elseif($currentStatus === 'completed')
+					<span class="status-progress-manage-link" style="color: #9ca3af; cursor: not-allowed;" title="Cannot update status for completed orders">Update status</span>
 				@elseif($paymentStatus === 'pending')
 					<span class="status-progress-manage-link" style="color: #9ca3af; cursor: not-allowed;" title="Cannot update status while payment is pending">Update status</span>
 				@endif
@@ -951,6 +995,13 @@
 							@endforeach
 						</ul>
 					@endif
+					<div class="ordersummary-card__actions">
+						@if($customerEmail && $customerId)
+							<a href="{{ route('admin.messages.index') }}?start_conversation={{ $customerId }}" class="btn btn-secondary btn-sm">
+								<i class="fi fi-rr-envelope" aria-hidden="true"></i> Message Customer
+							</a>
+						@endif
+					</div>
 				</header>
 				<div class="ordersummary-customer">
 					<div class="ordersummary-customer__profile">
@@ -1013,6 +1064,7 @@
 				</div>
 			</article>
 
+
 			<article class="ordersummary-card">
 				<header class="ordersummary-card__header">
 					<h2>Timeline</h2>
@@ -1067,7 +1119,44 @@
 						</li>
 					@endforelse
 				</ul>
-			</article>
+			</article> 
+
+			<article class="ordersummary-card">
+				<header class="ordersummary-card__header">
+					<h2>Customer Rating</h2>
+				</header>
+				@php
+					$rating = data_get($order, 'rating');
+					$ratingValue = $rating ? (int) data_get($rating, 'rating', 0) : null;
+					$ratingComment = $rating ? data_get($rating, 'comment') : null;
+				@endphp
+				@if($ratingValue)
+					<div class="rating-display" style="padding: 20px;">
+						<div class="rating-stars" style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+							<div class="stars" style="display: flex; gap: 4px;">
+								@for($i = 1; $i <= 5; $i++)
+									@if($i <= $ratingValue)
+										<span style="color: #f59e0b; font-size: 24px;">★</span>
+									@else
+										<span style="color: #d1d5db; font-size: 24px;">☆</span>
+									@endif
+								@endfor
+							</div>
+							<span style="font-size: 18px; font-weight: 600; color: #111827;">{{ $ratingValue }}/5</span>
+						</div>
+						@if($ratingComment)
+							<div class="rating-comment" style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px;">
+								<p style="margin: 0; font-style: italic; color: #374151; font-size: 16px; line-height: 1.5;">"{{ $ratingComment }}"</p>
+							</div>
+						@endif
+					</div>
+				@else
+					<div style="padding: 20px; text-align: center; color: #6b7280;">
+						<p style="margin: 0; font-size: 16px;">No customer rating has been submitted yet.</p>
+					</div>
+				@endif
+			</article> 
+
 		</section>
 
 		<aside

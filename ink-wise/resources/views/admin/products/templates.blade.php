@@ -17,7 +17,7 @@
 
     if ($showOnlyType) {
         $filteredTemplates = $templatesCollection->filter(function($template) use ($showOnlyType) {
-            return strtolower($template->product_type ?? '') === $showOnlyType;
+            return strtolower($template->product_type ?? '') === strtolower($showOnlyType);
         });
     } else {
         // Fallback to showing all templates if route detection fails
@@ -412,6 +412,8 @@
             var templateInput = document.getElementById('template_id');
             if (templateInput) {
                 templateInput.value = templateId;
+                // Fetch template data and populate form
+                fetchTemplateData(templateId);
                 // Update preview images if function exists
                 if (typeof updatePreviewImages === 'function') {
                     updatePreviewImages();
@@ -419,6 +421,199 @@
             }
         });
     });
+
+    // Function to fetch template data and populate form
+    function fetchTemplateData(templateId) {
+        fetch(`/admin/products/template/${templateId}/data`, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Populate form fields with template data
+            populateFormWithTemplateData(data);
+        })
+        .catch(error => {
+            console.error('Error fetching template data:', error);
+        });
+    }
+
+    // Function to populate form fields with template data
+    function populateFormWithTemplateData(data) {
+        // Populate basic info fields
+        const invitationNameField = document.getElementById('invitationName');
+        if (invitationNameField && data.template_name) {
+            invitationNameField.value = data.template_name;
+        }
+
+        const eventTypeField = document.getElementById('eventType');
+        if (eventTypeField && data.event_type) {
+            eventTypeField.value = data.event_type;
+        }
+
+        const productTypeField = document.getElementById('productType');
+        if (productTypeField && data.product_type) {
+            productTypeField.value = data.product_type;
+        }
+
+        const themeStyleField = document.getElementById('themeStyle');
+        if (themeStyleField && data.theme_style) {
+            themeStyleField.value = data.theme_style;
+        }
+
+        // Populate description
+        const descriptionEditor = document.getElementById('description-editor');
+        const descriptionTextarea = document.getElementById('description');
+        if (descriptionEditor && data.description) {
+            descriptionEditor.innerHTML = data.description;
+            if (descriptionTextarea) {
+                descriptionTextarea.value = data.description;
+            }
+        }
+
+        // Update preview images
+        if (data.front_image) {
+            updatePreviewImage('preview-front-img', data.front_image);
+        }
+        if (data.back_image) {
+            updatePreviewImage('preview-back-img', data.back_image);
+        }
+
+        // Populate design data sections if available
+        if (data.design_data) {
+            populateDesignDataSections(data.design_data);
+        }
+
+        // Navigate to next page (Basic Info)
+        if (typeof Navigation !== 'undefined' && Navigation.showPage) {
+            Navigation.showPage(1);
+        }
+    }
+
+    // Function to populate design data sections (paper stocks, addons, colors, bulk orders)
+    function populateDesignDataSections(designData) {
+        // Populate paper stocks
+        if (designData.paper_stocks && Array.isArray(designData.paper_stocks)) {
+            populatePaperStocks(designData.paper_stocks);
+        }
+
+        // Populate addons
+        if (designData.addons && Array.isArray(designData.addons)) {
+            populateAddons(designData.addons);
+        }
+
+        // Populate colors
+        if (designData.colors && Array.isArray(designData.colors)) {
+            populateColors(designData.colors);
+        }
+
+        // Populate bulk orders
+        if (designData.bulk_orders && Array.isArray(designData.bulk_orders)) {
+            populateBulkOrders(designData.bulk_orders);
+        }
+    }
+
+    // Function to populate paper stocks section
+    function populatePaperStocks(paperStocks) {
+        const container = document.getElementById('paper-stocks-container');
+        if (!container) return;
+
+        // Clear existing entries
+        const existingEntries = container.querySelectorAll('.paper-stock-entry');
+        existingEntries.forEach(entry => entry.remove());
+
+        paperStocks.forEach((stock, index) => {
+            addPaperStockEntry(stock, index);
+        });
+    }
+
+    // Function to populate addons section
+    function populateAddons(addons) {
+        const container = document.getElementById('addons-container');
+        if (!container) return;
+
+        // Clear existing entries
+        const existingEntries = container.querySelectorAll('.addon-entry');
+        existingEntries.forEach(entry => entry.remove());
+
+        addons.forEach((addon, index) => {
+            addAddonEntry(addon, index);
+        });
+    }
+
+    // Function to populate colors section
+    function populateColors(colors) {
+        const container = document.getElementById('colors-container');
+        if (!container) return;
+
+        // Clear existing entries
+        const existingEntries = container.querySelectorAll('.color-entry');
+        existingEntries.forEach(entry => entry.remove());
+
+        colors.forEach((color, index) => {
+            addColorEntry(color, index);
+        });
+    }
+
+    // Function to populate bulk orders section
+    function populateBulkOrders(bulkOrders) {
+        const container = document.getElementById('bulk-orders-container');
+        if (!container) return;
+
+        // Clear existing entries
+        const existingEntries = container.querySelectorAll('.bulk-order-entry');
+        existingEntries.forEach(entry => entry.remove());
+
+        bulkOrders.forEach((order, index) => {
+            addBulkOrderEntry(order, index);
+        });
+    }
+
+    // Helper functions to add entries (these need to be defined in the main form JavaScript)
+    function addPaperStockEntry(data = null, index = null) {
+        if (typeof window.addPaperStockEntry === 'function') {
+            window.addPaperStockEntry(data, index);
+        }
+    }
+
+    function addAddonEntry(data = null, index = null) {
+        if (typeof window.addAddonEntry === 'function') {
+            window.addAddonEntry(data, index);
+        }
+    }
+
+    function addColorEntry(data = null, index = null) {
+        if (typeof window.addColorEntry === 'function') {
+            window.addColorEntry(data, index);
+        }
+    }
+
+    function addBulkOrderEntry(data = null, index = null) {
+        if (typeof window.addBulkOrderEntry === 'function') {
+            window.addBulkOrderEntry(data, index);
+        }
+    }
+
+    // Helper function to update preview images
+    function updatePreviewImage(containerId, imageUrl) {
+        const container = document.getElementById(containerId);
+        if (container && imageUrl) {
+            if (container.tagName !== 'IMG') {
+                const img = document.createElement('img');
+                img.id = containerId;
+                img.src = imageUrl;
+                img.alt = containerId.includes('front') ? 'Front preview' : 'Back preview';
+                img.style.maxWidth = '100%';
+                img.style.maxHeight = '200px';
+                container.parentNode.replaceChild(img, container);
+            } else {
+                container.src = imageUrl;
+            }
+        }
+    }
     </script>
 
     <style>

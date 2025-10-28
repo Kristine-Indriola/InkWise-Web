@@ -21,7 +21,118 @@
 @endpush
 
 @push('scripts')
-    <script src="{{ asset('js/admin/template/template.js') }}" defer></script>
+    <script>
+        function getCsrfToken() {
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta && meta.getAttribute) return meta.getAttribute('content') || '';
+            const hidden = document.querySelector('input[name="_token"]');
+            return hidden ? hidden.value : '';
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.querySelector('.create-form');
+            if (!form) return;
+
+            // SVG preview handling
+            const frontFile = document.getElementById('front_image');
+            const previewContainer = document.getElementById('svg-preview-side') || document.getElementById('svg-preview');
+            function clearPreview() {
+                if (!previewContainer) return;
+                previewContainer.innerHTML = '<span class="muted">No SVG selected</span>';
+            }
+
+            function showError(msg) {
+                if (!previewContainer) return;
+                previewContainer.innerHTML = '<div class="preview-error" style="color:#b91c1c;">' + msg + '</div>';
+            }
+
+            if (frontFile && previewContainer) {
+                frontFile.addEventListener('change', function(ev) {
+                    const file = ev.target.files && ev.target.files[0];
+                    if (!file) {
+                        clearPreview();
+                        return;
+                    }
+
+                    // Basic client-side checks
+                    if (!/svg/i.test(file.type) && !file.name.toLowerCase().endsWith('.svg')) {
+                        showError('Please select an SVG file.');
+                        return;
+                    }
+
+                    // limit ~5MB
+                    if (file.size > 5 * 1024 * 1024) {
+                        showError('SVG is too large (max 5MB).');
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = function(r) {
+                        try {
+                            const text = r.target.result;
+                            // naive sanitization: remove script tags
+                            const cleaned = text.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '');
+                            // inject SVG markup into preview (wrap in a container)
+                            previewContainer.innerHTML = cleaned;
+                        } catch (err) {
+                            console.error(err);
+                            showError('Unable to render SVG preview');
+                        }
+                    };
+                    reader.onerror = function() {
+                        showError('Failed to read file');
+                    };
+                    reader.readAsText(file);
+                });
+            }
+
+            // Handle form submission
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(form);
+
+                // For envelope we require name and front_image
+                if (!formData.get('name') || !formData.get('front_image')) {
+                    alert('Please provide a name and an SVG file.');
+                    return;
+                }
+
+                // Set design data for envelope
+                const designInput = document.getElementById('design');
+                if (designInput) {
+                    designInput.value = JSON.stringify({
+                        text: "Envelope Design",
+                        type: "envelope"
+                    });
+                }
+
+                fetch(form.getAttribute('action'), {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': getCsrfToken(),
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    body: formData
+                }).then(async res => {
+                    if (!res.ok) {
+                        let message = 'Upload failed';
+                        try { message = (await res.json()).message || message; } catch (err) {}
+                        throw new Error(message);
+                    }
+                    return res.json();
+                }).then(json => {
+                    if (json && json.success) {
+                        alert('Envelope template uploaded successfully');
+                        window.location = json.redirect || '{{ route('staff.templates.index') }}';
+                    }
+                }).catch(err => {
+                    console.error(err);
+                    alert('Upload failed: ' + (err.message || 'Unknown'));
+                });
+            });
+        });
+    </script>
 @endpush
 
 @section('content')
@@ -91,7 +202,7 @@
             </div>
 
             <div class="create-actions">
-                <a href="{{ route('admin.templates.index') }}" class="btn-cancel">Cancel</a>
+                <a href="{{ route('staff.templates.index') }}" class="btn-cancel">Cancel</a>
                 <button type="submit" class="btn-submit">Create Template</button>
             </div>
         </form>

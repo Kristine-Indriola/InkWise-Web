@@ -183,6 +183,24 @@ class ProductController extends Controller
         return view('admin.products.create-invitation', compact('templates', 'materials', 'selectedTemplate'));
     }
 
+    // Get template data by ID for auto-populating form
+    public function getTemplateData($id)
+    {
+        $template = ProductUpload::findOrFail($id);
+
+        return response()->json([
+            'template_name' => $template->template_name,
+            'description' => $template->description,
+            'product_type' => $template->product_type,
+            'event_type' => $template->event_type,
+            'theme_style' => $template->theme_style,
+            'front_image' => $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : null,
+            'back_image' => $template->back_image ? \App\Support\ImageResolver::url($template->back_image) : null,
+            'preview_image' => $template->preview_image ? \App\Support\ImageResolver::url($template->preview_image) : null,
+            'design_data' => $template->design_data,
+        ]);
+    }
+
     public function createGiveaway(Request $request)
     {
         $product = null;
@@ -235,7 +253,7 @@ class ProductController extends Controller
         // Validate main product fields
         $validated = $request->validate([
             'product_id' => 'nullable|exists:products,id',
-            'template_id' => 'nullable|exists:templates,id',
+            'template_id' => 'nullable|exists:product_uploads,id',
             'invitationName' => 'required|string|max:255',
             'eventType' => 'nullable|string|max:255',
             'productType' => 'required|string|max:255',
@@ -292,16 +310,16 @@ class ProductController extends Controller
             // Custom image uploaded
             $imagePath = $request->file('image')->store('products', 'public');
         } elseif ($request->input('template_id')) {
-            // No custom image, use template image
-            $template = \App\Models\Template::find($request->input('template_id'));
-            if ($template && $template->preview) {
+            // No custom image, use template image from ProductUpload
+            $productUpload = ProductUpload::find($request->input('template_id'));
+            if ($productUpload && $productUpload->preview_image) {
                 // Copy template image to products directory
-                $templatePath = $template->preview;
+                $templatePath = $productUpload->preview_image;
                 if (!preg_match('/^(https?:)?\/\//i', $templatePath) && !str_starts_with($templatePath, '/')) {
                     // It's a relative path in storage
                     $sourcePath = storage_path('app/public/' . $templatePath);
                     if (file_exists($sourcePath)) {
-                        $filename = 'products/template_' . $template->id . '_' . time() . '.' . pathinfo($sourcePath, PATHINFO_EXTENSION);
+                        $filename = 'products/template_' . $productUpload->id . '_' . time() . '.' . pathinfo($sourcePath, PATHINFO_EXTENSION);
                         $destinationPath = storage_path('app/public/' . $filename);
                         if (copy($sourcePath, $destinationPath)) {
                             $imagePath = $filename;
@@ -317,8 +335,11 @@ class ProductController extends Controller
             $leadTimeInput = $validated['lead_time'] ?? null;
             $leadTimeDays = is_numeric($leadTimeInput) ? (int) $leadTimeInput : null;
 
+            // Get the actual template_id from ProductUpload if provided
+            $actualTemplateId = $validated['template_id'] ?? null;
+
             $data = [
-                'template_id' => $validated['template_id'] ?? null,
+                'template_id' => $actualTemplateId,
                 'name' => $validated['invitationName'],
                 'event_type' => $validated['eventType'] ?? 'General',
                 'product_type' => $validated['productType'],
@@ -340,6 +361,16 @@ class ProductController extends Controller
             } else {
                 $data['image'] = $imagePath;
                 $product = Product::create($data);
+            }
+
+            // Get template data if template_id is provided
+            $templateData = null;
+            $productUpload = null;
+            if (!empty($validated['template_id'])) {
+                $productUpload = ProductUpload::find($validated['template_id']);
+                if ($productUpload && $productUpload->design_data) {
+                    $templateData = $productUpload->design_data;
+                }
             }
 
             // Handle envelope products differently
@@ -365,6 +396,12 @@ class ProductController extends Controller
                 // Paper Stocks
                 $paperStocks = $request->input('paper_stocks', []);
                 $paperStockFiles = $request->file('paper_stocks') ?? [];
+
+                // If no paper stocks provided but we have template data, use template data
+                if (empty($paperStocks) && $templateData && isset($templateData['paper_stocks'])) {
+                    $paperStocks = $templateData['paper_stocks'];
+                }
+
                 if ($product) {
                     $product->paperStocks()->delete();
                     foreach ($paperStocks as $i => $ps) {
@@ -387,6 +424,12 @@ class ProductController extends Controller
                 // Addons
                 $addons = $request->input('addons', []);
                 $addonFiles = $request->file('addons') ?? [];
+
+                // If no addons provided but we have template data, use template data
+                if (empty($addons) && $templateData && isset($templateData['addons'])) {
+                    $addons = $templateData['addons'];
+                }
+
                 if ($product) {
                     $product->addons()->delete();
                     foreach ($addons as $i => $ad) {
@@ -408,6 +451,12 @@ class ProductController extends Controller
 
                 // Colors
                 $colors = $request->input('colors', []);
+
+                // If no colors provided but we have template data, use template data
+                if (empty($colors) && $templateData && isset($templateData['colors'])) {
+                    $colors = $templateData['colors'];
+                }
+
                 if ($product) {
                     $product->colors()->delete();
                     foreach ($colors as $c) {
@@ -420,6 +469,11 @@ class ProductController extends Controller
 
                 // Bulk Orders
                 $bulkOrders = $request->input('bulk_orders', []);
+
+                // If no bulk orders provided but we have template data, use template data
+                if (empty($bulkOrders) && $templateData && isset($templateData['bulk_orders'])) {
+                    $bulkOrders = $templateData['bulk_orders'];
+                }
 
                 if (empty($bulkOrders) && ($validated['productType'] ?? null) === 'Giveaway') {
                     $singleBulk = [
@@ -486,6 +540,15 @@ class ProductController extends Controller
                         if (!empty($value)) {
                             $previewData[$key] = $value;
                         }
+                    }
+
+                    // If no preview images provided but we have template data, use template images
+                    if (empty(array_filter($previewData)) && $productUpload) {
+                        $previewData = [
+                            'front' => $productUpload->front_image,
+                            'back' => $productUpload->back_image,
+                            'preview' => $productUpload->preview_image,
+                        ];
                     }
 
                     $hasPreviewValues = array_filter($previewData, fn ($value) => !empty($value));

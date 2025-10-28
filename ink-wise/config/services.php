@@ -42,4 +42,8 @@ return [
         'ca_bundle' => env('PAYMONGO_CA_BUNDLE'),
     ],
 
+    'google_fonts' => [
+        'api_key' => env('GOOGLE_FONTS_API_KEY'),
+    ],
+
 ];

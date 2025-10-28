@@ -5,7 +5,7 @@
 @section('content')
 <div class="bg-white rounded-2xl shadow p-6">
     <div class="flex border-b text-base font-semibold mb-4">
-        <a href="{{ route('customer.my_purchase') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab" data-route="all">All</a>
+
         <a href="{{ route('customer.my_purchase.topay') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Pay</a>
         <a href="{{ route('customer.my_purchase.inproduction') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">In Production</a>
         <a href="{{ route('customer.my_purchase.toship') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Ship</a>
@@ -206,7 +206,7 @@
                         <div class="text-sm text-gray-500">Paper: {{ $paper }}</div>
                         <div class="text-sm text-gray-500">Add-ons: {{ $addonsDisplay }}</div>
                         <div class="text-sm text-gray-500">Status: <span class="font-semibold text-[#a6b7ff]">{{ $statusLabel }}</span></div>
-                        <div class="text-sm text-gray-500">Next step: {{ $nextStatusLabel ?? 'All steps complete' }}</div>
+                        <div class="text-sm text-red-500">Pay within: <span class="js-payment-timer" data-order-id="{{ $orderId }}" data-deadline="{{ now()->addHours(24)->toISOString() }}">24:00:00</span></div>
                         @if($trackingNumber)
                             <div class="text-sm text-gray-500">Tracking: {{ $trackingNumber }}</div>
                         @endif
@@ -223,7 +223,8 @@
                         Order Total: <span class="text-[#a6b7ff] font-bold text-lg">₱{{ number_format($totalAmount, 2) }}</span>
                     </div>
                     <div class="flex gap-2">
-                        <button class="bg-[#a6b7ff] hover:bg-[#bce6ff] text-white px-6 py-2 rounded font-semibold js-to-pay-checkout" type="button" data-summary='@json($summary)'>Checkout</button>
+                        <button class="bg-[#a6b7ff] hover:bg-[#bce6ff] text-white px-4 py-2 rounded font-semibold js-to-pay-checkout" type="button" data-summary='@json($summary)' data-mode="half">Pay Deposit (₱{{ number_format($totalAmount / 2, 2) }})</button>
+                        <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-semibold js-to-pay-checkout-full" type="button" data-summary='@json($summary)' data-mode="full">Pay in Full (₱{{ number_format($totalAmount, 2) }})</button>
                         <button type="button" class="border border-gray-300 text-gray-700 px-5 py-2 rounded font-semibold js-to-pay-cancel" data-order-id="{{ $orderId ?? '' }}">Cancel</button>
                     </div>
                 </div>
@@ -240,15 +241,24 @@ document.addEventListener('DOMContentLoaded', function () {
     const clearSummaryUrl = @json(route('order.summary.clear'));
     const buttons = Array.from(document.querySelectorAll('.js-to-pay-checkout'));
     if (!buttons.length) {
+        console.log('No checkout buttons found');
         return;
     }
 
-    buttons.forEach(btn => {
-        btn.addEventListener('click', () => {
+    console.log('Found', buttons.length, 'checkout buttons');
+
+    buttons.forEach((btn, index) => {
+        btn.addEventListener('click', (event) => {
+            event.preventDefault(); // Prevent any default behavior
+
             try {
                 const raw = btn.getAttribute('data-summary');
                 const summary = raw ? JSON.parse(raw) : null;
+                const mode = btn.getAttribute('data-mode') || 'half'; // Default to half for backward compatibility
+
                 if (summary) {
+                    // Add payment mode to summary
+                    summary.paymentMode = mode;
                     window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(summary));
                 }
             } catch (err) {
@@ -259,35 +269,86 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    const cancels = Array.from(document.querySelectorAll('.js-to-pay-cancel'));
-    cancels.forEach(btn => {
-        btn.addEventListener('click', async () => {
+    // Handle full payment buttons
+    const fullButtons = Array.from(document.querySelectorAll('.js-to-pay-checkout-full'));
+    fullButtons.forEach((btn, index) => {
+        btn.addEventListener('click', (event) => {
+            event.preventDefault(); // Prevent any default behavior
+
             try {
-                if (!confirm('Cancel this order? This will remove it from your To Pay list.')) {
-                    return;
-                }
+                const raw = btn.getAttribute('data-summary');
+                const summary = raw ? JSON.parse(raw) : null;
 
-                const card = btn.closest('.bg-white.border.rounded-xl') || btn.closest('[data-summary-order-id]');
-                if (card) {
-                    card.remove();
-                }
-
-                const stored = window.sessionStorage.getItem('inkwise-finalstep');
-                if (stored) {
-                    window.sessionStorage.removeItem('inkwise-finalstep');
-                    try {
-                        await fetch(clearSummaryUrl, {
-                            method: 'DELETE',
-                            headers: {
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
-                            }
-                        });
-                    } catch (networkError) {
-                        console.warn('failed to clear server summary', networkError);
-                    }
+                if (summary) {
+                    // Force full payment mode
+                    summary.paymentMode = 'full';
+                    window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(summary));
                 }
             } catch (err) {
-                console.warn('cancel failed', err);
+                console.warn('failed to save order summary to sessionStorage', err);
+            }
+
+            window.location.href = checkoutUrl;
+        });
+    });    const cancels = Array.from(document.querySelectorAll('.js-to-pay-cancel'));
+    cancels.forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const orderId = btn.getAttribute('data-order-id');
+            if (!orderId) {
+                console.warn('No order ID found for cancel button');
+                return;
+            }
+
+            if (!confirm('Cancel this order? This cannot be undone and will remove it from your To Pay list.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/customer/orders/${orderId}/cancel`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                        'Accept': 'application/json',
+                    },
+                });
+
+                if (response.ok) {
+                    // Successfully cancelled - remove from UI
+                    const card = btn.closest('.bg-white.border.rounded-xl') || btn.closest('[data-summary-order-id]');
+                    if (card) {
+                        card.remove();
+                    }
+
+                    // Clear sessionStorage if it matches this order
+                    const stored = window.sessionStorage.getItem('inkwise-finalstep');
+                    if (stored) {
+                        try {
+                            const summary = JSON.parse(stored);
+                            if (summary && summary.orderId == orderId) {
+                                window.sessionStorage.removeItem('inkwise-finalstep');
+                                // Clear server summary
+                                await fetch(clearSummaryUrl, {
+                                    method: 'DELETE',
+                                    headers: {
+                                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                                    }
+                                });
+                            }
+                        } catch (sessionError) {
+                            console.warn('failed to clear sessionStorage', sessionError);
+                        }
+                    }
+
+                    // Show success message
+                    alert('Order cancelled successfully.');
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    alert(errorData.message || 'Failed to cancel order. Please try again.');
+                }
+            } catch (error) {
+                console.error('Cancel order error:', error);
+                alert('Failed to cancel order. Please check your connection and try again.');
             }
         });
     });
@@ -388,75 +449,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         return String(addons);
     }
-
-    try {
-        const raw = window.sessionStorage.getItem('inkwise-finalstep');
-        if (!raw) {
-            return;
-        }
-
-        const summary = JSON.parse(raw);
-        if (!summary) {
-            return;
-        }
-
-        const container = document.querySelector('.js-to-pay-list');
-        if (!container) {
-            return;
-        }
-
-        if (summary.orderId) {
-            const already = container.querySelector(`[data-summary-order-id="${summary.orderId}"]`);
-            if (already) {
-                return;
-            }
-        }
-
-        const card = document.createElement('div');
-        card.setAttribute('data-summary-order-id', summary.orderId ?? '');
-        card.className = 'bg-white border rounded-xl mb-4 shadow-sm';
-        card.innerHTML = `
-            <div class="flex items-center justify-between px-4 py-3 border-b">
-                <div></div>
-                <div class="flex items-center gap-2">
-                    <span class="text-yellow-600 flex items-center text-xs">
-                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z M21 12.5C21 18 17.5 22 12 22S3 18 3 12.5 6.5 3 12 3s9 4.5 9 9.5z"/></svg>
-                        ${summary.statusLabel || 'Pending payment'}
-                    </span>
-                </div>
-            </div>
-            <div class="flex flex-col md:flex-row items-start md:items-center px-4 py-4 gap-4">
-                <img src="${summary.previewImage || placeholderImage}" alt="Invitation Design" class="w-24 h-24 object-cover rounded-lg border">
-                <div class="flex-1">
-                    <div class="font-semibold text-lg text-[#a6b7ff]">${summary.productName || 'Custom invitation'}</div>
-                    <div class="text-sm text-gray-500">Theme: ${summary.theme || 'N/A'}</div>
-                    <div class="text-sm text-gray-500">Quantity: ${summary.quantity || 10} pcs</div>
-                    <div class="text-sm text-gray-500">Paper: ${summary.paper || 'Standard'}</div>
-                    <div class="text-sm text-gray-500">Add-ons: ${renderAddons(summary.addons)}</div>
-                    <div class="text-sm text-gray-500">Status: <span class="font-semibold text-[#a6b7ff]">${summary.statusLabel || 'Order Received'}</span></div>
-                    <div class="text-sm text-gray-500">Next step: ${summary.nextStatusLabel || 'All steps complete'}</div>
-                    ${summary.trackingNumber ? `<div class="text-sm text-gray-500">Tracking: ${summary.trackingNumber}</div>` : ''}
-                    ${summary.statusNote ? `<div class="text-xs text-gray-400 mt-1">Note: ${summary.statusNote}</div>` : ''}
-                </div>
-                <div class="text-right">
-                    <div class="text-lg font-bold text-gray-700">₱${(Number(summary.totalAmount) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                </div>
-            </div>
-            <div class="flex flex-col md:flex-row items-center justify-between px-4 py-3 bg-[#f7f8fa] rounded-b-xl">
-                <div class="text-sm text-gray-500 mb-2 md:mb-0">
-                    Order Total: <span class="text-[#a6b7ff] font-bold text-lg">₱${(Number(summary.totalAmount) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                </div>
-                <div class="flex gap-2">
-                    <button class="bg-[#a6b7ff] hover:bg-[#bce6ff] text-white px-6 py-2 rounded font-semibold js-client-checkout">Checkout</button>
-                    <button class="border border-gray-300 text-gray-700 px-5 py-2 rounded font-semibold js-client-cancel">Cancel</button>
-                </div>
-            </div>
-        `;
-
-        container.prepend(card);
-    } catch (err) {
-        console.warn('failed to render stored summary in topay', err);
-    }
 });
 </script>
 
@@ -542,4 +534,74 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 })();
 </script>
+
+<script>
+// Payment Timer Countdown
+(function () {
+    const clearSummaryUrl = @json(route('order.summary.clear'));
+
+    function formatTime(seconds) {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    async function cancelOrder(card, orderId) {
+        try {
+            // Remove the card from DOM
+            card.remove();
+
+            // Clear session storage if it matches
+            const stored = window.sessionStorage.getItem('inkwise-finalstep');
+            if (stored) {
+                const summary = JSON.parse(stored);
+                if (summary && summary.orderId == orderId) {
+                    window.sessionStorage.removeItem('inkwise-finalstep');
+                    // Clear server summary
+                    await fetch(clearSummaryUrl, {
+                        method: 'DELETE',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                        }
+                    });
+                }
+            }
+        } catch (err) {
+            console.warn('failed to auto-cancel expired order', err);
+        }
+    }
+
+    function updateTimers() {
+        const timers = document.querySelectorAll('.js-payment-timer');
+        timers.forEach(timer => {
+            const deadline = new Date(timer.getAttribute('data-deadline'));
+            const now = new Date();
+            const remaining = Math.max(0, Math.floor((deadline - now) / 1000));
+
+            timer.textContent = formatTime(remaining);
+
+            if (remaining === 0) {
+                // Payment expired - auto cancel the order
+                timer.textContent = 'EXPIRED';
+                timer.classList.add('text-gray-500');
+                timer.classList.remove('text-red-500');
+
+                // Auto cancel the order
+                const card = timer.closest('.bg-white.border.rounded-xl');
+                if (card) {
+                    const orderId = timer.getAttribute('data-order-id');
+                    cancelOrder(card, orderId);
+                }
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        updateTimers();
+        setInterval(updateTimers, 1000);
+    });
+})();
+</script>
+
 @endsection

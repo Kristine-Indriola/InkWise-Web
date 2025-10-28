@@ -39,7 +39,7 @@ class PaymentController extends Controller
             'name' => ['nullable', 'string', 'max:120'],
             'email' => ['nullable', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:64'],
-            'mode' => ['nullable', 'in:half,full'],
+            'mode' => ['nullable', 'in:half,full,balance_payment'],
         ]);
 
         if (empty($this->secretKey)) {
@@ -62,13 +62,26 @@ class PaymentController extends Controller
         $metadata = $order->metadata ?? [];
         $summary = $this->summarizePayments($order, $metadata);
 
+        Log::info('GCash payment request', [
+            'mode' => $mode,
+            'order_id' => $order->id,
+            'balance' => $summary['balance'],
+            'deposit_due' => $summary['deposit_due'],
+        ]);
+
         if ($summary['balance'] <= 0) {
             return response()->json([
                 'message' => 'This order is already fully paid.',
             ], 409);
         }
 
-        $amountToCharge = $mode === 'full' ? $summary['balance'] : $summary['deposit_due'];
+        $amountToCharge = ($mode === 'full' || $mode === 'balance_payment') ? $summary['balance'] : $summary['deposit_due'];
+
+        Log::info('GCash amount to charge', [
+            'amount_to_charge' => $amountToCharge,
+            'mode' => $mode,
+        ]);
+
         if ($amountToCharge <= 0) {
             return response()->json([
                 'message' => 'Nothing to charge for the selected payment mode.',
@@ -84,7 +97,8 @@ class PaymentController extends Controller
             ]);
         }
 
-        $intentDescription = sprintf('Inkwise order %s %s payment', $order->order_number, $mode === 'full' ? 'full' : 'deposit');
+        $intentDescription = sprintf('Inkwise order %s %s payment', $order->order_number,
+            ($mode === 'full' || $mode === 'balance_payment') ? 'remaining balance' : 'deposit');
 
         $name = $validated['name']
             ?? $order->customerOrder->name
@@ -240,13 +254,18 @@ class PaymentController extends Controller
             ]);
 
             $message = 'Payment received! Thank you for settling your order.';
+            return redirect()->route('customer.my_purchase.inproduction')->with('status', $message);
         } elseif (in_array($status, ['awaiting_next_action', 'awaiting_payment_method'], true)) {
             $message = 'Please finish your GCash payment in the opened window to complete the order.';
+            return redirect()->route('customer.my_purchase.topay')->with('status', $message);
         } else {
+            // Payment failed or was cancelled - ensure order remains in pending status for "To Pay"
+            if ($order && $order->status !== 'pending') {
+                $order->forceFill(['status' => 'pending'])->save();
+            }
             $message = 'We were unable to confirm the payment. Please try again or contact support.';
+            return redirect()->route('customer.my_purchase.topay')->with('status', $message);
         }
-
-        return redirect()->route('customer.checkout')->with('status', $message);
     }
 
     public function webhook(Request $request): JsonResponse
@@ -303,7 +322,10 @@ class PaymentController extends Controller
                     ],
                 ]);
 
-                $order->forceFill(['metadata' => $metadata])->save();
+                $order->forceFill([
+                    'status' => 'pending', // Ensure failed orders remain in pending status for "To Pay"
+                    'metadata' => $metadata
+                ])->save();
             }
         }
 
@@ -570,8 +592,8 @@ class PaymentController extends Controller
             'payment_status' => $summary['balance'] <= 0 ? 'paid' : ($summary['total_paid'] > 0 ? 'partial' : $order->payment_status),
         ];
 
-        if ($summary['balance'] <= 0 && $order->status !== 'completed') {
-            $attributes['status'] = 'completed';
+        if (($summary['balance'] <= 0 || $summary['total_paid'] > 0) && $order->status !== 'completed') {
+            $attributes['status'] = 'in_production';
         }
 
         $order->forceFill($attributes)->save();

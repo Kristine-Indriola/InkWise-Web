@@ -12,7 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('products', function (Blueprint $table) {
-            $table->string('lead_time')->nullable()->after('base_price');
+            if (!Schema::hasColumn('products', 'lead_time')) {
+                $table->string('lead_time')->nullable()->after('base_price');
+            }
+            if (!Schema::hasColumn('products', 'date_available')) {
+                $table->date('date_available')->nullable()->after('lead_time');
+            }
         });
     }
 
@@ -22,7 +27,12 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('products', function (Blueprint $table) {
-            $table->dropColumn('lead_time');
+            if (Schema::hasColumn('products', 'date_available')) {
+                $table->dropColumn('date_available');
+            }
+            if (Schema::hasColumn('products', 'lead_time')) {
+                $table->dropColumn('lead_time');
+            }
         });
     }
 };
