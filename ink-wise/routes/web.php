@@ -637,7 +637,12 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/products', [OwnerProductsController::class, 'index'])->name('products.index');
     Route::get('/products/{product}', [OwnerProductsController::class, 'show'])->name('products.show');
     Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
-    Route::get('/reports', fn () => view('owner.owner-reports'))->name('reports');
+
+    Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/', fn () => redirect()->route('owner.reports.sales'))->name('index');
+        Route::get('/sales', fn () => view('owner.reports.sales'))->name('sales');
+        Route::get('/inventory', fn () => view('owner.reports.inventory'))->name('inventory');
+    });
 
     
     
