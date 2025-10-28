@@ -249,10 +249,24 @@
 
   <div class="page-inner owner-dashboard-inner">
   @php
-    $totalTransactions = 0;
-    $totalAmount = 0.00;
-    $paidCount = 0;
-    $pendingCount = 0;
+    $summaryTotals = $summary ?? [];
+
+    $totalTransactions = isset($summaryTotals['total_transactions'])
+      ? (int) $summaryTotals['total_transactions']
+      : 0;
+
+    $totalAmount = isset($summaryTotals['total_amount'])
+      ? (float) $summaryTotals['total_amount']
+      : 0.00;
+
+    $paidCount = isset($summaryTotals['paid_count'])
+      ? (int) $summaryTotals['paid_count']
+      : 0;
+
+    $pendingCount = isset($summaryTotals['pending_count'])
+      ? (int) $summaryTotals['pending_count']
+      : 0;
+
     $usingDemoData = false;
 
     $transactionRows = collect();
@@ -260,30 +274,22 @@
     if (isset($transactions)) {
       if ($transactions instanceof \Illuminate\Support\Collection) {
         $transactionRows = $transactions;
-        $totalTransactions = $transactions->count();
+        if ($totalTransactions === 0) {
+          $totalTransactions = $transactions->count();
+        }
       } elseif ($transactions instanceof \Illuminate\Contracts\Pagination\Paginator) {
         $items = method_exists($transactions, 'items') ? $transactions->items() : [];
         $transactionRows = collect($items);
-        if (method_exists($transactions, 'total')) {
+        if ($totalTransactions === 0 && method_exists($transactions, 'total')) {
           $totalTransactions = (int) $transactions->total();
-        } else {
+        } elseif ($totalTransactions === 0) {
           $totalTransactions = $transactionRows->count();
         }
       } elseif (is_array($transactions)) {
         $transactionRows = collect($transactions);
-        $totalTransactions = $transactionRows->count();
-      }
-    }
-
-    if ($transactionRows->isEmpty() && class_exists(\App\Models\Transaction::class)) {
-      try {
-        $transactionRows = \App\Models\Transaction::latest()->take(25)->get();
-        $totalTransactions = \App\Models\Transaction::count();
-        $totalAmount = (float) \App\Models\Transaction::sum('amount');
-        $paidCount = \App\Models\Transaction::whereRaw("LOWER(COALESCE(status, '')) = 'paid'")->count();
-        $pendingCount = \App\Models\Transaction::whereIn('status', ['pending', 'unpaid'])->count();
-      } catch (\Exception $e) {
-        // swallow DB exceptions in view; keep graceful fallbacks
+        if ($totalTransactions === 0) {
+          $totalTransactions = $transactionRows->count();
+        }
       }
     }
 
@@ -309,10 +315,22 @@
         ],
       ]);
       $usingDemoData = true;
-    }
 
-    if ($totalTransactions === 0) {
-      $totalTransactions = $transactionRows->count();
+      if ($totalTransactions === 0) {
+        $totalTransactions = $transactionRows->count();
+      }
+
+      if ($totalAmount <= 0) {
+        $totalAmount = $transactionRows->sum('amount');
+      }
+
+      if ($paidCount === 0) {
+        $paidCount = $transactionRows->filter(fn ($row) => strtolower($row['status']) === 'paid')->count();
+      }
+
+      if ($pendingCount === 0) {
+        $pendingCount = $transactionRows->filter(fn ($row) => strtolower($row['status']) === 'pending')->count();
+      }
     }
 
     $normalizedPaidStatuses = ['paid', 'complete', 'completed', 'settled'];
@@ -334,7 +352,12 @@
     };
 
     $transformTransaction = static function ($transaction) use ($normalizeStatus, $resolveBadgeClass) {
-      $transactionId = data_get($transaction, 'transaction_id') ?? data_get($transaction, 'reference') ?? data_get($transaction, 'id') ?? '—';
+      $transactionId = data_get($transaction, 'transaction_id')
+        ?? data_get($transaction, 'provider_payment_id')
+        ?? data_get($transaction, 'intent_id')
+        ?? data_get($transaction, 'reference')
+        ?? data_get($transaction, 'id')
+        ?? '—';
       $transactionId = is_string($transactionId) ? trim($transactionId) : (is_numeric($transactionId) ? (string) $transactionId : '—');
 
       $orderId = data_get($transaction, 'order_id') ?? data_get($transaction, 'order.reference') ?? data_get($transaction, 'order.order_number') ?? data_get($transaction, 'order.id');
@@ -349,9 +372,17 @@
       }
       $orderId = $orderId ? (string) $orderId : '—';
 
-      $customerName = data_get($transaction, 'customer_name') ?? data_get($transaction, 'customer.name') ?? data_get($transaction, 'customer.full_name');
+      $customerName = data_get($transaction, 'customer_name')
+        ?? data_get($transaction, 'customer.name')
+        ?? data_get($transaction, 'customer.full_name')
+        ?? data_get($transaction, 'order.customer.name')
+        ?? data_get($transaction, 'order.customer.full_name')
+        ?? data_get($transaction, 'order.customerOrder.customer.name');
       if (!$customerName) {
         $customerSource = data_get($transaction, 'customer');
+        if (!$customerSource) {
+          $customerSource = data_get($transaction, 'order.customer') ?? data_get($transaction, 'order.customerOrder.customer');
+        }
         if (is_array($customerSource)) {
           $customerName = $customerSource['name'] ?? trim(($customerSource['first_name'] ?? '') . ' ' . ($customerSource['last_name'] ?? ''));
         } elseif (is_object($customerSource)) {
@@ -359,19 +390,40 @@
           if (!$customerName && method_exists($customerSource, '__toString')) {
             $customerName = (string) $customerSource;
           }
+        } elseif (is_null($customerSource)) {
+          $order = data_get($transaction, 'order');
+          if (is_object($order) && method_exists($order, 'effectiveCustomer')) {
+            $effective = $order->effectiveCustomer();
+            if (is_object($effective)) {
+              $customerName = $effective->name
+                ?? $effective->full_name
+                ?? trim(($effective->first_name ?? '') . ' ' . ($effective->last_name ?? ''));
+            } elseif (is_array($effective)) {
+              $customerName = $effective['name'] ?? trim(($effective['first_name'] ?? '') . ' ' . ($effective['last_name'] ?? ''));
+            } elseif (is_string($effective)) {
+              $customerName = $effective;
+            }
+          }
         } elseif (is_string($customerSource)) {
           $customerName = $customerSource;
         }
       }
       $customerName = $customerName ? trim((string) $customerName) : '—';
 
-      $paymentMethod = data_get($transaction, 'payment_method') ?? data_get($transaction, 'method') ?? data_get($transaction, 'payment.method');
+      $paymentMethod = data_get($transaction, 'payment_method')
+        ?? data_get($transaction, 'method')
+        ?? data_get($transaction, 'mode')
+        ?? data_get($transaction, 'payment.method');
       if (is_array($paymentMethod)) {
         $paymentMethod = $paymentMethod['name'] ?? $paymentMethod['label'] ?? null;
       }
       $paymentMethod = $paymentMethod ? (string) $paymentMethod : '—';
 
-      $rawDate = data_get($transaction, 'date') ?? data_get($transaction, 'paid_at') ?? data_get($transaction, 'created_at');
+      $rawDate = data_get($transaction, 'date')
+        ?? data_get($transaction, 'paid_at')
+        ?? data_get($transaction, 'recorded_at')
+        ?? data_get($transaction, 'created_at')
+        ?? data_get($transaction, 'updated_at');
       if ($rawDate instanceof \DateTimeInterface) {
         $displayDate = $rawDate->format('Y-m-d');
       } elseif (is_string($rawDate) && strlen($rawDate) >= 10) {
@@ -384,9 +436,11 @@
       if ($amountValue === null) {
         $amountValue = data_get($transaction, 'total');
       }
+      $currency = strtoupper((string) data_get($transaction, 'currency', 'PHP'));
+      $currencyPrefix = $currency === 'PHP' ? '₱' : ($currency !== '' ? $currency . ' ' : '');
       if (is_numeric($amountValue)) {
         $amountNumeric = (float) $amountValue;
-        $amountDisplay = number_format($amountNumeric, 2);
+        $amountDisplay = $currencyPrefix . number_format($amountNumeric, 2);
       } elseif (is_string($amountValue) && trim($amountValue) !== '') {
         $amountNumeric = null;
         $amountDisplay = trim($amountValue);
@@ -407,6 +461,8 @@
         $displayDate,
         $amountDisplay,
         $statusLabel,
+        data_get($transaction, 'provider'),
+        $currency,
       ]);
 
       return [
@@ -422,6 +478,7 @@
         'status_label' => $statusLabel,
         'status_class' => $statusClass,
         'search_blob' => \Illuminate\Support\Str::lower(implode(' ', $searchTargets)),
+        'currency' => $currency,
       ];
     };
 
