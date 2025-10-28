@@ -6,13 +6,22 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use App\Models\Order;
+use App\Notifications\OrderStatusUpdated;
 
 class OrderController extends Controller
 {
     public function editStatus(Order $order)
     {
-    $statusOptions = $this->statusOptions();
-    $statusFlow = ['pending', 'in_production', 'confirmed', 'to_receive', 'completed'];
+        // Prevent status management for completed orders
+        if ($order->status === 'completed') {
+            return redirect()->route('admin.ordersummary.index', $order)
+                ->with('error', 'Cannot modify status of completed orders.');
+        }
+
+        $order->loadMissing('rating');
+
+        $statusOptions = $this->statusOptions();
+        $statusFlow = ['pending', 'processing', 'in_production', 'confirmed', 'to_receive', 'completed'];
         $metadata = $this->normalizeMetadata($order->metadata);
 
         return view('admin.orders.manage-status', [
@@ -25,6 +34,11 @@ class OrderController extends Controller
 
     public function updateStatus(Request $request, Order $order)
     {
+        // Prevent status updates for completed orders
+        if ($order->status === 'completed') {
+            return redirect()->back()->with('error', 'Cannot update status of completed orders.');
+        }
+
         $allowedStatuses = array_keys($this->statusOptions());
 
         $validated = $request->validate([
@@ -33,6 +47,7 @@ class OrderController extends Controller
             'internal_note' => ['nullable', 'string', 'max:1000'],
         ]);
 
+        $oldStatus = $order->status;
         $order->status = $validated['status'];
 
         $metadata = $this->normalizeMetadata($order->metadata);
@@ -50,6 +65,24 @@ class OrderController extends Controller
         });
 
         $order->save();
+
+        // Send notification to customer if status changed
+        if ($oldStatus !== $validated['status']) {
+            $statusOptions = $this->statusOptions();
+            $statusLabel = $statusOptions[$validated['status']] ?? ucfirst(str_replace('_', ' ', $validated['status']));
+
+            // Get the customer user
+            $customerUser = $order->user;
+            if ($customerUser) {
+                $customerUser->notify(new OrderStatusUpdated(
+                    $order->id,
+                    $order->order_number,
+                    $oldStatus,
+                    $validated['status'],
+                    $statusLabel
+                ));
+            }
+        }
 
         return redirect()
             ->route('admin.orders.status.edit', $order)

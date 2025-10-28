@@ -26,6 +26,7 @@ class OrderSummaryPresenter
             'items.paperStockSelection',
             'items.addons',
             'items.colors',
+            'rating',
         ]);
 
         $customerOrder = $order->customerOrder;
@@ -41,6 +42,7 @@ class OrderSummaryPresenter
             'order_number' => $order->order_number,
             'created_at' => $order->order_date ?? $order->created_at,
             'updated_at' => $order->updated_at,
+            'status' => Str::lower((string) $order->status ?: 'pending'),
             'payment_status' => Str::lower((string) $order->payment_status ?: 'pending'),
             'fulfillment_status' => Str::lower((string) $order->status ?: 'processing'),
             'subtotal' => static::toFloat($order->subtotal_amount),
@@ -55,6 +57,7 @@ class OrderSummaryPresenter
             'payment_method' => $order->payment_method,
             'currency' => Arr::get($summary, 'currency', 'PHP'),
             'customer' => [
+                'id' => $customer?->customer_id,
                 'name' => $customerName,
                 'email' => $customerEmail,
                 'phone' => $customerPhone,
@@ -66,6 +69,11 @@ class OrderSummaryPresenter
             'items' => static::transformItems($order->items, $summary),
             'timeline' => static::buildTimeline($order),
             'admin_actions' => Arr::get($summary, 'admin_actions', []),
+            'rating' => $order->rating ? [
+                'rating' => (int) $order->rating->rating,
+                'comment' => $order->rating->comment,
+                'submitted_at' => $order->rating->created_at,
+            ] : null,
         ];
     }
 

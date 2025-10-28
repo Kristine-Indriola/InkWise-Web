@@ -5,19 +5,247 @@
 @push('styles')
 	<link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
 	<link rel="stylesheet" href="{{ asset('css/admin-css/reports.css') }}">
+	<style>
+		.reports-table tbody tr.needs-attention {
+			background-color: #fff3cd !important;
+			border-left: 4px solid #ffc107;
+		}
+		.reports-table tbody tr.needs-attention:hover {
+			background-color: #ffeaa7 !important;
+		}
+		.reports-table tbody tr.needs-attention td {
+			font-weight: 500;
+		}
+		.reports-callout-list li[data-status="out-of-stock"] {
+			background-color: #f8d7da;
+			border-left: 4px solid #dc3545;
+			padding: 1rem;
+			margin-bottom: 0.5rem;
+			border-radius: 4px;
+		}
+		.reports-callout-list li[data-status="low"] {
+			background-color: #fff3cd;
+			border-left: 4px solid #ffc107;
+			padding: 1rem;
+			margin-bottom: 0.5rem;
+			border-radius: 4px;
+		}
+		.reports-callout-list li[data-status="out-of-stock"] .callout-title {
+			color: #721c24;
+			font-weight: 600;
+		}
+		.reports-callout-list li[data-status="low"] .callout-title {
+			color: #856404;
+			font-weight: 600;
+		}
+
+		/* Report Header Styles */
+		.report-header-section {
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			color: white;
+			padding: 2rem;
+			margin-bottom: 2rem;
+			border-radius: 8px;
+		}
+		.report-header-content {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			flex-wrap: wrap;
+			gap: 2rem;
+		}
+		.company-name {
+			font-size: 2.5rem;
+			font-weight: 700;
+			margin: 0;
+			color: white;
+		}
+		.report-title {
+			font-size: 1.5rem;
+			font-weight: 400;
+			margin: 0.5rem 0 0 0;
+			opacity: 0.9;
+		}
+		.report-meta-info {
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
+		}
+		.meta-item {
+			font-size: 0.9rem;
+		}
+		.meta-item strong {
+			display: inline-block;
+			min-width: 120px;
+		}
+
+		/* Value Summary Styles */
+		.value-summary-section {
+			margin-bottom: 2rem;
+		}
+		.value-card {
+			border: 2px solid #e9ecef;
+		}
+		.value-card strong {
+			font-size: 1.5rem;
+			color: #28a745;
+		}
+
+		/* Analysis Section Styles */
+		.analysis-section {
+			margin-bottom: 2rem;
+		}
+		.analysis-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+			gap: 1.5rem;
+			margin-top: 1rem;
+		}
+		.analysis-card {
+			background: white;
+			border: 1px solid #e9ecef;
+			border-radius: 8px;
+			padding: 1.5rem;
+			box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+		}
+		.analysis-card h3 {
+			margin: 0 0 0.5rem 0;
+			font-size: 1.1rem;
+			color: #495057;
+		}
+		.analysis-count {
+			font-size: 1.8rem;
+			font-weight: 700;
+			color: #007bff;
+			margin: 0.5rem 0;
+		}
+		.analysis-description {
+			color: #6c757d;
+			font-size: 0.9rem;
+			margin-bottom: 1rem;
+		}
+		.analysis-list {
+			list-style: none;
+			padding: 0;
+			margin: 0;
+		}
+		.analysis-list li {
+			padding: 0.25rem 0;
+		 border-bottom: 1px solid #f8f9fa;
+			font-size: 0.85rem;
+			color: #495057;
+		}
+		.analysis-list li:last-child {
+			border-bottom: none;
+		}
+		.alert-card {
+			border-color: #ffc107;
+			background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+		}
+		.alert-card h3 {
+			color: #856404;
+		}
+		.analysis-list li.critical {
+			color: #dc3545;
+			font-weight: 600;
+		}
+		.analysis-list li.warning {
+			color: #ffc107;
+			font-weight: 500;
+		}
+
+		/* Filter Bar Styles */
+		.reports-filter-bar {
+			background: #f8f9fa;
+			border: 1px solid #e9ecef;
+			border-radius: 8px;
+			padding: 1.5rem;
+			margin-bottom: 2rem;
+		}
+		.reports-filter-form {
+			display: flex;
+			align-items: end;
+			gap: 1rem;
+			flex-wrap: wrap;
+		}
+		.reports-filter-field {
+			display: flex;
+			flex-direction: column;
+			min-width: 150px;
+		}
+		.reports-filter-field label {
+			font-weight: 600;
+			font-size: 0.875rem;
+			margin-bottom: 0.5rem;
+			color: #495057;
+		}
+		.reports-filter-field input {
+			padding: 0.5rem;
+			border: 1px solid #ced4da;
+			border-radius: 4px;
+			font-size: 0.875rem;
+		}
+		.reports-filter-field input:focus {
+			outline: none;
+			border-color: #007bff;
+			box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+		}
+		.reports-filter-actions {
+			display: flex;
+			gap: 0.5rem;
+			align-items: center;
+		}
+
+		/* Enhanced Table Styles */
+		.reports-table th {
+			background-color: #f8f9fa;
+			font-weight: 600;
+			font-size: 0.85rem;
+			padding: 0.75rem 0.5rem;
+		}
+		.reports-table td {
+			padding: 0.75rem 0.5rem;
+			font-size: 0.85rem;
+		}
+		.reports-table .text-center {
+			text-align: center;
+		}
+		.reports-table .text-end {
+			text-align: right;
+		}
+	</style>
 @endpush
 
 @section('content')
 @php
+	$currentFilters = $filters ?? ['startDate' => null, 'endDate' => null];
+	$reportDate = now()->format('F j, Y');
+	$reportPeriod = $currentFilters['startDate'] && $currentFilters['endDate']
+		? \Carbon\Carbon::parse($currentFilters['startDate'])->format('M j') . ' - ' . \Carbon\Carbon::parse($currentFilters['endDate'])->format('M j, Y')
+		: 'All Time';
+
 	$materialCollection = $materials instanceof \Illuminate\Support\Collection ? $materials : collect($materials);
 
-	$evaluateMaterial = function ($material) {
+	$evaluateMaterial = function ($material) use ($currentFilters) {
 		$stockLevel = optional($material->inventory)->stock_level
 			?? $material->stock_qty
 			?? 0;
 		$reorderLevel = optional($material->inventory)->reorder_level
 			?? $material->reorder_point
 			?? 0;
+		$unitCost = $material->unit_cost ?? 0;
+		$lastRestock = optional($material->inventory)->last_restock_date ?? null;
+		$stockValue = $stockLevel * $unitCost;
+
+		// Calculate stock movements for the period
+		$movements = $material->stockMovements ?? collect();
+		$stockIn = $movements->where('movement_type', 'restock')->sum('quantity');
+		$stockOut = abs($movements->whereIn('movement_type', ['used', 'issued', 'sold'])->sum('quantity'));
+		$adjustments = $movements->where('movement_type', 'adjustment')->sum('quantity');
+
+		// Calculate beginning stock (current stock - movements in period)
+		$beginningStock = $stockLevel - $stockIn + $stockOut - $adjustments;
+
 		$status = 'In stock';
 		$statusKey = 'in-stock';
 		$action = 'Monitor usage each week.';
@@ -54,6 +282,18 @@
 			default => 2,
 		};
 
+		// Determine movement category for analysis
+		$totalMovement = $stockIn + $stockOut;
+		$movementCategory = 'normal';
+		if ($totalMovement > 50) {
+			$movementCategory = 'fast-moving';
+		} elseif ($totalMovement < 5) {
+			$movementCategory = 'slow-moving';
+		}
+		if ($stockLevel > $reorderLevel * 2) {
+			$movementCategory = 'overstocked';
+		}
+
 		return [
 			'model' => $material,
 			'stock' => $stockLevel,
@@ -64,6 +304,14 @@
 			'coverage_percent' => $coveragePercent,
 			'coverage_label' => $coverageLabel,
 			'priority_key' => $priorityKey,
+			'stock_value' => $stockValue,
+			'last_restock' => $lastRestock,
+			'beginning_stock' => max(0, $beginningStock),
+			'stock_in' => $stockIn,
+			'stock_out' => $stockOut,
+			'adjustments' => $adjustments,
+			'ending_stock' => $stockLevel,
+			'movement_category' => $movementCategory,
 		];
 	};
 
@@ -86,6 +334,15 @@
 
 	$reorderQueue = $hotList->take(8);
 
+	$totalStockValue = $materialSnapshots->sum('stock_value');
+
+	// Analysis/Insights calculations
+	$fastMovingItems = $materialSnapshots->where('movement_category', 'fast-moving');
+	$slowMovingItems = $materialSnapshots->where('movement_category', 'slow-moving');
+	$overstockedItems = $materialSnapshots->where('movement_category', 'overstocked');
+	$outOfStockItems = $materialSnapshots->where('status_key', 'out-of-stock');
+	$lowStockItems = $materialSnapshots->where('status_key', 'low');
+
 	$reportPayload = [
 		'inventory' => [
 			'labels' => $materialLabels->values(),
@@ -98,6 +355,30 @@
 @endphp
 
 <main class="reports-shell admin-page-shell" id="adminInventoryReportsShell">
+	<!-- Report Header -->
+	<section class="report-header-section" aria-label="Report header">
+		<div class="report-header-content">
+			<div class="report-company-info">
+				<h1 class="company-name">InkWise</h1>
+				<h2 class="report-title">Inventory Summary Report</h2>
+			</div>
+			<div class="report-meta-info">
+				<div class="meta-item">
+					<strong>Date Generated:</strong> {{ $reportDate }}
+				</div>
+				<div class="meta-item">
+					<strong>Reporting Period:</strong> {{ $reportPeriod }}
+				</div>
+				<div class="meta-item">
+					<strong>Prepared by:</strong> System Administrator
+				</div>
+				<div class="meta-item">
+					<strong>Total Items:</strong> {{ number_format($materialSnapshots->count()) }}
+				</div>
+			</div>
+		</div>
+	</section>
+
 	<header class="page-header reports-page-header">
 		<div>
 			<h1 class="page-title">Inventory analytics</h1>
@@ -115,6 +396,41 @@
 			</button>
 		</div>
 	</header>
+
+	<section class="reports-filter-bar" aria-label="Filter inventory by date range">
+		<form method="GET" class="reports-filter-form">
+			<div class="reports-filter-field">
+				<label for="filterStartDate">Start date</label>
+				<input
+					type="date"
+					id="filterStartDate"
+					name="start_date"
+					value="{{ $currentFilters['startDate'] ?? '' }}"
+					max="{{ now()->format('Y-m-d') }}"
+				>
+			</div>
+			<div class="reports-filter-field">
+				<label for="filterEndDate">End date</label>
+				<input
+					type="date"
+					id="filterEndDate"
+					name="end_date"
+					value="{{ $currentFilters['endDate'] ?? '' }}"
+					max="{{ now()->format('Y-m-d') }}"
+				>
+			</div>
+			<div class="reports-filter-actions">
+				<button type="submit" class="btn btn-primary">
+					<i class="fi fi-rr-filter" aria-hidden="true"></i> Apply
+				</button>
+				@if ($currentFilters['startDate'] || $currentFilters['endDate'])
+					<a href="{{ route('admin.reports.inventory') }}" class="pill-link">
+						<i class="fi fi-rr-refresh" aria-hidden="true"></i> Reset
+					</a>
+				@endif
+			</div>
+		</form>
+	</section>
 
 	<section class="reports-summary-grid" aria-label="Inventory highlights">
 		<article class="reports-summary-card">
@@ -149,6 +465,104 @@
 			<strong data-metric="total-stock">{{ number_format($inventoryStats['totalStock'] ?? 0) }}</strong>
 			<p>Total on-hand units across all SKUs.</p>
 		</article>
+		<article class="reports-summary-card">
+			<header>
+				<span class="summary-label">Stock Value</span>
+				<i class="fi fi-rr-money-bill-wave" aria-hidden="true"></i>
+			</header>
+			<strong>₱{{ number_format($totalStockValue, 2) }}</strong>
+			<p>Overall value of your current inventory.</p>
+		</article>
+	</section>
+
+	<!-- Value Summary Section -->
+	<section class="reports-summary-grid value-summary-section" aria-label="Inventory value summary">
+		<article class="reports-summary-card value-card">
+			<header>
+				<span class="summary-label">Total Inventory Value</span>
+				<i class="fi fi-rr-money-bill-wave" aria-hidden="true"></i>
+			</header>
+			<strong>₱{{ number_format($totalStockValue, 2) }}</strong>
+			<p>Overall worth of current inventory</p>
+		</article>
+		<article class="reports-summary-card value-card">
+			<header>
+				<span class="summary-label">Average Item Value</span>
+				<i class="fi fi-rr-calculator" aria-hidden="true"></i>
+			</header>
+			<strong>₱{{ $materialSnapshots->count() > 0 ? number_format($totalStockValue / $materialSnapshots->count(), 2) : '0.00' }}</strong>
+			<p>Average value per inventory item</p>
+		</article>
+		<article class="reports-summary-card value-card">
+			<header>
+				<span class="summary-label">Stock Turnover</span>
+				<i class="fi fi-rr-refresh" aria-hidden="true"></i>
+			</header>
+			<strong>{{ $materialSnapshots->sum('stock_out') > 0 ? number_format(($materialSnapshots->sum('stock_out') / max(1, $materialSnapshots->avg('beginning_stock'))) * 100, 1) : 0 }}%</strong>
+			<p>Items moved during reporting period</p>
+		</article>
+	</section>
+
+	<!-- Analysis & Insights Section -->
+	<section class="reports-panel analysis-section" aria-label="Inventory analysis and insights">
+		<header class="reports-panel__header">
+			<div>
+				<h2>Analysis & Insights</h2>
+				<p>Key insights about inventory movement and status</p>
+			</div>
+		</header>
+		<div class="analysis-grid">
+			<div class="analysis-card">
+				<h3>🚀 Fast-Moving Items</h3>
+				<p class="analysis-count">{{ $fastMovingItems->count() }} items</p>
+				<p class="analysis-description">High turnover items that need frequent restocking</p>
+				@if($fastMovingItems->isNotEmpty())
+					<ul class="analysis-list">
+						@foreach($fastMovingItems->take(3) as $item)
+							<li>{{ $item['model']->material_name }} ({{ number_format($item['stock_out']) }} units moved)</li>
+						@endforeach
+					</ul>
+				@endif
+			</div>
+			<div class="analysis-card">
+				<h3>🐌 Slow-Moving Items</h3>
+				<p class="analysis-count">{{ $slowMovingItems->count() }} items</p>
+				<p class="analysis-description">Items with minimal movement that may need review</p>
+				@if($slowMovingItems->isNotEmpty())
+					<ul class="analysis-list">
+						@foreach($slowMovingItems->take(3) as $item)
+							<li>{{ $item['model']->material_name }} ({{ number_format($item['stock_out']) }} units moved)</li>
+						@endforeach
+					</ul>
+				@endif
+			</div>
+			<div class="analysis-card">
+				<h3>📦 Overstocked Items</h3>
+				<p class="analysis-count">{{ $overstockedItems->count() }} items</p>
+				<p class="analysis-description">Items with excess quantities tying up capital</p>
+				@if($overstockedItems->isNotEmpty())
+					<ul class="analysis-list">
+						@foreach($overstockedItems->take(3) as $item)
+							<li>{{ $item['model']->material_name }} ({{ number_format($item['stock']) }} units in stock)</li>
+						@endforeach
+					</ul>
+				@endif
+			</div>
+			<div class="analysis-card alert-card">
+				<h3>⚠️ Critical Stock Alerts</h3>
+				<p class="analysis-count">{{ $outOfStockItems->count() + $lowStockItems->count() }} items</p>
+				<p class="analysis-description">Items requiring immediate attention</p>
+				@if($hotList->isNotEmpty())
+					<ul class="analysis-list">
+						@foreach($hotList->take(3) as $item)
+							<li class="{{ $item['status_key'] === 'out-of-stock' ? 'critical' : 'warning' }}">
+								{{ $item['model']->material_name }} - {{ $item['status'] }}
+							</li>
+						@endforeach
+					</ul>
+				@endif
+			</div>
+		</div>
 	</section>
 
 	<section class="reports-panel" aria-label="Inventory chart">
@@ -195,49 +609,6 @@
 		</section>
 	@endif
 
-	@if($reorderQueue->isNotEmpty())
-		<section class="reports-panel reports-panel--queue" aria-label="Reorder queue">
-			<header class="reports-panel__header">
-				<div>
-					<h2>Reorder queue</h2>
-					<p>Review the next materials to restock, sorted by urgency.</p>
-				</div>
-			</header>
-			<div class="table-wrapper">
-				<table class="reports-table reports-table--compact" id="reorderQueueTable">
-					<thead>
-						<tr>
-							<th scope="col">Material</th>
-							<th scope="col">Status</th>
-							<th scope="col" class="text-center">On hand</th>
-							<th scope="col" class="text-center">Target</th>
-							<th scope="col">Coverage</th>
-							<th scope="col">Action</th>
-						</tr>
-					</thead>
-					<tbody>
-					@foreach($reorderQueue as $snapshot)
-						<tr data-status="{{ $snapshot['status_key'] }}">
-							<td>{{ $snapshot['model']->material_name }}</td>
-							<td><span class="status-pill status-pill--{{ $snapshot['status_key'] }}">{{ $snapshot['status'] }}</span></td>
-							<td class="text-center">{{ number_format($snapshot['stock']) }}</td>
-							<td class="text-center">{{ number_format($snapshot['reorder']) }}</td>
-							<td>
-								@if($snapshot['coverage_percent'] !== null)
-									<span class="coverage-indicator coverage-indicator--{{ $snapshot['status_key'] }}">{{ $snapshot['coverage_label'] }} ({{ $snapshot['coverage_percent'] }}%)</span>
-								@else
-									<span class="coverage-indicator coverage-indicator--unknown">No target</span>
-								@endif
-							</td>
-							<td>{{ $snapshot['action'] }}</td>
-						</tr>
-					@endforeach
-					</tbody>
-				</table>
-			</div>
-		</section>
-	@endif
-
 	<section class="reports-detail-grid single-column">
 		<article class="reports-card" aria-label="Inventory table">
 			<header>
@@ -262,13 +633,19 @@
 				<table class="reports-table" id="inventoryTable">
 					<thead>
 						<tr>
-							<th scope="col">Material</th>
+							<th scope="col">Item Code</th>
+							<th scope="col">Item Name</th>
 							<th scope="col">Category</th>
-							<th scope="col" class="text-center">Stock</th>
-							<th scope="col" class="text-center">Reorder</th>
-							<th scope="col">Coverage</th>
+							<th scope="col">UOM</th>
+							<th scope="col" class="text-center">Reorder Level</th>
+							<th scope="col" class="text-center">Beginning Stock</th>
+							<th scope="col" class="text-center">Stock In</th>
+							<th scope="col" class="text-center">Stock Out</th>
+							<th scope="col" class="text-center">Adjustments</th>
+							<th scope="col" class="text-center">Ending Stock</th>
+							<th scope="col" class="text-end">Unit Cost</th>
+							<th scope="col" class="text-end">Total Value</th>
 							<th scope="col">Status</th>
-							<th scope="col">Next step</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -280,27 +657,26 @@
 								'low' => 'status-badge status-badge--warning',
 								default => 'status-badge status-badge--success',
 							};
+							$rowClass = in_array($snapshot['status_key'], ['low', 'out-of-stock'], true) ? 'needs-attention' : '';
 						@endphp
-						<tr data-stock-status="{{ $snapshot['status_key'] }}">
+						<tr data-stock-status="{{ $snapshot['status_key'] }}" class="{{ $rowClass }}">
+							<td>{{ $material->sku ?? 'N/A' }}</td>
 							<td>{{ $material->material_name }}</td>
 							<td>{{ $material->material_type }}</td>
-							<td class="text-center">{{ number_format($snapshot['stock']) }}</td>
+							<td>{{ $material->unit ?? 'pcs' }}</td>
 							<td class="text-center">{{ number_format($snapshot['reorder']) }}</td>
-							<td>
-								@if($snapshot['coverage_percent'] !== null)
-									<span class="coverage-indicator coverage-indicator--{{ $snapshot['status_key'] }}">{{ $snapshot['coverage_label'] }} ({{ $snapshot['coverage_percent'] }}%)</span>
-								@else
-									<span class="coverage-indicator coverage-indicator--unknown">No target</span>
-								@endif
-							</td>
-							<td>
-								<span class="{{ $statusClass }}">{{ $snapshot['status'] }}</span>
-							</td>
-							<td>{{ $snapshot['action'] }}</td>
+							<td class="text-center">{{ number_format($snapshot['beginning_stock']) }}</td>
+							<td class="text-center">{{ number_format($snapshot['stock_in']) }}</td>
+							<td class="text-center">{{ number_format($snapshot['stock_out']) }}</td>
+							<td class="text-center">{{ $snapshot['adjustments'] != 0 ? number_format($snapshot['adjustments']) : '-' }}</td>
+							<td class="text-center">{{ number_format($snapshot['ending_stock']) }}</td>
+							<td class="text-end">₱{{ number_format($material->unit_cost ?? 0, 2) }}</td>
+							<td class="text-end">₱{{ number_format($snapshot['stock_value'], 2) }}</td>
+							<td><span class="{{ $statusClass }}">{{ $snapshot['status'] }}</span></td>
 						</tr>
 					@empty
 						<tr>
-							<td colspan="7" class="text-center">No materials found.</td>
+							<td colspan="14" class="text-center">No materials found.</td>
 						</tr>
 					@endforelse
 					</tbody>
@@ -344,6 +720,6 @@
 			applyFilter('all');
 		});
 	</script>
-	<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" data-chartjs-src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
+	<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
 	<script src="{{ asset('js/admin/reports.js') }}" defer></script>
 @endsection

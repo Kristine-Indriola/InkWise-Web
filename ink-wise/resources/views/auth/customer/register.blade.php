@@ -112,7 +112,7 @@
             margin: 0.75rem 0 0;
             color: var(--color-ink);
         }
-
+/* sample */
         .intro-copy {
             font-size: 0.95rem;
             line-height: 1.65;

@@ -22,7 +22,6 @@ class Staff extends Model
         'contact_number',
         'role',
         'status',
-        'profile_pic',
     ];
 
       // Scope to exclude archived staff

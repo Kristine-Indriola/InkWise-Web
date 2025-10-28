@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Order extends Model
 {
@@ -32,6 +33,26 @@ class Order extends Model
 		return $this->belongsTo(Customer::class, 'customer_id', 'customer_id');
 	}
 
+	public function effectiveCustomer()
+	{
+		// First try direct customer relationship
+		if ($this->customer) {
+			return $this->customer;
+		}
+
+		// If no direct customer, try through customerOrder
+		if ($this->customerOrder && $this->customerOrder->customer) {
+			return $this->customerOrder->customer;
+		}
+
+		// If customerOrder exists but no customer, return customerOrder as pseudo-customer
+		if ($this->customerOrder) {
+			return $this->customerOrder;
+		}
+
+		return null;
+	}
+
 	public function user(): BelongsTo
 	{
 		return $this->belongsTo(User::class, 'user_id', 'user_id');
@@ -45,6 +66,11 @@ class Order extends Model
 	public function payments(): HasMany
 	{
 		return $this->hasMany(Payment::class);
+	}
+
+	public function rating(): HasOne
+	{
+		return $this->hasOne(OrderRating::class);
 	}
 
 	public function totalPaid(): float

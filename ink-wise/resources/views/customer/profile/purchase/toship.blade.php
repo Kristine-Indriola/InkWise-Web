@@ -5,7 +5,7 @@
 @section('content')
 <div class="bg-white rounded-2xl shadow p-6">
        <div class="flex border-b text-base font-semibold mb-4">
-    <a href="{{ route('customer.my_purchase') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab" data-route="all">All</a>
+
     <a href="{{ route('customer.my_purchase.topay') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Pay</a>
     <a href="{{ route('customer.my_purchase.inproduction') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">In Production</a>
     <a href="{{ route('customer.my_purchase.toship') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Ship</a>
@@ -215,6 +215,23 @@
                         Order Total: <span class="text-[#a6b7ff] font-bold text-lg">₱{{ number_format($order->total_amount, 2) }}</span>
                     </div>
                     <div class="flex gap-2">
+                        @php
+                            // Check if order has remaining balance to pay (assuming 50% deposit system)
+                            $hasRemainingBalance = false;
+                            $metadata = $normalizeMetadata(data_get($order, 'metadata', []));
+                            $payments = collect($metadata['payments'] ?? []);
+                            $paidAmount = $payments->filter(fn($payment) => ($payment['status'] ?? null) === 'paid')->sum(fn($payment) => (float)($payment['amount'] ?? 0));
+                            $remainingBalance = max(($order->total_amount ?? 0) - $paidAmount, 0);
+                            $hasRemainingBalance = $remainingBalance > 0.01; // More than 1 cent remaining
+                        @endphp
+
+                        @if($hasRemainingBalance)
+                        <a href="{{ route('customer.pay.remaining.balance', ['order' => $order->id]) }}"
+                           class="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded font-semibold transition-colors duration-200">
+                            Pay Remaining Balance (₱{{ number_format($remainingBalance, 2) }})
+                        </a>
+                        @endif
+
                         <button class="bg-[#a6b7ff] hover:bg-[#bce6ff] text-white px-6 py-2 rounded font-semibold">Track Order</button>
                         <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white hover:bg-[#d3b7ff]">Contact Shop</button>
                         <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white hover:bg-[#d3b7ff]">View Shop Rating</button>

@@ -38,6 +38,9 @@
   .dark-mode .summary-card .summary-card-value { color:#f9fafb; }
   .dark-mode .summary-card .summary-card-meta { color:#9ca3af; }
   .dark-mode .summary-card-chip { background: rgba(148, 185, 255, 0.28); color: #bcd3ff; }
+  .dark-mode .summary-card-value__suffix { color: #d1d5db; }
+  .dark-mode .summary-card-rating-star { color: #facc15; }
+  .dark-mode .summary-card-rating-star--empty { color: #475569; }
 
   /* Dark mode for body */
   .dark-mode body { background:#111827; }
@@ -67,8 +70,8 @@
     margin: 0;
     width: 100%;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    gap: 20px;
   }
 
   .owner-dashboard-inner .charts {
@@ -86,7 +89,7 @@
     position: relative;
     background: #fff;
     border-radius: 12px;
-    padding: 16px 20px 24px;
+    padding: 18px 22px 26px;
     box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
     display: block;
     text-decoration: none;
@@ -94,12 +97,16 @@
     transition: transform 0.18s ease, box-shadow 0.18s ease;
   }
 
+  .summary-card.summary-card--link {
+    cursor: pointer;
+  }
+
   .summary-card::after {
     content: "";
     position: absolute;
-    left: 20px;
-    right: 20px;
-    bottom: 14px;
+    left: 22px;
+    right: 22px;
+    bottom: 16px;
     height: 3px;
     border-radius: 999px;
     background: linear-gradient(90deg, rgba(148, 185, 255, 0.45), rgba(111, 150, 227, 0.55));
@@ -117,9 +124,9 @@
     margin-bottom: 8px;
   }
 
-  .summary-card-label { font-size: 0.88rem; color: #475569; }
-  .summary-card-value { display: block; font-size: 1.35rem; font-weight: 800; color: #0f172a; margin-top: 4px; }
-  .summary-card-meta { color: #6b7280; font-size: 0.8rem; }
+  .summary-card-label { font-size: 0.92rem; color: #475569; }
+  .summary-card-value { display: block; font-size: 1.45rem; font-weight: 800; color: #0f172a; margin-top: 5px; }
+  .summary-card-meta { color: #6b7280; font-size: 0.85rem; }
 
   .summary-card-chip {
     padding: 4px 10px;
@@ -128,6 +135,79 @@
     color: #5a8de0;
     font-weight: 600;
     font-size: 0.75rem;
+  }
+
+  .summary-card-value--rating {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 1.45rem;
+  }
+
+  .summary-card-rating-star {
+    color: #f59e0b;
+    font-size: 1.2rem;
+    line-height: 1;
+  }
+
+  .summary-card-rating-star--empty {
+    color: #cbd5f5;
+  }
+
+  .summary-card-value__suffix {
+    font-size: 0.82rem;
+    color: #6b7280;
+    font-weight: 600;
+  }
+
+  .charts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 18px;
+  }
+
+  .chart-container {
+    position: relative;
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 20px 24px 32px;
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.08);
+    min-height: 320px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chart-container h3 {
+    margin: 0 0 18px;
+    font-size: 1.06rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .chart-container canvas {
+    width: 100%;
+    flex: 1;
+  }
+
+  .chart-empty-message {
+    margin: auto;
+    text-align: center;
+    color: #6b7280;
+    font-size: 0.94rem;
+    padding: 12px;
+  }
+
+  .dark-mode .chart-container {
+    background: #1f2937;
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.48);
+  }
+
+  .dark-mode .chart-container h3 {
+    color: #f9fafb;
+  }
+
+  .dark-mode .chart-empty-message {
+    color: #cbd5f5;
   }
 </style>
 
@@ -165,35 +245,55 @@
 
   <div class="page-inner owner-dashboard-inner">
   <section class="summary-grid" aria-label="Dashboard summary">
-      <div class="summary-card">
+      <a href="{{ route('owner.order.workflow') }}" class="summary-card summary-card--link" style="text-decoration:none; color:inherit;">
         <div class="summary-card-header">
           <span class="summary-card-label">New Orders</span>
           <span class="summary-card-chip">Orders</span>
         </div>
         <span class="summary-card-value">{{ number_format($newOrdersCount ?? 0) }}</span>
         <span class="summary-card-meta">Placed in the last 7 days</span>
-      </div>
+      </a>
 
-      <a href="{{ route('owner.inventory-track', ['status' => 'low']) }}" class="summary-card" style="text-decoration:none; color:inherit;">
+      <a href="{{ route('owner.inventory-track', ['status' => 'low']) }}" class="summary-card summary-card--link" style="text-decoration:none; color:inherit;">
         <div class="summary-card-header">
           <span class="summary-card-label">Low Stock Materials</span>
           <span class="summary-card-chip">Inventory</span>
         </div>
-        <span class="summary-card-value">{{ \App\Models\Material::whereHas('inventory', function($q) {
-              $q->whereColumn('stock_level', '<=', 'reorder_level')
-                ->where('stock_level', '>', 0);
-          })->count() }}</span>
+        <span class="summary-card-value">{{ number_format($lowStockCount ?? 0) }}</span>
         <span class="summary-card-meta">Items approaching reorder level</span>
       </a>
 
-      <div class="summary-card">
+      <a href="{{ route('owner.order.workflow', ['status' => 'pending']) }}" class="summary-card summary-card--link" style="text-decoration:none; color:inherit;">
         <div class="summary-card-header">
           <span class="summary-card-label">Pending Orders</span>
           <span class="summary-card-chip">Orders</span>
         </div>
         <span class="summary-card-value">{{ number_format($pendingOrdersCount ?? 0) }}</span>
         <span class="summary-card-meta">Awaiting processing</span>
-      </div>
+      </a>
+
+      <a href="{{ route('owner.ratings.index') }}" class="summary-card summary-card--link" style="text-decoration:none; color:inherit;">
+        <div class="summary-card-header">
+          <span class="summary-card-label">Average Rating</span>
+          <span class="summary-card-chip">Feedback</span>
+        </div>
+        <span class="summary-card-value summary-card-value--rating">
+          <span>{{ $averageRating !== null ? number_format($averageRating, 2) : '—' }}</span>
+          @if($averageRating !== null)
+            <span class="summary-card-rating-star" aria-hidden="true">★</span>
+          @else
+            <span class="summary-card-rating-star summary-card-rating-star--empty" aria-hidden="true">☆</span>
+          @endif
+          <span class="summary-card-value__suffix">/ 5</span>
+        </span>
+        <span class="summary-card-meta">
+          @if(($totalRatings ?? 0) === 1)
+            1 review recorded
+          @else
+            {{ number_format($totalRatings ?? 0) }} reviews recorded
+          @endif
+        </span>
+      </a>
 
       <div class="summary-card">
         <div class="summary-card-header">
@@ -211,73 +311,173 @@
     <div class="chart-container">
       <h3>Top-Selling Products</h3>
       <canvas id="barChart"></canvas>
+      <p id="barChartEmpty" class="chart-empty-message" hidden>No product sales recorded yet.</p>
     </div>
 
     <!-- Inventory Movement Overview Chart -->
     <div class="chart-container">
       <h3>Inventory Movement Overview</h3>
       <canvas id="lineChart"></canvas>
+      <p id="lineChartEmpty" class="chart-empty-message" hidden>No inventory movements recorded yet.</p>
     </div>
   </div>
 </section>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  const topSellingProducts = @json($topSellingProducts ?? ['labels' => [], 'data' => []]);
+  const inventoryMovement = @json($inventoryMovement ?? ['labels' => [], 'incoming' => [], 'outgoing' => []]);
   const barCanvas = document.getElementById('barChart');
+  const barEmpty = document.getElementById('barChartEmpty');
   if (barCanvas) {
-    const barCtx = barCanvas.getContext('2d');
-    new Chart(barCtx, {
-      type: 'bar',
-      data: {
-        labels: ['Invitation - Birthday Party','Keychain','Invitation - Floral Pink'],
-        datasets: [{
-          label: 'Units Sold',
-          data: [12, 15, 20],
-          backgroundColor: ['rgba(59,130,246,0.12)','rgba(59,130,246,0.18)','rgba(59,130,246,0.28)'],
-          borderRadius: 6
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        layout: { padding: { bottom: 30 } },
-        scales: {
-          y: {
-            beginAtZero: true,
-            grid: { color: '#eef2f7' }
-          },
-          x: {
-            grid: { display: false },
-            ticks: {
-              autoSkip: false,
-              maxRotation: 0,
-              minRotation: 0,
-              align: 'center',
-              callback: function(value){
-                const label = this.getLabelForValue(value);
-                return label.length > 22 ? label.slice(0,22) + '…' : label;
+    const hasData = Array.isArray(topSellingProducts.data) && topSellingProducts.data.length > 0;
+    if (!hasData) {
+      barCanvas.style.display = 'none';
+      if (barEmpty) {
+        barEmpty.hidden = false;
+      }
+    } else {
+      if (barEmpty) {
+        barEmpty.hidden = true;
+      }
+      barCanvas.style.display = '';
+      const barCtx = barCanvas.getContext('2d');
+      const palette = [
+        'rgba(59,130,246,0.28)',
+        'rgba(59,130,246,0.24)',
+        'rgba(59,130,246,0.20)',
+        'rgba(59,130,246,0.16)',
+        'rgba(59,130,246,0.12)'
+      ];
+      const backgroundColor = topSellingProducts.data.map((_, index) => palette[index % palette.length]);
+      const maxValue = Math.max(...topSellingProducts.data);
+      new Chart(barCtx, {
+        type: 'bar',
+        data: {
+          labels: topSellingProducts.labels,
+          datasets: [{
+            label: 'Units Sold',
+            data: topSellingProducts.data,
+            backgroundColor,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          layout: { padding: { bottom: 30 } },
+          scales: {
+            y: {
+              beginAtZero: true,
+              suggestedMax: maxValue < 5 ? 5 : maxValue + Math.ceil(maxValue * 0.1),
+              grid: { color: '#eef2f7' }
+            },
+            x: {
+              grid: { display: false },
+              ticks: {
+                autoSkip: false,
+                maxRotation: 0,
+                minRotation: 0,
+                align: 'center',
+                callback: function(value){
+                  const label = this.getLabelForValue(value);
+                  if (!label) {
+                    return '';
+                  }
+                  return label.length > 22 ? label.slice(0,22) + '...' : label;
+                }
               }
             }
           }
         }
-      }
-    });
+      });
+    }
   }
   const lineCanvas = document.getElementById('lineChart');
+  const lineEmpty = document.getElementById('lineChartEmpty');
   if (lineCanvas) {
-    const lineCtx = lineCanvas.getContext('2d');
-    new Chart(lineCtx, {
-      type: 'line',
-      data: {
-        labels: ['Week 1','Week 2','Week 3','Week 4'],
-        datasets: [
-          { label: 'Incoming Stock', data: [20,40,25,35], borderColor: 'rgba(16,185,129,0.9)', fill:false, tension:.3 },
-          { label: 'Outgoing Stock', data: [70,30,20,50], borderColor: 'rgba(14,165,233,0.9)', fill:false, tension:.3 }
-        ]
-      },
-      options: { responsive: true, maintainAspectRatio: false }
-    });
+    const labels = Array.isArray(inventoryMovement.labels) ? inventoryMovement.labels : [];
+    const incomingSeries = Array.isArray(inventoryMovement.incoming) ? inventoryMovement.incoming.map(Number) : [];
+    const outgoingSeries = Array.isArray(inventoryMovement.outgoing) ? inventoryMovement.outgoing.map(Number) : [];
+
+    const hasMovementData = labels.length > 0 && (
+      incomingSeries.some(value => value > 0) || outgoingSeries.some(value => value > 0)
+    );
+
+    if (!hasMovementData) {
+      lineCanvas.style.display = 'none';
+      if (lineEmpty) {
+        lineEmpty.hidden = false;
+      }
+    } else {
+      if (lineEmpty) {
+        lineEmpty.hidden = true;
+      }
+      lineCanvas.style.display = '';
+
+      const lineCtx = lineCanvas.getContext('2d');
+      const combinedValues = [...incomingSeries, ...outgoingSeries];
+      const maxValue = combinedValues.length ? Math.max(...combinedValues) : 0;
+
+      new Chart(lineCtx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Incoming Stock',
+              data: incomingSeries,
+              borderColor: 'rgba(16,185,129,0.85)',
+              backgroundColor: 'rgba(16,185,129,0.18)',
+              fill: true,
+              tension: 0.35,
+              pointRadius: 4,
+              pointHoverRadius: 5
+            },
+            {
+              label: 'Outgoing Stock',
+              data: outgoingSeries,
+              borderColor: 'rgba(14,165,233,0.85)',
+              backgroundColor: 'rgba(14,165,233,0.18)',
+              fill: true,
+              tension: 0.35,
+              pointRadius: 4,
+              pointHoverRadius: 5
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: true,
+              position: 'bottom'
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const parsed = context.parsed || {};
+                  const value = typeof parsed.y === 'number' ? parsed.y : 0;
+                  return `${context.dataset.label}: ${value}`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              suggestedMax: maxValue < 10 ? 10 : maxValue + Math.ceil(maxValue * 0.1),
+              grid: { color: '#eef2f7' }
+            },
+            x: {
+              grid: { display: false }
+            }
+          }
+        }
+      });
+    }
   }
 });
 </script>

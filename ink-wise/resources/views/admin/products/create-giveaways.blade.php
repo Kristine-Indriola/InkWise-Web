@@ -25,6 +25,7 @@
 	];
 
 	$existingBulkOrder = optional($product?->bulkOrders?->first());
+	$existingEnvelope = optional($product?->envelope);
 
 	$materialCollection = collect($materials ?? []);
 	$materialTypes = $materialCollection
@@ -38,10 +39,10 @@
 		->values();
 
 	$materialDefaults = [
-		'material_type' => old('material_type'),
-		'material_id' => old('envelope_material_id'),
-		'max_qty' => old('max_qty', $existingBulkOrder?->min_qty ?? ''),
-		'max_quantity' => old('max_quantity', $existingBulkOrder?->max_qty ?? ''),
+		'material_type' => old('material_type', $existingEnvelope->envelope_material_name ?? ''),
+		'material_id' => old('envelope_material_id', $existingEnvelope->material_id ?? ''),
+		'max_qty' => old('max_qty', $existingBulkOrder?->min_qty ?? $existingEnvelope->max_qty ?? ''),
+		'max_quantity' => old('max_quantity', $existingBulkOrder?->max_qty ?? $existingEnvelope->max_quantity ?? ''),
 	];
 @endphp
 
@@ -78,6 +79,7 @@
         <input type="hidden" id="product_id" name="product_id" value="{{ $product->id }}">
     @endif
     <input type="hidden" id="template_id" name="template_id" value="">
+    <input type="hidden" name="productType" value="Giveaway">
 
     <div class="invitation-container">
         {{-- Progress Bar --}}
@@ -247,7 +249,7 @@
 
                 <div class="form-buttons">
                     <button type="submit" class="btn-save" id="submit-btn">
-                        <span class="btn-text">{{ $isEditing ? 'Update Giveaway' : 'Create Giveaway' }}</span>
+                        <span class="btn-text">{{ $isEditing ? 'Update Giveaways' : 'Create Giveaways' }}</span>
                         <span class="loading-spinner" style="display: none;"><i class="fas fa-spinner fa-spin"></i> Saving...</span>
                     </button>
                 </div>

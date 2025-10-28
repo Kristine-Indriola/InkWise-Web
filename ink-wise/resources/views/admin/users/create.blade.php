@@ -15,7 +15,7 @@
             <p class="page-subtitle">Set a role, contact information, and access credentials for a new staff member.</p>
         </div>
         <a href="{{ route('admin.users.index') }}" class="pill-link" aria-label="Back to staff list">
-            <i class="fa-solid fa-arrow-left"></i>
+            <i class="fa-solid fa-arrow-left"></i> 
             <span>Back to Staff</span>
         </a>
     </header>

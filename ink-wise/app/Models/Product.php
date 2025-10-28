@@ -35,7 +35,7 @@ class Product extends Model
      */
     public function template()
     {
-        return $this->belongsTo(Template::class);
+        return $this->belongsTo(Template::class, 'template_id');
     }
 
     /**

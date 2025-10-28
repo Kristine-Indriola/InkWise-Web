@@ -17,24 +17,24 @@
     <link rel="icon" type="image/png" href="{{ asset('adminimage/ink.png') }}">
     <style>
         :root {
-            --page-gradient: radial-gradient(circle at top, #e1f5fe 0%, #f8fbff 45%, #ffffff 100%);
+            --page-gradient: linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%);
             --surface: #ffffff;
-            --surface-muted: #f3f6fb;
-            --surface-strong: #0f172a;
-            --divider: rgba(15, 23, 42, 0.08);
-            --shadow-lg: 0 22px 48px rgba(15, 23, 42, 0.10);
-            --shadow-md: 0 18px 32px rgba(15, 23, 42, 0.08);
-            --text-strong: #0f172a;
-            --text-default: #1f2937;
-            --text-muted: #6b7280;
-            --text-soft: #94a3b8;
-            --accent: #a6b7ff;
-            --accent-dark: #8f9dff;
-            --success: #10b981;
-            --warning: #f97316;
-            --danger: #dc2626;
-            --radius-lg: 20px;
-            --radius-md: 14px;
+            --surface-muted: #f8f9fa;
+            --surface-strong: #1a1a1a;
+            --divider: rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 4px 20px rgba(0, 0, 0, 0.08);
+            --shadow-md: 0 2px 12px rgba(0, 0, 0, 0.06);
+            --text-strong: #1a1a1a;
+            --text-default: #333333;
+            --text-muted: #666666;
+            --text-soft: #999999;
+            --accent: #ee4d2d;
+            --accent-dark: #d73211;
+            --success: #00bfa5;
+            --warning: #ffbf00;
+            --danger: #ee4d2d;
+            --radius-lg: 8px;
+            --radius-md: 6px;
         }
 
         * {
@@ -47,7 +47,7 @@
             font-family: 'Poppins', sans-serif;
             background: var(--page-gradient);
             color: var(--text-default);
-            padding: clamp(24px, 4vw, 48px) 0;
+            line-height: 1.5;
         }
 
         a {
@@ -60,21 +60,20 @@
         }
 
         .page-wrapper {
-            width: min(1120px, calc(100% - clamp(32px, 6vw, 80px)));
-            margin: calc(clamp(24px, 4vw, 48px) + 72px) auto 0;
+            width: min(1200px, calc(100% - 40px));
+            margin: 20px auto;
             display: grid;
-            grid-template-columns: minmax(0, 1.1fr) 320px;
-            gap: clamp(18px, 2.6vw, 32px);
-            align-items: flex-start;
+            grid-template-columns: 1fr 400px;
+            gap: 24px;
+            align-items: start;
         }
 
         .card {
             background: var(--surface);
             border-radius: var(--radius-lg);
             box-shadow: var(--shadow-lg);
-            border: 1px solid rgba(15, 23, 42, 0.04);
+            border: 1px solid rgba(0, 0, 0, 0.04);
             overflow: hidden;
-            transform: translateZ(0);
         }
 
         /* Ensure the Shipping information card is tall enough on desktop to avoid layout collapse */
@@ -88,34 +87,35 @@
         .checkout-form {
             display: flex;
             flex-direction: column;
-            gap: clamp(18px, 2vw, 26px);
-            padding: clamp(22px, 2.4vw, 30px);
+            gap: 32px;
+            padding: 32px;
         }
 
         .section-title {
             display: flex;
             align-items: center;
             gap: 12px;
-            font-size: clamp(20px, 2.4vw, 24px);
+            font-size: 20px;
             font-weight: 600;
             color: var(--text-strong);
-            margin: 0;
+            margin: 0 0 8px 0;
         }
 
         .section-title span {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 40px;
-            height: 40px;
-            border-radius: 12px;
-            background: rgba(166, 183, 255, 0.24);
-            color: #5f6ad9;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: #ffffff;
             font-weight: 600;
+            font-size: 14px;
         }
 
         .section-subtitle {
-            margin: 6px 0 0;
+            margin: 0 0 20px 0;
             color: var(--text-muted);
             font-size: 14px;
         }
@@ -168,31 +168,27 @@
         }
 
         .option-card {
-            border-radius: 18px;
-            border: 1px solid rgba(148, 163, 184, 0.22);
-            background: rgba(248, 250, 255, 0.82);
-            padding: 18px 20px;
+            border-radius: var(--radius-md);
+            border: 1px solid #e0e0e0;
+            background: #ffffff;
+            padding: 16px 20px;
             display: flex;
             gap: 16px;
             align-items: flex-start;
             cursor: pointer;
-            transition: border 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+            transition: all 0.2s ease;
         }
 
         .option-card:hover {
-            border-color: rgba(166, 183, 255, 0.6);
-            box-shadow: 0 20px 36px rgba(166, 183, 255, 0.22);
-            transform: translateY(-2px);
-            background: linear-gradient(135deg, rgba(166, 183, 255, 0.20), rgba(166, 183, 255, 0.08));
+            border-color: var(--accent);
+            box-shadow: 0 2px 8px rgba(238, 77, 45, 0.15);
         }
 
         .option-card.selected {
-            border-color: rgba(166, 183, 255, 0.8);
-            box-shadow: 0 24px 44px rgba(166, 183, 255, 0.26);
-            background: linear-gradient(135deg, rgba(166, 183, 255, 0.24), rgba(166, 183, 255, 0.10));
-        }
-
-        .option-card input[type="radio"] {
+            border-color: var(--accent);
+            background: rgba(238, 77, 45, 0.02);
+            box-shadow: 0 2px 8px rgba(238, 77, 45, 0.15);
+        }        .option-card input[type="radio"] {
             margin-top: 4px;
             width: 18px;
             height: 18px;
@@ -228,23 +224,23 @@
         }
 
         .summary-card {
-            padding: clamp(22px, 2.2vw, 28px);
+            padding: 24px;
             display: grid;
-            gap: 18px;
+            gap: 20px;
             position: sticky;
-            top: clamp(22px, 3vw, 36px);
+            top: 20px;
         }
 
         .summary-header {
             margin: 0;
-            font-size: clamp(20px, 2.4vw, 24px);
+            font-size: 18px;
             font-weight: 600;
             color: var(--text-strong);
         }
 
         .summary-items {
             display: grid;
-            gap: 16px;
+            gap: 12px;
         }
 
         .summary-item {
@@ -252,50 +248,53 @@
             justify-content: space-between;
             gap: 12px;
             font-size: 14px;
+            color: var(--text-muted);
         }
 
         .summary-item strong {
             font-size: 14px;
             color: var(--text-strong);
+            font-weight: 500;
         }
 
         .summary-divider {
             border: none;
-            border-top: 1px solid rgba(148, 163, 184, 0.2);
-            margin: 0;
+            border-top: 1px solid #e0e0e0;
+            margin: 16px 0;
         }
 
         .summary-total {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: clamp(18px, 2vw, 22px);
+            font-size: 20px;
             font-weight: 600;
             color: var(--text-strong);
+            padding: 16px 0;
+            border-top: 2px solid #e0e0e0;
         }
 
         .summary-total span:last-child {
-            color: var(--accent-dark);
+            color: var(--accent);
         }
 
         .place-order {
             width: 100%;
-            padding: 16px 18px;
-            border-radius: 16px;
+            padding: 14px 20px;
+            border-radius: var(--radius-md);
             border: none;
-            background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+            background: var(--accent);
             color: #ffffff;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            letter-spacing: 0.35px;
-            box-shadow: 0 26px 50px rgba(166, 183, 255, 0.30);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            transition: all 0.2s ease;
         }
 
         .place-order:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 32px 58px rgba(166, 183, 255, 0.34);
+            background: var(--accent-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(238, 77, 45, 0.3);
         }
 
         .shipping-header {
@@ -498,6 +497,182 @@
                 font-size: 15px;
             }
         }
+
+        /* Step-by-step checkout process */
+        .step-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .step-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .step-line {
+            width: 60px;
+            height: 2px;
+            background: #e0e0e0;
+            transition: background 0.3s ease;
+        }
+
+        .step.active .step-circle {
+            background: var(--accent);
+            color: white;
+        }
+
+        .step.active .step-label {
+            color: var(--text-strong);
+        }
+
+        .step.completed .step-circle {
+            background: var(--success);
+            color: white;
+        }
+
+        .step.completed .step-label {
+            color: var(--text-strong);
+        }
+
+        .step.completed + .step-line {
+            background: var(--success);
+        }
+
+        .checkout-section {
+            display: none;
+        }
+
+        .checkout-section.active {
+            display: block;
+        }
+            display: block;
+        }
+
+        .btn-continue {
+            width: 100%;
+            padding: 14px 20px;
+            border-radius: var(--radius-md);
+            border: none;
+            background: var(--accent);
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 24px;
+        }
+
+        .btn-continue:hover {
+            background: var(--accent-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(238, 77, 45, 0.3);
+        }
+
+        .btn-back {
+            width: 100%;
+            padding: 12px 20px;
+            border-radius: var(--radius-md);
+            border: 1px solid #e0e0e0;
+            background: #ffffff;
+            color: var(--text-default);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 12px;
+        }
+
+        .btn-back:hover {
+            background: #f8f9fa;
+            border-color: #d1d5db;
+        }
+
+        /* GCash payment options styling */
+        #gcashOptions .option-card,
+        #remainingBalanceOptions .option-card {
+            margin-bottom: 12px;
+        }
+
+        #gcashOptions .option-card:last-child,
+        #remainingBalanceOptions .option-card:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Payment summary styling */
+        .payment-summary {
+            margin-top: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: var(--radius-md);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .summary-box h4 {
+            margin: 0 0 16px 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-strong);
+        }
+
+        .payment-breakdown-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .payment-breakdown-item:last-child {
+            border-bottom: none;
+            font-weight: 600;
+            color: var(--text-strong);
+        }
+
+        .payment-timing {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .payment-amount {
+            font-weight: 600;
+        }
+
+        .payment-amount.now {
+            color: var(--accent);
+        }
+
+        .payment-amount.later {
+            color: var(--text-muted);
+        }
+
+        /* Enhanced option cards for payment methods */
+        .payment-option.selected {
+            border-color: var(--accent);
+            background: rgba(238, 77, 45, 0.02);
+            box-shadow: 0 2px 8px rgba(238, 77, 45, 0.15);
+        }
+
+        .payment-option .option-content h3 {
+            font-size: 15px;
+            margin-bottom: 4px;
+        }
+
+        .payment-option .option-content p {
+            font-size: 13px;
+            margin: 0 0 8px 0;
+            line-height: 1.4;
+        }
     </style>
 </head>
 <body>
@@ -526,7 +701,6 @@
     $shippingCity = $customerOrder->city ?? '';
     $shippingPostal = $customerOrder->postal_code ?? '';
     $taxRate = $subtotal > 0 ? round($taxAmount / $subtotal, 4) : 0.12;
-    $expressShippingFee = $shippingFee > 0 ? $shippingFee + 180 : 180;
     $hasPendingPayment = ($paymongoMeta['status'] ?? null) === 'awaiting_next_action';
     $pendingPaymentUrl = $paymongoMeta['next_action_url'] ?? null;
     $paymentMode = $paymongoMeta['mode'] ?? 'half';
@@ -548,6 +722,15 @@
 @if(session('status'))
     <div class="status-banner" style="margin:16px auto; max-width:960px; padding:12px 18px; border-radius:16px; background:#ecfdf5; color:#047857; font-weight:600; text-align:center;">
         {{ session('status') }}
+    </div>
+@endif
+
+@if($order && !$isFullyPaid && in_array($order->status, ['processing', 'confirmed']))
+    <div class="status-banner" style="margin:16px auto; max-width:960px; padding:12px 18px; border-radius:16px; background:#fef3c7; color:#92400e; font-weight:600; text-align:center; border: 1px solid #f59e0b;">
+        <div style="margin-bottom: 8px;">Your order has been confirmed! Please pay the remaining balance to complete your order.</div>
+        <a href="{{ route('order.pay.remaining.balance', $order) }}" class="inline-block px-6 py-2 bg-[#ee4d2d] text-white rounded-lg hover:bg-[#d73211] transition-colors font-semibold">
+            Pay Remaining Balance (₱{{ number_format($balanceDueDisplay, 2) }})
+        </a>
     </div>
 @endif
     <header class="global-nav shadow animate-fade-in-down bg-white w-full">
@@ -598,12 +781,30 @@
     </header>
 
     <div class="page-wrapper">
-        <section class="card checkout-form" id="shipping">
-            <header class="shipping-header">
-                <div class="shipping-header__copy">
-                    <h1 class="section-title"><span>1</span>Shipping information</h1>
-                    <p class="section-subtitle">Confirm your delivery address and preferred shipping option.</p>
+        <!-- Checkout Steps -->
+        <div class="checkout-steps" style="grid-column: 1 / -1; margin-bottom: 24px;">
+            <div class="steps-container" style="display: flex; align-items: center; justify-content: center; gap: 32px;">
+                <div class="step active" style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                    <div class="step-circle">1</div>
+                    <span class="step-label">Shipping</span>
                 </div>
+                <div class="step-line"></div>
+                <div class="step" style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                    <div class="step-circle">2</div>
+                    <span class="step-label">Payment</span>
+                </div>
+                <div class="step-line"></div>
+                <div class="step" style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                    <div class="step-circle">3</div>
+                    <span class="step-label">Review</span>
+                </div>
+            </div>
+        </div>
+
+        <section class="card checkout-form checkout-section active" id="shipping">
+            <header class="shipping-header">
+                <h1 class="section-title">Fulfillment Information</h1>
+                <p class="section-subtitle">Please provide your contact details and choose pickup or delivery</p>
             </header>
 
             {{-- If user has saved addresses, auto-fill shipping inputs from the first one but keep fields editable --}}
@@ -640,11 +841,11 @@
                 </label>
             </div>
 
-            <label>Delivery address
+            <label id="addressLabel">Delivery address
                 <input type="text" id="address" placeholder="House number, street, subdivision, barangay, city, province" value="{{ $shippingAddress }}">
             </label>
 
-            <div class="fieldset info-row">
+            <div class="fieldset info-row" id="addressFields">
                 <label>City / Municipality
                     <input type="text" id="city" placeholder="e.g. Quezon City" value="{{ $shippingCity }}">
                 </label>
@@ -661,59 +862,135 @@
             </footer>
 
             <div class="fieldset" id="shippingOptions">
-                <h2 class="section-title" style="font-size:18px; margin-bottom:4px;"><span>2</span>Shipping options</h2>
-                <p class="section-subtitle" style="margin-bottom:10px;">Choose the delivery speed that works best for you.</p>
+                <h2 class="section-title" style="font-size:16px; margin-bottom:12px;">Fulfillment Method</h2>
 
-                <label class="option-card" data-option="standard">
-                    <input type="radio" name="shippingOption" value="standard" data-cost="{{ $shippingFee }}" checked>
+                <label class="option-card" data-option="pickup">
+                    <input type="radio" name="shippingOption" value="pickup" data-cost="0" checked>
                     <div class="option-content">
-                        <h3>Standard shipping (3-5 business days)</h3>
-                        <p>Free delivery nationwide for orders above ₱3,000.</p>
+                        <h3>Pickup at Store</h3>
+                        <p>Pick up your order at our store location. No delivery fee.</p>
+                        <span class="option-tag">Free</span>
+                    </div>
+                </label>
+
+                <label class="option-card" data-option="delivery">
+                    <input type="radio" name="shippingOption" value="delivery" data-cost="{{ $shippingFee }}">
+                    <div class="option-content">
+                        <h3>Home Delivery</h3>
+                        <p>We'll deliver your order to your doorstep.</p>
                         <span class="option-tag">{{ $shippingFee > 0 ? '+ ₱' . number_format($shippingFee, 2) : 'Free' }}</span>
                     </div>
                 </label>
-
-                <label class="option-card" data-option="express">
-                    <input type="radio" name="shippingOption" value="express" data-cost="{{ $expressShippingFee }}">
-                    <div class="option-content">
-                        <h3>Express shipping (1-2 business days)</h3>
-                        <p>Priority dispatch with real-time tracking updates.</p>
-                        <span class="option-tag">+ ₱{{ number_format(max($expressShippingFee - $shippingFee, 0), 2) }}</span>
-                    </div>
-                </label>
             </div>
 
-            {{-- Payment method moved here to merge with Shipping into one container --}}
-            <div class="fieldset" id="paymentOptions" style="margin-top:18px;">
-                <h2 class="section-title" style="font-size:18px; margin-bottom:6px;"><span>3</span>Payment method</h2>
-                <p class="section-subtitle" style="margin-bottom:10px;">Pick a payment method and provide the necessary details.</p>
-
-                <label class="option-card" data-payment="gcash">
-                    <input type="radio" name="paymentMethod" value="gcash" data-label="GCash" checked>
-                    <div class="option-content">
-                        <h3>GCash</h3>
-                        <p>Pay instantly using your GCash account. You’ll receive a confirmation within minutes.</p>
-                        <span class="option-tag">Recommended</span>
-                    </div>
-                </label>
-
-                <label class="option-card" data-payment="cod">
-                    <input type="radio" name="paymentMethod" value="cod" data-label="Cash on Delivery">
-                    <div class="option-content">
-                        <h3>Cash on Delivery (COD)</h3>
-                        <p>Pay with cash once your order arrives. Available nationwide for orders under ₱10,000.</p>
-                        <span class="option-tag">No additional fee</span>
-                    </div>
-                </label>
-                <p class="section-subtitle" style="margin:0;">We’ll send instructions for your selected payment method after you place the order.</p>
-            </div>
+            <button type="button" class="btn-continue" id="continueToPayment">
+                Continue to Payment
+            </button>
 
             {{-- No dynamic select behavior: fields are prefilled server-side from first saved address (if any) and remain editable --}}
             <input type="hidden" id="checkoutQuantity" name="quantity" value="{{ $checkoutQuantity }}">
         </section>
 
+        <section class="card checkout-form checkout-section" id="payment">
+            <header class="shipping-header">
+                <h1 class="section-title">Payment Method</h1>
+                <p class="section-subtitle" id="paymentSubtitle">Choose how you want to pay for your order.</p>
+            </header>
+
+            <!-- Deposit Payment Options (50%) -->
+            <div class="fieldset" id="depositPaymentOptions">
+                <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--text-strong);">Deposit Payment (50%)</h3>
+
+                <!-- GCash Deposit (50%) + COD (50%) -->
+                <label class="option-card payment-option" data-payment-type="gcash-deposit-cod">
+                    <input type="radio" name="paymentMethod" value="gcash-deposit-cod">
+                    <div class="option-content">
+                        <h3>50% GCash Deposit + Cash on Delivery</h3>
+                        <p>Pay ₱{{ number_format($totalAmount / 2, 2) }} deposit now via GCash, ₱{{ number_format($totalAmount / 2, 2) }} cash on delivery.</p>
+                        <span class="option-tag">Required Deposit</span>
+                    </div>
+                </label>
+
+                <!-- GCash Deposit (50%) + GCash Balance (50%) -->
+                <label class="option-card payment-option" data-payment-type="gcash-split">
+                    <input type="radio" name="paymentMethod" value="gcash-split">
+                    <div class="option-content">
+                        <h3>50% GCash Deposit + GCash Balance</h3>
+                        <p>Pay ₱{{ number_format($totalAmount / 2, 2) }} deposit now, ₱{{ number_format($totalAmount / 2, 2) }} via GCash after confirmation.</p>
+                        <span class="option-tag">All Digital</span>
+                    </div>
+                </label>
+            </div>
+
+            <!-- Full Payment Options (100%) -->
+            <div class="fieldset" id="fullPaymentOptions" style="display: none;">
+                <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--text-strong);">Full Payment (100%)</h3>
+
+                <!-- GCash Full Payment -->
+                <label class="option-card payment-option" data-payment-type="gcash-full">
+                    <input type="radio" name="paymentMethod" value="gcash-full">
+                    <div class="option-content">
+                        <h3>Full GCash Payment</h3>
+                        <p>Pay ₱{{ number_format($totalAmount, 2) }} in full now via GCash. No remaining balance to pay later.</p>
+                        <span class="option-tag" style="background: #10b981;">Pay in Full</span>
+                    </div>
+                </label>
+            </div>
+
+            <!-- Payment Summary -->
+            <div class="payment-summary" id="paymentSummary" style="display: none;">
+                <div class="summary-box">
+                    <h4>Payment Summary</h4>
+                    <div id="paymentBreakdown"></div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 24px;">
+                <button type="button" class="btn-back" id="backToShipping">
+                    ← Back to Shipping
+                </button>
+                <button type="button" class="btn-continue" id="continueToReview" style="flex: 1;">
+                    Continue to Review
+                </button>
+            </div>
+        </section>
+
+        <section class="card checkout-form checkout-section" id="review">
+            <header class="shipping-header">
+                <h1 class="section-title">Review Your Order</h1>
+                <p class="section-subtitle">Please review your order details before placing your order</p>
+            </header>
+
+            <div class="fieldset">
+                <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--text-strong);">Fulfillment Details</h3>
+                <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+                    <div id="reviewShippingInfo" style="font-size: 14px; color: var(--text-default);">
+                        <!-- Fulfillment info will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="fieldset">
+                <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--text-strong);">Payment Method</h3>
+                <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+                    <div id="reviewPaymentInfo" style="font-size: 14px; color: var(--text-default);">
+                        <!-- Payment info will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 24px;">
+                <button type="button" class="btn-back" id="backToPayment">
+                    ← Back to Payment
+                </button>
+                <button type="button" class="place-order" id="placeOrderBtn" style="flex: 1;">
+                    Place Order
+                </button>
+            </div>
+        </section>
+
         <aside class="card summary-card" id="summary">
-            <h2 class="summary-header">Order summary</h2>
+            <h2 class="summary-header">Order Summary</h2>
             <div class="summary-items" id="summaryItems">
                 @forelse(($order?->items ?? collect()) as $item)
                     <div class="summary-item">
@@ -759,15 +1036,7 @@
                 <span>Total due</span>
                 <span id="grandTotal">₱{{ number_format($totalAmount, 2) }}</span>
             </div>
-            <button type="button" id="payWithGCash" class="place-order" @if($isFullyPaid) disabled @endif>
-                {{ $isFullyPaid ? 'Order fully paid' : 'Pay ' . '₱' . number_format($depositSuggested > 0 ? $depositSuggested : $balanceDueDisplay, 2) . ' via GCash' }}
-            </button>
-            <button type="button" id="markAsPaid" class="place-order" style="background: linear-gradient(135deg, #10b981, #059669); margin-top: 8px;" @if($isFullyPaid) disabled @endif>
-                {{ $isFullyPaid ? 'Order fully paid' : 'Mark as Paid' }}
-            </button>
             <div id="paymentAlert" class="payment-alert"></div>
-            {{-- 'Mark as fully paid' button removed per UI update: payment completion should be handled via the payment flow and recorded payments. --}}
-            {{-- Cancel Order button removed per UI update --}}
             <p class="note">Recorded payments total ₱{{ number_format($paidAmountDisplay, 2) }}. Outstanding balance: ₱{{ number_format($balanceDueDisplay, 2) }}.</p>
         </aside>
     </div>
@@ -776,6 +1045,178 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            // Step navigation logic
+            let currentStep = 1;
+            const totalSteps = 3;
+
+            const updateStepIndicator = () => {
+                // Update step circles and labels
+                document.querySelectorAll('.step').forEach((step, index) => {
+                    const stepNumber = index + 1;
+                    step.classList.remove('active', 'completed');
+
+                    if (stepNumber === currentStep) {
+                        step.classList.add('active');
+                    } else if (stepNumber < currentStep) {
+                        step.classList.add('completed');
+                    }
+                });
+
+                // Update step lines
+                document.querySelectorAll('.step-line').forEach((line, index) => {
+                    if (index + 1 < currentStep) {
+                        line.style.background = 'var(--success)';
+                    } else {
+                        line.style.background = '#e0e0e0';
+                    }
+                });
+            };
+
+            const showStep = (stepNumber) => {
+                // Hide all sections
+                document.querySelectorAll('.checkout-section').forEach(section => {
+                    section.classList.remove('active');
+                });
+
+                // Show current step
+                const currentSection = document.getElementById(['shipping', 'payment', 'review'][stepNumber - 1]);
+                if (currentSection) {
+                    currentSection.classList.add('active');
+                }
+
+                currentStep = stepNumber;
+                updateStepIndicator();
+            };
+
+            const validateShippingStep = () => {
+                const fullName = document.getElementById('fullName')?.value?.trim();
+                const email = document.getElementById('email')?.value?.trim();
+                const phone = document.getElementById('phone')?.value?.trim();
+                const selectedShipping = document.querySelector('input[name="shippingOption"]:checked');
+
+                if (!fullName || !email || !phone) {
+                    alert('Please fill in your name, email, and phone number.');
+                    return false;
+                }
+
+                // Basic email validation
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    alert('Please enter a valid email address.');
+                    return false;
+                }
+
+                // Only validate address fields for delivery
+                if (selectedShipping?.value === 'delivery') {
+                    const address = document.getElementById('address')?.value?.trim();
+                    const city = document.getElementById('city')?.value?.trim();
+                    const postalCode = document.getElementById('postalCode')?.value?.trim();
+
+                    if (!address || !city || !postalCode) {
+                        alert('Please fill in your complete delivery address.');
+                        return false;
+                    }
+                }
+
+                return true;
+            };
+
+            const populateReviewInfo = () => {
+                // Populate shipping info
+                const fullName = document.getElementById('fullName')?.value?.trim() || '';
+                const email = document.getElementById('email')?.value?.trim() || '';
+                const phone = document.getElementById('phone')?.value?.trim() || '';
+                const address = document.getElementById('address')?.value?.trim() || '';
+                const city = document.getElementById('city')?.value?.trim() || '';
+                const postalCode = document.getElementById('postalCode')?.value?.trim() || '';
+
+                const shippingInfo = document.getElementById('reviewShippingInfo');
+                if (shippingInfo) {
+                    const selectedShipping = document.querySelector('input[name="shippingOption"]:checked');
+                    let fulfillmentDetails = '';
+
+                    if (selectedShipping?.value === 'pickup') {
+                        fulfillmentDetails = `
+                            <div><strong>Pickup at Store</strong></div>
+                            <div>Ready for pickup at our store location</div>
+                            <div style="color: var(--success); font-size: 14px;">No delivery fee</div>
+                        `;
+                    } else if (selectedShipping?.value === 'delivery') {
+                        fulfillmentDetails = `
+                            <div><strong>Home Delivery</strong></div>
+                            <div>${address}</div>
+                            <div>${city}, ${postalCode}</div>
+                            <div>${phone}</div>
+                            <div>${email}</div>
+                        `;
+                    } else {
+                        // Fallback to delivery
+                        fulfillmentDetails = `
+                            <div><strong>Home Delivery</strong></div>
+                            <div>${address}</div>
+                            <div>${city}, ${postalCode}</div>
+                            <div>${phone}</div>
+                            <div>${email}</div>
+                        `;
+                    }
+
+                    shippingInfo.innerHTML = `
+                        <div><strong>${fullName}</strong></div>
+                        ${fulfillmentDetails}
+                    `;
+                }
+
+                // Populate payment info
+                const selectedPayment = document.querySelector('input[name="paymentMethod"]:checked');
+                const paymentInfo = document.getElementById('reviewPaymentInfo');
+                if (paymentInfo) {
+                    let paymentDetails = '';
+
+                    if (selectedPayment?.value === 'gcash-deposit-cod') {
+                        const depositAmount = currentTotal / 2;
+                        const remainingAmount = currentTotal / 2;
+                        paymentDetails = `
+                            <div><strong>50% GCash Deposit + Cash on Delivery</strong></div>
+                            <div>Deposit: ₱${depositAmount.toFixed(2)} (Pay now via GCash)</div>
+                            <div>Remaining: ₱${remainingAmount.toFixed(2)} (Pay on delivery)</div>
+                        `;
+                    } else if (selectedPayment?.value === 'gcash-split') {
+                        const depositAmount = currentTotal / 2;
+                        const remainingAmount = currentTotal / 2;
+                        paymentDetails = `
+                            <div><strong>50% GCash Deposit + GCash Balance</strong></div>
+                            <div>Deposit: ₱${depositAmount.toFixed(2)} (Pay now via GCash)</div>
+                            <div>Remaining: ₱${remainingAmount.toFixed(2)} (Pay later via GCash)</div>
+                        `;
+                    }
+
+                    paymentInfo.innerHTML = paymentDetails;
+                }
+            };
+
+            // Step navigation event listeners
+            document.getElementById('continueToPayment')?.addEventListener('click', () => {
+                if (validateShippingStep()) {
+                    showStep(2);
+                }
+            });
+
+            document.getElementById('backToShipping')?.addEventListener('click', () => {
+                showStep(1);
+            });
+
+            document.getElementById('continueToReview')?.addEventListener('click', () => {
+                populateReviewInfo();
+                showStep(3);
+            });
+
+            document.getElementById('backToPayment')?.addEventListener('click', () => {
+                showStep(2);
+            });
+
+            // Initialize first step
+            showStep(1);
+
             const priceFormatter = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' });
             const subtotal = @json($subtotal ?? 0);
             const baseShipping = @json($shippingFee ?? 0);
@@ -800,19 +1241,6 @@
             const grandTotalEl = document.getElementById('grandTotal');
             const paidAmountEl = document.getElementById('paidAmount');
             const balanceAmountEl = document.getElementById('balanceAmount');
-            const payButton = document.getElementById('payWithGCash');
-            // create COD button (hidden by default)
-            let codButton = document.getElementById('payWithCOD');
-            if (!codButton) {
-                codButton = document.createElement('button');
-                codButton.type = 'button';
-                codButton.id = 'payWithCOD';
-                codButton.className = 'place-order';
-                codButton.style.display = 'none';
-                codButton.textContent = 'Pay on delivery (COD)';
-                payButton.parentElement.insertBefore(codButton, payButton.nextSibling);
-            }
-            const markAsPaidButton = document.getElementById('markAsPaid');
             const paymentAlert = document.getElementById('paymentAlert');
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 
@@ -832,30 +1260,11 @@
             };
 
             const updatePayButton = () => {
-                if (!payButton) return;
-                if (paymentConfig.isFullyPaid) {
-                    payButton.textContent = 'Order fully paid';
-                    payButton.disabled = true;
-                    codButton.style.display = 'none';
-                    payButton.style.display = 'inline-block';
-                    return;
-                }
-                const amountLabel = paymentConfig.depositAmount > 0 ? paymentConfig.depositAmount : paymentConfig.balance;
-                payButton.textContent = `Pay ${priceFormatter.format(amountLabel)} via GCash`;
-                payButton.disabled = false;
-                payButton.style.display = 'inline-block';
-                codButton.style.display = 'none';
+                // No longer needed - payment happens in review step
             };
 
             const updateMarkAsPaidButton = () => {
-                if (!markAsPaidButton) return;
-                if (paymentConfig.isFullyPaid) {
-                    markAsPaidButton.textContent = 'Order fully paid';
-                    markAsPaidButton.disabled = true;
-                    return;
-                }
-                markAsPaidButton.textContent = 'Mark as Paid';
-                markAsPaidButton.disabled = false;
+                // No longer needed - payment happens in review step
             };
 
             // Update summary area when payment method changes
@@ -884,6 +1293,21 @@
                 target.closest('.option-card')?.classList.add('selected');
             };
 
+            const toggleAddressFields = (shippingMethod) => {
+                const addressLabel = document.getElementById('addressLabel');
+                const addressFields = document.getElementById('addressFields');
+
+                if (shippingMethod === 'pickup') {
+                    // Hide address fields for pickup
+                    if (addressLabel) addressLabel.style.display = 'none';
+                    if (addressFields) addressFields.style.display = 'none';
+                } else {
+                    // Show address fields for delivery
+                    if (addressLabel) addressLabel.style.display = 'block';
+                    if (addressFields) addressFields.style.display = 'grid';
+                }
+            };
+
             const recalcTotals = () => {
                 if (!shippingAmountEl || !taxAmountEl || !grandTotalEl) return;
                 const selectedShipping = document.querySelector('input[name="shippingOption"]:checked');
@@ -906,8 +1330,7 @@
                 paymentConfig.depositAmount = balance <= 0 ? 0 : Math.min(Number((total / 2).toFixed(2)), balance);
                 paymentConfig.isFullyPaid = paymentConfig.balance <= 0.01;
 
-                updatePayButton();
-                updateMarkAsPaidButton();
+                // No need to update buttons anymore
             };
 
             const applyPaymentLocally = (amount, options = {}) => {
@@ -921,9 +1344,13 @@
             };
 
             shippingRadios.forEach((radio) => {
-                if (radio.checked) highlightSelection(radio);
+                if (radio.checked) {
+                    highlightSelection(radio);
+                    toggleAddressFields(radio.value);
+                }
                 radio.addEventListener('change', (event) => {
                     highlightSelection(event.target);
+                    toggleAddressFields(event.target.value);
                     recalcTotals();
                 });
             });
@@ -933,13 +1360,74 @@
                 radio.addEventListener('change', (event) => highlightSelection(event.target));
             });
 
-            // Listen for payment method changes to adjust summary UI
+            // Listen for payment method changes to show payment summary
             document.querySelectorAll('input[name="paymentMethod"]').forEach(r => {
                 r.addEventListener('change', (e) => {
-                    updateSummaryForPaymentMethod(e.target.value);
+                    updatePaymentSummary(e.target.value);
+                    highlightSelection(e.target);
                 });
-                if (r.checked) updateSummaryForPaymentMethod(r.value);
+                if (r.checked) {
+                    updatePaymentSummary(r.value);
+                    highlightSelection(r);
+                }
             });
+
+            const updatePaymentSummary = (paymentType) => {
+                const summaryDiv = document.getElementById('paymentSummary');
+                const breakdownDiv = document.getElementById('paymentBreakdown');
+
+                if (!summaryDiv || !breakdownDiv) return;
+
+                let breakdownHTML = '';
+
+                switch (paymentType) {
+                    case 'gcash-deposit-cod':
+                        const depositCod = currentTotal / 2;
+                        const remainingCod = currentTotal / 2;
+                        summaryDiv.style.display = 'block';
+                        breakdownHTML = `
+                            <div class="payment-breakdown-item">
+                                <span>GCash Deposit (50%)</span>
+                                <span class="payment-amount now">₱${depositCod.toFixed(2)}</span>
+                            </div>
+                            <div class="payment-breakdown-item">
+                                <span>Cash on Delivery (50%)</span>
+                                <span class="payment-amount later">₱${remainingCod.toFixed(2)}</span>
+                            </div>
+                            <div class="payment-breakdown-item">
+                                <span class="payment-timing">Deposit now, balance on delivery</span>
+                                <span></span>
+                            </div>
+                        `;
+                        break;
+
+                    case 'gcash-split':
+                        const depositSplit = currentTotal / 2;
+                        const remainingSplit = currentTotal / 2;
+                        summaryDiv.style.display = 'block';
+                        breakdownHTML = `
+                            <div class="payment-breakdown-item">
+                                <span>GCash Deposit (50%)</span>
+                                <span class="payment-amount now">₱${depositSplit.toFixed(2)}</span>
+                            </div>
+                            <div class="payment-breakdown-item">
+                                <span>GCash Balance (50%)</span>
+                                <span class="payment-amount later">₱${remainingSplit.toFixed(2)}</span>
+                            </div>
+                            <div class="payment-breakdown-item">
+                                <span class="payment-timing">Deposit now, balance after confirmation</span>
+                                <span></span>
+                            </div>
+                        `;
+                        break;
+
+                    default:
+                        summaryDiv.style.display = 'none';
+                        return;
+                }
+
+                breakdownDiv.innerHTML = breakdownHTML;
+            };
 
             const readQuantityInput = () => {
                 const quantityInput = document.querySelector('input[name="quantity"]');
@@ -1013,18 +1501,21 @@
             };
 
             const determineGcashMode = () => {
-                const balance = Number(paymentConfig.balance ?? 0);
-                const deposit = Number(paymentConfig.depositAmount ?? 0);
+                const selected = document.querySelector('input[name="paymentMethod"]:checked');
+                const paymentMethod = selected?.value;
 
-                if (balance <= 0.01) {
-                    return 'full';
-                }
+                console.log('determineGcashMode: selected element:', selected, 'value:', paymentMethod);
 
-                if (deposit > 0 && deposit + 0.01 < balance) {
+                if (paymentMethod === 'gcash-deposit-cod' || paymentMethod === 'gcash-split') {
                     return 'half';
                 }
 
-                return 'full';
+                if (paymentMethod === 'gcash-full') {
+                    return 'full';
+                }
+
+                // Fallback
+                return 'half';
             };
 
             const collectContactDetails = () => ({
@@ -1039,7 +1530,17 @@
                     return { success: false };
                 }
 
-                const amount = Number(paymentConfig.depositAmount > 0 ? paymentConfig.depositAmount : paymentConfig.balance);
+                const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value;
+                let amount = 0;
+
+                if (paymentMethod === 'gcash-deposit-cod' || paymentMethod === 'gcash-split') {
+                    amount = currentTotal / 2; // Always 50% deposit
+                } else if (paymentMethod === 'gcash-full') {
+                    amount = currentTotal; // Full payment
+                } else {
+                    amount = Number(paymentConfig.depositAmount > 0 ? paymentConfig.depositAmount : paymentConfig.balance);
+                }
+
                 if (!Number.isFinite(amount) || amount <= 0) {
                     showPaymentMessage('error', 'There is no outstanding balance to charge.');
                     return { success: false };
@@ -1095,30 +1596,55 @@
                 }
             };
 
-            if (payButton) {
-                payButton.addEventListener('click', async () => {
+            const placeOrderBtn = document.getElementById('placeOrderBtn');
+
+            if (placeOrderBtn) {
+                placeOrderBtn.addEventListener('click', async () => {
                     if (paymentConfig.isFullyPaid) {
                         showPaymentMessage('info', 'This order is already fully paid.');
                         return;
                     }
 
-                    const amountLabel = Number(paymentConfig.depositAmount > 0 ? paymentConfig.depositAmount : paymentConfig.balance);
-                    payButton.disabled = true;
+                    const selectedPaymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value;
+
+                    if (!selectedPaymentMethod) {
+                        showPaymentMessage('error', 'Please select a payment method.');
+                        return;
+                    }
+
+                    let paymentAmount = 0;
+                    let finalPaymentMethod = selectedPaymentMethod;
+
+                    if (selectedPaymentMethod === 'gcash-deposit-cod') {
+                        paymentAmount = currentTotal / 2; // Always 50% deposit
+                        finalPaymentMethod = 'gcash_deposit_cod';
+                    } else if (selectedPaymentMethod === 'gcash-split') {
+                        paymentAmount = currentTotal / 2; // Always 50% deposit
+                        finalPaymentMethod = 'gcash_split';
+                    }
+
+                    placeOrderBtn.disabled = true;
+                    placeOrderBtn.textContent = 'Processing...';
 
                     try {
-                        const result = await persistFinalStepSelections('gcash', { paymentAmount: amountLabel });
-                        if (!result?.success || result?.handledRedirect) {
-                            payButton.disabled = false;
-                            return;
-                        }
+                        if (selectedPaymentMethod.startsWith('gcash')) {
+                            const result = await persistFinalStepSelections(finalPaymentMethod, { paymentAmount });
+                            if (!result?.success || result?.handledRedirect) {
+                                placeOrderBtn.disabled = false;
+                                placeOrderBtn.textContent = 'Place Order';
+                                return;
+                            }
 
-                        const paymentResult = await startGCashPayment();
-                        if (!paymentResult?.success || paymentResult.redirected !== true) {
-                            payButton.disabled = false;
+                            const paymentResult = await startGCashPayment();
+                            if (!paymentResult?.success || paymentResult.redirected !== true) {
+                                placeOrderBtn.disabled = false;
+                                placeOrderBtn.textContent = 'Place Order';
+                            }
                         }
                     } catch (err) {
                         console.error(err);
-                        payButton.disabled = false;
+                        placeOrderBtn.disabled = false;
+                        placeOrderBtn.textContent = 'Place Order';
                     }
                 });
             }
@@ -1144,6 +1670,18 @@
             }
 
             recalcTotals();
+
+            // Initialize address fields visibility based on selected shipping method
+            const initialShippingMethod = document.querySelector('input[name="shippingOption"]:checked');
+            if (initialShippingMethod) {
+                toggleAddressFields(initialShippingMethod.value);
+            }
+
+            // Initialize payment options visibility
+            const initialPaymentMethod = document.querySelector('input[name="paymentMethod"]:checked');
+            if (initialPaymentMethod && initialPaymentMethod.value === 'gcash') {
+                document.getElementById('gcashOptions').style.display = 'block';
+            }
 
             if (paymentConfig.hasPending && paymentConfig.resumeUrl) {
                 showPaymentMessage('info', `A GCash payment is waiting for completion. <a href="${paymentConfig.resumeUrl}" target="_blank" rel="noopener">Resume payment</a>.`);
@@ -1178,9 +1716,81 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const summaryData = {!! \Illuminate\Support\Js::from($orderSummary) !!};
+            console.log('OrderSummary from PHP:', summaryData);
+
+            // Preserve existing paymentMode from sessionStorage if it exists
+            const existingStored = window.sessionStorage.getItem('inkwise-finalstep');
+            console.log('Existing sessionStorage:', existingStored);
+            let existingPaymentMode = null;
+            if (existingStored) {
+                try {
+                    const existing = JSON.parse(existingStored);
+                    existingPaymentMode = existing.paymentMode;
+                    console.log('Existing paymentMode:', existingPaymentMode);
+                } catch (err) {
+                    console.warn('Failed to parse existing sessionStorage:', err);
+                }
+            }
+
+            // Merge with existing paymentMode if present
+            if (existingPaymentMode) {
+                summaryData.paymentMode = existingPaymentMode;
+                console.log('Merged paymentMode into summaryData:', summaryData.paymentMode);
+            }
+
             window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(summaryData));
+            console.log('Saved to sessionStorage:', summaryData);
+
+            // Check payment mode and adjust payment options
+            const paymentMode = summaryData.paymentMode || 'half';
+            console.log('Using paymentMode for updatePaymentOptions:', paymentMode);
+            updatePaymentOptions(paymentMode);
         });
     </script>
 @endif
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Also check sessionStorage directly in case orderSummary is not set
+    try {
+        const stored = window.sessionStorage.getItem('inkwise-finalstep');
+        console.log('Fallback: checking sessionStorage:', stored);
+        if (stored) {
+            const summary = JSON.parse(stored);
+            const paymentMode = summary.paymentMode || 'half';
+            console.log('Fallback: using paymentMode:', paymentMode);
+            updatePaymentOptions(paymentMode);
+        } else {
+            console.log('Fallback: no sessionStorage found');
+        }
+    } catch (err) {
+        console.warn('Failed to check payment mode from sessionStorage:', err);
+    }
+});
+
+function updatePaymentOptions(mode) {
+    const subtitle = document.getElementById('paymentSubtitle');
+    const depositOptions = document.getElementById('depositPaymentOptions');
+    const fullOptions = document.getElementById('fullPaymentOptions');
+
+    // Always show both payment options
+    subtitle.textContent = 'Choose how you want to pay for your order.';
+    depositOptions.style.display = 'block';
+    fullOptions.style.display = 'block';
+
+    // Pre-select based on mode
+    if (mode === 'full') {
+        const fullPaymentRadio = document.querySelector('input[name="paymentMethod"][value="gcash-full"]');
+        if (fullPaymentRadio) {
+            fullPaymentRadio.checked = true;
+        }
+    } else {
+        const firstDepositRadio = document.querySelector('input[name="paymentMethod"][value="gcash-deposit-cod"]');
+        if (firstDepositRadio) {
+            firstDepositRadio.checked = true;
+        }
+    }
+}
+</script>
 </body>
 </html>

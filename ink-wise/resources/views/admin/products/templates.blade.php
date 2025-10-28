@@ -17,7 +17,7 @@
 
     if ($showOnlyType) {
         $filteredTemplates = $templatesCollection->filter(function($template) use ($showOnlyType) {
-            return strtolower($template->product_type ?? '') === $showOnlyType;
+            return strtolower($template->product_type ?? '') === strtolower($showOnlyType);
         });
     } else {
         // Fallback to showing all templates if route detection fails
@@ -83,16 +83,16 @@
                                         $backImg = $template->back_image ?? null;
                                     @endphp
                                     @if($frontImg)
-                                        <img src="@imageUrl($frontImg)" alt="{{ $template->template_name }}" class="template-img">
+                                        <img src="@imageUrl($frontImg)" alt="{{ $template->name }}" class="template-img">
                                     @else
                                         <span>No preview</span>
                                     @endif
                                     @if($backImg)
-                                        <img src="@imageUrl($backImg)" alt="Back of {{ $template->template_name }}" class="back-thumb">
+                                        <img src="@imageUrl($backImg)" alt="Back of {{ $template->name }}" class="back-thumb">
                                     @endif
                                 </div>
                                 <div class="card-overlay">
-                                    <h3>{{ $template->template_name }}</h3>
+                                    <h3>{{ $template->name }}</h3>
                                     <p>{{ $template->description }}</p>
                                     <div class="card-meta">
                                         <span class="meta-pill">{{ $template->event_type ?? '—' }}</span>
@@ -101,7 +101,7 @@
                                     <div class="card-actions">
                                         <button type="button" class="btn continue-btn"
                                             data-template-id="{{ $template->id }}"
-                                            data-template-name="{{ $template->template_name }}"
+                                            data-template-name="{{ $template->name }}"
                                             data-template-description="{{ $template->description }}"
                                             data-template-event_type="{{ $template->event_type }}"
                                             data-template-product_type="{{ $template->product_type }}"
@@ -109,7 +109,7 @@
                                             data-template-preview="{{ $template->preview_image }}"
                                             data-front-url="{{ $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : '' }}"
                                         >Use template</button>
-                                        <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->template_name }}">Delete</button>
+                                        <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->name }}">Delete</button>
                                         @if(!empty($template->front_image))
                                             <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
                                         @endif
@@ -147,16 +147,16 @@
                                         $backImg = $template->back_image ?? null;
                                     @endphp
                                     @if($frontImg)
-                                        <img src="@imageUrl($frontImg)" alt="{{ $template->template_name }}" class="template-img">
+                                        <img src="@imageUrl($frontImg)" alt="{{ $template->name }}" class="template-img">
                                     @else
                                         <span>No preview</span>
                                     @endif
                                     @if($backImg)
-                                        <img src="@imageUrl($backImg)" alt="Back of {{ $template->template_name }}" class="back-thumb">
+                                        <img src="@imageUrl($backImg)" alt="Back of {{ $template->name }}" class="back-thumb">
                                     @endif
                                 </div>
                                 <div class="card-overlay">
-                                    <h3>{{ $template->template_name }}</h3>
+                                    <h3>{{ $template->name }}</h3>
                                     <p>{{ $template->description }}</p>
                                     <div class="card-meta">
                                         <span class="meta-pill">{{ $template->event_type ?? '—' }}</span>
@@ -165,7 +165,7 @@
                                     <div class="card-actions">
                                         <button type="button" class="btn continue-btn"
                                             data-template-id="{{ $template->id }}"
-                                            data-template-name="{{ $template->template_name }}"
+                                            data-template-name="{{ $template->name }}"
                                             data-template-description="{{ $template->description }}"
                                             data-template-event_type="{{ $template->event_type }}"
                                             data-template-product_type="{{ $template->product_type }}"
@@ -173,7 +173,7 @@
                                             data-template-preview="{{ $template->preview_image }}"
                                             data-front-url="{{ $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : '' }}"
                                         >Use template</button>
-                                        <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->template_name }}">Delete</button>
+                                        <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->name }}">Delete</button>
                                         @if(!empty($template->front_image))
                                             <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
                                         @endif
@@ -210,16 +210,16 @@
                                         $backImg = $template->back_image ?? null;
                                     @endphp
                                     @if($frontImg)
-                                        <img src="@imageUrl($frontImg)" alt="{{ $template->template_name }}" class="template-img">
+                                        <img src="@imageUrl($frontImg)" alt="{{ $template->name }}" class="template-img">
                                     @else
                                         <span>No preview</span>
                                     @endif
                                     @if($backImg)
-                                        <img src="@imageUrl($backImg)" alt="Back of {{ $template->template_name }}" class="back-thumb">
+                                        <img src="@imageUrl($backImg)" alt="Back of {{ $template->name }}" class="back-thumb">
                                     @endif
                                 </div>
                                 <div class="card-overlay">
-                                    <h3>{{ $template->template_name }}</h3>
+                                    <h3>{{ $template->name }}</h3>
                                     <p>{{ $template->description }}</p>
                                     <div class="card-meta">
                                         <span class="meta-pill">{{ $template->event_type ?? '—' }}</span>
@@ -228,7 +228,7 @@
                                     <div class="card-actions">
                                         <button type="button" class="btn continue-btn"
                                             data-template-id="{{ $template->id }}"
-                                            data-template-name="{{ $template->template_name }}"
+                                            data-template-name="{{ $template->name }}"
                                             data-template-description="{{ $template->description }}"
                                             data-template-event_type="{{ $template->event_type }}"
                                             data-template-product_type="{{ $template->product_type }}"
@@ -236,7 +236,7 @@
                                             data-template-preview="{{ $template->preview_image }}"
                                             data-front-url="{{ $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : '' }}"
                                         >Use template</button>
-                                        <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->template_name }}">Delete</button>
+                                        <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->name }}">Delete</button>
                                         @if(!empty($template->front_image))
                                             <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
                                         @endif
@@ -273,16 +273,16 @@
                                         $backImg = $template->back_image ?? null;
                                     @endphp
                                     @if($frontImg)
-                                        <img src="@imageUrl($frontImg)" alt="{{ $template->template_name }}" class="template-img">
+                                        <img src="@imageUrl($frontImg)" alt="{{ $template->name }}" class="template-img">
                                     @else
                                         <span>No preview</span>
                                     @endif
                                     @if($backImg)
-                                        <img src="@imageUrl($backImg)" alt="Back of {{ $template->template_name }}" class="back-thumb">
+                                        <img src="@imageUrl($backImg)" alt="Back of {{ $template->name }}" class="back-thumb">
                                     @endif
                                 </div>
                                 <div class="card-overlay">
-                                    <h3>{{ $template->template_name }}</h3>
+                                    <h3>{{ $template->name }}</h3>
                                     <p>{{ $template->description }}</p>
                                     <div class="card-meta">
                                         <span class="meta-pill">{{ $template->product_type ?? '—' }}</span>
@@ -291,7 +291,7 @@
                                     <div class="card-actions">
                                         <button type="button" class="btn continue-btn"
                                             data-template-id="{{ $template->id }}"
-                                            data-template-name="{{ $template->template_name }}"
+                                            data-template-name="{{ $template->name }}"
                                             data-template-description="{{ $template->description }}"
                                             data-template-event_type="{{ $template->event_type }}"
                                             data-template-product_type="{{ $template->product_type }}"
@@ -299,7 +299,7 @@
                                             data-template-preview="{{ $template->preview_image }}"
                                             data-front-url="{{ $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : '' }}"
                                         >Use template</button>
-                                        <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->template_name }}">Delete</button>
+                                        <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->name }}">Delete</button>
                                         @if(!empty($template->front_image))
                                             <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
                                         @endif
@@ -412,6 +412,8 @@
             var templateInput = document.getElementById('template_id');
             if (templateInput) {
                 templateInput.value = templateId;
+                // Fetch template data and populate form
+                fetchTemplateData(templateId);
                 // Update preview images if function exists
                 if (typeof updatePreviewImages === 'function') {
                     updatePreviewImages();
@@ -419,6 +421,199 @@
             }
         });
     });
+
+    // Function to fetch template data and populate form
+    function fetchTemplateData(templateId) {
+        fetch(`/admin/products/template/${templateId}/data`, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Populate form fields with template data
+            populateFormWithTemplateData(data);
+        })
+        .catch(error => {
+            console.error('Error fetching template data:', error);
+        });
+    }
+
+    // Function to populate form fields with template data
+    function populateFormWithTemplateData(data) {
+        // Populate basic info fields
+        const invitationNameField = document.getElementById('invitationName');
+        if (invitationNameField && data.name) {
+            invitationNameField.value = data.name;
+        }
+
+        const eventTypeField = document.getElementById('eventType');
+        if (eventTypeField && data.event_type) {
+            eventTypeField.value = data.event_type;
+        }
+
+        const productTypeField = document.getElementById('productType');
+        if (productTypeField && data.product_type) {
+            productTypeField.value = data.product_type;
+        }
+
+        const themeStyleField = document.getElementById('themeStyle');
+        if (themeStyleField && data.theme_style) {
+            themeStyleField.value = data.theme_style;
+        }
+
+        // Populate description
+        const descriptionEditor = document.getElementById('description-editor');
+        const descriptionTextarea = document.getElementById('description');
+        if (descriptionEditor && data.description) {
+            descriptionEditor.innerHTML = data.description;
+            if (descriptionTextarea) {
+                descriptionTextarea.value = data.description;
+            }
+        }
+
+        // Update preview images
+        if (data.front_image) {
+            updatePreviewImage('preview-front-img', data.front_image);
+        }
+        if (data.back_image) {
+            updatePreviewImage('preview-back-img', data.back_image);
+        }
+
+        // Populate design data sections if available
+        if (data.design_data) {
+            populateDesignDataSections(data.design_data);
+        }
+
+        // Navigate to next page (Basic Info)
+        if (typeof Navigation !== 'undefined' && Navigation.showPage) {
+            Navigation.showPage(1);
+        }
+    }
+
+    // Function to populate design data sections (paper stocks, addons, colors, bulk orders)
+    function populateDesignDataSections(designData) {
+        // Populate paper stocks
+        if (designData.paper_stocks && Array.isArray(designData.paper_stocks)) {
+            populatePaperStocks(designData.paper_stocks);
+        }
+
+        // Populate addons
+        if (designData.addons && Array.isArray(designData.addons)) {
+            populateAddons(designData.addons);
+        }
+
+        // Populate colors
+        if (designData.colors && Array.isArray(designData.colors)) {
+            populateColors(designData.colors);
+        }
+
+        // Populate bulk orders
+        if (designData.bulk_orders && Array.isArray(designData.bulk_orders)) {
+            populateBulkOrders(designData.bulk_orders);
+        }
+    }
+
+    // Function to populate paper stocks section
+    function populatePaperStocks(paperStocks) {
+        const container = document.getElementById('paper-stocks-container');
+        if (!container) return;
+
+        // Clear existing entries
+        const existingEntries = container.querySelectorAll('.paper-stock-entry');
+        existingEntries.forEach(entry => entry.remove());
+
+        paperStocks.forEach((stock, index) => {
+            addPaperStockEntry(stock, index);
+        });
+    }
+
+    // Function to populate addons section
+    function populateAddons(addons) {
+        const container = document.getElementById('addons-container');
+        if (!container) return;
+
+        // Clear existing entries
+        const existingEntries = container.querySelectorAll('.addon-entry');
+        existingEntries.forEach(entry => entry.remove());
+
+        addons.forEach((addon, index) => {
+            addAddonEntry(addon, index);
+        });
+    }
+
+    // Function to populate colors section
+    function populateColors(colors) {
+        const container = document.getElementById('colors-container');
+        if (!container) return;
+
+        // Clear existing entries
+        const existingEntries = container.querySelectorAll('.color-entry');
+        existingEntries.forEach(entry => entry.remove());
+
+        colors.forEach((color, index) => {
+            addColorEntry(color, index);
+        });
+    }
+
+    // Function to populate bulk orders section
+    function populateBulkOrders(bulkOrders) {
+        const container = document.getElementById('bulk-orders-container');
+        if (!container) return;
+
+        // Clear existing entries
+        const existingEntries = container.querySelectorAll('.bulk-order-entry');
+        existingEntries.forEach(entry => entry.remove());
+
+        bulkOrders.forEach((order, index) => {
+            addBulkOrderEntry(order, index);
+        });
+    }
+
+    // Helper functions to add entries (these need to be defined in the main form JavaScript)
+    function addPaperStockEntry(data = null, index = null) {
+        if (typeof window.addPaperStockEntry === 'function') {
+            window.addPaperStockEntry(data, index);
+        }
+    }
+
+    function addAddonEntry(data = null, index = null) {
+        if (typeof window.addAddonEntry === 'function') {
+            window.addAddonEntry(data, index);
+        }
+    }
+
+    function addColorEntry(data = null, index = null) {
+        if (typeof window.addColorEntry === 'function') {
+            window.addColorEntry(data, index);
+        }
+    }
+
+    function addBulkOrderEntry(data = null, index = null) {
+        if (typeof window.addBulkOrderEntry === 'function') {
+            window.addBulkOrderEntry(data, index);
+        }
+    }
+
+    // Helper function to update preview images
+    function updatePreviewImage(containerId, imageUrl) {
+        const container = document.getElementById(containerId);
+        if (container && imageUrl) {
+            if (container.tagName !== 'IMG') {
+                const img = document.createElement('img');
+                img.id = containerId;
+                img.src = imageUrl;
+                img.alt = containerId.includes('front') ? 'Front preview' : 'Back preview';
+                img.style.maxWidth = '100%';
+                img.style.maxHeight = '200px';
+                container.parentNode.replaceChild(img, container);
+            } else {
+                container.src = imageUrl;
+            }
+        }
+    }
     </script>
 
     <style>

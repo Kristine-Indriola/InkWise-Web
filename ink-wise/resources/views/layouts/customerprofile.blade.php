@@ -30,6 +30,29 @@
     <link href="https://fonts.googleapis.com/css2?family=Dancing+Script&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="{{ asset('adminimage/ink.png') }}">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    @stack('styles')
+</head>
+
+@push('styles')
+<style>
+    .notification-badge {
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        background: #ef4444;
+        color: white;
+        border-radius: 50%;
+        width: 18px;
+        height: 18px;
+        font-size: 11px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid white;
+    }
+</style>
+@endpush
 </head>
 
 <body class="bg-gray-50 text-gray-800">
@@ -83,6 +106,18 @@
            title="{{ $favoritesLink['label'] }}"
            @if($favoritesLink['disabled']) aria-disabled="true" @endif>
           <i class="fi fi-br-comment-heart" aria-hidden="true"></i>
+        </a>
+        <a href="{{ route('customer.notifications') }}"
+           class="nav-icon-button"
+           aria-label="Notifications"
+           title="Notifications">
+          <i class="fi fi-br-bell" aria-hidden="true"></i>
+          @auth
+            @php $unreadCount = auth()->user()->unreadNotifications()->count(); @endphp
+            @if($unreadCount > 0)
+              <span class="notification-badge">{{ $unreadCount }}</span>
+            @endif
+          @endauth
         </a>
         <a href="{{ $cartLink['url'] }}"
            class="nav-icon-button"
@@ -219,7 +254,7 @@ document.addEventListener('DOMContentLoaded', function () {
         @php
           $myPurchaseActive = request()->routeIs('customer.my_purchase*');
         @endphp
-      <a href="{{ route('customer.my_purchase') }}"
+      <a href="{{ route('customer.my_purchase.completed') }}"
         class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition {{ $myPurchaseActive ? 'bg-[#e0f7fa] text-gray-700 font-medium' : 'text-gray-700 hover:bg-[#e0f7fa]' }}">
           <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M3 7h18v2H3zm0 4h18v2H3zm0 4h18v2H3z"/></svg>
           <span class="font-medium">Purchase</span>
@@ -229,6 +264,12 @@ document.addEventListener('DOMContentLoaded', function () {
           class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition {{ $favoritesActive ? 'bg-[#e0f7fa] text-gray-700 font-medium' : 'text-gray-700 hover:bg-[#e0f7fa]' }}">
           <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 6 4 4 6.5 4c1.74 0 3.41.81 4.5 2.09C12.09 4.81 13.76 4 15.5 4 18 4 20 6 20 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
           <span class="font-medium">Favorites</span>
+        </a>
+        @php $notificationsActive = request()->routeIs('customer.notifications*'); @endphp
+        <a href="{{ route('customer.notifications') }}"
+          class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition {{ $notificationsActive ? 'bg-[#e0f7fa] text-gray-700 font-medium' : 'text-gray-700 hover:bg-[#e0f7fa]' }}">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C10.896 2 10 2.896 10 4v4.586l-2.707 2.707c-.391.391-.391 1.023 0 1.414.195.195.451.293.707.293s.512-.098.707-.293L10.414 10H14V4c0-1.104-.896-2-2-2zM12 22c1.104 0 2-.896 2-2H10c0 1.104.896 2 2 2z"/></svg>
+          <span class="font-medium">Notifications</span>
         </a>
         <a href="#" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition relative group">
           <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -549,6 +590,6 @@ window.addEventListener('mouseup', function() {
     window.addEventListener('beforeunload', () => clearInterval(pollInterval));
 })();
 </script>
-
+@stack('scripts')
 </body>
 </html>

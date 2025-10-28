@@ -1,10 +1,88 @@
 {{-- resources/views/admin/products/view.blade.php --}}
 @extends('layouts.admin')
 
-@section('title', 'View Product: ' . $product->name)
+@section('title', 'View Product: ' . ($product->product_type === 'Giveaway' && $product->materials && $product->materials->first() && $product->materials->first()->material ? $product->materials->first()->material->material_name : $product->name))
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('css/admin-css/product-view.css') }}">
+    <style>
+        .rating-summary {
+            margin-bottom: 1rem;
+        }
+        .stars-display {
+            display: flex;
+            gap: 2px;
+            margin: 0.5rem 0;
+        }
+        .stars-display .star {
+            font-size: 1.2rem;
+            color: #ddd;
+        }
+        .stars-display .star.filled {
+            color: #f59e0b;
+        }
+        .ratings-list {
+            list-style: none;
+            padding: 0;
+        }
+        .rating-item {
+            border-bottom: 1px solid #eee;
+            padding: 1rem 0;
+        }
+        .rating-item:last-child {
+            border-bottom: none;
+        }
+        .rating-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.5rem;
+            gap: 1rem;
+        }
+        .rating-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            flex: 1;
+        }
+        .rating-customer {
+            font-weight: 600;
+            color: #111827;
+            font-size: 0.9rem;
+        }
+        .rating-date {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        .rating-review {
+            margin: 0.5rem 0;
+            font-style: italic;
+        }
+        .rating-photos {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            gap: 8px;
+            margin-top: 0.75rem;
+            padding: 0.5rem;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+        .rating-photo {
+            width: 100%;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
+        }
+        .rating-photo:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+    </style>
 @endpush
 
 @section('content')
@@ -15,7 +93,13 @@
                 <i class="fi fi-rr-angle-left"></i>
                 Back to Products
             </a>
-            <h1>{{ $product->name }}</h1>
+            <h1>
+                @if($product->product_type === 'Giveaway' && $product->materials && $product->materials->first() && $product->materials->first()->material)
+                    {{ $product->materials->first()->material->material_name }}
+                @else
+                    {{ $product->name }}
+                @endif
+            </h1>
             @php $taglineParts = collect([$product->theme_style, $product->event_type])->filter(); @endphp
             @if($taglineParts->isNotEmpty())
                 <p class="product-tagline">{{ $taglineParts->implode(' • ') }}</p>
@@ -99,40 +183,77 @@
             <div class="product-card media-card">
                 <div class="media-card__image">
                     @php
-                        $sideFront = '';
-                        $sideBack = '';
+                        $displayImages = [];
                         $imgRecord = $product->images ?? $product->product_images ?? null;
+
+                        // First priority: Product images (front/back/preview)
                         if ($imgRecord) {
-                            $sideFront = \App\Support\ImageResolver::url($imgRecord->front ?? null);
-                            $sideBack = \App\Support\ImageResolver::url($imgRecord->back ?? null);
+                            if (!empty($imgRecord->front)) {
+                                $displayImages['front'] = [
+                                    'url' => \App\Support\ImageResolver::url($imgRecord->front),
+                                    'alt' => $product->name . ' front preview'
+                                ];
+                            }
+                            if (!empty($imgRecord->back)) {
+                                $displayImages['back'] = [
+                                    'url' => \App\Support\ImageResolver::url($imgRecord->back),
+                                    'alt' => $product->name . ' back preview'
+                                ];
+                            }
+                            if (!empty($imgRecord->preview) && empty($displayImages)) {
+                                $displayImages['preview'] = [
+                                    'url' => \App\Support\ImageResolver::url($imgRecord->preview),
+                                    'alt' => $product->name . ' preview'
+                                ];
+                            }
                         }
+
+                        // Second priority: Template images (for envelope products)
                         $templateRef = $product->template ?? null;
-                        if ((!$sideFront || !$sideBack) && $templateRef) {
+                        if (empty($displayImages) && $templateRef) {
                             $tFront = $templateRef->front_image ?? $templateRef->preview_front ?? null;
                             $tBack = $templateRef->back_image ?? $templateRef->preview_back ?? null;
-                            if (!$sideFront && $tFront) {
-                                $sideFront = preg_match('/^(https?:)?\/\//i', $tFront) || strpos($tFront, '/') === 0
-                                    ? $tFront
-                                    : \Illuminate\Support\Facades\Storage::url($tFront);
+
+                            if ($tFront) {
+                                $displayImages['front'] = [
+                                    'url' => preg_match('/^(https?:)?\/\//i', $tFront) || strpos($tFront, '/') === 0
+                                        ? $tFront
+                                        : \Illuminate\Support\Facades\Storage::url($tFront),
+                                    'alt' => $product->name . ' template front'
+                                ];
                             }
-                            if (!$sideBack && $tBack) {
-                                $sideBack = preg_match('/^(https?:)?\/\//i', $tBack) || strpos($tBack, '/') === 0
-                                    ? $tBack
-                                    : \Illuminate\Support\Facades\Storage::url($tBack);
+                            if ($tBack) {
+                                $displayImages['back'] = [
+                                    'url' => preg_match('/^(https?:)?\/\//i', $tBack) || strpos($tBack, '/') === 0
+                                        ? $tBack
+                                        : \Illuminate\Support\Facades\Storage::url($tBack),
+                                    'alt' => $product->name . ' template back'
+                                ];
                             }
                         }
+
+                        // Fallback: Main product image
+                        if (empty($displayImages) && !empty($product->image)) {
+                            $displayImages['main'] = [
+                                'url' => \App\Support\ImageResolver::url($product->image),
+                                'alt' => $product->name . ' preview'
+                            ];
+                        }
+
+                        $imageCount = count($displayImages);
                     @endphp
-                    <div style="display:flex; gap:8px; align-items:center;">
-                        @if($sideFront)
-                            <img src="{{ $sideFront }}" alt="{{ $product->name }} front preview" style="max-width:48%; max-height:140px; height:auto; object-fit:contain;">
-                        @endif
-                        @if($sideBack)
-                            <img src="{{ $sideBack }}" alt="{{ $product->name }} back preview" style="max-width:48%; max-height:140px; height:auto; object-fit:contain;">
-                        @endif
-                        @if(!$sideFront && !$sideBack)
-                            <img src="{{ \App\Support\ImageResolver::url($product->image) }}" alt="{{ $product->name }} preview" style="max-width:100%; max-height:140px; height:auto; object-fit:contain;">
-                        @endif
-                    </div>
+
+                    @if($imageCount > 0)
+                        <div style="display: grid; grid-template-columns: repeat({{ $imageCount }}, 1fr); gap: 8px; align-items: center;">
+                            @foreach($displayImages as $key => $image)
+                                <img src="{{ $image['url'] }}" alt="{{ $image['alt'] }}" style="width: 100%; max-height: 140px; height: auto; object-fit: contain; {{ $imageCount === 1 ? 'max-width: 100%;' : 'max-width: 48%;' }}">
+                            @endforeach
+                        </div>
+                    @else
+                        <div style="width: 100%; height: 140px; background: #f3f4f6; border: 2px dashed #d1d5db; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #6b7280;">
+                            <span>No images available</span>
+                        </div>
+                    @endif
                 </div>
                 <div class="media-card__meta">
                     <span class="meta-pill">Stock: {{ $product->stock_availability ?? '—' }}</span>
@@ -158,7 +279,60 @@
                 </div>
             @endif
 
-            @if($product->uploads && $product->uploads->count())
+            {{-- Ratings --}}
+            <div class="product-card">
+                <h2>Ratings</h2>
+                @php
+                    $ratings = $product->ratings ?? collect();
+                    $averageRating = $ratings->avg('rating');
+                @endphp
+                @if($ratings->isNotEmpty())
+                    <div class="rating-summary">
+                        <p><strong>Average Rating:</strong> {{ number_format($averageRating, 1) }} / 5 ({{ $ratings->count() }} review{{ $ratings->count() > 1 ? 's' : '' }})</p>
+                        <div class="stars-display">
+                            @foreach(range(1, 5) as $i)
+                                <span class="star {{ $i <= round($averageRating) ? 'filled' : '' }}">&#9733;</span>
+                            @endforeach
+                        </div>
+                    </div>
+                    <ul class="ratings-list">
+                        @foreach($ratings as $rating)
+                            <li class="rating-item">
+                                <div class="rating-header">
+                                    <div class="rating-info">
+                                        <strong class="rating-customer">{{ $rating->customer->name ?? 'Customer' }}</strong>
+                                        <div class="stars-display">
+                                            @foreach(range(1, 5) as $i)
+                                                <span class="star {{ $i <= $rating->rating ? 'filled' : '' }}">&#9733;</span>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                    <span class="rating-date">{{ optional($rating->submitted_at)->format('M d, Y') }}</span>
+                                </div>
+                                @if($rating->review)
+                                    <p class="rating-review">{{ $rating->review }}</p>
+                                @endif
+                                @if($rating->photos && count($rating->photos))
+                                    <div class="rating-photos">
+                                        @foreach($rating->photos as $photo)
+                                            @php
+                                                $photoUrl = \Illuminate\Support\Str::startsWith($photo, ['http://', 'https://'])
+                                                    ? $photo
+                                                    : \Illuminate\Support\Facades\Storage::disk('public')->url($photo);
+                                            @endphp
+                                            <img src="{{ $photoUrl }}" alt="Rating photo" class="rating-photo" onclick="window.open('{{ $photoUrl }}', '_blank')">
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                @else
+                    <p class="muted">No ratings yet.</p>
+                @endif
+            </div>
+
+            @if($product->uploads && $product->uploads->count() && !in_array($product->product_type, ['Envelope', 'Giveaway']))
                 <div class="product-card uploads-card">
                     <div class="card-heading">
                         <h2>Uploaded Assets</h2>
@@ -185,9 +359,15 @@
 
         <section class="product-details">
             <div class="product-card">
-                <h2>Basic Information</h2>
+                <h2>{{ $product->product_type ?? 'Product' }} Information</h2>
                 <dl class="info-grid">
-                    <div><dt>Name</dt><dd>{{ $product->name }}</dd></div>
+                    <div><dt>{{ $product->product_type ?? 'Product' }} Name</dt><dd>
+                        @if($product->product_type === 'Giveaway' && $product->materials && $product->materials->first() && $product->materials->first()->material)
+                            {{ $product->materials->first()->material->material_name }}
+                        @else
+                            {{ $product->name }}
+                        @endif
+                    </dd></div>
                     <div><dt>Theme / Style</dt><dd>{{ $product->theme_style ?? '—' }}</dd></div>
                     <div><dt>Event Type</dt><dd>{{ $product->event_type ?? '—' }}</dd></div>
                     <div><dt>Product Type</dt><dd>{{ $product->product_type ?? '—' }}</dd></div>
@@ -203,10 +383,6 @@
                 </div>
             </div>
 
-
-            
-
-            {{-- Paper Stocks --}}
             <div class="product-card">
                 <h2>Paper Stocks</h2>
                 @php $paperStocks = $product->paper_stocks ?? $product->paperStocks ?? collect(); @endphp
@@ -230,6 +406,7 @@
             </div>
 
             {{-- Addons --}}
+            @if($product->product_type !== 'Envelope' && $product->product_type !== 'Giveaway')
             <div class="product-card">
                 <h2>Addons</h2>
                 @php $addons = $product->addons ?? $product->product_addons ?? $product->addOns ?? collect(); @endphp
@@ -251,6 +428,7 @@
                     <p class="muted">No addons defined.</p>
                 @endif
             </div>
+            @endif
 
             {{-- Colors --}}
             <div class="two-column-row">
@@ -296,8 +474,8 @@
                     <p class="muted">No bulk order tiers defined.</p>
                 @endif
             </div>
-            </div>
-        </section>
+        </div>
+    </section>
     </div>
 </main>
 @endsection

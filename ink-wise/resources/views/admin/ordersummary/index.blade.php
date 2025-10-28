@@ -80,6 +80,11 @@
 			color: #3730a3;
 		}
 
+		.order-stage-chip--processing {
+			background: #ede9fe;
+			color: #7c3aed;
+		}
+
 		.order-stage-chip--in-production {
 			background: #fef3c7;
 			color: #b45309;
@@ -269,6 +274,66 @@
 			line-height: 1.6;
 			margin: 0;
 		}
+
+		.status-alert {
+			padding: 14px 18px;
+			border-radius: 10px;
+			font-size: 14px;
+			border: 1px solid transparent;
+		}
+
+		.status-alert--success {
+			background: #ecfdf5;
+			border-color: #34d399;
+			color: #047857;
+		}
+
+		.status-alert--danger {
+			background: #fef2f2;
+			border-color: #f87171;
+			color: #b91c1c;
+		}
+	</style>
+	<style>
+		.ordersummary-card__header {
+			display: flex;
+			justify-content: space-between;
+			align-items: flex-start;
+			margin-bottom: 20px;
+		}
+
+		.ordersummary-card__header h2 {
+			margin: 0;
+			font-size: 18px;
+			font-weight: 600;
+			color: #111827;
+		}
+
+		.ordersummary-card__actions {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+		}
+
+		.ordersummary-card__actions .btn {
+			font-size: 14px;
+			padding: 6px 12px;
+			border-radius: 6px;
+			border: 1px solid #d1d5db;
+			background: #f9fafb;
+			color: #374151;
+			cursor: pointer;
+			transition: all 0.2s ease;
+		}
+
+		.ordersummary-card__actions .btn:hover {
+			background: #f3f4f6;
+			border-color: #9ca3af;
+		}
+
+		.ordersummary-card__actions .btn i {
+			margin-right: 6px;
+		}
 	</style>
 @endpush
 
@@ -300,11 +365,12 @@
 	$discount = (float) data_get($order, 'discount_total', 0);
 	$shipping = (float) data_get($order, 'shipping_fee', 0);
 	$tax = (float) data_get($order, 'tax_total', 0);
-	$grandTotal = (float) data_get($order, 'grand_total', $subtotal - $discount + $shipping + $tax);
+	$grandTotal = (float) data_get($order, 'grand_total', $subtotal);
 
 	$customerName = trim((string) (data_get($customer, 'full_name')
 		?? trim((data_get($customer, 'first_name') ?? '') . ' ' . (data_get($customer, 'last_name') ?? ''))))
 		?: (data_get($customer, 'name') ?? 'Guest customer');
+	$customerId = data_get($customer, 'id');
 	$customerEmail = data_get($customer, 'email');
 	$customerPhone = data_get($customer, 'phone');
 	$customerCompany = data_get($customer, 'company');
@@ -351,7 +417,7 @@
 
 	// Use computed subtotal unless order explicitly provided one
 	$subtotal = $computedSubtotal ?: (float) data_get($order, 'subtotal', data_get($order, 'total_amount', 0));
-	$grandTotal = (float) data_get($order, 'grand_total', $subtotal - $discount + $shipping + $tax);
+	$grandTotal = (float) data_get($order, 'grand_total', $subtotal);
 
 	// initialize grouped sums (will be accumulated while rendering each item)
 	$groupSums = [
@@ -362,7 +428,7 @@
 		'giveaways' => 0.0,
 		'others' => 0.0,
 	];
-	$timeline = collect(data_get($order, 'timeline', data_get($order, 'events', [])))->sortByDesc(function ($event) {
+	$timeline = collect(data_get($order, 'timeline', data_get($order, 'events', [])))->sortBy(function ($event) {
 		$timestamp = data_get($event, 'timestamp', data_get($event, 'created_at'));
 		try {
 			return $timestamp ? \Illuminate\Support\Carbon::parse($timestamp)->timestamp : 0;
@@ -390,16 +456,18 @@
 	} catch (\Throwable $e) {
 		$statusManageUrl = null;
 	}
+	$ordersBackUrl = $statusManageUrl ?? $ordersIndexUrl;
 
 	$statusOptions = [
 		'pending' => 'Order Received',
+		'processing' => 'Processing',
 		'in_production' => 'In Progress',
 		'confirmed' => 'To Ship',
 		'to_receive' => 'To Receive',
 		'completed' => 'Completed',
 		'cancelled' => 'Cancelled',
 	];
-	$statusFlow = ['pending', 'in_production', 'confirmed', 'to_receive', 'completed'];
+	$statusFlow = ['pending', 'processing', 'in_production', 'confirmed', 'to_receive', 'completed'];
 	$currentStatus = strtolower((string) data_get($order, 'status', 'pending'));
 	$flowIndex = array_search($currentStatus, $statusFlow, true);
 	$currentChipModifier = str_replace('_', '-', $currentStatus);
@@ -453,10 +521,7 @@
 			</p>
 		</div>
 		<div class="page-header__quick-actions">
-			<a href="{{ $ordersIndexUrl }}" class="pill-link" title="Return to order list">Back to orders</a>
-			@if($statusManageUrl)
-				<a href="{{ $statusManageUrl }}" class="btn btn-outline" title="Update order status">Manage status</a>
-			@endif
+			<a href="{{ $ordersIndexUrl }}" class="pill-link" title="Return to order list">Back to order list</a>
 			<button type="button" class="btn btn-secondary" data-order-action="export">
 				<i class="fi fi-rr-download" aria-hidden="true"></i> Export PDF
 			</button>
@@ -489,14 +554,17 @@
 		<header class="status-progress-card__header">
 			<div>
 				<h2>Order progress</h2>
-				<p>Follow the Shopee-style milestones your customer sees from checkout to completion.</p>
 			</div>
 			<div class="status-progress-card__actions">
 				<span class="order-stage-chip order-stage-chip--{{ $currentChipModifier }}" data-status-chip>
 					{{ $currentStatusLabel }}
 				</span>
-				@if($statusManageUrl)
+				@if($statusManageUrl && $paymentStatus !== 'pending' && $currentStatus !== 'completed')
 					<a href="{{ $statusManageUrl }}" class="status-progress-manage-link">Update status</a>
+				@elseif($currentStatus === 'completed')
+					<span class="status-progress-manage-link" style="color: #9ca3af; cursor: not-allowed;" title="Cannot update status for completed orders">Update status</span>
+				@elseif($paymentStatus === 'pending')
+					<span class="status-progress-manage-link" style="color: #9ca3af; cursor: not-allowed;" title="Cannot update status while payment is pending">Update status</span>
 				@endif
 			</div>
 		</header>
@@ -510,7 +578,9 @@
 						if ($index < $flowIndex) {
 							$stateClass = 'status-tracker__item--done';
 						} elseif ($index === $flowIndex) {
-							$stateClass = 'status-tracker__item--current';
+							$stateClass = $currentStatus === 'completed'
+								? 'status-tracker__item--done'
+								: 'status-tracker__item--current';
 						}
 					}
 				@endphp
@@ -534,6 +604,9 @@
 								@case('pending')
 									Order received and awaiting confirmation.
 									@break
+								@case('processing')
+									Team is preparing assets before full production starts.
+									@break
 								@case('in_production')
 									Production team is preparing the items.
 									@break
@@ -555,37 +628,13 @@
 				</li>
 			@endforeach
 		</ol>
-
-		<div class="status-info-grid">
-			<article class="status-info-card">
-				<h2 class="status-info-card__title">Customer-facing update</h2>
-				<dl>
-					<div>
-						<dt>Tracking number</dt>
-						<dd>{{ $trackingNumber ?: '— Not provided yet' }}</dd>
-					</div>
-					<div>
-						<dt>Next milestone</dt>
-						<dd data-next-status>{{ $nextStatusLabel ?? 'All steps complete' }}</dd>
-					</div>
-					<div>
-						<dt>Last updated</dt>
-						<dd>{{ $lastUpdatedDisplay ?? 'Not available' }}</dd>
-					</div>
-				</dl>
-			</article>
-			<article class="status-info-card">
-				<h2 class="status-info-card__title">Internal note</h2>
-				@if(filled($statusNote))
-					<p class="status-info-card__text">{{ $statusNote }}</p>
-				@else
-					<p class="status-info-card__empty">
-						No notes yet. Hit “Update status” to leave instructions for the team.
-					</p>
-				@endif
-			</article>
-		</div>
 	</section>
+
+	@if($paymentStatus === 'pending')
+		<div class="status-alert status-alert--danger" role="alert" style="margin-top: 16px;">
+			<strong>Payment Required:</strong> Order status cannot be updated until payment is confirmed. Please mark the payment as paid first.
+		</div>
+	@endif
 
 	<div class="ordersummary-layout">
 		<section class="ordersummary-main" aria-label="Order details">
@@ -946,6 +995,13 @@
 							@endforeach
 						</ul>
 					@endif
+					<div class="ordersummary-card__actions">
+						@if($customerEmail && $customerId)
+							<a href="{{ route('admin.messages.index') }}?start_conversation={{ $customerId }}" class="btn btn-secondary btn-sm">
+								<i class="fi fi-rr-envelope" aria-hidden="true"></i> Message Customer
+							</a>
+						@endif
+					</div>
 				</header>
 				<div class="ordersummary-customer">
 					<div class="ordersummary-customer__profile">
@@ -1008,6 +1064,7 @@
 				</div>
 			</article>
 
+
 			<article class="ordersummary-card">
 				<header class="ordersummary-card__header">
 					<h2>Timeline</h2>
@@ -1062,16 +1119,44 @@
 						</li>
 					@endforelse
 				</ul>
-				<form class="ordersummary-note" data-note-form>
-					@csrf
-					<label for="orderNote">Add internal note</label>
-					<textarea id="orderNote" name="note" rows="3" placeholder="Record a call, update, or next step..."></textarea>
-					<div class="ordersummary-note__actions">
-						<button type="submit" class="btn btn-primary btn-sm">Save note</button>
-						<span class="hint">Notes save locally until backend endpoint is connected.</span>
+			</article> 
+
+			<article class="ordersummary-card">
+				<header class="ordersummary-card__header">
+					<h2>Customer Rating</h2>
+				</header>
+				@php
+					$rating = data_get($order, 'rating');
+					$ratingValue = $rating ? (int) data_get($rating, 'rating', 0) : null;
+					$ratingComment = $rating ? data_get($rating, 'comment') : null;
+				@endphp
+				@if($ratingValue)
+					<div class="rating-display" style="padding: 20px;">
+						<div class="rating-stars" style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+							<div class="stars" style="display: flex; gap: 4px;">
+								@for($i = 1; $i <= 5; $i++)
+									@if($i <= $ratingValue)
+										<span style="color: #f59e0b; font-size: 24px;">★</span>
+									@else
+										<span style="color: #d1d5db; font-size: 24px;">☆</span>
+									@endif
+								@endfor
+							</div>
+							<span style="font-size: 18px; font-weight: 600; color: #111827;">{{ $ratingValue }}/5</span>
+						</div>
+						@if($ratingComment)
+							<div class="rating-comment" style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px;">
+								<p style="margin: 0; font-style: italic; color: #374151; font-size: 16px; line-height: 1.5;">"{{ $ratingComment }}"</p>
+							</div>
+						@endif
 					</div>
-				</form>
-			</article>
+				@else
+					<div style="padding: 20px; text-align: center; color: #6b7280;">
+						<p style="margin: 0; font-size: 16px;">No customer rating has been submitted yet.</p>
+					</div>
+				@endif
+			</article> 
+
 		</section>
 
 		<aside
@@ -1093,6 +1178,12 @@
 						Collapse
 					</button>
 				</header>
+				<div class="payment-status-highlight" style="background: #f0f9ff; border: 2px solid #0ea5e9; border-radius: 8px; padding: 16px; margin-bottom: 16px; text-align: center;">
+					<div style="font-size: 14px; font-weight: 600; color: #0c4a6e; margin-bottom: 8px;">Payment Status</div>
+					<span class="status-chip {{ 'status-chip--' . $paymentStatus }}" style="font-size: 16px; padding: 8px 16px;">
+						{{ ucfirst($paymentStatus ?: 'pending') }}
+					</span>
+				</div>
 				<dl class="sidebar-totals" data-sidebar-section>
 					<div>
 						<dt>Invitations</dt>
@@ -1125,96 +1216,17 @@
 						@php
 							$computedSidebarSubtotal = array_sum($groupSums);
 							$subtotal = $computedSidebarSubtotal ?: $subtotal;
-							$grandTotal = (float) data_get($order, 'grand_total', $subtotal - $discount + $shipping + $tax);
+							$grandTotal = $subtotal;
 						@endphp
 						<dd data-money>{{ number_format($subtotal, 2) }}</dd>
 					</div>
-					<div>
-						<dt>Discounts</dt>
-						<dd class="text-negative" data-money>-{{ number_format($discount, 2) }}</dd>
-					</div>
-					<div>
-						<dt>Shipping</dt>
-						<dd data-money>{{ number_format($shipping, 2) }}</dd>
-					</div>
-					@if(!empty($tax) && (float) $tax !== 0.0)
-						<div>
-							<dt>Tax</dt>
-							<dd data-money>{{ number_format($tax, 2) }}</dd>
-						</div>
-					@endif
 					<div class="sidebar-totals__total">
 						<dt>Total due</dt>
 						<dd data-grand-total data-money>{{ number_format($grandTotal, 2) }}</dd>
 					</div>
 				</dl>
-				<div class="sidebar-actions">
-					<button type="button" class="btn btn-primary btn-sm" data-sidebar-action="mark-paid">
-						Mark as paid
-					</button>
-					<button type="button" class="btn btn-secondary btn-sm" data-sidebar-action="send-invoice">
-						Send invoice
-					</button>
-				</div>
 			</section>
 
-			<section class="sidebar-card">
-				<header>
-					<h2>Fulfillment</h2>
-					<span class="status-chip status-chip--outline {{ 'status-chip--' . $fulfillmentStatus }}" data-fulfillment-pill>
-						{{ ucfirst($fulfillmentStatus ?: 'processing') }}
-					</span>
-				</header>
-				<div class="sidebar-list">
-					<div class="sidebar-list__row">
-						<span>Production</span>
-						<span data-sidebar-production>Status: {{ ucfirst(data_get($order, 'production_status', 'queue')) }}</span>
-					</div>
-					<div class="sidebar-list__row">
-						<span>Estimated ship date</span>
-						<span>
-							@php
-								$shipDateRaw = data_get($order, 'estimated_ship_date');
-								try {
-									$shipDateCarbon = $shipDateRaw ? \Illuminate\Support\Carbon::parse($shipDateRaw) : null;
-								} catch (\Throwable $e) {
-									$shipDateCarbon = null;
-								}
-							@endphp
-							{{ $shipDateCarbon ? $shipDateCarbon->format('M j, Y') : 'TBD' }}
-						</span>
-					</div>
-				</div>
-				<div class="sidebar-actions">
-					<button type="button" class="btn btn-primary btn-sm" data-sidebar-action="mark-fulfilled">
-						Mark as fulfilled
-					</button>
-					<button type="button" class="btn btn-secondary btn-sm" data-sidebar-action="schedule-pickup">
-						Schedule pickup
-					</button>
-				</div>
-			</section>
-
-			<section class="sidebar-card">
-				<header>
-					<h2>Quick contact</h2>
-				</header>
-				<div class="sidebar-quick-actions">
-					@if($customerEmail)
-						<a class="pill-link" href="mailto:{{ $customerEmail }}">
-							<i class="fi fi-rr-envelope" aria-hidden="true"></i> Email customer
-						</a>
-					@endif
-					@if($customerPhone)
-						<a class="pill-link" href="tel:{{ $customerPhone }}">
-							<i class="fi fi-rr-phone-call" aria-hidden="true"></i> Call customer
-						</a>
-					@endif
-					<button type="button" class="pill-link" data-sidebar-action="copy-summary">
-						<i class="fi fi-rr-copy" aria-hidden="true"></i> Copy summary
-					</button>
-				</div>
-			</section>
 		</aside>
 	</div>
 </main>

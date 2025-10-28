@@ -3,7 +3,7 @@
 @section('content')
 @include('layouts.owner.sidebar')
 
-<link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
+<link rel="stylesheet" href="{{ asset('css/admin-css/product.css') }}">
 
 <!-- Inline critical CSS fallback to ensure table is visible and matches admin styles -->
 <style>
@@ -135,86 +135,78 @@
   .search-input {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     background: #fff;
-    border-radius: 10px;
-    padding: 6px 10px;
-    border: 1px solid rgba(148, 185, 255, 0.22);
-    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+    border-radius: 12px;
+    padding: 8px 14px;
+    border: 1px solid rgba(148, 185, 255, 0.26);
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
     transition: box-shadow 0.18s ease, border-color 0.18s ease;
   }
 
   .search-input:focus-within {
     border-color: rgba(59, 130, 246, 0.32);
-    box-shadow: 0 12px 28px rgba(59, 130, 246, 0.08);
+    box-shadow: 0 14px 32px rgba(59, 130, 246, 0.1);
   }
 
   .search-input input.form-control {
     border: 0;
     outline: 0;
-    width: 280px;
-    max-width: 40vw;
-    min-width: 140px;
-    padding: 6px 8px;
-    font-size: 0.95rem;
+    width: 360px;
+    max-width: 48vw;
+    min-width: 180px;
+    padding: 8px 10px;
+    font-size: 1.05rem;
     background: transparent;
   }
 
-  .table-wrapper {
-    border-radius: 14px;
-    border: 1px solid rgba(148, 185, 255, 0.2);
-    background: #f8fbff;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 16px 32px rgba(15, 23, 42, 0.08);
-    overflow-x: auto;
+  .owner-products-page {
+    font-size: 1.2rem;
+    line-height: 1.5;
   }
 
-  .table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.95rem;
-    color: #0f172a;
-    min-width: 880px;
+  .owner-products-page .page-title {
+    font-size: 2.1rem;
+    font-weight: 800;
   }
 
-  .table thead th {
-    background: rgba(148, 185, 255, 0.16);
-    padding: 14px 20px;
-    text-transform: uppercase;
-    font-size: 0.78rem;
-    letter-spacing: 0.06em;
-    font-weight: 700;
+  .owner-products-page .page-subtitle {
+    font-size: 1.2rem;
   }
 
-  .table tbody td {
-    padding: 14px 20px;
-    border-bottom: 1px solid rgba(148, 185, 255, 0.12);
-    vertical-align: middle;
+  .owner-products-page .summary-card-label,
+  .owner-products-page .summary-card-meta {
+    font-size: 1.15rem;
   }
 
-  .table tbody tr:last-child td {
-    border-bottom: none;
+  .owner-products-page .summary-card-value {
+    font-size: 2rem;
   }
 
-  .table tbody tr:hover {
-    background: rgba(148, 185, 255, 0.08);
+  .owner-products-page .summary-card-chip {
+    font-size: 1.1rem;
   }
 
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border-radius: 999px;
-    font-size: 0.78rem;
-    font-weight: 700;
-    text-transform: uppercase;
+  .owner-products-page .product-card {
+    font-size: 1rem;
   }
 
-  .badge.stock-ok { background: rgba(34, 197, 94, 0.16); color: #15803d; }
-  .badge.stock-low { background: rgba(251, 191, 36, 0.16); color: #b45309; }
-  .badge.stock-critical { background: rgba(239, 68, 68, 0.16); color: #b91c1c; }
+  .owner-products-page .product-card-title {
+    font-size: 1.75rem;
+    font-weight: 800;
+  }
 
-  .fw-bold { font-weight: 700; }
+  .owner-products-page .product-card-desc,
+  .owner-products-page .meta-item,
+  .owner-products-page .price,
+  .owner-products-page .entries-info {
+    font-size: 1rem;
+  }
+
+  .owner-products-page .meta-item,
+  .owner-products-page .price {
+    font-weight: 600;
+  }
 
   @media (max-width: 900px) {
     .owner-dashboard-shell {
@@ -224,29 +216,12 @@
     }
     .owner-dashboard-main { padding: 24px 20px 32px 12px; }
     .owner-dashboard-inner { padding: 0 4px; }
-    .table { min-width: 720px; }
   }
 
-  /* Dark mode */
-  .dark-mode body { background: #111827; }
-  .dark-mode .summary-card { background: #374151; color: #f9fafb; box-shadow: 0 12px 24px rgba(15, 23, 42, 0.4); }
-  .dark-mode .summary-card::after { background: linear-gradient(90deg, rgba(148, 185, 255, 0.65), rgba(111, 150, 227, 0.75)); }
-  .dark-mode .summary-card-label { color: #d1d5db; }
-  .dark-mode .summary-card-value { color: #f9fafb; }
-  .dark-mode .summary-card-meta { color: #9ca3af; }
-  .dark-mode .summary-card-chip { background: rgba(148, 185, 255, 0.28); color: #cbd9ff; }
-  .dark-mode .summary-card-chip.accent { background: rgba(148, 185, 255, 0.32); }
-  .dark-mode .search-input { background: #374151; border-color: #4b5563; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); }
-  .dark-mode .search-input input.form-control { color: #f9fafb; }
-  .dark-mode .table-wrapper { background: #1f2937; border-color: rgba(148, 185, 255, 0.32); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04); }
-  .dark-mode .table { color: #f9fafb; }
-  .dark-mode .table thead th { background: rgba(148, 185, 255, 0.22); color: #0f172a; }
-  .dark-mode .table tbody td { border-color: rgba(148, 185, 255, 0.18); }
-  .dark-mode .table tbody tr:hover { background: rgba(148, 185, 255, 0.12); }
 </style>
 
 <section class="main-content owner-dashboard-shell">
-  <main class="materials-page admin-page-shell materials-container owner-dashboard-main" role="main">
+  <main class="materials-page admin-page-shell materials-container owner-dashboard-main owner-products-page" role="main">
   <header class="page-header">
     <div>
       <h1 class="page-title">Products</h1>
@@ -255,28 +230,32 @@
   </header>
 
   @php
-    // Compute summary counts from the passed collection when available,
-    // otherwise attempt to query the Product model (safe fallback).
-    $totalProducts = 0;
-    $invitationCount = 0;
-    $giveawayCount = 0;
-    $inStockCount = 0;
+  $productsCollection = collect();
+  if ($products instanceof \Illuminate\Contracts\Pagination\Paginator) {
+    $productsCollection = collect($products->items());
+  } elseif ($products instanceof \Illuminate\Support\Collection) {
+    $productsCollection = $products;
+  }
 
-    if (isset($products) && $products instanceof \Illuminate\Support\Collection) {
-        $totalProducts = $products->count();
-        $invitationCount = $products->where('product_type', 'invitation')->count();
-        $giveawayCount = $products->where('product_type', 'giveaway')->count();
-        $inStockCount = $products->filter(fn($p) => (int)($p->stock ?? 0) > 0)->count();
-    } elseif (class_exists(\App\Models\Product::class)) {
-        try {
-            $totalProducts = \App\Models\Product::count();
-            $invitationCount = \App\Models\Product::where('product_type', 'invitation')->count();
-            $giveawayCount = \App\Models\Product::where('product_type', 'giveaway')->count();
-            $inStockCount = \App\Models\Product::where('stock', '>', 0)->count();
-        } catch (\Exception $e) {
-            // swallow DB exceptions in the view; keep counts zero
-        }
-    }
+  $totalProducts = $totalProducts ?? ($products instanceof \Illuminate\Contracts\Pagination\Paginator
+    ? $products->total()
+    : $productsCollection->count());
+
+  $countByType = function (string $type) use ($productsCollection) {
+    return $productsCollection->filter(function ($product) use ($type) {
+      return strtolower($product->product_type ?? '') === strtolower($type);
+    })->count();
+  };
+
+  $invitationCount = $invitationCount ?? $countByType('Invitation');
+  $giveawayCount = $giveawayCount ?? $countByType('Giveaway');
+
+  $inStockCount = $inStockCount ?? $productsCollection->filter(function ($product) {
+    $availability = strtolower($product->stock_availability ?? '');
+    return $availability === ''
+      || str_contains($availability, 'in stock')
+      || str_contains($availability, 'available');
+  })->count();
   @endphp
 
   <div class="page-inner owner-dashboard-inner">
@@ -347,45 +326,77 @@
     </div>
   </section>
 
-  <div class="table-wrapper">
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>SKU</th>
-          <th>Price</th>
-          <th>Stock</th>
-        </tr>
-      </thead>
-      <tbody>
-        @forelse($products as $product)
-          @php $stock = $product->stock ?? 0; @endphp
-          <tr>
-            <td class="fw-bold">{{ $product->name ?? '-' }}</td>
-            <td>{{ $product->sku ?? '-' }}</td>
-            <td>₱{{ isset($product->price) ? number_format($product->price, 2) : '-' }}</td>
-            <td>
-              <span class="badge {{ $stock <= 0 ? 'stock-critical' : ($stock > 0 && $stock <= 5 ? 'stock-low' : 'stock-ok') }}">
-                {{ $stock }}
-              </span>
-            </td>
-          </tr>
-        @empty
-          <tr>
-            <td colspan="4" class="text-center" style="padding:18px; color:#64748b;">No products yet.</td>
-          </tr>
-        @endforelse
-      </tbody>
-    </table>
-  </div>
+  @php
+    $isPaginator = $products instanceof \Illuminate\Contracts\Pagination\Paginator;
+    $hasProducts = $isPaginator ? $products->total() > 0 : ($products->count() > 0);
+  @endphp
 
-  @if(method_exists($products, 'links'))
-    <div style="margin-top:12px;">
-      {{ $products->links() }}
+  <div class="table-container" id="products-table-container">
+    <h2>Products List</h2>
+
+    <div class="products-grid" role="list">
+      @forelse($products as $product)
+        @include('owner.products.partials.card', ['product' => $product])
+      @empty
+        <div class="no-products">No products found.</div>
+      @endforelse
     </div>
-  @endif
+
+    <div class="table-pagination" id="products-list">
+      <div class="entries-info">
+        @if($isPaginator)
+          @if($products->total())
+            Showing {{ $products->firstItem() }} to {{ $products->lastItem() }} of {{ $products->total() }} entries
+          @else
+            No entries
+          @endif
+        @else
+          {{ $hasProducts ? 'Showing ' . $products->count() . ' entries' : 'No entries' }}
+        @endif
+      </div>
+      <div class="pagination-links">
+        @if($isPaginator)
+          {{ $products->links() }}
+        @endif
+      </div>
+    </div>
+  </div>
   </div> <!-- .page-inner -->
 </section>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      function isInteractiveElement(el) {
+        if (!el) return false;
+        return el.closest('a, button, form, input, select, textarea, .ajax-delete-form, .card-actions');
+      }
+
+      document.querySelectorAll('.product-card').forEach(function (card) {
+        card.addEventListener('click', function (e) {
+          if (isInteractiveElement(e.target)) return;
+          var url = card.getAttribute('data-view-url');
+          if (!url) return;
+
+          var openInNewTab = e.ctrlKey || e.metaKey || (e.button === 1);
+          if (openInNewTab) {
+            window.open(url, '_blank');
+            return;
+          }
+
+          window.location = url;
+        });
+
+        card.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') {
+            var url = card.getAttribute('data-view-url');
+            if (!url) return;
+            e.preventDefault();
+            window.location = url;
+          }
+        });
+      });
+    });
+  </script>
 
   <script>
     // Filter icon menu behavior for owner products

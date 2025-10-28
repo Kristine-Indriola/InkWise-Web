@@ -37,7 +37,6 @@
                 <p class="text-sm text-red-500 mt-1">{{ $message }}</p>
                 @enderror
             </div>
-
             <!-- Remember Me -->
             <div class="flex items-center">
                 <input type="checkbox" id="remember" name="remember" class="rounded border-gray-300 text-indigo-600">
@@ -49,7 +48,7 @@
                     class="w-full bg-gradient-to-r from-indigo-600 to-blue-500 hover:from-indigo-700 hover:to-blue-600 text-white font-medium py-2 px-4 rounded-lg shadow-md transition">
                 Sign In
             </button>
-        </form>
+        </form> 
 
         {{-- Third-party login coming soon --}}
 

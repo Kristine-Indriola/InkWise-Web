@@ -20,12 +20,12 @@ return new class extends Migration
                 $table->foreignId('order_id')
                     ->nullable()
                     ->constrained('orders')
-                    ->cascadeOnDelete();
+                    ->nullOnDelete();
 
                 $table->foreignId('order_item_id')
                     ->nullable()
                     ->constrained('order_items')
-                    ->cascadeOnDelete();
+                    ->nullOnDelete();
 
                 $table->foreignId('product_id')
                     ->nullable()

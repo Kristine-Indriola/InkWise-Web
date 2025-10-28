@@ -17,7 +17,7 @@ class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Product::query()->with(['template', 'images', 'envelope.material']);
+        $query = Product::query()->with(['template', 'images', 'envelope.material', 'materials.material', 'uploads']);
 
         $currentFilter = 'All';
         $typeFilter = $request->query('type');
@@ -56,7 +56,7 @@ class ProductController extends Controller
             $this->hydrateLegacyAttributes($product);
         });
 
-        $recentGiveaways = Product::with(['template', 'images'])
+        $recentGiveaways = Product::with(['template', 'images', 'envelope.material', 'materials.material', 'uploads'])
             ->where('product_type', 'Giveaway')
             ->latest()
             ->take(6)
@@ -69,7 +69,8 @@ class ProductController extends Controller
         $invitationCount = Product::where('product_type', 'Invitation')->count();
         $giveawayCount = Product::where('product_type', 'Giveaway')->count();
         $envelopeCount = Product::where('product_type', 'Envelope')->count();
-        $totalUploads = ProductUpload::count();
+        $totalUploads = Template::count();
+        $uploadedTemplatesCount = Product::whereHas('uploads')->count();
         $totalQuantity = 0; // Column removed from table
         $totalSales = 0; // Column removed from table
         $activeProducts = 0; // Status column removed from table
@@ -82,6 +83,7 @@ class ProductController extends Controller
             'giveawayCount',
             'envelopeCount',
             'totalUploads',
+            'uploadedTemplatesCount',
             'totalQuantity',
             'totalSales',
             'activeProducts',
@@ -158,7 +160,7 @@ class ProductController extends Controller
      */
     public function inks()
     {
-        $products = Product::with('inks')->orderBy('created_at', 'desc')->get();
+        $products = Product::with('inks', 'envelope.material')->orderBy('created_at', 'desc')->get();
         return view('admin.products.inks', compact('products'));
     }
 
@@ -167,34 +169,52 @@ class ProductController extends Controller
      */
     public function materials()
     {
-        $products = Product::with('materials')->orderBy('created_at', 'desc')->get();
+        $products = Product::with('materials', 'envelope.material')->orderBy('created_at', 'desc')->get();
         return view('admin.products.materials', compact('products'));
     }
 
     // Add: Method to show the create invitation form
     public function createInvitation(Request $request)
     {
-        $templates = \App\Models\ProductUpload::all();
+        $templates = \App\Models\Template::where('product_type', 'Invitation')->get();
         $materials = \App\Models\Material::all();
         $selectedTemplate = null;
         if ($request->has('template_id')) {
-            $selectedTemplate = \App\Models\ProductUpload::find($request->input('template_id'));
+            $selectedTemplate = \App\Models\Template::find($request->input('template_id'));
         }
         return view('admin.products.create-invitation', compact('templates', 'materials', 'selectedTemplate'));
+    }
+
+    // Get template data by ID for auto-populating form
+    public function getTemplateData($id)
+    {
+        $template = Template::findOrFail($id);
+
+        return response()->json([
+            'template_name' => $template->name,
+            'description' => $template->description,
+            'product_type' => $template->product_type,
+            'event_type' => $template->event_type,
+            'theme_style' => $template->theme_style,
+            'front_image' => $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : null,
+            'back_image' => $template->back_image ? \App\Support\ImageResolver::url($template->back_image) : null,
+            'preview_image' => $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : null,
+            'design_data' => $template->design,
+        ]);
     }
 
     public function createGiveaway(Request $request)
     {
         $product = null;
         if ($request->has('product_id')) {
-            $product = Product::with(['template', 'addons', 'colors', 'bulkOrders'])->find($request->input('product_id'));
+            $product = Product::with(['template', 'addons', 'colors', 'bulkOrders', 'envelope.material'])->find($request->input('product_id'));
         }
 
-        $templates = ProductUpload::all();
+        $templates = Template::where('product_type', 'Giveaway')->get();
         $materials = Material::all();
         $selectedTemplate = null;
         if ($request->has('template_id')) {
-            $selectedTemplate = ProductUpload::find($request->input('template_id'));
+            $selectedTemplate = Template::find($request->input('template_id'));
         }
 
         return view('admin.products.create-giveaways', compact('product', 'templates', 'materials', 'selectedTemplate'));
@@ -203,7 +223,7 @@ class ProductController extends Controller
     // Add: Method to show the create envelope form
     public function createEnvelope(Request $request)
     {
-        $templates = \App\Models\ProductUpload::all();
+        $templates = \App\Models\Template::where('product_type', 'Envelope')->get();
         $materials = \App\Models\Material::all();
         $materialTypes = \App\Models\Material::distinct()->pluck('material_type')->filter()->values();
         $envelopeMaterials = \App\Models\Material::where('material_type', 'like', '%envelope%')
@@ -215,7 +235,7 @@ class ProductController extends Controller
         $envelope = null;
 
         if ($request->has('template_id')) {
-            $selectedTemplate = \App\Models\ProductUpload::find($request->input('template_id'));
+            $selectedTemplate = \App\Models\Template::find($request->input('template_id'));
         }
 
         // Check if editing an existing envelope product
@@ -292,11 +312,11 @@ class ProductController extends Controller
             // Custom image uploaded
             $imagePath = $request->file('image')->store('products', 'public');
         } elseif ($request->input('template_id')) {
-            // No custom image, use template image
-            $template = \App\Models\Template::find($request->input('template_id'));
-            if ($template && $template->preview) {
+            // No custom image, use template image from Template
+            $template = Template::find($request->input('template_id'));
+            if ($template && $template->front_image) {
                 // Copy template image to products directory
-                $templatePath = $template->preview;
+                $templatePath = $template->front_image;
                 if (!preg_match('/^(https?:)?\/\//i', $templatePath) && !str_starts_with($templatePath, '/')) {
                     // It's a relative path in storage
                     $sourcePath = storage_path('app/public/' . $templatePath);
@@ -317,8 +337,11 @@ class ProductController extends Controller
             $leadTimeInput = $validated['lead_time'] ?? null;
             $leadTimeDays = is_numeric($leadTimeInput) ? (int) $leadTimeInput : null;
 
+            // Get the actual template_id from Template if provided
+            $actualTemplateId = $validated['template_id'] ?? null;
+
             $data = [
-                'template_id' => $validated['template_id'] ?? null,
+                'template_id' => $actualTemplateId,
                 'name' => $validated['invitationName'],
                 'event_type' => $validated['eventType'] ?? 'General',
                 'product_type' => $validated['productType'],
@@ -342,157 +365,207 @@ class ProductController extends Controller
                 $product = Product::create($data);
             }
 
-            // Handle envelope products differently
-            if ($validated['productType'] === 'Envelope') {
-                // Handle envelope image upload
-                $envelopeImagePath = null;
-                if ($request->hasFile('envelope_image')) {
-                    $envelopeImagePath = $request->file('envelope_image')->store('envelopes', 'public');
+            // Get template data if template_id is provided
+            $templateData = null;
+            $template = null;
+            if (!empty($validated['template_id'])) {
+                $template = Template::find($validated['template_id']);
+                if ($template && $template->design) {
+                    $templateData = $template->design;
                 }
+            }
 
-                // Save envelope details
-                $product->envelope()->updateOrCreate([], [
-                    'material_id' => $validated['envelope_material_id'] ?? null,
-                    'envelope_material_name' => $validated['material_type'] ?? null,
-                    'max_qty' => $validated['max_qty'] ?? null,
-                    'max_quantity' => $validated['max_quantity'] ?? null,
-                    'price_per_unit' => $validated['price_per_unit'] ?? null,
-                    'envelope_image' => $envelopeImagePath,
-                ]);
-            } else {
-                // Handle invitation products with complex relationships
-                // ---- Related arrays ----
-                // Paper Stocks
-                $paperStocks = $request->input('paper_stocks', []);
-                $paperStockFiles = $request->file('paper_stocks') ?? [];
-                if ($product) {
-                    $product->paperStocks()->delete();
-                    foreach ($paperStocks as $i => $ps) {
-                        $psImagePath = null;
-                        if (isset($paperStockFiles[$i]) && is_array($paperStockFiles[$i]) && isset($paperStockFiles[$i]['image_path'])) {
-                            $file = $paperStockFiles[$i]['image_path'];
-                            if ($file && method_exists($file, 'store')) {
-                                $psImagePath = $file->store('Materials/paper_stocks', 'public');
-                            }
-                        }
-                        $product->paperStocks()->create([
-                            'material_id' => !empty($ps['material_id']) ? intval($ps['material_id']) : null,
-                            'name' => $ps['name'] ?? null,
-                            'price' => isset($ps['price']) ? floatval($ps['price']) : null,
-                            'image_path' => $psImagePath,
-                        ]);
-                    }
-                }
-
-                // Addons
-                $addons = $request->input('addons', []);
-                $addonFiles = $request->file('addons') ?? [];
-                if ($product) {
-                    $product->addons()->delete();
-                    foreach ($addons as $i => $ad) {
-                        $adImagePath = null;
-                        if (isset($addonFiles[$i]) && is_array($addonFiles[$i]) && isset($addonFiles[$i]['image_path'])) {
-                            $file = $addonFiles[$i]['image_path'];
-                            if ($file && method_exists($file, 'store')) {
-                                $adImagePath = $file->store('Materials/addons', 'public');
-                            }
-                        }
-                        $product->addons()->create([
-                            'addon_type' => $ad['addon_type'] ?? null,
-                            'name' => $ad['name'] ?? null,
-                            'price' => isset($ad['price']) ? floatval($ad['price']) : null,
-                            'image_path' => $adImagePath,
-                        ]);
-                    }
-                }
-
-                // Colors
-                $colors = $request->input('colors', []);
-                if ($product) {
-                    $product->colors()->delete();
-                    foreach ($colors as $c) {
-                        $product->colors()->create([
-                            'name' => $c['name'] ?? null,
-                            'color_code' => $c['color_code'] ?? null,
-                        ]);
-                    }
-                }
-
-                // Bulk Orders
-                $bulkOrders = $request->input('bulk_orders', []);
-
-                if (empty($bulkOrders) && ($validated['productType'] ?? null) === 'Giveaway') {
-                    $singleBulk = [
-                        'min_qty' => $request->filled('max_qty') ? intval($request->input('max_qty')) : null,
-                        'max_qty' => $request->filled('max_quantity') ? intval($request->input('max_quantity')) : null,
-                        'price_per_unit' => isset($validated['base_price']) && $request->filled('base_price')
-                            ? floatval($validated['base_price'])
-                            : null,
+            // Handle envelope/giveaway materials
+            if ($product && ($validated['productType'] === 'Envelope' || $validated['productType'] === 'Giveaway')) {
+                // For envelopes, create/update envelope record
+                if ($validated['productType'] === 'Envelope') {
+                    $envelopeData = [
+                        'material_id' => $validated['envelope_material_id'] ?? null,
+                        'envelope_material_name' => $request->input('material_type') ?? null,
+                        'max_qty' => $validated['max_qty'] ?? null,
+                        'max_quantity' => $validated['max_quantity'] ?? null,
+                        'price_per_unit' => $validated['price_per_unit'] ?? null,
                     ];
 
-                    // Only keep if at least one value is provided
-                    if (!is_null($singleBulk['min_qty']) || !is_null($singleBulk['max_qty']) || !is_null($singleBulk['price_per_unit'])) {
-                        $bulkOrders[] = $singleBulk;
-                    }
+                    $product->envelope()->updateOrCreate([], $envelopeData);
                 }
+                // For giveaways, create ProductMaterial record
+                elseif ($validated['productType'] === 'Giveaway' && !empty($validated['envelope_material_id'])) {
+                    // Delete existing materials for this product
+                    $product->materials()->delete();
 
-                if ($product) {
-                    $product->bulkOrders()->delete();
-                    foreach ($bulkOrders as $b) {
-                        $minQty = isset($b['min_qty']) && $b['min_qty'] !== '' ? intval($b['min_qty']) : null;
-                        $maxQty = isset($b['max_qty']) && $b['max_qty'] !== '' ? intval($b['max_qty']) : null;
-                        $pricePerUnit = isset($b['price_per_unit']) && $b['price_per_unit'] !== '' ? floatval($b['price_per_unit']) : null;
-
-                        if (is_null($minQty) && is_null($maxQty) && is_null($pricePerUnit)) {
-                            continue;
-                        }
-
-                        $product->bulkOrders()->create([
-                            'min_qty' => $minQty,
-                            'max_qty' => $maxQty,
-                            'price_per_unit' => $pricePerUnit,
-                        ]);
-                    }
+                    // Create new material record
+                    $product->materials()->create([
+                        'material_id' => $validated['envelope_material_id'],
+                        'item' => 'giveaway',
+                        'type' => $request->input('material_type') ?? 'giveaway',
+                        'qty' => 1,
+                        'source_type' => 'product',
+                    ]);
                 }
+            }
+            // Paper Stocks
+            $paperStocks = $request->input('paper_stocks', []);
+            $paperStockFiles = $request->file('paper_stocks') ?? [];
 
-                // Preview Images (front/back/preview)
-                if ($product) {
-                    $existingPreview = $product->images;
-                    $previewInputs = $request->input('preview_images', []);
-                    $previewFiles = $request->file('preview_images') ?? [];
-                    $existingPreviewInputs = $request->input('preview_images_existing', []);
+            // If no paper stocks provided but we have template data, use template data
+            if (empty($paperStocks) && $templateData && isset($templateData['paper_stocks'])) {
+                $paperStocks = $templateData['paper_stocks'];
+            }
 
-                    $previewData = [
-                        'front' => $existingPreview ? $existingPreview->front : null,
-                        'back' => $existingPreview ? $existingPreview->back : null,
-                        'preview' => $existingPreview ? $existingPreview->preview : null,
-                    ];
-
-                    foreach (['front', 'back', 'preview'] as $key) {
-                        $existingValue = is_array($existingPreviewInputs) ? ($existingPreviewInputs[$key] ?? null) : null;
-                        if ($existingValue && empty($previewData[$key])) {
-                            $previewData[$key] = $existingValue;
-                        }
-                    }
-
-                    foreach (['front', 'back', 'preview'] as $key) {
-                        $file = is_array($previewFiles) ? ($previewFiles[$key] ?? null) : null;
+            if ($product) {
+                $product->paperStocks()->delete();
+                foreach ($paperStocks as $i => $ps) {
+                    $psImagePath = null;
+                    if (isset($paperStockFiles[$i]) && is_array($paperStockFiles[$i]) && isset($paperStockFiles[$i]['image_path'])) {
+                        $file = $paperStockFiles[$i]['image_path'];
                         if ($file && method_exists($file, 'store')) {
-                            $previewData[$key] = $file->store('products/previews', 'public');
-                            continue;
-                        }
-
-                        $value = is_array($previewInputs) ? ($previewInputs[$key] ?? null) : null;
-                        if (!empty($value)) {
-                            $previewData[$key] = $value;
+                            $psImagePath = $file->store('Materials/paper_stocks', 'public');
                         }
                     }
+                    $product->paperStocks()->create([
+                        'material_id' => !empty($ps['material_id']) ? intval($ps['material_id']) : null,
+                        'name' => $ps['name'] ?? null,
+                        'price' => isset($ps['price']) ? floatval($ps['price']) : null,
+                        'image_path' => $psImagePath,
+                    ]);
+                }
+            }
 
-                    $hasPreviewValues = array_filter($previewData, fn ($value) => !empty($value));
+            // Addons
+            $addons = $request->input('addons', []);
+            $addonFiles = $request->file('addons') ?? [];
 
-                    if ($hasPreviewValues || $existingPreview) {
-                        $product->images()->updateOrCreate([], $previewData);
+            // If no addons provided but we have template data, use template data
+            if (empty($addons) && $templateData && isset($templateData['addons'])) {
+                $addons = $templateData['addons'];
+            }
+
+            if ($product) {
+                $product->addons()->delete();
+                foreach ($addons as $i => $ad) {
+                    $adImagePath = null;
+                    if (isset($addonFiles[$i]) && is_array($addonFiles[$i]) && isset($addonFiles[$i]['image_path'])) {
+                        $file = $addonFiles[$i]['image_path'];
+                        if ($file && method_exists($file, 'store')) {
+                            $adImagePath = $file->store('Materials/addons', 'public');
+                        }
                     }
+                    $product->addons()->create([
+                        'addon_type' => $ad['addon_type'] ?? null,
+                        'name' => $ad['name'] ?? null,
+                        'price' => isset($ad['price']) ? floatval($ad['price']) : null,
+                        'image_path' => $adImagePath,
+                    ]);
+                }
+            }
+
+            // Colors
+            $colors = $request->input('colors', []);
+
+            // If no colors provided but we have template data, use template data
+            if (empty($colors) && $templateData && isset($templateData['colors'])) {
+                $colors = $templateData['colors'];
+            }
+
+            if ($product) {
+                $product->colors()->delete();
+                foreach ($colors as $c) {
+                    $product->colors()->create([
+                        'name' => $c['name'] ?? null,
+                        'color_code' => $c['color_code'] ?? null,
+                    ]);
+                }
+            }
+
+            // Bulk Orders
+            $bulkOrders = $request->input('bulk_orders', []);
+
+            // If no bulk orders provided but we have template data, use template data
+            if (empty($bulkOrders) && $templateData && isset($templateData['bulk_orders'])) {
+                $bulkOrders = $templateData['bulk_orders'];
+            }
+
+            if (empty($bulkOrders) && ($validated['productType'] ?? null) === 'Giveaway') {
+                $singleBulk = [
+                    'min_qty' => $request->filled('max_qty') ? intval($request->input('max_qty')) : null,
+                    'max_qty' => $request->filled('max_quantity') ? intval($request->input('max_quantity')) : null,
+                    'price_per_unit' => isset($validated['base_price']) && $request->filled('base_price')
+                        ? floatval($validated['base_price'])
+                        : null,
+                ];
+
+                // Only keep if at least one value is provided
+                if (!is_null($singleBulk['min_qty']) || !is_null($singleBulk['max_qty']) || !is_null($singleBulk['price_per_unit'])) {
+                    $bulkOrders[] = $singleBulk;
+                }
+            }
+
+            if ($product) {
+                $product->bulkOrders()->delete();
+                foreach ($bulkOrders as $b) {
+                    $minQty = isset($b['min_qty']) && $b['min_qty'] !== '' ? intval($b['min_qty']) : null;
+                    $maxQty = isset($b['max_qty']) && $b['max_qty'] !== '' ? intval($b['max_qty']) : null;
+                    $pricePerUnit = isset($b['price_per_unit']) && $b['price_per_unit'] !== '' ? floatval($b['price_per_unit']) : null;
+
+                    if (is_null($minQty) && is_null($maxQty) && is_null($pricePerUnit)) {
+                        continue;
+                    }
+
+                    $product->bulkOrders()->create([
+                        'min_qty' => $minQty,
+                        'max_qty' => $maxQty,
+                        'price_per_unit' => $pricePerUnit,
+                    ]);
+                }
+            }
+
+            // Preview Images (front/back/preview)
+            if ($product) {
+                $existingPreview = $product->images;
+                $previewInputs = $request->input('preview_images', []);
+                $previewFiles = $request->file('preview_images') ?? [];
+                $existingPreviewInputs = $request->input('preview_images_existing', []);
+
+                $previewData = [
+                    'front' => $existingPreview ? $existingPreview->front : null,
+                    'back' => $existingPreview ? $existingPreview->back : null,
+                    'preview' => $existingPreview ? $existingPreview->preview : null,
+                ];
+
+                foreach (['front', 'back', 'preview'] as $key) {
+                    $existingValue = is_array($existingPreviewInputs) ? ($existingPreviewInputs[$key] ?? null) : null;
+                    if ($existingValue && empty($previewData[$key])) {
+                        $previewData[$key] = $existingValue;
+                    }
+                }
+
+                foreach (['front', 'back', 'preview'] as $key) {
+                    $file = is_array($previewFiles) ? ($previewFiles[$key] ?? null) : null;
+                    if ($file && method_exists($file, 'store')) {
+                        $previewData[$key] = $file->store('products/previews', 'public');
+                        continue;
+                    }
+
+                    $value = is_array($previewInputs) ? ($previewInputs[$key] ?? null) : null;
+                    if (!empty($value)) {
+                        $previewData[$key] = $value;
+                    }
+                }
+
+                // If no preview images provided but we have template data, use template images
+                if (empty(array_filter($previewData)) && $template) {
+                    $previewData = [
+                        'front' => $template->front_image,
+                        'back' => $template->back_image,
+                        'preview' => $template->front_image, // Use front image as preview if no specific preview
+                    ];
+                }
+
+                $hasPreviewValues = array_filter($previewData, fn ($value) => !empty($value));
+
+                if ($hasPreviewValues || $existingPreview) {
+                    $product->images()->updateOrCreate([], $previewData);
                 }
             }
         });
@@ -508,7 +581,16 @@ class ProductController extends Controller
     public function destroy($id)
     {
         $product = \App\Models\Product::findOrFail($id);
+        $productName = $product->name;
         $product->delete();
+
+        // Return JSON for AJAX requests
+        if (request()->ajax() || request()->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Product "' . $productName . '" deleted successfully.'
+            ]);
+        }
 
         return redirect()->route('admin.products.index')->with('success', 'Product deleted successfully!');
     }
@@ -524,7 +606,8 @@ class ProductController extends Controller
             'addons',
             'colors',
             'bulkOrders',
-            'materials'
+            'materials',
+            'envelope.material'
         ])->findOrFail($id);
         $this->hydrateLegacyAttributes($product);
         $templates = Template::all();
@@ -549,9 +632,15 @@ class ProductController extends Controller
             'addons',
             'colors',
             'bulkOrders',
-            'materials'
+            'materials',
+            'envelope.material'
         ])->findOrFail($id);
         $this->hydrateLegacyAttributes($product);
+
+        // Load ratings for this product
+        $product->ratings = \App\Models\OrderRating::whereHas('order.items', function($query) use ($id) {
+            $query->where('product_id', $id);
+        })->with('customer')->get();
 
         // If request expects JSON or is AJAX, return the partial HTML for the slide panel
         if (request()->ajax() || request()->wantsJson() || request()->header('X-Requested-With') === 'XMLHttpRequest') {
@@ -573,12 +662,39 @@ class ProductController extends Controller
         $product->setAttribute('bulk_orders', $product->bulkOrders);
         $product->setAttribute('product_bulk_orders', $product->bulkOrders);
         $product->setAttribute('product_uploads', $product->uploads);
+        $product->setAttribute('envelope', $product->envelope);
     }
 
     public function upload(Request $request, $id)
     {
         $product = Product::findOrFail($id);
 
+        // Check if this is a publish request (no file) or actual file upload
+        if (!$request->hasFile('file')) {
+            // This is a publish request - create a ProductUpload record to mark as published
+            $upload = ProductUpload::create([
+                'product_id' => $product->id,
+                'template_id' => $product->template_id,
+                'template_name' => $product->name,
+                'description' => $product->description,
+                'product_type' => $product->product_type,
+                'event_type' => $product->event_type,
+                'theme_style' => $product->theme_style,
+                'front_image' => $product->images ? $product->images->front : null,
+                'back_image' => $product->images ? $product->images->back : null,
+                'preview_image' => $product->images ? $product->images->preview : ($product->image ?: null),
+                'design_data' => null, // Could populate from product data if needed
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Template published to customer pages successfully.',
+                'upload' => $upload,
+                'published' => true
+            ]);
+        }
+
+        // Original file upload logic
         $request->validate([
             'file' => 'required|file|mimes:jpg,jpeg,png,gif,pdf|max:10240', // 10MB max
         ]);
@@ -606,10 +722,16 @@ class ProductController extends Controller
             // Save to database (ProductUpload table for tracking)
             $upload = ProductUpload::create([
                 'product_id' => $product->id,
-                'filename' => $filename,
-                'original_name' => $file->getClientOriginalName(),
-                'mime_type' => $file->getMimeType(),
-                'size' => $file->getSize(),
+                'template_id' => $product->template_id,
+                'template_name' => $product->name,
+                'description' => $product->description,
+                'product_type' => $product->product_type,
+                'event_type' => $product->event_type,
+                'theme_style' => $product->theme_style,
+                'front_image' => $product->images ? $product->images->front : null,
+                'back_image' => $product->images ? $product->images->back : null,
+                'preview_image' => $product->images ? $product->images->preview : ($product->image ?: null),
+                'design_data' => null,
             ]);
 
             return response()->json([
@@ -634,7 +756,8 @@ class ProductController extends Controller
             'addons',
             'colors',
             'bulkOrders',
-            'materials'
+            'materials',
+            'envelope.material'
         ])->where('id', $id)->get();
 
         if ($products->isEmpty()) {

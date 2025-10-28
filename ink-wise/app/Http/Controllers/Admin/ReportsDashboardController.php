@@ -33,8 +33,13 @@ class ReportsDashboardController extends Controller
 
     public function inventory(Request $request)
     {
-        $context = $this->buildReportContext();
-        $context['filters'] = null;
+        [$startDate, $endDate] = $this->resolveDateRange($request);
+
+        $context = $this->buildReportContext($startDate, $endDate);
+        $context['filters'] = [
+            'startDate' => $startDate?->format('Y-m-d'),
+            'endDate' => $endDate?->format('Y-m-d'),
+        ];
 
         return view('admin.reports.inventory', $context);
     }
@@ -42,6 +47,16 @@ class ReportsDashboardController extends Controller
     private function buildReportContext(?Carbon $startDate = null, ?Carbon $endDate = null): array
     {
         $materials = Material::with('inventory')
+            ->with(['stockMovements' => function ($query) use ($startDate, $endDate) {
+                if ($startDate && $endDate) {
+                    $query->whereBetween('created_at', [$startDate, $endDate]);
+                } elseif ($startDate) {
+                    $query->where('created_at', '>=', $startDate);
+                } elseif ($endDate) {
+                    $query->where('created_at', '<=', $endDate);
+                }
+                $query->orderBy('created_at');
+            }])
             ->orderBy('material_name')
             ->get();
 
@@ -55,8 +70,10 @@ class ReportsDashboardController extends Controller
                 'customer:customer_id,first_name,last_name',
                 'customerOrder:id,name',
                 'items:id,order_id,product_name,quantity',
+                'items.paperStockSelection.paperStock.material:material_id,unit_cost',
+                'items.addons.productAddon.material:material_id,unit_cost',
             ])
-            ->where('status', '!=', 'cancelled')
+            ->where('status', 'completed')
             ->latest('order_date');
 
         $salesQuery = $this->applyOrderDateFilter($salesQuery, $startDate, $endDate);
@@ -82,10 +99,30 @@ class ReportsDashboardController extends Controller
                     ->filter()
                     ->values();
 
+                // Calculate material costs
+                $materialCost = 0;
+                foreach ($order->items as $item) {
+                    // Cost from paper stock
+                    if ($item->paperStockSelection && $item->paperStockSelection->paperStock) {
+                        $paperStockCost = ($item->paperStockSelection->paperStock->material->unit_cost ?? 0) * $item->quantity;
+                        $materialCost += $paperStockCost;
+                    }
+
+                    // Cost from addons
+                    foreach ($item->addons as $addon) {
+                        if ($addon->productAddon && $addon->productAddon->material) {
+                            $addonCost = ($addon->productAddon->material->unit_cost ?? 0) * ($addon->quantity ?? 1);
+                            $materialCost += $addonCost;
+                        }
+                    }
+                }
+
                 $order->customer_name = $customerName !== '' ? $customerName : '-';
                 $order->items_list = $itemsList->implode(', ');
                 $order->items_quantity = (int) $order->items->sum('quantity');
                 $order->total_amount_value = (float) $order->total_amount;
+                $order->material_cost_value = $materialCost;
+                $order->profit_value = $order->total_amount_value - $materialCost;
                 $order->order_date_value = $order->order_date ?? $order->created_at;
 
                 return $order;
@@ -93,7 +130,7 @@ class ReportsDashboardController extends Controller
 
         $analyticsQuery = Order::query()
             ->select(['id', 'total_amount', 'order_date', 'created_at'])
-            ->where('status', '!=', 'cancelled')
+            ->where('status', 'completed')
             ->whereRaw("COALESCE(order_date, created_at) >= ?", [
                 Carbon::now()->copy()->subYears(5)->startOfYear(),
             ]);
@@ -183,10 +220,12 @@ class ReportsDashboardController extends Controller
     {
         $lowStock = 0;
         $outStock = 0;
+        $totalValue = 0;
 
         foreach ($materials as $material) {
             $stock = $this->resolveStockLevel($material);
             $reorder = $this->resolveReorderLevel($material);
+            $unitCost = $material->unit_cost ?? 0;
 
             if ($stock <= 0) {
                 $outStock++;
@@ -196,6 +235,9 @@ class ReportsDashboardController extends Controller
             if ($reorder > 0 && $stock <= $reorder) {
                 $lowStock++;
             }
+
+            // Calculate inventory value
+            $totalValue += $stock * $unitCost;
         }
 
         return [
@@ -203,6 +245,7 @@ class ReportsDashboardController extends Controller
             'lowStock' => $lowStock,
             'outStock' => $outStock,
             'totalStock' => $materials->sum(fn (Material $material) => $this->resolveStockLevel($material)),
+            'totalValue' => $totalValue,
         ];
     }
 
@@ -362,11 +405,16 @@ class ReportsDashboardController extends Controller
 
         $orderCount = $filtered->count();
         $revenue = (float) $filtered->sum('total_amount');
+        $materialCost = (float) $filtered->sum('material_cost_value');
+        $profit = $revenue - $materialCost;
 
         return [
             'orders' => $orderCount,
             'revenue' => round($revenue, 2),
+            'materialCost' => round($materialCost, 2),
+            'profit' => round($profit, 2),
             'averageOrder' => $orderCount > 0 ? round($revenue / $orderCount, 2) : 0.0,
+            'profitMargin' => $revenue > 0 ? round(($profit / $revenue) * 100, 1) : 0.0,
         ];
     }
 

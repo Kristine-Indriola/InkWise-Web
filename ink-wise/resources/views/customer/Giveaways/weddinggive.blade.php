@@ -553,7 +553,8 @@
                                 </div>
 
                                 <div class="giveaway-card__actions">
-                                    <a href="{{ route('custome.rprofile.orderform') }}" class="giveaway-card__action">Start order</a>
+                                    <a href="{{ route('customer.profile.orderform') }}" class="giveaway-card__action">Start order</a>
+                                    <a href="{{ route('design.edit', ['product' => $product->id]) }}" class="giveaway-card__action">Edit my design</a>
                                     <button type="button"
                                             class="giveaway-card__action preview-trigger"
                                             data-preview-url="{{ $previewUrl }}">
