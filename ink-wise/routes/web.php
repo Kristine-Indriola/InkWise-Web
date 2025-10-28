@@ -43,6 +43,7 @@ use App\Http\Controllers\Owner\OwnerOrderWorkflowController;
 use App\Http\Controllers\Staff\StaffCustomerController;
 use App\Http\Controllers\Staff\StaffOrderController;
 use App\Http\Controllers\Staff\StaffMaterialController;
+use App\Http\Controllers\Owner\OwnerRatingsController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Owner\OwnerInventoryController;
 use App\Http\Controllers\Staff\StaffInventoryController;
@@ -154,11 +155,17 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
             return redirect()->route('admin.products.create.invitation', ['template_id' => $id]);
         });
         Route::post('{id}/upload-to-product-uploads', [AdminTemplateController::class, 'uploadTemplate'])->name('uploadToProductUploads');
+    // Session preview routes for staff (create -> preview -> save to templates)
+    Route::post('preview', [AdminTemplateController::class, 'preview'])->name('preview');
+    Route::post('preview/{preview}/save', [AdminTemplateController::class, 'savePreview'])->name('preview.save');
+    Route::post('preview/{preview}/remove', [AdminTemplateController::class, 'removePreview'])->name('preview.remove');
     // Custom upload via the templates UI (front/back images)
     Route::post('custom-upload', [AdminTemplateController::class, 'customUpload'])->name('customUpload');
         // Asset search API: images, videos, elements
         Route::get('{id}/assets/search', [AdminTemplateController::class, 'searchAssets'])->name('searchAssets');
         Route::post('{id}/canvas-settings', [AdminTemplateController::class, 'updateCanvasSettings'])->name('updateCanvasSettings');
+        // Add SVG save route
+        Route::post('{id}/save-svg', [AdminTemplateController::class, 'saveSvg'])->name('saveSvg');
     }); 
     // ✅ User Management 
 
@@ -642,7 +649,13 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/products', [OwnerProductsController::class, 'index'])->name('products.index');
     Route::get('/products/{product}', [OwnerProductsController::class, 'show'])->name('products.show');
     Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
-    Route::get('/reports', fn () => view('owner.owner-reports'))->name('reports');
+    Route::get('/ratings', [OwnerRatingsController::class, 'index'])->name('ratings.index');
+
+    Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/', fn () => redirect()->route('owner.reports.sales'))->name('index');
+        Route::get('/sales', fn () => view('owner.reports.sales'))->name('sales');
+        Route::get('/inventory', fn () => view('owner.reports.inventory'))->name('inventory');
+    });
 
     
     
@@ -743,8 +756,29 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
         // Asset search API: images, videos, elements
         Route::get('{id}/assets/search', [AdminTemplateController::class, 'searchAssets'])->name('searchAssets');
         Route::post('{id}/canvas-settings', [AdminTemplateController::class, 'updateCanvasSettings'])->name('updateCanvasSettings');
+        // Add SVG save route
+        Route::post('{id}/save-svg', [AdminTemplateController::class, 'saveSvg'])->name('saveSvg');
+        // Session preview routes for staff (create -> preview -> save to templates)
+        Route::post('preview', [AdminTemplateController::class, 'preview'])->name('preview');
+        Route::post('preview/{preview}/save', [AdminTemplateController::class, 'savePreview'])->name('preview.save');
+        Route::post('preview/{preview}/remove', [AdminTemplateController::class, 'removePreview'])->name('preview.remove');
     }); 
+
+    // Figma Integration Routes
+    Route::prefix('figma')->name('figma.')->group(function () {
+        Route::get('/', [App\Http\Controllers\FigmaController::class, 'index'])->name('index');
+        Route::post('/analyze', [App\Http\Controllers\FigmaController::class, 'analyze'])->name('analyze');
+        Route::post('/import', [App\Http\Controllers\FigmaController::class, 'import'])->name('import');
+        Route::post('/templates/{template}/sync', [App\Http\Controllers\FigmaController::class, 'sync'])->name('sync');
+    });
 });
+    // Figma Integration Routes
+    Route::prefix('figma')->name('figma.')->group(function () {
+        Route::get('/', [App\Http\Controllers\FigmaController::class, 'index'])->name('index');
+        Route::post('/analyze', [App\Http\Controllers\FigmaController::class, 'analyze'])->name('analyze');
+        Route::post('/import', [App\Http\Controllers\FigmaController::class, 'import'])->name('import');
+        Route::post('/templates/{template}/sync', [App\Http\Controllers\FigmaController::class, 'sync'])->name('sync');
+    });
 
 /*
 |--------------------------------------------------------------------------|

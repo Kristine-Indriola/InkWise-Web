@@ -80,6 +80,79 @@
     opacity: 0.6;
     cursor: wait;
   }
+
+  .sidebar .navlist li.has-submenu {
+    position: relative;
+  }
+
+  .sidebar .navlist li.has-submenu .sidebar-btn--dropdown {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .sidebar .navlist li.has-submenu .chevron {
+    transition: transform 0.2s ease;
+    display: inline-flex;
+  }
+
+  .sidebar .navlist li.has-submenu.open .chevron {
+    transform: rotate(90deg);
+  }
+
+  .sidebar .navlist li.has-submenu:hover .chevron,
+  .sidebar .navlist li.has-submenu:focus-within .chevron {
+    transform: rotate(90deg);
+  }
+
+  .sidebar-sublist {
+    list-style: none;
+    margin: 6px 0 0;
+    padding-left: 18px;
+    display: none;
+  }
+
+  .sidebar .navlist li.has-submenu.open .sidebar-sublist {
+    display: block;
+  }
+
+  .sidebar .navlist li.has-submenu:hover .sidebar-sublist,
+  .sidebar .navlist li.has-submenu:focus-within .sidebar-sublist {
+    display: block;
+  }
+
+  .sidebar-sublink {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    text-decoration: none;
+    transition: background 0.18s ease, color 0.18s ease;
+  }
+
+  .sidebar .navlist .sidebar-sublist .sidebar-sublink {
+    color: #ffffff;
+    font-weight: 700;
+  }
+
+  .sidebar .navlist .sidebar-sublist .sidebar-sublink .text {
+    color: inherit;
+    font-weight: inherit;
+  }
+
+  .sidebar .navlist .sidebar-sublist .sidebar-sublink:hover,
+  .sidebar .navlist .sidebar-sublist .sidebar-sublink:focus {
+    background: rgba(210, 236, 229, 0.65);
+    color: #000000;
+  }
+
+  .sidebar .navlist .sidebar-sublist .sidebar-sublink.active {
+    background: rgba(210, 236, 229, 0.95);
+    color: #000000;
+  }
 </style>
 
 <aside class="sidebar" id="sidebar" style="padding-top:32px;">
@@ -171,19 +244,37 @@
         </button>
       </a>
     </li>
-    <li>
-      <a href="{{ route('owner.reports') }}" class="text-decoration-none">
-        <button class="sidebar-btn {{ request()->routeIs('owner.reports') ? 'active' : '' }}">
-          <span class="ico">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M5 19V9" />
-              <path d="M12 19V5" />
-              <path d="M19 19v-7" />
-            </svg>
-          </span>
-          <span class="text">Reports</span>
-        </button>
-      </a>
+    <li class="has-submenu {{ request()->routeIs('owner.reports.*') ? 'open' : '' }}">
+      <button type="button"
+              class="sidebar-btn sidebar-btn--dropdown {{ request()->routeIs('owner.reports.*') ? 'active' : '' }}"
+              data-submenu-toggle="ownerReportsSubmenu"
+              aria-expanded="{{ request()->routeIs('owner.reports.*') ? 'true' : 'false' }}">
+        <span class="ico">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 19V9" />
+            <path d="M12 19V5" />
+            <path d="M19 19v-7" />
+          </svg>
+        </span>
+        <span class="text">Reports</span>
+        <span class="chevron" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m9 18 6-6-6-6" />
+          </svg>
+        </span>
+      </button>
+  <ul id="ownerReportsSubmenu" class="sidebar-sublist">
+        <li>
+          <a href="{{ route('owner.reports.sales') }}" class="sidebar-sublink {{ request()->routeIs('owner.reports.sales') ? 'active' : '' }}">
+            <span class="text">Sales</span>
+          </a>
+        </li>
+        <li>
+          <a href="{{ route('owner.reports.inventory') }}" class="sidebar-sublink {{ request()->routeIs('owner.reports.inventory') ? 'active' : '' }}">
+            <span class="text">Inventory</span>
+          </a>
+        </li>
+      </ul>
     </li>
   </ul>
 </aside>
@@ -235,7 +326,7 @@
         <ul class="notification-dropdown__list">
           @forelse($unreadNotifications as $notification)
             <li class="notification-dropdown__item">
-              <div class="notification-dropdown__message">📩 {{ $notification->data['message'] }}</div>
+              <div class="notification-dropdown__message">📩 {{ $notification->data['message'] ?? 'New notification' }}</div>
               @if(!empty($notification->data['email']))
                 <div class="notification-dropdown__meta">Email: {{ $notification->data['email'] }}</div>
               @endif
@@ -414,6 +505,7 @@
         profileToggle.setAttribute('aria-expanded','false'); 
       });
     }
+
   });
 </script>
 <script>

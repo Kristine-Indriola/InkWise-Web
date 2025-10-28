@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('products', function (Blueprint $table) {
-            //
+        Schema::table('templates', function (Blueprint $table) {
+            $table->string('back_svg_path')->nullable()->after('svg_path');
         });
     }
 
@@ -21,8 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('products', function (Blueprint $table) {
-            //
+        Schema::table('templates', function (Blueprint $table) {
+            $table->dropColumn('back_svg_path');
         });
     }
 };

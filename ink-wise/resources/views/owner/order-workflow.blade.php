@@ -147,12 +147,13 @@
 
   <div class="page-inner owner-dashboard-inner">
       @php
-        $counts = $counts ?? ['total' => 0, 'confirmed' => 0, 'pending' => 0];
+        $counts = $counts ?? ['total' => 0, 'confirmed' => 0, 'pending' => 0, 'cancelled' => 0];
         $orders = $orders ?? [];
         $filters = $filters ?? ['status' => null, 'search' => null, 'limit' => 50];
         $activeStatus = $filters['status'] ?? null;
         $pendingStatuses = ['pending', 'in_production', 'processing', 'to_receive'];
         $confirmedStatuses = ['confirmed', 'completed'];
+        $cancelledStatuses = ['cancelled'];
         $queryBase = [];
         if (!empty($filters['search'])) {
           $queryBase['search'] = $filters['search'];
@@ -188,6 +189,15 @@
           </div>
           <span class="summary-card-value" data-orders-stat="pending">{{ number_format($counts['pending'] ?? 0) }}</span>
           <span class="summary-card-meta">Awaiting action</span>
+        </a>
+
+        <a href="{{ route('owner.order.workflow', array_merge($queryBase, ['status' => 'cancelled'])) }}" class="summary-card{{ in_array($activeStatus, $cancelledStatuses, true) ? ' is-active' : '' }}" data-summary-card="cancelled" data-status-filter="cancelled">
+          <div class="summary-card-header">
+            <div style="display:flex;align-items:center;gap:8px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 21a9 9 0 1 0-9-9 9 9 0 0 0 9 9Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="m9 9 6 6m-6 0 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="summary-card-label">Cancelled</span></div>
+            <span class="summary-card-chip accent">Closed</span>
+          </div>
+          <span class="summary-card-value" data-orders-stat="cancelled">{{ number_format($counts['cancelled'] ?? 0) }}</span>
+          <span class="summary-card-meta">Orders marked cancelled</span>
         </a>
       </section>
       <section class="materials-toolbar" aria-label="Order filters and actions">
@@ -355,6 +365,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (['pending', 'in_production', 'processing', 'to_receive'].includes(normalized)) {
       return 'pending';
+    }
+
+    if (['cancelled'].includes(normalized)) {
+      return 'cancelled';
     }
 
     return normalized;
