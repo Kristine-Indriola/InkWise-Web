@@ -1,88 +1,68 @@
 @extends('layouts.owner.app')
+
 @section('content')
 @include('layouts.owner.sidebar')
 
-<link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
-
-<!-- Page-scoped layout alignment with owner dashboard -->
 <style>
-  .owner-dashboard-shell {
-    padding-right: 0;
-    padding-bottom: 0;
-    padding-left: 0;
-  }
-
-  .owner-dashboard-main {
-    max-width: var(--owner-content-shell-max, 1440px);
-    margin: 0;
-    padding: 0 28px 36px 12px;
-    width: 100%;
-  }
-
-  .owner-dashboard-inner {
-    max-width: var(--owner-content-shell-max, 1390px);
-    margin: 0;
-    width: 100%;
-    padding: 0;
-  }
-
-  .owner-dashboard-main .page-header {
-    margin-bottom: 24px;
-  }
-
-  .page-title {
-    font-size: 1.8rem;
-    font-weight: 800;
-    color: #0f172a;
-    margin: 0 0 6px;
-  }
-
-  .page-subtitle {
-    margin: 0;
-    color: #6b7280;
-    font-size: 0.98rem;
-  }
-
   .summary-grid {
-    margin: 0 0 20px 0;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 18px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    margin-bottom: 28px;
   }
 
   .summary-card {
     position: relative;
-    background: #fff;
-    border-radius: 12px;
-    padding: 18px 22px 24px;
-    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
-    display: block;
-    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 20px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(241, 245, 255, 0.95));
+    border: 1px solid rgba(148, 185, 255, 0.26);
+    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.12);
     color: inherit;
-    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    text-decoration: none;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   }
 
   .summary-card::after {
-    content: "";
+    content: '';
     position: absolute;
-    left: 22px;
-    right: 22px;
-    bottom: 14px;
-    height: 3px;
-    border-radius: 999px;
-    background: linear-gradient(90deg, rgba(148, 185, 255, 0.45), rgba(111, 150, 227, 0.55));
+    inset: 0;
+    background: linear-gradient(120deg, rgba(148, 185, 255, 0.12), rgba(59, 130, 246, 0.08));
+    z-index: 0;
   }
 
-  .summary-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.12);
+  .summary-card > * {
+    position: relative;
+    z-index: 1;
   }
 
   .summary-card-header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .summary-card--link {
+    color: inherit;
+  }
+
+  .summary-card--link:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 26px 50px rgba(15, 23, 42, 0.16);
+  }
+
+  .summary-card--active {
+    border-color: rgba(59, 130, 246, 0.5);
+    box-shadow: 0 22px 44px rgba(59, 130, 246, 0.18);
+  }
+
+  .card-icon {
+    color: #2563eb;
   }
 
   .summary-card-label {
@@ -335,27 +315,130 @@
       $totalTransactions = $transactionRows->count();
     }
 
-    if ($totalAmount <= 0 && $transactionRows->isNotEmpty()) {
-      $totalAmount = $transactionRows->sum(function ($item) {
-        $amount = data_get($item, 'amount');
-        if ($amount === null) {
-          $amount = data_get($item, 'total');
-        }
-        return is_numeric($amount) ? (float) $amount : 0;
-      });
-    }
-
     $normalizedPaidStatuses = ['paid', 'complete', 'completed', 'settled'];
     $normalizedPendingStatuses = ['pending', 'processing', 'unpaid', 'awaiting', 'awaiting payment'];
+    $normalizedFailedStatuses = ['failed', 'cancelled', 'canceled', 'refunded', 'void'];
 
-    $calculatedPaid = $transactionRows->filter(function ($item) use ($normalizedPaidStatuses) {
-      $status = strtolower(trim((string) data_get($item, 'status', '')));
-      return in_array($status, $normalizedPaidStatuses, true);
+    $normalizeStatus = static function ($value) {
+      return \Illuminate\Support\Str::lower(trim((string) $value));
+    };
+
+    $resolveBadgeClass = static function (string $status) use ($normalizedPaidStatuses, $normalizedFailedStatuses) {
+      if (in_array($status, $normalizedPaidStatuses, true)) {
+        return 'stock-ok';
+      }
+      if (in_array($status, $normalizedFailedStatuses, true)) {
+        return 'stock-critical';
+      }
+      return 'stock-low';
+    };
+
+    $transformTransaction = static function ($transaction) use ($normalizeStatus, $resolveBadgeClass) {
+      $transactionId = data_get($transaction, 'transaction_id') ?? data_get($transaction, 'reference') ?? data_get($transaction, 'id') ?? '—';
+      $transactionId = is_string($transactionId) ? trim($transactionId) : (is_numeric($transactionId) ? (string) $transactionId : '—');
+
+      $orderId = data_get($transaction, 'order_id') ?? data_get($transaction, 'order.reference') ?? data_get($transaction, 'order.order_number') ?? data_get($transaction, 'order.id');
+      if (is_array($orderId)) {
+        $orderId = $orderId['order_number'] ?? $orderId['id'] ?? null;
+      }
+      if ($orderId instanceof \DateTimeInterface) {
+        $orderId = $orderId->format('Y-m-d');
+      }
+      if (is_numeric($orderId)) {
+        $orderId = '#' . ltrim((string) $orderId, '#');
+      }
+      $orderId = $orderId ? (string) $orderId : '—';
+
+      $customerName = data_get($transaction, 'customer_name') ?? data_get($transaction, 'customer.name') ?? data_get($transaction, 'customer.full_name');
+      if (!$customerName) {
+        $customerSource = data_get($transaction, 'customer');
+        if (is_array($customerSource)) {
+          $customerName = $customerSource['name'] ?? trim(($customerSource['first_name'] ?? '') . ' ' . ($customerSource['last_name'] ?? ''));
+        } elseif (is_object($customerSource)) {
+          $customerName = $customerSource->name ?? $customerSource->full_name ?? trim(($customerSource->first_name ?? '') . ' ' . ($customerSource->last_name ?? ''));
+          if (!$customerName && method_exists($customerSource, '__toString')) {
+            $customerName = (string) $customerSource;
+          }
+        } elseif (is_string($customerSource)) {
+          $customerName = $customerSource;
+        }
+      }
+      $customerName = $customerName ? trim((string) $customerName) : '—';
+
+      $paymentMethod = data_get($transaction, 'payment_method') ?? data_get($transaction, 'method') ?? data_get($transaction, 'payment.method');
+      if (is_array($paymentMethod)) {
+        $paymentMethod = $paymentMethod['name'] ?? $paymentMethod['label'] ?? null;
+      }
+      $paymentMethod = $paymentMethod ? (string) $paymentMethod : '—';
+
+      $rawDate = data_get($transaction, 'date') ?? data_get($transaction, 'paid_at') ?? data_get($transaction, 'created_at');
+      if ($rawDate instanceof \DateTimeInterface) {
+        $displayDate = $rawDate->format('Y-m-d');
+      } elseif (is_string($rawDate) && strlen($rawDate) >= 10) {
+        $displayDate = substr($rawDate, 0, 10);
+      } else {
+        $displayDate = '—';
+      }
+
+      $amountValue = data_get($transaction, 'amount');
+      if ($amountValue === null) {
+        $amountValue = data_get($transaction, 'total');
+      }
+      if (is_numeric($amountValue)) {
+        $amountNumeric = (float) $amountValue;
+        $amountDisplay = number_format($amountNumeric, 2);
+      } elseif (is_string($amountValue) && trim($amountValue) !== '') {
+        $amountNumeric = null;
+        $amountDisplay = trim($amountValue);
+      } else {
+        $amountNumeric = null;
+        $amountDisplay = '—';
+      }
+
+      $statusRaw = $normalizeStatus(data_get($transaction, 'status', ''));
+      $statusLabel = $statusRaw !== '' ? ucwords(str_replace(['-', '_'], ' ', $statusRaw)) : '—';
+      $statusClass = $statusLabel === '—' ? null : $resolveBadgeClass($statusRaw);
+
+      $searchTargets = array_filter([
+        $transactionId,
+        $orderId,
+        $customerName,
+        $paymentMethod,
+        $displayDate,
+        $amountDisplay,
+        $statusLabel,
+      ]);
+
+      return [
+        'raw' => $transaction,
+        'transaction_id' => $transactionId,
+        'order_id' => $orderId,
+        'customer_name' => $customerName,
+        'payment_method' => $paymentMethod,
+        'display_date' => $displayDate,
+        'amount_display' => $amountDisplay,
+        'amount_numeric' => $amountNumeric,
+        'status_raw' => $statusRaw,
+        'status_label' => $statusLabel,
+        'status_class' => $statusClass,
+        'search_blob' => \Illuminate\Support\Str::lower(implode(' ', $searchTargets)),
+      ];
+    };
+
+    $transformedRows = $transactionRows->map($transformTransaction);
+
+    if ($totalAmount <= 0 && $transformedRows->isNotEmpty()) {
+      $totalAmount = $transformedRows->reduce(function ($carry, $row) {
+        return $carry + ($row['amount_numeric'] ?? 0);
+      }, 0);
+    }
+
+    $calculatedPaid = $transformedRows->filter(function ($row) use ($normalizedPaidStatuses) {
+      return in_array($row['status_raw'], $normalizedPaidStatuses, true);
     })->count();
 
-    $calculatedPending = $transactionRows->filter(function ($item) use ($normalizedPendingStatuses) {
-      $status = strtolower(trim((string) data_get($item, 'status', '')));
-      return in_array($status, $normalizedPendingStatuses, true);
+    $calculatedPending = $transformedRows->filter(function ($row) use ($normalizedPendingStatuses) {
+      return in_array($row['status_raw'], $normalizedPendingStatuses, true);
     })->count();
 
     if ($usingDemoData || $paidCount === 0) {
@@ -365,10 +448,39 @@
     if ($usingDemoData || $pendingCount === 0) {
       $pendingCount = $calculatedPending;
     }
+
+    $requestedStatus = $normalizeStatus(request()->query('status', ''));
+    $activeStatus = $requestedStatus !== '' ? $requestedStatus : 'all';
+
+    $statusGroupMap = [
+      'paid' => $normalizedPaidStatuses,
+      'pending' => $normalizedPendingStatuses,
+      'failed' => $normalizedFailedStatuses,
+    ];
+
+    $filteredRows = $transformedRows;
+
+    if ($activeStatus !== 'all') {
+      $allowedStatuses = $statusGroupMap[$activeStatus] ?? [$activeStatus];
+      $filteredRows = $filteredRows->filter(function ($row) use ($allowedStatuses) {
+        return in_array($row['status_raw'], $allowedStatuses, true);
+      })->values();
+    }
+
+    $searchQuery = trim((string) request()->query('search', ''));
+    $searchQueryLower = \Illuminate\Support\Str::lower($searchQuery);
+
+    if ($searchQueryLower !== '') {
+      $filteredRows = $filteredRows->filter(function ($row) use ($searchQueryLower) {
+        return $row['search_blob'] !== '' && str_contains($row['search_blob'], $searchQueryLower);
+      })->values();
+    }
+
+    $displayRows = $filteredRows;
   @endphp
 
     <section class="summary-grid" aria-label="Transactions summary">
-      <a href="{{ url()->current() }}" class="summary-card" aria-label="Total transactions">
+      <a href="{{ request()->fullUrlWithQuery(['status' => null]) }}" class="summary-card summary-card--link {{ $activeStatus === 'all' ? 'summary-card--active' : '' }}" aria-label="Total transactions">
         <div class="summary-card-header">
           <div style="display:flex;align-items:center;gap:8px;">
             <!-- Icon: list -->
@@ -381,7 +493,7 @@
         <span class="summary-card-meta">Transactions recorded</span>
       </a>
 
-      <a href="{{ url()->current() }}" class="summary-card" aria-label="Total amount">
+      <a href="{{ request()->fullUrlWithQuery(['status' => null]) }}" class="summary-card summary-card--link {{ $activeStatus === 'all' ? 'summary-card--active' : '' }}" aria-label="Total amount">
         <div class="summary-card-header">
           <div style="display:flex;align-items:center;gap:8px;">
             <!-- Icon: peso / money -->
@@ -394,7 +506,7 @@
         <span class="summary-card-meta">Collected / processed</span>
       </a>
 
-      <a href="{{ request()->fullUrlWithQuery(['status' => 'paid']) }}" class="summary-card" aria-label="Paid transactions">
+      <a href="{{ request()->fullUrlWithQuery(['status' => 'paid']) }}" class="summary-card summary-card--link {{ $activeStatus === 'paid' ? 'summary-card--active' : '' }}" aria-label="Paid transactions">
         <div class="summary-card-header">
           <div style="display:flex;align-items:center;gap:8px;">
             <!-- Icon: check circle -->
@@ -407,7 +519,7 @@
         <span class="summary-card-meta">Confirmed payments</span>
       </a>
 
-      <a href="{{ request()->fullUrlWithQuery(['status' => 'pending']) }}" class="summary-card" aria-label="Pending transactions">
+      <a href="{{ request()->fullUrlWithQuery(['status' => 'pending']) }}" class="summary-card summary-card--link {{ $activeStatus === 'pending' ? 'summary-card--active' : '' }}" aria-label="Pending transactions">
         <div class="summary-card-header">
           <div style="display:flex;align-items:center;gap:8px;">
             <!-- Icon: clock -->
@@ -427,22 +539,11 @@
             <span class="search-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="8" stroke="#9aa6c2" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="#9aa6c2" stroke-width="2" stroke-linecap="round"/></svg></span>
             <input class="form-control" type="text" name="search" placeholder="Search by Transaction ID, Order or Customer" value="{{ request('search') }}">
           </div>
+          <input type="hidden" name="status" value="{{ request('status') }}">
           <button type="submit" class="btn btn-secondary">Search</button>
         </form>
       </div>
       <div class="materials-toolbar__actions">
-        <!-- Add Transaction (opens UI flow modal) -->
-        <button type="button" class="btn btn-primary" data-action="open-add-transaction" title="Add Transaction">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span style="margin-left:8px;">Add</span>
-        </button>
-
-        <!-- Import CSV (placeholder) -->
-        <button type="button" class="btn btn-secondary" data-action="open-import-csv" title="Import CSV">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12M8 11l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Import
-        </button>
-
         <!-- Export (placeholder) -->
         <button type="button" class="btn btn-secondary" data-action="export-csv" title="Export CSV">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 10l5-5 5 5M12 5v12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -482,90 +583,19 @@
           </tr>
         </thead>
         <tbody>
-          @forelse($transactionRows as $transaction)
-            @php
-              $transactionId = data_get($transaction, 'transaction_id') ?? data_get($transaction, 'reference') ?? data_get($transaction, 'id') ?? '—';
-              $transactionId = is_string($transactionId) ? trim($transactionId) : (is_numeric($transactionId) ? (string) $transactionId : '—');
-
-              $orderId = data_get($transaction, 'order_id') ?? data_get($transaction, 'order.reference') ?? data_get($transaction, 'order.order_number') ?? data_get($transaction, 'order.id');
-              if (is_array($orderId)) {
-                  $orderId = $orderId['order_number'] ?? $orderId['id'] ?? null;
-              }
-              if ($orderId instanceof \DateTimeInterface) {
-                  $orderId = $orderId->format('Y-m-d');
-              }
-              if (is_numeric($orderId)) {
-                  $orderId = '#' . ltrim((string) $orderId, '#');
-              }
-              $orderId = $orderId ? (string) $orderId : '—';
-
-              $customerName = data_get($transaction, 'customer_name') ?? data_get($transaction, 'customer.name') ?? data_get($transaction, 'customer.full_name');
-              if (!$customerName) {
-                  $customerSource = data_get($transaction, 'customer');
-                  if (is_array($customerSource)) {
-                      $customerName = $customerSource['name'] ?? trim(($customerSource['first_name'] ?? '') . ' ' . ($customerSource['last_name'] ?? ''));
-                  } elseif (is_object($customerSource)) {
-                      $customerName = $customerSource->name ?? $customerSource->full_name ?? trim(($customerSource->first_name ?? '') . ' ' . ($customerSource->last_name ?? ''));
-                      if (!$customerName && method_exists($customerSource, '__toString')) {
-                          $customerName = (string) $customerSource;
-                      }
-                  } elseif (is_string($customerSource)) {
-                      $customerName = $customerSource;
-                  }
-              }
-              $customerName = $customerName ? trim((string) $customerName) : '—';
-
-              $paymentMethod = data_get($transaction, 'payment_method') ?? data_get($transaction, 'method') ?? data_get($transaction, 'payment.method');
-              if (is_array($paymentMethod)) {
-                  $paymentMethod = $paymentMethod['name'] ?? $paymentMethod['label'] ?? null;
-              } elseif (is_object($paymentMethod)) {
-                  $paymentMethod = $paymentMethod->name ?? (method_exists($paymentMethod, '__toString') ? (string) $paymentMethod : null);
-              }
-              $paymentMethod = $paymentMethod ? trim((string) $paymentMethod) : '—';
-
-              $rawDate = data_get($transaction, 'date') ?? data_get($transaction, 'created_at');
-              if ($rawDate instanceof \DateTimeInterface) {
-                  $displayDate = $rawDate->format('Y-m-d');
-              } elseif (is_string($rawDate) && strlen($rawDate) >= 10) {
-                  $displayDate = substr($rawDate, 0, 10);
-              } else {
-                  $displayDate = '—';
-              }
-
-              $amountValue = data_get($transaction, 'amount');
-              if ($amountValue === null) {
-                  $amountValue = data_get($transaction, 'total');
-              }
-              if (is_numeric($amountValue)) {
-                  $amountDisplay = number_format((float) $amountValue, 2);
-              } elseif (is_string($amountValue) && trim($amountValue) !== '') {
-                  $amountDisplay = $amountValue;
-              } else {
-                  $amountDisplay = '—';
-              }
-
-              $statusRaw = strtolower(trim((string) data_get($transaction, 'status', '')));
-              $statusLabel = $statusRaw !== '' ? ucwords(str_replace(['-', '_'], ' ', $statusRaw)) : '—';
-              if (in_array($statusRaw, ['paid', 'complete', 'completed', 'settled'], true)) {
-                  $statusClass = 'stock-ok';
-              } elseif (in_array($statusRaw, ['failed', 'cancelled', 'canceled', 'refunded', 'void'], true)) {
-                  $statusClass = 'stock-critical';
-              } else {
-                  $statusClass = 'stock-low';
-              }
-            @endphp
+          @forelse($displayRows as $transaction)
             <tr>
-              <td class="fw-bold">{{ $transactionId }}</td>
-              <td>{{ $orderId }}</td>
-              <td>{{ $customerName }}</td>
-              <td>{{ $paymentMethod }}</td>
-              <td>{{ $displayDate }}</td>
-              <td>{{ $amountDisplay }}</td>
+              <td class="fw-bold">{{ $transaction['transaction_id'] }}</td>
+              <td>{{ $transaction['order_id'] }}</td>
+              <td>{{ $transaction['customer_name'] }}</td>
+              <td>{{ $transaction['payment_method'] }}</td>
+              <td>{{ $transaction['display_date'] }}</td>
+              <td>{{ $transaction['amount_display'] }}</td>
               <td>
-                @if($statusLabel === '—')
-                  —
+                @if(!empty($transaction['status_label']) && $transaction['status_label'] !== '—')
+                  <span class="badge {{ $transaction['status_class'] ?? 'stock-low' }}">{{ $transaction['status_label'] }}</span>
                 @else
-                  <span class="badge {{ $statusClass }}">{{ $statusLabel }}</span>
+                  —
                 @endif
               </td>
             </tr>

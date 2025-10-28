@@ -488,6 +488,24 @@
       ),
     ),
   ),
+  'figma' => 
+  array (
+    'api_key' => NULL,
+    'base_url' => 'https://api.figma.com/v1',
+    'frame_types' => 
+    array (
+      0 => 'Template',
+      1 => 'Invitation',
+      2 => 'Giveaway',
+      3 => 'Envelope',
+    ),
+    'cache' => 
+    array (
+      'enabled' => true,
+      'ttl' => 3600,
+      'prefix' => 'figma_',
+    ),
+  ),
   'filesystems' => 
   array (
     'default' => 'local',
