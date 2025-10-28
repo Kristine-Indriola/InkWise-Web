@@ -852,48 +852,6 @@
     
     <section class="status-info-grid">
         <article class="status-info-card">
-            <h2 class="status-info-card__title">Customer rating</h2>
-            @if($ratingValue !== null)
-                <div class="rating-summary">
-                    @php $filledStars = (int) floor($ratingValue); @endphp
-                    <div class="rating-summary__stars" aria-label="Customer rated this order {{ $ratingValueDisplay }}/5">
-                        @for($i = 1; $i <= 5; $i++)
-                            <span class="{{ $i <= $filledStars ? 'is-filled' : '' }}">
-                                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                    <path d="M12 3.75l2.35 4.76 5.26.77-3.8 3.7.9 5.22L12 15.97l-4.71 2.43.9-5.22-3.8-3.7 5.26-.77L12 3.75Z" />
-                                </svg>
-                            </span>
-                        @endfor
-                        <strong>{{ $ratingValueDisplay }}/5</strong>
-                    </div>
-                    @if($ratingSubmittedDisplay)
-                        <span class="rating-summary__timestamp">Submitted {{ $ratingSubmittedDisplay }}</span>
-                    @endif
-                    @if($ratingReview !== '')
-                        <p class="rating-summary__comment">{!! nl2br(e($ratingReview)) !!}</p>
-                    @endif
-                    @if(!empty($ratingTags))
-                        <div class="rating-summary__tags">
-                            @foreach($ratingTags as $tag)
-                                <span class="rating-summary__tag">{{ $tag }}</span>
-                            @endforeach
-                        </div>
-                    @endif
-                    @if(!empty($ratingMedia))
-                        <div class="rating-summary__media">
-                            @foreach($ratingMedia as $mediaUrl)
-                                <a href="{{ $mediaUrl }}" target="_blank" rel="noopener noreferrer">
-                                    <img src="{{ $mediaUrl }}" alt="Customer review photo">
-                                </a>
-                            @endforeach
-                        </div>
-                    @endif
-                </div>
-            @else
-                <p class="status-info-card__empty">No customer rating has been submitted yet.</p>
-            @endif
-        </article>
-        <article class="status-info-card">
             <h2 class="status-info-card__title">Order details</h2>
             <dl>
                 <dt>Order number</dt>

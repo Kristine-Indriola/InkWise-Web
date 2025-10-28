@@ -102,6 +102,26 @@ $highlightStaffId = request()->query('highlight');
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 16px 32px rgba(15, 23, 42, 0.08);
   }
 
+  .btn-confirm {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: rgba(34, 197, 94, 0.18);
+    color: #166534;
+    font-weight: 600;
+    border: 1px solid rgba(34, 197, 94, 0.35);
+    transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .btn-confirm:hover {
+    background: rgba(34, 197, 94, 0.28);
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(22, 101, 52, 0.18);
+  }
+
   .staff-table-wrapper .table thead th {
     background: rgba(148, 185, 255, 0.16);
     padding: 14px 20px;
@@ -296,29 +316,22 @@ $highlightStaffId = request()->query('highlight');
                     <td>
                       <div style="display:flex;gap:8px;align-items:center;justify-content:center;">
                         @if(session('warning') && session('pendingStaffId') == $staff->staff_id)
-                          <form action="{{ route('owner.staff.approve', $staff->staff_id) }}" method="POST" style="display:inline;">
+                          <form action="{{ route('owner.staff.approve', $staff->staff_id) }}" method="POST" style="display:inline">
                             @csrf
                             <input type="hidden" name="confirm" value="true">
-                            <button type="submit" class="btn btn-warning" title="Confirm Approve">
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 8v5l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                <button type="submit" class="btn-confirm" title="Confirm">
+                                  <span>Confirm</span>
                             </button>
                           </form>
                           <div class="alert" style="margin-top:8px;">{{ session('warning') }}</div>
                         @else
                           <form action="{{ route('owner.staff.approve', $staff->staff_id) }}" method="POST" style="display:inline" onsubmit="return confirmApproval();">
                             @csrf
-                            <button type="submit" class="btn btn-success" title="Approve">
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <button type="submit" class="btn-confirm" title="Confirm">
+                              <span>Confirm</span>
                             </button>
                           </form>
                         @endif
-
-                        <form action="{{ route('owner.staff.reject', $staff->staff_id) }}" method="POST" style="display:inline" onsubmit="return confirm('Reject this account?');">
-                          @csrf
-                          <button type="submit" class="btn btn-danger" title="Reject">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                          </button>
-                        </form>
                       </div>
                     </td>
                   </tr>
