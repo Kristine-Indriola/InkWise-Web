@@ -23,15 +23,69 @@ class OwnerProductsController extends Controller
             'bulkOrders'
         ]);
 
-        if ($type = $request->query('type')) {
-            $query->whereRaw('LOWER(product_type) = ?', [Str::lower($type)]);
+        if (($type = trim((string) $request->query('type'))) !== '') {
+            $normalizedType = Str::lower($type);
+            $typeVariants = collect([$normalizedType])
+                ->merge(Str::endsWith($normalizedType, 's')
+                    ? [rtrim($normalizedType, 's')]
+                    : [$normalizedType . 's'])
+                ->unique()
+                ->all();
+
+            $query->where(function ($builder) use ($typeVariants) {
+                foreach ($typeVariants as $index => $value) {
+                    $clause = "LOWER(COALESCE(product_type, '')) = ?";
+                    if ($index === 0) {
+                        $builder->whereRaw($clause, [$value]);
+                    } else {
+                        $builder->orWhereRaw($clause, [$value]);
+                    }
+                }
+
+                $builder->orWhereHas('template', function ($relation) use ($typeVariants) {
+                    foreach ($typeVariants as $index => $value) {
+                        $clause = "LOWER(COALESCE(product_type, '')) = ?";
+                        if ($index === 0) {
+                            $relation->whereRaw($clause, [$value]);
+                        } else {
+                            $relation->orWhereRaw($clause, [$value]);
+                        }
+                    }
+                });
+            });
         }
 
-        if ($search = $request->query('search')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%")
-                  ->orWhere('event_type', 'like', "%{$search}%");
+        if (($search = trim((string) $request->query('search'))) !== '') {
+            $keyword = '%' . Str::lower($search) . '%';
+            $numeric = preg_replace('/\D+/', '', $search);
+
+            $query->where(function ($builder) use ($keyword, $numeric) {
+                $builder->whereRaw("LOWER(COALESCE(name, '')) LIKE ?", [$keyword])
+                    ->orWhereRaw("LOWER(COALESCE(description, '')) LIKE ?", [$keyword])
+                    ->orWhereRaw("LOWER(COALESCE(event_type, '')) LIKE ?", [$keyword])
+                    ->orWhereRaw("LOWER(COALESCE(product_type, '')) LIKE ?", [$keyword])
+                    ->orWhereRaw("LOWER(COALESCE(theme_style, '')) LIKE ?", [$keyword]);
+
+                if ($numeric !== '') {
+                    $builder->orWhere('id', (int) $numeric);
+                    $builder->orWhereRaw('LOWER(CAST(id AS CHAR)) LIKE ?', ['%' . $numeric . '%']);
+                }
+
+                $builder->orWhereHas('template', function ($relation) use ($keyword) {
+                    $relation->whereRaw("LOWER(COALESCE(name, '')) LIKE ?", [$keyword])
+                        ->orWhereRaw("LOWER(COALESCE(event_type, '')) LIKE ?", [$keyword])
+                        ->orWhereRaw("LOWER(COALESCE(product_type, '')) LIKE ?", [$keyword])
+                        ->orWhereRaw("LOWER(COALESCE(theme_style, '')) LIKE ?", [$keyword]);
+                });
+
+                $builder->orWhereHas('envelope.material', function ($relation) use ($keyword) {
+                    $relation->whereRaw("LOWER(COALESCE(material_name, '')) LIKE ?", [$keyword]);
+                });
+
+                $builder->orWhereHas('colors', function ($relation) use ($keyword) {
+                    $relation->whereRaw("LOWER(COALESCE(name, '')) LIKE ?", [$keyword])
+                        ->orWhereRaw("LOWER(COALESCE(color_code, '')) LIKE ?", [$keyword]);
+                });
             });
         }
 

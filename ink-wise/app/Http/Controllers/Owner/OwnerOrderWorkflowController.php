@@ -159,16 +159,19 @@ class OwnerOrderWorkflowController extends Controller
 
     protected function buildSummaryCounts(): array
     {
-        $row = Order::query()->selectRaw('
+        $row = Order::query()->selectRaw(<<<SQL
             COUNT(*) as total,
-            SUM(CASE WHEN LOWER(COALESCE(status, \'\')) IN (\'confirmed\', \'completed\') THEN 1 ELSE 0 END) as confirmed,
-            SUM(CASE WHEN LOWER(COALESCE(status, \'\')) IN (\'pending\', \'in_production\', \'processing\', \'to_receive\') THEN 1 ELSE 0 END) as pending
-        ')->first();
+            SUM(CASE WHEN LOWER(COALESCE(status, '')) IN ('confirmed', 'completed') THEN 1 ELSE 0 END) as confirmed,
+            SUM(CASE WHEN LOWER(COALESCE(status, '')) IN ('pending', 'in_production', 'processing', 'to_receive') THEN 1 ELSE 0 END) as pending,
+            SUM(CASE WHEN LOWER(COALESCE(status, '')) = 'cancelled' THEN 1 ELSE 0 END) as cancelled
+SQL
+        )->first();
 
         return [
             'total' => (int) ($row->total ?? 0),
             'confirmed' => (int) ($row->confirmed ?? 0),
             'pending' => (int) ($row->pending ?? 0),
+            'cancelled' => (int) ($row->cancelled ?? 0),
         ];
     }
 

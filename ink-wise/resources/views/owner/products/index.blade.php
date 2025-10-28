@@ -135,28 +135,28 @@
   .search-input {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     background: #fff;
-    border-radius: 10px;
-    padding: 6px 10px;
-    border: 1px solid rgba(148, 185, 255, 0.22);
-    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+    border-radius: 12px;
+    padding: 8px 14px;
+    border: 1px solid rgba(148, 185, 255, 0.26);
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
     transition: box-shadow 0.18s ease, border-color 0.18s ease;
   }
 
   .search-input:focus-within {
     border-color: rgba(59, 130, 246, 0.32);
-    box-shadow: 0 12px 28px rgba(59, 130, 246, 0.08);
+    box-shadow: 0 14px 32px rgba(59, 130, 246, 0.1);
   }
 
   .search-input input.form-control {
     border: 0;
     outline: 0;
-    width: 280px;
-    max-width: 40vw;
-    min-width: 140px;
-    padding: 6px 8px;
-    font-size: 0.95rem;
+    width: 360px;
+    max-width: 48vw;
+    min-width: 180px;
+    padding: 8px 10px;
+    font-size: 1.05rem;
     background: transparent;
   }
 

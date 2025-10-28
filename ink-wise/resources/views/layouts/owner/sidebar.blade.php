@@ -326,7 +326,7 @@
         <ul class="notification-dropdown__list">
           @forelse($unreadNotifications as $notification)
             <li class="notification-dropdown__item">
-              <div class="notification-dropdown__message">📩 {{ $notification->data['message'] }}</div>
+              <div class="notification-dropdown__message">📩 {{ $notification->data['message'] ?? 'New notification' }}</div>
               @if(!empty($notification->data['email']))
                 <div class="notification-dropdown__meta">Email: {{ $notification->data['email'] }}</div>
               @endif

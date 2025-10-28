@@ -43,6 +43,7 @@ use App\Http\Controllers\Owner\OwnerOrderWorkflowController;
 use App\Http\Controllers\Staff\StaffCustomerController;
 use App\Http\Controllers\Staff\StaffOrderController;
 use App\Http\Controllers\Staff\StaffMaterialController;
+use App\Http\Controllers\Owner\OwnerRatingsController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Owner\OwnerInventoryController;
 use App\Http\Controllers\Staff\StaffInventoryController;
@@ -643,6 +644,7 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/products', [OwnerProductsController::class, 'index'])->name('products.index');
     Route::get('/products/{product}', [OwnerProductsController::class, 'show'])->name('products.show');
     Route::get('/transactions/view', fn () => view('owner.transactions-view'))->name('transactions-view');
+    Route::get('/ratings', [OwnerRatingsController::class, 'index'])->name('ratings.index');
 
     Route::prefix('reports')->name('reports.')->group(function () {
         Route::get('/', fn () => redirect()->route('owner.reports.sales'))->name('index');
