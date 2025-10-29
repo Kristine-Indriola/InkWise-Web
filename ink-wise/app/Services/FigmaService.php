@@ -105,11 +105,33 @@ class FigmaService
         $frames = [];
         $frameTypes = config('figma.frame_types');
 
+        Log::debug('Extracting template frames', [
+            'frame_types' => $frameTypes,
+            'has_document' => isset($fileData['document']),
+            'has_children' => isset($fileData['document']['children']),
+            'children_count' => isset($fileData['document']['children']) ? count($fileData['document']['children']) : 0
+        ]);
+
         if (!isset($fileData['document']['children'])) {
+            Log::warning('No document children found in Figma file data');
             return $frames;
         }
 
+        // First try to find frames with strict matching
         $this->traverseNodes($fileData['document']['children'], $frameTypes, $frames);
+
+        // If no frames found with strict matching, try a more lenient approach
+        if (empty($frames)) {
+            Log::debug('No frames found with strict matching, trying lenient approach');
+            $this->traverseNodesLenient($fileData['document']['children'], $frames);
+        }
+
+        Log::debug('Template frames extraction complete', [
+            'found_frames' => count($frames),
+            'frames' => array_map(function($frame) {
+                return ['name' => $frame['name'], 'type' => $frame['type']];
+            }, $frames)
+        ]);
 
         return $frames;
     }
@@ -124,26 +146,127 @@ class FigmaService
     protected function traverseNodes(array $nodes, array $frameTypes, array &$frames): void
     {
         foreach ($nodes as $node) {
+            // Log all nodes for debugging
+            if (isset($node['type']) && isset($node['name'])) {
+                Log::debug('Figma node found', [
+                    'type' => $node['type'], 
+                    'name' => $node['name']
+                ]);
+            }
+
             // Check if this is a frame with matching name
             if (isset($node['type']) && $node['type'] === 'FRAME') {
                 $nodeName = $node['name'] ?? '';
 
+                Log::debug('Checking frame for templates', [
+                    'frame_name' => $nodeName,
+                    'expected_types' => $frameTypes
+                ]);
+
+                $matched = false;
                 foreach ($frameTypes as $type) {
-                    if (stripos($nodeName, $type) !== false) {
+                    $lowerName = strtolower($nodeName);
+                    $lowerType = strtolower($type);
+                    
+                    // Check for exact match, contains match, or starts/ends with match
+                    if ($lowerName === $lowerType || 
+                        strpos($lowerName, $lowerType) !== false ||
+                        strpos($lowerType, $lowerName) !== false) {
+                        
+                        Log::debug('Found matching frame', [
+                            'frame_name' => $nodeName,
+                            'matched_type' => $type,
+                            'lower_name' => $lowerName,
+                            'lower_type' => $lowerType
+                        ]);
+
                         $frames[] = [
                             'id' => $node['id'],
                             'name' => $nodeName,
                             'type' => $this->determineCategory($nodeName),
                             'bounds' => $node['absoluteBoundingBox'] ?? null,
                         ];
+                        $matched = true;
                         break;
                     }
+                }
+                
+                if (!$matched) {
+                    Log::debug('Frame did not match any type', [
+                        'frame_name' => $nodeName,
+                        'frame_types' => $frameTypes
+                    ]);
                 }
             }
 
             // Recursively check children
             if (isset($node['children']) && is_array($node['children'])) {
                 $this->traverseNodes($node['children'], $frameTypes, $frames);
+            }
+        }
+    }
+
+    /**
+     * More lenient traversal for finding any frames that could be templates
+     */
+    protected function traverseNodesLenient(array $nodes, array &$frames): void
+    {
+        foreach ($nodes as $node) {
+            // Check if this is a frame
+            if (isset($node['type']) && $node['type'] === 'FRAME') {
+                $nodeName = $node['name'] ?? '';
+                
+                // Include frames that might be templates based on common patterns
+                $include = false;
+                $lowerName = strtolower($nodeName);
+                
+                // Check for common template keywords
+                $templateKeywords = [
+                    'template', 'invitation', 'giveaway', 'envelope', 
+                    'card', 'design', 'layout', 'front', 'back',
+                    'cover', 'page', 'artboard'
+                ];
+                
+                foreach ($templateKeywords as $keyword) {
+                    if (strpos($lowerName, $keyword) !== false) {
+                        $include = true;
+                        break;
+                    }
+                }
+                
+                // Also include frames with dimensions that look like templates
+                if (!$include && isset($node['absoluteBoundingBox'])) {
+                    $width = $node['absoluteBoundingBox']['width'] ?? 0;
+                    $height = $node['absoluteBoundingBox']['height'] ?? 0;
+                    
+                    // Common template sizes (rough ranges)
+                    if (($width >= 200 && $width <= 2000) && ($height >= 200 && $height <= 2000)) {
+                        $include = true;
+                        Log::debug('Including frame based on size', [
+                            'name' => $nodeName,
+                            'width' => $width,
+                            'height' => $height
+                        ]);
+                    }
+                }
+
+                if ($include) {
+                    Log::debug('Including frame with lenient matching', [
+                        'frame_name' => $nodeName
+                    ]);
+
+                    $frames[] = [
+                        'id' => $node['id'],
+                        'name' => $nodeName,
+                        'type' => $this->determineCategory($nodeName),
+                        'bounds' => $node['absoluteBoundingBox'] ?? null,
+                    ];
+                }
+            }
+
+            // Recursively check children
+            if (isset($node['children']) && is_array($node['children'])) {
+                $this->traverseNodesLenient($node['children'], $frames);
             }
         }
     }

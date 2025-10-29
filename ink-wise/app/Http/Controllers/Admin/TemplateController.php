@@ -271,11 +271,29 @@ class TemplateController extends Controller
             'description' => 'nullable|string',
         ];
 
+        // Make file uploads conditional based on whether imported paths are provided
+        $hasImportedFront = $request->has('imported_front_path') && $request->input('imported_front_path');
+        $hasImportedBack = $request->has('imported_back_path') && $request->input('imported_back_path');
+        
         if ($type === 'invitation') {
-            $rules['front_image'] = 'required|file|mimes:jpeg,png,jpg,gif,svg|max:5120';
-            $rules['back_image'] = 'required|file|mimes:jpeg,png,jpg,gif,svg|max:5120';
+            if (!$hasImportedFront) {
+                $rules['front_image'] = 'required|file|mimes:jpeg,png,jpg,gif,svg|max:5120';
+            }
+            if (!$hasImportedBack) {
+                $rules['back_image'] = 'required|file|mimes:jpeg,png,jpg,gif,svg|max:5120';
+            }
         } else {
-            $rules['front_image'] = 'required|file|mimes:svg,svg+xml,image/svg+xml,svgz|max:5120';
+            if (!$hasImportedFront) {
+                $rules['front_image'] = 'required|file|mimes:svg,svg+xml,image/svg+xml,svgz|max:5120';
+            }
+        }
+        
+        // Add validation for imported paths if they exist
+        if ($hasImportedFront) {
+            $rules['imported_front_path'] = 'required|string';
+        }
+        if ($hasImportedBack) {
+            $rules['imported_back_path'] = 'required|string';
         }
 
         $validated = $request->validate($rules);
@@ -312,10 +330,17 @@ class TemplateController extends Controller
         // Save uploaded files into a previews folder on the public disk
         $frontPath = null;
         $backPath = null;
-        if ($request->hasFile('front_image')) {
+        
+        // Check for imported SVG paths first
+        if ($request->has('imported_front_path') && $request->input('imported_front_path')) {
+            $frontPath = $request->input('imported_front_path');
+        } elseif ($request->hasFile('front_image')) {
             $frontPath = $request->file('front_image')->store('templates/previews', 'public');
         }
-        if ($request->hasFile('back_image')) {
+        
+        if ($request->has('imported_back_path') && $request->input('imported_back_path')) {
+            $backPath = $request->input('imported_back_path');
+        } elseif ($request->hasFile('back_image')) {
             $backPath = $request->file('back_image')->store('templates/previews', 'public');
         }
 
