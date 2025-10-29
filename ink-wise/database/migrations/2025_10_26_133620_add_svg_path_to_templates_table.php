@@ -12,12 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('templates', function (Blueprint $table) {
-
-            $table->string('svg_path')->nullable()->after('metadata');
-
-            $table->string('svg_path')->nullable()->after('preview');
-            $table->timestamp('processed_at')->nullable()->after('svg_path');
-
+            if (!Schema::hasColumn('templates', 'svg_path')) {
+                $table->string('svg_path')->nullable()->after('preview');
+            }
+            if (!Schema::hasColumn('templates', 'processed_at')) {
+                $table->timestamp('processed_at')->nullable()->after('svg_path');
+            }
         });
     }
 
@@ -27,11 +27,12 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('templates', function (Blueprint $table) {
-
-            $table->dropColumn('svg_path');
-
-            $table->dropColumn(['svg_path', 'processed_at']);
-
+            if (Schema::hasColumn('templates', 'svg_path')) {
+                $table->dropColumn('svg_path');
+            }
+            if (Schema::hasColumn('templates', 'processed_at')) {
+                $table->dropColumn('processed_at');
+            }
         });
     }
 };

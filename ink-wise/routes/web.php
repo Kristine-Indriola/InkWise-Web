@@ -549,7 +549,7 @@ Route::get('/product/preview/{product}', function (Product $product) {
         'addons',
         'colors',
         'bulkOrders',
-        'materials'
+        'materials.material'
     ]);
 
     return view('customer.Invitations.productpreview', compact('product'));

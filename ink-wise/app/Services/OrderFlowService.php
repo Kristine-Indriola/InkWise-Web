@@ -2443,4 +2443,194 @@ class OrderFlowService
             ],
         ];
     }
+
+    public function checkStockFromSummary(array $summary): array
+    {
+        $product = $this->resolveProduct(null, $summary['productId'] ?? null);
+        $quantity = max(1, (int) ($summary['quantity'] ?? 1));
+
+        $shortages = [];
+        $materialCache = [];
+        $materialNameCache = [];
+
+        $resolveMaterialByName = function (?string $name) use (&$materialNameCache) {
+            if (!$name) {
+                return null;
+            }
+
+            $key = Str::lower(trim($name));
+            if ($key === '') {
+                return null;
+            }
+
+            if (!array_key_exists($key, $materialNameCache)) {
+                $material = Material::query()
+                    ->with('inventory')
+                    ->whereRaw('LOWER(material_name) = ?', [$key])
+                    ->first();
+
+                $materialNameCache[$key] = $material ?: false;
+            }
+
+            $cached = $materialNameCache[$key];
+
+            return $cached instanceof Material ? $cached : null;
+        };
+
+        $checkMaterial = function (Material $material, float $requiredQty) use (&$shortages) {
+            $currentStock = $material->inventory?->stock_level ?? $material->stock_qty ?? 0;
+            if ($currentStock < $requiredQty) {
+                $shortages[] = [
+                    'material_name' => $material->material_name,
+                    'required' => $requiredQty,
+                    'available' => $currentStock,
+                    'shortage' => $requiredQty - $currentStock,
+                ];
+            }
+        };
+
+        // Check product materials
+        if ($product) {
+            $productMaterials = ProductMaterial::query()
+                ->with(['material.inventory'])
+                ->where('product_id', $product->id)
+                ->whereNull('order_id')
+                ->get();
+
+            foreach ($productMaterials as $productMaterial) {
+                $perUnitQty = (float) ($productMaterial->qty ?? 0);
+                if ($perUnitQty <= 0) {
+                    continue;
+                }
+
+                $linkedMaterial = $productMaterial->material;
+
+                if (!$linkedMaterial && $productMaterial->material_id) {
+                    $linkedMaterial = $materialCache[$productMaterial->material_id] ??=
+                        Material::query()->with('inventory')->find($productMaterial->material_id);
+                }
+
+                if (!$linkedMaterial && $productMaterial->item) {
+                    $linkedMaterial = $resolveMaterialByName($productMaterial->item);
+                }
+
+                if (!$linkedMaterial) {
+                    continue;
+                }
+
+                $requiredQty = match ($productMaterial->quantity_mode) {
+                    'per_order' => $perUnitQty,
+                    default => $perUnitQty * $quantity,
+                };
+
+                if ($requiredQty > 0) {
+                    $checkMaterial($linkedMaterial, $requiredQty);
+                }
+            }
+
+            // Check paper stock if selected
+            $paperStockId = $summary['paperStockId'] ?? null;
+            if ($paperStockId) {
+                $paperStock = ProductPaperStock::query()
+                    ->with(['material.inventory'])
+                    ->find($paperStockId);
+
+                if ($paperStock && $paperStock->material) {
+                    $checkMaterial($paperStock->material, $quantity); // Assuming 1 per unit
+                }
+            }
+
+            // Check addons
+            $addonIds = $summary['addonIds'] ?? [];
+            if (!empty($addonIds)) {
+                $addons = ProductAddon::query()
+                    ->with(['material.inventory'])
+                    ->whereIn('id', $addonIds)
+                    ->get();
+
+                foreach ($addons as $addon) {
+                    $material = $addon->material;
+                    if (!$material && $addon->material_id) {
+                        $material = $materialCache[$addon->material_id] ??=
+                            Material::query()->with('inventory')->find($addon->material_id);
+                    }
+
+                    if (!$material) {
+                        $material = $resolveMaterialByName($addon->name);
+                    }
+
+                    if ($material) {
+                        $addonQuantity = 1; // Assuming 1 per addon, can be adjusted
+                        $checkMaterial($material, $addonQuantity);
+                    }
+                }
+            }
+        }
+
+        // Check envelope if present
+        if (!empty($summary['envelope'])) {
+            $envelopeData = $summary['envelope'];
+            $envelopeProductId = $envelopeData['product_id'] ?? $envelopeData['id'] ?? null;
+            if ($envelopeProductId) {
+                $envelope = ProductEnvelope::query()
+                    ->with(['material.inventory'])
+                    ->where('product_id', $envelopeProductId)
+                    ->first();
+
+                $material = $envelope?->material;
+                if (!$material && $envelope?->material_id) {
+                    $material = $materialCache[$envelope->material_id] ??=
+                        Material::query()->with('inventory')->find($envelope->material_id);
+                }
+
+                if (!$material) {
+                    $candidateNames = array_filter([
+                        $envelope?->envelope_material_name,
+                        $envelopeData['material'] ?? null,
+                    ], fn ($value) => is_string($value) && trim($value) !== '');
+
+                    foreach ($candidateNames as $candidateName) {
+                        $material = $resolveMaterialByName($candidateName);
+                        if ($material) {
+                            break;
+                        }
+                    }
+                }
+
+                if ($material) {
+                    $envelopeQty = (int) ($envelopeData['qty'] ?? $envelopeData['quantity'] ?? 0);
+                    $checkMaterial($material, $envelopeQty);
+                }
+            }
+        }
+
+        // Check giveaway if present
+        if (!empty($summary['giveaway'])) {
+            $giveawayData = $summary['giveaway'];
+            $giveawayProductId = $giveawayData['product_id'] ?? $giveawayData['id'] ?? null;
+            if ($giveawayProductId) {
+                $giveawayProduct = Product::find($giveawayProductId);
+                if ($giveawayProduct) {
+                    $giveawayQty = (int) ($giveawayData['qty'] ?? $giveawayData['quantity'] ?? 0);
+
+                    // Use fallback logic for giveaway
+                    $fallbackNames = array_filter([
+                        $giveawayProduct->name,
+                        $giveawayData['name'] ?? null,
+                        $giveawayData['material'] ?? null,
+                    ], fn ($name) => is_string($name) && trim($name) !== '');
+
+                    foreach ($fallbackNames as $candidateName) {
+                        $material = $resolveMaterialByName($candidateName);
+                        if ($material) {
+                            $checkMaterial($material, $giveawayQty);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        return $shortages;
+    }
 }

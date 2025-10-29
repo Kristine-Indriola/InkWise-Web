@@ -286,6 +286,50 @@
             font-weight: 500;
         }
 
+        .invitation-card__review {
+            margin: 0.5rem 0;
+            padding: 0.5rem;
+            background: rgba(166, 183, 255, 0.05);
+            border-radius: 8px;
+            border-left: 3px solid var(--invite-accent);
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+
+        .invitation-card__review-text {
+            font-size: 0.85rem;
+            color: #374151;
+            font-style: italic;
+            line-height: 1.4;
+            margin: 0;
+            flex: 1;
+        }
+
+        .invitation-card__materials {
+            margin: 0.5rem 0;
+            padding: 0.5rem;
+            background: rgba(166, 183, 255, 0.05);
+            border-radius: 8px;
+            border-left: 3px solid var(--invite-accent);
+        }
+
+        .invitation-card__materials-text {
+            font-size: 0.85rem;
+            color: #374151;
+            line-height: 1.4;
+            margin: 0;
+        }
+
+        .invitation-card__low-stock {
+            font-size: 0.8rem;
+            color: #dc2626;
+            font-weight: 600;
+            margin: 0.25rem 0;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
         /* Rating Modal Styles */
         .rating-modal-overlay {
             position: fixed;
@@ -666,7 +710,7 @@
                                 ${rating.photos && rating.photos.length > 0 ? `
                                     <div class="rating-modal-item-photos">
                                         ${rating.photos.map(photo => {
-                                            const photoUrl = photo.startsWith('http') ? photo : `/storage/${photo}`;
+                                            const photoUrl = photo.startsWith('http') ? photo : '/storage/' + photo;
                                             return `<img src="${photoUrl}" alt="Rating photo" class="rating-modal-item-photo" onclick="window.open('${photoUrl}', '_blank')">`;
                                         }).join('')}
                                     </div>
@@ -772,8 +816,14 @@
                         $ratings = $product->ratings ?? collect();
                         $averageRating = $ratings->avg('rating');
                         $ratingCount = $ratings->count();
+
+                        $materials = $product->materials ?? collect();
+
+                        $hasLowStockMaterials = $materials->some(function($material) {
+                            return ($material->stock_quantity ?? 100) < 10;
+                        });
                     @endphp
-                    <article class="invitation-card" role="listitem" data-product-id="{{ $product->id }}">
+                    <article class="invitation-card" role="listitem" data-product-id="{{ $product->id }}" data-has-low-stock="{{ $hasLowStockMaterials ? 'true' : 'false' }}">
                         <div class="invitation-card__preview">
                             <button type="button"
                                     class="favorite-toggle"
@@ -801,6 +851,14 @@
                             @else
                                 <p class="invitation-card__muted">Pricing available on request</p>
                             @endif
+                            @if($materials->count() > 0)
+                                <div class="invitation-card__materials">
+                                    <p class="invitation-card__materials-text">Materials: {{ $materials->pluck('name')->join(', ') }}</p>
+                                </div>
+                            @endif
+                            @if($hasLowStockMaterials)
+                                <p class="invitation-card__low-stock">Low stock - limited availability</p>
+                            @endif
                             @if($ratingCount > 0)
                                 <div class="invitation-card__rating rating-trigger"
                                      data-product-id="{{ $product->id }}"
@@ -814,6 +872,34 @@
                                         @endfor
                                     </div>
                                     <span class="invitation-card__rating-text">{{ number_format($averageRating, 1) }} ({{ $ratingCount }})</span>
+                                </div>
+                                @php $latestReview = $product->ratings->sortByDesc('submitted_at')->first(); @endphp
+                                @if($latestReview && $latestReview->review)
+                                    <div class="invitation-card__review">
+                                        @if($latestReview->photos && count($latestReview->photos) > 0)
+                                            <div class="flex flex-wrap gap-1 mr-2">
+                                                @foreach(array_slice($latestReview->photos, 0, 3) as $photo)
+                                                    @php
+                                                        $photoUrl = str_starts_with($photo, 'http') ? $photo : \Illuminate\Support\Facades\Storage::disk('public')->url($photo);
+                                                    @endphp
+                                                    <img src="{{ $photoUrl }}" alt="Rating photo" class="w-8 h-8 object-cover rounded border border-gray-200">
+                                                @endforeach
+                                                @if(count($latestReview->photos) > 3)
+                                                    <div class="w-8 h-8 bg-gray-100 rounded border border-gray-200 flex items-center justify-center text-xs text-gray-500">+{{ count($latestReview->photos) - 3 }}</div>
+                                                @endif
+                                            </div>
+                                        @endif
+                                        <p class="invitation-card__review-text">"{{ Str::limit($latestReview->review, 80) }}" - {{ $latestReview->customer->name ?? 'Customer' }}</p>
+                                    </div>
+                                @endif
+                            @else
+                                <div class="invitation-card__rating">
+                                    <div class="invitation-card__stars">
+                                        @for($i = 1; $i <= 5; $i++)
+                                            <span class="invitation-card__star">★</span>
+                                        @endfor
+                                    </div>
+                                    <span class="invitation-card__rating-text">No reviews yet</span>
                                 </div>
                             @endif
                             <div class="invitation-card__actions">

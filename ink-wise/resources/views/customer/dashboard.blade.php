@@ -1114,6 +1114,29 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     })();
+
+    // Show login modal if password was just reset or login requested
+    @if(session('status') && str_contains(session('status'), 'Password reset successfully'))
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var loginModal = document.getElementById('loginModal');
+            if (loginModal) {
+                loginModal.classList.remove('hidden');
+                loginModal.classList.add('flex');
+            }
+        });
+    </script>
+    @elseif(request('show_login'))
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var loginModal = document.getElementById('loginModal');
+            if (loginModal) {
+                loginModal.classList.remove('hidden');
+                loginModal.classList.add('flex');
+            }
+        });
+    </script>
+    @endif
 </script>
 
 </body>
