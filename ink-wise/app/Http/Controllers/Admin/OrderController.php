@@ -89,6 +89,49 @@ class OrderController extends Controller
             ->with('success', 'Order status updated successfully.');
     }
 
+    public function editPayment(Order $order)
+    {
+        $order->loadMissing(['payments', 'rating']);
+
+        $paymentStatusOptions = $this->paymentStatusOptions();
+        $metadata = $this->normalizeMetadata($order->metadata);
+
+        return view('admin.orders.manage-payment', [
+            'order' => $order,
+            'paymentStatusOptions' => $paymentStatusOptions,
+            'metadata' => $metadata,
+        ]);
+    }
+
+    public function updatePayment(Request $request, Order $order)
+    {
+        $allowedPaymentStatuses = array_keys($this->paymentStatusOptions());
+
+        $validated = $request->validate([
+            'payment_status' => ['required', Rule::in($allowedPaymentStatuses)],
+            'payment_note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $oldPaymentStatus = $order->payment_status;
+        $order->payment_status = $validated['payment_status'];
+
+        $metadata = $this->normalizeMetadata($order->metadata);
+
+        if (array_key_exists('payment_note', $validated)) {
+            $metadata['payment_note'] = $validated['payment_note'] ?: null;
+        }
+
+        $order->metadata = array_filter($metadata, function ($value) {
+            return $value !== null && $value !== '';
+        });
+
+        $order->save();
+
+        return redirect()
+            ->route('admin.orders.payment.edit', $order)
+            ->with('success', 'Payment status updated successfully.');
+    }
+
     /**
      * Remove the specified order from storage.
      */
@@ -111,6 +154,16 @@ class OrderController extends Controller
             'to_receive' => 'To Receive',
             'completed' => 'Completed',
             'cancelled' => 'Cancelled',
+        ];
+    }
+
+    protected function paymentStatusOptions(): array
+    {
+        return [
+            'pending' => 'Pending',
+            'paid' => 'Paid',
+            'failed' => 'Failed',
+            'refunded' => 'Refunded',
         ];
     }
 

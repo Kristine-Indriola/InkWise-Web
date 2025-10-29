@@ -833,6 +833,9 @@ body.dark-mode .btn-warning {
       <li class="{{ (request()->routeIs('admin.ordersummary.*') || request()->routeIs('admin.orders.index')) ? 'active' : '' }}">
         <a href="{{ route('admin.orders.index') }}"><i class="fi fi-rr-list-check"></i> <span class="label">Order Summaries</span></a>
       </li>
+      <li class="{{ request()->routeIs('admin.payments.*') ? 'active' : '' }}">
+        <a href="{{ route('admin.payments.index') }}"><i class="fi fi-rr-credit-card"></i> <span class="label">Payment Transactions</span></a>
+      </li>
       {{--<li class="{{ request()->routeIs('admin.messages.*') ? 'active' : '' }}">
         <a href="{{ route('admin.messages.index') }}"><i class="fi fi-rr-comment-dots"></i> <span class="label">Messages</span></a>
       </li> --}}

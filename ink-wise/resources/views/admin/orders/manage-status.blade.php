@@ -801,8 +801,8 @@
                             @switch($statusKey)
                                 @case('pending')
                                     Order received and awaiting confirmation.
-                                    @break
-                                @case('processing')
+                                    @break 
+                                @case('processing') 
                                     Team is preparing assets before full production starts.
                                     @break
                                 @case('in_production')

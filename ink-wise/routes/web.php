@@ -7,10 +7,10 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AddressController;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\MessageController;
-//use App\Http\Controllers\OwnerLoginController;
-//use App\Http\Controllers\Auth\AdminLoginController;
-//use App\Http\Controllers\StaffAuthController;
-//use App\Http\Controllers\Staff\StaffLoginController;
+//use App.Http\Controllers\OwnerLoginController;
+//use App.Http\Controllers\Auth\AdminLoginController;
+//use App.Http\Controllers\StaffAuthController;
+//use App.Http\Controllers\Staff\StaffLoginController;
 
 use App\Http\Controllers\StaffAssignedController;
 
@@ -128,9 +128,16 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         ->name('orders.status.edit');
     Route::put('/orders/{order}/status', [\App\Http\Controllers\Admin\OrderController::class, 'updateStatus'])
         ->name('orders.status.update');
+    Route::get('/orders/{order}/payment', [\App\Http\Controllers\Admin\OrderController::class, 'editPayment'])
+        ->name('orders.payment.edit');
+    Route::put('/orders/{order}/payment', [\App\Http\Controllers\Admin\OrderController::class, 'updatePayment'])
+        ->name('orders.payment.update');
     Route::delete('/orders/{order}', [\App\Http\Controllers\Admin\OrderController::class, 'destroy'])
         ->name('orders.destroy');
 
+    // Payments
+    Route::get('/payments', [\App\Http\Controllers\Admin\PaymentController::class, 'index'])
+        ->name('payments.index');
 
 
     // Templates 
@@ -576,7 +583,7 @@ Route::get('/api/envelopes', [OrderFlowController::class, 'envelopeOptions'])->n
 Route::get('/api/envelopes', [ProductController::class, 'getEnvelopes'])->name('api.envelopes');
 Route::get('/api/giveaways', [OrderFlowController::class, 'giveawayOptions'])->name('api.giveaways');
 // Temporary debug endpoint: lists resolved giveaway images (thumbnail + gallery)
-Route::get('/debug/giveaways-images', [\App\Http\Controllers\Customer\OrderFlowController::class, 'debugGiveawayImages'])->name('debug.giveaways.images');
+Route::get('/debug/giveaways-images', [OrderFlowController::class, 'debugGiveawayImages'])->name('debug.giveaways.images');
 Route::get('/order/birthday', fn () => view('customer.templates.birthday'))->name('order.birthday');
 
 Route::get('/checkout', [OrderFlowController::class, 'checkout'])->name('customer.checkout');
@@ -690,6 +697,8 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
     Route::get('/orders/{id}/summary', [StaffOrderController::class, 'summary'])->name('orders.summary');
     Route::get('/orders/{id}/status', [StaffOrderController::class, 'editStatus'])->name('orders.status.edit');
     Route::put('/orders/{id}/status', [StaffOrderController::class, 'updateStatus'])->name('orders.status.update');
+    Route::get('/orders/{id}/payment', [StaffOrderController::class, 'editPayment'])->name('orders.payment.edit');
+    Route::put('/orders/{id}/payment', [StaffOrderController::class, 'updatePayment'])->name('orders.payment.update');
     Route::get('/notify-customers', fn () => view('staff.notify_customers'))->name('notify.customers');
     Route::get('/profile/edit', [StaffProfileController::class, 'edit'])->name('profile.edit');
     Route::post('/profile/update', [StaffProfileController::class, 'update'])->name('profile.update');
@@ -771,10 +780,10 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
 
     // Figma Integration Routes
     Route::prefix('figma')->name('figma.')->group(function () {
-        Route::get('/', [App\Http\Controllers\FigmaController::class, 'index'])->name('index');
-        Route::post('/analyze', [App\Http\Controllers\FigmaController::class, 'analyze'])->name('analyze');
-        Route::post('/import', [App\Http\Controllers\FigmaController::class, 'import'])->name('import');
-        Route::post('/templates/{template}/sync', [App\Http\Controllers\FigmaController::class, 'sync'])->name('sync');
+        Route::get('/', [\App\Http\Controllers\FigmaController::class, 'index'])->name('index');
+        Route::post('/analyze', [\App\Http\Controllers\FigmaController::class, 'analyze'])->name('analyze');
+        Route::post('/import', [\App\Http\Controllers\FigmaController::class, 'import'])->name('import');
+        Route::post('/templates/{template}/sync', [\App\Http\Controllers\FigmaController::class, 'sync'])->name('sync');
     });
 });
 
