@@ -121,7 +121,7 @@
                 </div>
                 <span class="staff-quick-link__cta" aria-hidden="true"><i class="fi fi-rr-arrow-right"></i></span>
             </a>
-            <a href="{{ route('staff.inventory.index') }}" class="staff-quick-link" data-link-card>
+            <a href="{{ route('staff.materials.index') }}" class="staff-quick-link" data-link-card>
                 <span class="staff-quick-link__icon" aria-hidden="true"><i class="fi fi-rr-warehouse"></i></span>
                 <div class="staff-quick-link__copy">
                     <h3>Inventory Tracker</h3>
