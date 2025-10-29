@@ -258,7 +258,7 @@
                 resultsDiv.innerHTML = `
                     <div class="alert alert-warning">
                         <h6>No frames found</h6>
-                        <p>This Figma file doesn't contain any frames. Please ensure your Figma file has at least one frame.</p>
+                        <p>This Figma file doesn't contain any frames, components, or design elements. Please ensure your Figma file has at least one design element.</p>
                     </div>
                 `;
                 return;
@@ -669,7 +669,7 @@
             <p class="create-subtitle">Fill in the details to craft a new {{ $templateType }} template</p>
         </div>
 
-    <form action="{{ $editPreviewId ? route('staff.templates.store') : route('staff.templates.preview') }}" method="POST" class="create-form" enctype="multipart/form-data">
+    <form action="{{ route('staff.templates.store') }}" method="POST" class="create-form" enctype="multipart/form-data">
             @csrf
 
             <input type="hidden" name="design" id="design" value="{{ $previewData['design'] ?? '{}' }}">
@@ -744,23 +744,11 @@
                         <label for="front_image">Front Design (SVG)</label>
                         <input type="file" id="front_image" name="front_image" accept=".svg,.svg+xml,image/svg+xml" class="form-control">
                         <small class="form-text text-muted">Upload SVG file for the front design (optional)</small>
-                        <div class="preview-box mt-2" aria-live="polite">
-                            <div class="preview-label">Front SVG Preview</div>
-                            <div id="front-preview" class="svg-preview" style="width:100%;aspect-ratio:1/1;border:1px solid #d1d5db;padding:12px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:auto">
-                                <span class="muted">Upload SVG or import from Figma to see preview</span>
-                            </div>
-                        </div>
                     </div>
                     <div class="create-group flex-1">
                         <label for="back_image">Back Design (SVG)</label>
                         <input type="file" id="back_image" name="back_image" accept=".svg,.svg+xml,image/svg+xml" class="form-control">
                         <small class="form-text text-muted">Upload SVG file for the back design (optional)</small>
-                        <div class="preview-box mt-2" aria-live="polite">
-                            <div class="preview-label">Back SVG Preview</div>
-                            <div id="back-preview" class="svg-preview" style="width:100%;aspect-ratio:1/1;border:1px solid #d1d5db;padding:12px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:auto">
-                                <span class="muted">Upload SVG or import from Figma to see preview</span>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -800,23 +788,21 @@
                 </div>
             </div>
 
-            <!-- Preview Section (populated by Figma import) -->
-            <div id="manual-upload-section" style="display: block;">
-                <div class="create-row">
-                    <div class="create-group flex-1">
-                        <div class="preview-box" aria-live="polite">
-                            <div class="preview-label">Front SVG Preview</div>
-                            <div id="front-preview" class="svg-preview" style="width:100%;aspect-ratio:1/1;border:1px solid #d1d5db;padding:12px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:auto">
-                                <span class="muted">Import from Figma to see preview</span>
-                            </div>
+            <!-- Preview Section (always visible) -->
+            <div class="create-row">
+                <div class="create-group flex-1">
+                    <div class="preview-box" aria-live="polite">
+                        <div class="preview-label">Front SVG Preview</div>
+                        <div id="front-preview" class="svg-preview" style="width:100%;aspect-ratio:1/1;border:1px solid #d1d5db;padding:12px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:auto">
+                            <span class="muted">Upload SVG or import from Figma to see preview</span>
                         </div>
                     </div>
-                    <div class="create-group flex-1">
-                        <div class="preview-box" aria-live="polite">
-                            <div class="preview-label">Back SVG Preview</div>
-                            <div id="back-preview" class="svg-preview" style="width:100%;aspect-ratio:1/1;border:1px solid #d1d5db;padding:12px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:auto">
-                                <span class="muted">Import from Figma to see preview</span>
-                            </div>
+                </div>
+                <div class="create-group flex-1">
+                    <div class="preview-box" aria-live="polite">
+                        <div class="preview-label">Back SVG Preview</div>
+                        <div id="back-preview" class="svg-preview" style="width:100%;aspect-ratio:1/1;border:1px solid #d1d5db;padding:12px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:auto">
+                            <span class="muted">Upload SVG or import from Figma to see preview</span>
                         </div>
                     </div>
                 </div>

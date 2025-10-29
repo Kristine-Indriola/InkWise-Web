@@ -104,7 +104,7 @@ class FigmaService
     {
         $frames = [];
 
-        Log::debug('Extracting ALL frames from Figma file', [
+        Log::debug('Extracting ALL frame-like elements from Figma file', [
             'has_document' => isset($fileData['document']),
             'has_children' => isset($fileData['document']['children']),
             'children_count' => isset($fileData['document']['children']) ? count($fileData['document']['children']) : 0
@@ -115,21 +115,26 @@ class FigmaService
             return $frames;
         }
 
-        // Extract ALL frames from the Figma file - no filtering
+        // Extract ALL frame-like elements from the Figma file - no filtering
         $this->traverseAllFrames($fileData['document']['children'], $frames);
 
         Log::debug('Frame extraction complete', [
             'found_frames' => count($frames),
             'frames' => array_map(function($frame) {
-                return ['name' => $frame['name'], 'type' => $frame['type']];
-            }, $frames)
+                return [
+                    'name' => $frame['name'],
+                    'type' => $frame['type'],
+                    'id' => $frame['id']
+                ];
+            }, $frames),
+            'frame_types_found' => array_unique(array_column($frames, 'type'))
         ]);
 
         return $frames;
     }
 
-    /**
-     * Recursively traverse nodes to find ALL frames (no filtering)
+        /**
+     * Recursively traverse nodes to find ALL frame-like elements
      *
      * @param array $nodes
      * @param array &$frames
@@ -137,27 +142,35 @@ class FigmaService
     protected function traverseAllFrames(array $nodes, array &$frames): void
     {
         foreach ($nodes as $node) {
-            // Check if this is a frame - include ALL frames regardless of name or type
-            if (isset($node['type']) && $node['type'] === 'FRAME') {
-                $nodeName = $node['name'] ?? '';
-                $nodeId = $node['id'] ?? '';
+            $nodeType = $node['type'] ?? '';
+            $nodeName = $node['name'] ?? '';
+            $hasBounds = isset($node['absoluteBoundingBox']);
+            $hasChildren = isset($node['children']) && is_array($node['children']);
 
-                Log::debug('Found frame', [
-                    'frame_name' => $nodeName,
-                    'frame_id' => $nodeId,
-                    'frame_type' => $node['type'] ?? 'unknown'
+            // Collect any positioned element that could be a design element
+            // Include FRAME, COMPONENT, COMPONENT_SET, INSTANCE, and any element with bounds
+            $isDesignElement = in_array($nodeType, ['FRAME', 'COMPONENT', 'COMPONENT_SET', 'INSTANCE'])
+                || ($hasBounds && !in_array($nodeType, ['DOCUMENT', 'CANVAS', 'GROUP']));
+
+            if ($isDesignElement && !empty($nodeName)) {
+                Log::debug('Found design element', [
+                    'element_name' => $nodeName,
+                    'element_id' => $node['id'] ?? '',
+                    'element_type' => $nodeType,
+                    'has_bounds' => $hasBounds,
+                    'has_children' => $hasChildren
                 ]);
 
                 $frames[] = [
-                    'id' => $nodeId,
+                    'id' => $node['id'] ?? '',
                     'name' => $nodeName,
-                    'type' => $this->determineCategory($nodeName), // Keep category determination for compatibility
+                    'type' => $this->determineCategory($nodeName),
                     'bounds' => $node['absoluteBoundingBox'] ?? null,
                 ];
             }
 
-            // Recursively check children
-            if (isset($node['children']) && is_array($node['children'])) {
+            // Always traverse into children to find nested elements
+            if ($hasChildren) {
                 $this->traverseAllFrames($node['children'], $frames);
             }
         }

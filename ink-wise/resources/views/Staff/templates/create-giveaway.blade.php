@@ -30,6 +30,8 @@
         .create-container{max-width:1400px;margin:0 auto;padding:20px}
         /* Make the preview area scale inside the square */
         .svg-preview svg{width:100%;height:100%;object-fit:contain}
+        /* Make giveaway preview smaller */
+        .giveaway-preview{max-height:300px;aspect-ratio:4/3}
     </style>
 @endpush
 
@@ -217,7 +219,7 @@
                 resultsDiv.innerHTML = `
                     <div class="alert alert-warning">
                         <h6>No frames found</h6>
-                        <p>This Figma file doesn't contain any frames. Please ensure your Figma file has at least one frame.</p>
+                        <p>This Figma file doesn't contain any frames, components, or design elements. Please ensure your Figma file has at least one design element.</p>
                     </div>
                 `;
                 return;
@@ -408,7 +410,7 @@
             <p class="create-subtitle">Upload a single SVG to create a giveaway template</p>
         </div>
 
-    <form action="{{ $editPreviewId ? route('staff.templates.store') : route('staff.templates.preview') }}" method="POST" class="create-form" enctype="multipart/form-data">
+    <form action="{{ route('staff.templates.store') }}" method="POST" class="create-form" enctype="multipart/form-data">
             @csrf
 
             <input type="hidden" name="design" id="design" value="{}">
@@ -486,7 +488,7 @@
                         <small class="form-text text-muted">Upload SVG file for the giveaway design (required)</small>
                         <div class="preview-box mt-2" aria-live="polite">
                             <div class="preview-label">SVG Preview</div>
-                            <div id="svg-preview-side" class="svg-preview" style="width:100%;aspect-ratio:1/1;border:1px solid #d1d5db;padding:12px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:auto">
+                            <div id="svg-preview-side" class="svg-preview giveaway-preview" style="width:100%;border:1px solid #d1d5db;padding:12px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:auto">
                                 <span class="muted">Upload SVG or import from Figma to see preview</span>
                             </div>
                         </div>
