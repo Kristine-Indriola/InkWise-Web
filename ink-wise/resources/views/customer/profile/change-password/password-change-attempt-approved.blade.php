@@ -33,7 +33,7 @@
 
             <!-- Success Message -->
             <p class="text-gray-600 mb-6 leading-relaxed">
-                Your email verification has been completed successfully. You will be redirected to the password change form shortly.
+                Your email verification has been completed successfully. You will be redirected to your profile page shortly.
             </p>
 
             <!-- Progress Indicator -->
@@ -46,7 +46,7 @@
 
             <!-- Manual Redirect Link -->
             <p class="text-sm text-gray-500">
-                Not redirecting? <a href="{{ route('customerprofile.password-change-confirm') }}" class="text-orange-500 hover:text-orange-600 font-medium">Click here</a>
+                Not redirecting? <a href="{{ route('customerprofile.index') }}" class="text-orange-500 hover:text-orange-600 font-medium">Click here</a>
             </p>
         </div>
     </div>
@@ -69,8 +69,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (countdown <= 0) {
             clearInterval(timer);
-            // Redirect to password change confirm page
-            window.location.href = '{{ route("customerprofile.password-change-confirm") }}';
+            // Redirect to customer profile page
+            window.location.href = '{{ route("customerprofile.index") }}';
         }
     }, 1000);
 });
