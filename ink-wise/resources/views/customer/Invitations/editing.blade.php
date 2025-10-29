@@ -534,7 +534,8 @@
         </div>
 
         <!-- MIDDLE CANVAS -->
-        <div class="canvas-area">
+        <div class="canvas-column">
+            <div class="canvas-area">
             <!-- Canvas Layers Panel -->
             <div class="canvas-layers-panel" id="layersPanel">
                 <div class="layers-header">
@@ -721,6 +722,7 @@
                 <div class="bleed-line">Bleed</div>
                 <div id="cardFront" class="card active" data-card="front" data-default-image="{{ $frontPreview }}" role="img" aria-label="Front design preview">
                     @if(!empty($frontSvg))
+                        {{-- Render the provided SVG from Figma (kept visible so editor/parser can read it) --}}
                         {!! $frontSvg !!}
                     @else
                         <svg viewBox="0 0 500 700" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-labelledby="frontTitle" data-svg-editor>
@@ -731,18 +733,18 @@
                                     <stop offset="100%" stop-color="#dde4ff"/>
                                 </linearGradient>
                             </defs>
-                <rect x="0" y="0" width="500" height="700" fill="url(#frontGradient)" rx="24" data-background-layer="true"/>
-                <image data-editable-image="front"
-                    x="0"
-                    y="0"
-                    width="500"
-                    height="700"
-                    preserveAspectRatio="xMidYMid slice"
-                    href="{{ $frontPreview }}"
-                    xlink:href="{{ $frontPreview }}"
-                    data-default-src="{{ $frontPreview }}"
-                    @if(empty($frontPreview)) style="display:none;" @endif
-                />
+                            <rect x="0" y="0" width="500" height="700" fill="url(#frontGradient)" rx="24" data-background-layer="true"/>
+                            <image data-editable-image="front"
+                                x="0"
+                                y="0"
+                                width="500"
+                                height="700"
+                                preserveAspectRatio="xMidYMid slice"
+                                href="{{ $frontPreview }}"
+                                xlink:href="{{ $frontPreview }}"
+                                data-default-src="{{ $frontPreview }}"
+                                @if(empty($frontPreview)) style="display:none;" @endif
+                            />
                             <text data-text-node="front-date"
                                   x="250"
                                   y="126"
@@ -782,48 +784,49 @@
                         letter-spacing="0.1"
                         fill="#4b5563"></text>
                         </svg>
-                        <!-- Fabric canvas overlay for editable SVG (front) -->
-                        <canvas id="fabricFront" width="500" height="700" style="display:block; width:500px; height:700px;"></canvas>
                     @endif
+                    <!-- Always include the Fabric canvas overlay so imported SVGs become editable -->
+                    <canvas id="fabricFront" width="500" height="700" style="display:block; width:500px; height:700px;"></canvas>
                 </div>
                 @if($hasBackDesign)
                     <div id="cardBack" class="card" data-card="back" data-default-image="{{ $backPreview }}" role="img" aria-label="Back design preview">
                         @if(!empty($backSvg))
+                            {{-- Render provided back SVG from Figma --}}
                             {!! $backSvg !!}
                         @else
                             <svg viewBox="0 0 500 700" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-labelledby="backTitle" data-svg-editor>
                                 <title id="backTitle">Editable back invitation preview</title>
                                 <rect x="0" y="0" width="500" height="700" fill="#fdfcfa" rx="24" data-background-layer="true"/>
-                <image data-editable-image="back"
-                                   x="0"
-                                   y="0"
-                                   width="500"
-                                   height="700"
-                                   preserveAspectRatio="xMidYMid slice"
-                    href="{{ $backPreview }}"
-                    xlink:href="{{ $backPreview }}"
-                                   data-default-src="{{ $backPreview }}"
-                                   @if(empty($backPreview)) style="display:none;" @endif
-                            />
-                            <text data-text-node="back-heading"
-                                  x="250"
-                                  y="180"
-                                  text-anchor="middle"
-                                  dominant-baseline="middle"
-                        font-size="26"
-                        fill="#1f2933"></text>
-                            <text data-text-node="back-body"
-                                  x="250"
-                                  y="300"
-                                  text-anchor="middle"
-                                  dominant-baseline="middle"
-                                  font-size="16"
-                                                                    letter-spacing="0.05"
-                                              fill="#4b5563"></text>
-                        </svg>
-                        <!-- Fabric canvas overlay for editable SVG (back) -->
+                                <image data-editable-image="back"
+                                           x="0"
+                                           y="0"
+                                           width="500"
+                                           height="700"
+                                           preserveAspectRatio="xMidYMid slice"
+                                    href="{{ $backPreview }}"
+                                    xlink:href="{{ $backPreview }}"
+                                           data-default-src="{{ $backPreview }}"
+                                           @if(empty($backPreview)) style="display:none;" @endif
+                                />
+                                <text data-text-node="back-heading"
+                                      x="250"
+                                      y="180"
+                                      text-anchor="middle"
+                                      dominant-baseline="middle"
+                            font-size="26"
+                            fill="#1f2933"></text>
+                                <text data-text-node="back-body"
+                                      x="250"
+                                      y="300"
+                                      text-anchor="middle"
+                                      dominant-baseline="middle"
+                                      font-size="16"
+                                                                        letter-spacing="0.05"
+                                                  fill="#4b5563"></text>
+                            </svg>
+                        @endif
+                        <!-- Always include the Fabric canvas overlay for back too -->
                         <canvas id="fabricBack" width="500" height="700" style="display:block; width:500px; height:700px;"></canvas>
-                    @endif
                 </div>
                 @endif
             </div>
@@ -833,14 +836,13 @@
                 <button id="zoomIn" type="button">+</button>
                 <button id="zoomFit" type="button" title="Zoom to fit">Fit</button>
             </div>
-        </div>
-
-        <!-- Canvas Status Bar -->
-        <div class="canvas-status-bar">
-            <span id="statusZoom">Zoom: 100%</span>
-            <span id="statusSelection">Selected: None</span>
-            <span id="statusDimensions">Canvas: 500x700px</span>
-        </div>
+            <!-- Canvas Status Bar (placed below the canvas area) -->
+            <div class="canvas-status-bar">
+                <span id="statusZoom">Zoom: 100%</span>
+                <span id="statusSelection">Selected: None</span>
+                <span id="statusDimensions">Canvas: 500x700px (rectangle)</span>
+            </div>
+        </div> <!-- .canvas-column -->
 
         <!-- RIGHT PANEL (Front/Back toggle + text fields) -->
         <div class="right-panel">
@@ -2951,6 +2953,22 @@
                 if (showBackBtn) showBackBtn.addEventListener('click', function(){ showView('back'); });
                 // start showing front
                 showView(window.currentView);
+
+                // Ensure initial UI status (zoom, selection, dimensions) is visible and accurate
+                setTimeout(function(){
+                    try {
+                        updateZoomDisplay(1);
+                        var activeCanvas = canvases[window.currentView] || canvases.front || null;
+                        updateSelectionDisplay(activeCanvas);
+                        var statusDimensionsEl = document.getElementById('statusDimensions');
+                        if (statusDimensionsEl && activeCanvas) {
+                            var activeCardId = window.currentView === 'front' ? 'cardFront' : 'cardBack';
+                            var activeSvg = document.querySelector('#' + activeCardId + ' svg');
+                            var activeShape = activeSvg ? detectSvgShape(activeSvg) : 'rectangle';
+                            statusDimensionsEl.textContent = 'Canvas: ' + Math.round(activeCanvas.width) + 'x' + Math.round(activeCanvas.height) + 'px (' + activeShape + ')';
+                        }
+                    } catch (e) { console.warn('Initial UI status init failed', e); }
+                }, 80);
 
                 // Zoom controls
                 var zoomLevelEl = document.getElementById('zoomLevel');

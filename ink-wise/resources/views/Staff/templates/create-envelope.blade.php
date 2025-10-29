@@ -119,13 +119,31 @@
                 }
                 
                 const importMethod = document.querySelector('input[name="import_method"]:checked')?.value || 'manual';
+                const importMethodHidden = document.getElementById('import_method_hidden')?.value || 'manual';
                 
-                if (importMethod === 'manual') {
-                    if (!frontImageField || !frontImageField.files || frontImageField.files.length === 0) {
+                // Use the hidden field value if it indicates Figma import
+                const effectiveImportMethod = importMethodHidden === 'figma' ? 'figma' : importMethod;
+                
+                // Check if Figma data exists (regardless of current import method selection)
+                const figmaUrlHidden = document.getElementById('figma_url_hidden');
+                const figmaFileKeyHidden = document.getElementById('figma_file_key_hidden');
+                const frontSvgContent = document.getElementById('front_svg_content_hidden');
+                const hasFigmaData = figmaUrlHidden && figmaUrlHidden.value && figmaFileKeyHidden && figmaFileKeyHidden.value && frontSvgContent && frontSvgContent.value;
+                
+                if (hasFigmaData) {
+                    // This was a Figma import - validate that all Figma data is present
+                    if (!figmaUrlHidden.value || !figmaFileKeyHidden.value || !frontSvgContent.value) {
                         e.preventDefault();
-                        alert('Please select an SVG file.');
+                        alert('Figma import data is incomplete. Please import the design again.');
                         return false;
                     }
+                } else if (effectiveImportMethod === 'manual') {
+                    // Manual upload - no file validation required for envelopes
+                } else if (effectiveImportMethod === 'figma') {
+                    // Figma mode selected but no data imported yet
+                    e.preventDefault();
+                    alert('Please import a design from Figma before creating the template.');
+                    return false;
                 }
                 
                 // Set design data for envelope
@@ -193,7 +211,7 @@
                 resultsDiv.innerHTML = `
                     <div class="alert alert-warning">
                         <h6>No frames found</h6>
-                        <p>Make sure your Figma file contains frames with names that include:</p>
+                        <p>Make sure your Figma file contains frames, components, or other design elements with names that include:</p>
                         <ul>
                             <li><strong>Template</strong>, <strong>Invitation</strong>, <strong>Giveaway</strong>, or <strong>Envelope</strong></li>
                             <li>Common keywords like: <em>card, design, layout, front, back, cover</em></li>
@@ -272,6 +290,8 @@
                     
                     // Switch back to manual upload mode to show the preview
                     toggleImportMethod('manual');
+                    // Update radio button selection
+                    document.getElementById('import_manual').checked = true;
                     
                     // Update form data
                     updateFormWithFigmaData(preview, figmaAnalyzedData);
@@ -312,37 +332,16 @@
                 nameField.value = preview.name;
             }
             
-            // Store Figma data in hidden fields
-            let figmaUrlField = document.getElementById('figma_url_hidden');
-            if (!figmaUrlField) {
-                figmaUrlField = document.createElement('input');
-                figmaUrlField.type = 'hidden';
-                figmaUrlField.id = 'figma_url_hidden';
-                figmaUrlField.name = 'figma_url';
-                document.querySelector('form').appendChild(figmaUrlField);
-            }
-            figmaUrlField.value = document.getElementById('figma_url').value;
+            // Update hidden fields with Figma data
+            const figmaUrlField = document.getElementById('figma_url_hidden');
+            const figmaFileKeyField = document.getElementById('figma_file_key_hidden');
+            const frontSvgField = document.getElementById('front_svg_content_hidden');
+            const importMethodField = document.getElementById('import_method_hidden');
             
-            let figmaFileKeyField = document.getElementById('figma_file_key_hidden');
-            if (!figmaFileKeyField) {
-                figmaFileKeyField = document.createElement('input');
-                figmaFileKeyField.type = 'hidden';
-                figmaFileKeyField.id = 'figma_file_key_hidden';
-                figmaFileKeyField.name = 'figma_file_key';
-                document.querySelector('form').appendChild(figmaFileKeyField);
-            }
-            figmaFileKeyField.value = figmaData.file_key;
-            
-            // Store SVG content in hidden field
-            let frontSvgField = document.getElementById('front_svg_content');
-            if (!frontSvgField) {
-                frontSvgField = document.createElement('input');
-                frontSvgField.type = 'hidden';
-                frontSvgField.id = 'front_svg_content';
-                frontSvgField.name = 'front_svg_content';
-                document.querySelector('form').appendChild(frontSvgField);
-            }
-            frontSvgField.value = preview.front_svg || '';
+            if (figmaUrlField) figmaUrlField.value = document.getElementById('figma_url').value;
+            if (figmaFileKeyField) figmaFileKeyField.value = figmaData.file_key;
+            if (frontSvgField) frontSvgField.value = preview.front_svg || '';
+            if (importMethodField) importMethodField.value = 'figma';
         }
 
         // Toggle between manual upload and Figma import
@@ -355,16 +354,30 @@
             if (method === 'figma') {
                 manualUpload.style.display = 'none';
                 figmaImport.style.display = 'block';
-                // Set figma_url as required and remove required from file inputs
-                if (figmaUrlField) figmaUrlField.required = true;
-                if (frontImageField) frontImageField.required = false;
+                // Don't set figma_url as required since data will be stored in hidden fields after import
+                if (figmaUrlField) figmaUrlField.required = false;
+                // No file validation required for envelopes
             } else {
                 manualUpload.style.display = 'block';
                 figmaImport.style.display = 'none';
-                // Set file inputs as required and remove required from figma_url
+                // Remove required from figma_url
                 if (figmaUrlField) figmaUrlField.required = false;
-                if (frontImageField) frontImageField.required = true;
+                // Clear Figma data when switching to manual
+                clearFigmaData();
+                // No file validation required for envelopes
             }
+        }
+
+        function clearFigmaData() {
+            const figmaUrlField = document.getElementById('figma_url_hidden');
+            const figmaFileKeyField = document.getElementById('figma_file_key_hidden');
+            const frontSvgField = document.getElementById('front_svg_content_hidden');
+            const importMethodField = document.getElementById('import_method_hidden');
+            
+            if (figmaUrlField) figmaUrlField.value = '';
+            if (figmaFileKeyField) figmaFileKeyField.value = '';
+            if (frontSvgField) frontSvgField.value = '';
+            if (importMethodField) importMethodField.value = 'manual';
         }
     </script>
 @endpush
@@ -377,13 +390,19 @@
             <p class="create-subtitle">Upload a single SVG to create an envelope template</p>
         </div>
 
-    <form action="{{ route('staff.templates.preview') }}" method="POST" class="create-form" enctype="multipart/form-data">
+    <form action="{{ route('staff.templates.store') }}" method="POST" class="create-form" enctype="multipart/form-data">
             @csrf
 
             <input type="hidden" name="design" id="design" value="{}">
             @if($editPreviewId)
                 <input type="hidden" name="edit_preview_id" value="{{ $editPreviewId }}">
             @endif
+
+            <!-- Hidden fields for Figma import data -->
+            <input type="hidden" name="figma_url" id="figma_url_hidden">
+            <input type="hidden" name="figma_file_key" id="figma_file_key_hidden">
+            <input type="hidden" name="front_svg_content" id="front_svg_content_hidden">
+            <input type="hidden" name="import_method" id="import_method_hidden" value="manual">
 
             <div class="create-row">
                 <div class="create-group flex-1">
@@ -445,8 +464,8 @@
             <div id="manual-upload-section">
                 <div class="create-row">
                     <div class="create-group flex-1">
-                        <label for="front_image">Front SVG *</label>
-                        <input type="file" id="front_image" name="front_image" accept="image/svg+xml" required>
+                        <label for="front_image">Front SVG</label>
+                        <input type="file" id="front_image" name="front_image" accept="image/svg+xml">
                     </div>
                     <div class="create-group flex-1">
                         <!-- SVG Preview -->

@@ -82,7 +82,7 @@ class FigmaController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'No frames found in the Figma file. Please ensure your Figma file contains at least one frame.',
+                'message' => 'No frames found in the Figma file. Please ensure your Figma file contains at least one frame, component, or design element.',
             ], 404);
         }
 
