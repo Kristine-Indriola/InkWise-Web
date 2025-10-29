@@ -14,6 +14,10 @@ class StaffOrderController extends Controller
 {
     public function index(Request $request)
     {
+
+    // Return empty collection so the staff order list shows "No orders found"
+    $orders = collect([]);
+
         $statusFilter = $request->query('status');
 
         $ordersQuery = Order::query()
@@ -147,6 +151,7 @@ class StaffOrderController extends Controller
             'tracking_number' => ['nullable', 'string', 'max:255'],
             'internal_note' => ['nullable', 'string', 'max:1000'],
         ]);
+
 
         $order->status = $validated['status'];
 

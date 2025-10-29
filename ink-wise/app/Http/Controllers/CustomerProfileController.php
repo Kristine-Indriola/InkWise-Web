@@ -289,6 +289,13 @@ class CustomerProfileController extends Controller
             $order->update(['metadata' => $metadata]);
         });
 
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Thank you for your rating!',
+            ]);
+        }
+
         return redirect()->back()->with('status', 'Thank you for your rating!');
     }
 }

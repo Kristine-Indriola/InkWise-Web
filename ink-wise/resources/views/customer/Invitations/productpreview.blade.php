@@ -67,6 +67,17 @@
   $paperStocksRaw = $product->paper_stocks ?? $product->paperStocks ?? collect();
   $colors = $product->product_colors ?? $product->colors ?? collect();
   $stockAvailability = $product->stock_availability ?? optional($templateRef)->stock_availability;
+  if ($product->materials && $product->materials->count()) {
+    $allMaterialsAvailable = true;
+    foreach ($product->materials as $pm) {
+      $material = $pm->material;
+      if ($material && ($material->stock ?? 0) < $pm->quantity) {
+        $allMaterialsAvailable = false;
+        break;
+      }
+    }
+    $stockAvailability = $allMaterialsAvailable ? 'In Stock' : 'Out of Stock';
+  }
   $dateAvailable = $product->date_available ?? optional($templateRef)->date_available;
   $formattedAvailability = null;
   if ($dateAvailable) {

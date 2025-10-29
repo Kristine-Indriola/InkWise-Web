@@ -37,6 +37,12 @@
                 <p class="text-sm text-red-500 mt-1">{{ $message }}</p>
                 @enderror
             </div>
+
+            <!-- Forgot Password -->
+            <div class="text-right">
+                <a href="{{ route('customer.password.request') }}" class="text-sm text-indigo-600 hover:underline">Forgot Password?</a>
+            </div>
+
             <!-- Remember Me -->
             <div class="flex items-center">
                 <input type="checkbox" id="remember" name="remember" class="rounded border-gray-300 text-indigo-600">
@@ -45,7 +51,7 @@
 
             <!-- Submit -->
             <button type="submit"
-                    class="w-full bg-gradient-to-r from-indigo-600 to-blue-500 hover:from-indigo-700 hover:to-blue-600 text-white font-medium py-2 px-4 rounded-lg shadow-md transition">
+                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50">
                 Sign In
             </button>
         </form> 

@@ -372,12 +372,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const fileKey = (file) => `${file.name}-${file.size}-${file.lastModified}`;
 
-        const syncInput = () => {
-            if (uploadInput) {
-                uploadInput.files = fileBuffer.files;
-            }
-        };
-
         const removeBufferedFile = (key) => {
             for (let i = 0; i < fileBuffer.items.length; i++) {
                 const bufferedFile = fileBuffer.items[i].getAsFile();
@@ -386,7 +380,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     break;
                 }
             }
-            syncInput();
+            // Update input files after removal
+            const dt = new DataTransfer();
+            Array.from(fileBuffer.files).forEach(file => dt.items.add(file));
+            uploadInput.files = dt.files;
         };
 
         const addPreview = (file) => {
@@ -455,8 +452,50 @@ document.addEventListener("DOMContentLoaded", () => {
                 showToast();
             }
 
-            syncInput();
-            e.target.value = ""; // reset input to allow re-selection
+            // Create a new DataTransfer with current files for proper form submission
+            const dt = new DataTransfer();
+            Array.from(fileBuffer.files).forEach(file => dt.items.add(file));
+            uploadInput.files = dt.files;
+        });
+
+        // Handle form submission with proper file handling
+        form.addEventListener("submit", (e) => {
+            e.preventDefault();
+
+            // Create FormData with all form data
+            const formData = new FormData(form);
+
+            // Clear photos from FormData and add them properly
+            formData.delete('photos[]');
+            Array.from(fileBuffer.files).forEach(file => {
+                formData.append('photos[]', file);
+            });
+
+            // Submit via fetch
+            fetch(form.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'Accept': 'application/json',
+                },
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    return response.json().then(data => {
+                        throw new Error(data.message || 'Validation error');
+                    });
+                }
+            })
+            .then(data => {
+                window.location.reload();
+            })
+            .catch(error => {
+                console.error('Submission error:', error);
+                alert('Error submitting rating: ' + error.message);
+            });
         });
     });
 });

@@ -295,6 +295,59 @@
 		}
 	</style>
 	<style>
+		.rating-display {
+			padding: 20px;
+			background: #f9fafb;
+			border-radius: 8px;
+			margin-top: 20px;
+		}
+
+		.rating-display .stars {
+			display: flex;
+			gap: 4px;
+			margin-bottom: 12px;
+		}
+
+		.rating-display .star {
+			font-size: 24px;
+			color: #ddd;
+		}
+
+		.rating-display .star.filled {
+			color: #f59e0b;
+		}
+
+		.rating-display .review-text {
+			margin: 12px 0;
+			font-size: 14px;
+			color: #374151;
+			line-height: 1.5;
+		}
+
+		.rating-display .rating-photos-section {
+			margin-top: 16px;
+		}
+
+		.rating-display .rating-photos {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 8px;
+		}
+
+		.rating-display .rating-photo {
+			width: 80px;
+			height: 80px;
+			object-fit: cover;
+			border-radius: 6px;
+			border: 1px solid #e5e7eb;
+			transition: transform 0.2s ease;
+		}
+
+		.rating-display .rating-photo:hover {
+			transform: scale(1.05);
+		}
+	</style>
+	<style>
 		.ordersummary-card__header {
 			display: flex;
 			justify-content: space-between;
@@ -1145,8 +1198,28 @@
 							<span style="font-size: 18px; font-weight: 600; color: #111827;">{{ $ratingValue }}/5</span>
 						</div>
 						@if($ratingComment)
-							<div class="rating-comment" style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px;">
+							<div class="rating-comment" style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
 								<p style="margin: 0; font-style: italic; color: #374151; font-size: 16px; line-height: 1.5;">"{{ $ratingComment }}"</p>
+							</div>
+						@endif
+						@php
+							$ratingPhotos = collect(data_get($rating, 'photos', []))->filter();
+						@endphp
+						@if($ratingPhotos->isNotEmpty())
+							<div class="rating-photos-section">
+								<h4 style="margin: 0 0 12px; font-size: 14px; font-weight: 600; color: #374151;">Rating Photos</h4>
+								<div class="rating-photos">
+									@foreach($ratingPhotos as $photo)
+										@php
+											$photoUrl = \Illuminate\Support\Str::startsWith($photo, ['http://', 'https://'])
+												? $photo
+												: \Illuminate\Support\Facades\Storage::disk('public')->url($photo);
+										@endphp
+										<a href="{{ $photoUrl }}" target="_blank" rel="noopener" style="display: block;">
+											<img src="{{ $photoUrl }}" alt="Rating photo" class="rating-photo">
+										</a>
+									@endforeach
+								</div>
 							</div>
 						@endif
 					</div>

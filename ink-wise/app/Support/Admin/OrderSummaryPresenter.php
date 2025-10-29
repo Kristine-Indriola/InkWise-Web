@@ -71,7 +71,8 @@ class OrderSummaryPresenter
             'admin_actions' => Arr::get($summary, 'admin_actions', []),
             'rating' => $order->rating ? [
                 'rating' => (int) $order->rating->rating,
-                'comment' => $order->rating->comment,
+                'comment' => $order->rating->review,
+                'photos' => $order->rating->photos ?? [],
                 'submitted_at' => $order->rating->created_at,
             ] : null,
         ];
