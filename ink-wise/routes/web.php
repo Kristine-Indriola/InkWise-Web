@@ -426,7 +426,6 @@ Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->prefi
     // Email verification routes for password change
     Route::get('/email-verification', [CustomerProfileController::class, 'showEmailVerification'])->name('email-verification');
     Route::post('/email-verification/send', [CustomerProfileController::class, 'sendVerificationEmail'])->name('email-verification.send');
-    Route::get('/email-confirm/{token}', [CustomerProfileController::class, 'confirmEmail'])->name('email-confirm');
     Route::get('/password-change-confirm', [CustomerProfileController::class, 'showPasswordChangeConfirm'])->name('password-change-confirm');
 
     // Settings route
@@ -743,38 +742,40 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
 
     // Staff Templates routes
     Route::prefix('templates')->name('templates.')->group(function () { 
-        Route::get('/', [AdminTemplateController::class, 'index'])->name('index'); 
-        Route::get('/uploaded', [AdminTemplateController::class, 'uploaded'])->name('uploaded');
-        Route::get('/create', [AdminTemplateController::class, 'create'])->name('create'); 
-        Route::get('/create/invitation', [AdminTemplateController::class, 'create'])->name('create.invitation');
-        Route::post('/', [AdminTemplateController::class, 'store'])->name('store'); 
-        Route::get('/{id}/edit', [AdminTemplateController::class, 'edit'])->name('edit');
-        Route::put('/{id}', [AdminTemplateController::class, 'update'])->name('update');
-        Route::get('/editor/{id?}', [AdminTemplateController::class, 'editor'])->name('editor');
-        Route::delete('/{id}', [AdminTemplateController::class, 'destroy'])->name('destroy');
+        Route::get('/', [App\Http\Controllers\Admin\TemplateController::class, 'index'])->name('index'); 
+        Route::get('/uploaded', [App\Http\Controllers\Admin\TemplateController::class, 'uploaded'])->name('uploaded');
+        Route::get('/create', [App\Http\Controllers\Admin\TemplateController::class, 'create'])->name('create'); 
+        Route::get('/create/invitation', [App\Http\Controllers\Admin\TemplateController::class, 'create'])->name('create.invitation');
+        Route::get('/create/giveaway', [App\Http\Controllers\Admin\TemplateController::class, 'create'])->name('create.giveaway');
+        Route::get('/create/envelope', [App\Http\Controllers\Admin\TemplateController::class, 'create'])->name('create.envelope');
+        Route::post('/', [App\Http\Controllers\Admin\TemplateController::class, 'store'])->name('store'); 
+        Route::get('/{id}/edit', [App\Http\Controllers\Admin\TemplateController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [App\Http\Controllers\Admin\TemplateController::class, 'update'])->name('update');
+        Route::get('/editor/{id?}', [App\Http\Controllers\Admin\TemplateController::class, 'editor'])->name('editor');
+        Route::delete('/{id}', [App\Http\Controllers\Admin\TemplateController::class, 'destroy'])->name('destroy');
         // Move these two lines inside this group and fix the path:
-        Route::post('{id}/save-canvas', [AdminTemplateController::class, 'saveCanvas'])->name('saveCanvas');
-        Route::post('{id}/upload-preview', [AdminTemplateController::class, 'uploadPreview'])->name('uploadPreview');
+        Route::post('{id}/save-canvas', [App\Http\Controllers\Admin\TemplateController::class, 'saveCanvas'])->name('saveCanvas');
+        Route::post('{id}/upload-preview', [App\Http\Controllers\Admin\TemplateController::class, 'uploadPreview'])->name('uploadPreview');
         // Add new API routes
-        Route::get('{id}/load-design', [AdminTemplateController::class, 'loadDesign'])->name('loadDesign');
-        Route::delete('{id}/delete-element', [AdminTemplateController::class, 'deleteElement'])->name('deleteElement');
-        Route::post('{id}/save-version', [AdminTemplateController::class, 'saveVersion'])->name('saveVersion');
+        Route::get('{id}/load-design', [App\Http\Controllers\Admin\TemplateController::class, 'loadDesign'])->name('loadDesign');
+        Route::delete('{id}/delete-element', [App\Http\Controllers\Admin\TemplateController::class, 'deleteElement'])->name('deleteElement');
+        Route::post('{id}/save-version', [App\Http\Controllers\Admin\TemplateController::class, 'saveVersion'])->name('saveVersion');
         // Allow GET to redirect (avoid MethodNotAllowed when link is accidentally visited)
         Route::get('{id}/upload-to-product', function ($id) {
             return redirect()->route('admin.products.create.invitation', ['template_id' => $id]);
         });
-        Route::post('{id}/upload-to-product-uploads', [AdminTemplateController::class, 'uploadTemplate'])->name('uploadToProductUploads');
+        Route::post('{id}/upload-to-product-uploads', [App\Http\Controllers\Admin\TemplateController::class, 'uploadTemplate'])->name('uploadToProductUploads');
     // Custom upload via the templates UI (front/back images)
-    Route::post('custom-upload', [AdminTemplateController::class, 'customUpload'])->name('customUpload');
+    Route::post('custom-upload', [App\Http\Controllers\Admin\TemplateController::class, 'customUpload'])->name('customUpload');
         // Asset search API: images, videos, elements
-        Route::get('{id}/assets/search', [AdminTemplateController::class, 'searchAssets'])->name('searchAssets');
-        Route::post('{id}/canvas-settings', [AdminTemplateController::class, 'updateCanvasSettings'])->name('updateCanvasSettings');
+        Route::get('{id}/assets/search', [App\Http\Controllers\Admin\TemplateController::class, 'searchAssets'])->name('searchAssets');
+        Route::post('{id}/canvas-settings', [App\Http\Controllers\Admin\TemplateController::class, 'updateCanvasSettings'])->name('updateCanvasSettings');
         // Add SVG save route
-        Route::post('{id}/save-svg', [AdminTemplateController::class, 'saveSvg'])->name('saveSvg');
+        Route::post('{id}/save-svg', [App\Http\Controllers\Admin\TemplateController::class, 'saveSvg'])->name('saveSvg');
         // Session preview routes for staff (create -> preview -> save to templates)
-        Route::post('preview', [AdminTemplateController::class, 'preview'])->name('preview');
-        Route::post('preview/{preview}/save', [AdminTemplateController::class, 'savePreview'])->name('preview.save');
-        Route::post('preview/{preview}/remove', [AdminTemplateController::class, 'removePreview'])->name('preview.remove');
+        Route::post('preview', [App\Http\Controllers\Admin\TemplateController::class, 'preview'])->name('preview');
+        Route::post('preview/{preview}/save', [App\Http\Controllers\Admin\TemplateController::class, 'savePreview'])->name('preview.save');
+        Route::post('preview/{preview}/remove', [App\Http\Controllers\Admin\TemplateController::class, 'removePreview'])->name('preview.remove');
     }); 
 
     // Figma Integration Routes
@@ -785,13 +786,6 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
         Route::post('/templates/{template}/sync', [\App\Http\Controllers\FigmaController::class, 'sync'])->name('sync');
     });
 });
-    // Figma Integration Routes
-    Route::prefix('figma')->name('figma.')->group(function () {
-        Route::get('/', [\App\Http\Controllers\FigmaController::class, 'index'])->name('index');
-        Route::post('/analyze', [\App\Http\Controllers\FigmaController::class, 'analyze'])->name('analyze');
-        Route::post('/import', [\App\Http\Controllers\FigmaController::class, 'import'])->name('import');
-        Route::post('/templates/{template}/sync', [\App\Http\Controllers\FigmaController::class, 'sync'])->name('sync');
-    });
 
 /*
 |--------------------------------------------------------------------------|
@@ -835,10 +829,14 @@ Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->prefi
     // Email verification routes
     Route::get('/email-verification', [CustomerProfileController::class, 'showEmailVerification'])->name('email-verification');
     Route::post('/send-verification-email', [CustomerProfileController::class, 'sendVerificationEmail'])->name('send-verification-email')->withoutMiddleware(\App\Http\Middleware\RoleMiddleware::class.':customer');
-    Route::get('/email-confirm/{token}', [CustomerProfileController::class, 'confirmEmail'])->name('email-confirm');
+    Route::get('/email-confirm/{token}', [CustomerProfileController::class, 'confirmEmail'])->name('customerprofile.email-confirm')->withoutMiddleware(\App\Http\Middleware\RoleMiddleware::class.':customer');
     Route::get('/password-change-confirm', [CustomerProfileController::class, 'showPasswordChangeConfirm'])->name('password-change-confirm');
 });
 
+
+Route::get('/customer/profile/email-confirm/{token}', [CustomerProfileController::class, 'confirmEmail'])->name('customerprofile.email-confirm');
+
+Route::get('/auth/password-change/verify/{token}', [CustomerProfileController::class, 'confirmEmail'])->name('password.change.verify');
 
 Route::get('/unauthorized', function () {
     return view('errors.unauthorized');

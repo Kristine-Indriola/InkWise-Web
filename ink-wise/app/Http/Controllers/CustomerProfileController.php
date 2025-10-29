@@ -422,25 +422,13 @@ class CustomerProfileController extends Controller
 
             Log::info('Password change attempt created', ['attempt_id' => $attempt->id]);
 
-            // Send verification email (use log mailer for development)
-            Log::info('Sending verification email via log mailer');
+            // Send verification email (use smtp mailer for production)
+            Log::info('Sending verification email via smtp mailer');
             try {
-                // Send a simple test email first
-                \Illuminate\Support\Facades\Mail::mailer('log')->raw(
-                    "Password Change Verification\n\n" .
-                    "Hi {$customer->first_name},\n\n" .
-                    "Someone requested to change the password for your InkWise account.\n\n" .
-                    "If this was you, click here to verify: " . route('customerprofile.email-confirm', $attempt->token) . "\n\n" .
-                    "This link will expire in 15 minutes.\n\n" .
-                    "If you didn't request this change, please ignore this email.\n\n" .
-                    "InkWise Team",
-                    function($message) use ($user) {
-                        $message->to($user->email)->subject('Password Change Verification - InkWise');
-                    }
-                );
-                Log::info('Simple verification email sent successfully');
+                \Illuminate\Support\Facades\Mail::mailer('smtp')->to($user->email)->send(new PasswordChangeVerification($attempt));
+                Log::info('Verification email sent successfully via Mailable');
             } catch (\Exception $mailException) {
-                Log::error('Simple mail sending failed', ['error' => $mailException->getMessage()]);
+                Log::error('Mailable sending failed', ['error' => $mailException->getMessage()]);
                 throw $mailException;
             }
 
@@ -480,7 +468,7 @@ class CustomerProfileController extends Controller
         // Store verification in session for the change password form
         session(['password_change_verified' => true, 'verified_attempt_id' => $attempt->id]);
 
-        return view('customer.profile.change-password.email-confirmation', compact('attempt'));
+        return view('customer.profile.change-password.password-change-attempt-approved', compact('attempt'));
     }
 
     public function showPasswordChangeConfirm()
@@ -493,7 +481,7 @@ class CustomerProfileController extends Controller
 
         $attempt = PasswordChangeAttempt::find(session('verified_attempt_id'));
 
-        return view('customer.profile.change-password.email-confirmation', compact('attempt'));
+        return view('customer.profile.change-password.password-change-confirm', compact('attempt'));
     }
 
     // Helper methods
