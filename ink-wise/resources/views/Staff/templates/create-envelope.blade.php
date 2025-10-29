@@ -105,36 +105,29 @@
 
             // Handle form submission
             form.addEventListener('submit', function(e) {
-                e.preventDefault();
-                console.log('Form submission started');
+                // Don't prevent default - let the form submit naturally
+                // The form will handle file uploads properly via multipart/form-data
                 
-                const formData = new FormData(form);
-                console.log('Form data created');
+                // Basic validation
+                const nameField = document.getElementById('name');
+                const frontImageField = document.getElementById('front_image');
                 
-                // Log all form data for debugging
-                for (let [key, value] of formData.entries()) {
-                    console.log(`${key}: ${value}`);
+                if (!nameField || !nameField.value.trim()) {
+                    e.preventDefault();
+                    alert('Please provide a template name.');
+                    return false;
                 }
-
-                const importMethod = formData.get('import_method') || 'manual';
-                console.log('Import method:', importMethod);
-
-                // Validate based on import method
-                if (importMethod === 'figma') {
-                    if (!formData.get('name') || !formData.get('figma_url')) {
-                        console.log('Figma validation failed - missing name or figma_url');
-                        alert('Please provide a name and Figma URL.');
-                        return;
-                    }
-                } else {
-                    // For envelope we require name and front_image for manual upload
-                    if (!formData.get('name') || !formData.get('front_image')) {
-                        console.log('Manual validation failed - missing name or front_image');
-                        alert('Please provide a name and an SVG file.');
-                        return;
+                
+                const importMethod = document.querySelector('input[name="import_method"]:checked')?.value || 'manual';
+                
+                if (importMethod === 'manual') {
+                    if (!frontImageField || !frontImageField.files || frontImageField.files.length === 0) {
+                        e.preventDefault();
+                        alert('Please select an SVG file.');
+                        return false;
                     }
                 }
-
+                
                 // Set design data for envelope
                 const designInput = document.getElementById('design');
                 if (designInput) {
@@ -143,39 +136,9 @@
                         type: "envelope"
                     });
                 }
-
-                console.log('About to submit form to:', form.getAttribute('action'));
                 
-                fetch(form.getAttribute('action'), {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': getCsrfToken(),
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'application/json'
-                    },
-                    body: formData
-                }).then(async res => {
-                    console.log('Response received:', res.status, res.statusText);
-                    if (!res.ok) {
-                        let message = 'Upload failed';
-                        try { message = (await res.json()).message || message; } catch (err) {}
-                        throw new Error(message);
-                    }
-                    return res.json();
-                }).then(json => {
-                    if (json && json.success) {
-                        alert('Envelope template uploaded successfully');
-                        window.location = json.redirect || '{{ route('staff.templates.index') }}';
-                    }
-                }).catch(err => {
-                    console.error('Form submission error:', err);
-                    console.error('Error details:', {
-                        message: err.message,
-                        stack: err.stack,
-                        name: err.name
-                    });
-                    alert('Upload failed: ' + (err.message || 'Unknown'));
-                });
+                // Let the form submit normally
+                return true;
             });
         });
 
