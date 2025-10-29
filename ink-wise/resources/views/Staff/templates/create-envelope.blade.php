@@ -1,4 +1,4 @@
-@extends('layouts.admin')
+@extends('layouts.staffapp')
 
 @php
     $templateType = 'envelope';
@@ -106,12 +106,33 @@
             // Handle form submission
             form.addEventListener('submit', function(e) {
                 e.preventDefault();
+                console.log('Form submission started');
+                
                 const formData = new FormData(form);
+                console.log('Form data created');
+                
+                // Log all form data for debugging
+                for (let [key, value] of formData.entries()) {
+                    console.log(`${key}: ${value}`);
+                }
 
-                // For envelope we require name and front_image
-                if (!formData.get('name') || !formData.get('front_image')) {
-                    alert('Please provide a name and an SVG file.');
-                    return;
+                const importMethod = formData.get('import_method') || 'manual';
+                console.log('Import method:', importMethod);
+
+                // Validate based on import method
+                if (importMethod === 'figma') {
+                    if (!formData.get('name') || !formData.get('figma_url')) {
+                        console.log('Figma validation failed - missing name or figma_url');
+                        alert('Please provide a name and Figma URL.');
+                        return;
+                    }
+                } else {
+                    // For envelope we require name and front_image for manual upload
+                    if (!formData.get('name') || !formData.get('front_image')) {
+                        console.log('Manual validation failed - missing name or front_image');
+                        alert('Please provide a name and an SVG file.');
+                        return;
+                    }
                 }
 
                 // Set design data for envelope
@@ -123,6 +144,8 @@
                     });
                 }
 
+                console.log('About to submit form to:', form.getAttribute('action'));
+                
                 fetch(form.getAttribute('action'), {
                     method: 'POST',
                     headers: {
@@ -132,6 +155,7 @@
                     },
                     body: formData
                 }).then(async res => {
+                    console.log('Response received:', res.status, res.statusText);
                     if (!res.ok) {
                         let message = 'Upload failed';
                         try { message = (await res.json()).message || message; } catch (err) {}
@@ -144,7 +168,12 @@
                         window.location = json.redirect || '{{ route('staff.templates.index') }}';
                     }
                 }).catch(err => {
-                    console.error(err);
+                    console.error('Form submission error:', err);
+                    console.error('Error details:', {
+                        message: err.message,
+                        stack: err.stack,
+                        name: err.name
+                    });
                     alert('Upload failed: ' + (err.message || 'Unknown'));
                 });
             });
@@ -285,13 +314,21 @@
         function toggleImportMethod(method) {
             const manualUpload = document.getElementById('manual-upload-section');
             const figmaImport = document.getElementById('figma-import-section');
+            const figmaUrlField = document.getElementById('figma_url');
+            const frontImageField = document.getElementById('front_image');
 
             if (method === 'figma') {
                 manualUpload.style.display = 'none';
                 figmaImport.style.display = 'block';
+                // Set figma_url as required and remove required from file inputs
+                if (figmaUrlField) figmaUrlField.required = true;
+                if (frontImageField) frontImageField.required = false;
             } else {
                 manualUpload.style.display = 'block';
                 figmaImport.style.display = 'none';
+                // Set file inputs as required and remove required from figma_url
+                if (figmaUrlField) figmaUrlField.required = false;
+                if (frontImageField) frontImageField.required = true;
             }
         }
     </script>

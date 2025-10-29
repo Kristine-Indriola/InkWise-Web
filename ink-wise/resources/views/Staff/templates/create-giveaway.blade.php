@@ -1,4 +1,4 @@
-@extends('layouts.admin')
+@extends('layouts.staffapp')
 
 @php
     $templateType = 'giveaway';
@@ -49,6 +49,32 @@
         document.addEventListener('DOMContentLoaded', function() {
             const form = document.querySelector('.create-form');
             if (!form) return;
+
+            // Debug form submission
+            const submitBtn = document.querySelector('.btn-submit');
+            
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    console.log('Giveaway form submit event triggered');
+                    const requiredFields = form.querySelectorAll('[required]');
+                    requiredFields.forEach(field => {
+                        console.log(`Required field ${field.name}: ${field.value}`);
+                    });
+                });
+            }
+            
+            if (submitBtn) {
+                submitBtn.addEventListener('click', function(e) {
+                    console.log('Giveaway submit button clicked');
+                    if (form && !form.checkValidity()) {
+                        console.log('Giveaway form validation failed');
+                        form.reportValidity();
+                        e.preventDefault();
+                        return false;
+                    }
+                    console.log('Giveaway form should submit');
+                });
+            }
 
             // SVG preview handling
             const frontFile = document.getElementById('front_image');
@@ -285,13 +311,24 @@
         function toggleImportMethod(method) {
             const manualUpload = document.getElementById('manual-upload-section');
             const figmaImport = document.getElementById('figma-import-section');
+            const figmaUrl = document.getElementById('figma_url');
+            const frontImage = document.getElementById('custom_front_image');
+            const backImage = document.getElementById('custom_back_image');
 
             if (method === 'figma') {
                 manualUpload.style.display = 'none';
                 figmaImport.style.display = 'block';
+                // Make Figma URL required, remove file requirements
+                if (figmaUrl) figmaUrl.setAttribute('required', 'required');
+                if (frontImage) frontImage.removeAttribute('required');
+                if (backImage) backImage.removeAttribute('required');
             } else {
                 manualUpload.style.display = 'block';
                 figmaImport.style.display = 'none';
+                // Make files required, remove Figma URL requirement
+                if (figmaUrl) figmaUrl.removeAttribute('required');
+                if (frontImage) frontImage.setAttribute('required', 'required');
+                if (backImage) backImage.setAttribute('required', 'required');
             }
         }
     </script>
@@ -366,7 +403,7 @@
                 <div class="create-group">
                     <label for="figma_url">Figma File URL</label>
                     <div class="input-group">
-                        <input type="url" id="figma_url" class="form-control" placeholder="https://www.figma.com/design/... or https://www.figma.com/file/..." required>
+                        <input type="url" id="figma_url" class="form-control" placeholder="https://www.figma.com/design/... or https://www.figma.com/file/...">
                         <button type="button" id="analyze-figma-btn" class="btn btn-outline-primary" onclick="analyzeFigmaUrl()">
                             <i class="fas fa-search me-1"></i>Analyze Figma File
                         </button>

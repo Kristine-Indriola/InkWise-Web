@@ -21,7 +21,7 @@ class PasswordChangeVerification extends Mailable
      */
     public function __construct(PasswordChangeAttempt $attempt)
     {
-        $this->attempt = $attempt;
+        $this->attempt = $attempt->load(['user.customer']);
     }
 
     /**
@@ -30,8 +30,7 @@ class PasswordChangeVerification extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Verification Required: New Password Change Attempt on Your InkWise Account',
-            from: 'security@otp.inkwise.ph'
+            subject: 'Verification Required: New Password Change Attempt on Your InkWise Account'
         );
     }
 
