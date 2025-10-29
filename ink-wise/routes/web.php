@@ -650,6 +650,7 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/products', [OwnerProductsController::class, 'index'])->name('products.index');
     Route::get('/products/{product}', [OwnerProductsController::class, 'show'])->name('products.show');
     Route::get('/transactions/view', [OwnerTransactionsController::class, 'index'])->name('transactions-view');
+    Route::get('/transactions/export', [OwnerTransactionsController::class, 'export'])->name('transactions-export');
     Route::get('/ratings', [OwnerRatingsController::class, 'index'])->name('ratings.index');
 
     Route::prefix('reports')->name('reports.')->group(function () {
