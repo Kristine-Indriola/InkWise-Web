@@ -797,7 +797,7 @@
         <div id="userDropdownMenu"
              class="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-200 z-50 hidden group-hover:block">
             <!-- Profile -->
-            <a href="{{ route('customer.profile.index') }}"
+            <a href="{{ route('customerprofile.index') }}"
                class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] transition-colors">
                 My Account
             </a>

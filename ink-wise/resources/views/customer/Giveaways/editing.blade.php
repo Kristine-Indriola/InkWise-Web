@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -500,8 +500,8 @@
     <div class="editor-topbar">
         <div class="left-tools">
             <div class="undo-redo-controls">
-                <button class="undo-btn" id="canvasUndo" type="button" title="Undo last action" disabled>â†¶</button>
-                <button class="redo-btn" id="canvasRedo" type="button" title="Redo last action" disabled>â†·</button>
+                <button class="undo-btn" id="canvasUndo" type="button" title="Undo last action" disabled>↶</button>
+                <button class="redo-btn" id="canvasRedo" type="button" title="Redo last action" disabled>↷</button>
             </div>
             <button id="editModeToggle" class="edit-mode-btn" type="button" title="Toggle Edit Mode">Edit Mode</button>
             <button id="showLayers" class="layers-btn" type="button" title="Show layers panel">Layers</button>
@@ -538,7 +538,7 @@
             <div class="canvas-layers-panel" id="layersPanel">
                 <div class="layers-header">
                     <span>Layers</span>
-                    <button id="toggleLayers" type="button" title="Toggle layers panel">Ã—</button>
+                    <button id="toggleLayers" type="button" title="Toggle layers panel">×</button>
                 </div>
                 <div id="layersList" class="layers-list">
                     <!-- Layer items will be populated here -->
@@ -640,14 +640,14 @@
                 <div class="font-modal-card">
                     <div class="font-modal-header">
                         <input id="fontSearch" class="font-search" placeholder="Search fonts...">
-                        <button id="fontClose" class="font-close" aria-label="Close">Ã—</button>
+                        <button id="fontClose" class="font-close" aria-label="Close">×</button>
                     </div>
                     <div id="recentFonts" class="recent-fonts" aria-hidden="true">
                         <div class="recent-title">Recent</div>
                         <div class="recent-list">No recent fonts</div>
                     </div>
                     <div id="fontList" class="font-list">
-                        <div class="font-list-loading">Loading fontsâ€¦</div>
+                        <div class="font-list-loading">Loading fonts…</div>
                     </div>
                 </div>
             </div>
@@ -656,7 +656,7 @@
                 <div class="color-modal-card">
                     <div class="color-modal-header">
                         <div class="color-title">Text color</div>
-                        <button id="colorClose" class="color-close" aria-label="Close">Ã—</button>
+                        <button id="colorClose" class="color-close" aria-label="Close">×</button>
                     </div>
                     <div class="color-modal-body">
                         <div class="color-picker-grid">
@@ -811,7 +811,7 @@
                         <div class="panel-header">
                             <h3 class="panel-title">Text</h3>
                             <button class="expand-btn" type="button" title="Expand panel">
-                                <span class="expand-icon">â†—</span>
+                                <span class="expand-icon">↗</span>
                             </button>
                         </div>
 
@@ -1076,13 +1076,13 @@
                                 if (isExpanded) {
                                     // Collapse
                                     expandedGrid.classList.add('hidden');
-                                    btn.textContent = 'â†’';
+                                    btn.textContent = '→';
                                     btn.setAttribute('aria-expanded', 'false');
                                     btn.setAttribute('title', 'Show all ' + section);
                                 } else {
                                     // Expand
                                     expandedGrid.classList.remove('hidden');
-                                    btn.textContent = 'â†“';
+                                    btn.textContent = '↓';
                                     btn.setAttribute('aria-expanded', 'true');
                                     btn.setAttribute('title', 'Hide ' + section);
                                 }
@@ -1143,7 +1143,7 @@
                                                     <div class="discover-search">
                                                         <label for="discoverSearchInput" class="sr-only">Search images</label>
                                                         <div style="display:flex; gap:8px;">
-                                                            <input id="discoverSearchInput" type="search" placeholder="Search images (Unsplash)â€¦" aria-label="Search images" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                                                            <input id="discoverSearchInput" type="search" placeholder="Search images (Unsplash)…" aria-label="Search images" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:6px;">
                                                             <button id="discoverSearchBtn" type="button" class="btn-upload-primary">Search</button>
                                                         </div>
                                                     </div>
@@ -1178,7 +1178,7 @@
                                 <div class="flex items-center justify-between mb-2">
                                     <div class="font-medium">Shapes</div>
                                     <button type="button" class="text-gray-400 hover:text-blue-500 transition-colors expand-section-btn" data-section="shapes" title="Show all shapes" aria-label="Expand shapes section">
-                                        â†’
+                                        →
                                     </button>
                                 </div>
                                 <div class="shapes-grid grid grid-cols-3 gap-3">
@@ -1237,7 +1237,7 @@
                                 <div class="flex items-center justify-between mb-2">
                                     <div class="font-medium">Images</div>
                                     <button type="button" class="text-gray-400 hover:text-blue-500 transition-colors expand-section-btn" data-section="images" title="Show all images" aria-label="Expand images section">
-                                        â†’
+                                        →
                                     </button>
                                 </div>
                                 <div class="images-grid grid grid-cols-3 gap-3">
@@ -1292,7 +1292,7 @@
                                 <div class="flex items-center justify-between mb-2">
                                     <div class="font-medium">Illustrations</div>
                                     <button type="button" class="text-gray-400 hover:text-blue-500 transition-colors expand-section-btn" data-section="illustrations" title="Show all illustrations" aria-label="Expand illustrations section">
-                                        â†’
+                                        →
                                     </button>
                                 </div>
                                 <div class="illustrations-grid grid grid-cols-3 gap-3">
@@ -1478,7 +1478,7 @@
                 const ns = 'http://www.w3.org/2000/svg';
                 const g = document.createElementNS(ns, 'g');
                 const txt = document.createElementNS(ns, 'text');
-                txt.setAttribute('x', '250'); txt.setAttribute('y', '250'); txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('dominant-baseline', 'middle'); txt.setAttribute('font-size', '48'); txt.textContent = icon === 'fa-heart' ? 'â¤' : icon === 'fa-star' ? 'â˜…' : icon === 'fa-leaf' ? 'ðŸƒ' : 'â˜…';
+                txt.setAttribute('x', '250'); txt.setAttribute('y', '250'); txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('dominant-baseline', 'middle'); txt.setAttribute('font-size', '48'); txt.textContent = icon === 'fa-heart' ? '❤' : icon === 'fa-star' ? '★' : icon === 'fa-leaf' ? '🍃' : '★';
                 g.appendChild(txt);
                 svg.appendChild(g);
             }));
@@ -1794,7 +1794,7 @@
                         layerItem.className = 'layer-item';
                         layerItem.dataset.objectIndex = i;
 
-                        var visibilityIcon = obj.visible ? 'ðŸ‘' : 'ðŸ™ˆ';
+                        var visibilityIcon = obj.visible ? '👁' : '🙈';
                         var typeIcon = getObjectTypeIcon(obj.type);
                         var objectName = getObjectDisplayName(obj, i);
 
@@ -1825,19 +1825,19 @@
                     switch (type) {
                         case 'i-text':
                         case 'textbox':
-                            return 'ðŸ“';
+                            return '📝';
                         case 'image':
-                            return 'ðŸ–¼ï¸';
+                            return '🖼️';
                         case 'rect':
-                            return 'â–­';
+                            return '▭';
                         case 'circle':
-                            return 'â—‹';
+                            return '○';
                         case 'triangle':
-                            return 'â–³';
+                            return '△';
                         case 'path':
-                            return 'âœï¸';
+                            return '✏️';
                         default:
-                            return 'ðŸ“„';
+                            return '📄';
                     }
                 }
 
@@ -2923,9 +2923,9 @@
                                 if (activeObject.text.length > 25) text += '...';
                                 info += ' "' + text + '"';
                             } else if (type === 'image') {
-                                info += ' (' + Math.round(activeObject.width * activeObject.scaleX) + 'Ã—' + Math.round(activeObject.height * activeObject.scaleY) + ')';
+                                info += ' (' + Math.round(activeObject.width * activeObject.scaleX) + '×' + Math.round(activeObject.height * activeObject.scaleY) + ')';
                             } else if (type === 'rect') {
-                                info += ' (' + Math.round(activeObject.width) + 'Ã—' + Math.round(activeObject.height) + ')';
+                                info += ' (' + Math.round(activeObject.width) + '×' + Math.round(activeObject.height) + ')';
                             }
 
                             statusSelectionEl.textContent = 'Selected: ' + info;
@@ -3576,7 +3576,7 @@
                     if (!changeImageButton) {
                         changeImageButton = document.createElement('button');
                         changeImageButton.id = 'changeImageButton';
-                        changeImageButton.innerHTML = '🖼️ Change Image';
+                        changeImageButton.innerHTML = '??? Change Image';
                         changeImageButton.style.cssText = `
                             position: absolute;
                             background: #3b82f6;
@@ -3690,13 +3690,13 @@
                             <div style="padding: 24px;">
                                 <div style="display: flex; gap: 16px; margin-bottom: 20px;">
                                     <button class="image-source-btn active" data-source="upload">
-                                        📁 Upload
+                                        ?? Upload
                                     </button>
                                     <button class="image-source-btn" data-source="recent">
-                                        🕒 Recent
+                                        ?? Recent
                                     </button>
                                     <button class="image-source-btn" data-source="unsplash">
-                                        🔍 Unsplash
+                                        ?? Unsplash
                                     </button>
                                 </div>
 
@@ -3805,7 +3805,7 @@
                         case 'upload':
                             contentArea.innerHTML = `
                                 <div class="upload-area" id="uploadArea">
-                                    <div style="font-size: 48px; margin-bottom: 16px;">📁</div>
+                                    <div style="font-size: 48px; margin-bottom: 16px;">??</div>
                                     <div style="font-size: 16px; font-weight: 500; margin-bottom: 8px;">Drop images here or click to browse</div>
                                     <div style="font-size: 14px; color: #6b7280;">Supported formats: JPG, PNG, GIF, SVG, WebP</div>
                                     <input type="file" id="dialogFileInput" multiple accept="image/*" style="display: none;">
