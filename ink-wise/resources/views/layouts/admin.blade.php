@@ -897,9 +897,7 @@ body.dark-mode .btn-warning {
           <li class="{{ request()->routeIs('admin.settings.site-content.*') ? 'active' : '' }}">
             <a href="{{ route('admin.settings.site-content.edit') }}"><span class="label">Site Content</span></a>
           </li>
-          <li class="{{ request()->routeIs('admin.fonts.*') ? 'active' : '' }}">
-            <a href="{{ route('admin.fonts.index') }}"><span class="label">Fonts</span></a>
-          </li>
+
           <li class="{{ request()->routeIs('admin.users.passwords.*') ? 'active' : '' }}">
             <a href="{{ route('admin.users.passwords.index') }}"><span class="label">Password Reset</span></a>
           </li>

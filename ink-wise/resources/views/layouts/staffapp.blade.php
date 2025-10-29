@@ -600,11 +600,9 @@
       <li class="{{ request()->routeIs('staff.notify.customers') ? 'active' : '' }}">
         <a href="{{ route('staff.notify.customers') }}"><i class="fa-solid fa-bell"></i> <span class="label">Notify Customers</span></a>
       </li>
-      <li class="{{ request()->routeIs('staff.inventory.*') ? 'active' : '' }}">
-        <a href="{{ route('staff.inventory.index') }}"><i class="fa-solid fa-warehouse"></i> <span class="label">Inventory</span></a>
-      </li>
+
       <li class="{{ request()->routeIs('staff.materials.*') ? 'active' : '' }}">
-        <a href="{{ route('staff.materials.index') }}"><i class="fa-solid fa-boxes-stacked"></i> <span class="label">Materials</span></a>
+        <a href="{{ route('staff.materials.index') }}"><i class="fa-solid fa-boxes-stacked"></i> <span class="label">Inventory</span></a>
       </li>
     </ul>
   </div>
