@@ -509,6 +509,11 @@
 	} catch (\Throwable $e) {
 		$statusManageUrl = null;
 	}
+	try {
+		$paymentManageUrl = $order ? route('admin.orders.payment.edit', ['order' => data_get($order, 'id')]) : null;
+	} catch (\Throwable $e) {
+		$paymentManageUrl = null;
+	}
 	$ordersBackUrl = $statusManageUrl ?? $ordersIndexUrl;
 
 	$statusOptions = [
@@ -619,9 +624,12 @@
 				@elseif($paymentStatus === 'pending')
 					<span class="status-progress-manage-link" style="color: #9ca3af; cursor: not-allowed;" title="Cannot update status while payment is pending">Update status</span>
 				@endif
+				@if($paymentManageUrl)
+					<a href="{{ $paymentManageUrl }}" class="status-progress-manage-link">Update payment</a>
+				@endif
 			</div>
 		</header>
-		<ol class="status-tracker" aria-label="Order progress">
+		<ol class="status-tracker" aria-hidden="true">
 			@foreach($statusFlow as $index => $statusKey)
 				@php
 					$stateClass = 'status-tracker__item--upcoming';

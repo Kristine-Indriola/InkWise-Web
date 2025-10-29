@@ -29,17 +29,26 @@ class StaffOrderController extends Controller
             $ordersQuery->where('status', $statusFilter);
         }
 
+        // Calculate status counts from all orders (not just paginated)
+        $allOrdersQuery = Order::query()->select('status');
+        if ($statusFilter && $statusFilter !== 'all') {
+            $allOrdersQuery->where('status', $statusFilter);
+        }
+        $statusCounts = $allOrdersQuery->get()->groupBy('status')->map->count();
+
         // Staff can see all orders, not just orders assigned to them
-        $orders = $ordersQuery->get()->each(function (Order $order) {
+        $orders = $ordersQuery->paginate(10)->through(function (Order $order) {
             $order->display_customer_name = $this->formatCustomerName($order->effectiveCustomer());
             $order->display_items_count = $this->calculateItemsCount($order);
             $order->display_total_amount = (float) ($order->total_amount ?? 0);
+            return $order;
         });
 
         return view('staff.order_list', [
             'orders' => $orders,
             'statusFilter' => $statusFilter,
             'statusOptions' => $this->statusOptions(),
+            'statusCounts' => $statusCounts,
         ]);
     }
 
@@ -176,7 +185,7 @@ class StaffOrderController extends Controller
             ->with('success', 'Order status updated successfully.');
     }
 
-    protected function statusOptions(): array
+    protected function statusOptions(): array 
     {
         return [
             'pending' => 'Order Received',

@@ -224,8 +224,6 @@
     <div class="summary-cards">
       @php
         $totalOrders = $orders->total();
-        $statusCounts = collect($orders->items())->groupBy(fn($o) => strtolower(data_get($o,'status','processing')))
-          ->map->count();
         $pendingCount = $statusCounts->get('pending', 0);
         $processingCount = $statusCounts->get('processing', 0);
         $inProductionCount = $statusCounts->get('in_production', 0);
@@ -352,6 +350,9 @@
                     </a>
                     <a href="{{ route('admin.orders.status.edit', ['order' => $order->id]) }}" class="btn btn-outline btn-sm btn-icon" aria-label="Manage status for order {{ $order->order_number ?? $order->id }}" title="Update status">
                       <i class="fa-solid fa-bars-progress" aria-hidden="true"></i>
+                    </a>
+                    <a href="{{ route('admin.orders.payment.edit', ['order' => $order->id]) }}" class="btn btn-outline btn-sm btn-icon" aria-label="Manage payment for order {{ $order->order_number ?? $order->id }}" title="Update payment">
+                      <i class="fa-solid fa-credit-card" aria-hidden="true"></i>
                     </a>
                     <button type="button" class="btn btn-outline btn-sm btn-icon btn-delete" data-order-id="{{ $order->id }}" aria-label="Delete order {{ $order->order_number ?? $order->id }}" title="Delete order">
                       <i class="fa-solid fa-trash" aria-hidden="true"></i>
