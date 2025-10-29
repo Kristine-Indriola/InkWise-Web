@@ -65,7 +65,7 @@
                         Edit
                     </button>
 
-                    <form method="POST" action="{{ route('customer.profile.addresses.destroy', $address->address_id) }}" class="inline">
+                    <form method="POST" action="{{ route('customerprofile.addresses.destroy', $address->address_id) }}" class="inline">
                         @csrf
                         @method('DELETE')
                         <button type="submit" class="text-[#1976d2] hover:underline bg-transparent border-0 p-0 m-0">Delete</button>
@@ -170,8 +170,8 @@ document.addEventListener("DOMContentLoaded", function () {
     };
 
     // route templates
-    const storeUrl = "{{ route('customer.profile.addresses.store') }}";
-    const updateUrlTemplate = "{{ route('customer.profile.addresses.update', ['address' => '__ID__']) }}";
+    const storeUrl = "{{ route('customerprofile.addresses.store') }}";
+    const updateUrlTemplate = "{{ route('customerprofile.addresses.update', ['address' => '__ID__']) }}";
 
     // ---------------- Show modal for ADD ----------------
     document.getElementById("addAddressBtn").addEventListener("click", () => {

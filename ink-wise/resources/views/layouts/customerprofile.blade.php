@@ -18,6 +18,7 @@
   <!-- Icon fonts used by invitations header -->
   <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-bold-rounded/css/uicons-bold-rounded.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ asset('css/customer/customer.css') }}">
@@ -145,7 +146,7 @@
                     </button>
                     <div id="userDropdownMenu"
                          class="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-200 z-50 hidden group-hover:block">
-                        <a href="{{ route('customer.profile.index') }}"
+                        <a href="{{ route('customerprofile.index') }}"
 
                            class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa]">
                             My Account
@@ -217,35 +218,38 @@ document.addEventListener('DOMContentLoaded', function () {
       <nav class="space-y-2">
         <!-- My Account Dropdown -->
         @php
-          $myAccountActive = request()->routeIs('customer.profile.*');
+          $myAccountActive = request()->routeIs('customerprofile.*');
         @endphp
         <div x-data="{ open: {{ $myAccountActive ? 'true' : 'false' }} }" class="relative">
           <!-- Dropdown header with link + toggle -->
-          <div class="flex items-stretch gap-2">
-            <a href="{{ route('customer.profile.index') }}"
+          <div class="flex items-stretch gap-2 group">
+            <a href="{{ route('customerprofile.index') }}"
                class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition w-full font-medium {{ $myAccountActive ? 'bg-[#e0f7fa] text-gray-700' : 'text-gray-700 hover:bg-[#e0f7fa]' }}">
               <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-5 0-9 2.5-9 5.5A1.5 1.5 0 0 0 4.5 21h15a1.5 1.5 0 0 0 1.5-1.5C21 16.5 17 14 12 14Z"/></svg>
               <span>My Account</span>
             </a>
-            @if($myAccountActive)
-              <button type="button"
-                      @click="open = !open"
-                      class="px-3 py-3 rounded-xl text-gray-500 hover:bg-[#e0f7fa] transition">
-                <svg class="w-4 h-4 transition-transform" :class="{'rotate-180': open}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"></path></svg>
-              </button>
-            @endif
+            <button type="button"
+                    @click="open = !open"
+                    class="px-3 py-3 rounded-xl text-gray-500 hover:bg-[#e0f7fa] group-hover:bg-[#e0f7fa] transition">
+              <svg class="w-4 h-4 transition-transform" :class="{'rotate-180': open}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"></path></svg>
+            </button>
           </div>
           <div x-show="open" @click.away="open = false" class="mt-1 ml-6 space-y-1">
             <!-- Profile (with link) -->
-            <a href="{{ route('customer.profile.index') }}"
+            <a href="{{ route('customerprofile.index') }}"
 
                class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] rounded transition">
               Profile
             </a>
             <!-- Addresses (with link) -->
-            <a href="{{ route('customer.profile.addresses') }}"
+            <a href="{{ route('customerprofile.addresses') }}"
                class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] rounded transition">
               Addresses
+            </a>
+            <!-- Change Password (with link) -->
+            <a href="{{ route('customerprofile.change-password') }}"
+               class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] rounded transition">
+              Change Password
             </a>
             <!-- My Favorites removed from dropdown (moved below) -->
           </div>
@@ -279,12 +283,12 @@ document.addEventListener('DOMContentLoaded', function () {
   <svg class="w-4 h-4 ml-auto transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"></path></svg>
   <!-- Dropdown -->
   <div class="absolute left-0 top-full mt-1 w-48 bg-white rounded shadow-lg z-10 hidden group-hover:block">
-    <a href="{{ route('customer.profile.settings', ['tab' => 'account']) }}"
+    <a href="{{ route('customerprofile.settings', ['tab' => 'account']) }}"
 
        class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] rounded transition">
       Account Settings
     </a>
-    <a href="{{ route('customer.profile.settings', ['tab' => 'privacy']) }}"
+    <a href="{{ route('customerprofile.settings', ['tab' => 'privacy']) }}"
 
        class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] rounded transition">
       Privacy Settings

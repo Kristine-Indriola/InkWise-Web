@@ -395,29 +395,38 @@ Route::get('/chatbot/qas', [ChatbotController::class, 'getQAs'])->name('chatbot.
     ->name('chatbot.reply');
 
         
-/**Customer Profile Pages*/
-Route::prefix('customerprofile')->group(function () {
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->prefix('customerprofile')->name('customerprofile.')->group(function () {
     // Addresses
 
     Route::get('/addresses', [CustomerProfileController::class, 'addresses'])
-        ->name('customer.profile.addresses');
+        ->name('addresses');
 
     Route::post('/addresses', [CustomerProfileController::class, 'storeAddress'])
-        ->name('customer.profile.addresses.store');
+        ->name('addresses.store');
 
     Route::put('/addresses/{address}', [CustomerProfileController::class, 'updateAddress'])
-        ->name('customer.profile.addresses.update');
+        ->name('addresses.update');
 
     Route::delete('/addresses/{address}', [CustomerProfileController::class, 'destroyAddress'])
-        ->name('customer.profile.addresses.destroy');
+        ->name('addresses.destroy');
 
-   Route::get('/', [CustomerProfileController::class, 'index'])->name('customer.profile.index');
-    Route::get('/profile', [CustomerProfileController::class, 'edit'])->name('customer.profile.edit');
-    Route::put('/profile', [CustomerProfileController::class, 'update'])->name('customer.profile.update');
-// Other pages
-Route::get('/settings', fn () => view('customer.profile.settings'))->name('customer.profile.settings');
-Route::get('/order', fn () => view('customer.profile.orderform'))->name('customer.profile.orderform');
+   Route::get('/', [CustomerProfileController::class, 'index'])->name('index');
+    Route::get('/profile', [CustomerProfileController::class, 'edit'])->name('edit');
+    Route::put('/profile', [CustomerProfileController::class, 'update'])->name('update');
+    Route::get('/change-password', [CustomerProfileController::class, 'showChangePasswordForm'])->name('change-password');
+    Route::put('/change-password', [CustomerProfileController::class, 'changePassword'])->name('change-password.update');
 
+    // Email verification routes for password change
+    Route::get('/email-verification', [CustomerProfileController::class, 'showEmailVerification'])->name('email-verification');
+    Route::post('/email-verification/send', [CustomerProfileController::class, 'sendVerificationEmail'])->name('email-verification.send');
+    Route::get('/email-confirm/{token}', [CustomerProfileController::class, 'confirmEmail'])->name('email-confirm');
+    Route::get('/password-change-confirm', [CustomerProfileController::class, 'showPasswordChangeConfirm'])->name('password-change-confirm');
+
+    // Settings route
+    Route::get('/settings', function (\Illuminate\Http\Request $request) {
+        $tab = $request->query('tab', 'account');
+        return view('customer.profile.settings', compact('tab'));
+    })->name('settings');
 });
 
 Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/customerprofile/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customerprofile.dashboard');  // Protected
@@ -484,13 +493,6 @@ Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->post(
 Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/customer/my-purchase', function () {
     return view('customer.profile.my_purchase');
 })->name('customer.my_purchase');
-
-// Settings (with optional tab)
-Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/customer/profile/settings', function (\Illuminate\Http\Request $request) {
-    $tab = $request->query('tab', 'account');
-    return view('customer.profile.settings', compact('tab'));
-})->name('customerprofile.settings');
-
 
 // My Purchases
 
@@ -802,6 +804,30 @@ if (interface_exists('Laravel\\Socialite\\Contracts\\Factory')) {
 
 
 Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.show');
+
+// Customer Profile Routes Group
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->prefix('customer/profile')->name('customerprofile.')->group(function () {
+    // Profile routes
+    Route::get('/', [CustomerProfileController::class, 'index'])->name('index');
+    Route::get('/edit', [CustomerProfileController::class, 'edit'])->name('edit');
+    Route::put('/update', [CustomerProfileController::class, 'update'])->name('update');
+
+    // Address routes
+    Route::get('/addresses', [CustomerProfileController::class, 'addresses'])->name('addresses');
+    Route::post('/addresses/store', [CustomerProfileController::class, 'storeAddress'])->name('addresses.store');
+    Route::put('/addresses/{address}', [CustomerProfileController::class, 'updateAddress'])->name('addresses.update');
+    Route::delete('/addresses/{address}', [CustomerProfileController::class, 'destroyAddress'])->name('addresses.destroy');
+
+    // Password change routes
+    Route::get('/change-password', [CustomerProfileController::class, 'showChangePasswordForm'])->name('change-password');
+    Route::post('/change-password', [CustomerProfileController::class, 'changePassword'])->name('change-password');
+
+    // Email verification routes
+    Route::get('/email-verification', [CustomerProfileController::class, 'showEmailVerification'])->name('email-verification');
+    Route::post('/send-verification-email', [CustomerProfileController::class, 'sendVerificationEmail'])->name('send-verification-email')->withoutMiddleware(\App\Http\Middleware\RoleMiddleware::class.':customer');
+    Route::get('/email-confirm/{token}', [CustomerProfileController::class, 'confirmEmail'])->name('email-confirm');
+    Route::get('/password-change-confirm', [CustomerProfileController::class, 'showPasswordChangeConfirm'])->name('password-change-confirm');
+});
 
 
 Route::get('/unauthorized', function () {

@@ -766,7 +766,7 @@
                         </button>
 
                         <div id="userDropdownMenu" class="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-200 z-50 hidden group-hover:block">
-                            <a href="{{ route('customer.profile.index') }}" class="block px-4 py-2 text-gray-700 hover:bg-[#e7ecff] transition-colors">My Account</a>
+                            <a href="{{ route('customerprofile.index') }}" class="block px-4 py-2 text-gray-700 hover:bg-[#e7ecff] transition-colors">My Account</a>
                             <div class="block px-4 py-2 text-gray-700 hover:bg-[#e7ecff] cursor-pointer transition-colors">My Purchase</div>
                             <div class="block px-4 py-2 text-gray-700 hover:bg-[#e7ecff] cursor-pointer transition-colors">My Favorites</div>
                             <form method="POST" action="{{ route('customer.logout') }}">
@@ -856,8 +856,8 @@
 
             <footer class="shipping-footer">
                 <div class="shipping-footer__actions">
-                    <a href="{{ route('customer.profile.addresses') }}" class="shipping-action-button shipping-action-button--primary">Update</a>
-                    <a href="{{ route('customer.profile.addresses') }}" class="shipping-action-button">Add</a>
+                    <a href="{{ route('customerprofile.addresses') }}" class="shipping-action-button shipping-action-button--primary">Update</a>
+                    <a href="{{ route('customerprofile.addresses') }}" class="shipping-action-button">Add</a>
                 </div>
             </footer>
 

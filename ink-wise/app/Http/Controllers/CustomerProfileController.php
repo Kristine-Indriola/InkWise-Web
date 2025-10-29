@@ -10,6 +10,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use App\Models\PasswordChangeAttempt;
+use App\Mail\PasswordChangeVerification;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 class CustomerProfileController extends Controller
 {
@@ -60,7 +66,18 @@ class CustomerProfileController extends Controller
 
         // Handle new photo upload
         if ($request->hasFile('photo')) {
-            $customer->photo = $request->file('photo')->store('avatars', 'public');
+            $originalPhoto = $customer->photo; // Store original for debugging
+            $newPhotoPath = $request->file('photo')->store('avatars', 'public');
+            $customer->photo = $newPhotoPath;
+
+            // Debug logging
+            Log::info('Photo upload', [
+                'user_id' => $user->id,
+                'customer_id' => $customer->id,
+                'original_photo' => $originalPhoto,
+                'new_photo_path' => $newPhotoPath,
+                'file_exists' => Storage::disk('public')->exists($newPhotoPath)
+            ]);
         }
 
         // Update other fields
@@ -94,7 +111,7 @@ class CustomerProfileController extends Controller
             'country' => 'Philippines',
         ]));
 
-        return redirect()->route('customer.profile.addresses')->with('success', 'Address added successfully!');
+        return redirect()->route('customerprofile.addresses')->with('success', 'Address added successfully!');
     }
 
     public function updateAddress(Request $request, Address $address)
@@ -105,13 +122,13 @@ class CustomerProfileController extends Controller
         'country' => 'Philippines', // still force Philippines
     ]));
 
-    return redirect()->route('customer.profile.addresses')->with('success', 'Address updated successfully!');
+    return redirect()->route('customerprofile.addresses')->with('success', 'Address updated successfully!');
 }
 
     public function destroyAddress(Address $address)
     {
         $address->delete();
-        return redirect()->route('customer.profile.addresses')->with('success', 'Address deleted!');
+        return redirect()->route('customerprofile.addresses')->with('success', 'Address deleted!');
     }
 
     // --- Shared Validation ---
@@ -290,5 +307,205 @@ class CustomerProfileController extends Controller
         });
 
         return redirect()->back()->with('status', 'Thank you for your rating!');
+    }
+
+    public function changePassword(Request $request)
+    {
+        $request->validate([
+            'current_password' => 'required',
+            'password' => 'required|min:8|confirmed',
+        ]);
+
+        $user = Auth::user();
+
+        // Check if email verification was completed
+        if (!session('password_change_verified')) {
+            return back()->withErrors(['verification' => 'Please verify your email before changing password.']);
+        }
+
+        // Check if current password is correct
+        if (!Hash::check($request->current_password, $user->password)) {
+            return back()->withErrors(['current_password' => 'The current password is incorrect.']);
+        }
+
+        // Update password
+        $user->update([
+            'password' => Hash::make($request->password),
+        ]);
+
+        // Clear verification session
+        session()->forget(['password_change_verified', 'verified_attempt_id']);
+
+        return back()->with('status', 'Password updated successfully!');
+    }
+
+    public function showChangePasswordForm()
+    {
+        return view('customer.profile.change-password.change-password');
+    }
+
+    // Email Verification Methods
+    public function showEmailVerification()
+    {
+        return view('customer.profile.change-password.email-verification');
+    }
+
+    public function sendVerificationEmail(Request $request)
+    {
+        Log::info('sendVerificationEmail method called', [
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'headers' => $request->headers->all()
+        ]);
+
+        try {
+            $user = Auth::user();
+
+            if (!$user) {
+                Log::error('No authenticated user found');
+                throw new \Exception('User not authenticated');
+            }
+
+            Log::info('Sending verification email for user', ['user_id' => $user->user_id, 'email' => $user->email]);
+
+            $customer = $user->customer;
+            
+            if (!$customer) {
+                Log::error('No customer record found for user', ['user_id' => $user->user_id]);
+                // Try to find customer by different means
+                $customer = \App\Models\Customer::where('user_id', $user->user_id)->first();
+                if (!$customer) {
+                    // For testing, create a dummy customer object
+                    Log::warning('Creating dummy customer for testing');
+                    $customer = (object) [
+                        'first_name' => 'Test',
+                        'last_name' => 'User',
+                        'id' => 1
+                    ];
+                }
+            }            // Get client information
+            $ip = $request->ip();
+            $userAgent = $request->userAgent();
+
+            Log::info('Creating password change attempt', [
+                'user_id' => $user->user_id,
+                'ip' => $ip,
+                'user_agent' => $userAgent
+            ]);
+
+            // Create password change attempt
+            $attempt = PasswordChangeAttempt::create([
+                'user_id' => $user->user_id,
+                'token' => Str::random(64),
+                'email' => $user->email,
+                'attempt_details' => [
+                    'ip' => $ip,
+                    'device' => $this->getDeviceInfo($userAgent),
+                    'location' => $this->getLocationFromIP($ip),
+                    'user_agent' => $userAgent,
+                ],
+                'expires_at' => now()->addMinutes(15), // Token expires in 15 minutes
+            ]);
+
+            // Verify the attempt was created
+            if (!$attempt) {
+                Log::error('Failed to create password change attempt record');
+                throw new \Exception('Failed to create password change attempt record');
+            }
+
+            Log::info('Password change attempt created', ['attempt_id' => $attempt->id]);
+
+            // Send verification email (use log mailer for development)
+            Log::info('Sending verification email via log mailer');
+            try {
+                // Send a simple test email first
+                \Illuminate\Support\Facades\Mail::mailer('log')->raw(
+                    "Password Change Verification\n\n" .
+                    "Hi {$customer->first_name},\n\n" .
+                    "Someone requested to change the password for your InkWise account.\n\n" .
+                    "If this was you, click here to verify: " . route('customerprofile.email-confirm', $attempt->token) . "\n\n" .
+                    "This link will expire in 15 minutes.\n\n" .
+                    "If you didn't request this change, please ignore this email.\n\n" .
+                    "InkWise Team",
+                    function($message) use ($user) {
+                        $message->to($user->email)->subject('Password Change Verification - InkWise');
+                    }
+                );
+                Log::info('Simple verification email sent successfully');
+            } catch (\Exception $mailException) {
+                Log::error('Simple mail sending failed', ['error' => $mailException->getMessage()]);
+                throw $mailException;
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Verification email sent successfully'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to send verification email', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send verification email. Please try again.'
+            ], 500);
+        }
+    }
+
+    public function confirmEmail($token)
+    {
+        $attempt = PasswordChangeAttempt::where('token', $token)
+            ->where('used', false)
+            ->where('expires_at', '>', now())
+            ->first();
+
+        if (!$attempt) {
+            return redirect()->route('customerprofile.change-password')
+                ->with('error', 'Invalid or expired verification link.');
+        }
+
+        // Mark attempt as used
+        $attempt->markAsUsed();
+
+        // Store verification in session for the change password form
+        session(['password_change_verified' => true, 'verified_attempt_id' => $attempt->id]);
+
+        return view('customer.profile.change-password.email-confirmation', compact('attempt'));
+    }
+
+    public function showPasswordChangeConfirm()
+    {
+        // Check if user has verified email
+        if (!session('password_change_verified')) {
+            return redirect()->route('customerprofile.change-password')
+                ->with('error', 'Please verify your email first.');
+        }
+
+        $attempt = PasswordChangeAttempt::find(session('verified_attempt_id'));
+
+        return view('customer.profile.change-password.email-confirmation', compact('attempt'));
+    }
+
+    // Helper methods
+    private function getDeviceInfo($userAgent)
+    {
+        // Simple device detection
+        if (strpos($userAgent, 'Mobile') !== false) {
+            return 'Mobile Device';
+        } elseif (strpos($userAgent, 'Tablet') !== false) {
+            return 'Tablet';
+        } else {
+            return 'Desktop Computer';
+        }
+    }
+
+    private function getLocationFromIP($ip)
+    {
+        // For demo purposes, return a placeholder
+        // In production, you would use a geolocation service
+        return 'Cebu City, PH';
     }
 }

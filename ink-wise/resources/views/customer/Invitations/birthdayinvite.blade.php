@@ -562,7 +562,7 @@
                             @endif
 
                             <div class="invitation-card__actions">
-                                <a href="{{ route('customer.profile.orderform') }}" class="invitation-card__action">
+                                <a href="{{ route('design.edit') }}" class="invitation-card__action">
                                     Start order
                                 </a>
                                 <button type="button"
