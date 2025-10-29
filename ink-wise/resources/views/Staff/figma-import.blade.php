@@ -22,7 +22,7 @@
                     required
                 >
                 <p class="text-sm text-gray-500 mt-1">
-                    Enter the URL of your Figma file. The system will automatically extract template frames.
+                    Enter the URL of your Figma file. The system will automatically extract all frames.
                 </p>
             </div>
 
@@ -46,7 +46,7 @@
 
             <!-- Frames Display -->
             <div id="frames-section" class="hidden mb-6">
-                <h2 class="text-lg font-semibold text-gray-800 mb-4">Available Template Frames</h2>
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">Available Frames</h2>
                 <div id="frames-list" class="space-y-3">
                     <!-- Frames will be populated here -->
                 </div>

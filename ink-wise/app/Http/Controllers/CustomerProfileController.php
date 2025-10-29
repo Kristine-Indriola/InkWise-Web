@@ -320,18 +320,7 @@ class CustomerProfileController extends Controller
     {
         $request->validate([
             'current_password' => 'required',
-            'password' => [
-                'required',
-                'min:8',
-                'confirmed',
-                'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/',
-                'different:current_password'
-            ],
-        ], [
-            'password.min' => 'Password must be at least 8 characters long.',
-            'password.regex' => 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.',
-            'password.different' => 'New password must be different from your current password.',
-            'password.confirmed' => 'Password confirmation does not match.',
+            'password' => 'required|min:8|confirmed',
         ]);
 
         $user = Auth::user();
@@ -354,12 +343,12 @@ class CustomerProfileController extends Controller
         // Clear verification session
         session()->forget(['password_change_verified', 'verified_attempt_id']);
 
-        return redirect()->route('customerprofile.index')->with('status', 'Password updated successfully!');
+        return back()->with('status', 'Password updated successfully!');
     }
 
     public function showChangePasswordForm()
     {
-        return view('customer.profile.password-change-form');
+        return view('customer.profile.change-password.change-password');
     }
 
     // Email Verification Methods

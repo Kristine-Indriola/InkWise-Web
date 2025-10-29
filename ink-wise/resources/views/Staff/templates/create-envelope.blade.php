@@ -229,7 +229,7 @@
             if (!data.frames || data.frames.length === 0) {
                 resultsDiv.innerHTML = `
                     <div class="alert alert-warning">
-                        <h6>No template frames found</h6>
+                        <h6>No frames found</h6>
                         <p>Make sure your Figma file contains frames with names that include:</p>
                         <ul>
                             <li><strong>Template</strong>, <strong>Invitation</strong>, <strong>Giveaway</strong>, or <strong>Envelope</strong></li>
@@ -280,10 +280,11 @@
 
             const importBtn = document.querySelector('button[onclick="importSelectedFrames()"]');
             importBtn.disabled = true;
-            importBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Importing...';
+            importBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Loading Preview...';
 
             try {
-                const response = await fetch('{{ route("staff.figma.import") }}', {
+                // First get the preview/SVG content
+                const response = await fetch('{{ route("staff.figma.preview") }}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -299,25 +300,86 @@
 
                 const data = await response.json();
 
-                if (data.success) {
-                    alert('Successfully imported ' + data.imported.length + ' template(s)!');
-                    if (data.imported.length === 1) {
-                        // Redirect to edit the imported template
-                        window.location.href = '{{ route("staff.templates.edit", ":id") }}'.replace(':id', data.imported[0].id);
-                    } else {
-                        window.location.href = '{{ route("staff.templates.index") }}';
-                    }
+                if (data.success && data.previews && data.previews.length > 0) {
+                    // Use the first preview (most common case)
+                    const preview = data.previews[0];
+                    
+                    // Populate the SVG preview container (single container for envelope)
+                    populateSvgPreview(preview);
+                    
+                    // Switch back to manual upload mode to show the preview
+                    toggleImportMethod('manual');
+                    
+                    // Update form data
+                    updateFormWithFigmaData(preview, figmaAnalyzedData);
+                    
+                    // Hide the Figma import section
+                    document.getElementById('figma-import-section').style.display = 'none';
+                    
+                    alert('Figma frame loaded successfully! Review the preview and submit the form to create the template.');
                 } else {
-                    alert('Import failed: ' + (data.message || 'Unknown error'));
-                    console.error('Import errors:', data.errors);
+                    alert('Preview failed: ' + (data.message || 'Unknown error'));
+                    console.error('Preview errors:', data.errors);
                 }
             } catch (error) {
-                console.error('Import error:', error);
-                alert('Import failed: ' + error.message);
+                console.error('Preview error:', error);
+                alert('Preview failed: ' + error.message);
             } finally {
                 importBtn.disabled = false;
                 importBtn.innerHTML = 'Import Selected Frames';
             }
+        }
+
+        function populateSvgPreview(preview) {
+            const previewContainer = document.getElementById('svg-preview-side');
+            
+            // Update preview with front SVG (envelopes typically only have front)
+            if (preview.front_svg && previewContainer) {
+                previewContainer.innerHTML = preview.front_svg;
+                previewContainer.style.display = 'flex';
+                previewContainer.style.alignItems = 'center';
+                previewContainer.style.justifyContent = 'center';
+            }
+        }
+
+        function updateFormWithFigmaData(preview, figmaData) {
+            // Update the name field if it's empty
+            const nameField = document.getElementById('name');
+            if (nameField && !nameField.value.trim()) {
+                nameField.value = preview.name;
+            }
+            
+            // Store Figma data in hidden fields
+            let figmaUrlField = document.getElementById('figma_url_hidden');
+            if (!figmaUrlField) {
+                figmaUrlField = document.createElement('input');
+                figmaUrlField.type = 'hidden';
+                figmaUrlField.id = 'figma_url_hidden';
+                figmaUrlField.name = 'figma_url';
+                document.querySelector('form').appendChild(figmaUrlField);
+            }
+            figmaUrlField.value = document.getElementById('figma_url').value;
+            
+            let figmaFileKeyField = document.getElementById('figma_file_key_hidden');
+            if (!figmaFileKeyField) {
+                figmaFileKeyField = document.createElement('input');
+                figmaFileKeyField.type = 'hidden';
+                figmaFileKeyField.id = 'figma_file_key_hidden';
+                figmaFileKeyField.name = 'figma_file_key';
+                document.querySelector('form').appendChild(figmaFileKeyField);
+            }
+            figmaFileKeyField.value = figmaData.file_key;
+            
+            // Store SVG content in hidden field
+            let frontSvgField = document.getElementById('front_svg_content');
+            if (!frontSvgField) {
+                frontSvgField = document.createElement('input');
+                frontSvgField.type = 'hidden';
+                frontSvgField.id = 'front_svg_content';
+                frontSvgField.name = 'front_svg_content';
+                document.querySelector('form').appendChild(frontSvgField);
+            }
+            frontSvgField.value = preview.front_svg || '';
         }
 
         // Toggle between manual upload and Figma import
