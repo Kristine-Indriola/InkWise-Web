@@ -30,6 +30,26 @@
         .create-container{max-width:1400px;margin:0 auto;padding:20px}
         /* Make the preview area scale inside the square */
         .svg-preview svg{width:100%;height:100%;object-fit:contain}
+        /* Style for imported SVG previews */
+        .svg-preview.imported {
+            border: 2px solid #28a745 !important;
+            background: #f8fff9 !important;
+        }
+        .svg-preview.imported::before {
+            content: "✓ Imported from Figma";
+            position: absolute;
+            top: -20px;
+            left: 0;
+            font-size: 12px;
+            color: #28a745;
+            background: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            border: 1px solid #28a745;
+        }
+        .preview-box {
+            position: relative;
+        }
     </style>
 @endpush
 
@@ -145,6 +165,39 @@
                         console.log('Form should submit');
                     });
                 }
+                
+                // Handle form submission with imported SVG data
+                if (form) {
+                    form.addEventListener('submit', function(e) {
+                        const frontInput = document.getElementById('custom_front_image');
+                        const backInput = document.getElementById('custom_back_image');
+                        
+                        // If we have imported SVG paths, add them as hidden inputs
+                        if (frontInput && frontInput.dataset.importedPath) {
+                            let hiddenFront = document.getElementById('imported_front_path');
+                            if (!hiddenFront) {
+                                hiddenFront = document.createElement('input');
+                                hiddenFront.type = 'hidden';
+                                hiddenFront.name = 'imported_front_path';
+                                hiddenFront.id = 'imported_front_path';
+                                form.appendChild(hiddenFront);
+                            }
+                            hiddenFront.value = frontInput.dataset.importedPath;
+                        }
+                        
+                        if (backInput && backInput.dataset.importedPath) {
+                            let hiddenBack = document.getElementById('imported_back_path');
+                            if (!hiddenBack) {
+                                hiddenBack = document.createElement('input');
+                                hiddenBack.type = 'hidden';
+                                hiddenBack.name = 'imported_back_path';
+                                hiddenBack.id = 'imported_back_path';
+                                form.appendChild(hiddenBack);
+                            }
+                            hiddenBack.value = backInput.dataset.importedPath;
+                        }
+                    });
+                }
             });        // Figma integration functions
         async function analyzeFigmaUrl() {
             const figmaUrl = document.getElementById('figma_url').value.trim();
@@ -193,7 +246,17 @@
             const resultsDiv = document.getElementById('figma-results');
 
             if (!data.frames || data.frames.length === 0) {
-                resultsDiv.innerHTML = '<div class="alert alert-warning">No eligible frames found in this Figma file. Looking for frames named "Template", "Invitation", "Giveaway", or "Envelope".</div>';
+                resultsDiv.innerHTML = `
+                    <div class="alert alert-warning">
+                        <h6>No template frames found</h6>
+                        <p>Make sure your Figma file contains frames with names that include:</p>
+                        <ul>
+                            <li><strong>Template</strong>, <strong>Invitation</strong>, <strong>Giveaway</strong>, or <strong>Envelope</strong></li>
+                            <li>Common keywords like: <em>card, design, layout, front, back, cover</em></li>
+                        </ul>
+                        <p><small>Frame names are case-insensitive. Examples: "Wedding Invitation", "Giveaway Card", "Envelope Template"</small></p>
+                    </div>
+                `;
                 return;
             }
 
@@ -256,11 +319,13 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    alert('Successfully imported ' + data.imported.length + ' template(s)!');
+                    // Instead of redirecting, load the imported SVGs into the preview areas
                     if (data.imported.length === 1) {
-                        // Redirect to edit the imported template
-                        window.location.href = '{{ route("staff.templates.edit", ":id") }}'.replace(':id', data.imported[0].id);
+                        const imported = data.imported[0];
+                        await loadImportedTemplate(imported);
+                        alert('Successfully imported template! You can now preview and customize it below.');
                     } else {
+                        alert('Successfully imported ' + data.imported.length + ' template(s)!');
                         window.location.href = '{{ route("staff.templates.index") }}';
                     }
                 } else {
@@ -273,6 +338,108 @@
             } finally {
                 importBtn.disabled = false;
                 importBtn.innerHTML = 'Import Selected Frames';
+            }
+        }
+
+        // Load imported template data into the form
+        async function loadImportedTemplate(templateData) {
+            console.log('Loading imported template:', templateData);
+            
+            // Switch back to manual upload mode
+            document.getElementById('manual-import').checked = true;
+            toggleImportMethod('manual');
+            
+            // Hide Figma import section completely for now
+            document.getElementById('figma-import-section').style.display = 'none';
+            
+            // Also hide the import method selection radio buttons
+            const importMethodSection = document.querySelector('.btn-group[role="group"]');
+            if (importMethodSection) {
+                importMethodSection.style.display = 'none';
+            }
+            
+            // Pre-fill template name if available
+            if (templateData.name) {
+                document.getElementById('template_name').value = templateData.name;
+            }
+            
+            // Load SVG previews
+            if (templateData.svg_path) {
+                await loadSVGPreview(templateData.svg_path, 'front-preview');
+                
+                // Store the SVG path for form submission
+                const frontInput = document.getElementById('custom_front_image');
+                if (frontInput) {
+                    // Create a custom property to store the imported path
+                    frontInput.dataset.importedPath = templateData.svg_path;
+                    frontInput.required = false; // Remove required since we have imported data
+                }
+            }
+            
+            if (templateData.back_svg_path) {
+                await loadSVGPreview(templateData.back_svg_path, 'back-preview');
+                
+                // Store the back SVG path for form submission
+                const backInput = document.getElementById('custom_back_image');
+                if (backInput) {
+                    backInput.dataset.importedPath = templateData.back_svg_path;
+                    backInput.required = false;
+                }
+            }
+            
+            // Show success message in the form
+            const resultsDiv = document.getElementById('figma-results');
+            resultsDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <h6>Template Imported Successfully!</h6>
+                    <p>SVG files have been loaded into the preview areas below. You can now customize the template name and submit to create your template.</p>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="showFigmaImport()">Import Another Frame</button>
+                </div>
+            `;
+        }
+        
+        // Function to show Figma import section again
+        function showFigmaImport() {
+            document.getElementById('figma-import').checked = true;
+            toggleImportMethod('figma');
+        }
+        
+        // Function to load SVG preview from server path
+        async function loadSVGPreview(svgPath, previewElementId) {
+            try {
+                // Construct the full URL to the SVG file
+                const svgUrl = svgPath.startsWith('http') ? svgPath : '/storage/' + svgPath.replace('storage/', '');
+                
+                // Fetch the SVG content
+                const response = await fetch(svgUrl);
+                if (!response.ok) {
+                    throw new Error('Failed to load SVG');
+                }
+                
+                const svgContent = await response.text();
+                
+                // Display in preview area
+                const previewElement = document.getElementById(previewElementId);
+                if (previewElement) {
+                    previewElement.innerHTML = svgContent;
+                    previewElement.classList.add('imported');
+                    
+                    // Update the corresponding file input label
+                    const inputId = previewElementId === 'front-preview' ? 'custom_front_image' : 'custom_back_image';
+                    const inputElement = document.getElementById(inputId);
+                    if (inputElement) {
+                        const label = document.querySelector(`label[for="${inputId}"]`);
+                        if (label) {
+                            label.innerHTML = label.innerHTML.replace(' *', '') + ' <span class="text-success">(Imported from Figma)</span>';
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading SVG preview:', error);
+                const previewElement = document.getElementById(previewElementId);
+                if (previewElement) {
+                    previewElement.innerHTML = '<span class="text-danger">Error loading SVG</span>';
+                }
             }
         }
 
@@ -390,10 +557,12 @@
                     <div class="create-group flex-1">
                         <label for="custom_front_image">Front Image *</label>
                         <input type="file" id="custom_front_image" name="front_image" accept="image/*" required>
+                        <small class="form-text text-muted">Upload a front image or import from Figma</small>
                     </div>
                     <div class="create-group flex-1">
                         <label for="custom_back_image">Back Image *</label>
                         <input type="file" id="custom_back_image" name="back_image" accept="image/*" required>
+                        <small class="form-text text-muted">Upload a back image or import from Figma</small>
                     </div>
                 </div>
 

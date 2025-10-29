@@ -227,7 +227,17 @@
             const resultsDiv = document.getElementById('figma-results');
 
             if (!data.frames || data.frames.length === 0) {
-                resultsDiv.innerHTML = '<div class="alert alert-warning">No eligible frames found in this Figma file. Looking for frames named "Template", "Invitation", "Giveaway", or "Envelope".</div>';
+                resultsDiv.innerHTML = `
+                    <div class="alert alert-warning">
+                        <h6>No template frames found</h6>
+                        <p>Make sure your Figma file contains frames with names that include:</p>
+                        <ul>
+                            <li><strong>Template</strong>, <strong>Invitation</strong>, <strong>Giveaway</strong>, or <strong>Envelope</strong></li>
+                            <li>Common keywords like: <em>card, design, layout, front, back, cover</em></li>
+                        </ul>
+                        <p><small>Frame names are case-insensitive. Examples: "Wedding Invitation", "Giveaway Card", "Envelope Template"</small></p>
+                    </div>
+                `;
                 return;
             }
 

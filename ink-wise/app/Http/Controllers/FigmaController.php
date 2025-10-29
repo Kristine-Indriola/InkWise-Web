@@ -68,10 +68,21 @@ class FigmaController extends Controller
 
         $frames = $this->figmaService->extractTemplateFrames($fileData);
 
+        Log::debug('Figma analyze result', [
+            'file_key' => $fileKey,
+            'frames_found' => count($frames),
+            'frames' => $frames
+        ]);
+
         if (empty($frames)) {
+            Log::warning('No template frames found', [
+                'file_key' => $fileKey,
+                'figma_url' => $figmaUrl
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'No template frames found in the Figma file. Frames should be named with "Template", "Invitation", "Giveaway", or "Envelope".',
+                'message' => 'No template frames found in the Figma file. Frames should be named with keywords like "Template", "Invitation", "Giveaway", "Envelope", "Card", "Design", "Layout", etc. Frame names are case-insensitive.',
             ], 404);
         }
 
