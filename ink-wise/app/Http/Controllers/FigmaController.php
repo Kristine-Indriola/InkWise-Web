@@ -75,14 +75,14 @@ class FigmaController extends Controller
         ]);
 
         if (empty($frames)) {
-            Log::warning('No template frames found', [
+            Log::warning('No frames found', [
                 'file_key' => $fileKey,
                 'figma_url' => $figmaUrl
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'No template frames found in the Figma file. Frames should be named with keywords like "Template", "Invitation", "Giveaway", "Envelope", "Card", "Design", "Layout", etc. Frame names are case-insensitive.',
+                'message' => 'No frames found in the Figma file. Please ensure your Figma file contains at least one frame.',
             ], 404);
         }
 
@@ -207,6 +207,108 @@ class FigmaController extends Controller
             'imported' => $importedTemplates,
             'errors' => $errors,
             'message' => count($importedTemplates) . ' templates imported successfully.' . (!empty($errors) ? ' Some designs failed to import.' : ''),
+        ]);
+    }
+
+    /**
+     * Preview Figma frames as SVG content without creating templates
+     */
+    public function preview(Request $request): JsonResponse
+    {
+        Log::info('Figma preview request', [
+            'file_key' => $request->input('file_key'),
+            'frames' => $request->input('frames'),
+        ]);
+
+        $validator = Validator::make($request->all(), [
+            'file_key' => 'required|string',
+            'frames' => 'required|array',
+            'frames.*.id' => 'required|string',
+            'frames.*.name' => 'required|string',
+            'frames.*.type' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid preview data provided.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $fileKey = $request->input('file_key');
+        $selectedFrames = $request->input('frames');
+
+        // For single frame import, don't group - just process each frame individually
+        $previews = [];
+        $errors = [];
+
+        // Fetch SVG images for all selected frames
+        $nodeIds = array_column($selectedFrames, 'id');
+        $imagesData = $this->figmaService->fetchSvgs($fileKey, $nodeIds);
+
+        Log::info('Figma fetchSvgs result', [
+            'file_key' => $fileKey,
+            'node_ids' => $nodeIds,
+            'images_data_exists' => !empty($imagesData),
+            'images_key_exists' => isset($imagesData['images']),
+            'images_count' => isset($imagesData['images']) ? count($imagesData['images']) : 0,
+        ]);
+
+        if (empty($imagesData) || !isset($imagesData['images'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch SVG images from Figma.',
+            ], 400);
+        }
+
+        // Process each frame individually
+        foreach ($selectedFrames as $frame) {
+            try {
+                $nodeId = $frame['id'];
+                $svgUrl = $imagesData['images'][$nodeId] ?? null;
+
+                if (!$svgUrl) {
+                    $errors[] = "No SVG URL found for frame: {$frame['name']}";
+                    continue;
+                }
+
+                $svgContent = file_get_contents($svgUrl);
+
+                if (!$svgContent) {
+                    $errors[] = "Failed to download SVG content for frame: {$frame['name']}";
+                    continue;
+                }
+
+                $previews[] = [
+                    'name' => $frame['name'],
+                    'type' => $frame['type'],
+                    'front_svg' => $svgContent, // For single frame, put it as front_svg
+                    'back_svg' => null,
+                    'has_back' => false,
+                ];
+
+            } catch (\Exception $e) {
+                Log::error('Failed to preview Figma frame', [
+                    'frame' => $frame,
+                    'error' => $e->getMessage(),
+                ]);
+                $errors[] = "Failed to preview frame '{$frame['name']}': {$e->getMessage()}";
+            }
+        }
+
+        Log::info('Figma preview final result', [
+            'previews_count' => count($previews),
+            'errors_count' => count($errors),
+            'errors' => $errors,
+            'success' => !empty($previews),
+        ]);
+
+        return response()->json([
+            'success' => !empty($previews),
+            'previews' => $previews,
+            'errors' => $errors,
+            'message' => count($previews) . ' designs ready for preview.' . (!empty($errors) ? ' Some designs failed to load.' : ''),
         ]);
     }
 

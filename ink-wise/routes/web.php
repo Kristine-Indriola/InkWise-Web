@@ -782,6 +782,7 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
     Route::prefix('figma')->name('figma.')->group(function () {
         Route::get('/', [\App\Http\Controllers\FigmaController::class, 'index'])->name('index');
         Route::post('/analyze', [\App\Http\Controllers\FigmaController::class, 'analyze'])->name('analyze');
+        Route::post('/preview', [\App\Http\Controllers\FigmaController::class, 'preview'])->name('preview');
         Route::post('/import', [\App\Http\Controllers\FigmaController::class, 'import'])->name('import');
         Route::post('/templates/{template}/sync', [\App\Http\Controllers\FigmaController::class, 'sync'])->name('sync');
     });
