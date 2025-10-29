@@ -434,6 +434,8 @@ class OrderFlowPersistenceTest extends TestCase
             'line_type' => OrderItem::LINE_TYPE_GIVEAWAY,
         ]);
 
+        $order->update(['status' => 'processing']);
+
         /** @var OrderFlowService $service */
         $service = app(OrderFlowService::class);
         $service->syncMaterialUsage($order->fresh('items'));
@@ -529,6 +531,8 @@ class OrderFlowPersistenceTest extends TestCase
             ],
         ]);
 
+        $order->update(['status' => 'processing']);
+
         /** @var OrderFlowService $service */
         $service = app(OrderFlowService::class);
         $service->syncMaterialUsage($order->fresh('items'));
@@ -614,6 +618,8 @@ class OrderFlowPersistenceTest extends TestCase
                 'material' => 'Custom Kraft Envelope',
             ],
         ]);
+
+        $order->update(['status' => 'processing']);
 
         $service = app(OrderFlowService::class);
         $service->syncMaterialUsage($order->fresh('items'));
@@ -701,6 +707,8 @@ class OrderFlowPersistenceTest extends TestCase
                 'name' => 'Mini Plant Souvenir',
             ],
         ]);
+
+        $order->update(['status' => 'processing']);
 
         /** @var OrderFlowService $service */
         $service = app(OrderFlowService::class);

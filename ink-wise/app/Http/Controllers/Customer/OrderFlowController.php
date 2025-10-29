@@ -317,6 +317,19 @@ class OrderFlowController extends Controller
                 ], 404);
             }
 
+            // Check stock availability before creating order
+            $stockShortages = $this->orderFlow->checkStockFromSummary($summary);
+            if (!empty($stockShortages)) {
+                $errorMessages = [];
+                foreach ($stockShortages as $shortage) {
+                    $status = $shortage['available'] <= 0 ? 'out of stock' : 'low stock';
+                    $errorMessages[] = "{$shortage['material_name']} is {$status} (available: {$shortage['available']}, required: {$shortage['required']})";
+                }
+                return response()->json([
+                    'message' => 'Insufficient stock for some materials: ' . implode('; ', $errorMessages),
+                ], 400);
+            }
+
             DB::transaction(function () use (&$order, $summary, &$orderJustCreated) {
                 $customerOrder = $this->orderFlow->createCustomerOrder(Auth::user());
                 $metadata = $this->orderFlow->buildInitialOrderMetadata($summary);
