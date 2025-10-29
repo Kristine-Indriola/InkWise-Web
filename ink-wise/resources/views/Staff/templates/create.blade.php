@@ -126,79 +126,75 @@
         setupPreview('custom_front_image', 'front-preview');
         setupPreview('custom_back_image', 'back-preview');
 
-            // Debug form submission
-            document.addEventListener('DOMContentLoaded', function() {
-                const form = document.querySelector('.create-form');
-                const submitBtn = document.querySelector('.btn-submit');
-                
-                console.log('Form found:', form);
-                console.log('Submit button found:', submitBtn);
-                
-                if (form) {
-                    form.addEventListener('submit', function(e) {
-                        console.log('Form submit event triggered');
-                        console.log('Form data:', new FormData(form));
-                        
-                        // Check required fields
-                        const requiredFields = form.querySelectorAll('[required]');
-                        requiredFields.forEach(field => {
-                            console.log(`Required field ${field.name}: ${field.value}`);
-                        });
-                    });
-                }
-                
-                if (submitBtn) {
-                    submitBtn.addEventListener('click', function(e) {
-                        console.log('Submit button clicked');
-                        console.log('Form action:', form ? form.action : 'No form');
-                        console.log('Button type:', this.type);
-                        console.log('Button disabled:', this.disabled);
-                        
-                        // Check for form validation
-                        if (form && !form.checkValidity()) {
-                            console.log('Form validation failed');
-                            form.reportValidity();
+        // Form submission handling
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.querySelector('.create-form');
+            
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    // Don't prevent default - let the form submit naturally
+                    // The form will handle file uploads properly via multipart/form-data
+                    
+                    // Basic validation
+                    const nameField = document.getElementById('name');
+                    const frontImageField = document.getElementById('custom_front_image');
+                    const backImageField = document.getElementById('custom_back_image');
+                    
+                    if (!nameField || !nameField.value.trim()) {
+                        e.preventDefault();
+                        alert('Please provide a template name.');
+                        return false;
+                    }
+                    
+                    const importMethod = document.querySelector('input[name="import_method"]:checked')?.value || 'manual';
+                    
+                    if (importMethod === 'manual') {
+                        // For invitations, we need both front and back images
+                        if (!frontImageField || !frontImageField.files || frontImageField.files.length === 0) {
                             e.preventDefault();
+                            alert('Please select a front SVG file.');
                             return false;
                         }
-                        
-                        console.log('Form should submit');
-                    });
-                }
-                
-                // Handle form submission with imported SVG data
-                if (form) {
-                    form.addEventListener('submit', function(e) {
-                        const frontInput = document.getElementById('custom_front_image');
-                        const backInput = document.getElementById('custom_back_image');
-                        
-                        // If we have imported SVG paths, add them as hidden inputs
-                        if (frontInput && frontInput.dataset.importedPath) {
-                            let hiddenFront = document.getElementById('imported_front_path');
-                            if (!hiddenFront) {
-                                hiddenFront = document.createElement('input');
-                                hiddenFront.type = 'hidden';
-                                hiddenFront.name = 'imported_front_path';
-                                hiddenFront.id = 'imported_front_path';
-                                form.appendChild(hiddenFront);
-                            }
-                            hiddenFront.value = frontInput.dataset.importedPath;
+                        if (!backImageField || !backImageField.files || backImageField.files.length === 0) {
+                            e.preventDefault();
+                            alert('Please select a back SVG file.');
+                            return false;
                         }
-                        
-                        if (backInput && backInput.dataset.importedPath) {
-                            let hiddenBack = document.getElementById('imported_back_path');
-                            if (!hiddenBack) {
-                                hiddenBack = document.createElement('input');
-                                hiddenBack.type = 'hidden';
-                                hiddenBack.name = 'imported_back_path';
-                                hiddenBack.id = 'imported_back_path';
-                                form.appendChild(hiddenBack);
-                            }
-                            hiddenBack.value = backInput.dataset.importedPath;
+                    }
+                    
+                    // Handle imported SVG paths if they exist
+                    const frontInput = document.getElementById('custom_front_image');
+                    const backInput = document.getElementById('custom_back_image');
+                    
+                    if (frontInput && frontInput.dataset.importedPath) {
+                        let hiddenFront = document.getElementById('imported_front_path');
+                        if (!hiddenFront) {
+                            hiddenFront = document.createElement('input');
+                            hiddenFront.type = 'hidden';
+                            hiddenFront.name = 'imported_front_path';
+                            hiddenFront.id = 'imported_front_path';
+                            form.appendChild(hiddenFront);
                         }
-                    });
-                }
-            });        // Figma integration functions
+                        hiddenFront.value = frontInput.dataset.importedPath;
+                    }
+                    
+                    if (backInput && backInput.dataset.importedPath) {
+                        let hiddenBack = document.getElementById('imported_back_path');
+                        if (!hiddenBack) {
+                            hiddenBack = document.createElement('input');
+                            hiddenBack.type = 'hidden';
+                            hiddenBack.name = 'imported_back_path';
+                            hiddenBack.id = 'imported_back_path';
+                            form.appendChild(hiddenBack);
+                        }
+                        hiddenBack.value = backInput.dataset.importedPath;
+                    }
+                    
+                    // Let the form submit normally
+                    return true;
+                });
+            }
+        });        // Figma integration functions
         async function analyzeFigmaUrl() {
             const figmaUrl = document.getElementById('figma_url').value.trim();
             const analyzeBtn = document.getElementById('analyze-figma-btn');
