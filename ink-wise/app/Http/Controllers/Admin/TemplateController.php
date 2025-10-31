@@ -562,6 +562,9 @@ public function uploadToProduct(Request $request, $id)
         // Check if already uploaded to product_uploads
         $existing = ProductUpload::where('template_id', $template->id)->first();
         if ($existing) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['success' => true, 'message' => 'Template already uploaded to products']);
+            }
             return redirect()->back()->with('success', 'Template already uploaded to products');
         }
 
@@ -590,6 +593,14 @@ public function uploadToProduct(Request $request, $id)
 
         foreach ($admins as $admin) {
             $admin->notify(new TemplateUploadedNotification($template, $staff));
+        }
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Template uploaded to products successfully',
+                'redirect' => route('staff.templates.index')
+            ]);
         }
 
         return redirect()->back()->with('success', 'Template uploaded to products successfully');

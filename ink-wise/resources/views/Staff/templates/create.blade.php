@@ -52,6 +52,204 @@
             font-weight: 600;
             margin-bottom: 8px;
         }
+
+        /* Import method styling */
+        .import-method-section {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            background: #fafafa;
+        }
+        .import-method-section .alert {
+            margin-bottom: 20px;
+        }
+        .import-method-section .create-row {
+            margin-bottom: 20px;
+        }
+        .import-method-section .create-row:last-child {
+            margin-bottom: 0;
+        }
+        .w-100 {
+            width: 100% !important;
+        }
+
+        /* Import Method Buttons */
+        .import-method-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .import-method-btn {
+            display: flex;
+            align-items: center;
+            padding: 20px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            background: white;
+            color: #6b7280;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: left;
+            min-height: 80px;
+        }
+
+        .import-method-btn:hover {
+            border-color: #d1d5db;
+            background: #f9fafb;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .import-method-btn.active {
+            border-color: #3b82f6;
+            background: linear-gradient(135deg, #eff6ff, #dbeafe);
+            color: #1d4ed8;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+        }
+
+        .import-method-btn.active:hover {
+            border-color: #2563eb;
+            background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+        }
+
+        .import-method-btn .btn-content {
+            flex: 1;
+        }
+
+        .import-method-btn .btn-content strong {
+            display: block;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .import-method-btn .btn-content small {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .import-method-btn i {
+            font-size: 24px;
+            margin-right: 12px;
+            opacity: 0.8;
+        }
+
+        .import-method-btn.active i {
+            opacity: 1;
+            color: #3b82f6;
+        }
+
+        /* Responsive design for smaller screens */
+        @media (max-width: 768px) {
+            .import-method-buttons {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .import-method-btn {
+                padding: 16px 12px;
+                min-height: 70px;
+            }
+
+            .import-method-btn .btn-content strong {
+                font-size: 14px;
+            }
+        }
+
+        /* Frame Selection Buttons */
+        .frame-selection-btn {
+            display: block;
+            width: 100%;
+            padding: 16px 14px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            background: white;
+            color: #374151;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .frame-selection-btn:hover {
+            border-color: #d1d5db;
+            background: #f9fafb;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .frame-selection-btn.selected {
+            border-color: #3b82f6;
+            background: linear-gradient(135deg, #eff6ff, #dbeafe);
+            color: #1d4ed8;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+        }
+
+        .frame-selection-btn.selected:hover {
+            border-color: #2563eb;
+            background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+        }
+
+        .frame-btn-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .frame-btn-icon {
+            font-size: 20px;
+            opacity: 0.7;
+            flex-shrink: 0;
+        }
+
+        .frame-selection-btn.selected .frame-btn-icon {
+            opacity: 1;
+            color: #3b82f6;
+        }
+
+        .frame-btn-details {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .frame-btn-title {
+            font-weight: 600;
+            font-size: 15px;
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .frame-btn-meta {
+            font-size: 12px;
+            opacity: 0.7;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .frame-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .frame-badge.primary {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .frame-badge.secondary {
+            background: #f3f4f6;
+            color: #374151;
+        }
     </style>
 @endpush
 
@@ -185,6 +383,23 @@
                 });
             }
 
+            // Setup import method button toggles
+            const importMethodButtons = document.querySelectorAll('.import-method-btn');
+            importMethodButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const method = this.getAttribute('data-method');
+
+                    // Remove active class from all buttons
+                    importMethodButtons.forEach(btn => btn.classList.remove('active'));
+
+                    // Add active class to clicked button
+                    this.classList.add('active');
+
+                    // Toggle the import method sections
+                    toggleImportMethod(method);
+                });
+            });
+
             // Test Figma buttons
             const frontBtn = document.getElementById('analyze-figma-front-btn');
             const backBtn = document.getElementById('analyze-figma-back-btn');
@@ -271,21 +486,24 @@
             // Show all frames for both front and back - no filtering needed
             data.frames.forEach(frame => {
                 const frameId = `frame_${side}_${frame.id}`;
-                const badgeClass = side === 'front' ? 'bg-primary' : 'bg-secondary';
-                const borderClass = side === 'front' ? 'border-primary' : 'border-secondary';
+                const badgeClass = side === 'front' ? 'primary' : 'secondary';
+                const iconClass = side === 'front' ? 'fas fa-file-alt text-primary' : 'fas fa-file text-secondary';
                 html += `
-                    <div class="frame-item border rounded p-3 mb-2 ${borderClass}">
-                        <div class="form-check">
-                            <input class="form-check-input frame-checkbox" type="radio"
-                                   name="frame_${side}" id="${frameId}" value="${frame.id}"
-                                   data-frame='${JSON.stringify(frame).replace(/'/g, "&apos;")}'
-                                   data-side="${side}">
-                            <label class="form-check-label" for="${frameId}">
-                                <strong>${frame.name}</strong> <span class="badge ${badgeClass}">${sideTitle}</span>
-                                <br><small class="text-muted">Size: ${frame.bounds.width}x${frame.bounds.height}</small>
-                            </label>
+                    <button type="button" class="frame-selection-btn" id="${frameId}"
+                            data-frame='${JSON.stringify(frame).replace(/'/g, "&apos;")}'
+                            data-side="${side}"
+                            onclick="selectFrame('${frameId}', '${side}')">
+                        <div class="frame-btn-content">
+                            <i class="frame-btn-icon ${iconClass}"></i>
+                            <div class="frame-btn-details">
+                                <div class="frame-btn-title">${frame.name}</div>
+                                <div class="frame-btn-meta">
+                                    <span>Size: ${frame.bounds.width}x${frame.bounds.height}</span>
+                                    <span class="frame-badge ${badgeClass}">${sideTitle}</span>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    </button>
                 `;
             });
 
@@ -299,14 +517,28 @@
             resultsDiv.innerHTML = html;
         }
 
+        // Frame selection handling
+        function selectFrame(frameId, side) {
+            // Remove selected class from all buttons in this side
+            const allButtons = document.querySelectorAll(`#figma-results-${side} .frame-selection-btn`);
+            allButtons.forEach(btn => btn.classList.remove('selected'));
+
+            // Add selected class to clicked button
+            const selectedButton = document.getElementById(frameId);
+            selectedButton.classList.add('selected');
+
+            // Store the selection (you could store this in a variable if needed)
+            console.log('Selected frame:', frameId, 'for side:', side);
+        }
+
         async function importSingleFrame(side) {
-            const selectedRadio = document.querySelector(`input[name="frame_${side}"]:checked`);
-            if (!selectedRadio) {
+            const selectedButton = document.querySelector(`#figma-results-${side} .frame-selection-btn.selected`);
+            if (!selectedButton) {
                 alert(`Please select a frame for the ${side} design`);
                 return;
             }
 
-            const frame = JSON.parse(selectedRadio.getAttribute('data-frame').replace(/&apos;/g, "'"));
+            const frame = JSON.parse(selectedButton.getAttribute('data-frame').replace(/&apos;/g, "'"));
             console.log('Importing frame for', side, frame);
             const importBtn = document.querySelector(`button[onclick="importSingleFrame('${side}')"]`);
             
@@ -369,7 +601,7 @@
         }
 
         async function importSelectedFrames() {
-            const checkedBoxes = document.querySelectorAll('.frame-checkbox:checked');
+            const checkedBoxes = document.querySelectorAll('.frame-selection-btn.selected');
             if (checkedBoxes.length === 0) {
                 alert('Please select at least one frame to import');
                 return;
@@ -380,9 +612,9 @@
                 return;
             }
 
-            const frames = Array.from(checkedBoxes).map(checkbox => {
-                const frame = JSON.parse(checkbox.getAttribute('data-frame').replace(/&apos;/g, "'"));
-                frame.side = checkbox.getAttribute('data-side') || 'auto';
+            const frames = Array.from(checkedBoxes).map(button => {
+                const frame = JSON.parse(button.getAttribute('data-frame').replace(/&apos;/g, "'"));
+                frame.side = button.getAttribute('data-side') || 'auto';
                 return frame;
             });
 
@@ -720,70 +952,110 @@
                     <i class="fas fa-info-circle me-2"></i>
                     Choose how to import your template designs. You can either upload SVG files manually or import from Figma. At least one design (front or back) is required.
                 </div>
-                <div class="mb-3">
-                    <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="import_method_radio" id="method_manual" value="manual" checked onclick="toggleImportMethod('manual')">
-                        <label class="form-check-label" for="method_manual">
-                            Manual SVG Upload
-                        </label>
-                    </div>
-                    <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="import_method_radio" id="method_figma" value="figma" onclick="toggleImportMethod('figma')">
-                        <label class="form-check-label" for="method_figma">
-                            Import from Figma
-                        </label>
-                    </div>
+
+                <!-- Import Method Toggle Buttons -->
+                <div class="import-method-buttons mb-4">
+                    <button type="button" id="btn-method-manual" class="import-method-btn active" data-method="manual">
+                        <i class="fas fa-upload me-2"></i>
+                        <div class="btn-content">
+                            <strong>Manual SVG Upload</strong>
+                            <small>Upload files directly</small>
+                        </div>
+                    </button>
+                    <button type="button" id="btn-method-figma" class="import-method-btn" data-method="figma">
+                        <i class="fab fa-figma me-2"></i>
+                        <div class="btn-content">
+                            <strong>Import from Figma</strong>
+                            <small>Use Figma designs</small>
+                        </div>
+                    </button>
                 </div>
+
                 <input type="hidden" name="import_method" value="manual">
             </div>
 
             <!-- Manual Upload Section -->
-            <div id="manual-upload-section" style="display: block;">
+            <div id="manual-upload-section" class="import-method-section" style="display: block;">
+                <div class="alert alert-info mb-4">
+                    <i class="fas fa-upload me-2"></i>
+                    <strong>Manual Upload:</strong> Upload SVG files directly for your template designs. At least one design file is required.
+                </div>
+
+                <!-- File Upload Inputs Row -->
                 <div class="create-row">
                     <div class="create-group flex-1">
-                        <label for="front_image">Front Design (SVG)</label>
+                        <label for="front_image">
+                            <i class="fas fa-file-alt text-primary me-1"></i>Front Design (SVG)
+                        </label>
                         <input type="file" id="front_image" name="front_image" accept=".svg,.svg+xml,image/svg+xml" class="form-control">
-                        <small class="form-text text-muted">Upload SVG file for the front design (optional)</small>
+                        <small class="form-text text-muted">Upload SVG file for the front design</small>
                     </div>
                     <div class="create-group flex-1">
-                        <label for="back_image">Back Design (SVG)</label>
+                        <label for="back_image">
+                            <i class="fas fa-file text-secondary me-1"></i>Back Design (SVG) <small class="text-muted">(optional)</small>
+                        </label>
                         <input type="file" id="back_image" name="back_image" accept=".svg,.svg+xml,image/svg+xml" class="form-control">
-                        <small class="form-text text-muted">Upload SVG file for the back design (optional)</small>
+                        <small class="form-text text-muted">Upload SVG file for the back design</small>
                     </div>
                 </div>
             </div>
 
             <!-- Figma Import Section -->
-            <div id="figma-import-section" style="display: none;">
-                <!-- Front Design Import -->
-                <div class="create-group">
-                    <h5 class="mb-3"><i class="fas fa-file-alt text-primary me-2"></i>Front Design Import</h5>
-                    <label for="figma_url_front">Figma File URL for Front Design</label>
-                    <div class="input-group mb-2">
+            <div id="figma-import-section" class="import-method-section" style="display: none;">
+                <div class="alert alert-info mb-4">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Figma Import:</strong> Enter your Figma file URLs below and analyze them to import designs. You can import separate designs for front and back, or use the same file for both.
+                </div>
+
+                <!-- Figma URL Inputs Row -->
+                <div class="create-row mb-4">
+                    <div class="create-group flex-1">
+                        <label for="figma_url_front">
+                            <i class="fas fa-file-alt text-primary me-1"></i>Front Design Figma URL
+                        </label>
                         <input type="url" id="figma_url_front" class="form-control" placeholder="https://www.figma.com/design/... or https://www.figma.com/file/...">
-                        <button type="button" id="analyze-figma-front-btn" class="btn btn-outline-primary" onclick="analyzeFigmaUrl('front')">
-                            <i class="fas fa-search me-1"></i>Analyze Front Design
-                        </button>
+                        <small class="form-text text-muted">Shareable link to Figma file containing front design</small>
                     </div>
-                    <small class="form-text text-muted">Enter the shareable link to your Figma file containing the front design</small>
-                    <div id="figma-results-front" class="mt-3">
-                        <!-- Front figma analysis results will appear here -->
+                    <div class="create-group flex-1">
+                        <label for="figma_url_back">
+                            <i class="fas fa-file text-secondary me-1"></i>Back Design Figma URL <small class="text-muted">(optional)</small>
+                        </label>
+                        <input type="url" id="figma_url_back" class="form-control" placeholder="https://www.figma.com/design/... or https://www.figma.com/file/...">
+                        <small class="form-text text-muted">Shareable link to Figma file containing back design</small>
                     </div>
                 </div>
 
-                <!-- Back Design Import -->
-                <div class="create-group">
-                    <h5 class="mb-3"><i class="fas fa-file text-secondary me-2"></i>Back Design Import</h5>
-                    <label for="figma_url_back">Figma File URL for Back Design</label>
-                    <div class="input-group mb-2">
-                        <input type="url" id="figma_url_back" class="form-control" placeholder="https://www.figma.com/design/... or https://www.figma.com/file/...">
-                        <button type="button" id="analyze-figma-back-btn" class="btn btn-outline-secondary" onclick="analyzeFigmaUrl('back')">
-                            <i class="fas fa-search me-1"></i>Analyze Back Design
+                <!-- Analyze Buttons Row -->
+                <div class="create-row mb-4">
+                    <div class="create-group flex-1">
+                        <button type="button" id="analyze-figma-front-btn" class="btn btn-primary w-100" onclick="analyzeFigmaUrl('front')">
+                            <i class="fas fa-search me-2"></i>Analyze Front Design
                         </button>
                     </div>
-                    <small class="form-text text-muted">Enter the shareable link to your Figma file containing the back design (optional)</small>
-                    <div id="figma-results-back" class="mt-3">
-                        <!-- Back figma analysis results will appear here -->
+                    <div class="create-group flex-1">
+                        <button type="button" id="analyze-figma-back-btn" class="btn btn-secondary w-100" onclick="analyzeFigmaUrl('back')">
+                            <i class="fas fa-search me-2"></i>Analyze Back Design
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Analysis Results -->
+                <div class="create-row">
+                    <div class="create-group flex-1">
+                        <div id="figma-results-front">
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-file-alt fa-2x mb-2"></i>
+                                <p>Click "Analyze Front Design" to load available frames</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="create-group flex-1">
+                        <div id="figma-results-back">
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-file fa-2x mb-2"></i>
+                                <p>Click "Analyze Back Design" to load available frames</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
