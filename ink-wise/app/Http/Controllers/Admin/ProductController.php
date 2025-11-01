@@ -448,7 +448,7 @@ class ProductController extends Controller
                                 'type' => 'paper_stock',
                                 'qty' => 1, // 1 paper stock per invitation
                                 'source_type' => 'product',
-                                'quantity_mode' => 'per_item', // Deduct 1 per invitation ordered
+                                'quantity_mode' => 'per_unit', // Deduct 1 per invitation ordered
                             ]);
                         }
                     }

@@ -64,7 +64,7 @@ class LinkProductMaterials extends Command
                                 'type' => 'paper_stock',
                                 'qty' => 1,
                                 'source_type' => 'product',
-                                'quantity_mode' => 'per_item',
+                                'quantity_mode' => 'per_unit',
                             ]);
                         }
                     });
