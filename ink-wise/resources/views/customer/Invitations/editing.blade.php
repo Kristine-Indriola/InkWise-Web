@@ -1180,6 +1180,10 @@
                                         </div>
                                     </section>
 
+                                    <!-- Hidden image input elements for JavaScript image editing -->
+                                    <input type="file" id="imageInputFront" data-image-input="front" accept="image/*" style="display: none;" />
+                                    <input type="file" id="imageInputBack" data-image-input="back" accept="image/*" style="display: none;" />
+
                 <section class="editor-panel" data-panel="graphics">
                     <div class="graphics-panel p-4 flex flex-col h-full" style="height:100%;">
                         <div class="flex items-center justify-between mb-3">

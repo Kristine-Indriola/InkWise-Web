@@ -2798,36 +2798,53 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     closeInlineEditor(true);
-  inlineEditorOriginalValue = getSvgNodeValue(node);
-  // begin history capture for inline edit
-  beginHistoryCapture(node, side);
+    inlineEditorOriginalValue = getSvgNodeValue(node);
+    // begin history capture for inline edit
+    beginHistoryCapture(node, side);
 
-  const svg = getSvgRoot(side);
-  const host = canvasArea || canvasWrapper;
-  if (!svg || !host) return;
-  const nodeRect = node.getBoundingClientRect();
-  const hostRect = host.getBoundingClientRect();
+    const svg = getSvgRoot(side);
+    const host = canvasArea || canvasWrapper;
+    if (!svg || !host) return;
+
+    // Get the node's bounding rectangle, accounting for any SVG transformations
+    const nodeRect = node.getBoundingClientRect();
+    const hostRect = host.getBoundingClientRect();
+
+    // Account for canvas zoom scaling
+    const scaleFactor = zoom || 1;
+    const scaledLeft = (nodeRect.left - hostRect.left) / scaleFactor;
+    const scaledTop = (nodeRect.top - hostRect.top) / scaleFactor;
 
     const editor = document.createElement('textarea');
     editor.className = 'inline-text-editor';
     editor.setAttribute('aria-label', 'Edit canvas text');
     editor.value = inlineEditorOriginalValue;
     editor.style.position = 'absolute';
-    editor.style.left = `${nodeRect.left - hostRect.left}px`;
-    editor.style.top = `${nodeRect.top - hostRect.top}px`;
+    editor.style.left = `${scaledLeft}px`;
+    editor.style.top = `${scaledTop}px`;
 
     // initial sizing: at least as big as node bbox, otherwise readable minimums
-    const minWidth = Math.max(nodeRect.width, 120);
-    const minHeight = Math.max(nodeRect.height, 28);
+    const minWidth = Math.max(nodeRect.width / scaleFactor, 120);
+    const minHeight = Math.max(nodeRect.height / scaleFactor, 28);
     editor.style.width = `${minWidth}px`;
     editor.style.height = `${minHeight}px`;
 
     // visual: minimal by default, focus shows strong ring; caret color should match SVG fill
     editor.style.padding = '6px 8px';
-    editor.style.border = 'none';
+    editor.style.border = '2px solid #3B82F6';
     editor.style.borderRadius = '6px';
     editor.style.background = 'rgba(255,255,255,0.98)';
-    editor.style.boxShadow = '0 4px 12px rgba(15, 23, 42, 0.08)';
+    editor.style.boxShadow = '0 4px 12px rgba(15, 23, 42, 0.15)';
+    editor.style.zIndex = '35';
+
+    // Apply zoom scaling to the editor itself
+    editor.style.transform = `scale(${scaleFactor})`;
+    editor.style.transformOrigin = 'top left';
+
+    // Adjust positioning to account for scaling
+    editor.style.left = `${scaledLeft}px`;
+    editor.style.top = `${scaledTop}px`;
+
     const rawFontSize = node.getAttribute('font-size') || window.getComputedStyle(node).fontSize || '18px';
     const normalizedFontSize = /px$/i.test(rawFontSize) ? rawFontSize : `${rawFontSize}px`;
     editor.style.fontSize = normalizedFontSize;
@@ -2838,20 +2855,19 @@ document.addEventListener("DOMContentLoaded", () => {
     editor.style.color = svgFill;
     editor.style.caretColor = svgFill;
     editor.style.resize = 'none';
-    editor.style.zIndex = '35';
 
     // autosize helper: resize textarea height to fit content
     function autosize() {
       try {
         editor.style.height = '1px';
         const scrollH = Math.max(editor.scrollHeight, minHeight);
-        editor.style.height = (scrollH) + 'px';
+        editor.style.height = (scrollH / scaleFactor) + 'px';
       } catch (e) {}
     }
     // run once to ensure initial fit
     setTimeout(autosize, 0);
 
-  host.appendChild(editor);
+    host.appendChild(editor);
 
     inlineEditor = editor;
     inlineEditorNode = node;
@@ -2860,8 +2876,8 @@ document.addEventListener("DOMContentLoaded", () => {
     node.classList.add('svg-text-focus');
     syncFieldHighlight(nodeKey, side, true);
     showTextToolbar(node);
-  // populate toolbar with node state
-  populateToolbarForNode(node, side);
+    // populate toolbar with node state
+    populateToolbarForNode(node, side);
 
     // sync styles from SVG node to textarea so typing visually matches
     try {
@@ -2877,13 +2893,15 @@ document.addEventListener("DOMContentLoaded", () => {
       const fs = node.getAttribute('font-size') || window.getComputedStyle(node).fontSize || '';
       if (fs) editor.style.fontSize = /px$/i.test(fs) ? fs : `${fs}px`;
     } catch (e) {}
-  // composition state for IME (prevent Enter from committing during composition)
-  let composing = false;
-  // typing debounce to group rapid input into a single history entry
-  let typingTimer = null;
-  const TYPING_DEBOUNCE_MS = 600;
+
+    // composition state for IME (prevent Enter from committing during composition)
+    let composing = false;
+    // typing debounce to group rapid input into a single history entry
+    let typingTimer = null;
+    const TYPING_DEBOUNCE_MS = 600;
     editor.addEventListener('compositionstart', () => { composing = true; });
-    editor.addEventListener('compositionend', (ev) => { composing = false; /* propagate final input */
+    editor.addEventListener('compositionend', (ev) => {
+      composing = false;
       // after IME composition finishes, ensure SVG reflects the committed text
       setSvgNodeText(node, editor.value);
       syncPanelInputValue(nodeKey, side, editor.value);
@@ -2938,15 +2956,22 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       editor.select?.();
     });
-  }
-
-  function prepareSvgNode(node, side) {
+  }  function prepareSvgNode(node, side) {
+    if (!node || !side) return;
     const nodeKey = ensureTextNodeKey(node, side);
     if (!nodeKey) return;
-    if (node.dataset.prepared === side) {
-      svgTextCache[side].set(nodeKey, node);
-      return;
+
+    // Remove existing event listeners to prevent duplicates
+    if (node._iwEventListeners) {
+      node._iwEventListeners.forEach(({ event, handler }) => {
+        try { node.removeEventListener(event, handler); } catch (e) {}
+      });
+      node._iwEventListeners = [];
+    } else {
+      node._iwEventListeners = [];
     }
+
+    // Always prepare the node, don't skip based on dataset.prepared
     svgTextCache[side].set(nodeKey, node);
 
     if (!node.dataset.originalX && node.hasAttribute("x")) {
@@ -2956,10 +2981,14 @@ document.addEventListener("DOMContentLoaded", () => {
       node.dataset.originalY = node.getAttribute("y");
     }
 
+    // Ensure proper attributes for interaction
     node.setAttribute("contenteditable", "true");
     node.setAttribute("role", "textbox");
     node.setAttribute("spellcheck", "false");
     node.setAttribute("tabindex", "0");
+    node.style.cursor = "pointer"; // Make it clear it's clickable
+    node.style.userSelect = "none"; // Prevent text selection
+
     if (!node.hasAttribute("aria-label")) {
       try {
         const nodeKey = node.getAttribute('data-text-node') || node.getAttribute('id') || '';
@@ -2968,20 +2997,29 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (e) { node.setAttribute('aria-label', 'Edit canvas text'); }
     }
 
-    node.addEventListener("focus", () => {
+    // Focus/blur handlers
+    const focusHandler = () => {
       if (currentView !== side) setActiveView(side);
       node.classList.add("svg-text-focus");
       syncFieldHighlight(nodeKey, side, true);
       showTextToolbar(node);
       populateToolbarForNode(node, side);
-    });
-
-    node.addEventListener("blur", () => {
+      selectedElementNode = node;
+      selectedElementSide = side;
+      createBoundingBox(node, side);
+    };
+    const blurHandler = () => {
       node.classList.remove("svg-text-focus");
       syncFieldHighlight(nodeKey, side, false);
-    });
+    };
 
-    node.addEventListener("keydown", (event) => {
+    node.addEventListener("focus", focusHandler);
+    node.addEventListener("blur", blurHandler);
+    node._iwEventListeners.push({ event: "focus", handler: focusHandler });
+    node._iwEventListeners.push({ event: "blur", handler: blurHandler });
+
+    // Keydown handler for arrow keys and editing
+    const keydownHandler = (event) => {
       const moveKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
       if (moveKeys.includes(event.key)) {
         event.preventDefault();
@@ -3009,11 +3047,21 @@ document.addEventListener("DOMContentLoaded", () => {
         startInlineEditor(node, side);
         return;
       }
-    });
+    };
 
-    node.addEventListener("input", () => handleSvgNodeInput(node, side));
+    node.addEventListener("keydown", keydownHandler);
+    node._iwEventListeners.push({ event: "keydown", handler: keydownHandler });
 
-    node.addEventListener('pointerdown', (event) => handleNodePointerDown(event, node, side));
+    // Input handler
+    const inputHandler = () => handleSvgNodeInput(node, side);
+    node.addEventListener("input", inputHandler);
+    node._iwEventListeners.push({ event: "input", handler: inputHandler });
+
+    // Pointer events for dragging
+    const pointerDownHandler = (event) => handleNodePointerDown(event, node, side);
+    node.addEventListener('pointerdown', pointerDownHandler);
+    node._iwEventListeners.push({ event: 'pointerdown', handler: pointerDownHandler });
+
     node.addEventListener('pointermove', handleNodePointerMove);
     node.addEventListener('pointerup', (event) => handleNodePointerUp(event, false));
     node.addEventListener('pointercancel', (event) => handleNodePointerUp(event, true));
@@ -3023,18 +3071,40 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    node.addEventListener('dblclick', (event) => {
+    // Double-click handler for inline editing
+    const dblclickHandler = (event) => {
       event.preventDefault();
       event.stopPropagation();
       startInlineEditor(node, side);
-    });
+    };
+    node.addEventListener('dblclick', dblclickHandler);
+    node._iwEventListeners.push({ event: 'dblclick', handler: dblclickHandler });
 
-    // when node is focused/selected, ensure resize handle positions
-    node.addEventListener('focus', () => placeResizeHandle(node, side));
-    node.addEventListener('blur', () => hideResizeHandle());
+    // Click handler as fallback for single click editing
+    const clickHandler = (event) => {
+      // Only handle single clicks if not already handled by double-click
+      if (event.detail === 1) {
+        // Delay to allow for potential double-click
+        setTimeout(() => {
+          if (!inlineEditor || inlineEditorNode !== node) {
+            startInlineEditor(node, side);
+          }
+        }, 200);
+      }
+    };
+    node.addEventListener('click', clickHandler);
+    node._iwEventListeners.push({ event: 'click', handler: clickHandler });
 
-  // ensure there's a wrapper group for transforms
-  try { ensureTransformWrapper(node); } catch (e) {}
+    // Focus handlers for resize/rotate handles
+    const focusHandlerForHandles = () => placeResizeHandle(node, side);
+    const blurHandlerForHandles = () => hideResizeHandle();
+    node.addEventListener('focus', focusHandlerForHandles);
+    node.addEventListener('blur', blurHandlerForHandles);
+    node._iwEventListeners.push({ event: 'focus', handler: focusHandlerForHandles });
+    node._iwEventListeners.push({ event: 'blur', handler: blurHandlerForHandles });
+
+    // Ensure there's a wrapper group for transforms
+    try { ensureTransformWrapper(node); } catch (e) {}
 
     node.dataset.prepared = side;
   }
