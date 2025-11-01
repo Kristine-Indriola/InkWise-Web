@@ -18,14 +18,7 @@ class Template extends Model
         'front_image',
         'back_image',
         'status',
-
         'metadata',
-        'svg_path',
-    ];
-
-    protected $casts = [
-        'metadata' => 'array',
-
         'svg_path',
         'back_svg_path',
         'design',
@@ -37,7 +30,14 @@ class Template extends Model
         'figma_metadata',
         'figma_synced_at',
         'has_back_design',
+    ];
 
+    protected $casts = [
+        'metadata' => 'array',
+        'figma_metadata' => 'array',
+        'figma_synced_at' => 'datetime',
+        'processed_at' => 'datetime',
+        'has_back_design' => 'boolean',
     ];
 
     public function products()
