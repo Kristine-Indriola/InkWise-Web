@@ -240,35 +240,6 @@
                 bottom: 5px;
             }
         }
-        .undo-redo-controls {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-right: 16px;
-        }
-        .undo-redo-controls button {
-            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 16px;
-            color: #374151;
-            transition: all 0.2s ease;
-        }
-        .undo-redo-controls button:hover:not(:disabled) {
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        }
-        .undo-redo-controls button:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
         .canvas-layers-panel {
             position: absolute;
             top: 20px;
@@ -499,10 +470,6 @@
     <!-- TOP BAR -->
     <div class="editor-topbar">
         <div class="left-tools">
-            <div class="undo-redo-controls">
-                <button class="undo-btn" id="canvasUndo" type="button" title="Undo last action" disabled>↶</button>
-                <button class="redo-btn" id="canvasRedo" type="button" title="Redo last action" disabled>↷</button>
-            </div>
             <button id="editModeToggle" class="edit-mode-btn" type="button" title="Toggle Edit Mode">Edit Mode</button>
             <button id="showLayers" class="layers-btn" type="button" title="Show layers panel">Layers</button>
             <button id="showStats" class="stats-btn" type="button" title="Show canvas stats">Stats</button>
@@ -533,7 +500,7 @@
             <button class="side-btn" type="button" data-panel="colors">Design color</button>
         </div>
 
-        <!-- MIDDLE CANVAS -->
+        <!-- CANVAS COLUMN -->
         <div class="canvas-column">
             <div class="canvas-area">
             <!-- Canvas Layers Panel -->
@@ -1575,6 +1542,29 @@
                 });
             }
 
+            // Sidebar panel switching
+            const sideBtns = document.querySelectorAll('.side-btn');
+            const editorPanels = document.querySelectorAll('.editor-panel');
+
+            sideBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // Remove active class from all buttons
+                    sideBtns.forEach(b => b.classList.remove('active'));
+                    // Add active class to clicked button
+                    this.classList.add('active');
+
+                    // Hide all panels
+                    editorPanels.forEach(panel => panel.classList.remove('active'));
+
+                    // Show the corresponding panel
+                    const panelName = this.dataset.panel;
+                    const targetPanel = document.querySelector(`.editor-panel[data-panel="${panelName}"]`);
+                    if (targetPanel) {
+                        targetPanel.classList.add('active');
+                    }
+                });
+            });
+
             // Text Editor Enhancements
             initializeTextEditor();
         });
@@ -1768,85 +1758,6 @@
                 // Globals
                 window.currentView = window.currentView || 'front';
                 var canvases = { front: null, back: null };
-
-                // Undo/Redo System
-                var history = { front: [], back: [] };
-                var historyIndex = { front: -1, back: -1 };
-                var maxHistorySize = 50;
-
-                function saveCanvasState(canvas, view) {
-                    var state = JSON.stringify(canvas.toJSON());
-                    var viewHistory = history[view];
-                    var viewIndex = historyIndex[view];
-
-                    // Remove any history after current index
-                    viewHistory.splice(viewIndex + 1);
-
-                    // Add new state
-                    viewHistory.push(state);
-
-                    // Limit history size
-                    if (viewHistory.length > maxHistorySize) {
-                        viewHistory.shift();
-                    } else {
-                        viewIndex++;
-                    }
-
-                    historyIndex[view] = viewIndex;
-                    updateUndoRedoButtons(view);
-                }
-
-                function undoCanvas(view) {
-                    var viewHistory = history[view];
-                    var viewIndex = historyIndex[view];
-
-                    if (viewIndex > 0) {
-                        viewIndex--;
-                        historyIndex[view] = viewIndex;
-                        loadCanvasState(canvases[view], viewHistory[viewIndex]);
-                        updateUndoRedoButtons(view);
-                        showNotification('Action undone', 'info');
-                    }
-                }
-
-                function redoCanvas(view) {
-                    var viewHistory = history[view];
-                    var viewIndex = historyIndex[view];
-
-                    if (viewIndex < viewHistory.length - 1) {
-                        viewIndex++;
-                        historyIndex[view] = viewIndex;
-                        loadCanvasState(canvases[view], viewHistory[viewIndex]);
-                        updateUndoRedoButtons(view);
-                        showNotification('Action redone', 'info');
-                    }
-                }
-
-                function loadCanvasState(canvas, stateJson) {
-                    try {
-                        var state = JSON.parse(stateJson);
-                        canvas.loadFromJSON(state, function() {
-                            canvas.requestRenderAll();
-                            updateSelectionDisplay(canvas);
-                            updateLayersPanel(canvas);
-                        });
-                    } catch (error) {
-                        console.error('Failed to load canvas state:', error);
-                        showNotification('Failed to undo/redo action', 'error');
-                    }
-                }
-
-                function updateUndoRedoButtons(view) {
-                    var undoBtn = document.getElementById('canvasUndo');
-                    var redoBtn = document.getElementById('canvasRedo');
-
-                    if (undoBtn) {
-                        undoBtn.disabled = historyIndex[view] <= 0;
-                    }
-                    if (redoBtn) {
-                        redoBtn.disabled = historyIndex[view] >= history[view].length - 1;
-                    }
-                }
 
                 // Layers Panel System
                 function updateLayersPanel(canvas) {
@@ -2891,33 +2802,56 @@
                     }
                 }
 
-                // Add history tracking to canvases
-                if (canvases.front) {
-                    canvases.front.on('object:added', function() {
-                        saveCanvasState(canvases.front, 'front');
-                        updateLayersPanel(canvases.front);
-                    });
-                    canvases.front.on('object:removed', function() {
-                        saveCanvasState(canvases.front, 'front');
-                        updateLayersPanel(canvases.front);
-                    });
-                    canvases.front.on('object:modified', function() {
-                        saveCanvasState(canvases.front, 'front');
-                    });
-                }
+                // wire view toggle buttons to set currentView and show/hide canvases
+                var showFrontBtn = document.getElementById('showFront');
+                var showBackBtn = document.getElementById('showBack');
+                function showView(requestedView){
+                    var hasBack = !!document.getElementById('cardBack');
+                    var view = (requestedView === 'back' && !hasBack) ? 'front' : requestedView;
 
-                if (canvases.back) {
-                    canvases.back.on('object:added', function() {
-                        saveCanvasState(canvases.back, 'back');
-                        updateLayersPanel(canvases.back);
-                    });
-                    canvases.back.on('object:removed', function() {
-                        saveCanvasState(canvases.back, 'back');
-                        updateLayersPanel(canvases.back);
-                    });
-                    canvases.back.on('object:modified', function() {
-                        saveCanvasState(canvases.back, 'back');
-                    });
+                    window.currentView = view;
+
+                    document.querySelectorAll('.card').forEach(function(c){ c.classList.remove('active'); });
+
+                    var activeCardId = view === 'front' ? 'cardFront' : 'cardBack';
+                    var activeCard = document.getElementById(activeCardId);
+                    if (activeCard) {
+                        activeCard.classList.add('active');
+                    }
+
+                    var fabricFront = document.getElementById('fabricFront');
+                    if (fabricFront) {
+                        fabricFront.style.display = (view === 'front') ? 'block' : 'none';
+                    }
+
+                    var fabricBack = document.getElementById('fabricBack');
+                    if (fabricBack) {
+                        fabricBack.style.display = (view === 'back') ? 'block' : 'none';
+                    }
+
+                    return view;
+                }
+                if (showFrontBtn) showFrontBtn.addEventListener('click', function(){ showView('front'); });
+                if (showBackBtn) showBackBtn.addEventListener('click', function(){ showView('back'); });
+                // start showing front
+                showView(window.currentView);
+
+                // Ensure initial UI status (zoom, selection, dimensions) is visible and accurate
+                setTimeout(function(){
+                    try {
+                        updateZoomDisplay(1);
+                        var activeCanvas = canvases[window.currentView] || canvases.front || null;
+                        updateSelectionDisplay(activeCanvas);
+                        var statusDimensionsEl = document.getElementById('statusDimensions');
+                        if (statusDimensionsEl && activeCanvas) {
+                            var activeCardId = window.currentView === 'front' ? 'cardFront' : 'cardBack';
+                            var activeSvg = document.querySelector('#' + activeCardId + ' svg');
+                            var activeShape = activeSvg ? detectSvgShape(activeSvg) : 'rectangle';
+                            statusDimensionsEl.textContent = 'Canvas: ' + Math.round(activeCanvas.width) + 'x' + Math.round(activeCanvas.height) + 'px (' + activeShape + ')';
+                        }
+                    } catch (e) { console.warn('Initial UI status init failed', e); }
+                }, 80);
+        });
                 }
 
                 // wire view toggle buttons to set currentView and show/hide canvases
@@ -3148,18 +3082,6 @@
                 var layersPanel = document.getElementById('layersPanel');
                 var canvasStats = document.getElementById('canvasStats');
 
-                // Undo/Redo event listeners
-                if (canvasUndoBtn) {
-                    canvasUndoBtn.addEventListener('click', function() {
-                        undoCanvas(window.currentView);
-                    });
-                }
-                if (canvasRedoBtn) {
-                    canvasRedoBtn.addEventListener('click', function() {
-                        redoCanvas(window.currentView);
-                    });
-                }
-
                 // Layers panel toggle
                 if (showLayersBtn) {
                     showLayersBtn.addEventListener('click', function() {
@@ -3203,8 +3125,6 @@
                         updateLayersPanel(activeCanvas);
                     }
 
-                    updateUndoRedoButtons(activeView);
-
                     if (statusDimensionsEl && activeCanvas) {
                         var hasBackCard = !!document.getElementById('cardBack');
                         var activeCardId = (activeView === 'back' && hasBackCard) ? 'cardBack' : 'cardFront';
@@ -3214,9 +3134,6 @@
                         statusDimensionsEl.textContent = 'Canvas: ' + Math.round(activeCanvas.width) + 'x' + Math.round(activeCanvas.height) + 'px (' + activeShape + ')';
                     }
                 };
-
-                // Initialize undo/redo buttons for current view
-                updateUndoRedoButtons(window.currentView);
 
                 if (zoomInBtn) zoomInBtn.addEventListener('click', function() { zoomCanvas(1.2); });
                 if (zoomOutBtn) zoomOutBtn.addEventListener('click', function() { zoomCanvas(0.8); });
