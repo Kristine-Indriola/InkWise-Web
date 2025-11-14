@@ -251,289 +251,58 @@
   @php
     $summaryTotals = $summary ?? [];
 
-    $totalTransactions = isset($summaryTotals['total_transactions'])
-      ? (int) $summaryTotals['total_transactions']
-      : 0;
+    $totalTransactions = (int) ($summaryTotals['total_transactions'] ?? 0);
+    $totalAmount = (float) ($summaryTotals['total_amount'] ?? 0.00);
+    $paidCount = (int) ($summaryTotals['paid_count'] ?? 0);
+    $pendingCount = (int) ($summaryTotals['pending_count'] ?? 0);
 
-    $totalAmount = isset($summaryTotals['total_amount'])
-      ? (float) $summaryTotals['total_amount']
-      : 0.00;
-
-    $paidCount = isset($summaryTotals['paid_count'])
-      ? (int) $summaryTotals['paid_count']
-      : 0;
-
-    $pendingCount = isset($summaryTotals['pending_count'])
-      ? (int) $summaryTotals['pending_count']
-      : 0;
-
-    $usingDemoData = false;
-
-    $transactionRows = collect();
-
-    if (isset($transactions)) {
-      if ($transactions instanceof \Illuminate\Support\Collection) {
-        $transactionRows = $transactions;
-        if ($totalTransactions === 0) {
-          $totalTransactions = $transactions->count();
-        }
-      } elseif ($transactions instanceof \Illuminate\Contracts\Pagination\Paginator) {
-        $items = method_exists($transactions, 'items') ? $transactions->items() : [];
-        $transactionRows = collect($items);
-        if ($totalTransactions === 0 && method_exists($transactions, 'total')) {
-          $totalTransactions = (int) $transactions->total();
-        } elseif ($totalTransactions === 0) {
-          $totalTransactions = $transactionRows->count();
-        }
-      } elseif (is_array($transactions)) {
-        $transactionRows = collect($transactions);
-        if ($totalTransactions === 0) {
-          $totalTransactions = $transactionRows->count();
-        }
-      }
+    $transformedRows = $transformedRows ?? collect();
+    if (!($transformedRows instanceof \Illuminate\Support\Collection)) {
+      $transformedRows = collect($transformedRows);
     }
 
-    if ($transactionRows->isEmpty()) {
-      $transactionRows = collect([
-        [
-          'transaction_id' => 'TXN10001',
-          'order_id' => '#1001',
-          'customer' => 'Frechy',
-          'payment_method' => 'GCash',
-          'date' => '2025-04-28',
-          'amount' => 12000,
-          'status' => 'Paid',
-        ],
-        [
-          'transaction_id' => 'TXN10002',
-          'order_id' => '#1002',
-          'customer' => 'Kristine',
-          'payment_method' => 'COD',
-          'date' => '2025-04-28',
-          'amount' => 7500,
-          'status' => 'Pending',
-        ],
-      ]);
-      $usingDemoData = true;
-
-      if ($totalTransactions === 0) {
-        $totalTransactions = $transactionRows->count();
-      }
-
-      if ($totalAmount <= 0) {
-        $totalAmount = $transactionRows->sum('amount');
-      }
-
-      if ($paidCount === 0) {
-        $paidCount = $transactionRows->filter(fn ($row) => strtolower($row['status']) === 'paid')->count();
-      }
-
-      if ($pendingCount === 0) {
-        $pendingCount = $transactionRows->filter(fn ($row) => strtolower($row['status']) === 'pending')->count();
-      }
+    if (!isset($statusGroups) || !is_array($statusGroups)) {
+      $statusGroups = \App\Support\Owner\TransactionPresenter::statusGroups();
     }
 
-    $normalizedPaidStatuses = ['paid', 'complete', 'completed', 'settled'];
-    $normalizedPendingStatuses = ['pending', 'processing', 'unpaid', 'awaiting', 'awaiting payment'];
-    $normalizedFailedStatuses = ['failed', 'cancelled', 'canceled', 'refunded', 'void'];
-
-    $normalizeStatus = static function ($value) {
-      return \Illuminate\Support\Str::lower(trim((string) $value));
-    };
-
-    $resolveBadgeClass = static function (string $status) use ($normalizedPaidStatuses, $normalizedFailedStatuses) {
-      if (in_array($status, $normalizedPaidStatuses, true)) {
-        return 'stock-ok';
-      }
-      if (in_array($status, $normalizedFailedStatuses, true)) {
-        return 'stock-critical';
-      }
-      return 'stock-low';
-    };
-
-    $transformTransaction = static function ($transaction) use ($normalizeStatus, $resolveBadgeClass) {
-      $transactionId = data_get($transaction, 'transaction_id')
-        ?? data_get($transaction, 'provider_payment_id')
-        ?? data_get($transaction, 'intent_id')
-        ?? data_get($transaction, 'reference')
-        ?? data_get($transaction, 'id')
-        ?? '—';
-      $transactionId = is_string($transactionId) ? trim($transactionId) : (is_numeric($transactionId) ? (string) $transactionId : '—');
-
-      $orderId = data_get($transaction, 'order_id') ?? data_get($transaction, 'order.reference') ?? data_get($transaction, 'order.order_number') ?? data_get($transaction, 'order.id');
-      if (is_array($orderId)) {
-        $orderId = $orderId['order_number'] ?? $orderId['id'] ?? null;
-      }
-      if ($orderId instanceof \DateTimeInterface) {
-        $orderId = $orderId->format('Y-m-d');
-      }
-      if (is_numeric($orderId)) {
-        $orderId = '#' . ltrim((string) $orderId, '#');
-      }
-      $orderId = $orderId ? (string) $orderId : '—';
-
-      $customerName = data_get($transaction, 'customer_name')
-        ?? data_get($transaction, 'customer.name')
-        ?? data_get($transaction, 'customer.full_name')
-        ?? data_get($transaction, 'order.customer.name')
-        ?? data_get($transaction, 'order.customer.full_name')
-        ?? data_get($transaction, 'order.customerOrder.customer.name');
-      if (!$customerName) {
-        $customerSource = data_get($transaction, 'customer');
-        if (!$customerSource) {
-          $customerSource = data_get($transaction, 'order.customer') ?? data_get($transaction, 'order.customerOrder.customer');
-        }
-        if (is_array($customerSource)) {
-          $customerName = $customerSource['name'] ?? trim(($customerSource['first_name'] ?? '') . ' ' . ($customerSource['last_name'] ?? ''));
-        } elseif (is_object($customerSource)) {
-          $customerName = $customerSource->name ?? $customerSource->full_name ?? trim(($customerSource->first_name ?? '') . ' ' . ($customerSource->last_name ?? ''));
-          if (!$customerName && method_exists($customerSource, '__toString')) {
-            $customerName = (string) $customerSource;
-          }
-        } elseif (is_null($customerSource)) {
-          $order = data_get($transaction, 'order');
-          if (is_object($order) && method_exists($order, 'effectiveCustomer')) {
-            $effective = $order->effectiveCustomer();
-            if (is_object($effective)) {
-              $customerName = $effective->name
-                ?? $effective->full_name
-                ?? trim(($effective->first_name ?? '') . ' ' . ($effective->last_name ?? ''));
-            } elseif (is_array($effective)) {
-              $customerName = $effective['name'] ?? trim(($effective['first_name'] ?? '') . ' ' . ($effective['last_name'] ?? ''));
-            } elseif (is_string($effective)) {
-              $customerName = $effective;
-            }
-          }
-        } elseif (is_string($customerSource)) {
-          $customerName = $customerSource;
-        }
-      }
-      $customerName = $customerName ? trim((string) $customerName) : '—';
-
-      $paymentMethod = data_get($transaction, 'payment_method')
-        ?? data_get($transaction, 'method')
-        ?? data_get($transaction, 'mode')
-        ?? data_get($transaction, 'payment.method');
-      if (is_array($paymentMethod)) {
-        $paymentMethod = $paymentMethod['name'] ?? $paymentMethod['label'] ?? null;
-      }
-      $paymentMethod = $paymentMethod ? (string) $paymentMethod : '—';
-
-      $rawDate = data_get($transaction, 'date')
-        ?? data_get($transaction, 'paid_at')
-        ?? data_get($transaction, 'recorded_at')
-        ?? data_get($transaction, 'created_at')
-        ?? data_get($transaction, 'updated_at');
-      if ($rawDate instanceof \DateTimeInterface) {
-        $displayDate = $rawDate->format('Y-m-d');
-      } elseif (is_string($rawDate) && strlen($rawDate) >= 10) {
-        $displayDate = substr($rawDate, 0, 10);
+    if ($totalTransactions === 0) {
+      if (isset($transactions) && $transactions instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator) {
+        $totalTransactions = (int) $transactions->total();
       } else {
-        $displayDate = '—';
+        $totalTransactions = $transformedRows->count();
       }
-
-      $amountValue = data_get($transaction, 'amount');
-      if ($amountValue === null) {
-        $amountValue = data_get($transaction, 'total');
-      }
-      $currency = strtoupper((string) data_get($transaction, 'currency', 'PHP'));
-      $currencyPrefix = $currency === 'PHP' ? '₱' : ($currency !== '' ? $currency . ' ' : '');
-      if (is_numeric($amountValue)) {
-        $amountNumeric = (float) $amountValue;
-        $amountDisplay = $currencyPrefix . number_format($amountNumeric, 2);
-      } elseif (is_string($amountValue) && trim($amountValue) !== '') {
-        $amountNumeric = null;
-        $amountDisplay = trim($amountValue);
-      } else {
-        $amountNumeric = null;
-        $amountDisplay = '—';
-      }
-
-      $statusRaw = $normalizeStatus(data_get($transaction, 'status', ''));
-      $statusLabel = $statusRaw !== '' ? ucwords(str_replace(['-', '_'], ' ', $statusRaw)) : '—';
-      $statusClass = $statusLabel === '—' ? null : $resolveBadgeClass($statusRaw);
-
-      $searchTargets = array_filter([
-        $transactionId,
-        $orderId,
-        $customerName,
-        $paymentMethod,
-        $displayDate,
-        $amountDisplay,
-        $statusLabel,
-        data_get($transaction, 'provider'),
-        $currency,
-      ]);
-
-      return [
-        'raw' => $transaction,
-        'transaction_id' => $transactionId,
-        'order_id' => $orderId,
-        'customer_name' => $customerName,
-        'payment_method' => $paymentMethod,
-        'display_date' => $displayDate,
-        'amount_display' => $amountDisplay,
-        'amount_numeric' => $amountNumeric,
-        'status_raw' => $statusRaw,
-        'status_label' => $statusLabel,
-        'status_class' => $statusClass,
-        'search_blob' => \Illuminate\Support\Str::lower(implode(' ', $searchTargets)),
-        'currency' => $currency,
-      ];
-    };
-
-    $transformedRows = $transactionRows->map($transformTransaction);
+    }
 
     if ($totalAmount <= 0 && $transformedRows->isNotEmpty()) {
-      $totalAmount = $transformedRows->reduce(function ($carry, $row) {
+      $totalAmount = $transformedRows->reduce(static function ($carry, $row) {
         return $carry + ($row['amount_numeric'] ?? 0);
       }, 0);
     }
 
-    $calculatedPaid = $transformedRows->filter(function ($row) use ($normalizedPaidStatuses) {
-      return in_array($row['status_raw'], $normalizedPaidStatuses, true);
-    })->count();
-
-    $calculatedPending = $transformedRows->filter(function ($row) use ($normalizedPendingStatuses) {
-      return in_array($row['status_raw'], $normalizedPendingStatuses, true);
-    })->count();
-
-    if ($usingDemoData || $paidCount === 0) {
-      $paidCount = $calculatedPaid;
+    if ($paidCount === 0) {
+      $paidCount = $transformedRows->filter(static function ($row) use ($statusGroups) {
+        return in_array($row['status_raw'], $statusGroups['paid'], true);
+      })->count();
     }
 
-    if ($usingDemoData || $pendingCount === 0) {
-      $pendingCount = $calculatedPending;
+    if ($pendingCount === 0) {
+      $pendingCount = $transformedRows->filter(static function ($row) use ($statusGroups) {
+        return in_array($row['status_raw'], $statusGroups['pending'], true);
+      })->count();
     }
 
-    $requestedStatus = $normalizeStatus(request()->query('status', ''));
-    $activeStatus = $requestedStatus !== '' ? $requestedStatus : 'all';
-
-    $statusGroupMap = [
-      'paid' => $normalizedPaidStatuses,
-      'pending' => $normalizedPendingStatuses,
-      'failed' => $normalizedFailedStatuses,
-    ];
-
-    $filteredRows = $transformedRows;
-
-    if ($activeStatus !== 'all') {
-      $allowedStatuses = $statusGroupMap[$activeStatus] ?? [$activeStatus];
-      $filteredRows = $filteredRows->filter(function ($row) use ($allowedStatuses) {
-        return in_array($row['status_raw'], $allowedStatuses, true);
-      })->values();
+    $activeStatus = \Illuminate\Support\Str::lower((string) request()->query('status', 'all'));
+    if ($activeStatus === '') {
+      $activeStatus = 'all';
     }
 
-    $searchQuery = trim((string) request()->query('search', ''));
-    $searchQueryLower = \Illuminate\Support\Str::lower($searchQuery);
+    $exportQueryParams = static function (string $format): array {
+      $params = array_merge(request()->query(), ['format' => $format]);
 
-    if ($searchQueryLower !== '') {
-      $filteredRows = $filteredRows->filter(function ($row) use ($searchQueryLower) {
-        return $row['search_blob'] !== '' && str_contains($row['search_blob'], $searchQueryLower);
-      })->values();
-    }
-
-    $displayRows = $filteredRows;
+      return array_filter($params, static function ($value) {
+        return $value !== null && $value !== '';
+      });
+    };
   @endphp
 
     <section class="summary-grid" aria-label="Transactions summary">
@@ -550,7 +319,7 @@
         <span class="summary-card-meta">Transactions recorded</span>
       </a>
 
-      <a href="{{ request()->fullUrlWithQuery(['status' => null]) }}" class="summary-card summary-card--link {{ $activeStatus === 'all' ? 'summary-card--active' : '' }}" aria-label="Total amount">
+  <a href="{{ request()->fullUrlWithQuery(['status' => null]) }}" class="summary-card summary-card--link" aria-label="Total amount">
         <div class="summary-card-header">
           <div style="display:flex;align-items:center;gap:8px;">
             <!-- Icon: peso / money -->
@@ -601,31 +370,12 @@
         </form>
       </div>
       <div class="materials-toolbar__actions">
-        <!-- Export (placeholder) -->
-        <button type="button" class="btn btn-secondary" data-action="export-csv" title="Export CSV">
+        <a class="btn btn-secondary" href="{{ route('owner.transactions-export', $exportQueryParams('csv')) }}" title="Download CSV export">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 10l5-5 5 5M12 5v12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Export
-        </button>
-
-        <!-- Quick filters: Paid / Pending -->
-        <a href="{{ request()->fullUrlWithQuery(['status' => 'paid']) }}" class="btn" title="Show paid">Paid</a>
-        <a href="{{ request()->fullUrlWithQuery(['status' => 'pending']) }}" class="btn btn-warning" title="Show pending">Pending</a>
-
-        <!-- View History placeholder -->
-        <button type="button" class="btn btn-outline" data-action="open-history" title="View history">History</button>
+          Export CSV
+        </a>
       </div>
     </section>
-
-    <!-- Modal placeholders (non-functional flows) -->
-    <div id="modalOverlay" style="display:none; position:fixed; inset:0; background:rgba(2,6,23,0.5); z-index:60;">
-      <div id="modalBox" style="max-width:720px; margin:6vh auto; background:#fff; border-radius:10px; padding:18px; position:relative;">
-        <button id="modalClose" style="position:absolute; right:12px; top:12px; border:0; background:transparent; font-size:18px;">×</button>
-        <div id="modalContent">
-          <!-- Content will be injected by page script to demonstrate flows -->
-        </div>
-      </div>
-    </div>
-
     <div class="table-wrapper">
       <table class="table">
         <thead>
@@ -640,7 +390,7 @@
           </tr>
         </thead>
         <tbody>
-          @forelse($displayRows as $transaction)
+          @forelse($transformedRows as $transaction)
             <tr>
               <td class="fw-bold">{{ $transaction['transaction_id'] }}</td>
               <td>{{ $transaction['order_id'] }}</td>
@@ -665,7 +415,7 @@
       </table>
     </div>
 
-    @if(isset($transactions) && $transactions instanceof \Illuminate\Contracts\Pagination\Paginator)
+    @if(isset($transactions) && $transactions instanceof \Illuminate\Pagination\AbstractPaginator)
       <div class="table-pagination">
         {{ $transactions->links() }}
       </div>
@@ -675,89 +425,3 @@
 </section>
 
 @endsection
-
-@push('scripts')
-<script>
-  (function(){
-    const overlay = document.getElementById('modalOverlay');
-    const box = document.getElementById('modalBox');
-    const content = document.getElementById('modalContent');
-    const closeBtn = document.getElementById('modalClose');
-
-    function openModal(html) {
-      if (!overlay) return;
-      content.innerHTML = html;
-      overlay.style.display = 'block';
-    }
-    function closeModal() { if (!overlay) return; overlay.style.display='none'; content.innerHTML=''; }
-
-    document.addEventListener('click', function(e){
-      const btn = e.target.closest('[data-action]');
-      if (!btn) return;
-      const action = btn.dataset.action;
-      if (action === 'open-add-transaction') {
-        openModal(`<h3>Add Transaction (UI Demo)</h3>
-          <p>This is a non-functional demo of the add transaction flow. Fill fields and click Submit to simulate.</p>
-          <form id="demoAddForm">
-            <label>Order ID<br><input name="order_id" class="form-control" /></label><br>
-            <label>Amount<br><input name="amount" class="form-control" /></label><br>
-            <label>Payment Method<br><input name="method" class="form-control" /></label><br>
-            <div style="margin-top:10px;"><button type="button" id="demoSubmit" class="btn btn-primary">Submit (demo)</button></div>
-          </form>`);
-      }
-
-      if (action === 'open-import-csv') {
-        openModal(`<h3>Import CSV (UI Demo)</h3>
-          <p>Select a CSV file to preview rows. This demo does not upload.</p>
-          <input type="file" accept=".csv" id="demoCsvInput" />
-          <div id="demoCsvPreview" style="margin-top:12px; font-size:0.9rem; color:#374151;"></div>`);
-      }
-
-      if (action === 'export-csv') {
-        openModal(`<h3>Export CSV (UI Demo)</h3>
-          <p>This would trigger a server export in a real app. Here it's just a demo.</p>
-          <div style="margin-top:12px;"><button class="btn btn-secondary" id="demoExportBtn">Download (demo)</button></div>`);
-      }
-
-      if (action === 'open-history') {
-        openModal(`<h3>Transaction History (UI Demo)</h3>
-          <p>Show recent activity; this is a visual-only placeholder.</p>
-          <ul style="margin-top:8px; list-style:none; padding-left:0; color:#374151;"><li>2025-04-28 — TXN10001 was processed (Paid)</li><li>2025-04-28 — TXN10002 created (Pending)</li></ul>`);
-      }
-    });
-
-    if (closeBtn) closeBtn.addEventListener('click', closeModal);
-    if (overlay) overlay.addEventListener('click', function(e){ if (e.target === overlay) closeModal(); });
-
-    // Demo handlers inside modal
-    document.addEventListener('click', function(e){
-      if (e.target && e.target.id === 'demoSubmit') {
-        alert('Demo: transaction submitted (no server request)');
-        closeModal();
-      }
-      if (e.target && e.target.id === 'demoExportBtn') {
-        alert('Demo: export started (no server request)');
-      }
-      if (e.target && e.target.id === 'demoCsvInput') {
-        // noop
-      }
-    });
-
-    // CSV preview handling (delegated)
-    document.addEventListener('change', function(e){
-      if (e.target && e.target.id === 'demoCsvInput') {
-        const file = e.target.files && e.target.files[0];
-        const preview = document.getElementById('demoCsvPreview');
-        if (!file || !preview) return;
-        const reader = new FileReader();
-        reader.onload = function(ev){
-          const text = ev.target.result || '';
-          const lines = text.split(/\r?\n/).slice(0,6).map(l => `<div style="padding:6px 0;border-bottom:1px solid #eef2ff;">${l}</div>`).join('');
-          preview.innerHTML = `<div style="max-height:220px; overflow:auto;">${lines}</div>`;
-        };
-        reader.readAsText(file);
-      }
-    });
-  })();
-</script>
-@endpush

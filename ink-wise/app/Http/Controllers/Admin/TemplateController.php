@@ -12,7 +12,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use App\Services\SvgAutoParser;
 use App\Notifications\TemplateUploadedNotification;
 
 class TemplateController extends Controller
@@ -36,16 +35,13 @@ class TemplateController extends Controller
         $prefix = request()->route()->getPrefix();
         $isStaff = str_contains($prefix, 'staff');
 
-    // TEMPORARY: Force staff views for debugging
-    $isStaff = true;
+        // TEMPORARY: Force staff views for debugging
+        $isStaff = true;
 
-    // Debug: log the prefix and isStaff value
-    Log::info('TemplateController::index - Prefix: ' . $prefix . ', isStaff: ' . ($isStaff ? 'true' : 'false'));
+        // Debug: log the prefix and isStaff value
+        Log::info('TemplateController::index - Prefix: ' . $prefix . ', isStaff: ' . ($isStaff ? 'true' : 'false'));
 
-    // Load any session-stored preview templates (created but not yet saved to DB)
-    $previewTemplates = session('preview_templates', []);
-
-    return view('staff.templates.index', compact('templates', 'type', 'previewTemplates'));
+        return view('staff.templates.index', compact('templates', 'type'));
     }
 
     // Show uploaded templates
@@ -126,7 +122,7 @@ class TemplateController extends Controller
             $rules['back_image'] = 'file|mimes:jpeg,png,jpg,gif,svg|max:5120';
         }
 
-        $validated = $request->validate($rules);
+    $validated = $request->validate($rules);
 
         // Handle front image upload
         if ($request->hasFile('front_image')) {
@@ -167,6 +163,11 @@ class TemplateController extends Controller
     // Store new template
     public function store(Request $request)
     {
+        // Check if this is saving a preview
+        if ($request->filled('edit_preview_id')) {
+            return $this->savePreview($request, $request->input('edit_preview_id'));
+        }
+
         // Determine required file inputs based on type (invitation vs giveaway/envelope)
         $type = $request->input('product_type') ?: $request->query('type', 'invitation');
 
@@ -176,12 +177,13 @@ class TemplateController extends Controller
             'product_type' => 'nullable|string|max:255',
             'theme_style' => 'nullable|string|max:255',
             'description' => 'nullable|string',
+            'template_video' => 'nullable|file|mimes:mp4,mov,avi,webm|max:51200',
         ];
 
-        // Invitations require both front and back images; giveaways/envelopes only front_image
+        // Require at least one design file
         if ($type === 'invitation') {
             $rules['front_image'] = 'required|file|mimes:jpeg,png,jpg,gif,svg|max:5120';
-            $rules['back_image'] = 'required|file|mimes:jpeg,png,jpg,gif,svg|max:5120';
+            $rules['back_image'] = 'nullable|file|mimes:jpeg,png,jpg,gif,svg|max:5120';
         } else {
             $rules['front_image'] = 'required|file|mimes:svg,svg+xml,image/svg+xml,svgz|max:5120';
         }
@@ -192,33 +194,6 @@ class TemplateController extends Controller
         if ($request->hasFile('front_image')) {
             $frontImagePath = $request->file('front_image')->store('templates', 'public');
             $validated['front_image'] = $frontImagePath;
-
-            // Parse SVG if it's an SVG file
-            if ($this->isSvgFile($request->file('front_image'))) {
-                $svgParser = new SvgAutoParser();
-                $parsedSvg = $svgParser->parseSvg($frontImagePath);
-
-                // Store parsed SVG data in design field
-                $designData = $request->input('design', []);
-                if (!is_array($designData)) {
-                    $designData = json_decode($designData, true) ?: [];
-                }
-
-                $designData['svg_parsed'] = true;
-                $designData['svg_data'] = [
-                    'text_elements' => $parsedSvg['text_elements'],
-                    'image_elements' => $parsedSvg['image_elements'],
-                    'changeable_images' => $parsedSvg['changeable_images'],
-                    'metadata' => $parsedSvg['metadata']
-                ];
-
-                $validated['design'] = json_encode($designData);
-
-                // Use processed SVG path if available
-                if ($parsedSvg['processed_path'] !== $frontImagePath) {
-                    $validated['front_image'] = $parsedSvg['processed_path'];
-                }
-            }
         }
 
         // Handle back image upload
@@ -230,229 +205,39 @@ class TemplateController extends Controller
             $validated['back_image'] = $validated['back_image'] ?? null;
         }
 
-        $template = \App\Models\Template::create($validated);
-
-        if ($request->expectsJson() || $request->ajax()) {
-            // Determine if this is admin or staff route
-            $isStaff = str_contains(request()->route()->getPrefix(), 'staff');
-            // TEMPORARY: Force staff routes for debugging
-            $isStaff = true;
-            $redirectRoute = $isStaff ? 'staff.templates.index' : 'admin.templates.index';
-
-            return response()->json([
-                'success' => true,
-                'template_id' => $template->id,
-                'redirect' => route($redirectRoute),
-            ]);
+        // Handle optional template preview video
+        $videoPath = null;
+        if ($request->hasFile('template_video')) {
+            $videoPath = $request->file('template_video')->store('templates/videos', 'public');
         }
+
+        if ($videoPath) {
+            $metadata = [];
+            if (isset($validated['metadata']) && is_array($validated['metadata'])) {
+                $metadata = $validated['metadata'];
+            }
+            $metadata['preview_video'] = $videoPath;
+            $validated['metadata'] = $metadata;
+        }
+
+        $template = \App\Models\Template::create($validated);
 
         // Determine if this is admin or staff route
         $isStaff = str_contains(request()->route()->getPrefix(), 'staff');
         // TEMPORARY: Force staff routes for debugging
         $isStaff = true;
-        $redirectRoute = $isStaff ? 'staff.templates.index' : 'admin.templates.index';
-
-        return redirect()->route($redirectRoute)->with('success', 'Created successfully');
-    }
-
-    /**
-     * Store a preview of a template in session (do not persist to templates table yet)
-     */
-    public function preview(Request $request)
-    {
-        // Similar validation rules to store(), but we keep data in session and store uploaded files under templates/previews
-        $type = $request->input('product_type') ?: $request->query('type', 'invitation');
-
-        $rules = [
-            'name' => 'required|string|max:255',
-            'event_type' => 'nullable|string|max:255',
-            'product_type' => 'nullable|string|max:255',
-            'theme_style' => 'nullable|string|max:255',
-            'description' => 'nullable|string',
-        ];
-
-        if ($type === 'invitation') {
-            $rules['front_image'] = 'required|file|mimes:jpeg,png,jpg,gif,svg|max:5120';
-            $rules['back_image'] = 'required|file|mimes:jpeg,png,jpg,gif,svg|max:5120';
-        } else {
-            $rules['front_image'] = 'required|file|mimes:svg,svg+xml,image/svg+xml,svgz|max:5120';
-        }
-
-        $validated = $request->validate($rules);
-
-        // Check if we're editing an existing preview
-        $editPreviewId = $request->input('edit_preview_id');
-        $previews = session('preview_templates', []);
-        $existingPreviewKey = null;
-
-        if ($editPreviewId) {
-            foreach ($previews as $k => $p) {
-                if (isset($p['id']) && $p['id'] === $editPreviewId) {
-                    $existingPreviewKey = $k;
-                    break;
-                }
-            }
-        }
-
-        // If editing existing preview, remove old files
-        if ($existingPreviewKey !== null) {
-            $existingPreview = $previews[$existingPreviewKey];
-            try {
-                if (!empty($existingPreview['front_image']) && Storage::disk('public')->exists($existingPreview['front_image'])) {
-                    Storage::disk('public')->delete($existingPreview['front_image']);
-                }
-                if (!empty($existingPreview['back_image']) && Storage::disk('public')->exists($existingPreview['back_image'])) {
-                    Storage::disk('public')->delete($existingPreview['back_image']);
-                }
-            } catch (\Throwable $e) {
-                // ignore cleanup errors
-            }
-        }
-
-        // Save uploaded files into a previews folder on the public disk
-        $frontPath = null;
-        $backPath = null;
-        if ($request->hasFile('front_image')) {
-            $frontPath = $request->file('front_image')->store('templates/previews', 'public');
-        }
-        if ($request->hasFile('back_image')) {
-            $backPath = $request->file('back_image')->store('templates/previews', 'public');
-        }
-
-        // Build preview object
-        if ($existingPreviewKey !== null) {
-            // Update existing preview
-            $previewId = $editPreviewId;
-            $previews[$existingPreviewKey] = [
-                'id' => $previewId,
-                'name' => $validated['name'] ?? '',
-                'description' => $validated['description'] ?? null,
-                'product_type' => $validated['product_type'] ?? ucfirst($type),
-                'event_type' => $validated['event_type'] ?? null,
-                'theme_style' => $validated['theme_style'] ?? null,
-                'front_image' => $frontPath,
-                'back_image' => $backPath,
-                'preview' => $frontPath,
-                'design' => $request->input('design') ?? null,
-                'created_at' => $previews[$existingPreviewKey]['created_at'] ?? now()->toDateTimeString(),
-            ];
-        } else {
-            // Create new preview
-            $previewId = uniqid('preview_');
-            $preview = [
-                'id' => $previewId,
-                'name' => $validated['name'] ?? '',
-                'description' => $validated['description'] ?? null,
-                'product_type' => $validated['product_type'] ?? ucfirst($type),
-                'event_type' => $validated['event_type'] ?? null,
-                'theme_style' => $validated['theme_style'] ?? null,
-                'front_image' => $frontPath,
-                'back_image' => $backPath,
-                'preview' => $frontPath,
-                'design' => $request->input('design') ?? null,
-                'created_at' => now()->toDateTimeString(),
-            ];
-            $previews[] = $preview;
-        }
-
-        session(['preview_templates' => $previews]);
+        $editorRouteName = $isStaff ? 'staff.templates.editor' : 'admin.templates.editor';
+        $redirectUrl = route($editorRouteName, $template->id);
 
         if ($request->expectsJson() || $request->ajax()) {
-            return response()->json(['success' => true, 'preview_id' => $previewId, 'redirect' => route('staff.templates.index')]);
+            return response()->json([
+                'success' => true,
+                'template_id' => $template->id,
+                'redirect' => $redirectUrl,
+            ]);
         }
 
-        return redirect()->route('staff.templates.index')->with('success', 'Preview ' . ($existingPreviewKey !== null ? 'updated' : 'created'));
-    }
-
-    /**
-     * Persist a session preview into the templates DB table (called when staff confirms Upload)
-     */
-    public function savePreview(Request $request, $previewId)
-    {
-        $previews = session('preview_templates', []);
-        $foundKey = null;
-        $found = null;
-        foreach ($previews as $k => $p) {
-            if (isset($p['id']) && $p['id'] === $previewId) {
-                $foundKey = $k;
-                $found = $p;
-                break;
-            }
-        }
-
-        if (!$found) {
-            if ($request->expectsJson() || $request->ajax()) {
-                return response()->json(['success' => false, 'message' => 'Preview not found'], 404);
-            }
-            return redirect()->route('staff.templates.index')->with('error', 'Preview not found');
-        }
-
-        // Create Template from preview data
-        $templateData = [
-            'name' => $found['name'] ?? 'Untitled',
-            'description' => $found['description'] ?? null,
-            'product_type' => $found['product_type'] ?? 'Invitation',
-            'event_type' => $found['event_type'] ?? null,
-            'theme_style' => $found['theme_style'] ?? null,
-            'front_image' => $found['front_image'] ?? null,
-            'back_image' => $found['back_image'] ?? null,
-            'preview' => $found['preview'] ?? ($found['front_image'] ?? null),
-            'design' => $found['design'] ?? null,
-        ];
-
-    // Mark this template as uploaded so it appears in the "uploaded" listing
-    $templateData['status'] = 'uploaded';
-    $template = Template::create($templateData);
-
-        // Remove preview from session
-        array_splice($previews, $foundKey, 1);
-        session(['preview_templates' => $previews]);
-
-        $redirectRoute = route('staff.templates.uploaded');
-
-        if ($request->expectsJson() || $request->ajax()) {
-            return response()->json(['success' => true, 'template_id' => $template->id, 'redirect' => $redirectRoute]);
-        }
-
-        return redirect($redirectRoute)->with('success', 'Template saved and uploaded');
-    }
-
-    /**
-     * Remove a session preview entry (AJAX)
-     */
-    public function removePreview(Request $request, $previewId)
-    {
-        $previews = session('preview_templates', []);
-        $foundKey = null;
-        foreach ($previews as $k => $p) {
-            if (isset($p['id']) && $p['id'] === $previewId) {
-                $foundKey = $k;
-                break;
-            }
-        }
-
-        if ($foundKey === null) {
-            return response()->json(['success' => false, 'message' => 'Preview not found'], 404);
-        }
-
-        $entry = $previews[$foundKey];
-
-        // Remove any stored files for this preview (best-effort)
-        try {
-            if (!empty($entry['front_image']) && Storage::disk('public')->exists($entry['front_image'])) {
-                Storage::disk('public')->delete($entry['front_image']);
-            }
-            if (!empty($entry['back_image']) && Storage::disk('public')->exists($entry['back_image'])) {
-                Storage::disk('public')->delete($entry['back_image']);
-            }
-        } catch (\Throwable $e) {
-            // ignore file deletion errors
-        }
-
-        array_splice($previews, $foundKey, 1);
-        session(['preview_templates' => $previews]);
-
-        return response()->json(['success' => true]);
+        return redirect()->route($editorRouteName, $template->id)->with('success', 'Template created. You can continue editing it now.');
     }
 
     // Show editor page for a template
@@ -465,19 +250,6 @@ class TemplateController extends Controller
 
         // TEMPORARY: Force staff views for debugging
         $isStaff = true;
-
-        // Check if template has SVG design data
-        $designData = json_decode($template->design, true);
-        $hasSvgData = $designData && (
-            isset($designData['text_elements']) ||
-            isset($designData['changeable_images']) ||
-            $template->svg_path
-        );
-
-        // Use SVG editor if template has SVG data, otherwise use regular canvas editor
-        if ($hasSvgData) {
-            return view('staff.templates.svg-editor', compact('template'));
-        }
 
         return view('staff.templates.editor', compact('template'));
     }
@@ -547,6 +319,54 @@ public function uploadPreview(Request $request, $id)
 
     return response()->json(['success' => true, 'preview' => $filename]);
 }
+
+    public function autosave(Request $request, $id)
+    {
+        $template = Template::findOrFail($id);
+
+        $validated = $request->validate([
+            'design' => 'required|array',
+            'canvas' => 'nullable|array',
+            'template_name' => 'nullable|string|max:255',
+        ]);
+
+        Log::info('Template autosave request received', [
+            'template_id' => $template->id,
+            'user_id' => optional($request->user())->id,
+            'design_pages' => is_array($validated['design']['pages'] ?? null)
+                ? count($validated['design']['pages'])
+                : null,
+        ]);
+
+        $designPayload = $validated['design'];
+
+        $template->design = json_encode($designPayload, JSON_UNESCAPED_UNICODE);
+
+        if (!empty($validated['template_name'])) {
+            $template->name = $validated['template_name'];
+        }
+
+        if (array_key_exists('canvas', $validated)) {
+            $metadata = $template->metadata ?? [];
+            if (!is_array($metadata)) {
+                $metadata = (array) $metadata;
+            }
+            $metadata['builder_canvas'] = $validated['canvas'];
+            $template->metadata = $metadata;
+        }
+
+        $template->save();
+
+        Log::info('Template autosave persisted', [
+            'template_id' => $template->id,
+            'updated_at' => optional($template->updated_at)->toIso8601String(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'saved_at' => optional($template->updated_at)->toIso8601String(),
+        ]);
+    }
 
     // Handle custom front/back template upload from the Templates UI
     public function customUpload(Request $request)
@@ -721,16 +541,22 @@ public function uploadToProduct(Request $request, $id)
         $h = intval($request->input('height', 0));
         $shape = $request->input('shape', 'rectangle');
 
-        $design = json_decode($template->design, true) ?: [];
-        $design['canvas'] = array_merge($design['canvas'] ?? [], [
+        // Since design column was removed, store canvas settings in metadata instead
+        $metadata = $template->metadata ?? [];
+        if (!is_array($metadata)) {
+            $metadata = json_decode($metadata, true) ?? [];
+        }
+
+        $metadata['canvas'] = [
             'width' => $w,
             'height' => $h,
             'shape' => $shape,
-        ]);
-        $template->design = json_encode($design);
+        ];
+
+        $template->metadata = json_encode($metadata);
         $template->save();
 
-        return response()->json(['success' => true, 'canvas' => $design['canvas']]);
+        return response()->json(['success' => true, 'canvas' => $metadata['canvas']]);
     }
 
     // Search assets (images, videos, elements) under storage/public/assets/{type}
@@ -770,10 +596,7 @@ public function uploadToProduct(Request $request, $id)
         $existing = ProductUpload::where('template_id', $template->id)->first();
         if ($existing) {
             if ($request->expectsJson() || $request->ajax()) {
-                return response()->json([
-                    'success' => false, 
-                    'message' => 'Template already uploaded to products'
-                ]);
+                return response()->json(['success' => true, 'message' => 'Template already uploaded to products']);
             }
             return redirect()->back()->with('success', 'Template already uploaded to products');
         }
@@ -789,7 +612,7 @@ public function uploadToProduct(Request $request, $id)
             'front_image' => $template->front_image,
             'back_image' => $template->back_image,
             'preview_image' => $template->preview,
-            'design_data' => $template->design,
+            'design_data' => $template->metadata, // Use metadata instead of design
         ]);
 
         // Update template status to uploaded
@@ -809,90 +632,160 @@ public function uploadToProduct(Request $request, $id)
             return response()->json([
                 'success' => true,
                 'message' => 'Template uploaded to products successfully',
-                'product_upload_id' => $productUpload->id
+                'redirect' => route('staff.templates.index')
             ]);
         }
 
         return redirect()->back()->with('success', 'Template uploaded to products successfully');
     }
 
-    /**
-     * Check if an uploaded file is an SVG
-     */
-    private function isSvgFile($file): bool
+    // Create a preview of the template (store in session)
+    public function preview(Request $request)
     {
-        if (!$file) return false;
+        // Validate the request data
+        $rules = [
+            'name' => 'required|string|max:255',
+            'event_type' => 'nullable|string|max:255',
+            'product_type' => 'nullable|string|max:255',
+            'theme_style' => 'nullable|string|max:255',
+            'description' => 'nullable|string',
+            'template_video' => 'nullable|file|mimes:mp4,mov,avi,webm|max:51200', // 50MB max for video
+            'front_image' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg|max:5120',
+            'back_image' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg|max:5120',
+        ];
 
-        $mimeType = $file->getMimeType();
-        $extension = strtolower($file->getClientOriginalExtension());
+        $validated = $request->validate($rules);
 
-        return in_array($mimeType, ['image/svg+xml', 'text/xml', 'application/xml', 'application/svg+xml']) ||
-               in_array($extension, ['svg', 'svgz']);
+        // Handle file uploads and store temporarily
+        $previewData = $validated;
+
+        // Store video file temporarily
+        if ($request->hasFile('template_video')) {
+            $videoPath = $request->file('template_video')->store('temp/previews/videos', 'public');
+            $previewData['template_video_path'] = $videoPath;
+            $previewData['template_video_name'] = $request->file('template_video')->getClientOriginalName();
+        }
+
+        // Store front image temporarily
+        if ($request->hasFile('front_image')) {
+            $frontPath = $request->file('front_image')->store('temp/previews/images', 'public');
+            $previewData['front_image_path'] = $frontPath;
+            $previewData['front_image_name'] = $request->file('front_image')->getClientOriginalName();
+        }
+
+        // Store back image temporarily
+        if ($request->hasFile('back_image')) {
+            $backPath = $request->file('back_image')->store('temp/previews/images', 'public');
+            $previewData['back_image_path'] = $backPath;
+            $previewData['back_image_name'] = $request->file('back_image')->getClientOriginalName();
+        }
+
+        // Store in session with a unique ID
+        $previewId = uniqid('preview_');
+        $previews = session('preview_templates', []);
+        $previews[$previewId] = array_merge($previewData, [
+            'id' => $previewId,
+            'created_at' => now(),
+        ]);
+        session(['preview_templates' => $previews]);
+
+        // Redirect back to the create form with the preview ID
+        return redirect()->route('staff.templates.create', [
+            'type' => $request->query('type', 'invitation'),
+            'edit_preview' => $previewId
+        ])->with('success', 'Template preview created successfully. You can now review and save it.');
     }
 
-    /**
-     * Save SVG content from the editor
-     */
-    public function saveSvg(Request $request, $id)
+    // Save a preview to the database
+    public function savePreview(Request $request, $previewId)
     {
-        $request->validate([
-            'svg_content' => 'required|string',
-            'side' => 'nullable|string|in:front,back'
+        $previews = session('preview_templates', []);
+        if (!isset($previews[$previewId])) {
+            return response()->json(['success' => false, 'message' => 'Preview not found'], 404);
+        }
+
+        $previewData = $previews[$previewId];
+
+        // Create the template
+        $template = Template::create([
+            'name' => $previewData['name'],
+            'event_type' => $previewData['event_type'] ?? null,
+            'product_type' => $previewData['product_type'] ?? 'Invitation',
+            'theme_style' => $previewData['theme_style'] ?? null,
+            'description' => $previewData['description'] ?? null,
         ]);
 
-        $template = Template::findOrFail($id);
-        $side = $request->input('side', 'front');
+        // Prepare metadata array for additional preview assets
 
-        try {
-            // Store the SVG content
-            $svgContent = $request->input('svg_content');
+        $metadata = $template->metadata ?? [];
+        if (!is_array($metadata)) {
+            $metadata = (array) $metadata;
+        }
 
-            // Generate a filename for the processed SVG
-            $filename = 'processed_' . $side . '_' . time() . '_' . Str::random(8) . '.svg';
-            $path = 'templates/svg/' . $filename;
-
-            // Store the SVG file
-            Storage::disk('public')->put($path, $svgContent);
-
-            // Update template with the appropriate SVG path
-            if ($side === 'back') {
-                $template->update([
-                    'back_svg_path' => $path,
-                    'processed_at' => now(),
-                ]);
-            } else {
-                $template->update([
-                    'svg_path' => $path,
-                    'processed_at' => now(),
-                ]);
+        // Handle file storage - move from temp to permanent location
+        if (isset($previewData['template_video_path'])) {
+            $videoPath = str_replace('temp/previews/videos/', 'templates/videos/', $previewData['template_video_path']);
+            if (Storage::disk('public')->exists($previewData['template_video_path'])) {
+                Storage::disk('public')->move($previewData['template_video_path'], $videoPath);
+                $metadata['preview_video'] = $videoPath;
             }
+        }
 
-            // Log the save action
-            Log::info('SVG saved for template', [
-                'template_id' => $template->id,
-                'side' => $side,
-                'path' => $path,
-                'user_id' => Auth::id()
-            ]);
+        if (isset($previewData['front_image_path'])) {
+            $frontPath = str_replace('temp/previews/images/', 'templates/', $previewData['front_image_path']);
+            if (Storage::disk('public')->exists($previewData['front_image_path'])) {
+                Storage::disk('public')->move($previewData['front_image_path'], $frontPath);
+                $template->front_image = $frontPath;
+            }
+        }
 
+        if (isset($previewData['back_image_path'])) {
+            $backPath = str_replace('temp/previews/images/', 'templates/', $previewData['back_image_path']);
+            if (Storage::disk('public')->exists($previewData['back_image_path'])) {
+                Storage::disk('public')->move($previewData['back_image_path'], $backPath);
+                $template->back_image = $backPath;
+            }
+        }
+
+        if (!empty($metadata)) {
+            $template->metadata = $metadata;
+        }
+
+        $template->save();
+
+        // Remove from session
+        unset($previews[$previewId]);
+        session(['preview_templates' => $previews]);
+
+        $isStaff = str_contains(request()->route()->getPrefix(), 'staff');
+        $isStaff = true;
+        $editorRouteName = $isStaff ? 'staff.templates.editor' : 'admin.templates.editor';
+        $redirectUrl = route($editorRouteName, $template->id);
+
+        if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
-                'message' => ucfirst($side) . ' SVG saved successfully',
-                'path' => $path,
-                'side' => $side
+                'template_id' => $template->id,
+                'redirect' => $redirectUrl,
             ]);
-
-        } catch (\Exception $e) {
-            Log::error('Failed to save SVG', [
-                'template_id' => $id,
-                'side' => $side,
-                'error' => $e->getMessage()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to save ' . $side . ' SVG: ' . $e->getMessage()
-            ], 500);
         }
+
+        return redirect()->route($editorRouteName, $template->id)->with('success', 'Template created successfully. You can continue editing it now.');
+    }
+
+    // Remove a preview from session
+    public function removePreview(Request $request, $previewId)
+    {
+        $previews = session('preview_templates', []);
+        if (isset($previews[$previewId])) {
+            unset($previews[$previewId]);
+            session(['preview_templates' => $previews]);
+        }
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json(['success' => true]);
+        }
+
+        return redirect()->route('staff.templates.create');
     }
 }

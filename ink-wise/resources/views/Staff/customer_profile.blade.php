@@ -4,6 +4,19 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@flaticon/flaticon-uicons/css/all/all.css">
     <link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
     <link rel="stylesheet" href="{{ asset('css/staff-css/customer-profiles.css') }}">
+    <style>
+        .clickable-row {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .clickable-row:hover {
+            background-color: rgba(79, 70, 229, 0.05);
+            transform: scale(1.01);
+        }
+        .clickable-row:active {
+            background-color: rgba(79, 70, 229, 0.1);
+        }
+    </style>
 @endpush
 
 @section('title', 'Customer Profiles')
@@ -43,8 +56,8 @@
                 </thead>
                 <tbody>
                     @forelse($customersCollection as $customer)
-                        <tr>
-                            <td>{{ $customer->id }}</td>
+                        <tr class="clickable-row" data-href="{{ route('staff.customer_profile.show', $customer->user_id) }}" role="button" tabindex="0">
+                            <td>{{ $customer->user_id }}</td>
                             <td class="profile-pic-cell">
                                 <img src="{{ $customer->profile_picture ?? 'https://via.placeholder.com/50' }}" alt="Profile" class="profile-pic">
                             </td>
@@ -76,6 +89,21 @@
                     setTimeout(() => alertBanner.remove(), 600);
                 }, 4000);
             }
+
+            // Make table rows clickable
+            document.querySelectorAll('.clickable-row').forEach(function(row) {
+                row.addEventListener('click', function() {
+                    window.location.href = this.dataset.href;
+                });
+                
+                // Handle keyboard navigation
+                row.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        window.location.href = this.dataset.href;
+                    }
+                });
+            });
         });
     </script>
 @endpush

@@ -430,6 +430,29 @@ class ProductController extends Controller
                         'image_path' => $psImagePath,
                     ]);
                 }
+
+                // IMPORTANT: Link paper stocks to ProductMaterial for inventory deduction
+                // This ensures materials are deducted when orders are placed for Invitations
+                if ($validated['productType'] === 'Invitation') {
+                    // Delete existing product-level material links (not order-specific ones)
+                    $product->materials()->whereNull('order_id')->delete();
+
+                    // Re-get the paper stocks we just created
+                    $createdPaperStocks = $product->paperStocks()->with('material')->get();
+                    
+                    foreach ($createdPaperStocks as $paperStock) {
+                        if ($paperStock->material_id) {
+                            $product->materials()->create([
+                                'material_id' => $paperStock->material_id,
+                                'item' => $paperStock->name ?? 'paper_stock',
+                                'type' => 'paper_stock',
+                                'qty' => 1, // 1 paper stock per invitation
+                                'source_type' => 'product',
+                                'quantity_mode' => 'per_unit', // Deduct 1 per invitation ordered
+                            ]);
+                        }
+                    }
+                }
             }
 
             // Addons

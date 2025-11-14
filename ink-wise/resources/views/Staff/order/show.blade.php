@@ -429,8 +429,45 @@
 		'giveaways' => 0.0,
 		'others' => 0.0,
 	];
-	$timeline = collect(data_get($order, 'timeline', data_get($order, 'events', [])))->sortBy(function ($event) {
-		$timestamp = data_get($event, 'timestamp', data_get($event, 'created_at'));
+	// Build timeline from order activities
+	$activities = collect(data_get($order, 'activities', []));
+	
+	// Add order creation event
+	$timeline = collect([
+		[
+			'label' => 'Order Created',
+			'author' => data_get($order, 'user.name') ?? 'Customer',
+			'state' => 'default',
+			'note' => 'Order was placed by customer',
+			'timestamp' => data_get($order, 'created_at'),
+		]
+	]);
+	
+	// Add activity events
+	foreach ($activities as $activity) {
+		$activityType = data_get($activity, 'activity_type');
+		$label = match($activityType) {
+			'status_updated' => 'Status Updated',
+			'payment_updated' => 'Payment Updated',
+			default => ucfirst(str_replace('_', ' ', $activityType))
+		};
+		
+		$userName = data_get($activity, 'user_name') ?? 'System';
+		$userRole = data_get($activity, 'user_role');
+		$authorDisplay = $userName . ($userRole ? ' (' . ucfirst($userRole) . ')' : '');
+		
+		$timeline->push([
+			'label' => $label,
+			'author' => $authorDisplay,
+			'state' => $activityType === 'status_updated' ? data_get($activity, 'new_value', 'default') : 'default',
+			'note' => data_get($activity, 'description'),
+			'timestamp' => data_get($activity, 'created_at'),
+		]);
+	}
+	
+	// Sort timeline by timestamp (newest first)
+	$timeline = $timeline->sortByDesc(function ($event) {
+		$timestamp = data_get($event, 'timestamp');
 		try {
 			return $timestamp ? \Illuminate\Support\Carbon::parse($timestamp)->timestamp : 0;
 		} catch (\Throwable $e) {
@@ -447,13 +484,13 @@
 	$printUrl = $actionUrls->get('print', data_get($order, 'admin_print_url'));
 
 	try {
-		$ordersIndexUrl = route('admin.orders.index');
+		$ordersIndexUrl = route('staff.order_list.index');
 	} catch (\Throwable $e) {
-		$ordersIndexUrl = url('/admin/orders');
+		$ordersIndexUrl = url('/staff/order-list');
 	}
 
 	try {
-		$statusManageUrl = $order ? route('admin.orders.status.edit', ['order' => data_get($order, 'id')]) : null;
+		$statusManageUrl = $order ? route('staff.orders.status.edit', ['id' => data_get($order, 'id')]) : null;
 	} catch (\Throwable $e) {
 		$statusManageUrl = null;
 	}
@@ -998,7 +1035,7 @@
 					@endif
 					<div class="ordersummary-card__actions">
 						@if($customerEmail && $customerId)
-							<a href="{{ route('admin.messages.index') }}?start_conversation={{ $customerId }}" class="btn btn-secondary btn-sm">
+							<a href="{{ route('staff.messages.index') }}?start_conversation={{ $customerId }}" class="btn btn-secondary btn-sm">
 								<i class="fi fi-rr-envelope" aria-hidden="true"></i> Message Customer
 							</a>
 						@endif

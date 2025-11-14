@@ -6,9 +6,9 @@
 <div class="card bg-white p-6 md:p-8 border border-gray-100">
   <h2 class="text-xl font-semibold mb-6">Profile Photo</h2>
 
-  <form method="POST" action="{{ route('customer.profile.update') }}" enctype="multipart/form-data">
+  <form method="POST" action="{{ route('customerprofile.update') }}" enctype="multipart/form-data">
 
-  <form method="POST" action="{{ route('customer.profile.index') }}" enctype="multipart/form-data">
+  <form method="POST" action="{{ route('customerprofile.index') }}" enctype="multipart/form-data">
 
     @csrf
     @method('PUT')
@@ -18,11 +18,12 @@
       <div id="avatarWrap" class="w-24 h-24 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center">
   @if(Auth::user()->customer?->photo)
     <img id="avatarImg"
-         src="@imageUrl(Auth::user()->customer->photo)"
+         src="{{ asset('storage/' . Auth::user()->customer->photo) }}"
          alt="Profile"
-         class="w-full h-full object-cover" />
+         class="w-full h-full object-cover"
+         onerror="console.log('Image failed to load:', this.src)" />
   @else
-    <span id="avatarFallback" class="text-3xl text-gray-400">👤</span>
+    <span id="avatarFallback" class="text-3xl text-gray-400"><i class="fa-regular fa-user"></i></span>
   @endif
 </div>
 
@@ -131,6 +132,7 @@
     const avatarImg = document.getElementById('avatarImg');
     const avatarFallback = document.getElementById('avatarFallback');
     const removeInput = document.getElementById('removePhotoInput');
+    const photoInput = document.getElementById('photoInput');
 
     removeButton.addEventListener('click', function () {
         if (confirm('Are you sure you want to remove your photo?')) {
@@ -141,8 +143,45 @@
             avatarImg.classList.add('hidden');
             avatarFallback.classList.remove('hidden');
 
+            // Clear the file input
+            photoInput.value = '';
+
             // Optionally, you can submit the form automatically
             // this.closest('form').submit();
+        }
+    });
+
+    // Handle photo preview when file is selected
+    photoInput.addEventListener('change', function (event) {
+        const file = event.target.files[0];
+        if (file) {
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                alert('Please select a valid image file.');
+                photoInput.value = '';
+                return;
+            }
+
+            // Validate file size (max 2MB)
+            if (file.size > 2 * 1024 * 1024) {
+                alert('Please select an image smaller than 2MB.');
+                photoInput.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                // Hide fallback and show image
+                avatarFallback.classList.add('hidden');
+                avatarImg.classList.remove('hidden');
+
+                // Set the preview image source
+                avatarImg.src = e.target.result;
+
+                // Reset remove input since we're uploading a new photo
+                removeInput.value = 0;
+            };
+            reader.readAsDataURL(file);
         }
     });
 </script>

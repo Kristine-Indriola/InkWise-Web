@@ -8,7 +8,7 @@
 
 <style>
   .dashboard-alert {
-    background: rgba(16, 185, 129, 0.1); /* Transparent green background */
+    background: rgba(16, 185, 129, 0.1); 
     color: #065f46;
     padding: 12px 16px;
     border-radius: 8px;
@@ -23,6 +23,29 @@
     10% { opacity: 1; }
     90% { opacity: 1; }
     100% { opacity: 0; }
+  }
+  
+  /* Make summary cards clickable */
+  .summary-card {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+  }
+  
+  .summary-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  }
+  
+  .summary-card.is-hovered {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  }
+  
+  .summary-card:active {
+    transform: translateY(-2px);
   }
 </style>
 
@@ -50,8 +73,8 @@
         </div>
     </header>
 
-    <section class="summary-grid" aria-label="Key performance highlights">
-        <article class="summary-card">
+        <section class="summary-grid" aria-label="Key performance highlights">
+        <a href="{{ route('staff.order_list.index') }}" class="summary-card" data-link-card>
             <div class="summary-card-header">
                 <span class="summary-card-label">Total Orders</span>
                 <span class="summary-card-chip accent">All time</span>
@@ -61,8 +84,8 @@
                 <span class="summary-card-icon" aria-hidden="true">🛒</span>
             </div>
             <span class="summary-card-meta">Orders currently tracked across your assignments.</span>
-        </article>
-        <article class="summary-card">
+        </a>
+        <a href="{{ route('staff.order_list.index') }}" class="summary-card" data-link-card>
             <div class="summary-card-header">
                 <span class="summary-card-label">Assigned Orders</span>
                 <span class="summary-card-chip warning">Action needed</span>
@@ -72,8 +95,8 @@
                 <span class="summary-card-icon" aria-hidden="true">📋</span>
             </div>
             <span class="summary-card-meta">Tasks waiting for your updates and confirmations.</span>
-        </article>
-        <article class="summary-card">
+        </a>
+        <a href="{{ route('staff.customer_profile') }}" class="summary-card" data-link-card>
             <div class="summary-card-header">
                 <span class="summary-card-label">Customers</span>
                 <span class="summary-card-chip accent">Active</span>
@@ -82,9 +105,9 @@
                 <span class="summary-card-value">{{ number_format($customers ?? 0) }}</span>
                 <span class="summary-card-icon" aria-hidden="true">🤝</span>
             </div>
-            <span class="summary-card-meta">Contacts you’re currently supporting.</span>
-        </article>
-        <article class="summary-card">
+            <span class="summary-card-meta">Contacts you're currently supporting.</span>
+        </a>
+        <a href="{{ route('staff.messages.index') }}" class="summary-card" data-link-card>
             <div class="summary-card-header">
                 <span class="summary-card-label">Unread Messages</span>
                 <span class="summary-card-chip danger">Follow up</span>
@@ -94,7 +117,7 @@
                 <span class="summary-card-icon" aria-hidden="true">💬</span>
             </div>
             <span class="summary-card-meta">Reach out quickly to keep momentum.</span>
-        </article>
+        </a>
     </section>
 
     <section class="staff-dashboard-section" aria-label="Quick links">
@@ -108,7 +131,7 @@
             <a href="{{ route('staff.order_list.index') }}" class="staff-quick-link" data-link-card>
                 <span class="staff-quick-link__icon" aria-hidden="true"><i class="fi fi-rr-tasks-alt"></i></span>
                 <div class="staff-quick-link__copy">
-                    <h3>Assigned Orders</h3>
+                    <h3>Manage Orders</h3>
                     <p>Review what’s next and keep production flowing.</p>
                 </div>
                 <span class="staff-quick-link__cta" aria-hidden="true"><i class="fi fi-rr-arrow-right"></i></span>
@@ -121,7 +144,7 @@
                 </div>
                 <span class="staff-quick-link__cta" aria-hidden="true"><i class="fi fi-rr-arrow-right"></i></span>
             </a>
-            <a href="{{ route('staff.inventory.index') }}" class="staff-quick-link" data-link-card>
+            <a href="{{ route('staff.materials.index') }}" class="staff-quick-link" data-link-card>
                 <span class="staff-quick-link__icon" aria-hidden="true"><i class="fi fi-rr-warehouse"></i></span>
                 <div class="staff-quick-link__copy">
                     <h3>Inventory Tracker</h3>
@@ -140,44 +163,7 @@
         </div>
     </section>
 
-    <section class="staff-dashboard-section" aria-label="Today’s reminders">
-        <header class="section-header">
-            <div>
-                <h2 class="section-title">Today’s Reminders</h2>
-                <p class="section-subtitle">Keep a pulse on the essentials for your shift.</p>
-            </div>
-        </header>
-        <ul class="staff-reminders">
-            <li>
-                <span class="staff-reminders__icon" aria-hidden="true">✅</span>
-                <div>
-                    <h3>Confirm new assignments</h3>
-                    <p>Double-check timelines and material requirements before noon.</p>
-                </div>
-            </li>
-            <li>
-                <span class="staff-reminders__icon" aria-hidden="true">📞</span>
-                <div>
-                    <h3>Customer follow-ups</h3>
-                    <p>Touch base with clients waiting for design approvals.</p>
-                </div>
-            </li>
-            <li>
-                <span class="staff-reminders__icon" aria-hidden="true">📦</span>
-                <div>
-                    <h3>Inventory updates</h3>
-                    <p>Record any stock adjustments in the tracker after each production run.</p>
-                </div>
-            </li>
-            <li>
-                <span class="staff-reminders__icon" aria-hidden="true">📝</span>
-                <div>
-                    <h3>Daily hand-off</h3>
-                    <p>Send a quick status recap to the admin team before the end of your shift.</p>
-                </div>
-            </li>
-        </ul>
-    </section>
+   
 
     <section class="staff-dashboard-section staff-dashboard-updates" aria-label="Materials health">
         <header class="section-header">

@@ -104,7 +104,7 @@
                         @endphp
 
                         @if($hasRemainingBalance)
-                        <a href="{{ route('customer.pay.remaining.balance', ['order' => $order->id ?? $order['id']]) }}"
+                        <a href="{{ route('customer.pay.remaining.balance', ['order' => data_get($order, 'id')]) }}"
                            class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-semibold transition-colors duration-200">
                             Pay Remaining (₱{{ number_format($remainingBalance, 2) }})
                         </a>
@@ -112,6 +112,7 @@
 
                         <button class="px-4 py-2 bg-[#a6b7ff] text-white rounded font-semibold">View Design Proof</button>
                         <button class="px-4 py-2 border border-[#a6b7ff] text-[#a6b7ff] rounded font-semibold">Message Inkwise</button>
+                        <button type="button" class="px-4 py-2 border border-red-500 text-red-500 hover:bg-red-50 rounded font-semibold js-cancel-production-order" data-order-id="{{ data_get($order, 'id') }}">Cancel Order</button>
                     </div>
                 </div>
             </div>
@@ -202,5 +203,74 @@
         });
     });
 })();
+</script>
+
+<script>
+// Handle cancel production order
+document.addEventListener('DOMContentLoaded', function () {
+    const cancelButtons = document.querySelectorAll('.js-cancel-production-order');
+    
+    cancelButtons.forEach(btn => {
+        btn.addEventListener('click', async function () {
+            const orderId = this.getAttribute('data-order-id');
+            
+            if (!orderId) {
+                console.warn('No order ID found for cancel button');
+                return;
+            }
+
+            // Show warning for orders in production
+            const confirmed = confirm(
+                'This order is already in production. Cancelling may result in a restocking fee or partial refund.\n\n' +
+                'Are you sure you want to cancel this order? For immediate assistance, please contact InkWise support.'
+            );
+
+            if (!confirmed) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/customer/orders/${orderId}/cancel`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                        'Accept': 'application/json',
+                    },
+                });
+
+                if (response.ok) {
+                    const result = await response.json().catch(() => ({}));
+                    
+                    // Successfully cancelled - remove from UI
+                    const card = btn.closest('.bg-white.border.rounded-xl');
+                    if (card) {
+                        card.remove();
+                    }
+
+                    // Show success message
+                    const message = result.message || result.status || 'Order cancellation request submitted. Our team will review and process your refund.';
+                    alert(message);
+
+                    // Reload page if no more orders
+                    const remainingOrders = document.querySelectorAll('.bg-white.border.rounded-xl').length;
+                    if (remainingOrders === 0) {
+                        location.reload();
+                    }
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    if (response.status === 403 || errorData.message?.includes('no longer be cancelled')) {
+                        alert('This order cannot be cancelled at this stage. Please contact InkWise support for assistance.');
+                    } else {
+                        alert(errorData.message || 'Failed to cancel order. Please contact InkWise support.');
+                    }
+                }
+            } catch (error) {
+                console.error('Cancel order error:', error);
+                alert('Failed to cancel order. Please check your connection and try again, or contact InkWise support.');
+            }
+        });
+    });
+});
 </script>
 @endsection

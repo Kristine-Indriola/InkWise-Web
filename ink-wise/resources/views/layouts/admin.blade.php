@@ -833,6 +833,9 @@ body.dark-mode .btn-warning {
       <li class="{{ (request()->routeIs('admin.ordersummary.*') || request()->routeIs('admin.orders.index')) ? 'active' : '' }}">
         <a href="{{ route('admin.orders.index') }}"><i class="fi fi-rr-list-check"></i> <span class="label">Order Summaries</span></a>
       </li>
+      <li class="{{ request()->routeIs('admin.payments.*') ? 'active' : '' }}">
+        <a href="{{ route('admin.payments.index') }}"><i class="fi fi-rr-credit-card"></i> <span class="label">Payment Transactions</span></a>
+      </li>
       {{--<li class="{{ request()->routeIs('admin.messages.*') ? 'active' : '' }}">
         <a href="{{ route('admin.messages.index') }}"><i class="fi fi-rr-comment-dots"></i> <span class="label">Messages</span></a>
       </li> --}}
@@ -897,9 +900,7 @@ body.dark-mode .btn-warning {
           <li class="{{ request()->routeIs('admin.settings.site-content.*') ? 'active' : '' }}">
             <a href="{{ route('admin.settings.site-content.edit') }}"><span class="label">Site Content</span></a>
           </li>
-          <li class="{{ request()->routeIs('admin.fonts.*') ? 'active' : '' }}">
-            <a href="{{ route('admin.fonts.index') }}"><span class="label">Fonts</span></a>
-          </li>
+
           <li class="{{ request()->routeIs('admin.users.passwords.*') ? 'active' : '' }}">
             <a href="{{ route('admin.users.passwords.index') }}"><span class="label">Password Reset</span></a>
           </li>

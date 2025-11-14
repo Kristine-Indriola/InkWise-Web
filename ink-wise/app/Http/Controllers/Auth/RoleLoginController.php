@@ -26,6 +26,14 @@ class RoleLoginController extends Controller
 
             $user = Auth::user();
 
+            // ✅ Block customers from logging in here
+            if ($user->role === 'customer') {
+                Auth::logout();
+                return back()->withErrors([
+                    'login_error' => '❌ Customers must use the customer login page. Please visit the customer login.'
+                ])->withInput();
+            }
+
             if (!in_array($user->role, ['admin', 'owner', 'staff'])) {
                 Auth::logout();
                 return back()->withErrors([
@@ -81,7 +89,7 @@ class RoleLoginController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect('/')
+        return redirect()->route('login')
             ->with('success', '✅ You have been logged out successfully.');
     }
 }

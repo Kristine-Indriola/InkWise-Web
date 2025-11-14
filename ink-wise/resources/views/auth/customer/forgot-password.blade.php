@@ -34,28 +34,51 @@
             box-sizing: border-box;
         }
 
-        body {
-            position: relative;
-            min-height: 100vh;
-            margin: 0;
-            background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
-            color: var(--color-ink);
-            font-family: var(--font-accent);
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+
+        .step {
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: clamp(2rem, 5vw, 4rem) clamp(1.5rem, 4vw, 3rem);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #e5e7eb;
+            color: #6b7280;
+            font-weight: bold;
+            margin: 0 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .step.active {
+            background: #06b6d4;
+            color: white;
+        }
+
+        .step.completed {
+            background: #10b981;
+            color: white;
         }
     </style>
 </head>
 <body>
 <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-gray-100">
     <div class="w-full sm:max-w-md mt-6 px-6 py-4 bg-white shadow-md overflow-hidden sm:rounded-lg">
+        <!-- Step Indicator -->
+        <div class="step-indicator">
+            <div class="step active">1</div>
+            <div class="step">2</div>
+        </div>
+
         <div class="text-center mb-6">
             <h2 class="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-blue-400 bg-clip-text text-transparent">
-                Forgot Password
+                Reset Password
             </h2>
-            <p class="text-gray-500 text-sm mt-1">Enter your email address and we'll send you a 6-digit code to reset your password.</p>
+            <p class="text-gray-500 text-sm mt-1">Enter your email to receive a verification code</p>
         </div>
 
         <!-- Forgot Password Form -->
@@ -80,21 +103,16 @@
 
             <!-- Submit -->
             <button type="submit"
-                    class="w-full bg-gradient-to-r from-indigo-600 to-blue-500 hover:from-indigo-700 hover:to-blue-600 text-white font-medium py-2 px-4 rounded-lg shadow-md transition">
-                Send Password Reset Code
+                    class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-opacity-50"
+                    style="background-color: #0891b2 !important; color: white !important;">
+                Send Verification Code
             </button>
         </form>
 
-        <!-- Next Step -->
-        <p class="text-center text-sm text-gray-600 mt-4">
-            After receiving the code,
-            <a href="{{ route('customer.password.reset') }}" class="text-indigo-600 hover:underline">enter it here to reset your password</a>
-        </p>
-
         <!-- Back to Login -->
-        <p class="text-center text-sm text-gray-600 mt-2">
+        <p class="text-center text-sm text-gray-600 mt-4">
             Remember your password?
-            <a href="{{ route('customer.login.form') }}" class="text-indigo-600 hover:underline">Sign In</a>
+            <a href="{{ route('dashboard') }}?show_login=true" class="text-indigo-600 hover:underline">Sign In</a>
         </p>
     </div>
 </div>

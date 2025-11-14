@@ -15,7 +15,7 @@
         $second = $parts[1] ?? '';
         $abbr = strtoupper(substr($first, 0, 1) . ($second ? substr($second, 0, 1) : ''));
     }
-    $position = $user->position ?? __('Staff Member');
+    $position = $user->staff->role ?? __('Staff Member');
 @endphp
 
 <main class="materials-page admin-page-shell profile-page" role="main">
@@ -49,8 +49,8 @@
     <section class="profile-form-shell" aria-label="Edit staff profile">
         <div class="profile-form-header">
             <div class="profile-avatar-frame" aria-hidden="true">
-                @if($user->profile_pic)
-                    <img src="@imageUrl($user->profile_pic)" alt="{{ $user->name }} profile photo">
+                @if($user->staff && $user->staff->profile_pic)
+                    <img src="{{ asset('storage/' . $user->staff->profile_pic) }}" alt="{{ $user->name }} profile photo">
                 @else
                     <span>{{ $abbr ?: 'ST' }}</span>
                 @endif
@@ -77,12 +77,8 @@
                     <input id="profilePhone" type="text" name="phone" value="{{ old('phone', $user->phone ?? '') }}" class="profile-input" placeholder="e.g. 09XX-XXX-XXXX">
                 </div>
                 <div class="profile-field">
-                    <label for="profilePosition">Position</label>
-                    <input id="profilePosition" type="text" name="position" value="{{ old('position', $user->position ?? '') }}" class="profile-input" placeholder="Graphic Artist, Coordinator, ...">
-                </div>
-                <div class="profile-field">
                     <label for="profileAddress">Address</label>
-                    <input id="profileAddress" type="text" name="address" value="{{ old('address', $user->address ?? '') }}" class="profile-input" placeholder="City / Province">
+                    <input id="profileAddress" type="text" name="address" value="{{ old('address', $user->staff->address ?? '') }}" class="profile-input" placeholder="City / Province">
                 </div>
                 <div class="profile-field">
                     <label for="profilePicInput">Profile Picture</label>
@@ -91,12 +87,12 @@
                 </div>
             </div>
 
-            @if($user->profile_pic)
+            @if($user->staff && $user->staff->profile_pic)
                 <div class="profile-current-photo">
                     <span class="profile-current-photo__label">Current photo</span>
                     <div class="profile-current-photo__preview">
-                        <img src="@imageUrl($user->profile_pic)" alt="Current profile" class="profile-current-photo__img">
-                        <span class="profile-current-photo__meta">Last updated {{ optional($user->updated_at)->diffForHumans() }}</span>
+                        <img src="{{ asset('storage/' . $user->staff->profile_pic) }}" alt="Current profile" class="profile-current-photo__img">
+                        <span class="profile-current-photo__meta">Last updated {{ optional($user->staff->updated_at)->diffForHumans() }}</span>
                     </div>
                 </div>
             @endif

@@ -18,6 +18,7 @@
   <!-- Icon fonts used by invitations header -->
   <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-bold-rounded/css/uicons-bold-rounded.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ asset('css/customer/customer.css') }}">
@@ -145,7 +146,7 @@
                     </button>
                     <div id="userDropdownMenu"
                          class="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-200 z-50 hidden group-hover:block">
-                        <a href="{{ route('customer.profile.index') }}"
+                        <a href="{{ route('customerprofile.index') }}"
 
                            class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa]">
                             My Account
@@ -217,35 +218,38 @@ document.addEventListener('DOMContentLoaded', function () {
       <nav class="space-y-2">
         <!-- My Account Dropdown -->
         @php
-          $myAccountActive = request()->routeIs('customer.profile.*');
+          $myAccountActive = request()->routeIs('customerprofile.*');
         @endphp
         <div x-data="{ open: {{ $myAccountActive ? 'true' : 'false' }} }" class="relative">
           <!-- Dropdown header with link + toggle -->
-          <div class="flex items-stretch gap-2">
-            <a href="{{ route('customer.profile.index') }}"
+          <div class="flex items-stretch gap-2 group">
+            <a href="{{ route('customerprofile.index') }}"
                class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl transition w-full font-medium {{ $myAccountActive ? 'bg-[#e0f7fa] text-gray-700' : 'text-gray-700 hover:bg-[#e0f7fa]' }}">
               <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-5 0-9 2.5-9 5.5A1.5 1.5 0 0 0 4.5 21h15a1.5 1.5 0 0 0 1.5-1.5C21 16.5 17 14 12 14Z"/></svg>
               <span>My Account</span>
             </a>
-            @if($myAccountActive)
-              <button type="button"
-                      @click="open = !open"
-                      class="px-3 py-3 rounded-xl text-gray-500 hover:bg-[#e0f7fa] transition">
-                <svg class="w-4 h-4 transition-transform" :class="{'rotate-180': open}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"></path></svg>
-              </button>
-            @endif
+            <button type="button"
+                    @click="open = !open"
+                    class="px-3 py-3 rounded-xl text-gray-500 hover:bg-[#e0f7fa] group-hover:bg-[#e0f7fa] transition">
+              <svg class="w-4 h-4 transition-transform" :class="{'rotate-180': open}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"></path></svg>
+            </button>
           </div>
           <div x-show="open" @click.away="open = false" class="mt-1 ml-6 space-y-1">
             <!-- Profile (with link) -->
-            <a href="{{ route('customer.profile.index') }}"
+            <a href="{{ route('customerprofile.index') }}"
 
                class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] rounded transition">
               Profile
             </a>
             <!-- Addresses (with link) -->
-            <a href="{{ route('customer.profile.addresses') }}"
+            <a href="{{ route('customerprofile.addresses') }}"
                class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] rounded transition">
               Addresses
+            </a>
+            <!-- Change Password (with link) -->
+            <a href="{{ route('customerprofile.change-password') }}"
+               class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] rounded transition">
+              Change Password
             </a>
             <!-- My Favorites removed from dropdown (moved below) -->
           </div>
@@ -279,12 +283,12 @@ document.addEventListener('DOMContentLoaded', function () {
   <svg class="w-4 h-4 ml-auto transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"></path></svg>
   <!-- Dropdown -->
   <div class="absolute left-0 top-full mt-1 w-48 bg-white rounded shadow-lg z-10 hidden group-hover:block">
-    <a href="{{ route('customer.profile.settings', ['tab' => 'account']) }}"
+    <a href="{{ route('customerprofile.settings', ['tab' => 'account']) }}"
 
        class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] rounded transition">
       Account Settings
     </a>
-    <a href="{{ route('customer.profile.settings', ['tab' => 'privacy']) }}"
+    <a href="{{ route('customerprofile.settings', ['tab' => 'privacy']) }}"
 
        class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] rounded transition">
       Privacy Settings
@@ -316,113 +320,103 @@ document.addEventListener('DOMContentLoaded', function () {
 
 <div id="chatModal" class="fixed bottom-6 right-6 z-50 hidden">
     <div id="chatBox"
-         class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-4 relative transition-all duration-300 resize"
-         style="max-height: 400px; min-height: 300px; min-width: 320px; width: 100%;">
+         class="bg-white rounded-2xl shadow-2xl p-4 relative transition-all duration-300"
+         style="width: 380px; height: 500px; display: flex; flex-direction: column;">
         <!-- Minimize button -->
         <button onclick="document.getElementById('chatModal').classList.add('hidden'); document.getElementById('chatFloatingBtn').classList.remove('hidden');"
-                class="absolute top-2 right-2 text-gray-400 hover:text-[#94b9ff] transition text-base font-bold" title="Minimize">
+                class="absolute top-2 right-2 text-gray-400 hover:text-[#94b9ff] transition text-base font-bold z-10" title="Minimize">
             &#8211;
         </button>
         <!-- Expand/Shrink button -->
         <button id="toggleChatSize"
                 onclick="toggleChatSize()"
-                class="absolute top-2 right-10 text-gray-400 hover:text-[#94b9ff] transition text-base font-bold" title="Expand/Shrink">
+                class="absolute top-2 right-10 text-gray-400 hover:text-[#94b9ff] transition text-base font-bold z-10" title="Expand/Shrink">
             <svg id="expandIcon" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path d="M4 8V4h4M20 16v4h-4M4 16v4h4M20 8V4h-4"/>
             </svg>
         </button>
         <!-- Chat Header -->
-        <div class="text-center mb-2">
+        <div class="text-center mb-3 pt-2" style="flex-shrink: 0;">
             <h3 class="text-lg font-bold text-[#94b9ff]">Message Chat</h3>
             <p class="text-xs text-gray-500">Chat with staff for support</p>
         </div>
         <!-- Chat Messages -->
-        <div id="chatPlaceholder" class="overflow-y-auto mb-3 flex flex-col" style="max-height: 320px; min-height: 220px;">
+        <div id="chatPlaceholder" class="overflow-y-auto mb-3 flex flex-col gap-2" style="flex: 1; min-height: 0;">
             <!-- messages injected here -->
         </div>
+        <!-- Image preview area -->
+        <div id="imagePreviewContainer" class="mb-2 hidden" style="flex-shrink: 0;">
+            <div class="relative inline-block">
+                <img id="imagePreview" src="" alt="Preview" class="max-w-full max-h-24 rounded-lg border border-gray-300">
+                <button type="button" onclick="clearImageSelection()"
+                        class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600 transition-colors duration-200"
+                        title="Remove image">
+                    ✕
+                </button>
+                <p id="imageFileName" class="text-xs text-gray-600 mt-1"></p>
+            </div>
+        </div>
+
         <!-- Chat Input + Image Upload -->
-        <form id="customerChatForm" class="flex gap-2 items-center" enctype="multipart/form-data" onsubmit="return false;">
+        <form id="customerChatForm" class="flex gap-2 items-end" enctype="multipart/form-data" onsubmit="return false;" style="flex-shrink: 0;">
             <input id="customerChatInput" type="text" placeholder="Type your message..."
-                   class="flex-1 border rounded-lg px-4 py-3 text-base focus:outline-none focus:ring focus:ring-[#94b9ff]">
+                   class="flex-1 border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring focus:ring-[#94b9ff]">
             
             <!-- Hidden file input -->
             <input id="customerChatFile" type="file" accept="image/*" class="hidden">
 
             <!-- Button to open file picker -->
             <button type="button" onclick="document.getElementById('customerChatFile').click()"
-                    class="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded-lg">
+                    class="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded-lg transition-colors duration-200 flex-shrink-0"
+                    title="Attach an image">
                 📷
             </button>
 
             <!-- Send button -->
             <button id="customerChatSendBtn" type="button"
-                    class="bg-[#94b9ff] text-white px-4 py-2 rounded-lg text-base font-semibold hover:bg-[#6fa3ff]">
+                    class="bg-[#94b9ff] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#6fa3ff] transition-colors duration-200 flex-shrink-0">
                 Send
             </button>
         </form>
-
-        <!-- Drag Handle for Resizing -->
-        <div id="chatResizeHandle"
-             class="absolute bottom-2 right-2 w-5 h-5 cursor-nwse-resize z-50"
-             style="background: transparent;">
-            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path d="M20 20L4 4"/>
-            </svg>
-        </div>
     </div>
 </div>
 
 <script>
 function toggleChatSize() {
     const chatBox = document.getElementById('chatBox');
-    const chatPlaceholder = document.getElementById('chatPlaceholder');
     const expandIcon = document.getElementById('expandIcon');
-    if (chatBox.classList.contains('max-w-sm')) {
-        chatBox.classList.remove('max-w-sm');
-        chatBox.classList.add('max-w-xl');
-        chatBox.style.maxHeight = '700px';
-        chatBox.style.minHeight = '400px';
-        chatPlaceholder.style.maxHeight = '600px';
-        chatPlaceholder.style.minHeight = '320px';
-        expandIcon.style.transform = 'rotate(180deg)';
-    } else {
-        chatBox.classList.remove('max-w-xl');
-        chatBox.classList.add('max-w-sm');
-        chatBox.style.maxHeight = '400px';
-        chatBox.style.minHeight = '300px';
-        chatPlaceholder.style.maxHeight = '320px';
-        chatPlaceholder.style.minHeight = '220px';
+    const isExpanded = chatBox.getAttribute('data-expanded') === 'true';
+    
+    if (isExpanded) {
+        // Shrink to normal size
+        chatBox.style.width = '380px';
+        chatBox.style.height = '500px';
+        chatBox.setAttribute('data-expanded', 'false');
         expandIcon.style.transform = 'rotate(0deg)';
+    } else {
+        // Expand to larger size
+        chatBox.style.width = '500px';
+        chatBox.style.height = '650px';
+        chatBox.setAttribute('data-expanded', 'true');
+        expandIcon.style.transform = 'rotate(180deg)';
     }
 }
-
-// Drag resize
-const chatBox = document.getElementById('chatBox');
-const chatResizeHandle = document.getElementById('chatResizeHandle');
-let isResizing = false, lastX = 0, lastY = 0, startWidth = 0, startHeight = 0;
-chatResizeHandle.addEventListener('mousedown', function(e) {
-    isResizing = true;
-    lastX = e.clientX;
-    lastY = e.clientY;
-    startWidth = chatBox.offsetWidth;
-    startHeight = chatBox.offsetHeight;
-    document.body.style.userSelect = 'none';
-});
-window.addEventListener('mousemove', function(e) {
-    if (!isResizing) return;
-    let newWidth = Math.max(320, startWidth + (e.clientX - lastX));
-    let newHeight = Math.max(300, startHeight + (e.clientY - lastY));
-    chatBox.style.width = newWidth + 'px';
-    chatBox.style.maxHeight = newHeight + 'px';
-    chatBox.style.minHeight = Math.min(newHeight, 700) + 'px';
-});
-window.addEventListener('mouseup', function() {
-    isResizing = false;
-    document.body.style.userSelect = '';
-});
 </script>
 
 <script>
+// Function to clear image selection
+function clearImageSelection() {
+    const fileInput = document.getElementById('customerChatFile');
+    const previewContainer = document.getElementById('imagePreviewContainer');
+    const preview = document.getElementById('imagePreview');
+    const fileName = document.getElementById('imageFileName');
+    
+    fileInput.value = '';
+    preview.src = '';
+    fileName.textContent = '';
+    previewContainer.classList.add('hidden');
+}
+
 (function () {
     const threadUrl = "{{ route('customer.chat.thread') }}";
     const sendUrl   = "{{ route('customer.chat.send') }}";
@@ -430,8 +424,51 @@ window.addEventListener('mouseup', function() {
     const input = document.getElementById('customerChatInput');
     const fileInput = document.getElementById('customerChatFile');
     const sendBtn = document.getElementById('customerChatSendBtn');
+    const previewContainer = document.getElementById('imagePreviewContainer');
+    const preview = document.getElementById('imagePreview');
+    const fileName = document.getElementById('imageFileName');
 
     function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])); }
+
+    // Handle file input change for preview
+    fileInput.addEventListener('change', function(e) {
+        console.log('File input changed, files:', this.files);
+        const file = this.files[0];
+        if (file) {
+            console.log('File selected:', file.name, file.type, file.size);
+            
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                alert('Please select an image file.');
+                this.value = '';
+                return;
+            }
+            
+            // Validate file size (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('Image size should not exceed 5MB.');
+                this.value = '';
+                return;
+            }
+            
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                preview.src = e.target.result;
+                fileName.textContent = file.name;
+                previewContainer.classList.remove('hidden');
+                console.log('Preview displayed');
+            };
+            reader.onerror = function(e) {
+                console.error('FileReader error:', e);
+                alert('Failed to read image file.');
+            };
+            reader.readAsDataURL(file);
+        } else {
+            console.log('No file selected, clearing preview');
+            clearImageSelection();
+        }
+    });
 
     async function loadChatThread(){
       try {
@@ -451,13 +488,15 @@ window.addEventListener('mouseup', function() {
         const wrapper = document.createElement('div');
         wrapper.style.display = 'flex';
         wrapper.style.justifyContent = isAdmin ? 'flex-start' : 'flex-end';
+        wrapper.style.marginBottom = '8px';
 
         const bubble = document.createElement('div');
-        bubble.style.maxWidth = '85%';
-        bubble.style.padding = '8px 10px';
-        bubble.style.borderRadius = '10px';
+        bubble.style.maxWidth = '80%';
+        bubble.style.padding = '10px 12px';
+        bubble.style.borderRadius = '12px';
         bubble.style.background = isAdmin ? '#eef7ff' : '#94b9ff';
         bubble.style.color = isAdmin ? '#111' : '#fff';
+        bubble.style.wordWrap = 'break-word';
 
         const contentParts = [];
 
@@ -467,7 +506,7 @@ window.addEventListener('mouseup', function() {
             contentParts.push(
               `<a href="${it.attachment_url}" target="_blank" rel="noopener">
                  <img src="${it.attachment_url}" alt="${escapeHtml(it.attachment_name || 'Attachment')}"
-                      style="max-width: 100%; border-radius: 8px; margin-bottom: 6px;">
+                      style="max-width: 100%; height: auto; border-radius: 8px; margin-bottom: 6px; cursor: pointer; display: block;">
                </a>`
             );
           } else {
@@ -481,47 +520,88 @@ window.addEventListener('mouseup', function() {
         }
 
         if (it.message && it.message.trim() && it.message.trim() !== '[image attachment]') {
-          contentParts.push(`<p style="margin:0;white-space:pre-wrap;">${escapeHtml(it.message)}</p>`);
+          contentParts.push(`<p style="margin:0;white-space:pre-wrap;font-size:14px;line-height:1.4;">${escapeHtml(it.message)}</p>`);
         }
 
         if (!contentParts.length) {
-          contentParts.push(`<p style="margin:0;white-space:pre-wrap;">${escapeHtml(it.message || '')}</p>`);
+          contentParts.push(`<p style="margin:0;white-space:pre-wrap;font-size:14px;line-height:1.4;">${escapeHtml(it.message || '')}</p>`);
         }
 
         bubble.innerHTML = contentParts.join('');
         wrapper.appendChild(bubble);
         placeholder.appendChild(wrapper);
       });
-      placeholder.scrollTop = placeholder.scrollHeight;
+      
+      // Smooth scroll to bottom
+      setTimeout(() => {
+        placeholder.scrollTop = placeholder.scrollHeight;
+      }, 100);
     }
 
     async function sendMessage(){
       const msg = input.value.trim();
       const file = fileInput.files[0];
-      if (!msg && !file) return;
-
-      const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-      const fd = new FormData();
-      if (msg) fd.append('message', msg);
-      if (file) fd.append('file', file);
-
-      const res = await fetch(sendUrl, {
-        method: 'POST',
-        headers: { 'X-CSRF-TOKEN': token, 'Accept': 'application/json' },
-        body: fd
-      });
-      if (!res.ok) {
-        const txt = await res.text().catch(()=>null);
-        alert('Send failed: ' + (txt || res.status));
+      if (!msg && !file) {
+        alert('Please enter a message or select an image.');
         return;
       }
-      input.value = '';
-      fileInput.value = ''; // reset file input
-      await loadChatThread();
+
+      // Disable send button to prevent double-clicking
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Sending...';
+
+      try {
+        const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const fd = new FormData();
+        if (msg) fd.append('message', msg);
+        if (file) {
+          console.log('Uploading file:', file.name, 'Size:', file.size, 'Type:', file.type);
+          fd.append('file', file);
+        }
+
+        console.log('Sending to:', sendUrl);
+        
+        const res = await fetch(sendUrl, {
+          method: 'POST',
+          headers: { 'X-CSRF-TOKEN': token, 'Accept': 'application/json' },
+          body: fd
+        });
+        
+        console.log('Response status:', res.status);
+        
+        if (!res.ok) {
+          const txt = await res.text().catch(()=>null);
+          console.error('Send failed:', txt || res.status);
+          alert('Send failed: ' + (txt || res.status));
+          return;
+        }
+        
+        const responseData = await res.json();
+        console.log('Send successful:', responseData);
+        
+        // Clear inputs and preview
+        input.value = '';
+        clearImageSelection();
+        
+        // Reload chat thread
+        await loadChatThread();
+      } catch (error) {
+        console.error('Send error:', error);
+        alert('Failed to send message. Please try again.');
+      } finally {
+        // Re-enable send button
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send';
+      }
     }
 
     sendBtn.addEventListener('click', sendMessage);
-    input.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); sendMessage(); } });
+    input.addEventListener('keydown', function(e){ 
+      if (e.key === 'Enter' && !e.shiftKey) { 
+        e.preventDefault(); 
+        sendMessage(); 
+      } 
+    });
 
     // when modal opens, load messages
     window.loadChatThread = loadChatThread;

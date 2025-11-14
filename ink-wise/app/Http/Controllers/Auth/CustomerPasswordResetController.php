@@ -76,6 +76,6 @@ class CustomerPasswordResetController extends Controller
             return back()->withErrors(['email' => 'Failed to send reset code. Please try again.']);
         }
 
-        return back()->with('status', 'If an account with that email exists, we have sent a password reset code.');
+        return redirect()->route('customer.password.reset')->with('email', $email);
     }
 }

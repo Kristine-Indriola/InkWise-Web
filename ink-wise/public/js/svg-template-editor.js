@@ -10,6 +10,16 @@ class SvgTemplateEditor {
             onTextChange: options.onTextChange || null,
             ...options
         };
+        const bodyDataset = document && document.body && document.body.dataset ? document.body.dataset : {};
+        const modeRaw = (bodyDataset.imageReplacementMode || '').toLowerCase();
+        let mode = 'full';
+        if (modeRaw === 'panel-only' || modeRaw === 'disabled') {
+            mode = modeRaw;
+        } else if (bodyDataset.allowImageReplacement === 'false') {
+            mode = 'disabled';
+        }
+    this.imageReplacementMode = mode;
+    this.allowCanvasImageTools = mode !== 'disabled';
 
         this.changeableImages = [];
         this.textElements = [];
@@ -43,6 +53,19 @@ class SvgTemplateEditor {
 
         console.log('SvgTemplateEditor: Found', changeableElements.length, 'changeable image elements');
 
+        if (!this.allowCanvasImageTools) {
+            changeableElements.forEach((element) => {
+                element.style.cursor = 'default';
+                element.classList.remove('svg-changeable-image');
+                element.classList.remove('changeable-image-hover');
+                if (element._boundingBox) {
+                    try { element._boundingBox.remove(); } catch (err) {}
+                    element._boundingBox = null;
+                }
+            });
+            return;
+        }
+
         changeableElements.forEach((element, index) => {
             console.log('SvgTemplateEditor: Setting up element', index, element);
             element.style.cursor = 'pointer';
@@ -54,12 +77,6 @@ class SvgTemplateEditor {
             // Create bounding box for drag functionality
             const boundingBox = this.createBoundingBox(element);
             element._boundingBox = boundingBox;
-
-            element.addEventListener('click', function(e) {
-                console.log('SvgTemplateEditor: Image element clicked', element);
-                e.preventDefault();
-                self.showImageUploadDialog(element);
-            });
 
             element.addEventListener('mouseenter', function() {
                 element.classList.add('changeable-image-active');

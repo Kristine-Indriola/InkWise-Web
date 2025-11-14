@@ -67,6 +67,17 @@
   $paperStocksRaw = $product->paper_stocks ?? $product->paperStocks ?? collect();
   $colors = $product->product_colors ?? $product->colors ?? collect();
   $stockAvailability = $product->stock_availability ?? optional($templateRef)->stock_availability;
+  if ($product->materials && $product->materials->count()) {
+    $allMaterialsAvailable = true;
+    foreach ($product->materials as $pm) {
+      $material = $pm->material;
+      if ($material && ($material->stock ?? 0) < $pm->quantity) {
+        $allMaterialsAvailable = false;
+        break;
+      }
+    }
+    $stockAvailability = $allMaterialsAvailable ? 'In Stock' : 'Out of Stock';
+  }
   $dateAvailable = $product->date_available ?? optional($templateRef)->date_available;
   $formattedAvailability = null;
   if ($dateAvailable) {
@@ -279,7 +290,7 @@
           </section>
         @endif
       </div>
-  <a href="{{ route('design.edit', ['product' => $product->id]) }}" class="edit-btn" data-edit-link target="_top" rel="noopener">
+  <a href="{{ route('design.studio', ['product' => $product->id]) }}" class="edit-btn" data-edit-link target="_top" rel="noopener">
     <span>Edit my design</span>
     <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M17 7L7 17"></path>

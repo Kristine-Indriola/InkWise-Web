@@ -775,7 +775,7 @@
   
    {{-- If not logged in --}}
 @guest
-     <a href="{{ route('customer.login') }}"
+     <a href="{{ route('customer.login.form') }}"
          id="openLogin"
          class="btn-pill btn-primary animate-ocean focus-ring">
        Sign in
@@ -797,7 +797,7 @@
         <div id="userDropdownMenu"
              class="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-200 z-50 hidden group-hover:block">
             <!-- Profile -->
-            <a href="{{ route('customer.profile.index') }}"
+            <a href="{{ route('customerprofile.index') }}"
                class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] transition-colors">
                 My Account
             </a>
@@ -1114,6 +1114,39 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     })();
+
+    // Show login modal if password was just reset, login requested, or login failed
+    @if(session('status') && str_contains(session('status'), 'Password reset successfully'))
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var loginModal = document.getElementById('loginModal');
+            if (loginModal) {
+                loginModal.classList.remove('hidden');
+                loginModal.classList.add('flex');
+            }
+        });
+    </script>
+    @elseif(request('show_login'))
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var loginModal = document.getElementById('loginModal');
+            if (loginModal) {
+                loginModal.classList.remove('hidden');
+                loginModal.classList.add('flex');
+            }
+        });
+    </script>
+    @elseif(session('show_login_modal') || $errors->has('email') || $errors->has('password'))
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var loginModal = document.getElementById('loginModal');
+            if (loginModal) {
+                loginModal.classList.remove('hidden');
+                loginModal.classList.add('flex');
+            }
+        });
+    </script>
+    @endif
 </script>
 
 </body>
