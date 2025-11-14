@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="800" height="600" viewBox="0 0 800 600">
+  <defs>
+    <!-- Figma pattern for background image -->
+    <pattern id="pattern_bg" patternUnits="userSpaceOnUse" width="800" height="600">
+      <use xlink:href="#image_bg" x="0" y="0" width="800" height="600"/>
+    </pattern>
+    <image id="image_bg" width="800" height="600" xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="/>
+
+    <!-- Figma pattern for photo placeholder -->
+    <pattern id="pattern_photo" patternUnits="userSpaceOnUse" width="200" height="200">
+      <use xlink:href="#image_photo" x="0" y="0" width="200" height="200"/>
+    </pattern>
+    <image id="image_photo" width="200" height="200" xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="/>
+  </defs>
+
+  <!-- Background using pattern -->
+  <rect x="0" y="0" width="800" height="600" fill="url(#pattern_bg)" id="background" data-editable-image="image_pattern_2"/>
+
+  <!-- Figma text rendered as complex paths -->
+  <path d="M100,150 L120,140 L140,150 L160,140 L180,150 L200,140 L220,150 L240,140 L260,150 L280,140 L300,150 L320,140 L340,150 L360,140 L380,150" fill="black" stroke="none" data-editable-text="text_path_2"/>
+  <path d="M100,200 Q150,150 200,200 T300,200 Q350,150 400,200" fill="black" stroke="none" data-editable-text="text_path_3"/>
+  <path d="M100,250 C150,200 200,250 250,200 S300,250 350,200" fill="black" stroke="none" data-editable-text="text_path_4"/>
+
+  <!-- Photo placeholder using pattern -->
+  <rect x="50" y="300" width="200" height="200" fill="url(#pattern_photo)" id="photo_placeholder" data-editable-image="image_pattern_3"/>
+
+  <!-- Standard SVG text (for comparison) -->
+  <text x="450" y="150" font-family="Arial" font-size="24" fill="black" data-editable-text="text_1">Standard Text</text>
+
+  <!-- Standard SVG image (for comparison) -->
+  <image x="450" y="200" width="150" height="100" xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==" data-editable-image="image_3"/>
+</svg>

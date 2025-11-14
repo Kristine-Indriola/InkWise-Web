@@ -18,26 +18,18 @@ class Template extends Model
         'front_image',
         'back_image',
         'status',
-
         'metadata',
+    'design',
         'svg_path',
+        'back_svg_path',
+        'preview',
+        'processed_at',
     ];
 
     protected $casts = [
         'metadata' => 'array',
-
-        'svg_path',
-        'back_svg_path',
-        'design',
-        'preview',
-        'processed_at',
-        'figma_file_key',
-        'figma_node_id',
-        'figma_url',
-        'figma_metadata',
-        'figma_synced_at',
-        'has_back_design',
-
+        'design' => 'array',
+        'processed_at' => 'datetime',
     ];
 
     public function products()

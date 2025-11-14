@@ -155,55 +155,64 @@ document.addEventListener("DOMContentLoaded", function () {
 
 // Create Template Dropdown Functionality
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('Template dropdown script loaded');
+
     const dropdownContainer = document.querySelector('.create-dropdown-container');
     const dropdownToggle = document.querySelector('.dropdown-toggle');
     const dropdownMenu = document.querySelector('.create-dropdown-menu');
 
+    console.log('Found elements:', {
+        container: !!dropdownContainer,
+        toggle: !!dropdownToggle,
+        menu: !!dropdownMenu
+    });
+
     if (dropdownContainer && dropdownToggle && dropdownMenu) {
-        let hoverTimeout;
+        console.log('All dropdown elements found, attaching event listeners');
 
-        // Hover to open dropdown
-        dropdownContainer.addEventListener('mouseenter', function() {
-            clearTimeout(hoverTimeout);
-            dropdownToggle.setAttribute('aria-expanded', 'true');
-            dropdownMenu.setAttribute('aria-hidden', 'false');
-        });
+        // Initially hide the dropdown menu
+        dropdownMenu.style.display = 'none';
+        dropdownMenu.setAttribute('aria-hidden', 'true');
 
-        // Hover to close dropdown (with delay)
-        dropdownContainer.addEventListener('mouseleave', function() {
-            hoverTimeout = setTimeout(() => {
-                dropdownToggle.setAttribute('aria-expanded', 'false');
-                dropdownMenu.setAttribute('aria-hidden', 'true');
-            }, 300); // 300ms delay before closing
-        });
-
-        // Click to toggle (for mobile/touch devices)
+        // Click to toggle dropdown
         dropdownToggle.addEventListener('click', function(e) {
+            console.log('Dropdown toggle clicked');
             e.preventDefault();
             e.stopPropagation();
 
-            const isExpanded = dropdownToggle.getAttribute('aria-expanded') === 'true';
-            clearTimeout(hoverTimeout); // Clear any pending close timeout
+            const isVisible = dropdownMenu.style.display === 'block';
+            console.log('Dropdown currently visible:', isVisible);
 
-            dropdownToggle.setAttribute('aria-expanded', !isExpanded);
-            dropdownMenu.setAttribute('aria-hidden', isExpanded);
+            if (isVisible) {
+                // Hide dropdown
+                dropdownMenu.style.display = 'none';
+                dropdownMenu.setAttribute('aria-hidden', 'true');
+                dropdownToggle.setAttribute('aria-expanded', 'false');
+                console.log('Dropdown hidden');
+            } else {
+                // Show dropdown
+                dropdownMenu.style.display = 'block';
+                dropdownMenu.setAttribute('aria-hidden', 'false');
+                dropdownToggle.setAttribute('aria-expanded', 'true');
+                console.log('Dropdown shown');
+            }
         });
 
         // Close dropdown when clicking outside
         document.addEventListener('click', function(e) {
             if (!dropdownContainer.contains(e.target)) {
-                clearTimeout(hoverTimeout);
-                dropdownToggle.setAttribute('aria-expanded', 'false');
+                dropdownMenu.style.display = 'none';
                 dropdownMenu.setAttribute('aria-hidden', 'true');
+                dropdownToggle.setAttribute('aria-expanded', 'false');
             }
         });
 
         // Close dropdown on Escape key
         document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && dropdownToggle.getAttribute('aria-expanded') === 'true') {
-                clearTimeout(hoverTimeout);
-                dropdownToggle.setAttribute('aria-expanded', 'false');
+            if (e.key === 'Escape') {
+                dropdownMenu.style.display = 'none';
                 dropdownMenu.setAttribute('aria-hidden', 'true');
+                dropdownToggle.setAttribute('aria-expanded', 'false');
             }
         });
 
@@ -212,11 +221,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const item = e.target.closest('.dropdown-item');
             if (item) {
                 // Close dropdown after selection
-                clearTimeout(hoverTimeout);
-                dropdownToggle.setAttribute('aria-expanded', 'false');
+                dropdownMenu.style.display = 'none';
                 dropdownMenu.setAttribute('aria-hidden', 'true');
+                dropdownToggle.setAttribute('aria-expanded', 'false');
             }
         });
+    } else {
+        console.error('Dropdown elements not found - this may cause the create template button to not work');
     }
 });
 

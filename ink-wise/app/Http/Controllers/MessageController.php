@@ -527,7 +527,15 @@ class MessageController extends Controller
 
     public function customerChatSend(Request $request)
     {
-        $request->validate(['message' => 'required|string|max:2000']);
+        $request->validate([
+            'message' => 'nullable|string|max:2000',
+            'file' => 'nullable|image|max:5120', // max 5MB
+        ]);
+
+        // At least one of message or file must be present
+        if (!$request->filled('message') && !$request->hasFile('file')) {
+            return response()->json(['error' => 'Please provide a message or an image'], 400);
+        }
 
         $user = Auth::user();
         $customer = $user->customer;
@@ -538,15 +546,23 @@ class MessageController extends Controller
         // change adminUserId if you have a different admin assignment
         $adminUserId = 1;
 
-        $msg = Message::create([
+        $data = [
             'sender_id'     => $customer->getKey(),
             'sender_type'   => 'customer',
             'receiver_id'   => $adminUserId,
             'receiver_type' => 'user',
-            'message'       => $request->input('message'),
+            'message'       => $request->input('message') ?: '[image attachment]',
             'email'         => $user->email ?? null,
             'name'          => $customer->first_name ?? $user->name ?? null,
-        ]);
+        ];
+
+        // Handle file upload
+        if ($request->hasFile('file')) {
+            $attachmentData = $this->uploadAttachment($request->file('file'));
+            $data = array_merge($data, $attachmentData);
+        }
+
+        $msg = Message::create($data);
 
         return response()->json([
             'status' => 'ok',

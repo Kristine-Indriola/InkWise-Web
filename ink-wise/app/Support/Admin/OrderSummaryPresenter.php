@@ -27,6 +27,7 @@ class OrderSummaryPresenter
             'items.addons',
             'items.colors',
             'rating',
+            'activities',
         ]);
 
         $customerOrder = $order->customerOrder;
@@ -68,6 +69,19 @@ class OrderSummaryPresenter
             'billing_address' => static::formatAddress($customerOrder, Arr::get($summary, 'billing.address')),
             'items' => static::transformItems($order->items, $summary),
             'timeline' => static::buildTimeline($order),
+            'activities' => $order->activities->map(function ($activity) {
+                return [
+                    'id' => $activity->id,
+                    'activity_type' => $activity->activity_type,
+                    'old_value' => $activity->old_value,
+                    'new_value' => $activity->new_value,
+                    'description' => $activity->description,
+                    'user_id' => $activity->user_id,
+                    'user_name' => $activity->user_name,
+                    'user_role' => $activity->user_role,
+                    'created_at' => $activity->created_at,
+                ];
+            })->all(),
             'admin_actions' => Arr::get($summary, 'admin_actions', []),
             'rating' => $order->rating ? [
                 'rating' => (int) $order->rating->rating,

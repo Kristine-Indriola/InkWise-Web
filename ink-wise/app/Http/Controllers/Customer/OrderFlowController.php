@@ -42,8 +42,13 @@ class OrderFlowController extends Controller
         $product = $this->orderFlow->resolveProduct($product, $productId);
         $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
 
-        $frontSvg = $this->readInlineSvg($product?->template->front_image ?? null);
-        $backSvg = $this->readInlineSvg($product?->template->back_image ?? null);
+    $frontSvgData = $this->readInlineSvg($product?->template->front_image ?? null);
+    $backSvgData = $this->readInlineSvg($product?->template->back_image ?? null);
+
+    $frontSvg = $frontSvgData['content'] ?? null;
+    $backSvg = $backSvgData['content'] ?? null;
+
+    $templateParser = $this->buildTemplateParserSummary($product, $frontSvgData, $backSvgData);
 
         // Determine the correct view based on product type
         $viewName = $product && strtolower($product->product_type ?? '') === 'giveaway'
@@ -62,6 +67,7 @@ class OrderFlowController extends Controller
             'defaultQuantity' => $product ? $this->orderFlow->defaultQuantityFor($product) : 50,
             'frontSvg' => $frontSvg,
             'backSvg' => $backSvg,
+            'templateParser' => $templateParser,
         ]);
     }
 
@@ -1535,10 +1541,15 @@ class OrderFlowController extends Controller
         );
     }
 
-    private function readInlineSvg(?string $path): ?string
+    private function readInlineSvg(?string $path): array
     {
+        $result = [
+            'content' => null,
+            'analysis' => null,
+        ];
+
         if (!$path || !Str::endsWith(Str::lower($path), '.svg')) {
-            return null;
+            return $result;
         }
 
         $raw = null;
@@ -1547,7 +1558,7 @@ class OrderFlowController extends Controller
             try {
                 $raw = @file_get_contents($path);
             } catch (\Throwable $e) {
-                return null;
+                return $result;
             }
         } else {
             $normalized = str_replace('\\', '/', $path);
@@ -1590,7 +1601,7 @@ class OrderFlowController extends Controller
         }
 
         if (!$raw) {
-            return null;
+            return $result;
         }
 
         $raw = preg_replace('/<\?xml[^>]*\?>/i', '', $raw);
@@ -1598,7 +1609,30 @@ class OrderFlowController extends Controller
         $raw = trim($raw ?? '');
 
         if ($raw === '') {
-            return null;
+            return $result;
+        }
+
+        $processedResult = null;
+
+        // Process SVG with auto-parser if it's from Figma (check for Figma patterns)
+        $isFigmaImport = strpos($raw, 'figma') !== false ||
+            strpos($raw, 'Figma') !== false ||
+            preg_match('/<!--\s*Generated\s*by\s*Figma/i', $raw);
+
+        try {
+            $svgParser = app(\App\Services\SvgAutoParser::class);
+
+            if ($isFigmaImport) {
+                $processedResult = $svgParser->processFigmaImportedSvg($raw);
+            } else {
+                $processedResult = $svgParser->processSvgContent($raw);
+            }
+
+            if (isset($processedResult['content']) && !empty($processedResult['content'])) {
+                $raw = $processedResult['content'];
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::info('SVG processing failed in readInlineSvg: ' . $e->getMessage());
         }
 
         $previous = libxml_use_internal_errors(true);
@@ -1609,7 +1643,18 @@ class OrderFlowController extends Controller
         if (!$loaded) {
             libxml_use_internal_errors($previous);
             libxml_clear_errors();
-            return $raw;
+
+            $result['content'] = trim($raw);
+            if (is_array($processedResult)) {
+                $result['analysis'] = [
+                    'metadata' => $processedResult['metadata'] ?? [],
+                    'text_elements' => $processedResult['text_elements'] ?? [],
+                    'image_elements' => $processedResult['image_elements'] ?? [],
+                    'changeable_images' => $processedResult['changeable_images'] ?? [],
+                ];
+            }
+
+            return $result;
         }
 
         $svg = $dom->documentElement;
@@ -1635,7 +1680,92 @@ class OrderFlowController extends Controller
         libxml_use_internal_errors($previous);
         libxml_clear_errors();
 
-        return trim($raw);
+        $result['content'] = trim($raw);
+        if (is_array($processedResult)) {
+            $result['analysis'] = [
+                'metadata' => $processedResult['metadata'] ?? [],
+                'text_elements' => $processedResult['text_elements'] ?? [],
+                'image_elements' => $processedResult['image_elements'] ?? [],
+                'changeable_images' => $processedResult['changeable_images'] ?? [],
+            ];
+        }
+
+        return $result;
+    }
+
+    private function buildTemplateParserSummary(?Product $product, array $frontSvgData, array $backSvgData): array
+    {
+        $templateMetadata = $product?->template?->metadata ?? [];
+        $figmaProcessing = Arr::get($templateMetadata, 'figma_processing', []);
+
+        $front = $this->buildSideParserSummary('front', $frontSvgData, Arr::get($figmaProcessing, 'front', []));
+        $back = $this->buildSideParserSummary('back', $backSvgData, Arr::get($figmaProcessing, 'back', []));
+
+        $warnings = array_values(array_unique(array_filter(array_merge(
+            $front['warnings'],
+            $back['warnings'],
+        ))));
+
+        return [
+            'front' => $front,
+            'back' => $back,
+            'warnings' => $warnings,
+            'has_front' => $front['has_content'],
+            'has_back' => $back['has_content'],
+        ];
+    }
+
+    private function buildSideParserSummary(string $side, array $svgData, array $storedMetadata): array
+    {
+        $content = $svgData['content'] ?? null;
+        $analysis = $svgData['analysis'] ?? [];
+
+        $inlineMeta = Arr::get($analysis, 'metadata', []);
+        $textElements = $this->normalizeParserList($analysis['text_elements'] ?? Arr::get($storedMetadata, 'text_elements', []));
+        $changeableImages = $this->normalizeParserList($analysis['changeable_images'] ?? Arr::get($storedMetadata, 'changeable_images', []));
+        $imageElements = $this->normalizeParserList($analysis['image_elements'] ?? Arr::get($storedMetadata, 'image_elements', []));
+
+        $textCount = (int) ($inlineMeta['text_count'] ?? $storedMetadata['text_count'] ?? count($textElements));
+        $changeableCount = (int) ($inlineMeta['changeable_count'] ?? $storedMetadata['changeable_count'] ?? count($changeableImages));
+        $imageCount = (int) ($inlineMeta['image_count'] ?? $storedMetadata['image_count'] ?? count($imageElements));
+
+        $shouldWarn = (bool) ($content || $textCount || $changeableCount || $imageCount);
+
+        $warnings = [];
+        if ($shouldWarn) {
+            if ($textCount <= 0) {
+                $warnings[] = ucfirst($side) . ' design has no editable text layers detected.';
+            }
+            if ($changeableCount <= 0) {
+                $warnings[] = ucfirst($side) . ' design has no replaceable image areas from the import.';
+            }
+        }
+
+        return [
+            'text_count' => $textCount,
+            'changeable_count' => $changeableCount,
+            'image_count' => $imageCount,
+            'text_elements' => $textElements,
+            'changeable_images' => $changeableImages,
+            'image_elements' => $imageElements,
+            'vector_shapes_converted' => $storedMetadata['vector_shapes_converted'] ?? $inlineMeta['vector_shapes_converted'] ?? null,
+            'processing_type' => $storedMetadata['processing_type'] ?? $inlineMeta['processing_type'] ?? null,
+            'has_content' => (bool) $content,
+            'warnings' => $warnings,
+        ];
+    }
+
+    private function normalizeParserList($value): array
+    {
+        if (is_array($value)) {
+            return array_values($value);
+        }
+
+        if ($value instanceof \Traversable) {
+            return iterator_to_array($value, false);
+        }
+
+        return [];
     }
 
     private function redirectToCatalog(): RedirectResponse

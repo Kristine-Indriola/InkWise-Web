@@ -33,7 +33,7 @@ class Order extends Model
 		return $this->belongsTo(Customer::class, 'customer_id', 'customer_id');
 	}
 
-	public function effectiveCustomer()
+	public function getEffectiveCustomerAttribute()
 	{
 		// First try direct customer relationship
 		if ($this->customer) {
@@ -71,6 +71,11 @@ class Order extends Model
 	public function rating(): HasOne
 	{
 		return $this->hasOne(OrderRating::class);
+	}
+
+	public function activities(): HasMany
+	{
+		return $this->hasMany(OrderActivity::class)->orderBy('created_at', 'desc');
 	}
 
 	public function totalPaid(): float

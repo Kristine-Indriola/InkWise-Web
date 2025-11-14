@@ -624,7 +624,7 @@
     $statusNote = old('internal_note', $metadata['status_note'] ?? '');
     $previousUrl = url()->previous();
     if ($previousUrl === url()->current()) {
-        $previousUrl = route('admin.orders.index');
+        $previousUrl = route('staff.order_list.index');
     }
     $currentChipModifier = str_replace('_', '-', $currentStatus);
     $currentStatusLabel = $statusLabels[$currentStatus] ?? ucfirst(str_replace('_', ' ', $currentStatus));
@@ -753,7 +753,7 @@
 
     @if($currentStatus === 'cancelled')
         <div class="status-alert status-alert--danger" role="alert">
-            This order is marked as cancelled. Move it back to another status if the order is being reactivated.
+            <strong>Order Cancelled:</strong> This order has been cancelled by the customer and cannot be updated. Status changes are locked for cancelled orders.
         </div>
     @endif
 
@@ -827,7 +827,8 @@
         </ol>
     </section>
 
-    <form method="POST" action="{{ route('admin.orders.status.update', $order) }}" class="status-form-card status-form">
+    @if($currentStatus !== 'cancelled')
+    <form method="POST" action="{{ route('staff.orders.status.update', ['id' => $order->id]) }}" class="status-form-card status-form">
         @csrf
         @method('PUT')
 
@@ -848,6 +849,15 @@
 
         <button type="submit">Save status update</button>
     </form>
+    @else
+    <div class="status-form-card" style="text-align: center; padding: 40px 24px;">
+        <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;">🚫</div>
+        <h3 style="margin: 0 0 8px; color: #111827; font-size: 18px; font-weight: 600;">Status Updates Disabled</h3>
+        <p style="margin: 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+            This order has been cancelled by the customer. Status updates are not allowed for cancelled orders.
+        </p>
+    </div>
+    @endif
 
     
     <section class="status-info-grid">

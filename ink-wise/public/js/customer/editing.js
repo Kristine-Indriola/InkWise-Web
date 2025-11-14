@@ -29,6 +29,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const svg = node.closest('svg');
         const card = svg.closest('.card');
         const side = (card && card.dataset && card.dataset.card) ? card.dataset.card : (svg.id === 'cardFront' ? 'front' : 'back');
+        if (!allowCanvasImageInteractions) {
+          hideTextToolbar();
+          return;
+        }
         selectedElementNode = node;
         selectedElementSide = side;
         // hide text toolbar when selecting image
@@ -58,10 +62,109 @@ document.addEventListener("DOMContentLoaded", () => {
     front: document.querySelector('[data-image-preview="front"]'),
     back: document.querySelector('[data-image-preview="back"]'),
   };
+  const bodyDataset = document.body?.dataset || {};
+  const imageReplacementModeRaw = (bodyDataset.imageReplacementMode || '').toLowerCase();
+  let imageReplacementMode = 'full';
+  if (imageReplacementModeRaw === 'panel-only' || imageReplacementModeRaw === 'disabled') {
+    imageReplacementMode = imageReplacementModeRaw;
+  } else if (bodyDataset.allowImageReplacement === 'false') {
+    imageReplacementMode = 'disabled';
+  }
+  const canReplaceImages = imageReplacementMode !== 'disabled';
+  const allowCanvasImageInteractions = imageReplacementMode === 'full';
+  const shouldDisplayFallbackImages = imageReplacementMode === 'disabled';
   const allowImageEditing = imageInputs.length > 0;
   const textToolbar = document.getElementById("textToolbar");
   const canvasArea = document.querySelector('.canvas-area');
   const canvasWrapper = document.querySelector('.canvas');
+  const changeImageBtn = document.getElementById('changeImageBtn');
+
+  const parserData = window.inkwiseTemplateParser || {};
+  const parserFront = parserData.front || {};
+  const parserBack = parserData.back || {};
+  const parserWarnings = Array.isArray(parserData.warnings) ? parserData.warnings : [];
+
+  const resolveParserCount = (source, countKey, listKey) => {
+    if (!source || typeof source !== 'object') {
+      return 0;
+    }
+    const direct = source[countKey];
+    if (typeof direct === 'number' && Number.isFinite(direct)) {
+      return Number(direct);
+    }
+    const list = source[listKey];
+    if (Array.isArray(list)) {
+      return list.length;
+    }
+    return 0;
+  };
+
+  const parserTextCounts = {
+    front: resolveParserCount(parserFront, 'text_count', 'text_elements'),
+    back: resolveParserCount(parserBack, 'text_count', 'text_elements'),
+  };
+
+  const parserChangeableCounts = {
+    front: resolveParserCount(parserFront, 'changeable_count', 'changeable_images'),
+    back: resolveParserCount(parserBack, 'changeable_count', 'changeable_images'),
+  };
+
+  const parserTotalChangeable = parserChangeableCounts.front + parserChangeableCounts.back;
+
+  function renderParserInsights() {
+    const frontSummaryEl = document.getElementById('parserFrontSummary');
+    if (frontSummaryEl) {
+      frontSummaryEl.textContent = `Front: text ${parserTextCounts.front} • replaceable images ${parserChangeableCounts.front}`;
+    }
+
+    const backSummaryEl = document.getElementById('parserBackSummary');
+    if (backSummaryEl) {
+      backSummaryEl.textContent = `Back: text ${parserTextCounts.back} • replaceable images ${parserChangeableCounts.back}`;
+    }
+
+    const warningsContainer = document.getElementById('parserWarningsContainer');
+    const warningsList = document.getElementById('parserWarningsList');
+    if (warningsContainer && warningsList) {
+      if (!parserWarnings.length) {
+        warningsContainer.hidden = true;
+        warningsList.innerHTML = '';
+      } else {
+        warningsContainer.hidden = false;
+        warningsList.innerHTML = '';
+        parserWarnings.forEach((message) => {
+          const item = document.createElement('li');
+          item.textContent = message;
+          warningsList.appendChild(item);
+        });
+      }
+    }
+
+    const changeSummaryParts = [`front ${parserChangeableCounts.front}`];
+    if (parserChangeableCounts.back) {
+      changeSummaryParts.push(`back ${parserChangeableCounts.back}`);
+    }
+
+    const imageStatusEl = document.getElementById('imageParserStatus');
+    if (imageStatusEl) {
+      if (parserTotalChangeable > 0) {
+        if (allowCanvasImageInteractions) {
+          imageStatusEl.textContent = `Replaceable image areas detected: ${changeSummaryParts.join(' • ')}`;
+        } else {
+          imageStatusEl.textContent = 'Use the Images panel to swap the template background.';
+        }
+      } else {
+        imageStatusEl.textContent = 'No replaceable image areas detected in this template.';
+      }
+    }
+
+    if (changeImageBtn) {
+      changeImageBtn.title = parserTotalChangeable > 0
+        ? `Swap detected image areas (${changeSummaryParts.join(' • ')})`
+        : 'Template import did not include replaceable image frames.';
+    }
+  }
+
+  renderParserInsights();
   if (canvasArea) {
     const areaPosition = window.getComputedStyle(canvasArea).position;
     if (!areaPosition || areaPosition === 'static') {
@@ -1445,6 +1548,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Automatic image insertion when a file is chosen in the Images panel
   (function wireImageUploadInput() {
+    if (!canReplaceImages) return;
     const fileInput = document.getElementById('imageUploadInput');
     if (!fileInput) return;
     fileInput.addEventListener('change', async (e) => {
@@ -2070,12 +2174,81 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const card = side === 'front' ? cardFront : cardBack;
     if (!card) return null;
+    try {
+      card.classList.remove('background-fallback');
+      card.style.removeProperty('background-image');
+      if (!card.style.backgroundColor) card.style.backgroundColor = '#ffffff';
+    } catch (e) {}
 
     const svg = getSvgRoot(side);
     if (!svg) return null;
 
-    // Always insert the image as the very first child so it is below all text nodes
-    let layer = svg.querySelector(`image[data-editable-image="${side}"]`);
+    function getImageHref(img) {
+      if (!img) return '';
+      try {
+        return img.getAttribute('href')
+          || (img.href && img.href.baseVal)
+          || img.getAttributeNS(XLINK_NS, 'href')
+          || '';
+      } catch (e) {
+        return '';
+      }
+    }
+
+    function pickSvgImageCandidate() {
+      const allImages = Array.from(svg.querySelectorAll('image')).filter((img) => {
+        if (!img || !img.tagName) return false;
+        const tag = img.tagName.toLowerCase();
+        if (tag !== 'image') return false;
+        if (img.closest && img.closest('defs, symbol, clipPath, mask, pattern')) return false;
+        return true;
+      });
+      if (!allImages.length) return null;
+
+      const explicitEditable = allImages.find((img) => {
+        const modeTag = (img.dataset && img.dataset.editableImage) || '';
+        return modeTag === side;
+      });
+      if (explicitEditable) return explicitEditable;
+
+      const flagged = allImages.find((img) => {
+        if (!img.dataset) return false;
+        const changeable = (img.dataset.changeable || '').toLowerCase();
+        const uploaded = img.hasAttribute('data-uploaded');
+        return changeable === 'image' || uploaded;
+      });
+      if (flagged) return flagged;
+
+      let largest = allImages[0];
+      let largestArea = 0;
+      allImages.forEach((img) => {
+        let area = 0;
+        try {
+          const bbox = img.getBBox();
+          area = (bbox && Number.isFinite(bbox.width) && Number.isFinite(bbox.height)) ? bbox.width * bbox.height : 0;
+        } catch (e) {
+          const w = Number(img.getAttribute('width')) || 0;
+          const h = Number(img.getAttribute('height')) || 0;
+          area = w * h;
+        }
+        if (area > largestArea) {
+          largest = img;
+          largestArea = area;
+        }
+      });
+      return largest || null;
+    }
+
+    // Prefer an existing SVG <image> instead of creating a duplicate layer
+    const allImages = Array.from(svg.querySelectorAll('image')).filter((img) => {
+      if (!img || !img.tagName) return false;
+      const tag = img.tagName.toLowerCase();
+      if (tag !== 'image') return false;
+      if (img.closest && img.closest('defs, symbol, clipPath, mask, pattern')) return false;
+      return true;
+    });
+
+    let layer = svg.querySelector(`image[data-editable-image="${side}"]`) || pickSvgImageCandidate();
     if (!layer) {
       layer = document.createElementNS(SVG_NS, 'image');
       layer.setAttribute('data-editable-image', side);
@@ -2092,7 +2265,32 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         svg.appendChild(layer);
       }
+    } else if (!layer.getAttribute('data-editable-image')) {
+      layer.setAttribute('data-editable-image', side);
     }
+
+    // Remove other SVG image elements that point to the same source to avoid duplicate renders
+    try {
+      const layerHref = getImageHref(layer);
+      if (layerHref) {
+        allImages.forEach((img) => {
+          if (img === layer) return;
+          const href = getImageHref(img);
+          if (!href) return;
+          if (href === layerHref) {
+            try { img.remove(); } catch (err) {}
+          }
+        });
+      }
+    } catch (e) {}
+
+    // Remove any additional SVG layers previously marked as editable for this side
+    try {
+      const duplicates = Array.from(svg.querySelectorAll(`image[data-editable-image="${side}"]`)).filter((img) => img !== layer);
+      duplicates.forEach((img) => {
+        try { img.remove(); } catch (err) {}
+      });
+    } catch (e) {}
 
     imageLayers[side] = layer;
     try {
@@ -2105,6 +2303,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function ensureFallbackImage(side) {
     if (!allowImageEditing) return null;
+    if (!shouldDisplayFallbackImages) {
+      // Remove any stale fallback element so only the SVG layer is visible
+      try {
+        const existing = imageFallbackLayers[side];
+        if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+      } catch (e) {}
+      imageFallbackLayers[side] = null;
+      return null;
+    }
     if (imageFallbackLayers[side]) {
       return imageFallbackLayers[side];
     }
@@ -2143,6 +2350,7 @@ document.addEventListener("DOMContentLoaded", () => {
       console.debug('[setImageElementSource] element:', element, 'src:', src, 'isImg:', isImg);
 
       if (isImg) {
+        const isCardFallbackLayer = element.hasAttribute && element.hasAttribute('data-image-layer');
         element.dataset.loaded = 'pending';
         element.onload = function () {
           element.dataset.loaded = 'true';
@@ -2174,8 +2382,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (src) {
           element.src = src;
-          try { element.style.removeProperty('display'); } catch (e) {}
-          element.style.visibility = 'visible';
+          if (isCardFallbackLayer && !shouldDisplayFallbackImages) {
+            element.style.display = 'none';
+            element.style.visibility = 'hidden';
+          } else {
+            try { element.style.removeProperty('display'); } catch (e) {}
+            element.style.visibility = 'visible';
+          }
           try { element.style.removeProperty('filter'); } catch(e){}
           try { element.style.removeProperty('image-rendering'); } catch(e){}
         } else {
@@ -2200,6 +2413,23 @@ document.addEventListener("DOMContentLoaded", () => {
         try { element.setAttributeNS(XLINK_NS, 'xlink:href', src); } catch(e) {}
         try { element.setAttribute('xlink:href', src); } catch(e) {}
 
+        // Even before load events fire, clear any background fallback so the
+        // template doesn't show a duplicated image (one static background and
+        // one draggable SVG layer).
+        const card = element.closest && element.closest('.card');
+        if (card) {
+          card.classList.remove('background-fallback');
+          card.style.removeProperty('background-image');
+        }
+        const sideKey = element.getAttribute && element.getAttribute('data-editable-image');
+        if (sideKey) {
+          const fallbackLayer = imageFallbackLayers[sideKey];
+          if (fallbackLayer && !shouldDisplayFallbackImages) {
+            fallbackLayer.style.display = 'none';
+            fallbackLayer.style.visibility = 'hidden';
+          }
+        }
+
         element.__iw_onload = function () {
           console.debug('[setImageElementSource] svg image load', src);
           try { element.style.removeProperty('display'); element.style.visibility = 'visible'; } catch(e){}
@@ -2209,6 +2439,14 @@ document.addEventListener("DOMContentLoaded", () => {
           if (card) {
             card.classList.remove('background-fallback');
             card.style.removeProperty('background-image');
+          }
+          const sideKey = element.getAttribute && element.getAttribute('data-editable-image');
+          if (sideKey) {
+            const fallbackLayer = imageFallbackLayers[sideKey];
+            if (fallbackLayer && !shouldDisplayFallbackImages) {
+              fallbackLayer.style.display = 'none';
+              fallbackLayer.style.visibility = 'hidden';
+            }
           }
           updateDebugPanel({
             type: 'svg-image',
@@ -2226,6 +2464,14 @@ document.addEventListener("DOMContentLoaded", () => {
               try { card.style.removeProperty('filter'); } catch(e){}
               try { card.style.removeProperty('image-rendering'); } catch(e){}
             } catch (err) {}
+          }
+          const sideKey = element.getAttribute && element.getAttribute('data-editable-image');
+          if (sideKey) {
+            const fallbackLayer = imageFallbackLayers[sideKey];
+            if (fallbackLayer) {
+              try { fallbackLayer.style.removeProperty('display'); } catch (e) {}
+              fallbackLayer.style.visibility = 'visible';
+            }
           }
           updateDebugPanel({ type: 'svg-image', href: src, error: 'load failed' });
         };
@@ -2361,13 +2607,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const blobUrl = URL.createObjectURL(blob);
       imageBlobUrls[side] = blobUrl;
       setImageElementSource(layer, blobUrl);
-      const fallbackLayer = ensureFallbackImage(side);
+      const fallbackLayer = shouldDisplayFallbackImages ? ensureFallbackImage(side) : null;
       if (fallbackLayer) setImageElementSource(fallbackLayer, blobUrl);
       updateDebugPanel({ event: 'applyImage', side, inlined: true });
     } catch (e) {
       console.warn('[applyImage] failed to inline raw svg, falling back to direct src', e);
       setImageElementSource(layer, displaySrc);
-      const fallbackLayer = ensureFallbackImage(side);
+      const fallbackLayer = shouldDisplayFallbackImages ? ensureFallbackImage(side) : null;
       if (fallbackLayer) setImageElementSource(fallbackLayer, displaySrc);
     }
   } else if (isDataUrl) {
@@ -2381,24 +2627,24 @@ document.addEventListener("DOMContentLoaded", () => {
           const blobUrl = URL.createObjectURL(blob);
           imageBlobUrls[side] = blobUrl;
           setImageElementSource(layer, blobUrl);
-          const fallbackLayer = ensureFallbackImage(side);
+          const fallbackLayer = shouldDisplayFallbackImages ? ensureFallbackImage(side) : null;
           if (fallbackLayer) setImageElementSource(fallbackLayer, blobUrl);
           updateDebugPanel({ event: 'applyImage', side, dataUrl: true });
         } else {
           // not an svg data URL; set directly (e.g., PNG/JPEG data URLs)
           setImageElementSource(layer, normalizedDisplaySrc);
-          const fallbackLayer = ensureFallbackImage(side);
+          const fallbackLayer = shouldDisplayFallbackImages ? ensureFallbackImage(side) : null;
           if (fallbackLayer) setImageElementSource(fallbackLayer, normalizedDisplaySrc);
         }
       } else {
         setImageElementSource(layer, normalizedDisplaySrc);
-        const fallbackLayer = ensureFallbackImage(side);
+        const fallbackLayer = shouldDisplayFallbackImages ? ensureFallbackImage(side) : null;
         if (fallbackLayer) setImageElementSource(fallbackLayer, normalizedDisplaySrc);
       }
     } catch (e) {
       console.warn('[applyImage] data url handling failed', e);
       setImageElementSource(layer, normalizedDisplaySrc);
-      const fallbackLayer = ensureFallbackImage(side);
+      const fallbackLayer = shouldDisplayFallbackImages ? ensureFallbackImage(side) : null;
       if (fallbackLayer) setImageElementSource(fallbackLayer, normalizedDisplaySrc);
     }
   } else if (isSvgUrl) {
@@ -2413,26 +2659,26 @@ document.addEventListener("DOMContentLoaded", () => {
           const blobUrl = URL.createObjectURL(blob);
           imageBlobUrls[side] = blobUrl;
           setImageElementSource(layer, blobUrl);
-          const fallbackLayer = ensureFallbackImage(side);
+          const fallbackLayer = shouldDisplayFallbackImages ? ensureFallbackImage(side) : null;
           if (fallbackLayer) setImageElementSource(fallbackLayer, blobUrl);
           updateDebugPanel({ event: 'applyImage', side, fetched: true, blobUrl });
         } catch (e) {
           console.warn('[applyImage] failed to inline svg, falling back to direct href', e);
           setImageElementSource(layer, normalizedDisplaySrc);
-          const fallbackLayer = ensureFallbackImage(side);
+          const fallbackLayer = shouldDisplayFallbackImages ? ensureFallbackImage(side) : null;
           if (fallbackLayer) setImageElementSource(fallbackLayer, normalizedDisplaySrc);
         }
       }).catch(err => {
         console.warn('[applyImage] fetch svg failed, using direct src', err);
         setImageElementSource(layer, normalizedDisplaySrc || displaySrc);
-        const fallbackLayer = ensureFallbackImage(side);
+        const fallbackLayer = shouldDisplayFallbackImages ? ensureFallbackImage(side) : null;
         if (fallbackLayer) setImageElementSource(fallbackLayer, normalizedDisplaySrc || displaySrc);
       });
     }
   } else {
     // non-SVG images (PNG/JPEG/WEBP etc.) — set directly on svg <image> and fallback <img>
     setImageElementSource(layer, normalizedDisplaySrc || displaySrc);
-    const fallbackLayer = ensureFallbackImage(side);
+    const fallbackLayer = shouldDisplayFallbackImages ? ensureFallbackImage(side) : null;
     if (fallbackLayer) {
       setImageElementSource(fallbackLayer, normalizedDisplaySrc || displaySrc);
     }
@@ -2798,36 +3044,53 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     closeInlineEditor(true);
-  inlineEditorOriginalValue = getSvgNodeValue(node);
-  // begin history capture for inline edit
-  beginHistoryCapture(node, side);
+    inlineEditorOriginalValue = getSvgNodeValue(node);
+    // begin history capture for inline edit
+    beginHistoryCapture(node, side);
 
-  const svg = getSvgRoot(side);
-  const host = canvasArea || canvasWrapper;
-  if (!svg || !host) return;
-  const nodeRect = node.getBoundingClientRect();
-  const hostRect = host.getBoundingClientRect();
+    const svg = getSvgRoot(side);
+    const host = canvasArea || canvasWrapper;
+    if (!svg || !host) return;
+
+    // Get the node's bounding rectangle, accounting for any SVG transformations
+    const nodeRect = node.getBoundingClientRect();
+    const hostRect = host.getBoundingClientRect();
+
+    // Account for canvas zoom scaling
+    const scaleFactor = zoom || 1;
+    const scaledLeft = (nodeRect.left - hostRect.left) / scaleFactor;
+    const scaledTop = (nodeRect.top - hostRect.top) / scaleFactor;
 
     const editor = document.createElement('textarea');
     editor.className = 'inline-text-editor';
     editor.setAttribute('aria-label', 'Edit canvas text');
     editor.value = inlineEditorOriginalValue;
     editor.style.position = 'absolute';
-    editor.style.left = `${nodeRect.left - hostRect.left}px`;
-    editor.style.top = `${nodeRect.top - hostRect.top}px`;
+    editor.style.left = `${scaledLeft}px`;
+    editor.style.top = `${scaledTop}px`;
 
     // initial sizing: at least as big as node bbox, otherwise readable minimums
-    const minWidth = Math.max(nodeRect.width, 120);
-    const minHeight = Math.max(nodeRect.height, 28);
+    const minWidth = Math.max(nodeRect.width / scaleFactor, 120);
+    const minHeight = Math.max(nodeRect.height / scaleFactor, 28);
     editor.style.width = `${minWidth}px`;
     editor.style.height = `${minHeight}px`;
 
     // visual: minimal by default, focus shows strong ring; caret color should match SVG fill
     editor.style.padding = '6px 8px';
-    editor.style.border = 'none';
+    editor.style.border = '2px solid #3B82F6';
     editor.style.borderRadius = '6px';
     editor.style.background = 'rgba(255,255,255,0.98)';
-    editor.style.boxShadow = '0 4px 12px rgba(15, 23, 42, 0.08)';
+    editor.style.boxShadow = '0 4px 12px rgba(15, 23, 42, 0.15)';
+    editor.style.zIndex = '35';
+
+    // Apply zoom scaling to the editor itself
+    editor.style.transform = `scale(${scaleFactor})`;
+    editor.style.transformOrigin = 'top left';
+
+    // Adjust positioning to account for scaling
+    editor.style.left = `${scaledLeft}px`;
+    editor.style.top = `${scaledTop}px`;
+
     const rawFontSize = node.getAttribute('font-size') || window.getComputedStyle(node).fontSize || '18px';
     const normalizedFontSize = /px$/i.test(rawFontSize) ? rawFontSize : `${rawFontSize}px`;
     editor.style.fontSize = normalizedFontSize;
@@ -2838,20 +3101,19 @@ document.addEventListener("DOMContentLoaded", () => {
     editor.style.color = svgFill;
     editor.style.caretColor = svgFill;
     editor.style.resize = 'none';
-    editor.style.zIndex = '35';
 
     // autosize helper: resize textarea height to fit content
     function autosize() {
       try {
         editor.style.height = '1px';
         const scrollH = Math.max(editor.scrollHeight, minHeight);
-        editor.style.height = (scrollH) + 'px';
+        editor.style.height = (scrollH / scaleFactor) + 'px';
       } catch (e) {}
     }
     // run once to ensure initial fit
     setTimeout(autosize, 0);
 
-  host.appendChild(editor);
+    host.appendChild(editor);
 
     inlineEditor = editor;
     inlineEditorNode = node;
@@ -2860,8 +3122,8 @@ document.addEventListener("DOMContentLoaded", () => {
     node.classList.add('svg-text-focus');
     syncFieldHighlight(nodeKey, side, true);
     showTextToolbar(node);
-  // populate toolbar with node state
-  populateToolbarForNode(node, side);
+    // populate toolbar with node state
+    populateToolbarForNode(node, side);
 
     // sync styles from SVG node to textarea so typing visually matches
     try {
@@ -2877,13 +3139,15 @@ document.addEventListener("DOMContentLoaded", () => {
       const fs = node.getAttribute('font-size') || window.getComputedStyle(node).fontSize || '';
       if (fs) editor.style.fontSize = /px$/i.test(fs) ? fs : `${fs}px`;
     } catch (e) {}
-  // composition state for IME (prevent Enter from committing during composition)
-  let composing = false;
-  // typing debounce to group rapid input into a single history entry
-  let typingTimer = null;
-  const TYPING_DEBOUNCE_MS = 600;
+
+    // composition state for IME (prevent Enter from committing during composition)
+    let composing = false;
+    // typing debounce to group rapid input into a single history entry
+    let typingTimer = null;
+    const TYPING_DEBOUNCE_MS = 600;
     editor.addEventListener('compositionstart', () => { composing = true; });
-    editor.addEventListener('compositionend', (ev) => { composing = false; /* propagate final input */
+    editor.addEventListener('compositionend', (ev) => {
+      composing = false;
       // after IME composition finishes, ensure SVG reflects the committed text
       setSvgNodeText(node, editor.value);
       syncPanelInputValue(nodeKey, side, editor.value);
@@ -2938,15 +3202,22 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       editor.select?.();
     });
-  }
-
-  function prepareSvgNode(node, side) {
+  }  function prepareSvgNode(node, side) {
+    if (!node || !side) return;
     const nodeKey = ensureTextNodeKey(node, side);
     if (!nodeKey) return;
-    if (node.dataset.prepared === side) {
-      svgTextCache[side].set(nodeKey, node);
-      return;
+
+    // Remove existing event listeners to prevent duplicates
+    if (node._iwEventListeners) {
+      node._iwEventListeners.forEach(({ event, handler }) => {
+        try { node.removeEventListener(event, handler); } catch (e) {}
+      });
+      node._iwEventListeners = [];
+    } else {
+      node._iwEventListeners = [];
     }
+
+    // Always prepare the node, don't skip based on dataset.prepared
     svgTextCache[side].set(nodeKey, node);
 
     if (!node.dataset.originalX && node.hasAttribute("x")) {
@@ -2956,10 +3227,14 @@ document.addEventListener("DOMContentLoaded", () => {
       node.dataset.originalY = node.getAttribute("y");
     }
 
+    // Ensure proper attributes for interaction
     node.setAttribute("contenteditable", "true");
     node.setAttribute("role", "textbox");
     node.setAttribute("spellcheck", "false");
     node.setAttribute("tabindex", "0");
+    node.style.cursor = "pointer"; // Make it clear it's clickable
+    node.style.userSelect = "none"; // Prevent text selection
+
     if (!node.hasAttribute("aria-label")) {
       try {
         const nodeKey = node.getAttribute('data-text-node') || node.getAttribute('id') || '';
@@ -2968,20 +3243,29 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (e) { node.setAttribute('aria-label', 'Edit canvas text'); }
     }
 
-    node.addEventListener("focus", () => {
+    // Focus/blur handlers
+    const focusHandler = () => {
       if (currentView !== side) setActiveView(side);
       node.classList.add("svg-text-focus");
       syncFieldHighlight(nodeKey, side, true);
       showTextToolbar(node);
       populateToolbarForNode(node, side);
-    });
-
-    node.addEventListener("blur", () => {
+      selectedElementNode = node;
+      selectedElementSide = side;
+      createBoundingBox(node, side);
+    };
+    const blurHandler = () => {
       node.classList.remove("svg-text-focus");
       syncFieldHighlight(nodeKey, side, false);
-    });
+    };
 
-    node.addEventListener("keydown", (event) => {
+    node.addEventListener("focus", focusHandler);
+    node.addEventListener("blur", blurHandler);
+    node._iwEventListeners.push({ event: "focus", handler: focusHandler });
+    node._iwEventListeners.push({ event: "blur", handler: blurHandler });
+
+    // Keydown handler for arrow keys and editing
+    const keydownHandler = (event) => {
       const moveKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
       if (moveKeys.includes(event.key)) {
         event.preventDefault();
@@ -3009,11 +3293,21 @@ document.addEventListener("DOMContentLoaded", () => {
         startInlineEditor(node, side);
         return;
       }
-    });
+    };
 
-    node.addEventListener("input", () => handleSvgNodeInput(node, side));
+    node.addEventListener("keydown", keydownHandler);
+    node._iwEventListeners.push({ event: "keydown", handler: keydownHandler });
 
-    node.addEventListener('pointerdown', (event) => handleNodePointerDown(event, node, side));
+    // Input handler
+    const inputHandler = () => handleSvgNodeInput(node, side);
+    node.addEventListener("input", inputHandler);
+    node._iwEventListeners.push({ event: "input", handler: inputHandler });
+
+    // Pointer events for dragging
+    const pointerDownHandler = (event) => handleNodePointerDown(event, node, side);
+    node.addEventListener('pointerdown', pointerDownHandler);
+    node._iwEventListeners.push({ event: 'pointerdown', handler: pointerDownHandler });
+
     node.addEventListener('pointermove', handleNodePointerMove);
     node.addEventListener('pointerup', (event) => handleNodePointerUp(event, false));
     node.addEventListener('pointercancel', (event) => handleNodePointerUp(event, true));
@@ -3023,18 +3317,40 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    node.addEventListener('dblclick', (event) => {
+    // Double-click handler for inline editing
+    const dblclickHandler = (event) => {
       event.preventDefault();
       event.stopPropagation();
       startInlineEditor(node, side);
-    });
+    };
+    node.addEventListener('dblclick', dblclickHandler);
+    node._iwEventListeners.push({ event: 'dblclick', handler: dblclickHandler });
 
-    // when node is focused/selected, ensure resize handle positions
-    node.addEventListener('focus', () => placeResizeHandle(node, side));
-    node.addEventListener('blur', () => hideResizeHandle());
+    // Click handler as fallback for single click editing
+    const clickHandler = (event) => {
+      // Only handle single clicks if not already handled by double-click
+      if (event.detail === 1) {
+        // Delay to allow for potential double-click
+        setTimeout(() => {
+          if (!inlineEditor || inlineEditorNode !== node) {
+            startInlineEditor(node, side);
+          }
+        }, 200);
+      }
+    };
+    node.addEventListener('click', clickHandler);
+    node._iwEventListeners.push({ event: 'click', handler: clickHandler });
 
-  // ensure there's a wrapper group for transforms
-  try { ensureTransformWrapper(node); } catch (e) {}
+    // Focus handlers for resize/rotate handles
+    const focusHandlerForHandles = () => placeResizeHandle(node, side);
+    const blurHandlerForHandles = () => hideResizeHandle();
+    node.addEventListener('focus', focusHandlerForHandles);
+    node.addEventListener('blur', blurHandlerForHandles);
+    node._iwEventListeners.push({ event: 'focus', handler: focusHandlerForHandles });
+    node._iwEventListeners.push({ event: 'blur', handler: blurHandlerForHandles });
+
+    // Ensure there's a wrapper group for transforms
+    try { ensureTransformWrapper(node); } catch (e) {}
 
     node.dataset.prepared = side;
   }
@@ -3435,6 +3751,9 @@ document.addEventListener("DOMContentLoaded", () => {
   function createBoundingBox(node, side) {
     const svg = getSvgRoot(side);
     if (!svg || !node) return;
+    const tagName = node.tagName ? node.tagName.toLowerCase() : '';
+    if (tagName === 'image') return;
+    if (node.hasAttribute && node.hasAttribute('data-uploaded')) return;
     // remove existing bounding box and handles for this specific node to avoid duplicates
     try {
       const nodeKey = node.getAttribute && node.getAttribute('data-text-node') || '';
@@ -4045,24 +4364,25 @@ document.addEventListener("DOMContentLoaded", () => {
     applyImage("back", imageState.back.currentSrc, { skipPreview: false });
 
     // Immediate visual fallback: if the card has a default image URL, apply it as background so the canvas is never empty.
-    try {
-      ['front','back'].forEach(side => {
-        const card = side === 'front' ? cardFront : cardBack;
-        if (!card) return;
-        const defaultSrc = card.dataset.defaultImage || '';
-        const current = card.dataset.currentImage || '';
-        if (defaultSrc && !current) {
-          try {
-            card.classList.add('background-fallback');
-            card.style.backgroundImage = `url("${defaultSrc}")`;
-            // also update preview panel image if present
-            const previewImg = document.querySelector(`[data-image-preview="${side}"]`);
-            if (previewImg && !previewImg.getAttribute('src')) previewImg.src = defaultSrc;
-            updateDebugPanel({ event: 'immediate-background-fallback', side, defaultSrc });
-          } catch (e) { console.warn('background fallback apply failed', e); }
-        }
-      });
-    } catch (e) {}
+    if (shouldDisplayFallbackImages) {
+      try {
+        ['front','back'].forEach(side => {
+          const card = side === 'front' ? cardFront : cardBack;
+          if (!card) return;
+          const defaultSrc = card.dataset.defaultImage || '';
+          const current = card.dataset.currentImage || '';
+          if (defaultSrc && !current) {
+            try {
+              card.classList.add('background-fallback');
+              card.style.backgroundImage = `url("${defaultSrc}")`;
+              const previewImg = document.querySelector(`[data-image-preview="${side}"]`);
+              if (previewImg && !previewImg.getAttribute('src')) previewImg.src = defaultSrc;
+              updateDebugPanel({ event: 'immediate-background-fallback', side, defaultSrc });
+            } catch (e) { console.warn('background fallback apply failed', e); }
+          }
+        });
+      } catch (e) {}
+    }
   }
   initializeTextFields();
   registerTextMetaSubmitHandlers();
@@ -4152,7 +4472,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  if (allowImageEditing) {
+  if (allowImageEditing && canReplaceImages) {
     imageInputs.forEach(input => {
       const side = input.dataset.imageInput;
       input.addEventListener("change", () => {
@@ -4214,6 +4534,25 @@ document.addEventListener("DOMContentLoaded", () => {
   (function wireImagesSidebar() {
     const panel = document.getElementById('imagesPanel');
     if (!panel) return;
+    if (!canReplaceImages) {
+      // Show a readonly notice when background swapping is disabled for this template.
+  const disabledMessage = document.createElement('div');
+  disabledMessage.className = 'images-locked-message';
+  disabledMessage.textContent = 'Image replacement is disabled for this template.';
+  disabledMessage.style.padding = '16px';
+  disabledMessage.style.textAlign = 'center';
+  disabledMessage.style.color = '#4b5563';
+      const body = panel.querySelector('.images-body');
+      if (body) {
+        body.innerHTML = '';
+        body.appendChild(disabledMessage);
+      }
+      panel.querySelectorAll('button, input').forEach(el => {
+        el.disabled = true;
+        el.setAttribute('aria-disabled', 'true');
+      });
+      return;
+    }
   const tabs = panel.querySelectorAll('.images-tab');
   const fileInput = document.getElementById('imagesFileInput');
   const btnUpload = document.getElementById('btnUploadFiles');

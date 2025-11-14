@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('templates', function (Blueprint $table) {
-            $table->string('back_svg_path')->nullable()->after('svg_path');
+            if (!Schema::hasColumn('templates', 'design')) {
+                $table->longText('design')->nullable()->after('metadata');
+            }
         });
     }
 
@@ -22,7 +24,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('templates', function (Blueprint $table) {
-            $table->dropColumn('back_svg_path');
+            if (Schema::hasColumn('templates', 'design')) {
+                $table->dropColumn('design');
+            }
         });
     }
 };

@@ -121,6 +121,14 @@
 		</article>
 		<article class="reports-summary-card">
 			<header>
+				<span class="summary-label">Estimated Sales</span>
+				<i class="fi fi-rr-chart-line-up" aria-hidden="true"></i>
+			</header>
+			<strong data-metric="estimated-sales">₱{{ number_format($salesSummary['estimatedSales'] ?? 0, 2) }}</strong>
+			<p>Pending revenue from incomplete orders.</p>
+		</article>
+		<article class="reports-summary-card">
+			<header>
 				<span class="summary-label">Avg. Order</span>
 				<i class="fi fi-rr-circle-dollar" aria-hidden="true"></i>
 			</header>

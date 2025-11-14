@@ -224,8 +224,6 @@
     <div class="summary-cards">
       @php
         $totalOrders = $orders->total();
-        $statusCounts = collect($orders->items())->groupBy(fn($o) => strtolower(data_get($o,'status','processing')))
-          ->map->count();
         $pendingCount = $statusCounts->get('pending', 0);
         $processingCount = $statusCounts->get('processing', 0);
         $inProductionCount = $statusCounts->get('in_production', 0);
@@ -322,7 +320,7 @@
                 @php
                   $rowStatus = strtolower($order->status ?? 'processing');
                 @endphp
-                <tr data-order-id="{{ $order->id }}" data-status="{{ $rowStatus }}" data-order-url="{{ route('admin.ordersummary.index', ['order' => $order->order_number]) }}" style="cursor: pointer;">
+                <tr data-order-id="{{ $order->id }}" data-status="{{ $rowStatus }}" data-order-url="{{ route('staff.orders.summary', ['id' => $order->id]) }}" style="cursor: pointer;">
                   <td>{{ $order->order_number ?? ('#' . $order->id) }}</td>
                   <td>{{ optional($order->customer)->name ?? 'Guest' }}</td>
                   <td class="text-center">{{ (int) data_get($order, 'items_count', 0) }}</td>
@@ -347,11 +345,14 @@
                   </td>
                   <td>{{ optional($order->order_date)->format('M j, Y') ?? optional($order->created_at)->format('M j, Y') }}</td>
                   <td class="actions-cell">
-                    <a href="{{ route('admin.ordersummary.index', ['order' => $order->order_number]) }}" class="btn btn-outline btn-sm btn-icon" aria-label="View order {{ $order->order_number ?? $order->id }}">
+                    <a href="{{ route('staff.orders.summary', ['id' => $order->id]) }}" class="btn btn-outline btn-sm btn-icon" aria-label="View order {{ $order->order_number ?? $order->id }}">
                       <i class="fa-solid fa-eye" aria-hidden="true"></i>
                     </a>
-                    <a href="{{ route('admin.orders.status.edit', ['order' => $order->id]) }}" class="btn btn-outline btn-sm btn-icon" aria-label="Manage status for order {{ $order->order_number ?? $order->id }}" title="Update status">
+                    <a href="{{ route('staff.orders.status.edit', ['id' => $order->id]) }}" class="btn btn-outline btn-sm btn-icon" aria-label="Manage status for order {{ $order->order_number ?? $order->id }}" title="Update status">
                       <i class="fa-solid fa-bars-progress" aria-hidden="true"></i>
+                    </a>
+                    <a href="{{ route('staff.orders.payment.edit', ['id' => $order->id]) }}" class="btn btn-outline btn-sm btn-icon" aria-label="Manage payment for order {{ $order->order_number ?? $order->id }}" title="Update payment">
+                      <i class="fa-solid fa-credit-card" aria-hidden="true"></i>
                     </a>
                     <button type="button" class="btn btn-outline btn-sm btn-icon btn-delete" data-order-id="{{ $order->id }}" aria-label="Delete order {{ $order->order_number ?? $order->id }}" title="Delete order">
                       <i class="fa-solid fa-trash" aria-hidden="true"></i>

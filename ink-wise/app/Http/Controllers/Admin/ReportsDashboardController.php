@@ -149,6 +149,16 @@ class ReportsDashboardController extends Controller
         $salesSummaryTotals = $this->buildOrdersSummary($analyticsOrders, $summaryStart, $summaryEnd);
         $salesSummaryLabel = $this->formatRangeLabel($summaryStart, $summaryEnd);
 
+        // Calculate estimated sales from incomplete orders (all non-completed orders)
+        $estimatedSalesQuery = Order::query()
+            ->where('status', '!=', 'completed')
+            ->where('status', '!=', 'cancelled');
+        
+        $estimatedSalesQuery = $this->applyOrderDateFilter($estimatedSalesQuery, $startDate, $endDate);
+        $estimatedSales = (float) $estimatedSalesQuery->sum('total_amount');
+        
+        $salesSummaryTotals['estimatedSales'] = round($estimatedSales, 2);
+
         return compact(
             'materials',
             'materialLabels',

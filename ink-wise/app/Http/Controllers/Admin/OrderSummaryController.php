@@ -17,6 +17,11 @@ class OrderSummaryController extends Controller
             return view('admin.ordersummary.index', ['order' => null]);
         }
 
+        // Load activities for timeline
+        $orderModel->loadMissing(['activities' => function ($query) {
+            $query->orderBy('created_at', 'asc');
+        }]);
+
         $presented = OrderSummaryPresenter::make($orderModel);
 
         return view('admin.ordersummary.index', [

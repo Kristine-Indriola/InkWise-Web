@@ -8,6 +8,44 @@ use Illuminate\Support\Facades\Storage;
 class SvgAutoParser
 {
     /**
+     * Process Figma imported SVG content specifically
+     * This method is more aggressive in converting vector shapes to changeable images
+     *
+     * @param string $svgContent Raw SVG content from Figma import
+     * @return array Processed SVG data with converted changeable elements
+     */
+    public function processFigmaImportedSvg(string $svgContent): array
+    {
+        try {
+            $processedSvg = $this->processSvgContent($svgContent, true); // Pass flag for Figma processing
+
+            return [
+                'content' => $processedSvg['content'],
+                'text_elements' => $processedSvg['text_elements'],
+                'image_elements' => $processedSvg['image_elements'],
+                'changeable_images' => $processedSvg['changeable_images'],
+                'metadata' => array_merge($processedSvg['metadata'], [
+                    'processing_type' => 'figma_import',
+                    'vector_shapes_converted' => count($processedSvg['changeable_images'])
+                ])
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Figma SVG processing failed', [
+                'error' => $e->getMessage()
+            ]);
+
+            return [
+                'content' => $svgContent,
+                'text_elements' => [],
+                'image_elements' => [],
+                'changeable_images' => [],
+                'metadata' => ['error' => $e->getMessage(), 'processing_type' => 'figma_import_failed']
+            ];
+        }
+    }
+
+    /**
      * Parse and process an uploaded SVG file
      *
      * @param string $filePath The path to the uploaded SVG file
@@ -61,15 +99,19 @@ class SvgAutoParser
     /**
      * Process SVG content to add data attributes and clean up
      */
-    private function processSvgContent(string $content): array
+    public function processSvgContent(string $content, bool $isFigmaImport = false): array
     {
         $textElements = [];
-        $imageElements = [];
+    $imageElements = [];
         $changeableImages = [];
 
         // Load SVG as DOMDocument
         $dom = new \DOMDocument();
         $dom->loadXML($content, LIBXML_NOERROR | LIBXML_NOWARNING);
+        
+        // Register XLink namespace for XPath queries
+        $xpath = new \DOMXPath($dom);
+        $xpath->registerNamespace('xlink', 'http://www.w3.org/1999/xlink');
 
         // Find all text elements
         $textNodes = $dom->getElementsByTagName('text');
@@ -90,8 +132,8 @@ class SvgAutoParser
         }
 
         // Find all image elements
-        $imageNodes = $dom->getElementsByTagName('image');
-        foreach ($imageNodes as $index => $imageNode) {
+        $imageNodeList = $dom->getElementsByTagName('image');
+        foreach ($imageNodeList as $index => $imageNode) {
             $imageNode->setAttribute('data-image-id', 'image_' . ($index + 1));
 
             $imageElements[] = [
@@ -104,27 +146,36 @@ class SvgAutoParser
             ];
         }
 
-        // Find images and rects that should be changeable
-        $changeableSelectors = [
-            'image[id*="photo" i]',
-            'image[id*="replaceable" i]',
-            'image[id*="editable" i]',
-            'rect[id*="photo" i]',
-            'rect[id*="replaceable" i]',
-            'rect[id*="editable" i]'
-        ];
+        // Enhanced Figma SVG processing - convert vector shapes to changeable images
+        // (Use the existing $xpath variable created above)
+        
+        // Process existing images with changeable patterns
+        $changeableImageNodes = $xpath->query('//*[local-name()="image"]');
+        if ($changeableImageNodes === false) {
+            $changeableImageNodes = [];
+        }
 
-        $xpath = new \DOMXPath($dom);
-        foreach ($changeableSelectors as $selector) {
-            // Simple attribute contains check since XPath 1.0 doesn't have contains() for case-insensitive
-            $elements = $xpath->query('//' . $selector);
-            foreach ($elements as $element) {
-                /** @var \DOMElement $element */
+        foreach ($changeableImageNodes as $element) {
+            /** @var \DOMElement $element */
+            $id = strtolower($element->getAttribute('id') ?: '');
+            $href = strtolower($element->getAttribute('href') ?: $element->getAttribute('xlink:href') ?: '');
+            
+            // Check if this image should be changeable
+            $isChangeable = false;
+            $changeablePatterns = ['photo', 'replaceable', 'editable', 'changeable', 'placeholder'];
+            
+            foreach ($changeablePatterns as $pattern) {
+                if (strpos($id, $pattern) !== false || strpos($href, $pattern) !== false) {
+                    $isChangeable = true;
+                    break;
+                }
+            }
+            
+            if ($isChangeable) {
                 $element->setAttribute('data-changeable', 'image');
-                $element->setAttribute('data-changeable-id', 'changeable_' . count($changeableImages));
-
+                $newId = 'changeable_' . count($changeableImages);
                 $changeableImages[] = [
-                    'id' => 'changeable_' . count($changeableImages),
+                    'id' => $newId,
                     'element_type' => $element->tagName,
                     'original_id' => $element->getAttribute('id'),
                     'x' => $element->getAttribute('x') ?: '0',
@@ -132,14 +183,31 @@ class SvgAutoParser
                     'width' => $element->getAttribute('width') ?: '',
                     'height' => $element->getAttribute('height') ?: ''
                 ];
+                $element->setAttribute('data-changeable-id', $newId);
             }
         }
+        
+        // Enhanced conversion of vector shapes to changeable image placeholders (especially for Figma imports)
+            if ($isFigmaImport) {
+                $this->convertFigmaVectorShapesToChangeableImages($dom, $xpath, $changeableImages);
+            }
 
         // Clean up base64 data and local paths
         $this->cleanSvgReferences($dom);
 
+        // Add SVG data attribute for JavaScript to read
+        $svgElement = $dom->getElementsByTagName('svg')->item(0);
+        if ($svgElement) {
+            $svgElement->setAttribute('data-svg-editor', 'true');
+            $svgElement->setAttribute('data-svg-data', json_encode([
+                'text_elements' => $textElements,
+                'image_elements' => $imageElements,
+                'changeable_images' => $changeableImages
+            ]));
+        }
+
         // Save the processed SVG
-        $processedContent = $dom->saveXML();
+        $processedContent = $dom->saveXML($dom->documentElement);
 
         return [
             'content' => $processedContent,
@@ -156,27 +224,294 @@ class SvgAutoParser
     }
 
     /**
+     * Convert Figma vector shapes to changeable image elements
+     * This method identifies rectangular shapes that could be placeholders for images
+     * and converts them to proper <image> elements with changeable attributes
+     */
+    private function convertFigmaVectorShapesToChangeableImages(\DOMDocument $dom, \DOMXPath $xpath, array &$changeableImages): void
+    {
+        // Strategy 1: Convert large rectangular shapes to changeable images
+        // Use local-name() to handle default namespaces in SVG
+        $rectangularShapes = $xpath->query('//*[local-name()="rect"]');
+        if ($rectangularShapes === false) {
+            $rectangularShapes = []; // Fallback to empty array
+        }
+        
+        foreach ($rectangularShapes as $element) {
+            /** @var \DOMElement $element */
+            
+            // Skip if already processed
+            if ($element->hasAttribute('data-changeable')) {
+                continue;
+            }
+            
+            $shouldConvert = $this->shouldConvertShapeToChangeableImage($element);
+            
+            if ($shouldConvert) {
+                // Convert shape to changeable image placeholder
+                $this->convertShapeToChangeableImage($element, $changeableImages);
+            }
+        }
+        
+        // Strategy 2: Look for groups or elements with specific patterns that suggest images
+        $potentialImageContainers = $xpath->query("//g[contains(@id, 'image') or contains(@id, 'photo') or contains(@id, 'picture')] | //*[contains(@class, 'image') or contains(@class, 'photo')]");
+        
+        if ($potentialImageContainers !== false) {
+            foreach ($potentialImageContainers as $container) {
+                /** @var \DOMElement $container */
+                
+                // Check if this container has children that could be converted to images
+                $childShapes = $xpath->query('.//*[local-name()="rect" or local-name()="path" or local-name()="circle" or local-name()="ellipse"]', $container);
+                
+                if ($childShapes !== false && $childShapes->length > 0) {
+                    // Convert the largest child shape to a changeable image
+                    $largestShape = $this->findLargestShape($childShapes);
+                    if ($largestShape && !$largestShape->hasAttribute('data-changeable')) {
+                        $this->convertShapeToChangeableImage($largestShape, $changeableImages);
+                    }
+                }
+            }
+        }
+        
+        // Strategy 3: Aggressive conversion for Figma imports - convert the largest rectangles
+            // Strategy 3 removed: avoid aggressively converting large rectangles to prevent stripping real artwork
+    }
+    
+    /**
+     * Determine if a shape should be converted to a changeable image
+     */
+    private function shouldConvertShapeToChangeableImage(\DOMElement $element): bool
+    {
+        $indicators = [
+            strtolower($element->getAttribute('id') ?: ''),
+            strtolower($element->getAttribute('class') ?: ''),
+            strtolower($element->getAttribute('name') ?: ''),
+            strtolower($element->getAttribute('data-name') ?: ''),
+            strtolower($element->getAttribute('data-placeholder') ?: ''),
+        ];
+
+        $imageIndicators = [
+            'photo', 'image', 'picture', 'img', 'placeholder', 'changeable',
+            'editable', 'replaceable', 'avatar', 'profile', 'logo', 'banner'
+        ];
+
+        foreach ($indicators as $value) {
+            if (empty($value)) {
+                continue;
+            }
+
+            foreach ($imageIndicators as $indicator) {
+                if (strpos($value, $indicator) !== false) {
+                    return true;
+                }
+            }
+        }
+
+        // Walk up the DOM tree to see if any parent group hints at being an image container
+        $parent = $element->parentNode;
+        while ($parent instanceof \DOMElement) {
+            /** @var \DOMElement $parent */
+            $parentTokens = [
+                strtolower($parent->getAttribute('id') ?: ''),
+                strtolower($parent->getAttribute('class') ?: ''),
+                strtolower($parent->getAttribute('name') ?: ''),
+            ];
+
+            foreach ($parentTokens as $token) {
+                if (empty($token)) {
+                    continue;
+                }
+
+                foreach ($imageIndicators as $indicator) {
+                    if (strpos($token, $indicator) !== false) {
+                        return true;
+                    }
+                }
+            }
+
+            $parent = $parent->parentNode;
+        }
+
+        return false;
+    }
+    
+    /**
+     * Convert a shape element to a changeable image element
+     */
+    private function convertShapeToChangeableImage(\DOMElement $element, array &$changeableImages): void
+    {
+        // Extract position and size information
+        $bounds = $this->getElementBounds($element);
+        
+        if (!$bounds) {
+            return; // Skip if we can't determine bounds
+        }
+        
+        // Create a new image element
+        $imageElement = $element->ownerDocument->createElementNS('http://www.w3.org/2000/svg', 'image');
+        
+        // Set image attributes
+        $imageElement->setAttribute('x', $bounds['x']);
+        $imageElement->setAttribute('y', $bounds['y']);
+        $imageElement->setAttribute('width', $bounds['width']);
+        $imageElement->setAttribute('height', $bounds['height']);
+        $imageElement->setAttribute('href', 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Y0ZjRmNCIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1zaXplPSIxMiIgZmlsbD0iIzk5OTk5OSI+SW1hZ2U8L3RleHQ+PC9zdmc+'); // Placeholder image
+        $imageElement->setAttribute('preserveAspectRatio', 'xMidYMid slice');
+        
+        // Add changeable attributes
+        $changeableId = 'changeable_' . count($changeableImages);
+        $imageElement->setAttribute('data-changeable', 'image');
+        $imageElement->setAttribute('data-changeable-id', $changeableId);
+        $imageElement->setAttribute('data-original-element', $element->tagName);
+        
+        // Copy over original id if it exists
+        if ($element->hasAttribute('id')) {
+            $imageElement->setAttribute('data-original-id', $element->getAttribute('id'));
+        }
+        
+        // Replace the original element with the new image element
+        $element->parentNode->replaceChild($imageElement, $element);
+        
+        // Add to changeable images array
+        $changeableImages[] = [
+            'id' => $changeableId,
+            'element_type' => 'image',
+            'original_element' => $element->tagName,
+            'original_id' => $element->getAttribute('id') ?: '',
+            'x' => $bounds['x'],
+            'y' => $bounds['y'],
+            'width' => $bounds['width'],
+            'height' => $bounds['height']
+        ];
+    }
+    
+    /**
+     * Get bounds for an SVG element
+     */
+    private function getElementBounds(\DOMElement $element): ?array
+    {
+        switch ($element->tagName) {
+            case 'rect':
+                return [
+                    'x' => $element->getAttribute('x') ?: '0',
+                    'y' => $element->getAttribute('y') ?: '0',
+                    'width' => $element->getAttribute('width') ?: '100',
+                    'height' => $element->getAttribute('height') ?: '100'
+                ];
+                
+            case 'circle':
+                $cx = floatval($element->getAttribute('cx') ?: 0);
+                $cy = floatval($element->getAttribute('cy') ?: 0);
+                $r = floatval($element->getAttribute('r') ?: 50);
+                return [
+                    'x' => strval($cx - $r),
+                    'y' => strval($cy - $r),
+                    'width' => strval($r * 2),
+                    'height' => strval($r * 2)
+                ];
+                
+            case 'ellipse':
+                $cx = floatval($element->getAttribute('cx') ?: 0);
+                $cy = floatval($element->getAttribute('cy') ?: 0);
+                $rx = floatval($element->getAttribute('rx') ?: 50);
+                $ry = floatval($element->getAttribute('ry') ?: 50);
+                return [
+                    'x' => strval($cx - $rx),
+                    'y' => strval($cy - $ry),
+                    'width' => strval($rx * 2),
+                    'height' => strval($ry * 2)
+                ];
+                
+            case 'path':
+                // For paths, try to extract bounds from the d attribute
+                // This is a simplified approach - for production, you'd want more robust path parsing
+                $d = $element->getAttribute('d');
+                if ($d) {
+                    // Try to extract coordinate numbers from the path
+                    preg_match_all('/[\d.]+/', $d, $matches);
+                    if (isset($matches[0]) && count($matches[0]) >= 4) {
+                        $coords = array_map('floatval', $matches[0]);
+                        $minX = min($coords);
+                        $minY = min($coords);
+                        $maxX = max($coords);
+                        $maxY = max($coords);
+                        
+                        return [
+                            'x' => strval($minX),
+                            'y' => strval($minY),
+                            'width' => strval($maxX - $minX),
+                            'height' => strval($maxY - $minY)
+                        ];
+                    }
+                }
+                // Fallback for paths
+                return [
+                    'x' => '0',
+                    'y' => '0',
+                    'width' => '100',
+                    'height' => '100'
+                ];
+                
+            default:
+                return null;
+        }
+    }
+    
+    /**
+     * Find the largest shape among a collection of elements
+     */
+    private function findLargestShape(\DOMNodeList $shapes): ?\DOMElement
+    {
+        $largestShape = null;
+        $largestArea = 0;
+        
+        foreach ($shapes as $shape) {
+            /** @var \DOMElement $shape */
+            $bounds = $this->getElementBounds($shape);
+            if ($bounds) {
+                $area = floatval($bounds['width']) * floatval($bounds['height']);
+                if ($area > $largestArea) {
+                    $largestArea = $area;
+                    $largestShape = $shape;
+                }
+            }
+        }
+        
+        return $largestShape;
+    }
+
+    /**
      * Clean up SVG references (base64 data, local paths)
      */
     private function cleanSvgReferences(\DOMDocument $dom): void
     {
         $xpath = new \DOMXPath($dom);
+        $xpath->registerNamespace('xlink', 'http://www.w3.org/1999/xlink');
 
-        // Handle image elements with base64 data
-        $images = $xpath->query('//image');
+        // Handle image elements and preserve inline data URLs so previews render correctly
+        $images = $xpath->query('//*[local-name()="image"]');
         foreach ($images as $image) {
             /** @var \DOMElement $image */
             $href = $image->getAttribute('href') ?: $image->getAttribute('xlink:href');
 
-            if ($href && strpos($href, 'data:image') === 0) {
-                // Replace base64 data with placeholder
-                $image->setAttribute('href', 'data:image/png;base64,PLACEHOLDER_IMAGE');
+            if (!$href) {
+                continue;
+            }
+
+            if (strpos($href, 'data:image') === 0) {
+                // Keep data URLs intact; ensure both href variants are aligned
+                $image->setAttribute('href', $href);
                 if ($image->hasAttribute('xlink:href')) {
-                    $image->removeAttribute('xlink:href');
+                    $image->setAttribute('xlink:href', $href);
                 }
-            } elseif ($href && !filter_var($href, FILTER_VALIDATE_URL)) {
-                // Remove local file paths
-                $image->setAttribute('href', 'data:image/png;base64,PLACEHOLDER_IMAGE');
+                continue;
+            }
+
+            if (!filter_var($href, FILTER_VALIDATE_URL)) {
+                // Strip unresolved local file paths to avoid broken references
+                if ($image->hasAttribute('href')) {
+                    $image->removeAttribute('href');
+                }
                 if ($image->hasAttribute('xlink:href')) {
                     $image->removeAttribute('xlink:href');
                 }
@@ -184,22 +519,31 @@ class SvgAutoParser
         }
 
         // Handle other elements that might have local references
-        $elementsWithRefs = $xpath->query('//*[@href] | //*[@xlink:href] | //*[@src]');
+        $elementsWithRefs = $xpath->query('//*[@href] | //*[@src]');
+        if ($elementsWithRefs === false) {
+            $elementsWithRefs = [];
+        }
         foreach ($elementsWithRefs as $element) {
             /** @var \DOMElement $element */
             $href = $element->getAttribute('href') ?: $element->getAttribute('xlink:href') ?: $element->getAttribute('src');
 
-            if ($href && !filter_var($href, FILTER_VALIDATE_URL) && strpos($href, 'data:') !== 0) {
-                // Remove local references
-                if ($element->hasAttribute('href')) {
-                    $element->removeAttribute('href');
-                }
-                if ($element->hasAttribute('xlink:href')) {
-                    $element->removeAttribute('xlink:href');
-                }
-                if ($element->hasAttribute('src')) {
-                    $element->removeAttribute('src');
-                }
+            if (!$href) {
+                continue;
+            }
+
+            if (strpos($href, 'data:') === 0 || filter_var($href, FILTER_VALIDATE_URL)) {
+                continue;
+            }
+
+            // Remove unresolved local references while leaving valid URLs/data intact
+            if ($element->hasAttribute('href')) {
+                $element->removeAttribute('href');
+            }
+            if ($element->hasAttribute('xlink:href')) {
+                $element->removeAttribute('xlink:href');
+            }
+            if ($element->hasAttribute('src')) {
+                $element->removeAttribute('src');
             }
         }
     }

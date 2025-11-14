@@ -1858,7 +1858,7 @@ class OrderFlowService
                 $material = $materialCache[$materialId];
             }
 
-            $quantityMode = $meta['quantity_mode'] ?? 'per_item';
+            $quantityMode = $meta['quantity_mode'] ?? 'per_unit';
             unset($meta['quantity_mode']);
 
             $orderQty = max(0, (int) $item->quantity);
@@ -2256,7 +2256,7 @@ class OrderFlowService
                     ];
                 }
 
-                $detailGroups[$detailKey]['quantity_modes'][] = $component['quantity_mode'] ?? 'per_item';
+                $detailGroups[$detailKey]['quantity_modes'][] = $component['quantity_mode'] ?? 'per_unit';
                 $detailGroups[$detailKey]['per_unit_qty'] = max(
                     $detailGroups[$detailKey]['per_unit_qty'],
                     (float) ($component['per_unit_qty'] ?? 0)

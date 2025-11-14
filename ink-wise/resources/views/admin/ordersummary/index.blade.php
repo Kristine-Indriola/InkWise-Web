@@ -481,8 +481,33 @@
 		'giveaways' => 0.0,
 		'others' => 0.0,
 	];
-	$timeline = collect(data_get($order, 'timeline', data_get($order, 'events', [])))->sortBy(function ($event) {
-		$timestamp = data_get($event, 'timestamp', data_get($event, 'created_at'));
+
+	// Build timeline from order activities
+	$timeline = collect();
+	
+	// Add order creation event
+	$timeline->push([
+		'label' => 'Order Created',
+		'author' => $customerName,
+		'state' => 'created',
+		'note' => null,
+		'timestamp' => data_get($order, 'created_at'),
+	]);
+
+	// Add activity events from database
+	$activities = collect(data_get($order, 'activities', []));
+	foreach ($activities as $activity) {
+		$timeline->push([
+			'label' => data_get($activity, 'description', 'Order Updated'),
+			'author' => data_get($activity, 'user_name', 'System') . ' (' . data_get($activity, 'user_role', 'Unknown') . ')',
+			'state' => data_get($activity, 'activity_type', 'updated'),
+			'note' => null,
+			'timestamp' => data_get($activity, 'created_at'),
+		]);
+	}
+
+	$timeline = $timeline->sortBy(function ($event) {
+		$timestamp = data_get($event, 'timestamp');
 		try {
 			return $timestamp ? \Illuminate\Support\Carbon::parse($timestamp)->timestamp : 0;
 		} catch (\Throwable $e) {
@@ -508,6 +533,11 @@
 		$statusManageUrl = $order ? route('admin.orders.status.edit', ['order' => data_get($order, 'id')]) : null;
 	} catch (\Throwable $e) {
 		$statusManageUrl = null;
+	}
+	try {
+		$paymentManageUrl = $order ? route('admin.orders.payment.edit', ['order' => data_get($order, 'id')]) : null;
+	} catch (\Throwable $e) {
+		$paymentManageUrl = null;
 	}
 	$ordersBackUrl = $statusManageUrl ?? $ordersIndexUrl;
 
@@ -619,9 +649,12 @@
 				@elseif($paymentStatus === 'pending')
 					<span class="status-progress-manage-link" style="color: #9ca3af; cursor: not-allowed;" title="Cannot update status while payment is pending">Update status</span>
 				@endif
+				@if($paymentManageUrl)
+					<a href="{{ $paymentManageUrl }}" class="status-progress-manage-link">Payment Details</a>
+				@endif
 			</div>
 		</header>
-		<ol class="status-tracker" aria-label="Order progress">
+		<ol class="status-tracker" aria-hidden="true">
 			@foreach($statusFlow as $index => $statusKey)
 				@php
 					$stateClass = 'status-tracker__item--upcoming';

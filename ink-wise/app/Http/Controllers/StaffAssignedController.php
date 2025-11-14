@@ -56,6 +56,11 @@ class StaffAssignedController extends Controller
 
     public function updateStatus(Request $request, Order $order)
     {
+        // Prevent status updates for cancelled orders
+        if ($order->status === 'cancelled') {
+            return back()->with('error', 'Cannot update status of cancelled orders. Cancelled orders are locked.');
+        }
+
         $validated = $request->validate([
             'status' => 'required|string|in:pending,in_production,confirmed,to_receive,completed,cancelled',
         ]);

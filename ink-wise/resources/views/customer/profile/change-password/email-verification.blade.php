@@ -40,11 +40,12 @@
                     </div>
 
                     <!-- Title -->
-                    <h2 class="text-xl font-semibold text-gray-800 mb-6">Respond on Email</h2>
+                    <h2 class="text-xl font-semibold text-gray-800 mb-6">Verification Email Sent</h2>
 
                     <!-- Email Message -->
                     <p class="text-gray-600 mb-8 leading-relaxed">
-                        Please respond to the notification sent via Email to <span class="font-medium">{{ Auth::user()->email ? substr(Auth::user()->email, 0, 3) . '*******' . substr(Auth::user()->email, -1) : 'your email' }}</span>
+                        A verification email has been sent to <span class="font-medium">{{ Auth::user()->email ? substr(Auth::user()->email, 0, 3) . '*******' . substr(Auth::user()->email, -1) : 'your email' }}</span>.
+                        Please check your inbox and click the verification link to proceed.
                     </p>
 
                     <!-- Resend Section -->

@@ -147,7 +147,7 @@ class CustomerProfileController extends Controller
     ]);
 }
 
-    public function cancelOrder(Request $request, Order $order): RedirectResponse
+    public function cancelOrder(Request $request, Order $order)
     {
         $user = Auth::user();
 
@@ -167,10 +167,19 @@ class CustomerProfileController extends Controller
             abort(403);
         }
 
-        $cancellableStatuses = ['pending', 'awaiting_payment'];
+        $cancellableStatuses = ['pending', 'awaiting_payment', 'in_production', 'processing'];
 
         if (!in_array($order->status, $cancellableStatuses, true)) {
-            return redirect()->back()->with('error', 'Order can no longer be cancelled once it is in progress.');
+            $errorMessage = 'Order can no longer be cancelled at this stage. Please contact InkWise support for assistance.';
+            
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $errorMessage,
+                ], 403);
+            }
+            
+            return redirect()->back()->with('error', $errorMessage);
         }
 
         $metadata = $order->metadata ?? [];
@@ -181,13 +190,112 @@ class CustomerProfileController extends Controller
             $metadata['cancel_reason'] = trim((string) $request->input('cancel_reason'));
         }
 
+        // Process refunds for any paid payments
+        $paidPayments = $order->payments()->where('status', 'paid')->get();
+        $totalPaid = $paidPayments->sum(fn($payment) => abs($payment->amount));
+        $totalRefunded = 0;
+        $refundRecords = [];
+        $restockingFee = 0;
+
+        // Apply restocking fee for orders in production
+        if (in_array($order->status, ['in_production', 'processing'], true) && $totalPaid > 0) {
+            // 20% restocking fee for orders already in production
+            $restockingFee = round($totalPaid * 0.20, 2);
+            $metadata['restocking_fee'] = $restockingFee;
+            $metadata['restocking_fee_percentage'] = 20;
+        }
+
+        $refundAmount = max($totalPaid - $restockingFee, 0);
+
+        if ($refundAmount > 0) {
+            foreach ($paidPayments as $payment) {
+                $paymentAmount = abs($payment->amount);
+                // Calculate proportional refund for this payment
+                $proportionalRefund = round(($paymentAmount / $totalPaid) * $refundAmount, 2);
+
+                // Create refund record
+                $refund = \App\Models\Payment::create([
+                    'order_id' => $order->id,
+                    'customer_id' => $order->customer_id,
+                    'recorded_by' => null, // System automated refund
+                    'provider' => $payment->provider,
+                    'provider_payment_id' => $payment->provider_payment_id . '_refund',
+                    'intent_id' => $payment->intent_id,
+                    'method' => $payment->method,
+                    'mode' => 'refund',
+                    'amount' => -$proportionalRefund, // Negative amount for refund
+                    'currency' => $payment->currency,
+                    'status' => 'refunded',
+                    'raw_payload' => [
+                        'refund_reason' => 'Order cancelled by customer',
+                        'original_payment_id' => $payment->id,
+                        'restocking_fee_applied' => $restockingFee > 0,
+                        'restocking_fee' => $restockingFee,
+                        'refunded_at' => now()->toIso8601String(),
+                    ],
+                    'recorded_at' => now(),
+                ]);
+
+                $totalRefunded += $proportionalRefund;
+                $refundRecords[] = [
+                    'payment_id' => $payment->id,
+                    'refund_id' => $refund->id,
+                    'original_amount' => $paymentAmount,
+                    'refund_amount' => $proportionalRefund,
+                    'refunded_at' => now()->toIso8601String(),
+                ];
+
+                // Update original payment status
+                $payment->update(['status' => 'refunded']);
+            }
+        }
+
+        // Store refund information in metadata
+        if ($totalRefunded > 0 || $restockingFee > 0) {
+            $metadata['refund_processed'] = true;
+            $metadata['total_paid'] = $totalPaid;
+            $metadata['total_refunded'] = $totalRefunded;
+            $metadata['refund_records'] = $refundRecords;
+            $metadata['refund_processed_at'] = now()->toIso8601String();
+        }
+
         $order->update([
             'status' => 'cancelled',
-            'payment_status' => 'cancelled',
+            'payment_status' => $totalRefunded > 0 ? 'refunded' : 'cancelled',
             'metadata' => $metadata,
         ]);
 
-        return redirect()->back()->with('status', 'Order cancelled successfully.');
+        // Build success message
+        if ($totalRefunded > 0) {
+            if ($restockingFee > 0) {
+                $successMessage = sprintf(
+                    'Order cancelled successfully. A 20%% restocking fee of ₱%s has been applied. Your refund of ₱%s will be processed to your account.',
+                    number_format($restockingFee, 2),
+                    number_format($totalRefunded, 2)
+                );
+            } else {
+                $successMessage = sprintf(
+                    'Order cancelled successfully. A refund of ₱%s will be processed to your account.',
+                    number_format($totalRefunded, 2)
+                );
+            }
+        } else {
+            $successMessage = 'Order cancelled successfully.';
+        }
+
+        // Return JSON for AJAX requests
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => $successMessage,
+                'refunded' => $totalRefunded > 0,
+                'refund_amount' => $totalRefunded,
+                'restocking_fee' => $restockingFee,
+                'total_paid' => $totalPaid,
+            ]);
+        }
+
+        return redirect()->back()->with('status', $successMessage);
     }
 
     public function confirmReceived(Request $request, Order $order): RedirectResponse
@@ -422,25 +530,13 @@ class CustomerProfileController extends Controller
 
             Log::info('Password change attempt created', ['attempt_id' => $attempt->id]);
 
-            // Send verification email (use log mailer for development)
-            Log::info('Sending verification email via log mailer');
+            // Send verification email (use smtp mailer for production)
+            Log::info('Sending verification email via smtp mailer');
             try {
-                // Send a simple test email first
-                \Illuminate\Support\Facades\Mail::mailer('log')->raw(
-                    "Password Change Verification\n\n" .
-                    "Hi {$customer->first_name},\n\n" .
-                    "Someone requested to change the password for your InkWise account.\n\n" .
-                    "If this was you, click here to verify: " . route('customerprofile.email-confirm', $attempt->token) . "\n\n" .
-                    "This link will expire in 15 minutes.\n\n" .
-                    "If you didn't request this change, please ignore this email.\n\n" .
-                    "InkWise Team",
-                    function($message) use ($user) {
-                        $message->to($user->email)->subject('Password Change Verification - InkWise');
-                    }
-                );
-                Log::info('Simple verification email sent successfully');
+                \Illuminate\Support\Facades\Mail::mailer('smtp')->to($user->email)->send(new PasswordChangeVerification($attempt));
+                Log::info('Verification email sent successfully via Mailable');
             } catch (\Exception $mailException) {
-                Log::error('Simple mail sending failed', ['error' => $mailException->getMessage()]);
+                Log::error('Mailable sending failed', ['error' => $mailException->getMessage()]);
                 throw $mailException;
             }
 
@@ -480,7 +576,7 @@ class CustomerProfileController extends Controller
         // Store verification in session for the change password form
         session(['password_change_verified' => true, 'verified_attempt_id' => $attempt->id]);
 
-        return view('customer.profile.change-password.email-confirmation', compact('attempt'));
+        return view('customer.profile.change-password.password-change-attempt-approved', compact('attempt'));
     }
 
     public function showPasswordChangeConfirm()
@@ -493,7 +589,7 @@ class CustomerProfileController extends Controller
 
         $attempt = PasswordChangeAttempt::find(session('verified_attempt_id'));
 
-        return view('customer.profile.change-password.email-confirmation', compact('attempt'));
+        return view('customer.profile.change-password.password-change-confirm', compact('attempt'));
     }
 
     // Helper methods

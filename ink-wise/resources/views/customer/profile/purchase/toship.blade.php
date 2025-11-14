@@ -226,7 +226,7 @@
                         @endphp
 
                         @if($hasRemainingBalance)
-                        <a href="{{ route('customer.pay.remaining.balance', ['order' => $order->id]) }}"
+                        <a href="{{ route('customer.pay.remaining.balance', ['order' => data_get($order, 'id')]) }}"
                            class="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded font-semibold transition-colors duration-200">
                             Pay Remaining Balance (₱{{ number_format($remainingBalance, 2) }})
                         </a>
