@@ -74,6 +74,12 @@
                 $statusNote = $metadata['status_note'] ?? null;
                 $statusKey = data_get($order, 'status', 'cancelled');
                 $statusLabel = $statusOptions[$statusKey] ?? ucfirst(str_replace('_', ' ', $statusKey));
+                $refundProcessed = $metadata['refund_processed'] ?? false;
+                $totalRefunded = $metadata['total_refunded'] ?? 0;
+                $totalPaid = $metadata['total_paid'] ?? 0;
+                $restockingFee = $metadata['restocking_fee'] ?? 0;
+                $refundProcessedAt = isset($metadata['refund_processed_at']) ? $formatDate($metadata['refund_processed_at'], 'M d, Y g:i A') : null;
+                $paymentStatus = data_get($order, 'payment_status', 'cancelled');
             @endphp
 
             <div class="bg-white border rounded-xl p-4 shadow-sm flex items-center gap-4">
@@ -84,6 +90,33 @@
                     <div class="text-sm text-gray-500">Cancelled: <span class="font-medium">{{ $cancelledDate ?? 'Not available' }}</span></div>
                     <div class="text-sm text-gray-500">Reason: {{ $reason }}</div>
                     <div class="text-sm text-gray-500">Status: <span class="text-[#a6b7ff] font-semibold">{{ $statusLabel }}</span></div>
+                    @if($refundProcessed && $totalRefunded > 0)
+                        <div class="text-sm text-green-600 font-semibold mt-1">
+                            <svg class="inline w-4 h-4 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            Refunded: ₱{{ number_format($totalRefunded, 2) }}
+                        </div>
+                        @if($restockingFee > 0)
+                            <div class="text-xs text-orange-600 mt-1">
+                                <svg class="inline w-3 h-3 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                Restocking fee: ₱{{ number_format($restockingFee, 2) }} (20%)
+                            </div>
+                            <div class="text-xs text-gray-500">Original payment: ₱{{ number_format($totalPaid, 2) }}</div>
+                        @endif
+                        @if($refundProcessedAt)
+                            <div class="text-xs text-gray-500">Refund processed: {{ $refundProcessedAt }}</div>
+                        @endif
+                    @elseif($paymentStatus === 'refunded')
+                        <div class="text-sm text-green-600 font-semibold mt-1">
+                            <svg class="inline w-4 h-4 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            Payment Refunded
+                        </div>
+                    @endif
                     @if($statusNote)
                         <div class="text-xs text-gray-400 mt-1">Note: {{ $statusNote }}</div>
                     @endif

@@ -180,14 +180,38 @@ class CustomerAuthController extends Controller
         $credentials = $request->only('email', 'password');
 
         if (Auth::attempt($credentials)) {
+            $request->session()->regenerate();
+
+            $user = Auth::user();
+
+            // ✅ ONLY allow customers to login through this route
+            if ($user->role !== 'customer') {
+                Auth::logout();
+                return redirect()->route('dashboard')
+                    ->with('show_login_modal', true)
+                    ->withErrors([
+                        'email' => '❌ This login is for customers only. Please use the appropriate login page for your role.'
+                    ])
+                    ->withInput();
+            }
+
             return redirect()->route('customer.dashboard');
         }
 
-        return back()->withErrors(['email' => 'Invalid email or password']);
+        return redirect()->route('dashboard')
+            ->with('show_login_modal', true)
+            ->withErrors(['email' => '❌ Invalid email or password'])
+            ->withInput();
     }
 
     public function dashboard()
     {
+        // ✅ Double-check that only customers can access this
+        if (!Auth::check() || Auth::user()->role !== 'customer') {
+            Auth::logout();
+            return redirect()->route('customer.login.form')
+                ->withErrors(['error' => '❌ You must be logged in as a customer to access this page.']);
+        }
 
         return view('customer.dashboard', [
             'customer' => Auth::user()->customer ?? null, // safe access

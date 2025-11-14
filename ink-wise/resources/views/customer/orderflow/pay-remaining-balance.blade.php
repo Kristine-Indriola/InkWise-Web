@@ -1,4 +1,4 @@
-@extends('layouts.customer')
+@extends('layouts.customerprofile')
 
 @section('title', 'Pay Remaining Balance')
 

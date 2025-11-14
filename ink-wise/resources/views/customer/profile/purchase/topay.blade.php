@@ -299,7 +299,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            if (!confirm('Cancel this order? This cannot be undone and will remove it from your To Pay list.')) {
+            if (!confirm('Cancel this order? If you have already paid, a refund will be processed to your account.')) {
                 return;
             }
 
@@ -314,6 +314,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
 
                 if (response.ok) {
+                    const result = await response.json().catch(() => ({}));
+                    
                     // Successfully cancelled - remove from UI
                     const card = btn.closest('.bg-white.border.rounded-xl') || btn.closest('[data-summary-order-id]');
                     if (card) {
@@ -341,7 +343,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
 
                     // Show success message
-                    alert('Order cancelled successfully.');
+                    const message = result.message || result.status || 'Order cancelled successfully.';
+                    alert(message);
                 } else {
                     const errorData = await response.json().catch(() => ({}));
                     alert(errorData.message || 'Failed to cancel order. Please try again.');
