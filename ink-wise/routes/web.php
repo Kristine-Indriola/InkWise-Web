@@ -154,6 +154,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         // Move these two lines inside this group and fix the path:
         Route::post('{id}/save-canvas', [AdminTemplateController::class, 'saveCanvas'])->name('saveCanvas');
         Route::post('{id}/upload-preview', [AdminTemplateController::class, 'uploadPreview'])->name('uploadPreview');
+    Route::post('{id}/autosave', [AdminTemplateController::class, 'autosave'])->name('autosave');
         // Add new API routes
         Route::get('{id}/load-design', [AdminTemplateController::class, 'loadDesign'])->name('loadDesign');
         Route::delete('{id}/delete-element', [AdminTemplateController::class, 'deleteElement'])->name('deleteElement');
@@ -562,6 +563,13 @@ Route::get('/product/preview/{product}', function (Product $product) {
 
     return view('customer.Invitations.productpreview', compact('product'));
 })->name('product.preview');
+Route::get('/design/studio/{product?}', function (?Product $product) {
+    if ($product) {
+        $product->loadMissing(['template']);
+    }
+
+    return view('customer.Invitations.studio', compact('product'));
+})->name('design.studio');
 Route::get('/design/edit/{product?}', [OrderFlowController::class, 'edit'])->name('design.edit');
 Route::post('/order/cart/items', [OrderFlowController::class, 'storeDesignSelection'])->name('order.cart.add');
 
@@ -756,6 +764,7 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
         // Move these two lines inside this group and fix the path:
         Route::post('{id}/save-canvas', [App\Http\Controllers\Admin\TemplateController::class, 'saveCanvas'])->name('saveCanvas');
         Route::post('{id}/upload-preview', [App\Http\Controllers\Admin\TemplateController::class, 'uploadPreview'])->name('uploadPreview');
+    Route::post('{id}/autosave', [App\Http\Controllers\Admin\TemplateController::class, 'autosave'])->name('autosave');
         // Add new API routes
         Route::get('{id}/load-design', [App\Http\Controllers\Admin\TemplateController::class, 'loadDesign'])->name('loadDesign');
         Route::delete('{id}/delete-element', [App\Http\Controllers\Admin\TemplateController::class, 'deleteElement'])->name('deleteElement');
@@ -776,15 +785,11 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
         Route::post('preview', [App\Http\Controllers\Admin\TemplateController::class, 'preview'])->name('preview');
         Route::post('preview/{preview}/save', [App\Http\Controllers\Admin\TemplateController::class, 'savePreview'])->name('preview.save');
         Route::post('preview/{preview}/remove', [App\Http\Controllers\Admin\TemplateController::class, 'removePreview'])->name('preview.remove');
-    }); 
 
-    // Figma Integration Routes
-    Route::prefix('figma')->name('figma.')->group(function () {
-        Route::get('/', [\App\Http\Controllers\FigmaController::class, 'index'])->name('index');
-        Route::post('/analyze', [\App\Http\Controllers\FigmaController::class, 'analyze'])->name('analyze');
-        Route::post('/preview', [\App\Http\Controllers\FigmaController::class, 'preview'])->name('preview');
-        Route::post('/import', [\App\Http\Controllers\FigmaController::class, 'import'])->name('import');
-        Route::post('/templates/{template}/sync', [\App\Http\Controllers\FigmaController::class, 'sync'])->name('sync');
+        // Figma Integration Routes for staff templates
+        Route::post('figma/analyze', [\App\Http\Controllers\FigmaController::class, 'analyze'])->name('figma.analyze');
+        Route::post('figma/preview', [\App\Http\Controllers\FigmaController::class, 'preview'])->name('figma.preview');
+        Route::post('figma/import', [\App\Http\Controllers\FigmaController::class, 'import'])->name('figma.import');
     });
 });
 

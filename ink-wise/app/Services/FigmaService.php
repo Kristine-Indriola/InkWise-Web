@@ -148,9 +148,9 @@ class FigmaService
             $hasChildren = isset($node['children']) && is_array($node['children']);
 
             // Collect any positioned element that could be a design element
-            // Include FRAME, COMPONENT, COMPONENT_SET, INSTANCE, and any element with bounds
-            $isDesignElement = in_array($nodeType, ['FRAME', 'COMPONENT', 'COMPONENT_SET', 'INSTANCE'])
-                || ($hasBounds && !in_array($nodeType, ['DOCUMENT', 'CANVAS', 'GROUP']));
+            // Include FRAME, COMPONENT, COMPONENT_SET, INSTANCE, CANVAS, and any element with bounds
+            $isDesignElement = in_array($nodeType, ['FRAME', 'COMPONENT', 'COMPONENT_SET', 'INSTANCE', 'CANVAS'])
+                || ($hasBounds && !in_array($nodeType, ['DOCUMENT', 'GROUP']));
 
             if ($isDesignElement && !empty($nodeName)) {
                 Log::debug('Found design element', [

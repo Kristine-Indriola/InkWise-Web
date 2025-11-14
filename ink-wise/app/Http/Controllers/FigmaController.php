@@ -7,6 +7,9 @@ use App\Services\FigmaService;
 use App\Services\SvgAutoParser;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -240,12 +243,12 @@ class FigmaController extends Controller
         $selectedFrames = $request->input('frames');
 
         // For single frame import, don't group - just process each frame individually
-        $previews = [];
-        $errors = [];
+    $previews = [];
+    $errors = [];
 
-        // Fetch SVG images for all selected frames
-        $nodeIds = array_column($selectedFrames, 'id');
-        $imagesData = $this->figmaService->fetchSvgs($fileKey, $nodeIds);
+    // Fetch SVG images for all selected frames
+    $nodeIds = array_column($selectedFrames, 'id');
+    $imagesData = $this->figmaService->fetchSvgs($fileKey, $nodeIds);
 
         Log::info('Figma fetchSvgs result', [
             'file_key' => $fileKey,
@@ -262,38 +265,112 @@ class FigmaController extends Controller
             ], 400);
         }
 
-        // Process each frame individually
+        // Build request map for concurrent downloads
+        $frameRequests = [];
         foreach ($selectedFrames as $frame) {
-            try {
-                $nodeId = $frame['id'];
-                $svgUrl = $imagesData['images'][$nodeId] ?? null;
+            $nodeId = $frame['id'];
+            $svgUrl = $imagesData['images'][$nodeId] ?? null;
 
-                if (!$svgUrl) {
-                    $errors[] = "No SVG URL found for frame: {$frame['name']}";
-                    continue;
+            if (!$svgUrl) {
+                $errors[] = "No SVG URL found for frame: {$frame['name']}";
+                continue;
+            }
+
+            $frameRequests[$nodeId] = [
+                'frame' => $frame,
+                'url' => $svgUrl,
+            ];
+        }
+
+        if (!empty($frameRequests)) {
+            $responses = [];
+
+            try {
+                if (count($frameRequests) === 1) {
+                    $firstKey = array_key_first($frameRequests);
+                    $single = $frameRequests[$firstKey];
+                    $responses[$firstKey] = Http::timeout(20)->get($single['url']);
+                } else {
+                    $responses = Http::pool(function (Pool $pool) use ($frameRequests) {
+                        $requests = [];
+                        foreach ($frameRequests as $nodeId => $requestData) {
+                            $requests[] = $pool->as($nodeId)->timeout(20)->get($requestData['url']);
+                        }
+                        return $requests;
+                    });
+                }
+            } catch (\Exception $e) {
+                Log::error('Figma SVG download request failed', [
+                    'file_key' => $fileKey,
+                    'error' => $e->getMessage(),
+                ]);
+                $errors[] = 'Failed to download SVG content from Figma.';
+            }
+
+            foreach ($frameRequests as $nodeId => $requestData) {
+                $frame = $requestData['frame'];
+                $response = $responses[$nodeId] ?? null;
+
+                $svgContent = null;
+
+                if ($response instanceof Response && $response->successful()) {
+                    $svgContent = $response->body();
                 }
 
-                $svgContent = file_get_contents($svgUrl);
+                if (!$svgContent) {
+                    try {
+                        $fallbackResponse = Http::timeout(20)->get($requestData['url']);
+                        if ($fallbackResponse->successful()) {
+                            $svgContent = $fallbackResponse->body();
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning('Figma SVG sequential download failed', [
+                            'node_id' => $nodeId,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+
+                if (!$svgContent) {
+                    try {
+                        $svgContent = file_get_contents($requestData['url']);
+                    } catch (\Exception $e) {
+                        $status = $response instanceof Response ? $response->status() : 'n/a';
+                        Log::warning('Figma SVG download unsuccessful', [
+                            'node_id' => $nodeId,
+                            'status' => $status,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
 
                 if (!$svgContent) {
                     $errors[] = "Failed to download SVG content for frame: {$frame['name']}";
                     continue;
                 }
 
+                $processedSvg = $this->svgParser->processFigmaImportedSvg($svgContent);
+                $countMetadata = $processedSvg['metadata'] ?? [];
+                $insights = $this->buildPreviewInsights(
+                    $frame['name'],
+                    $countMetadata,
+                    $processedSvg['text_elements'] ?? [],
+                    $processedSvg['changeable_images'] ?? []
+                );
+
                 $previews[] = [
                     'name' => $frame['name'],
                     'type' => $frame['type'],
-                    'front_svg' => $svgContent, // For single frame, put it as front_svg
+                    'node_id' => $frame['id'],
+                    'front_svg' => $processedSvg['content'] ?? $svgContent,
                     'back_svg' => null,
                     'has_back' => false,
+                    'metadata' => $countMetadata,
+                    'text_elements' => $processedSvg['text_elements'] ?? [],
+                    'changeable_images' => $processedSvg['changeable_images'] ?? [],
+                    'image_elements' => $processedSvg['image_elements'] ?? [],
+                    'insights' => $insights,
                 ];
-
-            } catch (\Exception $e) {
-                Log::error('Failed to preview Figma frame', [
-                    'frame' => $frame,
-                    'error' => $e->getMessage(),
-                ]);
-                $errors[] = "Failed to preview frame '{$frame['name']}': {$e->getMessage()}";
             }
         }
 
@@ -496,5 +573,38 @@ class FigmaController extends Controller
             'processed_path' => $processedSvgData['processed_path'],
             'metadata' => $processedSvgData['metadata'],
         ];
+    }
+
+    /**
+     * Build human-friendly insights for preview metadata
+     */
+    protected function buildPreviewInsights(string $frameName, array $metadata, array $textElements, array $changeableImages): array
+    {
+        $insights = [];
+
+        $textCount = $metadata['text_count'] ?? count($textElements);
+        $changeableCount = $metadata['changeable_count'] ?? count($changeableImages);
+
+        if ($textCount > 0) {
+            $insights[] = sprintf('%d editable text layer%s detected.', $textCount, $textCount === 1 ? '' : 's');
+        } else {
+            $insights[] = 'No editable text layers detected. Keep text live in Figma for in-app editing.';
+        }
+
+        if ($changeableCount > 0) {
+            $insights[] = sprintf('%d replaceable image area%s detected.', $changeableCount, $changeableCount === 1 ? '' : 's');
+        } else {
+            $insights[] = 'No replaceable image areas detected. Name image layers with photo/placeholder to enable swaps.';
+        }
+
+        if (!empty($metadata['vector_shapes_converted'])) {
+            $insights[] = sprintf('%d vector shape%s converted into image placeholder%s.',
+                $metadata['vector_shapes_converted'],
+                $metadata['vector_shapes_converted'] === 1 ? '' : 's',
+                $metadata['vector_shapes_converted'] === 1 ? '' : 's'
+            );
+        }
+
+        return $insights;
     }
 }
