@@ -44,6 +44,7 @@ use App\Http\Controllers\Owner\OwnerTransactionsController;
 use App\Http\Controllers\Staff\StaffCustomerController;
 use App\Http\Controllers\Staff\StaffOrderController;
 use App\Http\Controllers\Staff\StaffMaterialController;
+use App\Http\Controllers\Staff\StaffDashboardController;
 use App\Http\Controllers\Owner\OwnerRatingsController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Owner\OwnerInventoryController;
@@ -251,6 +252,7 @@ Route::prefix('users')->name('users.')->group(function () {
 
     Route::prefix('customers')->name('customers.')->group(function () {
         Route::get('/', [AdminCustomerController::class, 'index'])->name('index'); 
+        Route::get('/{id}', [AdminCustomerController::class, 'show'])->name('show'); 
         // Optional: Add more customer routes (show/edit/delete) here later
     });
 
@@ -388,13 +390,14 @@ Route::middleware('auth')->group(function () {
 
 Route::post('/messages', [MessageController::class, 'storeFromContact'])->name('messages.store');
 
+Route::middleware('auth')->group(function () {
     Route::get('customer/chat/thread', [MessageController::class, 'customerChatThread'])->name('customer.chat.thread');
     Route::post('customer/chat/send', [MessageController::class, 'customerChatSend'])->name('customer.chat.send');
-Route::get('customer/chat/unread-count', [MessageController::class, 'customerUnreadCount'])
+    Route::get('customer/chat/unread-count', [MessageController::class, 'customerUnreadCount'])
         ->name('customer.chat.unread');
-
     Route::post('customer/chat/mark-read', [MessageController::class, 'customerMarkRead'])
         ->name('customer.chat.markread');
+});
 
 
 Route::get('/chatbot/qas', [ChatbotController::class, 'getQAs'])->name('chatbot.qas');
@@ -475,9 +478,12 @@ Route::get('/customer/my-orders/cancelled', fn () => view('customer.profile.purc
 Route::get('/customer/my-orders/return-refund', fn () => view('customer.profile.purchase.return_refund'))->name('customer.my_purchase.return_refund');
 Route::get('/customer/pay-remaining-balance/{order}', function (\App\Models\Order $order) {
     // Ensure the order belongs to the authenticated user
-    if (!$order || $order->customer_id !== auth()->user()->customer->id ?? null) {
-        abort(404);
+    $customerId = auth()->user()->customer->customer_id ?? null;
+    
+    if (!$customerId || $order->customer_id !== $customerId) {
+        abort(404, 'Order not found or does not belong to you.');
     }
+    
     return view('customer.orderflow.pay-remaining-balance', compact('order'));
 })->middleware('auth')->name('customer.pay.remaining.balance');
 
@@ -697,7 +703,7 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
 
 Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
     // Staff routes - updated for order list functionality
-    Route::get('/dashboard', fn () => view('staff.dashboard'))->name('dashboard');
+    Route::get('/dashboard', [StaffDashboardController::class, 'index'])->name('dashboard');
     Route::get('/assigned-orders', [StaffAssignedController::class, 'index'])->name('assigned.orders');
     Route::get('/order-list', [StaffOrderController::class, 'index'])->name('order_list.index');
     Route::get('/order-list/{id}', [StaffOrderController::class, 'show'])->name('order_list.show');
@@ -723,6 +729,8 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
     Route::post('/orders/{order}/update-status', [StaffAssignedController::class, 'updateStatus'])->name('orders.updateStatus');
     Route::get('/customers', [StaffCustomerController::class, 'index'])
         ->name('customer_profile'); 
+    Route::get('/customers/{id}', [StaffCustomerController::class, 'show'])
+        ->name('customer_profile.show'); 
 
     Route::get('/materials/notification', [StaffMaterialController::class, 'notification'])
      ->name('materials.notification');

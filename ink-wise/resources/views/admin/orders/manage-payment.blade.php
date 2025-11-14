@@ -471,9 +471,9 @@
     <section class="payment-card">
         <header class="payment-card__header">
             <div>
-                <h1>Manage payment transaction</h1>
+                <h1>Payment details</h1>
                 <p class="payment-card__subtitle">
-                    Track and update payment status for this order
+                    View payment status and transaction history for this order
                 </p>
             </div>
             <span class="payment-status-chip payment-status-chip--{{ $currentPaymentChipModifier }}">
@@ -510,22 +510,6 @@
         </div>
     </section>
 
-    @if(session('success'))
-        <div class="payment-alert payment-alert--success" role="alert">
-            {{ session('success') }}
-        </div>
-    @endif
-
-    @if($errors->any())
-        <div class="payment-alert payment-alert--danger" role="alert">
-            <ul style="margin: 0; padding-left: 20px;">
-                @foreach($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </div>
-    @endif
-
     <section class="transaction-history-card">
         <header class="transaction-history-card__header">
             <div>
@@ -556,35 +540,6 @@
             @endforelse
         </div>
     </section>
-
-    <form method="POST" action="{{ route('admin.orders.payment.update', $order) }}" class="payment-form-card payment-form">
-        @csrf
-        @method('PUT')
-
-        <div class="form-row">
-            <div>
-                <label for="payment_status">Payment status</label>
-                <select id="payment_status" name="payment_status" required>
-                    @foreach($paymentStatusOptions as $value => $label)
-                        <option value="{{ $value }}" {{ $currentPaymentStatus === $value ? 'selected' : '' }}>
-                            {{ $label }}
-                        </option>
-                    @endforeach
-                </select>
-                <span class="hint">Update the payment status based on transaction confirmation.</span>
-            </div>
-        </div>
-
-        <div class="form-row">
-            <div>
-                <label for="payment_note">Payment note</label>
-                <textarea id="payment_note" name="payment_note" rows="3" placeholder="Add any notes about this payment transaction...">{{ $paymentNote }}</textarea>
-                <span class="hint">Optional notes about the payment (e.g., reference numbers, transaction details).</span>
-            </div>
-        </div>
-
-        <button type="submit">Update payment status</button>
-    </form>
 
     <section class="payment-info-grid">
         <article class="payment-info-card">

@@ -13,10 +13,23 @@ class RoleMiddleware
     public function handle($request, Closure $next, $role)
     {
         if (!Auth::check()) {
+            // Redirect to appropriate login page based on expected role
+            if ($role === 'customer') {
+                return redirect()->route('customer.login.form')
+                    ->withErrors(['error' => '❌ Please log in to access this page.']);
+            }
             return redirect('/login');
         }
 
         if (Auth::user()->role !== $role) {
+            // Log out the user and redirect to appropriate login
+            Auth::logout();
+            
+            if ($role === 'customer') {
+                return redirect()->route('customer.login.form')
+                    ->withErrors(['error' => '❌ You must be logged in as a customer to access this page.']);
+            }
+            
             return redirect('/unauthorized'); // you can make a custom 403 page
         }
 

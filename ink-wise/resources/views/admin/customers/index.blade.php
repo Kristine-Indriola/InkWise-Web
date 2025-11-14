@@ -5,6 +5,19 @@
 @push('styles')
     <link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
     <link rel="stylesheet" href="{{ asset('css/admin-css/customer.css') }}">
+    <style>
+        .clickable-row {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .clickable-row:hover {
+            background-color: rgba(79, 70, 229, 0.05);
+            transform: scale(1.005);
+        }
+        .clickable-row:active {
+            background-color: rgba(79, 70, 229, 0.1);
+        }
+    </style>
 @endpush
 
 @section('content')
@@ -58,8 +71,8 @@
                                 $profile->last_name ?? null,
                             ])->filter()->implode(' ');
                         @endphp
-                        <tr>
-                            <td>{{ $customer->id }}</td>
+                        <tr class="clickable-row" data-href="{{ route('admin.customers.show', $customer->user_id) }}" role="button" tabindex="0">
+                            <td>{{ $customer->user_id }}</td>
                             <td>
                                 <span class="customer-avatar" aria-hidden="true">
                                     <img src="{{ $avatar }}" alt="{{ $fullName ?: 'Customer avatar' }}">
@@ -102,3 +115,24 @@
     </section>
 </main>
 @endsection
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Make table rows clickable
+            document.querySelectorAll('.clickable-row').forEach(function(row) {
+                row.addEventListener('click', function() {
+                    window.location.href = this.dataset.href;
+                });
+                
+                // Handle keyboard navigation
+                row.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        window.location.href = this.dataset.href;
+                    }
+                });
+            });
+        });
+    </script>
+@endpush

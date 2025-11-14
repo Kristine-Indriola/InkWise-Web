@@ -127,7 +127,8 @@
 
 .reports-panel canvas {
     width: 100%;
-    min-height: 320px;
+    min-height: 220px;
+    max-height: 280px;
 }
 
 .reports-panel__header {

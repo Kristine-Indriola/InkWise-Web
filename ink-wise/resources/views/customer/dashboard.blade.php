@@ -775,7 +775,7 @@
   
    {{-- If not logged in --}}
 @guest
-     <a href="{{ route('customer.login') }}"
+     <a href="{{ route('customer.login.form') }}"
          id="openLogin"
          class="btn-pill btn-primary animate-ocean focus-ring">
        Sign in
@@ -1115,7 +1115,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     })();
 
-    // Show login modal if password was just reset or login requested
+    // Show login modal if password was just reset, login requested, or login failed
     @if(session('status') && str_contains(session('status'), 'Password reset successfully'))
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -1127,6 +1127,16 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     </script>
     @elseif(request('show_login'))
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var loginModal = document.getElementById('loginModal');
+            if (loginModal) {
+                loginModal.classList.remove('hidden');
+                loginModal.classList.add('flex');
+            }
+        });
+    </script>
+    @elseif(session('show_login_modal') || $errors->has('email') || $errors->has('password'))
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             var loginModal = document.getElementById('loginModal');

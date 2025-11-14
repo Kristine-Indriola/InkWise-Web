@@ -58,6 +58,21 @@
         display: flex;
         align-items: center;
         gap: 16px;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+        border-color: #3b82f6;
+    }
+
+    .stat-card.active {
+        border-color: #3b82f6;
+        border-width: 2px;
+        background: #eff6ff;
     }
 
     .stat-card__icon {
@@ -88,6 +103,11 @@
 
     .stat-card__icon--overdue {
         background: linear-gradient(135deg, #ef4444, #dc2626);
+        color: white;
+    }
+
+    .stat-card__icon--partial {
+        background: linear-gradient(135deg, #8b5cf6, #7c3aed);
         color: white;
     }
 
@@ -322,16 +342,16 @@
 
 @section('content')
 @php
-    // Calculate payment statistics
-    $totalOrders = $orders->total();
-    $paidOrders = $orders->where('payment_status', 'paid')->count();
-    $pendingOrders = $orders->where('payment_status', 'pending')->count();
-    $failedOrders = $orders->where('payment_status', 'failed')->count();
-
-    // Calculate total amounts
-    $totalAmount = $orders->sum('total_amount');
-    $paidAmount = $orders->where('payment_status', 'paid')->sum('total_amount');
-    $pendingAmount = $orders->where('payment_status', 'pending')->sum('total_amount');
+    // Use statistics from controller
+    $totalOrders = $statistics->total_orders ?? 0;
+    $paidOrders = $statistics->paid_orders ?? 0;
+    $pendingOrders = $statistics->pending_orders ?? 0;
+    $failedOrders = $statistics->failed_orders ?? 0;
+    $partialOrders = $partialPayments ?? 0;
+    $totalAmount = $statistics->total_amount ?? 0;
+    $paidAmount = $statistics->paid_amount ?? 0;
+    $pendingAmount = $statistics->pending_amount ?? 0;
+    $currentFilter = $filter ?? null;
 @endphp
 
 <main class="payments-shell">
@@ -340,7 +360,7 @@
     </header>
 
     <section class="payments-stats">
-        <div class="stat-card">
+        <a href="{{ route('admin.payments.index') }}" class="stat-card {{ !$currentFilter ? 'active' : '' }}">
             <div class="stat-card__icon stat-card__icon--total">
                 <i class="fas fa-shopping-cart"></i>
             </div>
@@ -348,9 +368,9 @@
                 <h3>{{ number_format($totalOrders) }}</h3>
                 <p>Total Orders</p>
             </div>
-        </div>
+        </a>
 
-        <div class="stat-card">
+        <a href="{{ route('admin.payments.index', ['filter' => 'paid']) }}" class="stat-card {{ $currentFilter === 'paid' ? 'active' : '' }}">
             <div class="stat-card__icon stat-card__icon--paid">
                 <i class="fas fa-check-circle"></i>
             </div>
@@ -358,9 +378,9 @@
                 <h3>{{ number_format($paidOrders) }}</h3>
                 <p>Paid Orders</p>
             </div>
-        </div>
+        </a>
 
-        <div class="stat-card">
+        <a href="{{ route('admin.payments.index', ['filter' => 'pending']) }}" class="stat-card {{ $currentFilter === 'pending' ? 'active' : '' }}">
             <div class="stat-card__icon stat-card__icon--pending">
                 <i class="fas fa-clock"></i>
             </div>
@@ -368,9 +388,19 @@
                 <h3>{{ number_format($pendingOrders) }}</h3>
                 <p>Pending Payments</p>
             </div>
-        </div>
+        </a>
 
-        <div class="stat-card">
+        <a href="{{ route('admin.payments.index', ['filter' => 'partial']) }}" class="stat-card {{ $currentFilter === 'partial' ? 'active' : '' }}">
+            <div class="stat-card__icon stat-card__icon--partial">
+                <i class="fas fa-coins"></i>
+            </div>
+            <div class="stat-card__content">
+                <h3>{{ number_format($partialOrders) }}</h3>
+                <p>Partial Payments</p>
+            </div>
+        </a>
+
+        <a href="{{ route('admin.payments.index', ['filter' => 'failed']) }}" class="stat-card {{ $currentFilter === 'failed' ? 'active' : '' }}">
             <div class="stat-card__icon stat-card__icon--overdue">
                 <i class="fas fa-exclamation-triangle"></i>
             </div>
@@ -378,7 +408,7 @@
                 <h3>{{ number_format($failedOrders) }}</h3>
                 <p>Failed Payments</p>
             </div>
-        </div>
+        </a>
     </section>
 
     <section class="payments-table-container">
