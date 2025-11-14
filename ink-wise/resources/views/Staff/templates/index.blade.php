@@ -610,6 +610,23 @@
             </div>
         @endif
 
+        @if(session('template_import_warnings'))
+            @php
+                $warnings = (array) session('template_import_warnings');
+                $warnings = array_filter($warnings, fn($message) => !empty($message));
+            @endphp
+            @if(count($warnings))
+                <div class="alert alert-warning" role="status">
+                    <strong>Heads up:</strong>
+                    <ul class="mt-2" style="margin-bottom:0;padding-left:18px;">
+                        @foreach($warnings as $warning)
+                            <li>{{ $warning }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+        @endif
+
     @if((empty($previewTemplates) || count($previewTemplates) === 0) && $templates->isEmpty())
             <div class="empty-state mt-gap">
                 <div class="empty-state-icon">
@@ -627,11 +644,19 @@
                             <div class="template-preview">
                                 @if(!empty($preview['front_image']))
                                     <img src="{{ \App\Support\ImageResolver::url($preview['front_image']) }}" alt="Preview of {{ $preview['name'] }}">
+                                @elseif(!empty($preview['front_svg_content']))
+                                    <div class="svg-preview-container" style="width:100%;height:200px;display:flex;align-items:center;justify-content:center;border:1px solid #d1d5db;background:#fff;">
+                                        {!! $preview['front_svg_content'] !!}
+                                    </div>
                                 @else
                                     <span>No preview</span>
                                 @endif
                                 @if(!empty($preview['back_image']))
                                     <img src="{{ \App\Support\ImageResolver::url($preview['back_image']) }}" alt="Back of {{ $preview['name'] }}" class="back-thumb">
+                                @elseif(!empty($preview['back_svg_content']))
+                                    <div class="svg-preview-container back-thumb" style="width:60px;height:60px;display:flex;align-items:center;justify-content:center;border:1px solid #d1d5db;background:#fff;position:absolute;bottom:8px;right:8px;">
+                                        {!! $preview['back_svg_content'] !!}
+                                    </div>
                                 @endif
                             </div>
                             <div class="template-info">
@@ -670,14 +695,74 @@
                             @php
                                 $front = $template->front_image ?? $template->preview;
                                 $back = $template->back_image ?? null;
+                                
+                                // Check if front image is an SVG file
+                                $isSvgFront = $template->svg_path || ($front && str_ends_with(strtolower($front), '.svg'));
+                                $isSvgBack = $template->back_svg_path || ($back && str_ends_with(strtolower($back), '.svg'));
                             @endphp
                             @if($front)
-                                <img src="{{ \App\Support\ImageResolver::url($front) }}" alt="Preview of {{ $template->name }}">
+                                @if($isSvgFront)
+                                    @php
+                                        // Read SVG content from file
+                                        $svgPath = $template->svg_path ?? $front;
+                                        $svgContent = '';
+                                        try {
+                                            $svgContent = \Illuminate\Support\Facades\Storage::disk('public')->get($svgPath);
+                                        } catch (\Exception $e) {
+                                            $svgContent = '<div class="svg-error">SVG not found</div>';
+                                        }
+                                    @endphp
+                                    @php
+                                        if (is_string($svgContent)) {
+                                            // Strip XML declarations that break inline rendering in HTML
+                                            $trimmed = ltrim($svgContent);
+                                            if (strpos($trimmed, '<?xml') === 0) {
+                                                $svgContent = preg_replace('/^<\?xml[^>]+>\s*/', '', $trimmed);
+                                            }
+                                            if (strpos(ltrim($svgContent), '<!DOCTYPE') === 0) {
+                                                $svgContent = preg_replace('/^<!DOCTYPE[^>]+>\s*/i', '', ltrim($svgContent));
+                                            }
+                                        }
+                                    @endphp
+                                    <div class="svg-preview-container" style="width:100%;height:200px;display:flex;align-items:center;justify-content:center;border:1px solid #d1d5db;background:#fff;">
+                                        {!! $svgContent !!}
+                                    </div>
+                                @else
+                                    <img src="{{ \App\Support\ImageResolver::url($front) }}" alt="Preview of {{ $template->name }}">
+                                @endif
                             @else
                                 <span>No preview</span>
                             @endif
                             @if($back)
-                                <img src="{{ \App\Support\ImageResolver::url($back) }}" alt="Back of {{ $template->name }}" class="back-thumb">
+                                @if($isSvgBack)
+                                    @php
+                                        // Read SVG content from file for back
+                                        $backSvgPath = $template->back_svg_path ?? $back;
+                                        $backSvgContent = '';
+                                        try {
+                                            $backSvgContent = \Illuminate\Support\Facades\Storage::disk('public')->get($backSvgPath);
+                                        } catch (\Exception $e) {
+                                            $backSvgContent = '<div class="svg-error">SVG not found</div>';
+                                        }
+                                    @endphp
+                                    @php
+                                        if (is_string($backSvgContent)) {
+                                            // Strip XML declarations that break inline rendering in HTML
+                                            $trimmedBack = ltrim($backSvgContent);
+                                            if (strpos($trimmedBack, '<?xml') === 0) {
+                                                $backSvgContent = preg_replace('/^<\?xml[^>]+>\s*/', '', $trimmedBack);
+                                            }
+                                            if (strpos(ltrim($backSvgContent), '<!DOCTYPE') === 0) {
+                                                $backSvgContent = preg_replace('/^<!DOCTYPE[^>]+>\s*/i', '', ltrim($backSvgContent));
+                                            }
+                                        }
+                                    @endphp
+                                    <div class="svg-preview-container back-thumb" style="width:60px;height:60px;display:flex;align-items:center;justify-content:center;border:1px solid #d1d5db;background:#fff;position:absolute;bottom:8px;right:8px;">
+                                        {!! $backSvgContent !!}
+                                    </div>
+                                @else
+                                    <img src="{{ \App\Support\ImageResolver::url($back) }}" alt="Back of {{ $template->name }}" class="back-thumb">
+                                @endif
                             @endif
                         </div>
                         <div class="template-info">
@@ -696,6 +781,9 @@
                             <div class="action-buttons">
                                 <a href="{{ route('staff.templates.edit', $template->id) }}" class="btn-action btn-edit" title="Edit Template Details">
                                     Edit
+                                </a>
+                                <a href="{{ route('staff.templates.editor', $template->id) }}" class="btn-action btn-editor" title="Open in Editor">
+                                    Editor
                                 </a>
                                 <button type="button" class="btn-action btn-upload upload-template-btn"
                                         data-template-id="{{ $template->id }}"

@@ -122,7 +122,7 @@ class TemplateController extends Controller
             $rules['back_image'] = 'file|mimes:jpeg,png,jpg,gif,svg|max:5120';
         }
 
-        $validated = $request->validate($rules);
+    $validated = $request->validate($rules);
 
         // Handle front image upload
         if ($request->hasFile('front_image')) {
@@ -177,88 +177,67 @@ class TemplateController extends Controller
             'product_type' => 'nullable|string|max:255',
             'theme_style' => 'nullable|string|max:255',
             'description' => 'nullable|string',
+            'template_video' => 'nullable|file|mimes:mp4,mov,avi,webm|max:51200',
         ];
 
-        // Check if this is a Figma import (has SVG content or Figma URL)
-        $isFigmaImport = $request->filled('front_svg_content') || $request->filled('back_svg_content') || $request->filled('figma_url');
-
-        // Make file uploads optional, but ensure at least one design source is provided
+        // Require at least one design file
         if ($type === 'invitation') {
-            $rules['front_image'] = 'nullable|file|mimes:jpeg,png,jpg,gif,svg|max:5120';
+            $rules['front_image'] = 'required|file|mimes:jpeg,png,jpg,gif,svg|max:5120';
             $rules['back_image'] = 'nullable|file|mimes:jpeg,png,jpg,gif,svg|max:5120';
         } else {
-            $rules['front_image'] = 'nullable|file|mimes:svg,svg+xml,image/svg+xml,svgz|max:5120';
+            $rules['front_image'] = 'required|file|mimes:svg,svg+xml,image/svg+xml,svgz|max:5120';
         }
 
         $validated = $request->validate($rules);
 
-        // Custom validation: Ensure at least one design source is provided
-        $hasManualUpload = $request->hasFile('front_image') || ($type === 'invitation' && $request->hasFile('back_image'));
-        $hasFigmaContent = $request->filled('front_svg_content') || ($type === 'invitation' && $request->filled('back_svg_content'));
-
-        if (!$hasManualUpload && !$hasFigmaContent) {
-            return back()->withErrors(['design' => 'Please provide at least one design source: upload files manually or import from Figma.']);
-        }
-
-        // Handle front image upload or SVG content from Figma
+        // Handle front image upload
         if ($request->hasFile('front_image')) {
             $frontImagePath = $request->file('front_image')->store('templates', 'public');
             $validated['front_image'] = $frontImagePath;
-        } elseif ($request->filled('front_svg_content')) {
-            // Handle Figma SVG content
-            $frontSvgContent = $request->input('front_svg_content');
-            $filename = 'figma_front_' . uniqid() . '.svg';
-            $frontImagePath = 'templates/' . $filename;
-            Storage::disk('public')->put($frontImagePath, $frontSvgContent);
-            $validated['front_image'] = $frontImagePath;
         }
 
-        // Handle back image upload or SVG content from Figma
+        // Handle back image upload
         if ($request->hasFile('back_image')) {
             $backImagePath = $request->file('back_image')->store('templates', 'public');
-            $validated['back_image'] = $backImagePath;
-        } elseif ($request->filled('back_svg_content')) {
-            // Handle Figma SVG content
-            $backSvgContent = $request->input('back_svg_content');
-            $filename = 'figma_back_' . uniqid() . '.svg';
-            $backImagePath = 'templates/' . $filename;
-            Storage::disk('public')->put($backImagePath, $backSvgContent);
             $validated['back_image'] = $backImagePath;
         } else {
             // For giveaway/envelope, back_image may be absent; keep it null
             $validated['back_image'] = $validated['back_image'] ?? null;
         }
 
-        // Store Figma metadata if available
-        if ($request->filled('figma_url') && $request->filled('figma_file_key')) {
-            $validated['figma_url'] = $request->input('figma_url');
-            $validated['figma_file_key'] = $request->input('figma_file_key');
-            $validated['figma_synced_at'] = now();
+        // Handle optional template preview video
+        $videoPath = null;
+        if ($request->hasFile('template_video')) {
+            $videoPath = $request->file('template_video')->store('templates/videos', 'public');
+        }
+
+        if ($videoPath) {
+            $metadata = [];
+            if (isset($validated['metadata']) && is_array($validated['metadata'])) {
+                $metadata = $validated['metadata'];
+            }
+            $metadata['preview_video'] = $videoPath;
+            $validated['metadata'] = $metadata;
         }
 
         $template = \App\Models\Template::create($validated);
-
-        if ($request->expectsJson() || $request->ajax()) {
-            // Determine if this is admin or staff route
-            $isStaff = str_contains(request()->route()->getPrefix(), 'staff');
-            // TEMPORARY: Force staff routes for debugging
-            $isStaff = true;
-            $redirectRoute = $isStaff ? 'staff.templates.index' : 'admin.templates.index';
-
-            return response()->json([
-                'success' => true,
-                'template_id' => $template->id,
-                'redirect' => route($redirectRoute),
-            ]);
-        }
 
         // Determine if this is admin or staff route
         $isStaff = str_contains(request()->route()->getPrefix(), 'staff');
         // TEMPORARY: Force staff routes for debugging
         $isStaff = true;
-        $redirectRoute = $isStaff ? 'staff.templates.index' : 'admin.templates.index';
+        $editorRouteName = $isStaff ? 'staff.templates.editor' : 'admin.templates.editor';
+        $redirectUrl = route($editorRouteName, $template->id);
 
-        return redirect()->route($redirectRoute)->with('success', 'Created successfully');
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'template_id' => $template->id,
+                'redirect' => $redirectUrl,
+            ]);
+        }
+
+        return redirect()->route($editorRouteName, $template->id)->with('success', 'Template created. You can continue editing it now.');
     }
 
     // Show editor page for a template
@@ -340,6 +319,54 @@ public function uploadPreview(Request $request, $id)
 
     return response()->json(['success' => true, 'preview' => $filename]);
 }
+
+    public function autosave(Request $request, $id)
+    {
+        $template = Template::findOrFail($id);
+
+        $validated = $request->validate([
+            'design' => 'required|array',
+            'canvas' => 'nullable|array',
+            'template_name' => 'nullable|string|max:255',
+        ]);
+
+        Log::info('Template autosave request received', [
+            'template_id' => $template->id,
+            'user_id' => optional($request->user())->id,
+            'design_pages' => is_array($validated['design']['pages'] ?? null)
+                ? count($validated['design']['pages'])
+                : null,
+        ]);
+
+        $designPayload = $validated['design'];
+
+        $template->design = json_encode($designPayload, JSON_UNESCAPED_UNICODE);
+
+        if (!empty($validated['template_name'])) {
+            $template->name = $validated['template_name'];
+        }
+
+        if (array_key_exists('canvas', $validated)) {
+            $metadata = $template->metadata ?? [];
+            if (!is_array($metadata)) {
+                $metadata = (array) $metadata;
+            }
+            $metadata['builder_canvas'] = $validated['canvas'];
+            $template->metadata = $metadata;
+        }
+
+        $template->save();
+
+        Log::info('Template autosave persisted', [
+            'template_id' => $template->id,
+            'updated_at' => optional($template->updated_at)->toIso8601String(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'saved_at' => optional($template->updated_at)->toIso8601String(),
+        ]);
+    }
 
     // Handle custom front/back template upload from the Templates UI
     public function customUpload(Request $request)
@@ -514,16 +541,22 @@ public function uploadToProduct(Request $request, $id)
         $h = intval($request->input('height', 0));
         $shape = $request->input('shape', 'rectangle');
 
-        $design = json_decode($template->design, true) ?: [];
-        $design['canvas'] = array_merge($design['canvas'] ?? [], [
+        // Since design column was removed, store canvas settings in metadata instead
+        $metadata = $template->metadata ?? [];
+        if (!is_array($metadata)) {
+            $metadata = json_decode($metadata, true) ?? [];
+        }
+
+        $metadata['canvas'] = [
             'width' => $w,
             'height' => $h,
             'shape' => $shape,
-        ]);
-        $template->design = json_encode($design);
+        ];
+
+        $template->metadata = json_encode($metadata);
         $template->save();
 
-        return response()->json(['success' => true, 'canvas' => $design['canvas']]);
+        return response()->json(['success' => true, 'canvas' => $metadata['canvas']]);
     }
 
     // Search assets (images, videos, elements) under storage/public/assets/{type}
@@ -579,7 +612,7 @@ public function uploadToProduct(Request $request, $id)
             'front_image' => $template->front_image,
             'back_image' => $template->back_image,
             'preview_image' => $template->preview,
-            'design_data' => $template->design,
+            'design_data' => $template->metadata, // Use metadata instead of design
         ]);
 
         // Update template status to uploaded
@@ -616,45 +649,41 @@ public function uploadToProduct(Request $request, $id)
             'product_type' => 'nullable|string|max:255',
             'theme_style' => 'nullable|string|max:255',
             'description' => 'nullable|string',
+            'template_video' => 'nullable|file|mimes:mp4,mov,avi,webm|max:51200', // 50MB max for video
+            'front_image' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg|max:5120',
+            'back_image' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg|max:5120',
         ];
-
-        // Check if this is a Figma import
-        $isFigmaImport = $request->filled('front_svg_content') || $request->filled('back_svg_content');
-
-        // For Figma imports, SVG content is required
-        if ($isFigmaImport) {
-            if (!$request->filled('front_svg_content') && !$request->filled('back_svg_content')) {
-                return back()->withErrors(['svg_content' => 'At least one SVG design (front or back) is required for Figma imports.']);
-            }
-        }
 
         $validated = $request->validate($rules);
 
-        // Add SVG content if present
-        if ($request->filled('front_svg_content')) {
-            $validated['front_svg_content'] = $request->input('front_svg_content');
-        }
-        if ($request->filled('back_svg_content')) {
-            $validated['back_svg_content'] = $request->input('back_svg_content');
+        // Handle file uploads and store temporarily
+        $previewData = $validated;
+
+        // Store video file temporarily
+        if ($request->hasFile('template_video')) {
+            $videoPath = $request->file('template_video')->store('temp/previews/videos', 'public');
+            $previewData['template_video_path'] = $videoPath;
+            $previewData['template_video_name'] = $request->file('template_video')->getClientOriginalName();
         }
 
-        // Add Figma metadata if present
-        if ($request->filled('figma_url')) {
-            $validated['figma_url'] = $request->input('figma_url');
-        }
-        if ($request->filled('figma_file_key')) {
-            $validated['figma_file_key'] = $request->input('figma_file_key');
+        // Store front image temporarily
+        if ($request->hasFile('front_image')) {
+            $frontPath = $request->file('front_image')->store('temp/previews/images', 'public');
+            $previewData['front_image_path'] = $frontPath;
+            $previewData['front_image_name'] = $request->file('front_image')->getClientOriginalName();
         }
 
-        // Add design data if present
-        if ($request->filled('design')) {
-            $validated['design'] = $request->input('design');
+        // Store back image temporarily
+        if ($request->hasFile('back_image')) {
+            $backPath = $request->file('back_image')->store('temp/previews/images', 'public');
+            $previewData['back_image_path'] = $backPath;
+            $previewData['back_image_name'] = $request->file('back_image')->getClientOriginalName();
         }
 
         // Store in session with a unique ID
         $previewId = uniqid('preview_');
         $previews = session('preview_templates', []);
-        $previews[$previewId] = array_merge($validated, [
+        $previews[$previewId] = array_merge($previewData, [
             'id' => $previewId,
             'created_at' => now(),
         ]);
@@ -684,25 +713,42 @@ public function uploadToProduct(Request $request, $id)
             'product_type' => $previewData['product_type'] ?? 'Invitation',
             'theme_style' => $previewData['theme_style'] ?? null,
             'description' => $previewData['description'] ?? null,
-            'design' => $previewData['design'] ?? '{}',
-            'figma_url' => $previewData['figma_url'] ?? null,
-            'figma_file_key' => $previewData['figma_file_key'] ?? null,
-            'figma_synced_at' => isset($previewData['figma_url']) ? now() : null,
         ]);
 
-        // Handle SVG content storage
-        if (isset($previewData['front_svg_content'])) {
-            $filename = 'figma_front_' . uniqid() . '.svg';
-            $frontImagePath = 'templates/' . $filename;
-            Storage::disk('public')->put($frontImagePath, $previewData['front_svg_content']);
-            $template->front_image = $frontImagePath;
+        // Prepare metadata array for additional preview assets
+
+        $metadata = $template->metadata ?? [];
+        if (!is_array($metadata)) {
+            $metadata = (array) $metadata;
         }
 
-        if (isset($previewData['back_svg_content'])) {
-            $filename = 'figma_back_' . uniqid() . '.svg';
-            $backImagePath = 'templates/' . $filename;
-            Storage::disk('public')->put($backImagePath, $previewData['back_svg_content']);
-            $template->back_image = $backImagePath;
+        // Handle file storage - move from temp to permanent location
+        if (isset($previewData['template_video_path'])) {
+            $videoPath = str_replace('temp/previews/videos/', 'templates/videos/', $previewData['template_video_path']);
+            if (Storage::disk('public')->exists($previewData['template_video_path'])) {
+                Storage::disk('public')->move($previewData['template_video_path'], $videoPath);
+                $metadata['preview_video'] = $videoPath;
+            }
+        }
+
+        if (isset($previewData['front_image_path'])) {
+            $frontPath = str_replace('temp/previews/images/', 'templates/', $previewData['front_image_path']);
+            if (Storage::disk('public')->exists($previewData['front_image_path'])) {
+                Storage::disk('public')->move($previewData['front_image_path'], $frontPath);
+                $template->front_image = $frontPath;
+            }
+        }
+
+        if (isset($previewData['back_image_path'])) {
+            $backPath = str_replace('temp/previews/images/', 'templates/', $previewData['back_image_path']);
+            if (Storage::disk('public')->exists($previewData['back_image_path'])) {
+                Storage::disk('public')->move($previewData['back_image_path'], $backPath);
+                $template->back_image = $backPath;
+            }
+        }
+
+        if (!empty($metadata)) {
+            $template->metadata = $metadata;
         }
 
         $template->save();
@@ -711,15 +757,20 @@ public function uploadToProduct(Request $request, $id)
         unset($previews[$previewId]);
         session(['preview_templates' => $previews]);
 
+        $isStaff = str_contains(request()->route()->getPrefix(), 'staff');
+        $isStaff = true;
+        $editorRouteName = $isStaff ? 'staff.templates.editor' : 'admin.templates.editor';
+        $redirectUrl = route($editorRouteName, $template->id);
+
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
                 'template_id' => $template->id,
-                'redirect' => route('staff.templates.index'),
+                'redirect' => $redirectUrl,
             ]);
         }
 
-        return redirect()->route('staff.templates.index')->with('success', 'Template created successfully');
+        return redirect()->route($editorRouteName, $template->id)->with('success', 'Template created successfully. You can continue editing it now.');
     }
 
     // Remove a preview from session

@@ -318,7 +318,21 @@
             
             // Update preview with front SVG (envelopes typically only have front)
             if (preview.front_svg && previewContainer) {
-                previewContainer.innerHTML = preview.front_svg;
+                // Clean SVG content for inline HTML display
+                let svgContent = preview.front_svg;
+                if (typeof svgContent === 'string') {
+                    // Strip XML declarations that break inline rendering in HTML
+                    let trimmed = svgContent.trim();
+                    if (trimmed.startsWith('<?xml')) {
+                        trimmed = trimmed.replace(/^<\?xml[^>]+>\s*/, '');
+                    }
+                    if (trimmed.trim().startsWith('<!DOCTYPE')) {
+                        trimmed = trimmed.replace(/^<!DOCTYPE[^>]+>\s*/i, '');
+                    }
+                    svgContent = trimmed;
+                }
+
+                previewContainer.innerHTML = svgContent;
                 previewContainer.style.display = 'flex';
                 previewContainer.style.alignItems = 'center';
                 previewContainer.style.justifyContent = 'center';
