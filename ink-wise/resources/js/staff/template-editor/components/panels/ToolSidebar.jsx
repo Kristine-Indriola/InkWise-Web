@@ -185,94 +185,17 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       downloadUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/user.svg',
       description: 'User',
       provider: 'default',
-      const fonts = styledFontsListRef.current.length > 0 ? styledFontsListRef.current : [
-        { family: 'Inter' }, { family: 'Roboto' }, { family: 'Montserrat' }, { family: 'Poppins' }, { family: 'Playfair Display' }, { family: 'Lato' }, { family: 'Merriweather' }, { family: 'Crimson Text' }
-      ];
-
-      const start = (styledPage - 1) * styledPerPage;
-      const slice = fonts.slice(start, start + styledPerPage);
-
-      // Build a pool of unique short phrases/words without repeating words across presets
-      const wordPool = new Set();
-      // Seed from sampleStyledTexts but split into words and keep short phrases
-      sampleStyledTexts.forEach((phrase) => {
-        const pieces = String(phrase).split(/\s+/).map(p => p.replace(/[^\w'-]/g, '')).filter(Boolean);
-        // Add whole phrase if short, otherwise add individual words
-        if (pieces.length <= 3 && phrase.length <= 24) {
-          wordPool.add(phrase);
-        }
-        pieces.forEach((w) => {
-          if (w && w.length <= 14) wordPool.add(w);
-        });
-      });
-      // Add some extra single-word options to increase variety
-      [
-        'Exclusive','New','Limited','Now','Today','Free','Pro','Bold','Fresh','Simple','Studio','Idea','Spark','Design','Create','Launch','Dream','Vision','Style','Trend','Modern','Classic','Urban','Vintage','Handmade','Elegant','Bright','Clean','Minimal','Edge','Pulse'
-      ].forEach(w => wordPool.add(w));
-
-      const poolArray = Array.from(wordPool);
-      const usedContents = new Set(styledPresets.map(p => p.content));
-      const usedStyleKeys = new Set();
-
-      const fontSizes = [18, 20, 24, 28, 32, 36, 44];
-      const weights = ['300','400','500','600','700','800'];
-      const aligns = ['center','left','right'];
-      const transforms = ['none','uppercase','lowercase','capitalize'];
-      const extras = ['',' italic',' smallcaps'];
-
-      const newPresets = [];
-      let poolIndex = 0;
-
-      // For each font in slice, create one or two unique presets per font
-      for (let fIdx = 0; fIdx < slice.length; fIdx++) {
-        const font = slice[fIdx];
-        const presetsPerFont = 2;
-        for (let k = 0; k < presetsPerFont; k++) {
-          // pick next unique content from pool
-          let attempts = 0;
-          let content = null;
-          while (attempts < poolArray.length) {
-            const candidate = poolArray[poolIndex % poolArray.length];
-            poolIndex++;
-            attempts++;
-            if (!usedContents.has(candidate)) {
-              content = candidate;
-              usedContents.add(candidate);
-              break;
-            }
-          }
-          if (!content) {
-            // fallback: combine two random unique words
-            const a = poolArray[Math.floor(Math.random()*poolArray.length)] || 'Text';
-            const b = poolArray[Math.floor(Math.random()*poolArray.length)] || 'Sample';
-            content = `${a} ${b}`.slice(0, 30);
-          }
-
-          const fontSize = fontSizes[(start + fIdx + k) % fontSizes.length];
-          const fontWeight = weights[(start + fIdx + k) % weights.length];
-          const align = aligns[(start + fIdx + k) % aligns.length];
-          const transform = transforms[(start + fIdx + k) % transforms.length];
-          const extra = extras[(start + fIdx + k) % extras.length];
-
-          const styleKey = `${font.family}::${fontWeight}::${fontSize}::${align}::${transform}::${content}`;
-          if (usedStyleKeys.has(styleKey)) continue;
-          usedStyleKeys.add(styleKey);
-
-          newPresets.push({
-            id: `styled-${font.family.replace(/\s+/g, '-').toLowerCase()}-${start + fIdx}-${k}`,
-            family: font.family,
-            content: content + extra,
-            fontSize,
-            fontWeight,
-            align,
-            transform,
-          });
-        }
-      }
-
-      setStyledPresets((prev) => [...prev, ...newPresets]);
-      setStyledPage(styledPage + 1);
-      setHasMoreStyledPresets(start + styledPerPage < fonts.length || usedContents.size < poolArray.length);
+      providerLabel: 'Simple Icons',
+      credit: 'Simple Icons',
+    },
+  ]);
+  const [isSearchingIcons, setIsSearchingIcons] = useState(false);
+  const [iconCurrentPage, setIconCurrentPage] = useState(1);
+  const [isLoadingMoreIcons, setIsLoadingMoreIcons] = useState(false);
+  const [hasMoreIcons, setHasMoreIcons] = useState(true);
+  const iconCurrentPageRef = useRef(1);
+  const activeIconSearchQueryRef = useRef('');
+  const hasTriggeredIconSearchRef = useRef(false);
   const [fontSearchQuery, setFontSearchQuery] = useState('');
   const [fontSearchResults, setFontSearchResults] = useState([]);
   const [isSearchingFonts, setIsSearchingFonts] = useState(false);
