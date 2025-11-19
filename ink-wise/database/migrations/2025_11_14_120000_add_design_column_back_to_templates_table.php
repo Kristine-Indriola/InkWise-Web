@@ -11,11 +11,19 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('templates', function (Blueprint $table) {
-            if (!Schema::hasColumn('templates', 'design')) {
-                $table->longText('design')->nullable()->after('metadata');
-            }
-        });
+        if (!Schema::hasColumn('templates', 'metadata')) {
+            Schema::table('templates', function (Blueprint $table) {
+                $table->json('metadata')->nullable()->after('status');
+            });
+        }
+
+        if (!Schema::hasColumn('templates', 'design')) {
+            $afterColumn = Schema::hasColumn('templates', 'metadata') ? 'metadata' : 'status';
+
+            Schema::table('templates', function (Blueprint $table) use ($afterColumn) {
+                $table->longText('design')->nullable()->after($afterColumn);
+            });
+        }
     }
 
     /**
