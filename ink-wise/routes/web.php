@@ -821,34 +821,7 @@ if (interface_exists('Laravel\\Socialite\\Contracts\\Factory')) {
 
 
 
-Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/customer/profile', [CustomerProfileController::class, 'index'])->name('customer.profile.show');
-
-// Customer Profile Routes Group
-Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->prefix('customer/profile')->name('customerprofile.')->group(function () {
-    // Profile routes
-    Route::get('/', [CustomerProfileController::class, 'index'])->name('index');
-    Route::get('/edit', [CustomerProfileController::class, 'edit'])->name('edit');
-    Route::put('/update', [CustomerProfileController::class, 'update'])->name('update');
-
-    // Address routes
-    Route::get('/addresses', [CustomerProfileController::class, 'addresses'])->name('addresses');
-    Route::post('/addresses/store', [CustomerProfileController::class, 'storeAddress'])->name('addresses.store');
-    Route::put('/addresses/{address}', [CustomerProfileController::class, 'updateAddress'])->name('addresses.update');
-    Route::delete('/addresses/{address}', [CustomerProfileController::class, 'destroyAddress'])->name('addresses.destroy');
-
-    // Password change routes
-    Route::get('/change-password', [CustomerProfileController::class, 'showChangePasswordForm'])->name('change-password');
-    Route::post('/change-password', [CustomerProfileController::class, 'changePassword'])->name('change-password');
-
-    // Email verification routes
-    Route::get('/email-verification', [CustomerProfileController::class, 'showEmailVerification'])->name('email-verification');
-    Route::post('/send-verification-email', [CustomerProfileController::class, 'sendVerificationEmail'])->name('send-verification-email')->withoutMiddleware(\App\Http\Middleware\RoleMiddleware::class.':customer');
-    Route::get('/email-confirm/{token}', [CustomerProfileController::class, 'confirmEmail'])->name('customerprofile.email-confirm')->withoutMiddleware(\App\Http\Middleware\RoleMiddleware::class.':customer');
-    Route::get('/password-change-confirm', [CustomerProfileController::class, 'showPasswordChangeConfirm'])->name('password-change-confirm');
-});
-
-
-Route::get('/customer/profile/email-confirm/{token}', [CustomerProfileController::class, 'confirmEmail'])->name('customerprofile.email-confirm');
+Route::get('/customerprofile/email-confirm/{token}', [CustomerProfileController::class, 'confirmEmail'])->name('customerprofile.email-confirm');
 
 Route::get('/auth/password-change/verify/{token}', [CustomerProfileController::class, 'confirmEmail'])->name('password.change.verify');
 
