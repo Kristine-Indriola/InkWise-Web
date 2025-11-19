@@ -47,6 +47,50 @@
     gap: 12px;
   }
 
+  .summary-card-heading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .summary-card-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    flex-shrink: 0;
+    background: rgba(148, 185, 255, 0.18);
+    color: #2563eb;
+    transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+  }
+
+  .summary-card-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .summary-card-icon--total {
+    background: rgba(59, 130, 246, 0.18);
+    color: #2563eb;
+  }
+
+  .summary-card-icon--amount {
+    background: rgba(139, 92, 246, 0.18);
+    color: #6d28d9;
+  }
+
+  .summary-card-icon--paid {
+    background: rgba(34, 197, 94, 0.2);
+    color: #15803d;
+  }
+
+  .summary-card-icon--pending {
+    background: rgba(251, 191, 36, 0.24);
+    color: #b45309;
+  }
+
   .summary-card--link {
     color: inherit;
   }
@@ -95,6 +139,58 @@
 
   .summary-card-chip.accent {
     background: rgba(148, 185, 255, 0.22);
+  }
+
+  .dark-mode .summary-card {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.94), rgba(15, 23, 42, 0.82));
+    border-color: rgba(59, 130, 246, 0.32);
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.5);
+    color: #e5e7eb;
+  }
+
+  .dark-mode .summary-card::after {
+    background: linear-gradient(120deg, rgba(148, 185, 255, 0.28), rgba(59, 130, 246, 0.24));
+  }
+
+  .dark-mode .summary-card-label {
+    color: #d1d5db;
+  }
+
+  .dark-mode .summary-card-value {
+    color: #f9fafb;
+  }
+
+  .dark-mode .summary-card-meta {
+    color: #9ca3af;
+  }
+
+  .dark-mode .summary-card-chip {
+    background: rgba(148, 185, 255, 0.28);
+    color: #c7d8ff;
+  }
+
+  .dark-mode .summary-card-chip.accent {
+    background: rgba(148, 185, 255, 0.32);
+  }
+
+  .dark-mode .summary-card-icon--total {
+    background: rgba(59, 130, 246, 0.32);
+    color: #93c5fd;
+  }
+
+  .dark-mode .summary-card-icon--amount {
+    background: rgba(139, 92, 246, 0.32);
+    color: #c4b5fd;
+  }
+
+  .dark-mode .summary-card-icon--paid {
+    background: rgba(34, 197, 94, 0.32);
+    color: #6ee7b7;
+  }
+
+  .dark-mode .summary-card-icon--pending {
+    background: rgba(251, 191, 36, 0.32);
+    color: #fbbf24;
   }
 
   .materials-toolbar {
@@ -308,9 +404,10 @@
     <section class="summary-grid" aria-label="Transactions summary">
       <a href="{{ request()->fullUrlWithQuery(['status' => null]) }}" class="summary-card summary-card--link {{ $activeStatus === 'all' ? 'summary-card--active' : '' }}" aria-label="Total transactions">
         <div class="summary-card-header">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <!-- Icon: list -->
-            <svg class="card-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="summary-card-heading">
+            <span class="summary-card-icon summary-card-icon--total" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
             <span class="summary-card-label">Total Transactions</span>
           </div>
           <span class="summary-card-chip accent">All</span>
@@ -321,9 +418,10 @@
 
   <a href="{{ request()->fullUrlWithQuery(['status' => null]) }}" class="summary-card summary-card--link" aria-label="Total amount">
         <div class="summary-card-header">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <!-- Icon: peso / money -->
-            <svg class="card-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 8v8M9 6h6M9 18h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="summary-card-heading">
+            <span class="summary-card-icon summary-card-icon--amount" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M8 9h8a3 3 0 010 6H8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 13h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
             <span class="summary-card-label">Total Amount</span>
           </div>
           <span class="summary-card-chip accent">PHP</span>
@@ -334,9 +432,10 @@
 
       <a href="{{ request()->fullUrlWithQuery(['status' => 'paid']) }}" class="summary-card summary-card--link {{ $activeStatus === 'paid' ? 'summary-card--active' : '' }}" aria-label="Paid transactions">
         <div class="summary-card-header">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <!-- Icon: check circle -->
-            <svg class="card-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 12a8 8 0 11-16 0 8 8 0 0116 0z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.5 12.5l1.8 1.8 4.2-4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="summary-card-heading">
+            <span class="summary-card-icon summary-card-icon--paid" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 12a8 8 0 11-16 0 8 8 0 0116 0z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.5 12.5l1.8 1.8 4.2-4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
             <span class="summary-card-label">Paid</span>
           </div>
           <span class="summary-card-chip accent">Settled</span>
@@ -347,9 +446,10 @@
 
       <a href="{{ request()->fullUrlWithQuery(['status' => 'pending']) }}" class="summary-card summary-card--link {{ $activeStatus === 'pending' ? 'summary-card--active' : '' }}" aria-label="Pending transactions">
         <div class="summary-card-header">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <!-- Icon: clock -->
-            <svg class="card-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v5l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="summary-card-heading">
+            <span class="summary-card-icon summary-card-icon--pending" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v5l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
             <span class="summary-card-label">Pending</span>
           </div>
           <span class="summary-card-chip accent">Review</span>

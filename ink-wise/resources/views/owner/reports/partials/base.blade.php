@@ -5,6 +5,40 @@
   $charts = $charts ?? [];
   $tableTitle = $tableTitle ?? 'Reports';
   $generateModalTitle = $generateModalTitle ?? 'Generate Report';
+  $summaryCardIcons = [
+    'revenue' => [
+      'class' => 'summary-card-icon--revenue',
+      'svg' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 17l6-6 4 4 6-7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M14.5 8H20v5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    ],
+    'orders' => [
+      'class' => 'summary-card-icon--orders',
+      'svg' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 4h6a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 3h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M10 11.5l2 2 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    ],
+    'average-order' => [
+      'class' => 'summary-card-icon--average',
+      'svg' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 14a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 8v4l3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 18h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+    ],
+    'profit' => [
+      'class' => 'summary-card-icon--profit',
+      'svg' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 8c0-2.1 3.4-3.5 5-3.5S17 5.9 17 8s-3.4 3.5-5 3.5S7 10.1 7 8z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 8v6c0 2.1 3.4 3.5 5 3.5s5-1.4 5-3.5V8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 14c0 2.1 3.4 3.5 5 3.5s5-1.4 5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    ],
+    'inventory-total' => [
+      'class' => 'summary-card-icon--inventory-total',
+      'svg' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 9.5 12 14l9-4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 3.5 21 8v8l-9 4.5-9-4.5V8l9-4.5z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 12.5V20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M21 8l-9 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+    ],
+    'inventory-low' => [
+      'class' => 'summary-card-icon--inventory-low',
+      'svg' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4.5 21 19.5H3L12 4.5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 10v3.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>',
+    ],
+    'inventory-out' => [
+      'class' => 'summary-card-icon--inventory-out',
+      'svg' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.6"/><path d="M9 9l6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M15 9l-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+    ],
+    'inventory-pending' => [
+      'class' => 'summary-card-icon--inventory-pending',
+      'svg' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 16V9a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 13h3a2 2 0 0 1 2 2v3H16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 16h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M7 16v1a2 2 0 0 0 2 2h2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+    ],
+  ];
 @endphp
 
 <link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
@@ -87,6 +121,70 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 10px;
+  }
+
+  .summary-card-heading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .summary-card-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    flex-shrink: 0;
+    background: rgba(148, 185, 255, 0.18);
+    color: #2563eb;
+    transition: transform 0.18s ease, background 0.18s ease, color 0.18s ease;
+  }
+
+  .summary-card-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .summary-card-icon--revenue {
+    background: rgba(59, 130, 246, 0.2);
+    color: #1d4ed8;
+  }
+
+  .summary-card-icon--orders {
+    background: rgba(16, 185, 129, 0.22);
+    color: #047857;
+  }
+
+  .summary-card-icon--average {
+    background: rgba(245, 158, 11, 0.24);
+    color: #b45309;
+  }
+
+  .summary-card-icon--profit {
+    background: rgba(139, 92, 246, 0.2);
+    color: #6d28d9;
+  }
+
+  .summary-card-icon--inventory-total {
+    background: rgba(37, 99, 235, 0.22);
+    color: #1d4ed8;
+  }
+
+  .summary-card-icon--inventory-low {
+    background: rgba(249, 115, 22, 0.24);
+    color: #c2410c;
+  }
+
+  .summary-card-icon--inventory-out {
+    background: rgba(239, 68, 68, 0.24);
+    color: #b91c1c;
+  }
+
+  .summary-card-icon--inventory-pending {
+    background: rgba(34, 197, 94, 0.22);
+    color: #047857;
   }
 
   .summary-card-label {
@@ -274,6 +372,15 @@
   .dark-mode .summary-card-meta { color: #9ca3af; }
   .dark-mode .summary-card-chip { background: rgba(148, 185, 255, 0.28); color: #cbd9ff; }
   .dark-mode .summary-card-chip.accent { background: rgba(148, 185, 255, 0.32); }
+  .dark-mode .summary-card-icon { background: rgba(148, 185, 255, 0.28); color: #93c5fd; }
+  .dark-mode .summary-card-icon--revenue { background: rgba(59, 130, 246, 0.32); color: #bfdbfe; }
+  .dark-mode .summary-card-icon--orders { background: rgba(16, 185, 129, 0.3); color: #6ee7b7; }
+  .dark-mode .summary-card-icon--average { background: rgba(245, 158, 11, 0.32); color: #fcd34d; }
+  .dark-mode .summary-card-icon--profit { background: rgba(139, 92, 246, 0.32); color: #ddd6fe; }
+  .dark-mode .summary-card-icon--inventory-total { background: rgba(59, 130, 246, 0.32); color: #bfdbfe; }
+  .dark-mode .summary-card-icon--inventory-low { background: rgba(249, 115, 22, 0.34); color: #fdba74; }
+  .dark-mode .summary-card-icon--inventory-out { background: rgba(239, 68, 68, 0.34); color: #fca5a5; }
+  .dark-mode .summary-card-icon--inventory-pending { background: rgba(34, 197, 94, 0.32); color: #a7f3d0; }
   .dark-mode .chart-card { background: #1f2937; box-shadow: 0 16px 32px rgba(15, 23, 42, 0.5); }
   .dark-mode .chart-card h4 { color: #f9fafb; }
   .dark-mode .materials-toolbar__search select { background: #374151; border-color: #4b5563; color: #f9fafb; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); }
@@ -448,11 +555,20 @@
               $chipAccent = $chipData['accent'] ?? true;
               $chipClass = $chipText ? 'summary-card-chip' . ($chipAccent ? ' accent' : '') : '';
               $href = $card['href'] ?? null;
+              $iconKey = $card['icon'] ?? null;
+              $iconData = $iconKey && isset($summaryCardIcons[$iconKey]) ? $summaryCardIcons[$iconKey] : null;
+              $iconClass = $iconData ? 'summary-card-icon ' . $iconData['class'] : null;
+              $iconSvg = $iconData['svg'] ?? null;
             @endphp
             @if($href)
               <a href="{{ $href }}" class="summary-card">
                 <div class="summary-card-header">
-                  <span class="summary-card-label">{{ $card['label'] ?? '—' }}</span>
+                  <div class="summary-card-heading">
+                    @if($iconSvg)
+                      <span class="{{ $iconClass }}" aria-hidden="true">{!! $iconSvg !!}</span>
+                    @endif
+                    <span class="summary-card-label">{{ $card['label'] ?? '—' }}</span>
+                  </div>
                   @if($chipText)
                     <span class="{{ $chipClass }}">{{ $chipText }}</span>
                   @endif
@@ -463,7 +579,12 @@
             @else
               <div class="summary-card">
                 <div class="summary-card-header">
-                  <span class="summary-card-label">{{ $card['label'] ?? '—' }}</span>
+                  <div class="summary-card-heading">
+                    @if($iconSvg)
+                      <span class="{{ $iconClass }}" aria-hidden="true">{!! $iconSvg !!}</span>
+                    @endif
+                    <span class="summary-card-label">{{ $card['label'] ?? '—' }}</span>
+                  </div>
                   @if($chipText)
                     <span class="{{ $chipClass }}">{{ $chipText }}</span>
                   @endif

@@ -10,24 +10,28 @@
         [
             'label' => 'Total Sales',
             'chip' => ['text' => 'Revenue', 'accent' => true],
+            'icon' => 'revenue',
             'value' => '₱120,500',
             'meta' => 'This period',
         ],
         [
             'label' => 'Orders Fulfilled',
             'chip' => ['text' => 'Orders', 'accent' => true],
+            'icon' => 'orders',
             'value' => '320',
             'meta' => 'Completed orders',
         ],
         [
             'label' => 'Average Order Value',
             'chip' => ['text' => 'AOV', 'accent' => true],
+            'icon' => 'average-order',
             'value' => '₱1,550',
             'meta' => 'Per order',
         ],
         [
             'label' => 'Profit',
             'chip' => ['text' => 'Profit', 'accent' => true],
+            'icon' => 'profit',
             'value' => '₱12,400',
             'meta' => 'Net profit this period',
         ],

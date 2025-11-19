@@ -35,7 +35,12 @@ class AuthenticatedSessionController extends Controller
             case 'admin':
                 return redirect()->route('admin.dashboard');
             case 'owner':
-                return redirect()->route('owner.owner-home');
+                $rawName = $user->name ?? '';
+                $displayName = trim($rawName) !== '' ? trim($rawName) : $user->email;
+
+                return redirect()
+                    ->route('owner.owner-home')
+                    ->with('success', "Welcome back, {$displayName}!");
             case 'staff':
                 return redirect()->route('staff.dashboard');
             default:
