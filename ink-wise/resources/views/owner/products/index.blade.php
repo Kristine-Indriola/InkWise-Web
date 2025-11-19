@@ -86,6 +86,40 @@
     margin-bottom: 10px;
   }
 
+  .summary-card-heading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .summary-card-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    flex-shrink: 0;
+    background: rgba(148, 185, 255, 0.18);
+    color: #2563eb;
+    transition: background 0.18s ease, color 0.18s ease;
+  }
+
+  .summary-card-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .summary-card-icon--total { background: rgba(59, 130, 246, 0.20); color: #2563eb; }
+  .summary-card-icon--invitation { background: rgba(129, 140, 248, 0.22); color: #4f46e5; }
+  .summary-card-icon--giveaway { background: rgba(236, 72, 153, 0.24); color: #be185d; }
+  .summary-card-icon--stock { background: rgba(16, 185, 129, 0.24); color: #0f766e; }
+
+  .dark-mode .summary-card-icon--total { background: rgba(59, 130, 246, 0.32); color: #93c5fd; }
+  .dark-mode .summary-card-icon--invitation { background: rgba(129, 140, 248, 0.34); color: #c7d2fe; }
+  .dark-mode .summary-card-icon--giveaway { background: rgba(236, 72, 153, 0.32); color: #f9a8d4; }
+  .dark-mode .summary-card-icon--stock { background: rgba(16, 185, 129, 0.32); color: #6ee7b7; }
+
   .summary-card-label {
     font-size: 0.92rem;
     font-weight: 600;
@@ -262,7 +296,14 @@
   <section class="summary-grid" aria-label="Products summary">
     <a href="{{ route('owner.products.index') }}" class="summary-card" aria-label="Total products">
       <div class="summary-card-header">
-        <span class="summary-card-label">Total Products</span>
+        <div class="summary-card-heading">
+          <span class="summary-card-icon summary-card-icon--total" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+          <span class="summary-card-label">Total Products</span>
+        </div>
         <span class="summary-card-chip accent">All</span>
       </div>
       <span class="summary-card-value">{{ number_format($totalProducts) }}</span>
@@ -271,7 +312,15 @@
 
     <a href="{{ route('owner.products.index', ['type' => 'invitation']) }}" class="summary-card" aria-label="Invitations">
       <div class="summary-card-header">
-        <span class="summary-card-label">Invitations</span>
+        <div class="summary-card-heading">
+          <span class="summary-card-icon summary-card-icon--invitation" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M6 4h12a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+              <path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+          </span>
+          <span class="summary-card-label">Invitations</span>
+        </div>
         <span class="summary-card-chip accent">Products</span>
       </div>
       <span class="summary-card-value">{{ number_format($invitationCount) }}</span>
@@ -280,7 +329,16 @@
 
     <a href="{{ route('owner.products.index', ['type' => 'giveaway']) }}" class="summary-card summary-card--qty" aria-label="Giveaways">
       <div class="summary-card-header">
-        <span class="summary-card-label">Giveaways</span>
+        <div class="summary-card-heading">
+          <span class="summary-card-icon summary-card-icon--giveaway" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 8c-2.21 0-4-1.79-4-4 0-1.1.9-2 2-2 1.48 0 2.12 1.03 2 3 .12-1.97.52-3 2-3 1.1 0 2 .9 2 2 0 2.21-1.79 4-4 4z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M4 9h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+              <path d="M4 13h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+          </span>
+          <span class="summary-card-label">Giveaways</span>
+        </div>
         <span class="summary-card-chip accent">Products</span>
       </div>
       <span class="summary-card-value">{{ number_format($giveawayCount) }}</span>
@@ -289,7 +347,15 @@
 
     <a href="{{ route('owner.products.index', ['stock' => 'in']) }}" class="summary-card summary-card--low" aria-label="In Stock">
       <div class="summary-card-header">
-        <span class="summary-card-label">In Stock</span>
+        <div class="summary-card-heading">
+          <span class="summary-card-icon summary-card-icon--stock" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M6 19V9l6-4 6 4v10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M9 22h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+          <span class="summary-card-label">In Stock</span>
+        </div>
         <span class="summary-card-chip accent">Available</span>
       </div>
       <span class="summary-card-value">{{ number_format($inStockCount) }}</span>
