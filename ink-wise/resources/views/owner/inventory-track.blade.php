@@ -138,6 +138,40 @@
     margin-bottom: 10px;
   }
 
+  .summary-card-heading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .summary-card-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    flex-shrink: 0;
+    background: rgba(148, 185, 255, 0.18);
+    color: #2563eb;
+    transition: background 0.18s ease, color 0.18s ease;
+  }
+
+  .summary-card-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .summary-card-icon--total { background: rgba(59, 130, 246, 0.20); color: #2563eb; }
+  .summary-card-icon--stock { background: rgba(16, 185, 129, 0.22); color: #0f766e; }
+  .summary-card-icon--low { background: rgba(245, 158, 11, 0.24); color: #b45309; }
+  .summary-card-icon--out { background: rgba(239, 68, 68, 0.24); color: #b91c1c; }
+
+  .dark-mode .summary-card-icon--total { background: rgba(59, 130, 246, 0.32); color: #93c5fd; }
+  .dark-mode .summary-card-icon--stock { background: rgba(16, 185, 129, 0.32); color: #6ee7b7; }
+  .dark-mode .summary-card-icon--low { background: rgba(245, 158, 11, 0.32); color: #fbbf24; }
+  .dark-mode .summary-card-icon--out { background: rgba(239, 68, 68, 0.34); color: #fca5a5; }
+
   .summary-card-label {
     font-size: 0.9rem;
     font-weight: 600;
@@ -218,7 +252,14 @@
   <section class="summary-grid" aria-label="Inventory summary">
         <a href="{{ url()->current() }}" class="summary-card">
           <div class="summary-card-header">
-            <div style="display:flex;align-items:center;gap:8px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 7h18M3 12h18M3 17h18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="summary-card-label">Total Items</span></div>
+            <div class="summary-card-heading">
+              <span class="summary-card-icon summary-card-icon--total" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M3 7h18M3 12h18M3 17h18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="summary-card-label">Total Items</span>
+            </div>
             <span class="summary-card-chip accent">All</span>
           </div>
           <span class="summary-card-value">{{ number_format($counts['total'] ?? 0) }}</span>
@@ -227,7 +268,15 @@
 
         <a href="{{ request()->fullUrlWithQuery(['stock' => 'in']) }}" class="summary-card">
           <div class="summary-card-header">
-            <div style="display:flex;align-items:center;gap:8px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 20V10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 14l4-4 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="summary-card-label">In Stock</span></div>
+            <div class="summary-card-heading">
+              <span class="summary-card-icon summary-card-icon--stock" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 20V10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M8 14l4-4 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="summary-card-label">In Stock</span>
+            </div>
             <span class="summary-card-chip accent">Available</span>
           </div>
           <span class="summary-card-value">{{ number_format($counts['in'] ?? 0) }}</span>
@@ -236,7 +285,15 @@
 
         <a href="{{ request()->fullUrlWithQuery(['stock' => 'low']) }}" class="summary-card">
           <div class="summary-card-header">
-            <div style="display:flex;align-items:center;gap:8px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 8v5l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="summary-card-label">Low Stock</span></div>
+            <div class="summary-card-heading">
+              <span class="summary-card-icon summary-card-icon--low" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 8v5l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M9 17h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="summary-card-label">Low Stock</span>
+            </div>
             <span class="summary-card-chip accent">Attention</span>
           </div>
           <span class="summary-card-value">{{ number_format($counts['low'] ?? 0) }}</span>
@@ -245,7 +302,16 @@
 
         <a href="{{ request()->fullUrlWithQuery(['stock' => 'out']) }}" class="summary-card">
           <div class="summary-card-header">
-            <div style="display:flex;align-items:center;gap:8px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 8v8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 12h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="summary-card-label">Out of Stock</span></div>
+            <div class="summary-card-heading">
+              <span class="summary-card-icon summary-card-icon--out" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 8v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M8 12h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M12 4v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                </svg>
+              </span>
+              <span class="summary-card-label">Out of Stock</span>
+            </div>
             <span class="summary-card-chip accent">Critical</span>
           </div>
           <span class="summary-card-value">{{ number_format($counts['out'] ?? 0) }}</span>
