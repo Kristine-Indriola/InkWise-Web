@@ -163,7 +163,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Send verification email function
     function sendVerificationEmail() {
-        const url = '{{ route("customerprofile.send-verification-email") }}';
+        const url = '{{ route("customerprofile.email-verification.send") }}';
         console.log('Sending request to:', url);
         console.log('CSRF Token:', document.querySelector('meta[name="csrf-token"]').getAttribute('content'));
 

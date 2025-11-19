@@ -13,6 +13,7 @@
 /.zed
 /auth.json
 /bootstrap/cache
+/public/build
 /node_modules
 /public/hot
 /public/storage
