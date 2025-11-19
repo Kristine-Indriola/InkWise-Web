@@ -1162,7 +1162,7 @@ export function InspectorPanel() {
         handleLayerChange({
               content: dataUrl,
               name: file.name || selectedLayer.name,
-              metadata: { objectFit: 'contain', imageScale: 1, imageOffsetX: 0, imageOffsetY: 0 },
+              metadata: { objectFit: 'cover', imageScale: 1, imageOffsetX: 0, imageOffsetY: 0 },
             });
       };
       testImg.onerror = () => {
@@ -1212,7 +1212,7 @@ export function InspectorPanel() {
     handleLayerChange({
       content: imageDataUrl,
       name: fileName || selectedLayer.name,
-      metadata: { objectFit: 'contain', imageScale: 1, imageOffsetX: 0, imageOffsetY: 0 },
+      metadata: { objectFit: 'cover', imageScale: 1, imageOffsetX: 0, imageOffsetY: 0 },
     });
   };
 
