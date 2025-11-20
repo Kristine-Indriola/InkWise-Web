@@ -152,8 +152,7 @@
     border: 1px solid #3b82f6;
   }
 
-  .status-badge.status-confirmed,
-  .status-badge.status-to_ship {
+  .status-badge.status-confirmed {
     background: #fef3c7;
     color: #d97706;
     border: 1px solid #f59e0b;
@@ -229,12 +228,10 @@
         $pendingCount = $statusCounts->get('pending', 0);
         $processingCount = $statusCounts->get('processing', 0);
         $inProductionCount = $statusCounts->get('in_production', 0);
-        $toShipRawCount = $statusCounts->get('to_ship', 0);
         $confirmedCount = $statusCounts->get('confirmed', 0);
         $completedCount = $statusCounts->get('completed', 0);
         $cancelledCount = $statusCounts->get('cancelled', 0);
         $inProgressCount = $processingCount + $inProductionCount;
-        $toShipCount = $confirmedCount + $toShipRawCount;
       @endphp
       <button type="button" class="summary-card-button" data-summary-filter="all" data-summary-label="All orders" data-summary-description="Includes every order regardless of status.">
         <div class="summary-card" data-summary-count="{{ $totalOrders }}">
@@ -254,10 +251,10 @@
           <div class="summary-card__value">{{ $inProgressCount }}</div>
         </div>
       </button>
-      <button type="button" class="summary-card-button" data-summary-filter="to_ship" data-summary-label="To ship" data-summary-description="Orders confirmed and preparing for dispatch.">
-        <div class="summary-card" data-summary-count="{{ $toShipCount }}">
-          <div class="summary-card__label">To ship</div>
-          <div class="summary-card__value">{{ $toShipCount }}</div>
+      <button type="button" class="summary-card-button" data-summary-filter="ready_pickup" data-summary-label="Ready for pickup" data-summary-description="Orders packed and ready for customer pickup.">
+        <div class="summary-card" data-summary-count="{{ $confirmedCount }}">
+          <div class="summary-card__label">Ready for pickup</div>
+          <div class="summary-card__value">{{ $confirmedCount }}</div>
         </div>
       </button>
       <button type="button" class="summary-card-button" data-summary-filter="completed" data-summary-label="Completed" data-summary-description="Orders successfully fulfilled and closed.">
@@ -413,7 +410,7 @@
       all: null,
       pending: ['pending'],
       in_progress: ['processing', 'in_production'],
-      to_ship: ['confirmed', 'to_ship'],
+      ready_pickup: ['confirmed'],
       completed: ['completed'],
       cancelled: ['cancelled']
     };
@@ -430,13 +427,13 @@
         total: 0,
         pending: 0,
         in_progress: 0,
-        to_ship: 0,
+        ready_pickup: 0,
         completed: 0,
         cancelled: 0
       };
 
       const inProgressStatuses = statusMap.in_progress;
-      const toShipStatuses = statusMap.to_ship;
+      const readyPickupStatuses = statusMap.ready_pickup;
 
       tableRows.forEach(row => {
         if (!row.isConnected) {
@@ -446,7 +443,7 @@
         counts.total += 1;
         if (status === 'pending') counts.pending += 1;
         if (inProgressStatuses.includes(status)) counts.in_progress += 1;
-        if (toShipStatuses.includes(status)) counts.to_ship += 1;
+        if (readyPickupStatuses.includes(status)) counts.ready_pickup += 1;
         if (status === 'completed') counts.completed += 1;
         if (status === 'cancelled') counts.cancelled += 1;
       });
@@ -458,7 +455,7 @@
       switch (filterKey) {
         case 'pending': return counts.pending;
         case 'in_progress': return counts.in_progress;
-        case 'to_ship': return counts.to_ship;
+        case 'ready_pickup': return counts.ready_pickup;
         case 'completed': return counts.completed;
         case 'cancelled': return counts.cancelled;
         case 'all':
