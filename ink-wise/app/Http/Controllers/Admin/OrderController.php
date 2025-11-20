@@ -23,7 +23,7 @@ class OrderController extends Controller
         $order->loadMissing('rating');
 
         $statusOptions = $this->statusOptions();
-        $statusFlow = ['pending', 'processing', 'in_production', 'confirmed', 'to_receive', 'completed'];
+        $statusFlow = ['pending', 'processing', 'in_production', 'confirmed', 'completed'];
         $metadata = $this->normalizeMetadata($order->metadata);
 
         return view('admin.orders.manage-status', [
@@ -197,9 +197,9 @@ class OrderController extends Controller
     {
         return [
             'pending' => 'Order Received',
+            'processing' => 'Processing',
             'in_production' => 'In Progress',
-            'confirmed' => 'To Ship',
-            'to_receive' => 'To Receive',
+            'confirmed' => 'Ready for Pickup',
             'completed' => 'Completed',
             'cancelled' => 'Cancelled',
         ];

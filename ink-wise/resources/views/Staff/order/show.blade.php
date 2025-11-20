@@ -500,12 +500,11 @@
 		'pending' => 'Order Received',
 		'processing' => 'Processing',
 		'in_production' => 'In Progress',
-		'confirmed' => 'To Ship',
-		'to_receive' => 'To Receive',
+		'confirmed' => 'Ready for Pickup',
 		'completed' => 'Completed',
 		'cancelled' => 'Cancelled',
 	];
-	$statusFlow = ['pending', 'processing', 'in_production', 'confirmed', 'to_receive', 'completed'];
+	$statusFlow = ['pending', 'processing', 'in_production', 'confirmed', 'completed'];
 	$currentStatus = strtolower((string) data_get($order, 'status', 'pending'));
 	$flowIndex = array_search($currentStatus, $statusFlow, true);
 	$currentChipModifier = str_replace('_', '-', $currentStatus);
@@ -649,13 +648,10 @@
 									Production team is preparing the items.
 									@break
 								@case('confirmed')
-									Packaged and ready for courier hand-off.
-									@break
-								@case('to_receive')
-									Order is in transit to the customer.
+									Packaged and ready for customer pickup at store.
 									@break
 								@case('completed')
-									Delivered and closed out.
+									Picked up and closed out.
 									@break
 								@default
 									Status update in progress.

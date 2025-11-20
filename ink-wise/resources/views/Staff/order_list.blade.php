@@ -252,9 +252,9 @@
           <div class="summary-card__value">{{ $inProgressCount }}</div>
         </div>
       </button>
-      <button type="button" class="summary-card-button" data-summary-filter="to_ship" data-summary-label="To ship" data-summary-description="Orders confirmed and preparing for dispatch.">
+      <button type="button" class="summary-card-button" data-summary-filter="ready_pickup" data-summary-label="Ready for Pickup" data-summary-description="Orders packed and ready for customer pickup at store.">
         <div class="summary-card" data-summary-count="{{ $toShipCount }}">
-          <div class="summary-card__label">To ship</div>
+          <div class="summary-card__label">Ready for Pickup</div>
           <div class="summary-card__value">{{ $toShipCount }}</div>
         </div>
       </button>
@@ -411,7 +411,7 @@
       all: null,
       pending: ['pending'],
       in_progress: ['processing', 'in_production'],
-      to_ship: ['confirmed', 'to_ship'],
+      ready_pickup: ['confirmed'],
       completed: ['completed'],
       cancelled: ['cancelled']
     };
@@ -428,13 +428,13 @@
         total: 0,
         pending: 0,
         in_progress: 0,
-        to_ship: 0,
+        ready_pickup: 0,
         completed: 0,
         cancelled: 0
       };
 
       const inProgressStatuses = statusMap.in_progress;
-      const toShipStatuses = statusMap.to_ship;
+      const readyPickupStatuses = statusMap.ready_pickup;
 
       tableRows.forEach(row => {
         if (!row.isConnected) {
@@ -444,7 +444,7 @@
         counts.total += 1;
         if (status === 'pending') counts.pending += 1;
         if (inProgressStatuses.includes(status)) counts.in_progress += 1;
-        if (toShipStatuses.includes(status)) counts.to_ship += 1;
+        if (readyPickupStatuses.includes(status)) counts.ready_pickup += 1;
         if (status === 'completed') counts.completed += 1;
         if (status === 'cancelled') counts.cancelled += 1;
       });
@@ -456,7 +456,7 @@
       switch (filterKey) {
         case 'pending': return counts.pending;
         case 'in_progress': return counts.in_progress;
-        case 'to_ship': return counts.to_ship;
+        case 'ready_pickup': return counts.ready_pickup;
         case 'completed': return counts.completed;
         case 'cancelled': return counts.cancelled;
         case 'all':
