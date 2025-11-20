@@ -1,0 +1,46 @@
+{
+  "resources/css/app.css": {
+    "file": "assets/app-iS0bldWa.css",
+    "src": "resources/css/app.css",
+    "isEntry": true
+  },
+  "resources/css/customer/customer.css": {
+    "file": "assets/customer-BYbDMLiU.css",
+    "src": "resources/css/customer/customer.css",
+    "isEntry": true
+  },
+  "resources/js/app.js": {
+    "file": "assets/app-GutwCy_4.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true
+  },
+  "resources/js/customer/customer.js": {
+    "file": "assets/customer-DGU99OZZ.js",
+    "name": "customer",
+    "src": "resources/js/customer/customer.js",
+    "isEntry": true
+  },
+  "resources/js/staff/template-editor/main.jsx": {
+    "file": "assets/main-D07s_8jc.js",
+    "name": "main",
+    "src": "resources/js/staff/template-editor/main.jsx",
+    "isEntry": true,
+    "dynamicImports": [
+      "resources/js/staff/template-editor/utils/recentImagesDB.js",
+      "resources/js/staff/template-editor/utils/recentImagesDB.js",
+      "resources/js/staff/template-editor/utils/recentImagesDB.js",
+      "resources/js/staff/template-editor/utils/recentImagesDB.js",
+      "resources/js/staff/template-editor/utils/recentImagesDB.js"
+    ],
+    "css": [
+      "assets/main-pbwiCvag.css"
+    ]
+  },
+  "resources/js/staff/template-editor/utils/recentImagesDB.js": {
+    "file": "assets/recentImagesDB-CO6kquVm.js",
+    "name": "recentImagesDB",
+    "src": "resources/js/staff/template-editor/utils/recentImagesDB.js",
+    "isDynamicEntry": true
+  }
+}
