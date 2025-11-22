@@ -474,6 +474,8 @@ Route::get('/customer/my-orders', fn () => view('customer.profile.my_purchase'))
 // To Pay tab (lists orders pending payment)
 Route::get('/customer/my-orders/topay', fn () => view('customer.profile.purchase.topay'))->name('customer.my_purchase.topay');
 Route::get('/customer/my-orders/inproduction', fn () => view('customer.profile.purchase.inproduction'))->name('customer.my_purchase.inproduction');
+Route::get('/customer/my-orders/toship', fn () => view('customer.profile.purchase.toship'))->name('customer.my_purchase.toship');
+Route::get('/customer/my-orders/toreceive', fn () => view('customer.profile.purchase.toreceive'))->name('customer.my_purchase.toreceive');
 Route::get('/customer/my-orders/topickup', fn () => view('customer.profile.purchase.topickup'))->name('customer.my_purchase.topickup');
 Route::get('/customer/my-orders/completed', fn () => view('customer.profile.purchase.completed'))->name('customer.my_purchase.completed');
 Route::get('/customer/my-orders/rate', [CustomerProfileController::class, 'rate'])->middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->name('customer.my_purchase.rate');
@@ -481,7 +483,8 @@ Route::get('/customer/my-orders/cancelled', fn () => view('customer.profile.purc
 Route::get('/customer/my-orders/return-refund', fn () => view('customer.profile.purchase.return_refund'))->name('customer.my_purchase.return_refund');
 Route::get('/customer/pay-remaining-balance/{order}', function (\App\Models\Order $order) {
     // Ensure the order belongs to the authenticated user
-    $customerId = auth()->user()->customer->customer_id ?? null;
+    $customer = Auth::user();
+    $customerId = $customer?->customer->customer_id ?? null;
     
     if (!$customerId || $order->customer_id !== $customerId) {
         abort(404, 'Order not found or does not belong to you.');
