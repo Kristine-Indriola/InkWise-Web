@@ -2294,385 +2294,77 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       ],
     },
     {
-      id: 'combo-bold-step',
-      label: 'Bold Step',
-      description: 'Manrope gives confident rounded tech titling.',
-      align: 'center',
-      layers: [
-        {
-          role: 'heading',
-          content: 'Bold Step',
-          family: 'Manrope',
-          fallback: 'sans-serif',
-          fontSize: 44,
-          fontWeight: '700',
-          letterSpacing: 0.6,
-          offsetY: 0,
-        },
-      ],
+      id: 'default-user',
+      thumbUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/user.svg',
+      previewUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/user.svg',
+      downloadUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/user.svg',
+      description: 'User',
+      provider: 'default',
+      providerLabel: 'Simple Icons',
+      credit: 'Simple Icons',
     },
-    {
-      id: 'combo-soft-dawn',
-      label: 'Soft Dawn',
-      description: 'Josefin Sans Light feels airy and romantic.',
-      align: 'center',
-      layers: [
-        {
-          role: 'heading',
-          content: 'Soft Dawn',
-          family: 'Josefin Sans',
-          fallback: 'sans-serif',
-          fontSize: 44,
-          fontWeight: '300',
-          letterSpacing: 1.4,
-          offsetY: 0,
-        },
-      ],
-    },
-    {
-      id: 'combo-new-hope',
-      label: 'New Hope',
-      description: 'Merriweather Light provides timeless romance.',
-      align: 'center',
-      layers: [
-        {
-          role: 'heading',
-          content: 'New Hope',
-          family: 'Merriweather',
-          fallback: 'serif',
-          fontSize: 44,
-          fontWeight: '300',
-          letterSpacing: 1,
-          offsetY: 0,
-        },
-      ],
-    },
-    {
-      id: 'combo-little-light',
-      label: 'Little Light',
-      description: 'Sacramento handwriting adds gentle scripts.',
-      align: 'center',
-      layers: [
-        {
-          role: 'heading',
-          content: 'Little Light',
-          family: 'Sacramento',
-          fallback: 'cursive',
-          fontSize: 48,
-          fontWeight: '400',
-          letterSpacing: 1,
-          offsetY: 0,
-        },
-      ],
-    },
-    {
-      id: 'combo-pure-joy',
-      label: 'Pure Joy',
-      description: 'Dancing Script keeps celebrations flowing.',
-      align: 'center',
-      layers: [
-        {
-          role: 'heading',
-          content: 'Pure Joy',
-          family: 'Dancing Script',
-          fallback: 'cursive',
-          fontSize: 48,
-          fontWeight: '600',
-          letterSpacing: 1,
-          offsetY: 0,
-        },
-      ],
-    },
-    {
-      id: 'combo-calm-grace',
-      label: 'Calm Grace',
-      description: 'Marcellus offers statuesque ceremony styling.',
-      align: 'center',
-      layers: [
-        {
-          role: 'heading',
-          content: 'Calm Grace',
-          family: 'Marcellus',
-          fallback: 'serif',
-          fontSize: 46,
-          fontWeight: '400',
-          letterSpacing: 1.2,
-          offsetY: 0,
-        },
-      ],
-    },
-    {
-      id: 'combo-holy-warmth',
-      label: 'Holy Warmth',
-      description: 'Crimson Pro gives heritage invitation vibes.',
-      align: 'center',
-      layers: [
-        {
-          role: 'heading',
-          content: 'Holy Warmth',
-          family: 'Crimson Pro',
-          fallback: 'serif',
-          fontSize: 46,
-          fontWeight: '400',
-          letterSpacing: 1,
-          offsetY: 0,
-        },
-      ],
-    },
-    {
-      id: 'combo-fresh-gift',
-      label: 'Fresh Gift',
-      description: 'ABeeZee keeps kids invitations clear and sweet.',
-      align: 'center',
-      layers: [
-        {
-          role: 'heading',
-          content: 'Fresh Gift',
-          family: 'ABeeZee',
-          fallback: 'sans-serif',
-          fontSize: 46,
-          fontWeight: '400',
-          letterSpacing: 0.8,
-          offsetY: 0,
-        },
-      ],
-    },
-    {
-      id: 'combo-gentle-bless',
-      label: 'Gentle Bless',
-      description: 'GFS Didot adds a refined liturgical feel.',
-      align: 'center',
-      layers: [
-        {
-          role: 'heading',
-          content: 'Gentle Bless',
-          family: 'GFS Didot',
-          fallback: 'serif',
-          fontSize: 46,
-          fontWeight: '400',
-          letterSpacing: 1,
-          offsetY: 0,
-        },
-      ],
-    },
-    {
-      id: 'combo-silent-peace',
-      label: 'Silent Peace',
-      description: 'Overlock Light brings cozy stitched lettering.',
-      align: 'center',
-      layers: [
-        {
-          role: 'heading',
-          content: 'Silent Peace',
-          family: 'Overlock',
-          fallback: 'sans-serif',
-          fontSize: 46,
-          fontWeight: '300',
-          letterSpacing: 1,
-          offsetY: 0,
-        },
-      ],
-    },
-    {
-      id: 'combo-baby-glow',
-      label: 'Baby Glow',
-      description: 'Hind Soft styling keeps baby themes gentle.',
-      align: 'center',
-      layers: [
-        {
-          role: 'heading',
-          content: 'Baby Glow',
-          family: 'Hind',
-          fallback: 'sans-serif',
-          fontSize: 44,
-          fontWeight: '300',
-          letterSpacing: 0.8,
-          offsetY: 0,
-        },
-      ],
-    },
-    {
-      id: 'combo-golden-kiss',
-      label: 'Golden Kiss',
-      description: 'Tangerine script glimmers with elegant curves.',
-      align: 'center',
-      layers: [
-        {
-          role: 'heading',
-          content: 'Golden Kiss',
-          family: 'Tangerine',
-          fallback: 'cursive',
-          fontSize: 50,
-          fontWeight: '700',
-          letterSpacing: 1.4,
-          offsetY: 0,
-        },
-      ],
-    },
-    {
-      id: 'combo-royal-love',
-      label: 'Royal Love',
-      description: 'Cinzel Decorative makes regal celebration titles.',
-      align: 'center',
-      layers: [
-        {
-          role: 'heading',
-          content: 'Royal Love',
-          family: 'Cinzel Decorative',
-          fallback: 'serif',
-          fontSize: 50,
-          fontWeight: '700',
-          letterSpacing: 1.2,
-          offsetY: 0,
-        },
-      ],
-    },
-    {
-      id: 'combo-eternal-bond',
-      label: 'Eternal Bond',
-      description: 'Forum brings graceful classic invitation energy.',
-      align: 'center',
-      layers: [
-        {
-          role: 'heading',
-          content: 'Eternal Bond',
-          family: 'Forum',
-          fallback: 'serif',
-          fontSize: 48,
-          fontWeight: '400',
-          letterSpacing: 1,
-          offsetY: 0,
-        },
-      ],
-    },
-    {
-      id: 'combo-soft-promise',
-      label: 'Soft Promise',
-      description: 'Cardo Italic offers gentle storytelling romance.',
-      align: 'center',
-      layers: [
-        {
-          role: 'heading',
-          content: 'Soft Promise',
-          family: 'Cardo',
-          fallback: 'serif',
-          fontSize: 48,
-          fontWeight: '400',
-          fontStyle: 'italic',
-          letterSpacing: 1,
-          offsetY: 0,
-        },
-      ],
-    },
-    {
-      id: 'combo-sweet-union',
-      label: 'Sweet Union',
-      description: 'Unna Italic adds heartfelt ceremony scripts.',
-      align: 'center',
-      layers: [
-        {
-          role: 'heading',
-          content: 'Sweet Union',
-          family: 'Unna',
-          fallback: 'serif',
-          fontSize: 48,
-          fontWeight: '400',
-          fontStyle: 'italic',
-          letterSpacing: 1,
-          offsetY: 0,
-        },
-      ],
-    },
-    {
-      id: 'combo-pure-charm',
-      label: 'Pure Charm',
-      description: 'Prata provides statuesque wedding headings.',
-      align: 'center',
-      layers: [
-        {
-          role: 'heading',
-          content: 'Pure Charm',
-          family: 'Prata',
-          fallback: 'serif',
-          fontSize: 48,
-          fontWeight: '400',
-          letterSpacing: 1,
-          offsetY: 0,
-        },
-      ],
-    },
-    {
-      id: 'combo-true-bliss',
-      label: 'True Bliss',
-      description: 'Gilda Display pairs classic curves with warmth.',
-      align: 'center',
-      layers: [
-        {
-          role: 'heading',
-          content: 'True Bliss',
-          family: 'Gilda Display',
-          fallback: 'serif',
-          fontSize: 48,
-          fontWeight: '400',
-          letterSpacing: 1,
-          offsetY: 0,
-        },
-      ],
-    },
-    {
-      id: 'combo-noble-heart',
-      label: 'Noble Heart',
-      description: 'Cormorant SC captures timeless small caps romance.',
-      align: 'center',
-      layers: [
-        {
-          role: 'heading',
-          content: 'Noble Heart',
-          family: 'Cormorant SC',
-          fallback: 'serif',
-          fontSize: 48,
-          fontWeight: '600',
-          letterSpacing: 1.2,
-          offsetY: 0,
-        },
-      ],
-    },
-    {
-      id: 'combo-classic-vow',
-      label: 'Classic Vow',
-      description: 'Quattrocento brings Old World ceremony grace.',
-      align: 'center',
-      layers: [
-        {
-          role: 'heading',
-          content: 'Classic Vow',
-          family: 'Quattrocento',
-          fallback: 'serif',
-          fontSize: 48,
-          fontWeight: '700',
-          letterSpacing: 1,
-          offsetY: 0,
-        },
-      ],
-    },
-    {
-      id: 'combo-forever-more',
-      label: 'Forever More',
-      description: 'Marcellus SC celebrates refined uppercase vows.',
-      align: 'center',
-      layers: [
-        {
-          role: 'heading',
-          content: 'Forever More',
-          family: 'Marcellus SC',
-          fallback: 'serif',
-          fontSize: 48,
-          fontWeight: '400',
-          letterSpacing: 1,
-          offsetY: 0,
-        },
-      ],
-    },
+  ]);
+  const [isSearchingIcons, setIsSearchingIcons] = useState(false);
+  const [iconCurrentPage, setIconCurrentPage] = useState(1);
+  const [isLoadingMoreIcons, setIsLoadingMoreIcons] = useState(false);
+  const [hasMoreIcons, setHasMoreIcons] = useState(true);
+  const iconCurrentPageRef = useRef(1);
+  const activeIconSearchQueryRef = useRef('');
+  const hasTriggeredIconSearchRef = useRef(false);
+  const [fontSearchQuery, setFontSearchQuery] = useState('');
+  const [fontSearchResults, setFontSearchResults] = useState([]);
+  const [isSearchingFonts, setIsSearchingFonts] = useState(false);
+  const [fontCurrentPage, setFontCurrentPage] = useState(1);
+  const [isLoadingMoreFonts, setIsLoadingMoreFonts] = useState(false);
+  const [hasMoreFonts, setHasMoreFonts] = useState(true);
+  const fontCurrentPageRef = useRef(1);
+  const activeFontSearchQueryRef = useRef('');
+  const hasTriggeredFontSearchRef = useRef(false);
+
+  // Styled text presets (loaded from Google Fonts list + sample text)
+  const [styledPresets, setStyledPresets] = useState([]);
+  const [styledPage, setStyledPage] = useState(1);
+  const [isLoadingStyledPresets, setIsLoadingStyledPresets] = useState(false);
+  const [hasMoreStyledPresets, setHasMoreStyledPresets] = useState(true);
+  const styledPerPage = 12;
+  const styledFontsListRef = useRef([]); // cache of fonts fetched from API
+  const styledContainerRef = useRef(null);
+  const styledObserverRef = useRef(null);
+
+  // Use the provided Google API key (from your message)
+  const GOOGLE_FONTS_API_KEY = 'AIzaSyBRCDdZjTcR4brOsHV_OBsDO11We11BVi0';
+
+  const sampleStyledTexts = [
+    'Life is an ADVENTURE',
+    "Congratulations! You're a Big Brother",
+    'MARKETING PROPOSAL',
+    'SALE',
+    'MINIMALISM',
+    'Operations Manager',
+    'CREATIVE DESIGN',
+    'MODERN ARTISTRY',
+    'PROFESSIONAL SERVICES',
+    'DIGITAL INNOVATION',
+    'BRAND IDENTITY',
+    'VISUAL STORYTELLING',
+    'GRAPHIC DESIGN',
+    'TYPOGRAPHY MATTERS',
+    'DESIGN EXCELLENCE',
+    'CREATIVE SOLUTIONS',
+    'ART DIRECTION',
+    'VISUAL IMPACT',
+    'DESIGN THINKING',
+    'CREATIVE PROCESS',
+    'BRAND STORY',
+    'VISUAL LANGUAGE',
+    'DESIGN SYSTEM',
+    'CREATIVE AGENCY',
+    'VISUAL DESIGN',
+    'TYPEFACE DESIGN',
+    'GRAPHIC ARTS',
+    'DESIGN STUDIO',
+    'CREATIVE BRIEF',
+    'VISUAL CONCEPT',
   ];
 
   const loadStyledPresets = useCallback((page = 1) => {

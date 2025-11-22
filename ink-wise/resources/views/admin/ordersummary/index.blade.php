@@ -545,12 +545,11 @@
 		'pending' => 'Order Received',
 		'processing' => 'Processing',
 		'in_production' => 'In Progress',
-		'confirmed' => 'To Ship',
-		'to_receive' => 'To Receive',
+		'confirmed' => 'Ready for Pickup',
 		'completed' => 'Completed',
 		'cancelled' => 'Cancelled',
 	];
-	$statusFlow = ['pending', 'processing', 'in_production', 'confirmed', 'to_receive', 'completed'];
+	$statusFlow = ['pending', 'processing', 'in_production', 'confirmed', 'completed'];
 	$currentStatus = strtolower((string) data_get($order, 'status', 'pending'));
 	$flowIndex = array_search($currentStatus, $statusFlow, true);
 	$currentChipModifier = str_replace('_', '-', $currentStatus);
