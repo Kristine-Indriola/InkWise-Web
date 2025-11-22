@@ -3,7 +3,7 @@
 @section('title', 'Templates')
 
 @push('styles')
-    <link rel="stylesheet" href="{{ asset('css/admin-css/template/template.css') }}">
+    @vite('resources/css/admin/template/template.css')
     <style>
         /* Toast Notifications */
         .toast-notification {
@@ -297,7 +297,7 @@
 @endpush
 
 @push('scripts')
-    <script src="{{ asset('js/admin/template/template.js') }}" defer></script>
+    @vite('resources/js/admin/template/template.js')
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Create toast notification system
