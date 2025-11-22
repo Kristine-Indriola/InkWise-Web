@@ -4,7 +4,7 @@
     "name": "client"
   },
   "resources/css/app.css": {
-    "file": "assets/app-Dvqxhsnr.css",
+    "file": "assets/app-KMDQAHUM.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -26,7 +26,7 @@
     "isEntry": true
   },
   "resources/js/customer/studio/main.jsx": {
-    "file": "assets/main-DvqIAIAC.js",
+    "file": "assets/main-D90A_XyZ.js",
     "name": "main",
     "src": "resources/js/customer/studio/main.jsx",
     "isEntry": true,
@@ -44,7 +44,7 @@
     "isEntry": true
   },
   "resources/js/staff/template-editor/main.jsx": {
-    "file": "assets/main-D07s_8jc.js",
+    "file": "assets/main-B9yQAKKN.js",
     "name": "main",
     "src": "resources/js/staff/template-editor/main.jsx",
     "isEntry": true,
@@ -59,7 +59,7 @@
       "resources/js/staff/template-editor/utils/recentImagesDB.js"
     ],
     "css": [
-      "assets/main-pbwiCvag.css"
+      "assets/main-DuNGlsMr.css"
     ]
   },
   "resources/js/staff/template-editor/utils/recentImagesDB.js": {

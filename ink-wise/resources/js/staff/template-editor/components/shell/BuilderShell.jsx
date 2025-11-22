@@ -162,28 +162,39 @@ export function BuilderShell() {
       return;
     }
 
-    dispatch({ type: 'SHOW_PREVIEW_MODAL' });
-
     setIsSavingTemplate(true);
     setSaveTemplateError(null);
 
     const bodyEl = typeof document !== 'undefined' ? document.body : null;
-    const pixelRatio = typeof window !== 'undefined' ? Math.max(window.devicePixelRatio || 1, 2) : 2;
+    const pixelRatio = typeof window !== 'undefined'
+      ? Math.min(Math.max(window.devicePixelRatio || 1, 1), 2)
+      : 1.5;
 
     try {
+      dispatch({ type: 'SHOW_PREVIEW_MODAL' });
       bodyEl?.classList.add('builder-exporting');
 
       const designSnapshot = serializeDesign(state);
+      let pngDataUrl = null;
+      let svgDataUrl = null;
 
-      const pngDataUrl = await toPng(canvasRef.current, {
-        cacheBust: true,
-        pixelRatio,
-        quality: 1,
-      });
+      try {
+        pngDataUrl = await toPng(canvasRef.current, {
+          cacheBust: true,
+          pixelRatio,
+          quality: 0.92,
+        });
+      } catch (captureError) {
+        console.warn('[InkWise Builder] PNG preview capture failed.', captureError);
+      }
 
-      const svgDataUrl = await toSvg(canvasRef.current, {
-        cacheBust: true,
-      });
+      try {
+        svgDataUrl = await toSvg(canvasRef.current, {
+          cacheBust: true,
+        });
+      } catch (captureError) {
+        console.warn('[InkWise Builder] SVG snapshot capture failed.', captureError);
+      }
 
       const response = await fetch(saveTemplateRoute, {
         method: 'POST',
@@ -202,8 +213,31 @@ export function BuilderShell() {
       });
 
       if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message || 'Failed to save template');
+        let errorMessage = 'Failed to save template';
+        const contentType = response.headers.get('Content-Type') || '';
+
+        if (contentType.includes('application/json')) {
+          try {
+            const errorPayload = await response.clone().json();
+            if (typeof errorPayload?.message === 'string' && errorPayload.message.trim() !== '') {
+              errorMessage = errorPayload.message.trim();
+            } else if (errorPayload?.errors && typeof errorPayload.errors === 'object') {
+              const firstField = Object.values(errorPayload.errors)[0];
+              if (Array.isArray(firstField) && typeof firstField[0] === 'string') {
+                errorMessage = firstField[0];
+              }
+            }
+          } catch (jsonError) {
+            console.warn('[InkWise Builder] Failed to parse error response JSON.', jsonError);
+          }
+        } else {
+          const textMessage = await response.text();
+          if (textMessage && textMessage.trim().length > 0) {
+            errorMessage = textMessage.trim();
+          }
+        }
+
+        throw new Error(errorMessage);
       }
 
       const data = await response.json().catch(() => ({}));
@@ -215,6 +249,7 @@ export function BuilderShell() {
     } catch (error) {
       console.error('[InkWise Builder] Template save failed:', error);
       setSaveTemplateError(error.message || 'Failed to save template');
+      dispatch({ type: 'HIDE_PREVIEW_MODAL' });
     } finally {
       bodyEl?.classList.remove('builder-exporting');
       setIsSavingTemplate(false);
