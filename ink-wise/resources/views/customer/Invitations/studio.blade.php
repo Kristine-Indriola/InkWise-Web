@@ -9,11 +9,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="{{ asset('css/customer/studio.css') }}">
     @if(app()->environment('local'))
         @viteReactRefresh
     @endif
-    @vite(['resources/js/customer/studio/main.jsx'])
+    @vite([
+        'resources/css/customer/studio.css',
+        'resources/js/customer/studio/main.jsx',
+    ])
 </head>
 <body>
 @php
