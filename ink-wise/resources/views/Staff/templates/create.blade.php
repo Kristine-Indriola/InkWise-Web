@@ -86,7 +86,7 @@
 <main class="dashboard-container templates-page" role="main">
     <section class="create-container" aria-labelledby="create-template-heading">
         <div>
-            <h2 id="create-template-heading">Preview Template Design</h2>
+            <h2 id="create-template-heading">Create New Invitation Template</h2>
             <p class="create-subtitle">Upload your design files to preview how the template will look before creating it</p>
         </div>
 
@@ -104,7 +104,7 @@
                     </div>
                     <div class="create-group flex-1">
                         <label for="event_type">Event Type</label>
-                        <select id="event_type" name="event_type">
+                        <select id="event_type" name="event_type" required>
                             <option value="">Select event type</option>
                             <option value="Wedding" {{ ($previewData['event_type'] ?? '') === 'Wedding' ? 'selected' : '' }}>Wedding</option>
                             <option value="Birthday" {{ ($previewData['event_type'] ?? '') === 'Birthday' ? 'selected' : '' }}>Birthday</option>
@@ -124,7 +124,7 @@
                     </div>
                     <div class="create-group flex-1">
                         <label for="theme_style">Theme/Style</label>
-                        <input type="text" id="theme_style" name="theme_style" placeholder="e.g. Minimalist, Floral" value="{{ $previewData['theme_style'] ?? '' }}">
+                        <input type="text" id="theme_style" name="theme_style" placeholder="e.g. Minimalist, Floral" value="{{ $previewData['theme_style'] ?? '' }}" required>
                     </div>
                 </div>
 
@@ -136,7 +136,7 @@
 
             <div class="create-actions">
                 <a href="{{ route('staff.templates.index') }}" class="btn-cancel">Cancel</a>
-                <button type="submit" class="btn-submit">Create Preview</button>
+                <button type="submit" class="btn-submit">Create Template</button>
             </div>
         </form>
     </section>

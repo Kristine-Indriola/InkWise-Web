@@ -55,10 +55,13 @@ use App\Http\Controllers\PaymentController;
 
 use App\Http\Controllers\Admin\OrderSummaryController;
 use App\Models\Product;
+use App\Models\Template;
+use App\Services\OrderFlowService;
 
 use App\Http\Controllers\Admin\UserPasswordResetController;
 use App\Models\User as AppUser;
 use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Http\Request;
 
 use App\Http\Controllers\Auth\VerifyEmailController;
 
@@ -154,6 +157,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::delete('/{id}', [AdminTemplateController::class, 'destroy'])->name('destroy');
         // Move these two lines inside this group and fix the path:
         Route::post('{id}/save-canvas', [AdminTemplateController::class, 'saveCanvas'])->name('saveCanvas');
+        Route::post('{id}/save-template', [AdminTemplateController::class, 'saveTemplate'])->name('saveTemplate');
         Route::post('{id}/upload-preview', [AdminTemplateController::class, 'uploadPreview'])->name('uploadPreview');
     Route::post('{id}/autosave', [AdminTemplateController::class, 'autosave'])->name('autosave');
         // Add new API routes
@@ -569,15 +573,136 @@ Route::get('/product/preview/{product}', function (Product $product) {
 
     return view('customer.Invitations.productpreview', compact('product'));
 })->name('product.preview');
-Route::get('/design/studio/{product?}', function (?Product $product) {
-    if ($product) {
-        $product->loadMissing(['template']);
+Route::get('/design/studio/{template}', function (Template $template, Request $request) {
+    /** @var OrderFlowService $orderFlow */
+    $orderFlow = app(OrderFlowService::class);
+    $productId = $request->query('product');
+
+    $product = null;
+    if ($productId) {
+        $product = Product::with(['template'])->find($productId);
     }
 
-    return view('customer.Invitations.studio', compact('product'));
+    if (!$product) {
+        $product = Product::query()
+            ->with(['template'])
+            ->where('template_id', $template->id)
+            ->latest('updated_at')
+            ->first();
+    }
+
+    if ($product) {
+        $product->setRelation('template', $template);
+    }
+
+    $summaryKey = 'order_summary_payload';
+    $orderKey = 'current_order_id';
+    $summary = session($summaryKey);
+    if (!is_array($summary)) {
+        $summary = [];
+    }
+
+    $defaultQuantity = null;
+
+    if ($product) {
+        $defaultQuantity = $summary['quantity'] ?? $orderFlow->defaultQuantityFor($product);
+        $unitPrice = $orderFlow->unitPriceFor($product);
+        $subtotal = round($unitPrice * $defaultQuantity, 2);
+        $taxAmount = 0.0;
+        $shippingFee = 0.0;
+        $images = $orderFlow->resolveProductImages($product);
+        $designMetadata = $orderFlow->buildDesignMetadata($product);
+
+        $shouldResetSummary = ($summary['productId'] ?? null) !== $product->id;
+
+        if ($shouldResetSummary) {
+            $summary = [
+                'orderId' => null,
+                'orderNumber' => null,
+                'orderStatus' => 'draft',
+                'paymentStatus' => null,
+                'productId' => $product->id,
+                'productName' => $product->name ?? 'Custom Invitation',
+                'quantity' => $defaultQuantity,
+                'unitPrice' => $unitPrice,
+                'subtotalAmount' => $subtotal,
+                'taxAmount' => $taxAmount,
+                'shippingFee' => $shippingFee,
+                'totalAmount' => round($subtotal + $taxAmount + $shippingFee, 2),
+                'previewImages' => $images['all'] ?? [],
+                'previewImage' => $images['front'] ?? null,
+                'invitationImage' => $images['front'] ?? null,
+                'paperStockId' => null,
+                'paperStockName' => null,
+                'paperStockPrice' => null,
+                'addons' => [],
+                'addonIds' => [],
+                'metadata' => [
+                    'design' => $designMetadata,
+                ],
+                'placeholders' => $designMetadata['placeholders'] ?? [],
+                'extras' => [
+                    'paper' => 0,
+                    'addons' => 0,
+                    'envelope' => 0,
+                    'giveaway' => 0,
+                ],
+            ];
+        } else {
+            $summary['productId'] = $product->id;
+            $summary['productName'] = $product->name ?? 'Custom Invitation';
+            $summary['quantity'] = $summary['quantity'] ?? $defaultQuantity;
+            $summary['unitPrice'] = $summary['unitPrice'] ?? $unitPrice;
+            $summary['subtotalAmount'] = $summary['subtotalAmount'] ?? $subtotal;
+            $summary['taxAmount'] = $summary['taxAmount'] ?? $taxAmount;
+            $summary['shippingFee'] = $summary['shippingFee'] ?? $shippingFee;
+            $summary['totalAmount'] = $summary['totalAmount'] ?? round(($summary['subtotalAmount'] ?? $subtotal) + ($summary['taxAmount'] ?? $taxAmount) + ($summary['shippingFee'] ?? $shippingFee), 2);
+
+            $summary['metadata'] = is_array($summary['metadata'] ?? null) ? $summary['metadata'] : [];
+            if (empty($summary['metadata']['design'])) {
+                $summary['metadata']['design'] = $designMetadata;
+            }
+
+            if (empty($summary['previewImages'])) {
+                $summary['previewImages'] = $images['all'] ?? [];
+            }
+
+            if (empty($summary['previewImage']) && !empty($images['front'])) {
+                $summary['previewImage'] = $images['front'];
+            }
+
+            if (empty($summary['invitationImage']) && !empty($summary['previewImage'])) {
+                $summary['invitationImage'] = $summary['previewImage'];
+            }
+
+            if (empty($summary['placeholders']) && !empty($designMetadata['placeholders'])) {
+                $summary['placeholders'] = $designMetadata['placeholders'];
+            }
+
+            if (!isset($summary['extras']) || !is_array($summary['extras'])) {
+                $summary['extras'] = [
+                    'paper' => 0,
+                    'addons' => 0,
+                    'envelope' => 0,
+                    'giveaway' => 0,
+                ];
+            }
+        }
+
+        session()->put($summaryKey, $summary);
+        session()->forget($orderKey);
+    }
+
+    return view('customer.Invitations.studio', [
+        'product' => $product,
+        'template' => $template,
+        'defaultQuantity' => $defaultQuantity,
+        'orderSummary' => $summary,
+    ]);
 })->name('design.studio');
 Route::get('/design/edit/{product?}', [OrderFlowController::class, 'edit'])->name('design.edit');
 Route::post('/order/cart/items', [OrderFlowController::class, 'storeDesignSelection'])->name('order.cart.add');
+Route::post('/design/autosave', [OrderFlowController::class, 'autosaveDesign'])->name('order.design.autosave');
 
 /**Order Forms & Pages*/
 Route::get('/order/review', [OrderFlowController::class, 'review'])->name('order.review');
@@ -771,6 +896,7 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
         Route::delete('/{id}', [App\Http\Controllers\Admin\TemplateController::class, 'destroy'])->name('destroy');
         // Move these two lines inside this group and fix the path:
         Route::post('{id}/save-canvas', [App\Http\Controllers\Admin\TemplateController::class, 'saveCanvas'])->name('saveCanvas');
+        Route::post('{id}/save-template', [App\Http\Controllers\Admin\TemplateController::class, 'saveTemplate'])->name('saveTemplate');
         Route::post('{id}/upload-preview', [App\Http\Controllers\Admin\TemplateController::class, 'uploadPreview'])->name('uploadPreview');
     Route::post('{id}/autosave', [App\Http\Controllers\Admin\TemplateController::class, 'autosave'])->name('autosave');
         // Add new API routes

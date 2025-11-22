@@ -33,17 +33,17 @@ function formatSavedLabel(autosaveStatus, lastSavedAt) {
   }
 }
 
-function formatPreviewStatus({ isSavingPreview, previewSaveError, lastPreviewSavedAt }) {
-  if (isSavingPreview) {
-    return 'Saving preview…';
+function formatManualSaveStatus({ isSavingTemplate, saveError, lastManualSaveAt }) {
+  if (isSavingTemplate) {
+    return 'Saving template…';
   }
-  if (previewSaveError) {
-    return previewSaveError;
+  if (saveError) {
+    return saveError;
   }
-  if (lastPreviewSavedAt) {
-    const date = new Date(lastPreviewSavedAt);
+  if (lastManualSaveAt) {
+    const date = new Date(lastManualSaveAt);
     if (!Number.isNaN(date.getTime())) {
-      return `Preview saved at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      return `Template saved at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     }
   }
   return null;
@@ -53,9 +53,9 @@ export function BuilderTopBar({
   autosaveStatus,
   lastSavedAt,
   onSaveTemplate,
-  isSavingPreview,
-  previewSaveError,
-  lastPreviewSavedAt,
+  isSavingTemplate,
+  saveError,
+  lastManualSaveAt,
 }) {
   const { state, dispatch, routes } = useBuilderStore();
   const templateName = state.template?.name ?? 'Untitled template';
@@ -64,21 +64,21 @@ export function BuilderTopBar({
   const handleRedo = () => dispatch({ type: 'REDO' });
   const handlePreview = () => dispatch({ type: 'SHOW_PREVIEW_MODAL' });
   const handleSave = () => {
-    if (typeof onSaveTemplate === 'function' && !isSavingPreview) {
+    if (typeof onSaveTemplate === 'function' && !isSavingTemplate) {
       onSaveTemplate();
     }
   };
   const statusLabel = formatSavedLabel(autosaveStatus, lastSavedAt);
   const isSaving = autosaveStatus === 'saving';
   const hasError = autosaveStatus === 'error';
-  const previewStatusLabel = formatPreviewStatus({ isSavingPreview, previewSaveError, lastPreviewSavedAt });
-  const previewStatusClass = previewSaveError
+  const manualSaveStatusLabel = formatManualSaveStatus({ isSavingTemplate, saveError, lastManualSaveAt });
+  const manualStatusClass = saveError
     ? 'builder-topbar__status--error'
-    : isSavingPreview
+    : isSavingTemplate
       ? 'builder-topbar__status--saving'
       : 'builder-topbar__status--success';
-  const saveButtonLabel = isSavingPreview ? 'Saving preview…' : 'Save preview';
-  const saveDisabled = typeof onSaveTemplate !== 'function' || isSavingPreview;
+  const saveButtonLabel = isSavingTemplate ? 'Saving template…' : 'Save template';
+  const saveDisabled = typeof onSaveTemplate !== 'function' || isSavingTemplate;
 
   return (
     <header className="builder-topbar" role="banner">
@@ -114,9 +114,9 @@ export function BuilderTopBar({
           >
             {statusLabel}
           </span>
-          {previewStatusLabel && (
-            <span className={`builder-topbar__status builder-topbar__status--sub ${previewStatusClass}`}>
-              {previewStatusLabel}
+          {manualSaveStatusLabel && (
+            <span className={`builder-topbar__status builder-topbar__status--sub ${manualStatusClass}`}>
+              {manualSaveStatusLabel}
             </span>
           )}
         </div>
@@ -126,7 +126,7 @@ export function BuilderTopBar({
         <button
           type="button"
           className="builder-btn builder-btn--primary"
-          aria-label="Save template preview"
+          aria-label="Save template"
           onClick={handleSave}
           disabled={saveDisabled}
         >
@@ -141,16 +141,16 @@ BuilderTopBar.propTypes = {
   autosaveStatus: PropTypes.string,
   lastSavedAt: PropTypes.string,
   onSaveTemplate: PropTypes.func,
-  isSavingPreview: PropTypes.bool,
-  previewSaveError: PropTypes.string,
-  lastPreviewSavedAt: PropTypes.string,
+  isSavingTemplate: PropTypes.bool,
+  saveError: PropTypes.string,
+  lastManualSaveAt: PropTypes.string,
 };
 
 BuilderTopBar.defaultProps = {
   autosaveStatus: 'idle',
   lastSavedAt: null,
   onSaveTemplate: null,
-  isSavingPreview: false,
-  previewSaveError: null,
-  lastPreviewSavedAt: null,
+  isSavingTemplate: false,
+  saveError: null,
+  lastManualSaveAt: null,
 };

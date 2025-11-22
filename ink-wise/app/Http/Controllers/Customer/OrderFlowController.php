@@ -145,6 +145,91 @@ class OrderFlowController extends Controller
         return redirect()->route('order.review');
     }
 
+    public function autosaveDesign(Request $request): JsonResponse
+    {
+        $payload = $request->validate([
+            'design' => ['required', 'array'],
+            'design.updated_at' => ['nullable', 'string'],
+            'design.sides' => ['nullable', 'array'],
+            'design.sides.*' => ['nullable', 'array'],
+            'design.texts' => ['nullable', 'array'],
+            'design.texts.*' => ['nullable', 'array'],
+            'design.images' => ['nullable', 'array'],
+            'design.images.*' => ['nullable', 'array'],
+            'design.canvas' => ['nullable', 'array'],
+            'preview' => ['nullable', 'array'],
+            'preview.image' => ['nullable', 'string'],
+            'preview.images' => ['nullable', 'array'],
+            'preview.images.*' => ['nullable', 'string'],
+            'placeholders' => ['nullable', 'array'],
+            'placeholders.*' => ['nullable', 'string'],
+        ]);
+
+        $placeholders = collect(Arr::get($payload, 'placeholders', []))
+            ->filter(fn ($value) => is_string($value) && trim($value) !== '')
+            ->map(fn ($value) => trim($value))
+            ->values()
+            ->all();
+
+        $designMeta = $this->normalizeDesignAutosavePayload(Arr::get($payload, 'design', []), $placeholders);
+        $preview = Arr::get($payload, 'preview', []);
+        $previewImages = $this->deriveDesignPreviewImages($preview, $designMeta);
+        $primaryPreview = $previewImages[0] ?? Arr::get($preview, 'image');
+
+        $summary = session(static::SESSION_SUMMARY_KEY) ?? [];
+        if (!is_array($summary)) {
+            $summary = [];
+        }
+
+        $summary['metadata'] = is_array($summary['metadata'] ?? null)
+            ? $summary['metadata']
+            : [];
+        $summary['metadata']['design'] = $designMeta;
+
+        if (!empty($previewImages)) {
+            $summary['previewImages'] = $previewImages;
+        }
+
+        if ($primaryPreview) {
+            $summary['previewImage'] = $primaryPreview;
+            $summary['invitationImage'] = $primaryPreview;
+            if (empty($summary['previewImages'])) {
+                $summary['previewImages'] = [$primaryPreview];
+            } else {
+                $summary['previewImages'][0] = $primaryPreview;
+            }
+        }
+
+        if (!empty($placeholders)) {
+            $summary['placeholders'] = $placeholders;
+        }
+
+        session()->put(static::SESSION_SUMMARY_KEY, $summary);
+
+        $order = $this->currentOrder(false);
+        if ($order) {
+            DB::transaction(function () use (&$order, $designMeta, $placeholders, $summary) {
+                $previewImages = $summary['previewImages'] ?? [];
+                $previewImage = $summary['previewImage'] ?? null;
+
+                $order = $this->orderFlow->applyDesignAutosave($order, [
+                    'design' => $designMeta,
+                    'placeholders' => $placeholders,
+                    'preview_image' => $previewImage,
+                    'preview_images' => $previewImages,
+                ]);
+            });
+        }
+
+        return response()->json([
+            'message' => 'Design saved.',
+            'saved_at' => $designMeta['updated_at'] ?? Carbon::now()->toIso8601String(),
+            'order_id' => $order?->id,
+            'summary' => $summary,
+            'review_url' => route('order.review'),
+        ]);
+    }
+
     public function review(): RedirectResponse|ViewContract
     {
         $order = $this->currentOrder();
@@ -160,6 +245,24 @@ class OrderFlowController extends Controller
             $product = $this->orderFlow->resolveProduct(null, $summary['productId']);
             $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
             $placeholderItems = collect($summary['placeholders'] ?? []);
+
+            $summaryPreviewImages = array_values(array_filter($summary['previewImages'] ?? [], fn ($value) => is_string($value) && trim($value) !== ''));
+            if (!empty($summaryPreviewImages)) {
+                $images['all'] = $summaryPreviewImages;
+                $images['front'] = $summaryPreviewImages[0];
+                if (!empty($summaryPreviewImages[1])) {
+                    $images['back'] = $summaryPreviewImages[1];
+                }
+            }
+
+            if (!empty($summary['previewImage']) && is_string($summary['previewImage'])) {
+                $images['front'] = $summary['previewImage'];
+                if (empty($images['all'])) {
+                    $images['all'] = [$summary['previewImage']];
+                } else {
+                    $images['all'][0] = $summary['previewImage'];
+                }
+            }
 
             $orderPlaceholder = (object) ['items' => collect()];
 
@@ -188,6 +291,27 @@ class OrderFlowController extends Controller
         $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
         $designMeta = $item?->design_metadata ?? [];
         $placeholderItems = collect(Arr::get($designMeta, 'placeholders', []));
+
+        $summaryPayload = session(static::SESSION_SUMMARY_KEY);
+        if (is_array($summaryPayload)) {
+            $sessionPreviewImages = array_values(array_filter($summaryPayload['previewImages'] ?? [], fn ($value) => is_string($value) && trim($value) !== ''));
+            if (!empty($sessionPreviewImages)) {
+                $images['all'] = $sessionPreviewImages;
+                $images['front'] = $sessionPreviewImages[0];
+                if (!empty($sessionPreviewImages[1])) {
+                    $images['back'] = $sessionPreviewImages[1];
+                }
+            }
+
+            if (!empty($summaryPayload['previewImage']) && is_string($summaryPayload['previewImage'])) {
+                $images['front'] = $summaryPayload['previewImage'];
+                if (empty($images['all'])) {
+                    $images['all'] = [$summaryPayload['previewImage']];
+                } else {
+                    $images['all'][0] = $summaryPayload['previewImage'];
+                }
+            }
+        }
 
         return view('customer.orderflow.review', [
             'order' => $order,
@@ -1231,6 +1355,125 @@ class OrderFlowController extends Controller
             'order' => $order,
             'orderSummary' => $orderSummary,
         ]);
+    }
+
+    private function normalizeDesignAutosavePayload(array $design, array $placeholders): array
+    {
+        $updatedAt = Arr::get($design, 'updated_at');
+        if (!is_string($updatedAt) || trim($updatedAt) === '') {
+            $updatedAt = Carbon::now()->toIso8601String();
+        }
+
+        $sides = [];
+        $rawSides = Arr::get($design, 'sides', []);
+        if (is_array($rawSides)) {
+            foreach ($rawSides as $key => $side) {
+                if (!is_array($side)) {
+                    continue;
+                }
+
+                $normalizedSide = array_filter([
+                    'svg' => is_string($side['svg'] ?? null) ? $side['svg'] : null,
+                    'preview' => is_string($side['preview'] ?? null) ? $side['preview'] : null,
+                ], fn ($value) => is_string($value) && trim($value) !== '');
+
+                if (!empty($normalizedSide)) {
+                    $sides[(string) $key] = $normalizedSide;
+                }
+            }
+        }
+
+        $textEntries = [];
+        foreach ((array) Arr::get($design, 'texts', []) as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $textEntries[] = [
+                'key' => (string) ($entry['key'] ?? ''),
+                'label' => (string) ($entry['label'] ?? ''),
+                'value' => (string) ($entry['value'] ?? ''),
+                'defaultValue' => (string) ($entry['defaultValue'] ?? ''),
+            ];
+        }
+
+        $imageEntries = [];
+        foreach ((array) Arr::get($design, 'images', []) as $image) {
+            if (!is_array($image)) {
+                continue;
+            }
+
+            $imageEntries[] = array_filter([
+                'key' => $image['key'] ?? null,
+                'href' => $image['href'] ?? null,
+                'x' => $image['x'] ?? null,
+                'y' => $image['y'] ?? null,
+                'width' => $image['width'] ?? null,
+                'height' => $image['height'] ?? null,
+            ], fn ($value) => $value !== null && $value !== '');
+        }
+
+        $canvas = null;
+        $rawCanvas = Arr::get($design, 'canvas');
+        if (is_array($rawCanvas)) {
+            $canvas = array_filter([
+                'width' => isset($rawCanvas['width']) ? (float) $rawCanvas['width'] : null,
+                'height' => isset($rawCanvas['height']) ? (float) $rawCanvas['height'] : null,
+                'unit' => is_string($rawCanvas['unit'] ?? null) ? $rawCanvas['unit'] : null,
+                'shape' => is_string($rawCanvas['shape'] ?? null) ? $rawCanvas['shape'] : null,
+            ], fn ($value) => $value !== null && $value !== '');
+        }
+
+        return array_filter([
+            'updated_at' => $updatedAt,
+            'sides' => $sides ?: null,
+            'texts' => $textEntries,
+            'images' => $imageEntries,
+            'canvas' => $canvas,
+            'placeholders' => $placeholders,
+        ], function ($value) {
+            if (is_array($value)) {
+                return !empty($value);
+            }
+
+            return $value !== null && $value !== '';
+        });
+    }
+
+    private function deriveDesignPreviewImages(array $preview, array $designMeta): array
+    {
+        $candidates = [];
+
+        $primary = Arr::get($preview, 'image');
+        if (is_string($primary) && trim($primary) !== '') {
+            $candidates[] = trim($primary);
+        }
+
+        foreach ((array) Arr::get($preview, 'images', []) as $image) {
+            if (is_string($image) && trim($image) !== '') {
+                $candidates[] = trim($image);
+            }
+        }
+
+        foreach ((array) Arr::get($designMeta, 'sides', []) as $side) {
+            if (!is_array($side)) {
+                continue;
+            }
+
+            $previewValue = $side['preview'] ?? null;
+            if (is_string($previewValue) && trim($previewValue) !== '') {
+                $candidates[] = trim($previewValue);
+            }
+        }
+
+        $unique = [];
+        foreach ($candidates as $candidate) {
+            if (!in_array($candidate, $unique, true)) {
+                $unique[] = $candidate;
+            }
+        }
+
+        return $unique;
     }
 
     private function sanitizeSummaryPayload(array $payload): array

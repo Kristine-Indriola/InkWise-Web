@@ -1,6 +1,10 @@
 {
+  "_client-Cv0X-2PX.js": {
+    "file": "assets/client-Cv0X-2PX.js",
+    "name": "client"
+  },
   "resources/css/app.css": {
-    "file": "assets/app-iS0bldWa.css",
+    "file": "assets/app-Dvqxhsnr.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -21,11 +25,32 @@
     "src": "resources/js/customer/customer.js",
     "isEntry": true
   },
+  "resources/js/customer/studio/main.jsx": {
+    "file": "assets/main-DvqIAIAC.js",
+    "name": "main",
+    "src": "resources/js/customer/studio/main.jsx",
+    "isEntry": true,
+    "imports": [
+      "_client-Cv0X-2PX.js"
+    ],
+    "css": [
+      "assets/main-GbDmIJBe.css"
+    ]
+  },
+  "resources/js/customer/studio/svg-template-editor.jsx": {
+    "file": "assets/svg-template-editor-C1DJoYuc.js",
+    "name": "svg-template-editor",
+    "src": "resources/js/customer/studio/svg-template-editor.jsx",
+    "isEntry": true
+  },
   "resources/js/staff/template-editor/main.jsx": {
-    "file": "assets/main-Zicevmx-.js",
+    "file": "assets/main-DTQRCSZQ.js",
     "name": "main",
     "src": "resources/js/staff/template-editor/main.jsx",
     "isEntry": true,
+    "imports": [
+      "_client-Cv0X-2PX.js"
+    ],
     "dynamicImports": [
       "resources/js/staff/template-editor/utils/recentImagesDB.js",
       "resources/js/staff/template-editor/utils/recentImagesDB.js",
@@ -34,7 +59,7 @@
       "resources/js/staff/template-editor/utils/recentImagesDB.js"
     ],
     "css": [
-      "assets/main-f9n9hlOR.css"
+      "assets/main-DuNGlsMr.css"
     ]
   },
   "resources/js/staff/template-editor/utils/recentImagesDB.js": {

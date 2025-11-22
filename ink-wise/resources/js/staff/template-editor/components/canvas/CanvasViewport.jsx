@@ -3,8 +3,6 @@ import PropTypes from 'prop-types';
 
 import { useBuilderStore } from '../../state/BuilderStore';
 
-const domElementProp = typeof Element === 'undefined' ? PropTypes.any : PropTypes.instanceOf(Element);
-
 // Helper functions to constrain layers within safe zone
 function resolveInsets(zone) {
   if (!zone) {
@@ -43,13 +41,6 @@ function constrainFrameToSafeZone(frame, page, safeInsets) {
   };
 }
 
-const RESIZE_HANDLES = [
-  { corner: 'nw', cursor: 'nwse-resize' },
-  { corner: 'ne', cursor: 'nesw-resize' },
-  { corner: 'sw', cursor: 'nesw-resize' },
-  { corner: 'se', cursor: 'nwse-resize' },
-];
-
 export function CanvasViewport({ page, canvasRef }) {
   const { state, dispatch } = useBuilderStore();
   const dragStateRef = useRef(null);
@@ -57,37 +48,6 @@ export function CanvasViewport({ page, canvasRef }) {
   const resizeStateRef = useRef(null);
   const [draggingLayerId, setDraggingLayerId] = useState(null);
   const [resizingLayerId, setResizingLayerId] = useState(null);
-  const [activeGuides, setActiveGuides] = useState([]);
-
-  const updateLayerMetadata = (layer, metadataPatch) => {
-    if (!layer || !metadataPatch) {
-      return;
-    }
-
-    dispatch({
-      type: 'UPDATE_LAYER_PROPS',
-      pageId: page.id,
-      layerId: layer.id,
-      props: {
-        metadata: {
-          ...(layer.metadata ?? {}),
-          ...metadataPatch,
-        },
-      },
-    });
-  };
-
-  const applyImageFitMode = (layer, mode) => {
-    if (!mode) {
-      return;
-    }
-    updateLayerMetadata(layer, { objectFit: mode });
-  };
-
-  const cycleImageFitMode = (layer, currentMode) => {
-    const nextMode = currentMode === 'cover' ? 'contain' : 'cover';
-    applyImageFitMode(layer, nextMode);
-  };
 
   if (!page) {
     return null;
@@ -163,7 +123,6 @@ export function CanvasViewport({ page, canvasRef }) {
 
     dispatch({ type: 'BEGIN_LAYER_TRANSFORM' });
     setDraggingLayerId(layer.id);
-  setActiveGuides([]);
 
     const pointerId = event.pointerId;
     dragStateRef.current = {
@@ -197,20 +156,12 @@ export function CanvasViewport({ page, canvasRef }) {
       };
 
       const constrainedFrame = constrainFrameToSafeZone(nextFrame, page, safeInsets);
-      const { frame: snappedFrame, guides } = applySmartGuides(
-        constrainedFrame,
-        page,
-        layerFrames,
-        dragState.layerId,
-      );
-      setActiveGuides(guides);
-      const finalFrame = constrainFrameToSafeZone(snappedFrame, page, safeInsets);
 
       dispatch({
         type: 'UPDATE_LAYER_FRAME',
         pageId: page.id,
         layerId: dragState.layerId,
-        frame: finalFrame,
+        frame: constrainedFrame,
         trackHistory: false,
       });
       return;
@@ -237,7 +188,6 @@ export function CanvasViewport({ page, canvasRef }) {
         panX: nextPanX,
         panY: nextPanY,
       });
-      setActiveGuides([]);
     }
   };
 
@@ -255,7 +205,6 @@ export function CanvasViewport({ page, canvasRef }) {
 
     dragStateRef.current = null;
     setDraggingLayerId(null);
-    setActiveGuides([]);
   };
 
   const beginLayerResize = (event, layer, frame, corner) => {
@@ -268,7 +217,6 @@ export function CanvasViewport({ page, canvasRef }) {
 
     dispatch({ type: 'BEGIN_LAYER_TRANSFORM' });
     setResizingLayerId(layer.id);
-  setActiveGuides([]);
 
     const pointerId = event.pointerId;
     const captureTarget = event.currentTarget;
@@ -340,20 +288,11 @@ export function CanvasViewport({ page, canvasRef }) {
         break;
     }
 
-    const constrainedFrame = constrainFrameToSafeZone(nextFrame, page, safeInsets);
-    const { frame: snappedFrame, guides } = applySmartGuides(
-      constrainedFrame,
-      page,
-      layerFrames,
-      resizeState.layerId,
-    );
-    setActiveGuides(guides);
-
     dispatch({
       type: 'UPDATE_LAYER_FRAME',
       pageId: page.id,
       layerId: resizeState.layerId,
-      frame: constrainFrameToSafeZone(snappedFrame, page, safeInsets),
+      frame: constrainFrameToSafeZone(nextFrame, page, safeInsets),
       trackHistory: false,
     });
   };
@@ -382,7 +321,6 @@ export function CanvasViewport({ page, canvasRef }) {
 
     resizeStateRef.current = null;
     setResizingLayerId(null);
-    setActiveGuides([]);
   };
 
   const safeInsets = resolveInsets(page.safeZone);
@@ -392,23 +330,6 @@ export function CanvasViewport({ page, canvasRef }) {
   const pageShape = page.shape ?? null;
 
   const visibleLayers = Array.isArray(page.nodes) ? page.nodes : [];
-
-  // Sort layers by side property for proper z-index stacking
-  // 'back' layers render first (behind), 'front' layers render last (on top)
-  const sortedLayers = [...visibleLayers].sort((a, b) => {
-    const sideA = a.side || 'middle';
-    const sideB = b.side || 'middle';
-
-    // Define rendering order: back -> middle -> front
-    const order = { 'back': 0, 'middle': 1, 'front': 2 };
-
-    return order[sideA] - order[sideB];
-  });
-
-  const layerFrames = sortedLayers.map((layer, index) => ({
-    layer,
-    frame: resolveFrame(layer, index, page),
-  }));
 
   // Helper function to get shape styling based on variant
   const getShapeStyling = (shape) => {
@@ -504,7 +425,6 @@ export function CanvasViewport({ page, canvasRef }) {
         >
           <div
             className="canvas-viewport__page"
-            ref={canvasRef ?? null}
             style={{
               width: page.width,
               height: page.height,
@@ -514,6 +434,7 @@ export function CanvasViewport({ page, canvasRef }) {
             }}
             onClick={() => handleSelectLayer(null)}
             data-zoom={zoom}
+            ref={canvasRef ?? null}
           >
             <div className="canvas-viewport__grid" aria-hidden="true" />
             <div
@@ -527,18 +448,7 @@ export function CanvasViewport({ page, canvasRef }) {
               aria-hidden="true"
             />
 
-            {activeGuides.map((guide, index) => (
-              <div
-                key={`guide-${guide.orientation}-${index}-${guide.position}`}
-                className={`canvas-guide canvas-guide--${guide.orientation}`}
-                style={guide.orientation === 'vertical'
-                  ? { left: guide.position }
-                  : { top: guide.position }}
-                aria-hidden="true"
-              />
-            ))}
-
-            {sortedLayers.length === 0 && (
+            {visibleLayers.length === 0 && (
               <div className="canvas-viewport__empty-state">
                 <h2>Canvas ready</h2>
                 <p>
@@ -547,7 +457,8 @@ export function CanvasViewport({ page, canvasRef }) {
               </div>
             )}
 
-            {layerFrames.map(({ layer, frame }) => {
+            {visibleLayers.map((layer, index) => {
+              const frame = resolveFrame(layer, index, page);
               const isSelected = layer.id === selectedLayerId;
               const isHidden = layer.visible === false;
               const isLocked = layer.locked === true;
@@ -569,11 +480,6 @@ export function CanvasViewport({ page, canvasRef }) {
               const scaleY = flipVertical ? -imageScale : imageScale;
 
               const isResizing = layer.id === resizingLayerId;
-              const shouldShowHandles = isSelected && !isLocked;
-              const displayX = Math.round(frame.x);
-              const displayY = Math.round(frame.y);
-              const displayWidth = Math.round(frame.width);
-              const displayHeight = Math.round(frame.height);
 
               const style = buildLayerStyle(layer, frame, {
                 hidden: isHidden,
@@ -609,13 +515,6 @@ export function CanvasViewport({ page, canvasRef }) {
                   onPointerCancel={(event) => {
                     endLayerResize(event);
                     endLayerDrag(event);
-                  }}
-                  onDoubleClick={(event) => {
-                    if (!isImage) {
-                      return;
-                    }
-                    event.stopPropagation();
-                    cycleImageFitMode(layer, objectFitMode);
                   }}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
@@ -702,55 +601,190 @@ export function CanvasViewport({ page, canvasRef }) {
                     </div>
                   )}
 
+                  {/* Resize handles for selected images */}
+                  {isSelected && isImage && layer.content && (
+                    <>
+                      {/* Northwest corner */}
+                      <div
+                        className="canvas-layer__resize-handle canvas-layer__resize-handle--nw"
+                        onPointerDown={(e) => {
+                          e.stopPropagation();
+                          beginLayerResize(e, layer, frame, 'nw');
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          position: 'absolute',
+                          top: '-8px',
+                          left: '-8px',
+                          width: '16px',
+                          height: '16px',
+                          backgroundColor: '#3b82f6',
+                          border: '2px solid #ffffff',
+                          borderRadius: '3px',
+                          cursor: 'nw-resize',
+                          zIndex: 1000,
+                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
+                          transition: 'all 0.1s ease',
+                          pointerEvents: 'auto',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'scale(1.2)';
+                          e.currentTarget.style.backgroundColor = '#1d4ed8';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'scale(1)';
+                          e.currentTarget.style.backgroundColor = '#3b82f6';
+                        }}
+                      >
+                        <div style={{
+                          width: '4px',
+                          height: '4px',
+                          backgroundColor: '#ffffff',
+                          borderRadius: '1px',
+                          opacity: 0.8,
+                          pointerEvents: 'none',
+                        }} />
+                      </div>
+                      {/* Northeast corner */}
+                      <div
+                        className="canvas-layer__resize-handle canvas-layer__resize-handle--ne"
+                        onPointerDown={(e) => {
+                          e.stopPropagation();
+                          beginLayerResize(e, layer, frame, 'ne');
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          position: 'absolute',
+                          top: '-8px',
+                          right: '-8px',
+                          width: '16px',
+                          height: '16px',
+                          backgroundColor: '#3b82f6',
+                          border: '2px solid #ffffff',
+                          borderRadius: '3px',
+                          cursor: 'ne-resize',
+                          zIndex: 1000,
+                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
+                          transition: 'all 0.1s ease',
+                          pointerEvents: 'auto',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'scale(1.2)';
+                          e.currentTarget.style.backgroundColor = '#1d4ed8';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'scale(1)';
+                          e.currentTarget.style.backgroundColor = '#3b82f6';
+                        }}
+                      >
+                        <div style={{
+                          width: '4px',
+                          height: '4px',
+                          backgroundColor: '#ffffff',
+                          borderRadius: '1px',
+                          opacity: 0.8,
+                          pointerEvents: 'none',
+                        }} />
+                      </div>
+                      {/* Southwest corner */}
+                      <div
+                        className="canvas-layer__resize-handle canvas-layer__resize-handle--sw"
+                        onPointerDown={(e) => {
+                          e.stopPropagation();
+                          beginLayerResize(e, layer, frame, 'sw');
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          position: 'absolute',
+                          bottom: '-8px',
+                          left: '-8px',
+                          width: '16px',
+                          height: '16px',
+                          backgroundColor: '#3b82f6',
+                          border: '2px solid #ffffff',
+                          borderRadius: '3px',
+                          cursor: 'sw-resize',
+                          zIndex: 1000,
+                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
+                          transition: 'all 0.1s ease',
+                          pointerEvents: 'auto',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'scale(1.2)';
+                          e.currentTarget.style.backgroundColor = '#1d4ed8';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'scale(1)';
+                          e.currentTarget.style.backgroundColor = '#3b82f6';
+                        }}
+                      >
+                        <div style={{
+                          width: '4px',
+                          height: '4px',
+                          backgroundColor: '#ffffff',
+                          borderRadius: '1px',
+                          opacity: 0.8,
+                          pointerEvents: 'none',
+                        }} />
+                      </div>
+                      {/* Southeast corner */}
+                      <div
+                        className="canvas-layer__resize-handle canvas-layer__resize-handle--se"
+                        onPointerDown={(e) => {
+                          e.stopPropagation();
+                          beginLayerResize(e, layer, frame, 'se');
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          position: 'absolute',
+                          bottom: '-8px',
+                          right: '-8px',
+                          width: '16px',
+                          height: '16px',
+                          backgroundColor: '#3b82f6',
+                          border: '2px solid #ffffff',
+                          borderRadius: '3px',
+                          cursor: 'se-resize',
+                          zIndex: 1000,
+                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
+                          transition: 'all 0.1s ease',
+                          pointerEvents: 'auto',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'scale(1.2)';
+                          e.currentTarget.style.backgroundColor = '#1d4ed8';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'scale(1)';
+                          e.currentTarget.style.backgroundColor = '#3b82f6';
+                        }}
+                      >
+                        <div style={{
+                          width: '4px',
+                          height: '4px',
+                          backgroundColor: '#ffffff',
+                          borderRadius: '1px',
+                          opacity: 0.8,
+                          pointerEvents: 'none',
+                        }} />
+                      </div>
+                    </>
+                  )}
 
                   {isShape && !isText && !isImage && (
                     <span className="canvas-layer__label">{layer.name}</span>
-                  )}
-
-                  {shouldShowHandles && (
-                    <>
-                      <div className="canvas-layer__outline" aria-hidden="true" />
-                      <div className="canvas-layer__meta-pill" aria-hidden="true">
-                        {displayX}, {displayY} · {displayWidth} × {displayHeight} px
-                      </div>
-                      {isImage && (
-                        <div className="canvas-layer__image-tools" role="group" aria-label="Image fit controls">
-                          <button
-                            type="button"
-                            className={`canvas-layer__image-tool${objectFitMode === 'contain' ? ' is-active' : ''}`}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              applyImageFitMode(layer, 'contain');
-                            }}
-                          >
-                            Fit
-                          </button>
-                          <button
-                            type="button"
-                            className={`canvas-layer__image-tool${objectFitMode === 'cover' ? ' is-active' : ''}`}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              applyImageFitMode(layer, 'cover');
-                            }}
-                          >
-                            Fill
-                          </button>
-                        </div>
-                      )}
-                      {RESIZE_HANDLES.map((handle) => (
-                        <div
-                          key={handle.corner}
-                          className={`canvas-layer__resize-handle canvas-layer__resize-handle--${handle.corner}`}
-                          role="presentation"
-                          style={{ cursor: handle.cursor }}
-                          onPointerDown={(e) => {
-                            e.stopPropagation();
-                            beginLayerResize(e, layer, frame, handle.corner);
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      ))}
-                    </>
                   )}
                 </div>
               );
@@ -770,7 +804,7 @@ CanvasViewport.propTypes = {
     height: PropTypes.number.isRequired,
     nodes: PropTypes.array,
   }).isRequired,
-  canvasRef: PropTypes.shape({ current: domElementProp }),
+  canvasRef: PropTypes.shape({ current: PropTypes.any }),
 };
 
 CanvasViewport.defaultProps = {
@@ -922,126 +956,4 @@ function clampNumber(value, min, max) {
     return max;
   }
   return value;
-}
-
-function applySmartGuides(frame, page, layerFrames, activeLayerId, options = {}) {
-  if (!frame || !page) {
-    return { frame, guides: [] };
-  }
-
-  const threshold = options.threshold ?? 6;
-  const guides = [];
-  const workingFrame = { ...frame };
-
-  if (!Array.isArray(layerFrames) || layerFrames.length === 0) {
-    return { frame: workingFrame, guides };
-  }
-
-  const anchors = calculateAnchors(workingFrame);
-  const { verticalGuides, horizontalGuides } = buildGuideCandidates(page, layerFrames, activeLayerId);
-
-  const verticalSnap = findClosestGuide(verticalGuides, ['left', 'centerX', 'right'], anchors, threshold);
-  if (verticalSnap) {
-    const delta = verticalSnap.target - anchors[verticalSnap.anchorKey];
-    workingFrame.x = Math.round(workingFrame.x + delta);
-    anchors.left += delta;
-    anchors.centerX += delta;
-    anchors.right += delta;
-    guides.push({ orientation: 'vertical', position: verticalSnap.target, source: verticalSnap.source });
-  }
-
-  const horizontalSnap = findClosestGuide(horizontalGuides, ['top', 'centerY', 'bottom'], anchors, threshold);
-  if (horizontalSnap) {
-    const delta = horizontalSnap.target - anchors[horizontalSnap.anchorKey];
-    workingFrame.y = Math.round(workingFrame.y + delta);
-    anchors.top += delta;
-    anchors.centerY += delta;
-    anchors.bottom += delta;
-    guides.push({ orientation: 'horizontal', position: horizontalSnap.target, source: horizontalSnap.source });
-  }
-
-  return { frame: workingFrame, guides };
-}
-
-function buildGuideCandidates(page, layerFrames, activeLayerId) {
-  const verticalGuides = [
-    { position: 0, source: 'page-edge' },
-    { position: page.width / 2, source: 'page-center' },
-    { position: page.width, source: 'page-edge' },
-  ];
-  const horizontalGuides = [
-    { position: 0, source: 'page-edge' },
-    { position: page.height / 2, source: 'page-center' },
-    { position: page.height, source: 'page-edge' },
-  ];
-
-  layerFrames.forEach(({ layer, frame }) => {
-    if (!frame || layer.id === activeLayerId || layer.visible === false) {
-      return;
-    }
-    const anchors = calculateAnchors(frame);
-    verticalGuides.push(
-      { position: anchors.left, source: 'layer', layerId: layer.id },
-      { position: anchors.centerX, source: 'layer', layerId: layer.id },
-      { position: anchors.right, source: 'layer', layerId: layer.id },
-    );
-    horizontalGuides.push(
-      { position: anchors.top, source: 'layer', layerId: layer.id },
-      { position: anchors.centerY, source: 'layer', layerId: layer.id },
-      { position: anchors.bottom, source: 'layer', layerId: layer.id },
-    );
-  });
-
-  return { verticalGuides, horizontalGuides };
-}
-
-function calculateAnchors(frame) {
-  if (!frame) {
-    return {
-      left: 0,
-      right: 0,
-      centerX: 0,
-      top: 0,
-      bottom: 0,
-      centerY: 0,
-    };
-  }
-  return {
-    left: frame.x,
-    right: frame.x + frame.width,
-    centerX: frame.x + frame.width / 2,
-    top: frame.y,
-    bottom: frame.y + frame.height,
-    centerY: frame.y + frame.height / 2,
-  };
-}
-
-function findClosestGuide(guides, anchorKeys, anchors, threshold) {
-  if (!Array.isArray(guides) || guides.length === 0) {
-    return null;
-  }
-
-  let bestMatch = null;
-
-  guides.forEach((guide) => {
-    anchorKeys.forEach((anchorKey) => {
-      const anchorValue = anchors[anchorKey];
-      if (!Number.isFinite(anchorValue)) {
-        return;
-      }
-      const delta = guide.position - anchorValue;
-      if (Math.abs(delta) <= threshold) {
-        if (!bestMatch || Math.abs(delta) < Math.abs(bestMatch.delta)) {
-          bestMatch = {
-            ...guide,
-            anchorKey,
-            delta,
-            target: guide.position,
-          };
-        }
-      }
-    });
-  });
-
-  return bestMatch;
 }

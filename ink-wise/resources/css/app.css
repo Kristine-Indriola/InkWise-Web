@@ -1,6 +1,11 @@
 /* InkWise global stylesheet placeholder.
    Replace with Tailwind output or SCSS pipeline when ready. */
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles */
 :root {
   font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
   color: #0f172a;
