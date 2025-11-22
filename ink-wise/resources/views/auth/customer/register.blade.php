@@ -112,7 +112,7 @@
             margin: 0.75rem 0 0;
             color: var(--color-ink);
         }
-/* sample */
+
         .intro-copy {
             font-size: 0.95rem;
             line-height: 1.65;
@@ -155,16 +155,13 @@
             gap: 1.25rem;
             max-height: 86vh;
             overflow-y: auto;
+            -ms-overflow-style: none;
+            scrollbar-width: none;
         }
 
         .auth-card::-webkit-scrollbar {
             width: 0 !important;
             background: transparent;
-        }
-
-        .auth-card {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
         }
 
         .auth-card__action {
@@ -292,6 +289,105 @@
         .btn-inkwise--small {
             padding: 0.45rem 1rem;
             font-size: 0.78rem;
+        }
+
+        .register-step {
+            display: block;
+        }
+
+        .register-step.hidden {
+            display: none !important;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Input field styles */
+        input[type="text"],
+        input[type="email"],
+        input[type="password"],
+        input[type="date"] {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.875rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            transition: all 0.15s ease;
+            font-family: inherit;
+            background-color: #ffffff;
+            color: var(--color-ink);
+        }
+
+        input[type="text"]:focus,
+        input[type="email"]:focus,
+        input[type="password"]:focus,
+        input[type="date"]:focus {
+            outline: none;
+            border-color: #5eead4;
+            ring: 2px;
+            ring-color: rgba(94, 234, 212, 0.5);
+            box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        input[type="text"]::placeholder,
+        input[type="email"]::placeholder,
+        input[type="password"]::placeholder {
+            color: #9ca3af;
+        }
+
+        /* Label styles */
+        label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #374151;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.25rem;
+        }
+
+        /* Field container spacing */
+        .flex-1 {
+            flex: 1 1 0%;
+        }
+
+        .space-y-4 > * + * {
+            margin-top: 1rem;
+        }
+
+        .gap-3 {
+            gap: 0.75rem;
+        }
+
+        .mt-1 {
+            margin-top: 0.25rem;
+        }
+
+        .mt-4 {
+            margin-top: 1rem;
+        }
+
+        .mt-6 {
+            margin-top: 1.5rem;
+        }
+
+        /* Navigation buttons container */
+        .flex.items-center.justify-between,
+        .flex.items-center.justify-end {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            padding: 0 0.5rem;
+        }
+
+        .flex.items-center.justify-between {
+            justify-content: space-between;
+        }
+
+        .flex.items-center.justify-end {
+            justify-content: flex-end;
         }
     </style>
 </head>
@@ -565,9 +661,21 @@
                     return false;
                 }
 
-                if (index === 2 && !verificationSent) {
-                    setStatus('Please send your verification code before continuing.', 'error');
-                    return false;
+                if (index === 2) {
+                    if (!verificationSent) {
+                        setStatus('Please send your verification code before continuing.', 'error');
+                        return false;
+                    }
+
+                    // Validate verification code format before proceeding
+                    const code = verificationCodeInput ? verificationCodeInput.value.trim() : '';
+                    
+                    if (!code || code.length !== 6) {
+                        setStatus('Please enter a valid 6-digit verification code.', 'error');
+                        return false;
+                    }
+
+                    clearStatus();
                 }
 
                 return true;
