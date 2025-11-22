@@ -410,23 +410,24 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
     paletteContainer.addEventListener('touchmove', preventScrollPropagation, { passive: true });
 
     return () => {
-      try {
-        paletteContainer.removeEventListener('wheel', preventScrollPropagation);
-        paletteContainer.removeEventListener('touchmove', preventScrollPropagation);
-      } catch (err) {
-        // ignore
-      }
+      paletteContainer.removeEventListener('wheel', preventScrollPropagation);
+      paletteContainer.removeEventListener('touchmove', preventScrollPropagation);
     };
-  }, [currentPaletteSets.length]);
+  }, []);
 
   const pickRandomCuratedPalette = useCallback(() => {
-    if (!CURATED_PALETTE_LIBRARY.length) {
+    if (!CURATED_PALETTE_LIBRARY?.length) {
       return null;
     }
     const randomIndex = Math.floor(Math.random() * CURATED_PALETTE_LIBRARY.length);
     const entry = CURATED_PALETTE_LIBRARY[randomIndex];
     return entry
-      ? { id: `curated-${entry.id}-${Math.random().toString(36).slice(2, 7)}`, label: entry.label, colors: [...entry.colors], source: 'curated' }
+      ? {
+          id: `curated-${entry.id}-${Math.random().toString(36).slice(2, 7)}`,
+          label: entry.label,
+          colors: [...entry.colors],
+          source: 'curated',
+        }
       : null;
   }, [CURATED_PALETTE_LIBRARY]);
 
@@ -2293,9 +2294,17 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
         },
       ],
     },
+    {
+      id: 'default-user',
+      thumbUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/user.svg',
+      previewUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/user.svg',
+      downloadUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/user.svg',
+      description: 'User',
+      provider: 'default',
+      providerLabel: 'Simple Icons',
+      credit: 'Simple Icons',
+    },
   ];
-  // Styled text presets (loaded from Google Fonts list + sample text)
-
   const sampleStyledTexts = [
     'Life is an ADVENTURE',
     "Congratulations! You're a Big Brother",
