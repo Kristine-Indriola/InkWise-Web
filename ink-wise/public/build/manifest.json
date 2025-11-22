@@ -3,6 +3,21 @@
     "file": "assets/client-Cv0X-2PX.js",
     "name": "client"
   },
+  "resources/css/admin/template/edit.css": {
+    "file": "assets/edit-CShXJca9.css",
+    "src": "resources/css/admin/template/edit.css",
+    "isEntry": true
+  },
+  "resources/css/admin/template/image.css": {
+    "file": "assets/image-DX1JsKfP.css",
+    "src": "resources/css/admin/template/image.css",
+    "isEntry": true
+  },
+  "resources/css/admin/template/template.css": {
+    "file": "assets/template-Cm6Cr1Qw.css",
+    "src": "resources/css/admin/template/template.css",
+    "isEntry": true
+  },
   "resources/css/app.css": {
     "file": "assets/app-KMDQAHUM.css",
     "src": "resources/css/app.css",
@@ -11,6 +26,28 @@
   "resources/css/customer/customer.css": {
     "file": "assets/customer-BYbDMLiU.css",
     "src": "resources/css/customer/customer.css",
+    "isEntry": true
+  },
+  "resources/css/customer/editing.css": {
+    "file": "assets/editing-tn0RQdqM.css",
+    "src": "resources/css/customer/editing.css",
+    "isEntry": true
+  },
+  "resources/css/customer/studio.css": {
+    "file": "assets/studio-CkkyVuCb.css",
+    "src": "resources/css/customer/studio.css",
+    "isEntry": true
+  },
+  "resources/js/admin/template/editor.js": {
+    "file": "assets/editor-B58b___x.js",
+    "name": "editor",
+    "src": "resources/js/admin/template/editor.js",
+    "isEntry": true
+  },
+  "resources/js/admin/template/template.js": {
+    "file": "assets/template-BQfTB3YT.js",
+    "name": "template",
+    "src": "resources/js/admin/template/template.js",
     "isEntry": true
   },
   "resources/js/app.js": {
@@ -23,6 +60,12 @@
     "file": "assets/customer-DGU99OZZ.js",
     "name": "customer",
     "src": "resources/js/customer/customer.js",
+    "isEntry": true
+  },
+  "resources/js/customer/editing.js": {
+    "file": "assets/editing-BjQi3bBh.js",
+    "name": "editing",
+    "src": "resources/js/customer/editing.js",
     "isEntry": true
   },
   "resources/js/customer/studio/main.jsx": {
@@ -44,7 +87,7 @@
     "isEntry": true
   },
   "resources/js/staff/template-editor/main.jsx": {
-    "file": "assets/main-D4C-i_Ti.js",
+    "file": "assets/main-Cel6EmK5.js",
     "name": "main",
     "src": "resources/js/staff/template-editor/main.jsx",
     "isEntry": true,
