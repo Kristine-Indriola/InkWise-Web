@@ -2293,46 +2293,8 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
         },
       ],
     },
-    {
-      id: 'default-user',
-      thumbUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/user.svg',
-      previewUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/user.svg',
-      downloadUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/user.svg',
-      description: 'User',
-      provider: 'default',
-      providerLabel: 'Simple Icons',
-      credit: 'Simple Icons',
-    },
-  ]);
-  const [isSearchingIcons, setIsSearchingIcons] = useState(false);
-  const [iconCurrentPage, setIconCurrentPage] = useState(1);
-  const [isLoadingMoreIcons, setIsLoadingMoreIcons] = useState(false);
-  const [hasMoreIcons, setHasMoreIcons] = useState(true);
-  const iconCurrentPageRef = useRef(1);
-  const activeIconSearchQueryRef = useRef('');
-  const hasTriggeredIconSearchRef = useRef(false);
-  const [fontSearchQuery, setFontSearchQuery] = useState('');
-  const [fontSearchResults, setFontSearchResults] = useState([]);
-  const [isSearchingFonts, setIsSearchingFonts] = useState(false);
-  const [fontCurrentPage, setFontCurrentPage] = useState(1);
-  const [isLoadingMoreFonts, setIsLoadingMoreFonts] = useState(false);
-  const [hasMoreFonts, setHasMoreFonts] = useState(true);
-  const fontCurrentPageRef = useRef(1);
-  const activeFontSearchQueryRef = useRef('');
-  const hasTriggeredFontSearchRef = useRef(false);
-
+  ];
   // Styled text presets (loaded from Google Fonts list + sample text)
-  const [styledPresets, setStyledPresets] = useState([]);
-  const [styledPage, setStyledPage] = useState(1);
-  const [isLoadingStyledPresets, setIsLoadingStyledPresets] = useState(false);
-  const [hasMoreStyledPresets, setHasMoreStyledPresets] = useState(true);
-  const styledPerPage = 12;
-  const styledFontsListRef = useRef([]); // cache of fonts fetched from API
-  const styledContainerRef = useRef(null);
-  const styledObserverRef = useRef(null);
-
-  // Use the provided Google API key (from your message)
-  const GOOGLE_FONTS_API_KEY = 'AIzaSyBRCDdZjTcR4brOsHV_OBsDO11We11BVi0';
 
   const sampleStyledTexts = [
     'Life is an ADVENTURE',
