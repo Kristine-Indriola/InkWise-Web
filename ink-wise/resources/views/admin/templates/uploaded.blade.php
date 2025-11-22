@@ -3,7 +3,7 @@
 @section('title', 'Uploaded Templates')
 
 @push('styles')
-    <link rel="stylesheet" href="{{ asset('css/admin-css/template/template.css') }}">
+    @vite('resources/css/admin/template/template.css')
 @endpush
 
 @section('content')

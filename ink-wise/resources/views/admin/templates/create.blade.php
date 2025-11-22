@@ -11,7 +11,7 @@
 @endphp
 
 @push('styles')
-    <link rel="stylesheet" href="{{ asset('css/admin-css/template/template.css') }}">
+    @vite('resources/css/admin/template/template.css')
     <style>
         /* Make the create container bigger */
         .create-container{max-width:1400px;margin:0 auto;padding:20px}
@@ -21,7 +21,7 @@
 @endpush
 
 @push('scripts')
-    <script src="{{ asset('js/admin/template/template.js') }}" defer></script>
+    @vite('resources/js/admin/template/template.js')
     <script>
         // Helper to read CSRF token from meta or hidden input
         function getCsrfToken() {

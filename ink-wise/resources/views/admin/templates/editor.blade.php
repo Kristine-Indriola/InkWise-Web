@@ -6,10 +6,11 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $template->name ?? 'Template Editor' }}</title>
 
-    <link rel="stylesheet" href="{{ asset('css/admin-css/template/edit.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/admin-css/template/image.css') }}">
-    <script src="{{ asset('js/admin/template/edit.js') }}"></script>
-    <script src="{{ asset('js/admin/template/image.js') }}"></script>
+    @vite([
+        'resources/css/admin/template/edit.css',
+        'resources/css/admin/template/image.css',
+        'resources/js/admin/template/editor.js',
+    ])
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&family=Playfair+Display&family=Montserrat&family=Roboto&family=Great+Vibes&family=Poppins&family=Lobster&family=Dancing+Script&family=Merriweather&family=Oswald&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fontisto@3.0.4/css/fontisto/fontisto.min.css">

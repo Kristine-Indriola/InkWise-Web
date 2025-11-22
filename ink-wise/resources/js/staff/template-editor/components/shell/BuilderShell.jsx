@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { toPng, toSvg } from 'html-to-image';
+import { toJpeg, toPng, toSvg } from 'html-to-image';
 
 import { useBuilderStore } from '../../state/BuilderStore';
 import { ToolSidebar } from '../panels/ToolSidebar';
@@ -12,6 +12,136 @@ import { BuilderHotkeys } from './BuilderHotkeys';
 import { PreviewModal } from '../modals/PreviewModal';
 import { serializeDesign } from '../../utils/serializeDesign';
 import { BuilderErrorBoundary } from './BuilderErrorBoundary';
+
+const MAX_DEVICE_PIXEL_RATIO = 1.2;
+const PREVIEW_MAX_EDGE = 960;
+const PREVIEW_JPEG_QUALITY = 0.62;
+const PREVIEW_MAX_BYTES = 1_500_000;
+
+function estimateBase64Bytes(dataUrl) {
+  if (typeof dataUrl !== 'string') {
+    return 0;
+  }
+  const commaIndex = dataUrl.indexOf(',');
+  const base64 = commaIndex !== -1 ? dataUrl.slice(commaIndex + 1) : dataUrl;
+  return Math.ceil((base64.length * 3) / 4);
+}
+
+function loadImageElement(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = (err) => reject(err);
+    image.src = dataUrl;
+  });
+}
+
+function renderCompressedImage(image, scale, quality) {
+  const targetWidth = Math.max(1, Math.round(image.width * scale));
+  const targetHeight = Math.max(1, Math.round(image.height * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    return null;
+  }
+
+  ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
+  return canvas.toDataURL('image/jpeg', quality);
+}
+
+async function compressPreviewImage(dataUrl, options = {}) {
+  if (!dataUrl || typeof document === 'undefined') {
+    return dataUrl;
+  }
+
+  const {
+    maxEdge = PREVIEW_MAX_EDGE,
+    quality = PREVIEW_JPEG_QUALITY,
+    maxBytes = PREVIEW_MAX_BYTES,
+  } = options;
+
+  try {
+    const image = await loadImageElement(dataUrl);
+    const longestEdge = Math.max(image.width, image.height);
+    let scale = longestEdge > maxEdge && maxEdge > 0 ? maxEdge / longestEdge : 1;
+    let currentQuality = quality;
+    let output = renderCompressedImage(image, scale, currentQuality) || dataUrl;
+
+    while (estimateBase64Bytes(output) > maxBytes && scale > 0.3) {
+      scale = Math.max(0.3, scale * 0.85);
+      currentQuality = Math.max(0.4, currentQuality - 0.08);
+      const attempt = renderCompressedImage(image, scale, currentQuality);
+      if (!attempt) {
+        break;
+      }
+      output = attempt;
+    }
+
+    return output;
+  } catch (err) {
+    console.warn('[InkWise Builder] Failed to compress preview image.', err);
+    return dataUrl;
+  }
+}
+
+function extractSvgMarkup(dataUrl) {
+  if (typeof dataUrl !== 'string') {
+    return null;
+  }
+
+  if (!dataUrl.startsWith('data:image/svg+xml')) {
+    return dataUrl;
+  }
+
+  const commaIndex = dataUrl.indexOf(',');
+  if (commaIndex === -1) {
+    return dataUrl;
+  }
+
+  const encodedPayload = dataUrl.slice(commaIndex + 1);
+
+  try {
+    return decodeURIComponent(encodedPayload);
+  } catch (err) {
+    console.warn('[InkWise Builder] Failed to decode SVG markup payload.', err);
+    return encodedPayload;
+  }
+}
+
+function sanitizeSvgMarkup(markup) {
+  if (typeof markup !== 'string') {
+    return markup;
+  }
+
+  return markup
+    .replace(/<!--.*?-->/gs, '')
+    .replace(/\s*\n+\s*/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+function encodeSvgMarkup(markup) {
+  if (!markup || typeof markup !== 'string') {
+    return markup;
+  }
+
+  const sanitized = sanitizeSvgMarkup(markup);
+
+  try {
+    if (typeof window !== 'undefined' && typeof window.btoa === 'function') {
+      const encoded = window.btoa(unescape(encodeURIComponent(sanitized)));
+      return `data:image/svg+xml;base64,${encoded}`;
+    }
+  } catch (err) {
+    console.warn('[InkWise Builder] Failed to encode SVG markup payload.', err);
+  }
+
+  return sanitized;
+}
 
 export function BuilderShell() {
   const { state, routes, csrfToken, dispatch } = useBuilderStore();
@@ -167,8 +297,8 @@ export function BuilderShell() {
 
     const bodyEl = typeof document !== 'undefined' ? document.body : null;
     const pixelRatio = typeof window !== 'undefined'
-      ? Math.min(Math.max(window.devicePixelRatio || 1, 1), 2)
-      : 1.5;
+      ? Math.min(Math.max(window.devicePixelRatio || 1, 1), MAX_DEVICE_PIXEL_RATIO)
+      : MAX_DEVICE_PIXEL_RATIO;
 
     try {
       dispatch({ type: 'SHOW_PREVIEW_MODAL' });
@@ -179,13 +309,23 @@ export function BuilderShell() {
       let svgDataUrl = null;
 
       try {
-        pngDataUrl = await toPng(canvasRef.current, {
+        pngDataUrl = await toJpeg(canvasRef.current, {
           cacheBust: true,
           pixelRatio,
-          quality: 0.92,
+          quality: PREVIEW_JPEG_QUALITY,
+          backgroundColor: '#ffffff',
         });
-      } catch (captureError) {
-        console.warn('[InkWise Builder] PNG preview capture failed.', captureError);
+      } catch (jpegError) {
+        console.warn('[InkWise Builder] JPEG preview capture failed, falling back to PNG.', jpegError);
+        try {
+          pngDataUrl = await toPng(canvasRef.current, {
+            cacheBust: true,
+            pixelRatio,
+            quality: PREVIEW_JPEG_QUALITY,
+          });
+        } catch (pngError) {
+          console.warn('[InkWise Builder] PNG preview capture failed.', pngError);
+        }
       }
 
       try {
@@ -196,6 +336,25 @@ export function BuilderShell() {
         console.warn('[InkWise Builder] SVG snapshot capture failed.', captureError);
       }
 
+      const previewImage = await compressPreviewImage(pngDataUrl);
+      const svgMarkup = extractSvgMarkup(svgDataUrl);
+      const svgPayload = encodeSvgMarkup(svgMarkup);
+
+      const shouldIncludePreview = previewImage && estimateBase64Bytes(previewImage) <= PREVIEW_MAX_BYTES;
+
+      const payload = {
+        design: designSnapshot,
+        template_name: state.template?.name ?? null,
+      };
+
+      if (shouldIncludePreview) {
+        payload.preview_image = previewImage;
+      }
+
+      if (svgPayload) {
+        payload.svg_markup = svgPayload;
+      }
+
       const response = await fetch(saveTemplateRoute, {
         method: 'POST',
         headers: {
@@ -204,12 +363,7 @@ export function BuilderShell() {
           'X-CSRF-TOKEN': csrfToken,
         },
         credentials: 'same-origin',
-        body: JSON.stringify({
-          design: designSnapshot,
-          preview_image: pngDataUrl,
-          svg_markup: svgDataUrl,
-          template_name: state.template?.name ?? null,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
