@@ -11,6 +11,8 @@ export default defineConfig({
         'resources/css/customer/customer.css',
         'resources/js/app.js',
         'resources/js/customer/customer.js',
+        'resources/js/customer/studio/main.jsx',
+        'resources/js/customer/studio/svg-template-editor.jsx',
         'resources/js/staff/template-editor/main.jsx',
       ],
       refresh: true,

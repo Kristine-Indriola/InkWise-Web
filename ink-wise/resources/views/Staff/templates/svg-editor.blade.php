@@ -156,7 +156,7 @@
 @endsection
 
 @section('scripts')
-<script src="{{ asset('js/svg-template-editor.js') }}"></script>
+@vite('resources/js/customer/studio/svg-template-editor.jsx')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     let currentSide = 'front';

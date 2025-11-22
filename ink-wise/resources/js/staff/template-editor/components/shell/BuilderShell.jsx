@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { toPng } from 'html-to-image';
+import { toPng, toSvg } from 'html-to-image';
 
 import { useBuilderStore } from '../../state/BuilderStore';
 import { ToolSidebar } from '../panels/ToolSidebar';
@@ -11,6 +11,7 @@ import { BuilderStatusBar } from './BuilderStatusBar';
 import { BuilderHotkeys } from './BuilderHotkeys';
 import { PreviewModal } from '../modals/PreviewModal';
 import { serializeDesign } from '../../utils/serializeDesign';
+import { BuilderErrorBoundary } from './BuilderErrorBoundary';
 
 export function BuilderShell() {
   const { state, routes, csrfToken, dispatch } = useBuilderStore();
@@ -18,14 +19,20 @@ export function BuilderShell() {
   const [isSidebarHidden, setIsSidebarHidden] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState('idle');
   const [lastSavedAt, setLastSavedAt] = useState(state.template?.updated_at ?? null);
-  const [isSavingPreview, setIsSavingPreview] = useState(false);
-  const [previewSaveError, setPreviewSaveError] = useState(null);
-  const [lastPreviewSavedAt, setLastPreviewSavedAt] = useState(null);
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [saveTemplateError, setSaveTemplateError] = useState(null);
+  const [lastTemplateSavedAt, setLastTemplateSavedAt] = useState(null);
   const pendingSaveRef = useRef(null);
   const lastSnapshotRef = useRef(null);
   const controllerRef = useRef(null);
   const initialRenderRef = useRef(true);
   const canvasRef = useRef(null);
+
+  const handleBoundaryReset = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.location.reload();
+    }
+  }, []);
 
   const toggleSidebar = () => {
     setIsSidebarHidden(!isSidebarHidden);
@@ -136,41 +143,60 @@ export function BuilderShell() {
     };
   }, [state.pages, state.template?.name, state.zoom, state.panX, state.panY, state.activePageId, routes?.autosave, csrfToken]);
 
-  const saveCanvasRoute = routes?.saveCanvas;
+  const saveTemplateRoute = routes?.saveTemplate ?? routes?.saveCanvas;
 
   const handleSaveTemplate = useCallback(async () => {
-    if (!saveCanvasRoute) {
-      setPreviewSaveError('Save route is unavailable.');
+    if (!saveTemplateRoute) {
+      setSaveTemplateError('Save route is unavailable.');
       return;
     }
     if (!csrfToken) {
-      setPreviewSaveError('Missing CSRF token.');
+      setSaveTemplateError('Missing CSRF token.');
       return;
     }
     if (!canvasRef.current) {
-      setPreviewSaveError('Canvas not ready yet.');
+      setSaveTemplateError('Canvas not ready yet.');
       return;
     }
-    if (isSavingPreview) {
+    if (isSavingTemplate) {
       return;
     }
 
-    setIsSavingPreview(true);
-    setPreviewSaveError(null);
+    setIsSavingTemplate(true);
+    setSaveTemplateError(null);
 
     const bodyEl = typeof document !== 'undefined' ? document.body : null;
-    const pixelRatio = typeof window !== 'undefined' ? Math.max(window.devicePixelRatio || 1, 2) : 2;
+    const pixelRatio = typeof window !== 'undefined'
+      ? Math.min(Math.max(window.devicePixelRatio || 1, 1), 2)
+      : 1.5;
 
     try {
+      dispatch({ type: 'SHOW_PREVIEW_MODAL' });
       bodyEl?.classList.add('builder-exporting');
 
-      const dataUrl = await toPng(canvasRef.current, {
-        cacheBust: true,
-        pixelRatio,
-        quality: 1,
-      });
+      const designSnapshot = serializeDesign(state);
+      let pngDataUrl = null;
+      let svgDataUrl = null;
 
-      const response = await fetch(saveCanvasRoute, {
+      try {
+        pngDataUrl = await toPng(canvasRef.current, {
+          cacheBust: true,
+          pixelRatio,
+          quality: 0.92,
+        });
+      } catch (captureError) {
+        console.warn('[InkWise Builder] PNG preview capture failed.', captureError);
+      }
+
+      try {
+        svgDataUrl = await toSvg(canvasRef.current, {
+          cacheBust: true,
+        });
+      } catch (captureError) {
+        console.warn('[InkWise Builder] SVG snapshot capture failed.', captureError);
+      }
+
+      const response = await fetch(saveTemplateRoute, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -178,53 +204,88 @@ export function BuilderShell() {
           'X-CSRF-TOKEN': csrfToken,
         },
         credentials: 'same-origin',
-        body: JSON.stringify({ canvas_image: dataUrl }),
+        body: JSON.stringify({
+          design: designSnapshot,
+          preview_image: pngDataUrl,
+          svg_markup: svgDataUrl,
+          template_name: state.template?.name ?? null,
+        }),
       });
 
       if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message || 'Failed to save preview');
+        let errorMessage = 'Failed to save template';
+        const contentType = response.headers.get('Content-Type') || '';
+
+        if (contentType.includes('application/json')) {
+          try {
+            const errorPayload = await response.clone().json();
+            if (typeof errorPayload?.message === 'string' && errorPayload.message.trim() !== '') {
+              errorMessage = errorPayload.message.trim();
+            } else if (errorPayload?.errors && typeof errorPayload.errors === 'object') {
+              const firstField = Object.values(errorPayload.errors)[0];
+              if (Array.isArray(firstField) && typeof firstField[0] === 'string') {
+                errorMessage = firstField[0];
+              }
+            }
+          } catch (jsonError) {
+            console.warn('[InkWise Builder] Failed to parse error response JSON.', jsonError);
+          }
+        } else {
+          const textMessage = await response.text();
+          if (textMessage && textMessage.trim().length > 0) {
+            errorMessage = textMessage.trim();
+          }
+        }
+
+        throw new Error(errorMessage);
       }
 
-      await response.json().catch(() => null);
-      setLastPreviewSavedAt(new Date().toISOString());
+      const data = await response.json().catch(() => ({}));
+      const savedAt = new Date().toISOString();
+      setLastTemplateSavedAt(savedAt);
+
+      const redirectTarget = data?.redirect || routes?.index || '/staff/templates';
+      window.location.href = redirectTarget;
     } catch (error) {
-      console.error('[InkWise Builder] Preview save failed:', error);
-      setPreviewSaveError(error.message || 'Failed to save preview');
+      console.error('[InkWise Builder] Template save failed:', error);
+      setSaveTemplateError(error.message || 'Failed to save template');
+      dispatch({ type: 'HIDE_PREVIEW_MODAL' });
     } finally {
       bodyEl?.classList.remove('builder-exporting');
-      setIsSavingPreview(false);
+      setIsSavingTemplate(false);
     }
-  }, [saveCanvasRoute, csrfToken, isSavingPreview]);
+  }, [saveTemplateRoute, csrfToken, isSavingTemplate, state, routes, dispatch]);
 
   return (
-    <div className="builder-shell" role="application" aria-label="InkWise template builder">
-      <BuilderHotkeys />
-      <BuilderTopBar
-        autosaveStatus={autosaveStatus}
-        lastSavedAt={lastSavedAt}
-        onSaveTemplate={handleSaveTemplate}
-        isSavingPreview={isSavingPreview}
-        lastPreviewSavedAt={lastPreviewSavedAt}
-        previewSaveError={previewSaveError}
-      />
-      <div className="builder-workspace" style={{ gridTemplateColumns: isSidebarHidden ? '60px minmax(0, 1fr) 340px' : '600px minmax(0, 1fr) 340px' }}>
-        <ToolSidebar isSidebarHidden={isSidebarHidden} onToggleSidebar={toggleSidebar} />
-        <main className="builder-canvas-column" aria-live="polite">
-          <div className="builder-canvas-header">
-            <CanvasToolbar />
-          </div>
-          <CanvasViewport page={activePage} canvasRef={canvasRef} />
-          <BuilderStatusBar />
-        </main>
-        <aside className="builder-right-column" aria-label="Inspector panels">
-          <InspectorPanel />
-        </aside>
+    <BuilderErrorBoundary onReset={handleBoundaryReset} templateId={state.template?.id}>
+      <div className="builder-shell" role="application" aria-label="InkWise template builder">
+        <BuilderHotkeys />
+        <BuilderTopBar
+          autosaveStatus={autosaveStatus}
+          lastSavedAt={lastSavedAt}
+          onSaveTemplate={handleSaveTemplate}
+          isSavingTemplate={isSavingTemplate}
+          lastManualSaveAt={lastTemplateSavedAt}
+          saveError={saveTemplateError}
+        />
+        <div className="builder-workspace" style={{ gridTemplateColumns: isSidebarHidden ? '60px minmax(0, 1fr) 340px' : '600px minmax(0, 1fr) 340px' }}>
+          <ToolSidebar isSidebarHidden={isSidebarHidden} onToggleSidebar={toggleSidebar} />
+          <main className="builder-canvas-column" aria-live="polite">
+            <div className="builder-canvas-header">
+              <CanvasToolbar />
+            </div>
+            <CanvasViewport page={activePage} canvasRef={canvasRef} />
+            <BuilderStatusBar />
+          </main>
+          <aside className="builder-right-column" aria-label="Inspector panels">
+            <InspectorPanel />
+          </aside>
+        </div>
+        <PreviewModal
+          isOpen={state.showPreviewModal}
+          onClose={() => dispatch({ type: 'HIDE_PREVIEW_MODAL' })}
+        />
       </div>
-      <PreviewModal
-        isOpen={state.showPreviewModal}
-        onClose={() => dispatch({ type: 'HIDE_PREVIEW_MODAL' })}
-      />
-    </div>
+    </BuilderErrorBoundary>
   );
 }

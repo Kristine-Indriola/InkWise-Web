@@ -79,8 +79,8 @@
                             <div class="template-card" tabindex="0" role="button" data-template-id="{{ $template->id }}">
                                 <div class="template-image-container">
                                     @php
-                                        $frontImg = $template->front_image ?? $template->preview_image;
-                                        $backImg = $template->back_image ?? null;
+                                        $frontImg = $template->front_image ?? $template->preview_front ?? $template->preview;
+                                        $backImg = $template->back_image ?? $template->preview_back ?? null;
                                     @endphp
                                     @if($frontImg)
                                         <img src="@imageUrl($frontImg)" alt="{{ $template->name }}" class="template-img">
@@ -106,15 +106,15 @@
                                             data-template-event_type="{{ $template->event_type }}"
                                             data-template-product_type="{{ $template->product_type }}"
                                             data-template-theme_style="{{ $template->theme_style }}"
-                                            data-template-preview="{{ $template->preview_image }}"
-                                            data-front-url="{{ $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : '' }}"
+                                            data-template-preview="{{ $template->preview ? \App\Support\ImageResolver::url($template->preview) : '' }}"
+                                            data-front-url="{{ ($template->front_image ?? $template->preview) ? \App\Support\ImageResolver::url($template->front_image ?? $template->preview) : '' }}"
                                         >Use template</button>
                                         <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->name }}">Delete</button>
-                                        @if(!empty($template->front_image))
-                                            <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
+                                        @if(!empty($template->front_image) || !empty($template->preview))
+                                            <button type="button" class="btn view-front-btn" data-front-url="{{ ($template->front_image ?? $template->preview) ? \App\Support\ImageResolver::url($template->front_image ?? $template->preview) : '' }}">View Front</button>
                                         @endif
-                                        @if(!empty($template->back_image))
-                                            <button type="button" class="btn view-back-btn" data-back-url="{{ \App\Support\ImageResolver::url($template->back_image) }}">View Back</button>
+                                        @if(!empty($template->back_image) || !empty($template->preview_back))
+                                            <button type="button" class="btn view-back-btn" data-back-url="{{ ($template->back_image ?? $template->preview_back) ? \App\Support\ImageResolver::url($template->back_image ?? $template->preview_back) : '' }}">View Back</button>
                                         @endif
                                     </div>
                                 </div>
@@ -143,8 +143,8 @@
                             <div class="template-card" tabindex="0" role="button" data-template-id="{{ $template->id }}">
                                 <div class="template-image-container">
                                     @php
-                                        $frontImg = $template->front_image ?? $template->preview_image;
-                                        $backImg = $template->back_image ?? null;
+                                        $frontImg = $template->front_image ?? $template->preview_front ?? $template->preview;
+                                        $backImg = $template->back_image ?? $template->preview_back ?? null;
                                     @endphp
                                     @if($frontImg)
                                         <img src="@imageUrl($frontImg)" alt="{{ $template->name }}" class="template-img">
@@ -170,15 +170,15 @@
                                             data-template-event_type="{{ $template->event_type }}"
                                             data-template-product_type="{{ $template->product_type }}"
                                             data-template-theme_style="{{ $template->theme_style }}"
-                                            data-template-preview="{{ $template->preview_image }}"
-                                            data-front-url="{{ $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : '' }}"
+                                            data-template-preview="{{ $template->preview ? \App\Support\ImageResolver::url($template->preview) : '' }}"
+                                            data-front-url="{{ ($template->front_image ?? $template->preview) ? \App\Support\ImageResolver::url($template->front_image ?? $template->preview) : '' }}"
                                         >Use template</button>
                                         <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->name }}">Delete</button>
-                                        @if(!empty($template->front_image))
-                                            <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
+                                        @if(!empty($template->front_image) || !empty($template->preview))
+                                            <button type="button" class="btn view-front-btn" data-front-url="{{ ($template->front_image ?? $template->preview) ? \App\Support\ImageResolver::url($template->front_image ?? $template->preview) : '' }}">View Front</button>
                                         @endif
-                                        @if(!empty($template->back_image))
-                                            <button type="button" class="btn view-back-btn" data-back-url="{{ \App\Support\ImageResolver::url($template->back_image) }}">View Back</button>
+                                        @if(!empty($template->back_image) || !empty($template->preview_back))
+                                            <button type="button" class="btn view-back-btn" data-back-url="{{ ($template->back_image ?? $template->preview_back) ? \App\Support\ImageResolver::url($template->back_image ?? $template->preview_back) : '' }}">View Back</button>
                                         @endif
                                     </div>
                                 </div>
@@ -206,8 +206,8 @@
                             <div class="template-card" tabindex="0" role="button" data-template-id="{{ $template->id }}">
                                 <div class="template-image-container">
                                     @php
-                                        $frontImg = $template->front_image ?? $template->preview_image;
-                                        $backImg = $template->back_image ?? null;
+                                        $frontImg = $template->front_image ?? $template->preview_front ?? $template->preview;
+                                        $backImg = $template->back_image ?? $template->preview_back ?? null;
                                     @endphp
                                     @if($frontImg)
                                         <img src="@imageUrl($frontImg)" alt="{{ $template->name }}" class="template-img">
@@ -233,15 +233,15 @@
                                             data-template-event_type="{{ $template->event_type }}"
                                             data-template-product_type="{{ $template->product_type }}"
                                             data-template-theme_style="{{ $template->theme_style }}"
-                                            data-template-preview="{{ $template->preview_image }}"
-                                            data-front-url="{{ $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : '' }}"
+                                            data-template-preview="{{ $template->preview ? \App\Support\ImageResolver::url($template->preview) : '' }}"
+                                            data-front-url="{{ ($template->front_image ?? $template->preview) ? \App\Support\ImageResolver::url($template->front_image ?? $template->preview) : '' }}"
                                         >Use template</button>
                                         <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->name }}">Delete</button>
-                                        @if(!empty($template->front_image))
-                                            <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
+                                        @if(!empty($template->front_image) || !empty($template->preview))
+                                            <button type="button" class="btn view-front-btn" data-front-url="{{ ($template->front_image ?? $template->preview) ? \App\Support\ImageResolver::url($template->front_image ?? $template->preview) : '' }}">View Front</button>
                                         @endif
-                                        @if(!empty($template->back_image))
-                                            <button type="button" class="btn view-back-btn" data-back-url="{{ \App\Support\ImageResolver::url($template->back_image) }}">View Back</button>
+                                        @if(!empty($template->back_image) || !empty($template->preview_back))
+                                            <button type="button" class="btn view-back-btn" data-back-url="{{ ($template->back_image ?? $template->preview_back) ? \App\Support\ImageResolver::url($template->back_image ?? $template->preview_back) : '' }}">View Back</button>
                                         @endif
                                     </div>
                                 </div>
@@ -269,8 +269,8 @@
                             <div class="template-card" tabindex="0" role="button" data-template-id="{{ $template->id }}">
                                 <div class="template-image-container">
                                     @php
-                                        $frontImg = $template->front_image ?? $template->preview_image;
-                                        $backImg = $template->back_image ?? null;
+                                        $frontImg = $template->front_image ?? $template->preview_front ?? $template->preview;
+                                        $backImg = $template->back_image ?? $template->preview_back ?? null;
                                     @endphp
                                     @if($frontImg)
                                         <img src="@imageUrl($frontImg)" alt="{{ $template->name }}" class="template-img">
@@ -296,15 +296,15 @@
                                             data-template-event_type="{{ $template->event_type }}"
                                             data-template-product_type="{{ $template->product_type }}"
                                             data-template-theme_style="{{ $template->theme_style }}"
-                                            data-template-preview="{{ $template->preview_image }}"
-                                            data-front-url="{{ $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : '' }}"
+                                            data-template-preview="{{ $template->preview ? \App\Support\ImageResolver::url($template->preview) : '' }}"
+                                            data-front-url="{{ ($template->front_image ?? $template->preview) ? \App\Support\ImageResolver::url($template->front_image ?? $template->preview) : '' }}"
                                         >Use template</button>
                                         <button type="button" class="btn delete-btn template-delete-btn" data-delete-url="{{ route('admin.templates.destroy', $template->id) }}" data-template-name="{{ $template->name }}">Delete</button>
-                                        @if(!empty($template->front_image))
-                                            <button type="button" class="btn view-front-btn" data-front-url="{{ \App\Support\ImageResolver::url($template->front_image) }}">View Front</button>
+                                        @if(!empty($template->front_image) || !empty($template->preview))
+                                            <button type="button" class="btn view-front-btn" data-front-url="{{ ($template->front_image ?? $template->preview) ? \App\Support\ImageResolver::url($template->front_image ?? $template->preview) : '' }}">View Front</button>
                                         @endif
-                                        @if(!empty($template->back_image))
-                                            <button type="button" class="btn view-back-btn" data-back-url="{{ \App\Support\ImageResolver::url($template->back_image) }}">View Back</button>
+                                        @if(!empty($template->back_image) || !empty($template->preview_back))
+                                            <button type="button" class="btn view-back-btn" data-back-url="{{ ($template->back_image ?? $template->preview_back) ? \App\Support\ImageResolver::url($template->back_image ?? $template->preview_back) : '' }}">View Back</button>
                                         @endif
                                     </div>
                                 </div>

@@ -809,13 +809,10 @@
                                     Team is preparing the invitation or giveaway items.
                                     @break
                                 @case('confirmed')
-                                    Items are packed and ready to ship or arrange for pickup.
-                                    @break
-                                @case('to_receive')
-                                    Order is on the way to the customer. Share tracking updates if available.
+                                    Items are packed and ready for customer pickup at store.
                                     @break
                                 @case('completed')
-                                    Order delivered and marked as finished.
+                                    Order picked up and marked as finished.
                                     @break
                                 @default
                                     Status update in progress.

@@ -872,6 +872,66 @@ class OrderFlowService
         return $initialized;
     }
 
+    public function applyDesignAutosave(Order $order, array $payload): Order
+    {
+        $designMeta = Arr::get($payload, 'design', []);
+        $placeholders = Arr::get($payload, 'placeholders', []);
+        $previewImage = Arr::get($payload, 'preview_image');
+        $previewImages = Arr::get($payload, 'preview_images', []);
+        $updatedAt = Arr::get($designMeta, 'updated_at') ?? now()->toIso8601String();
+
+        $metadata = $order->metadata;
+        if (is_string($metadata)) {
+            $decoded = json_decode($metadata, true);
+            $metadata = is_array($decoded) ? $decoded : [];
+        } elseif (!is_array($metadata)) {
+            $metadata = [];
+        }
+
+        $metadata['design'] = $designMeta;
+
+        if ($previewImage || !empty($previewImages)) {
+            $metadata['design_preview'] = array_filter([
+                'image' => $previewImage,
+                'images' => $previewImages,
+                'updated_at' => $updatedAt,
+            ], fn ($value) => $value !== null && $value !== '');
+        }
+
+        $order->update(['metadata' => $metadata]);
+
+        $invitationItem = $this->primaryInvitationItem($order);
+        if ($invitationItem) {
+            $designData = $invitationItem->design_metadata;
+            if (is_string($designData)) {
+                $decoded = json_decode($designData, true);
+                $designData = is_array($decoded) ? $decoded : [];
+            } elseif (!is_array($designData)) {
+                $designData = [];
+            }
+
+            if (!empty($designMeta)) {
+                $designData['design'] = $designMeta;
+            }
+
+            if (!empty($placeholders)) {
+                $designData['placeholders'] = $placeholders;
+            }
+
+            $designData['snapshot'] = array_filter([
+                'preview_image' => $previewImage,
+                'preview_images' => $previewImages,
+            ], fn ($value) => $value !== null && $value !== '');
+
+            $designData['updated_at'] = $updatedAt;
+
+            $invitationItem->design_metadata = $designData;
+            $invitationItem->save();
+        }
+
+        return $order->fresh(['items']);
+    }
+
     protected function syncEnvelopeAssociations(OrderItem $orderItem, ?Product $product, array $meta): void
     {
         $quantity = max(1, (int) ($meta['qty'] ?? $meta['quantity'] ?? $orderItem->quantity ?? 1));
@@ -1159,6 +1219,39 @@ class OrderFlowService
         $product = optional($invitationItem)->product;
         $images = $product ? $this->resolveProductImages($product) : $this->placeholderImages();
 
+        $orderMeta = $order->metadata;
+        if (is_string($orderMeta)) {
+            $decodedMeta = json_decode($orderMeta, true);
+            $orderMeta = is_array($decodedMeta) ? $decodedMeta : [];
+        } elseif (!is_array($orderMeta)) {
+            $orderMeta = [];
+        }
+
+        $designPreviewMeta = Arr::get($orderMeta, 'design_preview');
+        if (is_array($designPreviewMeta)) {
+            $previewCandidates = [];
+
+            $primaryPreview = Arr::get($designPreviewMeta, 'image');
+            if (is_string($primaryPreview) && trim($primaryPreview) !== '') {
+                $previewCandidates[] = trim($primaryPreview);
+            }
+
+            foreach ((array) Arr::get($designPreviewMeta, 'images', []) as $candidate) {
+                if (is_string($candidate) && trim($candidate) !== '') {
+                    $previewCandidates[] = trim($candidate);
+                }
+            }
+
+            $previewCandidates = array_values(array_unique($previewCandidates));
+            if (!empty($previewCandidates)) {
+                $images['front'] = $previewCandidates[0];
+                if (!empty($previewCandidates[1])) {
+                    $images['back'] = $previewCandidates[1];
+                }
+                $images['all'] = $previewCandidates;
+            }
+        }
+
         $envelopeItem = $order->items->firstWhere('line_type', OrderItem::LINE_TYPE_ENVELOPE);
         $giveawayItem = $order->items->firstWhere('line_type', OrderItem::LINE_TYPE_GIVEAWAY);
 
@@ -1208,11 +1301,19 @@ class OrderFlowService
                 ], fn ($value) => $value !== null && $value !== '');
             })->values()->all(),
             'colorIds' => $invitationItem?->colors?->pluck('color_id')->filter()->values()->all(),
-            'metadata' => $order->metadata,
+            'metadata' => $orderMeta,
         ];
 
         if ($invitationItem?->design_metadata) {
-            $summary['placeholders'] = Arr::get($invitationItem->design_metadata, 'placeholders', []);
+            $itemDesignMeta = $invitationItem->design_metadata;
+            if (is_string($itemDesignMeta)) {
+                $decodedDesignMeta = json_decode($itemDesignMeta, true);
+                $itemDesignMeta = is_array($decodedDesignMeta) ? $decodedDesignMeta : [];
+            }
+
+            if (is_array($itemDesignMeta)) {
+                $summary['placeholders'] = Arr::get($itemDesignMeta, 'placeholders', []);
+            }
         }
 
         $envelopeTotal = $this->calculateItemTotal($envelopeItem);
@@ -1221,12 +1322,12 @@ class OrderFlowService
         $summary['extras'] = [
             'paper' => $invitationItem?->paperStockSelection?->price ?? 0,
             'addons' => $invitationItem?->addons?->sum('addon_price') ?? 0,
-            'envelope' => $envelopeItem ? $envelopeTotal : (float) Arr::get($order->metadata, 'envelope.total', Arr::get($order->metadata, 'envelope.price', 0)),
-            'giveaway' => $giveawayItem ? $giveawayTotal : (float) Arr::get($order->metadata, 'giveaway.total', Arr::get($order->metadata, 'giveaway.price', 0)),
+            'envelope' => $envelopeItem ? $envelopeTotal : (float) Arr::get($orderMeta, 'envelope.total', Arr::get($orderMeta, 'envelope.price', 0)),
+            'giveaway' => $giveawayItem ? $giveawayTotal : (float) Arr::get($orderMeta, 'giveaway.total', Arr::get($orderMeta, 'giveaway.price', 0)),
         ];
 
         // Provide detailed ink breakdown if present in metadata
-        $inkMetaSummary = Arr::get($order->metadata, 'ink', []);
+        $inkMetaSummary = Arr::get($orderMeta, 'ink', []);
         $inkUsageSummary = (float) Arr::get($inkMetaSummary, 'usage_per_invite_ml', Arr::get($inkMetaSummary, 'usage_ml', 0));
         $inkUnitPriceSummary = (float) Arr::get($inkMetaSummary, 'unit_price', Arr::get($inkMetaSummary, 'price', 0));
         $inkTotalSummary = 0.0;
@@ -1242,7 +1343,7 @@ class OrderFlowService
             'total' => $inkTotalSummary,
         ];
 
-        $envelopeMeta = Arr::get($order->metadata, 'envelope');
+        $envelopeMeta = Arr::get($orderMeta, 'envelope');
         if (!$envelopeMeta && $envelopeItem) {
             $envelopeMeta = array_merge(
                 is_array($envelopeItem->design_metadata) ? $envelopeItem->design_metadata : [],
@@ -1260,7 +1361,7 @@ class OrderFlowService
             $summary['envelope'] = $envelopeMeta;
         }
 
-        $giveawayMeta = Arr::get($order->metadata, 'giveaway');
+        $giveawayMeta = Arr::get($orderMeta, 'giveaway');
         if (!$giveawayMeta && $giveawayItem) {
             $giveawayMeta = array_merge(
                 is_array($giveawayItem->design_metadata) ? $giveawayItem->design_metadata : [],

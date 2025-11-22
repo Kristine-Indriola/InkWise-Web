@@ -231,9 +231,9 @@ class StaffOrderController extends Controller
     {
         return [
             'pending' => 'Order Received',
+            'processing' => 'Processing',
             'in_production' => 'In Progress',
-            'confirmed' => 'To Ship',
-            'to_receive' => 'To Receive',
+            'confirmed' => 'Ready for Pickup',
             'completed' => 'Completed',
             'cancelled' => 'Cancelled',
         ];
@@ -241,7 +241,7 @@ class StaffOrderController extends Controller
 
     protected function statusFlow(): array
     {
-        return ['pending', 'in_production', 'confirmed', 'to_receive', 'completed'];
+        return ['pending', 'processing', 'in_production', 'confirmed', 'completed'];
     }
 
     protected function normalizeMetadata($metadata): array

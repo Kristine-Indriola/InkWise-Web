@@ -346,7 +346,7 @@
     </style>
     <script src="{{ asset('js/customer/editing.js') }}" defer></script>
     <!-- SVG Template Editor for auto-parser enhanced editing -->
-    <script src="{{ asset('js/svg-template-editor.js') }}" defer></script>
+    @vite('resources/js/customer/studio/svg-template-editor.jsx')
     <!-- Fabric.js for SVG -> editable canvas support -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.2.4/fabric.min.js" defer integrity="sha512-HkRNCiaZYxQAkHpLFYI90ObSzL0vaIXL8Xe3bM51vhdYI79RDFMLTAsmVH1xVPREmTlUWexgrQMk+c3RBTsLGw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>

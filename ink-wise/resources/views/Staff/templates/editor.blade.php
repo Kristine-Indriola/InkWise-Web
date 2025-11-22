@@ -2,7 +2,14 @@
 <html lang="en" class="h-full">
 <head>
     @php
-        $designPayload = json_decode($template->design ?? '[]', true) ?? [];
+        $rawDesign = $template->design;
+        if (is_string($rawDesign)) {
+            $designPayload = json_decode($rawDesign ?: '[]', true) ?? [];
+        } elseif (is_array($rawDesign)) {
+            $designPayload = $rawDesign;
+        } else {
+            $designPayload = [];
+        }
         $pageCount = isset($designPayload['pages']) && is_array($designPayload['pages'])
             ? count($designPayload['pages'])
             : 1;
@@ -130,6 +137,7 @@
                 'index' => route('staff.templates.index'),
                 'create' => route('staff.templates.create'),
                 'update' => route('staff.templates.update', $template->id),
+                'saveTemplate' => route('staff.templates.saveTemplate', $template->id),
                 'saveCanvas' => route('staff.templates.saveCanvas', $template->id),
                 'saveSvg' => route('staff.templates.saveSvg', $template->id),
                 'uploadPreview' => route('staff.templates.uploadPreview', $template->id),
