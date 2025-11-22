@@ -190,15 +190,20 @@ class ProductController extends Controller
     {
         $template = Template::findOrFail($id);
 
+        $frontPath = $template->front_image ?: $template->preview;
+        $backPath = $template->back_image ?: null;
+
         return response()->json([
             'template_name' => $template->name,
             'description' => $template->description,
             'product_type' => $template->product_type,
             'event_type' => $template->event_type,
             'theme_style' => $template->theme_style,
-            'front_image' => $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : null,
-            'back_image' => $template->back_image ? \App\Support\ImageResolver::url($template->back_image) : null,
-            'preview_image' => $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : null,
+            'front_image' => $frontPath ? \App\Support\ImageResolver::url($frontPath) : null,
+            'back_image' => $backPath ? \App\Support\ImageResolver::url($backPath) : null,
+            'preview_image' => $template->preview
+                ? \App\Support\ImageResolver::url($template->preview)
+                : ($frontPath ? \App\Support\ImageResolver::url($frontPath) : null),
             'design_data' => $template->design,
         ]);
     }

@@ -20,6 +20,18 @@
 
 	$frontImage = $finalArtwork['front'] ?? $finalArtworkFront ?? null;
 	$backImage = $finalArtwork['back'] ?? $finalArtworkBack ?? null;
+	$summaryData = $orderSummary ?? [];
+	if (!$frontImage && is_array($summaryData) && !empty($summaryData['previewImage'])) {
+		$frontImage = $summaryData['previewImage'];
+	}
+
+	if ((!$backImage || $backImage === $frontImage) && is_array($summaryData) && !empty(data_get($summaryData, 'previewImages.1'))) {
+		$backImage = data_get($summaryData, 'previewImages.1');
+	}
+
+	if (is_array($summaryData) && empty(data_get($summaryData, 'previewImages.1')) && empty($backImage) && !empty(data_get($summaryData, 'previewImages.0'))) {
+		$backImage = data_get($summaryData, 'previewImages.0');
+	}
 
 	$resolveImage = function ($candidate) {
 		if (!$candidate) {
@@ -71,7 +83,8 @@
 	$frontImage = $frontImage ?? $fallbackImage;
 	$backImage = $backImage ?? $frontImage;
 
-	$placeholderItems = collect($placeholderItems ?? $unfilledPlaceholders ?? [])
+	$placeholderSource = $placeholderItems ?? $unfilledPlaceholders ?? data_get($summaryData, 'placeholders', []);
+	$placeholderItems = collect($placeholderSource)
 		->filter()
 		->values();
 

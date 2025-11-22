@@ -213,21 +213,24 @@
                         if (empty($displayImages) && $templateRef) {
                             $tFront = $templateRef->front_image ?? $templateRef->preview_front ?? null;
                             $tBack = $templateRef->back_image ?? $templateRef->preview_back ?? null;
+                            $tPreview = $templateRef->preview ?? $templateRef->image ?? null;
 
                             if ($tFront) {
                                 $displayImages['front'] = [
-                                    'url' => preg_match('/^(https?:)?\/\//i', $tFront) || strpos($tFront, '/') === 0
-                                        ? $tFront
-                                        : \Illuminate\Support\Facades\Storage::url($tFront),
+                                    'url' => \App\Support\ImageResolver::url($tFront),
                                     'alt' => $product->name . ' template front'
                                 ];
                             }
                             if ($tBack) {
                                 $displayImages['back'] = [
-                                    'url' => preg_match('/^(https?:)?\/\//i', $tBack) || strpos($tBack, '/') === 0
-                                        ? $tBack
-                                        : \Illuminate\Support\Facades\Storage::url($tBack),
+                                    'url' => \App\Support\ImageResolver::url($tBack),
                                     'alt' => $product->name . ' template back'
+                                ];
+                            }
+                            if (empty($displayImages) && $tPreview) {
+                                $displayImages['preview'] = [
+                                    'url' => \App\Support\ImageResolver::url($tPreview),
+                                    'alt' => $product->name . ' template preview'
                                 ];
                             }
                         }

@@ -428,10 +428,16 @@
         $data = is_array($template) ? $template : $template->toArray();
         $previewSource = $data['preview'] ?? $data['preview_image'] ?? $data['image'] ?? null;
         $imageSource = $data['image'] ?? $data['preview'] ?? null;
-        $data['preview_url'] = \App\Support\ImageResolver::url($previewSource);
-        $data['image_url'] = \App\Support\ImageResolver::url($imageSource);
-        $data['front_url'] = \App\Support\ImageResolver::url($data['front_image'] ?? $data['preview_front'] ?? null);
-        $data['back_url'] = \App\Support\ImageResolver::url($data['back_image'] ?? $data['preview_back'] ?? null);
+        $frontSource = $data['front_image'] ?? $data['preview_front'] ?? $previewSource;
+        $backSource = $data['back_image'] ?? $data['preview_back'] ?? null;
+
+        $data['preview'] = $data['preview'] ?? $data['preview_image'] ?? null;
+        $data['preview_image'] = $data['preview'];
+        $data['preview_url'] = $previewSource ? \App\Support\ImageResolver::url($previewSource) : null;
+        $data['image_url'] = $imageSource ? \App\Support\ImageResolver::url($imageSource) : null;
+        $data['front_url'] = $frontSource ? \App\Support\ImageResolver::url($frontSource) : null;
+        $data['back_url'] = ($backSource ?: $previewSource) ? \App\Support\ImageResolver::url($backSource ?: $previewSource) : null;
+
         return $data;
     })->values();
 @endphp
@@ -448,15 +454,17 @@
         if (!template) return;
 
         var frontContainer = document.getElementById('preview-front-img');
-        if (template.front_url) {
+        var frontSource = template.front_url || template.preview_url || '';
+        if (frontSource) {
             if (frontContainer.tagName !== 'IMG') {
                 var img = document.createElement('img');
                 img.id = 'preview-front-img';
-                img.src = template.front_url;
+                img.src = frontSource;
                 img.alt = 'Front preview';
                 frontContainer.parentNode.replaceChild(img, frontContainer);
             } else {
-                frontContainer.src = template.front_url;
+                frontContainer.src = frontSource;
+                frontContainer.alt = 'Front preview';
             }
         } else {
             if (frontContainer.tagName === 'IMG') {
@@ -469,15 +477,17 @@
         }
 
         var backContainer = document.getElementById('preview-back-img');
-        if (template.back_url) {
+        var backSource = template.back_url || template.preview_url || '';
+        if (backSource) {
             if (backContainer.tagName !== 'IMG') {
                 var img = document.createElement('img');
                 img.id = 'preview-back-img';
-                img.src = template.back_url;
+                img.src = backSource;
                 img.alt = 'Back preview';
                 backContainer.parentNode.replaceChild(img, backContainer);
             } else {
-                backContainer.src = template.back_url;
+                backContainer.src = backSource;
+                backContainer.alt = 'Back preview';
             }
         } else {
             if (backContainer.tagName === 'IMG') {

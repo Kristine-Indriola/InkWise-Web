@@ -1,5 +1,5 @@
-// SVG Template Editor
-// This script provides interactive editing capabilities for SVG templates
+// SVG Template Editor (Vite module version)
+// Provides interactive editing capabilities for SVG templates
 
 class SvgTemplateEditor {
     constructor(svgElement, options = {}) {
@@ -8,7 +8,7 @@ class SvgTemplateEditor {
         this.options = {
             onImageChange: options.onImageChange || null,
             onTextChange: options.onTextChange || null,
-            ...options
+            ...options,
         };
         const bodyDataset = document && document.body && document.body.dataset ? document.body.dataset : {};
         const modeRaw = (bodyDataset.imageReplacementMode || '').toLowerCase();
@@ -18,8 +18,8 @@ class SvgTemplateEditor {
         } else if (bodyDataset.allowImageReplacement === 'false') {
             mode = 'disabled';
         }
-    this.imageReplacementMode = mode;
-    this.allowCanvasImageTools = mode !== 'disabled';
+        this.imageReplacementMode = mode;
+        this.allowCanvasImageTools = mode !== 'disabled';
 
         this.changeableImages = [];
         this.textElements = [];
@@ -36,7 +36,6 @@ class SvgTemplateEditor {
     }
 
     parseSvgData() {
-        // Get SVG data from the data attributes or from the template data
         const svgData = this.svg.dataset.svgData;
         if (svgData) {
             const data = JSON.parse(svgData);
@@ -64,8 +63,6 @@ class SvgTemplateEditor {
 
     setupImageHandlers() {
         const self = this;
-
-        // Find all elements with data-changeable="image" or data-editable-image attributes
         const changeableElements = this.svg.querySelectorAll('[data-changeable="image"], [data-editable-image]');
 
         console.log('SvgTemplateEditor: Found', changeableElements.length, 'changeable image elements');
@@ -83,38 +80,34 @@ class SvgTemplateEditor {
             return;
         }
 
-        changeableElements.forEach((element, index) => {
-            console.log('SvgTemplateEditor: Setting up element', index, element);
-            element.style.cursor = 'pointer';
-            element.classList.add('svg-changeable-image');
+        // Create bounding boxes after a short delay to allow layout
+        setTimeout(() => {
+            changeableElements.forEach((element, index) => {
+                console.log('SvgTemplateEditor: Setting up element', index, element);
+                element.style.cursor = 'pointer';
+                element.classList.add('svg-changeable-image');
+                element.classList.add('changeable-image-hover');
 
-            // Add visual indicator
-            element.classList.add('changeable-image-hover');
+                element.addEventListener('mouseenter', function() {
+                    element.classList.add('changeable-image-active');
+                });
 
-            // Create bounding box for drag functionality
-            const boundingBox = this.createBoundingBox(element);
-            element._boundingBox = boundingBox;
+                element.addEventListener('mouseleave', function() {
+                    element.classList.remove('changeable-image-active');
+                });
 
-            element.addEventListener('mouseenter', function() {
-                element.classList.add('changeable-image-active');
-                self.showBoundingBox(element);
+                const boundingBox = this.createBoundingBox(element);
+                element._boundingBox = boundingBox;
+
+                this.makeDraggable(element);
             });
-
-            element.addEventListener('mouseleave', function() {
-                element.classList.remove('changeable-image-active');
-                self.hideBoundingBox(element);
-            });
-
-            // Add drag functionality
-            this.makeDraggable(element);
-        });
+        }, 200);
     }
 
     createBoundingBox(element) {
         const bbox = element.getBBox();
         const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         group.classList.add('svg-bounding-box');
-        group.style.display = 'none';
 
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         rect.classList.add('svg-bounding-box__rect');
@@ -126,13 +119,10 @@ class SvgTemplateEditor {
         rect.style.pointerEvents = 'none';
         group.appendChild(rect);
 
-        // Add resize handles
         const handles = this.createResizeHandles();
         handles.forEach((handle) => group.appendChild(handle));
 
         this.svg.appendChild(group);
-
-        // Prime the bounding box with initial dimensions
         this.positionBoundingElements(group, bbox);
 
         return group;
@@ -144,10 +134,10 @@ class SvgTemplateEditor {
             { name: 'nw', x: 0, y: 0 },
             { name: 'ne', x: 1, y: 0 },
             { name: 'sw', x: 0, y: 1 },
-            { name: 'se', x: 1, y: 1 }
+            { name: 'se', x: 1, y: 1 },
         ];
 
-        positions.forEach(pos => {
+        positions.forEach((pos) => {
             const handle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
             handle.setAttribute('r', '4');
             handle.setAttribute('fill', '#007cba');
@@ -160,19 +150,6 @@ class SvgTemplateEditor {
         });
 
         return handles;
-    }
-
-    showBoundingBox(element) {
-        if (element._boundingBox) {
-            this.updateBoundingBox(element);
-            element._boundingBox.style.display = 'block';
-        }
-    }
-
-    hideBoundingBox(element) {
-        if (element._boundingBox) {
-            element._boundingBox.style.display = 'none';
-        }
     }
 
     positionBoundingElements(group, rawBBox) {
@@ -223,7 +200,9 @@ class SvgTemplateEditor {
     }
 
     updateBoundingBox(element) {
-        if (!element._boundingBox) return;
+        if (!element._boundingBox) {
+            return;
+        }
         const bbox = element.getBBox();
         this.positionBoundingElements(element._boundingBox, bbox);
     }
@@ -478,11 +457,9 @@ class SvgTemplateEditor {
 
     setupTextHandlers() {
         const self = this;
-
-        // Find all elements with data-editable="true"
         const editableTexts = this.svg.querySelectorAll('[data-editable="true"]');
 
-        editableTexts.forEach((element, index) => {
+        editableTexts.forEach((element) => {
             element.style.cursor = 'pointer';
             element.classList.add('svg-editable-text');
 
@@ -503,8 +480,6 @@ class SvgTemplateEditor {
 
     showImageUploadDialog(element) {
         const self = this;
-
-        // Create file input
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = 'image/*';
@@ -529,15 +504,12 @@ class SvgTemplateEditor {
         reader.onload = function(e) {
             const imageUrl = e.target.result;
 
-            // Update the SVG element
             if (element.tagName.toLowerCase() === 'image') {
                 element.setAttribute('href', imageUrl);
-                // Remove xlink:href if it exists (for older SVG compatibility)
                 if (element.hasAttribute('xlink:href')) {
                     element.removeAttribute('xlink:href');
                 }
             } else if (element.tagName.toLowerCase() === 'rect') {
-                // For rect elements, create an image pattern or replace with image
                 const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
                 image.setAttribute('x', element.getAttribute('x') || '0');
                 image.setAttribute('y', element.getAttribute('y') || '0');
@@ -548,20 +520,18 @@ class SvgTemplateEditor {
                 image.classList.add('uploaded-image');
 
                 element.parentNode.replaceChild(image, element);
-                element = image; // Update reference
+                element = image;
             }
 
-            // Trigger change event
             const event = new CustomEvent('svgImageChanged', {
                 detail: {
-                    element: element,
-                    imageUrl: imageUrl,
-                    file: file
-                }
+                    element,
+                    imageUrl,
+                    file,
+                },
             });
             self.svg.dispatchEvent(event);
 
-            // Call optional callback
             if (self.options.onImageChange) {
                 self.options.onImageChange(element, imageUrl, file);
             }
@@ -574,13 +544,11 @@ class SvgTemplateEditor {
         const self = this;
         const currentText = element.textContent || '';
 
-        // Create a simple inline edit
         const input = document.createElement('input');
         input.type = 'text';
         input.value = currentText;
         input.className = 'svg-text-editor';
 
-        // Position the input over the text element
         const rect = element.getBoundingClientRect();
         const svgRect = self.svg.getBoundingClientRect();
 
@@ -595,7 +563,6 @@ class SvgTemplateEditor {
         input.style.background = 'white';
         input.style.zIndex = '1000';
 
-        // Hide the original text temporarily
         element.style.visibility = 'hidden';
 
         self.svg.parentNode.appendChild(input);
@@ -605,33 +572,26 @@ class SvgTemplateEditor {
         const finishEdit = function() {
             const newText = input.value;
 
-            // Clear existing text nodes
             while (element.firstChild) {
                 element.removeChild(element.firstChild);
             }
 
-            // Add new text
             element.appendChild(document.createTextNode(newText));
-
-            // Show original element
             element.style.visibility = 'visible';
 
-            // Remove input
             if (input.parentNode) {
                 input.parentNode.removeChild(input);
             }
 
-            // Trigger change event
             const event = new CustomEvent('svgTextChanged', {
                 detail: {
-                    element: element,
+                    element,
                     oldText: currentText,
-                    newText: newText
-                }
+                    newText,
+                },
             });
             self.svg.dispatchEvent(event);
 
-            // Call optional callback
             if (self.options.onTextChange) {
                 self.options.onTextChange(element, currentText, newText);
             }
@@ -642,7 +602,6 @@ class SvgTemplateEditor {
             if (e.key === 'Enter') {
                 finishEdit();
             } else if (e.key === 'Escape') {
-                // Cancel edit
                 element.style.visibility = 'visible';
                 if (input.parentNode) {
                     input.parentNode.removeChild(input);
@@ -653,7 +612,7 @@ class SvgTemplateEditor {
 
     addCssStyles() {
         if (document.getElementById('svg-editor-styles')) {
-            return; // Already added
+            return;
         }
 
         const style = document.createElement('style');
@@ -719,18 +678,15 @@ class SvgTemplateEditor {
         document.head.appendChild(style);
     }
 
-    // Get the current SVG as a string
     getSvgString() {
         return new XMLSerializer().serializeToString(this.svg);
     }
 
-    // Export the SVG as a data URL
     getSvgDataUrl() {
         const svgString = this.getSvgString();
         return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
     }
 
-    // Save the current SVG to server
     async saveSvg(templateId, side = 'front') {
         const svgData = this.getSvgString();
 
@@ -739,12 +695,12 @@ class SvgTemplateEditor {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
                 },
                 body: JSON.stringify({
                     svg_content: svgData,
-                    side: side
-                })
+                    side,
+                }),
             });
 
             const result = await response.json();
@@ -756,31 +712,52 @@ class SvgTemplateEditor {
     }
 }
 
-// Auto-initialize editors for SVGs with data-svg-editor attribute
-document.addEventListener('DOMContentLoaded', function() {
-    const svgEditors = document.querySelectorAll('svg[data-svg-editor]');
-    console.log('SvgTemplateEditor: Found', svgEditors.length, 'SVGs with data-svg-editor attribute');
-    svgEditors.forEach((svg, index) => {
-        console.log('SvgTemplateEditor: Initializing editor', index, 'for SVG:', svg);
-        new SvgTemplateEditor(svg);
-    });
-});
-
-// Also initialize on dynamic content
-const observer = new MutationObserver(function(mutations) {
-    mutations.forEach(function(mutation) {
-        mutation.addedNodes.forEach(function(node) {
-            if (node.nodeType === 1 && node.matches && node.matches('svg[data-svg-editor]')) {
-                new SvgTemplateEditor(node);
+function autoInitializeEditors() {
+    const initialize = () => {
+        const svgEditors = document.querySelectorAll('svg[data-svg-editor]');
+        console.log('SvgTemplateEditor: Found', svgEditors.length, 'SVGs with data-svg-editor attribute');
+        svgEditors.forEach((svg, index) => {
+            if (!svg.__inkwiseSvgTemplateEditor) {
+                console.log('SvgTemplateEditor: Initializing editor', index, 'for SVG:', svg);
+                svg.__inkwiseSvgTemplateEditor = new SvgTemplateEditor(svg);
             }
         });
-    });
-});
+    };
 
-observer.observe(document.body, {
-    childList: true,
-    subtree: true
-});
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        initialize();
+    } else {
+        document.addEventListener('DOMContentLoaded', initialize, { once: true });
+    }
 
-// Export for global use
-window.SvgTemplateEditor = SvgTemplateEditor;
+    if (!window.__inkwiseSvgTemplateEditorObserver) {
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                mutation.addedNodes.forEach((node) => {
+                    if (node.nodeType === 1 && node.matches && node.matches('svg[data-svg-editor]')) {
+                        if (!node.__inkwiseSvgTemplateEditor) {
+                            node.__inkwiseSvgTemplateEditor = new SvgTemplateEditor(node);
+                        }
+                    }
+                });
+            });
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+        });
+
+        window.__inkwiseSvgTemplateEditorObserver = observer;
+    }
+}
+
+if (typeof window !== 'undefined') {
+    window.SvgTemplateEditor = SvgTemplateEditor;
+    if (!window.__inkwiseSvgTemplateEditorAutoInit) {
+        window.__inkwiseSvgTemplateEditorAutoInit = true;
+        autoInitializeEditors();
+    }
+}
+
+export default SvgTemplateEditor;
