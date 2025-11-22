@@ -410,23 +410,24 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
     paletteContainer.addEventListener('touchmove', preventScrollPropagation, { passive: true });
 
     return () => {
-      try {
-        paletteContainer.removeEventListener('wheel', preventScrollPropagation);
-        paletteContainer.removeEventListener('touchmove', preventScrollPropagation);
-      } catch (err) {
-        // ignore
-      }
+      paletteContainer.removeEventListener('wheel', preventScrollPropagation);
+      paletteContainer.removeEventListener('touchmove', preventScrollPropagation);
     };
-  }, [currentPaletteSets.length]);
+  }, []);
 
   const pickRandomCuratedPalette = useCallback(() => {
-    if (!CURATED_PALETTE_LIBRARY.length) {
+    if (!CURATED_PALETTE_LIBRARY?.length) {
       return null;
     }
     const randomIndex = Math.floor(Math.random() * CURATED_PALETTE_LIBRARY.length);
     const entry = CURATED_PALETTE_LIBRARY[randomIndex];
     return entry
-      ? { id: `curated-${entry.id}-${Math.random().toString(36).slice(2, 7)}`, label: entry.label, colors: [...entry.colors], source: 'curated' }
+      ? {
+          id: `curated-${entry.id}-${Math.random().toString(36).slice(2, 7)}`,
+          label: entry.label,
+          colors: [...entry.colors],
+          source: 'curated',
+        }
       : null;
   }, [CURATED_PALETTE_LIBRARY]);
 
@@ -2303,37 +2304,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       providerLabel: 'Simple Icons',
       credit: 'Simple Icons',
     },
-  ]);
-  const [isSearchingIcons, setIsSearchingIcons] = useState(false);
-  const [iconCurrentPage, setIconCurrentPage] = useState(1);
-  const [isLoadingMoreIcons, setIsLoadingMoreIcons] = useState(false);
-  const [hasMoreIcons, setHasMoreIcons] = useState(true);
-  const iconCurrentPageRef = useRef(1);
-  const activeIconSearchQueryRef = useRef('');
-  const hasTriggeredIconSearchRef = useRef(false);
-  const [fontSearchQuery, setFontSearchQuery] = useState('');
-  const [fontSearchResults, setFontSearchResults] = useState([]);
-  const [isSearchingFonts, setIsSearchingFonts] = useState(false);
-  const [fontCurrentPage, setFontCurrentPage] = useState(1);
-  const [isLoadingMoreFonts, setIsLoadingMoreFonts] = useState(false);
-  const [hasMoreFonts, setHasMoreFonts] = useState(true);
-  const fontCurrentPageRef = useRef(1);
-  const activeFontSearchQueryRef = useRef('');
-  const hasTriggeredFontSearchRef = useRef(false);
-
-  // Styled text presets (loaded from Google Fonts list + sample text)
-  const [styledPresets, setStyledPresets] = useState([]);
-  const [styledPage, setStyledPage] = useState(1);
-  const [isLoadingStyledPresets, setIsLoadingStyledPresets] = useState(false);
-  const [hasMoreStyledPresets, setHasMoreStyledPresets] = useState(true);
-  const styledPerPage = 12;
-  const styledFontsListRef = useRef([]); // cache of fonts fetched from API
-  const styledContainerRef = useRef(null);
-  const styledObserverRef = useRef(null);
-
-  // Use the provided Google API key (from your message)
-  const GOOGLE_FONTS_API_KEY = 'AIzaSyBRCDdZjTcR4brOsHV_OBsDO11We11BVi0';
-
+  ];
   const sampleStyledTexts = [
     'Life is an ADVENTURE',
     "Congratulations! You're a Big Brother",
