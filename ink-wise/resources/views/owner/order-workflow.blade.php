@@ -50,6 +50,30 @@
   .summary-card:hover { transform: translateY(-4px); box-shadow: 0 18px 36px rgba(15, 23, 42, 0.12); }
   .summary-card.is-active { box-shadow:0 20px 40px rgba(59, 130, 246, 0.25); outline:2px solid rgba(145, 167, 241, 0.45); }
   .summary-card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .summary-card-heading { display:flex; align-items:center; gap:12px; }
+  .summary-card-icon {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:36px;
+    height:36px;
+    border-radius:12px;
+    flex-shrink:0;
+    background: rgba(148, 185, 255, 0.18);
+    color:#3b82f6;
+    transition: background 0.18s ease, color 0.18s ease;
+  }
+  .summary-card-icon svg { width:18px; height:18px; }
+
+  .summary-card-icon--total { background: rgba(59, 130, 246, 0.18); color:#2563eb; }
+  .summary-card-icon--confirmed { background: rgba(16, 185, 129, 0.20); color:#0f766e; }
+  .summary-card-icon--pending { background: rgba(245, 158, 11, 0.22); color:#b45309; }
+  .summary-card-icon--cancelled { background: rgba(239, 68, 68, 0.20); color:#b91c1c; }
+
+  .dark-mode .summary-card-icon--total { background: rgba(59, 130, 246, 0.32); color:#93c5fd; }
+  .dark-mode .summary-card-icon--confirmed { background: rgba(16, 185, 129, 0.32); color:#6ee7b7; }
+  .dark-mode .summary-card-icon--pending { background: rgba(245, 158, 11, 0.32); color:#fbbf24; }
+  .dark-mode .summary-card-icon--cancelled { background: rgba(239, 68, 68, 0.34); color:#fca5a5; }
   .summary-card-label { font-size:0.92rem; font-weight:600; color:#475569; }
   .summary-card-value { display:block; font-size:1.6rem; font-weight:800; color:#0f172a; margin-top:6px; }
   .summary-card-meta { color:#6b7280; font-size:0.84rem; }
@@ -166,7 +190,14 @@
       <section class="summary-grid" aria-label="Orders summary">
         <a href="{{ route('owner.order.workflow', $queryBase) }}" class="summary-card{{ $activeStatus === null ? ' is-active' : '' }}" data-summary-card="total" data-status-filter="total">
           <div class="summary-card-header">
-            <div style="display:flex;align-items:center;gap:8px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 7h18M3 12h18M3 17h18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="summary-card-label">Total Orders</span></div>
+            <div class="summary-card-heading">
+              <span class="summary-card-icon summary-card-icon--total" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M3 7h18M3 12h18M3 17h18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="summary-card-label">Total Orders</span>
+            </div>
             <span class="summary-card-chip accent">All</span>
           </div>
           <span class="summary-card-value" data-orders-stat="total">{{ number_format($counts['total'] ?? 0) }}</span>
@@ -175,7 +206,15 @@
 
         <a href="{{ route('owner.order.workflow', array_merge($queryBase, ['status' => 'confirmed'])) }}" class="summary-card{{ in_array($activeStatus, $confirmedStatuses, true) ? ' is-active' : '' }}" data-summary-card="confirmed" data-status-filter="confirmed">
           <div class="summary-card-header">
-            <div style="display:flex;align-items:center;gap:8px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 11-16 0 8 8 0 0116 0z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.5 12.5l1.8 1.8 4.2-4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="summary-card-label">Confirmed</span></div>
+            <div class="summary-card-heading">
+              <span class="summary-card-icon summary-card-icon--confirmed" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M20 12a8 8 0 1 1-16 0 8 8 0 0 1 16 0z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M9.5 12.5l1.8 1.8 4.2-4.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="summary-card-label">Confirmed</span>
+            </div>
             <span class="summary-card-chip accent">Done</span>
           </div>
           <span class="summary-card-value" data-orders-stat="confirmed">{{ number_format($counts['confirmed'] ?? 0) }}</span>
@@ -184,7 +223,15 @@
 
         <a href="{{ route('owner.order.workflow', array_merge($queryBase, ['status' => 'pending'])) }}" class="summary-card{{ in_array($activeStatus, $pendingStatuses, true) ? ' is-active' : '' }}" data-summary-card="pending" data-status-filter="pending">
           <div class="summary-card-header">
-            <div style="display:flex;align-items:center;gap:8px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v5l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="summary-card-label">Pending</span></div>
+            <div class="summary-card-heading">
+              <span class="summary-card-icon summary-card-icon--pending" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8" />
+                  <path d="M12 8v5l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="summary-card-label">Pending</span>
+            </div>
             <span class="summary-card-chip accent">Review</span>
           </div>
           <span class="summary-card-value" data-orders-stat="pending">{{ number_format($counts['pending'] ?? 0) }}</span>
@@ -193,7 +240,15 @@
 
         <a href="{{ route('owner.order.workflow', array_merge($queryBase, ['status' => 'cancelled'])) }}" class="summary-card{{ in_array($activeStatus, $cancelledStatuses, true) ? ' is-active' : '' }}" data-summary-card="cancelled" data-status-filter="cancelled">
           <div class="summary-card-header">
-            <div style="display:flex;align-items:center;gap:8px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 21a9 9 0 1 0-9-9 9 9 0 0 0 9 9Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="m9 9 6 6m-6 0 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="summary-card-label">Cancelled</span></div>
+            <div class="summary-card-heading">
+              <span class="summary-card-icon summary-card-icon--cancelled" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 21a9 9 0 1 0-9-9 9 9 0 0 0 9 9Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="m9 9 6 6m-6 0 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="summary-card-label">Cancelled</span>
+            </div>
             <span class="summary-card-chip accent">Closed</span>
           </div>
           <span class="summary-card-value" data-orders-stat="cancelled">{{ number_format($counts['cancelled'] ?? 0) }}</span>

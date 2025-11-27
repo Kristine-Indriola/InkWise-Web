@@ -290,13 +290,21 @@
           </section>
         @endif
       </div>
-  <a href="{{ route('design.studio', ['product' => $product->id]) }}" class="edit-btn" data-edit-link target="_top" rel="noopener">
-    <span>Edit my design</span>
-    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M17 7L7 17"></path>
-      <path d="M8 7h9v9"></path>
-    </svg>
-  </a>
+  @php
+      $templateId = $product->template_id ?? optional($product->template)->id;
+      $editDesignUrl = $templateId
+          ? route('design.studio', ['template' => $templateId, 'product' => $product->id])
+          : null;
+  @endphp
+  @if($editDesignUrl)
+    <a href="{{ $editDesignUrl }}" class="edit-btn" data-edit-link target="_top" rel="noopener">
+      <span>Edit my design</span>
+      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M17 7L7 17"></path>
+        <path d="M8 7h9v9"></path>
+      </svg>
+    </a>
+  @endif
       <div id="addonToast" class="selection-toast" role="status" aria-live="polite"></div>
     </div>
   </div>

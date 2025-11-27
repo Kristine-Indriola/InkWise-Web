@@ -33,6 +33,7 @@ const initialState = ({ template }) => {
     layersPanelOpen: true,
     inspectorOpen: true,
     recentlyUploadedImages: [],
+    showPreviewModal: false,
     history: {
       undoStack: [],
       redoStack: [],
@@ -398,6 +399,16 @@ function reducer(state, action) {
         },
       };
     }
+    case 'SHOW_PREVIEW_MODAL':
+      return {
+        ...state,
+        showPreviewModal: true,
+      };
+    case 'HIDE_PREVIEW_MODAL':
+      return {
+        ...state,
+        showPreviewModal: false,
+      };
     default:
       return state;
   }

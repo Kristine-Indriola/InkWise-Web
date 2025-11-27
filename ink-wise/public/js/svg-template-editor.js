@@ -45,6 +45,23 @@ class SvgTemplateEditor {
         }
     }
 
+    toSvgPoint(clientX, clientY) {
+        if (!this.svg || typeof this.svg.createSVGPoint !== 'function') {
+            return null;
+        }
+
+        const point = this.svg.createSVGPoint();
+        point.x = clientX;
+        point.y = clientY;
+
+        const matrix = this.svg.getScreenCTM();
+        if (!matrix) {
+            return null;
+        }
+
+        return point.matrixTransform(matrix.inverse());
+    }
+
     setupImageHandlers() {
         const self = this;
 
@@ -95,30 +112,33 @@ class SvgTemplateEditor {
 
     createBoundingBox(element) {
         const bbox = element.getBBox();
-        const boundingBox = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        group.classList.add('svg-bounding-box');
+        group.style.display = 'none';
 
-        boundingBox.setAttribute('x', bbox.x - 5);
-        boundingBox.setAttribute('y', bbox.y - 5);
-        boundingBox.setAttribute('width', bbox.width + 10);
-        boundingBox.setAttribute('height', bbox.height + 10);
-        boundingBox.setAttribute('fill', 'none');
-        boundingBox.setAttribute('stroke', '#007cba');
-        boundingBox.setAttribute('stroke-width', '2');
-        boundingBox.setAttribute('stroke-dasharray', '5,5');
-        boundingBox.setAttribute('rx', '3');
-        boundingBox.classList.add('svg-bounding-box');
-        boundingBox.style.display = 'none';
-        boundingBox.style.pointerEvents = 'none';
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.classList.add('svg-bounding-box__rect');
+        rect.setAttribute('fill', 'none');
+        rect.setAttribute('stroke', '#007cba');
+        rect.setAttribute('stroke-width', '2');
+        rect.setAttribute('stroke-dasharray', '5,5');
+        rect.setAttribute('rx', '3');
+        rect.style.pointerEvents = 'none';
+        group.appendChild(rect);
 
         // Add resize handles
-        const handles = this.createResizeHandles(boundingBox);
-        handles.forEach(handle => boundingBox.appendChild(handle));
+        const handles = this.createResizeHandles();
+        handles.forEach((handle) => group.appendChild(handle));
 
-        this.svg.appendChild(boundingBox);
-        return boundingBox;
+        this.svg.appendChild(group);
+
+        // Prime the bounding box with initial dimensions
+        this.positionBoundingElements(group, bbox);
+
+        return group;
     }
 
-    createResizeHandles(boundingBox) {
+    createResizeHandles() {
         const handles = [];
         const positions = [
             { name: 'nw', x: 0, y: 0 },
@@ -155,104 +175,145 @@ class SvgTemplateEditor {
         }
     }
 
+    positionBoundingElements(group, rawBBox) {
+        const rect = group.querySelector('.svg-bounding-box__rect');
+        if (!rect) {
+            return;
+        }
+
+        const offset = 5;
+        const x = rawBBox.x - offset;
+        const y = rawBBox.y - offset;
+        const width = rawBBox.width + offset * 2;
+        const height = rawBBox.height + offset * 2;
+
+        rect.setAttribute('x', x);
+        rect.setAttribute('y', y);
+        rect.setAttribute('width', Math.max(width, 0));
+        rect.setAttribute('height', Math.max(height, 0));
+
+        const handles = group.querySelectorAll('.resize-handle');
+        handles.forEach((handle) => {
+            if (handle.classList.contains('handle-nw')) {
+                handle.setAttribute('cx', x);
+                handle.setAttribute('cy', y);
+            } else if (handle.classList.contains('handle-ne')) {
+                handle.setAttribute('cx', x + width);
+                handle.setAttribute('cy', y);
+            } else if (handle.classList.contains('handle-sw')) {
+                handle.setAttribute('cx', x);
+                handle.setAttribute('cy', y + height);
+            } else if (handle.classList.contains('handle-se')) {
+                handle.setAttribute('cx', x + width);
+                handle.setAttribute('cy', y + height);
+            } else if (handle.classList.contains('handle-n')) {
+                handle.setAttribute('cx', x + width / 2);
+                handle.setAttribute('cy', y);
+            } else if (handle.classList.contains('handle-s')) {
+                handle.setAttribute('cx', x + width / 2);
+                handle.setAttribute('cy', y + height);
+            } else if (handle.classList.contains('handle-e')) {
+                handle.setAttribute('cx', x + width);
+                handle.setAttribute('cy', y + height / 2);
+            } else if (handle.classList.contains('handle-w')) {
+                handle.setAttribute('cx', x);
+                handle.setAttribute('cy', y + height / 2);
+            }
+        });
+    }
+
     updateBoundingBox(element) {
         if (!element._boundingBox) return;
-
         const bbox = element.getBBox();
-        element._boundingBox.setAttribute('x', bbox.x - 5);
-        element._boundingBox.setAttribute('y', bbox.y - 5);
-        element._boundingBox.setAttribute('width', bbox.width + 10);
-        element._boundingBox.setAttribute('height', bbox.height + 10);
-
-        // Update resize handle positions
-        const handles = element._boundingBox.querySelectorAll('.resize-handle');
-        const x = bbox.x - 5;
-        const y = bbox.y - 5;
-        const width = bbox.width + 10;
-        const height = bbox.height + 10;
-
-        handles.forEach((handle, index) => {
-            const positions = [
-                { x: x, y: y }, // nw
-                { x: x + width, y: y }, // ne
-                { x: x, y: y + height }, // sw
-                { x: x + width, y: y + height } // se
-            ];
-            handle.setAttribute('cx', positions[index].x);
-            handle.setAttribute('cy', positions[index].y);
-        });
+        this.positionBoundingElements(element._boundingBox, bbox);
     }
 
     makeDraggable(element) {
         let isDragging = false;
-        let startX, startY;
-        let originalX, originalY;
-        let currentX, currentY;
+        let originalX = 0;
+        let originalY = 0;
+        let grabOffsetX = 0;
+        let grabOffsetY = 0;
+        let currentX = 0;
+        let currentY = 0;
 
         const startDrag = (e) => {
-            if (e.target.closest('.resize-handle')) return; // Don't drag if clicking on resize handle
-
-            isDragging = true;
-            startX = e.clientX;
-            startY = e.clientY;
-
-            // Get current transform or position
-            const transform = element.getAttribute('transform') || '';
-            const translateMatch = transform.match(/translate\(([^,]+),\s*([^)]+)\)/);
-
-            if (translateMatch) {
-                originalX = parseFloat(translateMatch[1]);
-                originalY = parseFloat(translateMatch[2]);
-            } else {
-                originalX = parseFloat(element.getAttribute('x') || 0);
-                originalY = parseFloat(element.getAttribute('y') || 0);
+            if (e.target.closest('.resize-handle')) {
+                return;
             }
 
+            const startPoint = this.toSvgPoint(e.clientX, e.clientY);
+            if (!startPoint) {
+                return;
+            }
+
+            const bbox = element.getBBox();
+            originalX = parseFloat(element.getAttribute('x'));
+            originalY = parseFloat(element.getAttribute('y'));
+
+            if (Number.isNaN(originalX)) {
+                originalX = bbox.x;
+                element.setAttribute('x', originalX);
+            }
+
+            if (Number.isNaN(originalY)) {
+                originalY = bbox.y;
+                element.setAttribute('y', originalY);
+            }
+
+            grabOffsetX = startPoint.x - originalX;
+            grabOffsetY = startPoint.y - originalY;
             currentX = originalX;
             currentY = originalY;
+            isDragging = true;
 
             element.style.cursor = 'grabbing';
             this.svg.style.cursor = 'grabbing';
-
-            // Add drag overlay to prevent text selection
             document.body.style.userSelect = 'none';
 
             e.preventDefault();
         };
 
         const drag = (e) => {
-            if (!isDragging) return;
+            if (!isDragging) {
+                return;
+            }
 
-            const deltaX = e.clientX - startX;
-            const deltaY = e.clientY - startY;
+            const point = this.toSvgPoint(e.clientX, e.clientY);
+            if (!point) {
+                return;
+            }
 
-            currentX = originalX + deltaX;
-            currentY = originalY + deltaY;
+            currentX = point.x - grabOffsetX;
+            currentY = point.y - grabOffsetY;
 
-            // Apply transform
-            element.setAttribute('transform', `translate(${currentX}, ${currentY})`);
+            element.removeAttribute('transform');
+            element.setAttribute('x', currentX);
+            element.setAttribute('y', currentY);
 
-            // Update bounding box
             this.updateBoundingBox(element);
 
             e.preventDefault();
         };
 
         const endDrag = (e) => {
-            if (!isDragging) return;
+            if (!isDragging) {
+                return;
+            }
 
             isDragging = false;
             element.style.cursor = 'pointer';
             this.svg.style.cursor = 'default';
             document.body.style.userSelect = '';
 
-            // Trigger change event
+            this.updateBoundingBox(element);
+
             const event = new CustomEvent('svgImageMoved', {
                 detail: {
-                    element: element,
+                    element,
                     x: currentX,
-                    y: currentY
-                }
+                    y: currentY,
+                },
             });
             this.svg.dispatchEvent(event);
 
@@ -263,32 +324,51 @@ class SvgTemplateEditor {
         document.addEventListener('mousemove', drag);
         document.addEventListener('mouseup', endDrag);
 
-        // Add resize functionality to handles
         const handles = element._boundingBox.querySelectorAll('.resize-handle');
-        handles.forEach(handle => {
+        handles.forEach((handle) => {
             this.makeResizable(element, handle);
         });
     }
 
     makeResizable(element, handle) {
         let isResizing = false;
-        let startX, startY;
-        let originalWidth, originalHeight;
-        let originalX, originalY;
-        let handleType;
+        let startPoint = null;
+        let originalWidth = 0;
+        let originalHeight = 0;
+        let originalX = 0;
+        let originalY = 0;
+        let handleType = '';
+        let originalFontSize = 0;
 
         const startResize = (e) => {
-            isResizing = true;
-            startX = e.clientX;
-            startY = e.clientY;
-            handleType = Array.from(handle.classList).find(cls => cls.startsWith('handle-'));
+            const point = this.toSvgPoint(e.clientX, e.clientY);
+            if (!point) {
+                return;
+            }
 
-            // Get current dimensions
             const bbox = element.getBBox();
             originalWidth = bbox.width;
             originalHeight = bbox.height;
-            originalX = bbox.x;
-            originalY = bbox.y;
+            originalX = parseFloat(element.getAttribute('x'));
+            originalY = parseFloat(element.getAttribute('y'));
+
+            if (Number.isNaN(originalX)) {
+                originalX = bbox.x;
+                element.setAttribute('x', originalX);
+            }
+
+            if (Number.isNaN(originalY)) {
+                originalY = bbox.y;
+                element.setAttribute('y', originalY);
+            }
+
+            originalFontSize = parseFloat(element.getAttribute('font-size'))
+                || parseFloat(window.getComputedStyle(element).fontSize)
+                || 16;
+
+            startPoint = point;
+            handleType = Array.from(handle.classList).find((cls) => cls.startsWith('handle-')) || '';
+            isResizing = true;
 
             element.style.cursor = handle.style.cursor;
             this.svg.style.cursor = handle.style.cursor;
@@ -299,56 +379,67 @@ class SvgTemplateEditor {
         };
 
         const resize = (e) => {
-            if (!isResizing) return;
+            if (!isResizing) {
+                return;
+            }
 
-            const deltaX = e.clientX - startX;
-            const deltaY = e.clientY - startY;
+            const point = this.toSvgPoint(e.clientX, e.clientY);
+            if (!point) {
+                return;
+            }
+
+            const deltaX = point.x - startPoint.x;
+            const deltaY = point.y - startPoint.y;
+
             let newWidth = originalWidth;
             let newHeight = originalHeight;
             let newX = originalX;
             let newY = originalY;
 
             switch (handleType) {
-                case 'handle-se': // southeast
+                case 'handle-se':
                     newWidth = originalWidth + deltaX;
                     newHeight = originalHeight + deltaY;
                     break;
-                case 'handle-sw': // southwest
+                case 'handle-sw':
                     newWidth = originalWidth - deltaX;
                     newHeight = originalHeight + deltaY;
                     newX = originalX + deltaX;
                     break;
-                case 'handle-ne': // northeast
+                case 'handle-ne':
                     newWidth = originalWidth + deltaX;
                     newHeight = originalHeight - deltaY;
                     newY = originalY + deltaY;
                     break;
-                case 'handle-nw': // northwest
+                case 'handle-nw':
                     newWidth = originalWidth - deltaX;
                     newHeight = originalHeight - deltaY;
                     newX = originalX + deltaX;
                     newY = originalY + deltaY;
+                    break;
+                default:
                     break;
             }
 
-            // Apply minimum size constraints
             newWidth = Math.max(20, newWidth);
             newHeight = Math.max(20, newHeight);
 
-            // Update element size and position
-            if (element.tagName.toLowerCase() === 'image') {
+            const tag = element.tagName.toLowerCase();
+            if (tag === 'image' || tag === 'rect') {
                 element.setAttribute('width', newWidth);
                 element.setAttribute('height', newHeight);
                 element.setAttribute('x', newX);
                 element.setAttribute('y', newY);
-            } else if (element.tagName.toLowerCase() === 'rect') {
-                element.setAttribute('width', newWidth);
-                element.setAttribute('height', newHeight);
-                element.setAttribute('x', newX);
-                element.setAttribute('y', newY);
+            } else {
+                const initialWidth = Math.max(1, originalWidth);
+                const initialHeight = Math.max(1, originalHeight);
+                const scaleX = newWidth / initialWidth;
+                const scaleY = newHeight / initialHeight;
+                const scale = Math.max(scaleX, scaleY);
+                const newFontSize = Math.max(6, originalFontSize * scale);
+                element.setAttribute('font-size', newFontSize);
             }
 
-            // Update bounding box
             this.updateBoundingBox(element);
 
             e.preventDefault();
@@ -356,23 +447,24 @@ class SvgTemplateEditor {
         };
 
         const endResize = (e) => {
-            if (!isResizing) return;
+            if (!isResizing) {
+                return;
+            }
 
             isResizing = false;
             element.style.cursor = 'pointer';
             this.svg.style.cursor = 'default';
             document.body.style.userSelect = '';
 
-            // Trigger change event
-            const event = new CustomEvent('svgImageResized', {
-                detail: {
-                    element: element,
-                    width: parseFloat(element.getAttribute('width')),
-                    height: parseFloat(element.getAttribute('height')),
-                    x: parseFloat(element.getAttribute('x')),
-                    y: parseFloat(element.getAttribute('y'))
-                }
-            });
+            const detail = {
+                element,
+                width: parseFloat(element.getAttribute('width')),
+                height: parseFloat(element.getAttribute('height')),
+                x: parseFloat(element.getAttribute('x')),
+                y: parseFloat(element.getAttribute('y')),
+            };
+
+            const event = new CustomEvent('svgImageResized', { detail });
             this.svg.dispatchEvent(event);
 
             e.preventDefault();
@@ -585,6 +677,9 @@ class SvgTemplateEditor {
 
             .svg-bounding-box {
                 transition: all 0.2s ease;
+            }
+
+            .svg-bounding-box__rect {
                 pointer-events: none;
             }
 

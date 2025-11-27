@@ -220,37 +220,7 @@ const DEFAULT_FONT_OPTIONS = [
   { family: 'Zilla Slab', category: 'serif', variants: ['400', '700'] },
 ];
 
-const DEFAULT_FONT_MAP = new Map(DEFAULT_FONT_OPTIONS.map(font => [font.family, font]));
-
-const CURATED_HANDWRITING_FONTS = [
-  'Dancing Script',
-  'Pacifico',
-  'Caveat',
-  'Shadows Into Light',
-  'Satisfy',
-  'Amatic SC',
-  'Kalam',
-  'Permanent Marker',
-  'Rock Salt',
-  'Allura',
-  'Alex Brush',
-  'Bad Script',
-  'Marck Script',
-  'Pangolin',
-  'Great Vibes',
-  'Homemade Apple',
-  'Kaushan Script',
-];
-
-// Function to add more handwriting fonts to the curated list via API
-export function addHandwritingFonts(newFonts) {
-  if (Array.isArray(newFonts)) {
-    const uniqueFonts = newFonts.filter(font => 
-      typeof font === 'string' && font.trim() && !CURATED_HANDWRITING_FONTS.includes(font.trim())
-    );
-    CURATED_HANDWRITING_FONTS.push(...uniqueFonts);
-  }
-}
+const DEFAULT_FONT_MAP = new Map(DEFAULT_FONT_OPTIONS.map((font) => [font.family, font]));
 
 export function InspectorPanel() {
   const { state, dispatch } = useBuilderStore();
@@ -260,6 +230,7 @@ export function InspectorPanel() {
     if (!activePage) return null;
     return activePage.nodes.find((node) => node.id === state.selectedLayerId) ?? null;
   }, [activePage, state.selectedLayerId]);
+  const selectedLayerSide = selectedLayer?.side ?? 'front';
 
   // Resize functionality
   const [panelWidth, setPanelWidth] = useState(() => {
@@ -374,16 +345,12 @@ export function InspectorPanel() {
       if (fontCategoryFilter !== 'all' && (font.category ?? '').toLowerCase() !== fontCategoryFilter.toLowerCase()) {
         return false;
       }
-      // Special handling for handwriting category - only show curated fonts when we have loaded fonts
-      if (fontCategoryFilter === 'handwriting' && loadedFonts.length > 0 && !CURATED_HANDWRITING_FONTS.includes(font.family)) {
-        return false;
-      }
       if (!query) {
         return true;
       }
       return font.family.toLowerCase().includes(query);
     });
-  }, [fontChoices, fontSearchTerm, fontCategoryFilter, loadedFonts.length]);
+  }, [fontChoices, fontSearchTerm, fontCategoryFilter]);
 
   const filteredShapeOptions = useMemo(() => {
     const query = shapeSearchTerm.trim().toLowerCase();
@@ -474,18 +441,16 @@ export function InspectorPanel() {
       try {
   const triggerRect = fontTriggerRef.current.getBoundingClientRect();
   const panelRect = panelRef.current.getBoundingClientRect();
-    const preferredWidth = Math.min(400, Math.max(250, Math.round(triggerRect.width * 1.5)));
-      const preferredHeight = Math.min(640, Math.max(360, Math.round(window.innerHeight * 0.6)));
-      let left = panelRect.left - preferredWidth - 12 + window.scrollX;
-    // Prefer showing the modal well above the trigger; keep viewport clamping below
-    let top = triggerRect.top + window.scrollY - 600;
+    const preferredWidth = Math.min(320, Math.max(200, triggerRect.width * 1.6));
+        let left = panelRect.left - preferredWidth - 12 + window.scrollX;
+        let top = triggerRect.top + window.scrollY - 6;
         if (left < 8) {
           left = panelRect.right + 12 + window.scrollX;
         }
         const maxTop = window.scrollY + window.innerHeight - 48;
         if (top > maxTop) top = Math.max(window.scrollY + 8, maxTop - 8);
-  if (top < window.scrollY + 8) top = window.scrollY + 8;
-  setFontModalPosition({ top, left, width: preferredWidth, height: preferredHeight });
+        if (top < window.scrollY + 8) top = window.scrollY + 8;
+        setFontModalPosition({ top, left, width: preferredWidth });
       } catch (err) {
         // ignore
       }
@@ -507,18 +472,16 @@ export function InspectorPanel() {
       try {
         const triggerRect = shapeButtonRef.current.getBoundingClientRect();
         const panelRect = panelRef.current.getBoundingClientRect();
-  // Make the shape modal much wider while keeping a reasonable height
-  const preferredWidth = Math.min(window.innerWidth - 24, Math.max(1000, Math.round(triggerRect.width * 3.0)));
-  const preferredHeight = 500;
-  let left = panelRect.left - preferredWidth - 12 + window.scrollX;
-  let top = triggerRect.top + window.scrollY - 6;
+        const preferredWidth = Math.min(320, Math.max(200, triggerRect.width * 1.6));
+        let left = panelRect.left - preferredWidth - 12 + window.scrollX;
+        let top = triggerRect.top + window.scrollY - 6;
         if (left < 8) {
           left = panelRect.right + 12 + window.scrollX;
         }
         const maxTop = window.scrollY + window.innerHeight - 48;
         if (top > maxTop) top = Math.max(window.scrollY + 8, maxTop - 8);
-  if (top < window.scrollY + 8) top = window.scrollY + 8;
-  setShapeModalPosition({ top, left, width: preferredWidth, height: preferredHeight });
+        if (top < window.scrollY + 8) top = window.scrollY + 8;
+        setShapeModalPosition({ top, left, width: preferredWidth });
       } catch (err) {
         // ignore
       }
@@ -555,14 +518,8 @@ export function InspectorPanel() {
           }
           const payload = await response.json();
           const items = Array.isArray(payload?.items) ? payload.items.slice(0, 250) : [];
-          
-          // Ensure curated handwriting fonts are included
-          const handwritingFonts = items.filter(font => CURATED_HANDWRITING_FONTS.includes(font.family));
-          const otherFonts = items.filter(font => !CURATED_HANDWRITING_FONTS.includes(font.family));
-          const allFonts = [...handwritingFonts, ...otherFonts];
-          
-          setGoogleFonts(allFonts);
-          setLoadedFonts(allFonts.slice(0, 150)); // initial batch of 150 fonts
+          setGoogleFonts(items);
+          setLoadedFonts(items.slice(0, 50)); // initial batch of 50 fonts
           success = true;
           break;
         } catch (error) {
@@ -589,9 +546,9 @@ export function InspectorPanel() {
   const loadMoreFonts = useCallback(() => {
     if (loadingMore || loadedFonts.length >= googleFonts.length) return;
     setLoadingMore(true);
-    // Load next batch of 200 fonts
+    // Load next batch of 100 fonts
     setLoadedFonts((prev) => {
-      const nextBatch = googleFonts.slice(prev.length, prev.length + 200);
+      const nextBatch = googleFonts.slice(prev.length, prev.length + 100);
       return [...prev, ...nextBatch];
     });
     setLoadingMore(false);
@@ -644,8 +601,8 @@ export function InspectorPanel() {
     if (!isFontModalOpen || loadingMore || loadedFonts.length >= googleFonts.length) {
       return;
     }
-    // Load more if we have less than 200 fonts loaded
-    if (loadedFonts.length < 200) {
+    // Load more if we have less than 100 fonts loaded
+    if (loadedFonts.length < 100) {
       loadMoreFonts();
     }
   }, [isFontModalOpen, loadedFonts.length, googleFonts.length, loadingMore, loadMoreFonts]);
@@ -754,7 +711,7 @@ export function InspectorPanel() {
           const triggerRect = shapeButtonRef.current.getBoundingClientRect();
           const panelRect = panelRef.current.getBoundingClientRect();
           // Prefer a large wide modal (width x height). Cap at viewport height and available width.
-          const preferredWidth = Math.min(6000, Math.max(3500, triggerRect.width * 4.0));
+          const preferredWidth = Math.min(4000, Math.max(2200, triggerRect.width * 3.0));
           // Use fixed height instead of square sizing to keep it wide but not too tall
           const preferredHeight = 500;
 
@@ -808,26 +765,19 @@ export function InspectorPanel() {
   };
 
   const handlePageNameSubmit = (pageId) => {
-    if (!pageId) {
-      return;
-    }
-
-    const trimmed = editingPageName.trim();
-    if (trimmed) {
+    if (editingPageName.trim()) {
       dispatch({
         type: 'UPDATE_PAGE_PROPS',
         pageId,
-        props: { name: trimmed },
+        props: { name: editingPageName.trim() },
       });
     }
-
     setEditingPageId(null);
     setEditingPageName('');
   };
 
   const handlePageNameKeyDown = (event, pageId) => {
     if (event.key === 'Enter') {
-      event.preventDefault();
       handlePageNameSubmit(pageId);
     } else if (event.key === 'Escape') {
       setEditingPageId(null);
@@ -865,7 +815,17 @@ export function InspectorPanel() {
   };
 
   const handleLayerSideChange = (side) => {
+    if (!selectedLayer || !activePage) {
+      return;
+    }
+
     handleLayerChange({ side });
+    dispatch({
+      type: 'REORDER_LAYER',
+      pageId: activePage.id,
+      layerId: selectedLayer.id,
+      direction: side === 'front' ? 'FRONT' : 'BACK',
+    });
   };
 
   const handleSelectShapeOption = (shape) => {
@@ -1281,8 +1241,8 @@ export function InspectorPanel() {
                     className="inspector-pages__label-input"
                     value={editingPageName}
                     onChange={handlePageNameChange}
-                    onBlur={() => handlePageNameSubmit(page.id)}
-                    onKeyDown={(event) => handlePageNameKeyDown(event, page.id)}
+                    onBlur={handlePageNameSubmit}
+                    onKeyDown={handlePageNameKeyDown}
                     autoFocus
                   />
                 ) : (
@@ -1504,7 +1464,7 @@ export function InspectorPanel() {
     <div className="inspector-panel__group">
       <div className="inspector-section__header">
         <h3>Typography</h3>
-        <span className="inspector-section__meta">{fontsLoading ? 'Loading fonts...' : 'Text content & styling'}</span>
+  <span className="inspector-section__meta">{fontsLoading ? 'Loading fonts...' : 'Text content & styling'}</span>
       </div>
       <label className="inspector-field">
         <span className="inspector-field__label">Content</span>
@@ -1527,24 +1487,22 @@ export function InspectorPanel() {
                 try {
   const triggerRect = fontTriggerRef.current.getBoundingClientRect();
   const panelRect = panelRef.current.getBoundingClientRect();
-  const preferredWidth = Math.min(400, Math.max(250, Math.round(triggerRect.width * 1.5)));
-                    const preferredHeight = Math.min(640, Math.max(360, Math.round(window.innerHeight * 0.6)));
-                    // Position to the left of the inspector panel, aligned to trigger top if possible
-                    let left = panelRect.left - preferredWidth - 12 + window.scrollX;
-                    let top = triggerRect.top + window.scrollY - 600; // Moved way up (from -300 to -600)
+  const preferredWidth = Math.min(320, Math.max(200, triggerRect.width * 1.6));
+                  // Position to the left of the inspector panel, aligned to trigger top if possible
+                  let left = panelRect.left - preferredWidth - 12 + window.scrollX;
+                  let top = triggerRect.top + window.scrollY - 6;
 
                   // If not enough space on left, place to the right of panel
                   if (left < 8) {
                     left = panelRect.right + 12 + window.scrollX;
                   }
 
-                  // Keep within viewport vertically (but allow higher positioning)
+                  // Keep within viewport vertically
                   const maxTop = window.scrollY + window.innerHeight - 48;
                   if (top > maxTop) top = Math.max(window.scrollY + 8, maxTop - 8);
-                  // Allow modal to go higher than minimum scroll position
-                  if (top < 0) top = 0;
+                  if (top < window.scrollY + 8) top = window.scrollY + 8;
 
-                  setFontModalPosition({ top, left, width: preferredWidth, height: preferredHeight });
+                  setFontModalPosition({ top, left, width: preferredWidth });
                 } catch (err) {
                   setFontModalPosition(null);
                 }
@@ -1585,7 +1543,7 @@ export function InspectorPanel() {
               ensureFontLoaded={ensureFontLoaded}
               loadMoreFonts={loadMoreFonts}
               loadingMore={loadingMore}
-              style={fontModalPosition ? { position: 'absolute', top: `${fontModalPosition.top}px`, left: `${fontModalPosition.left}px`, width: `${fontModalPosition.width}px`, ...(fontModalPosition.height ? { height: `${fontModalPosition.height}px` } : {}) } : { position: 'absolute' }}
+              style={fontModalPosition ? { position: 'absolute', top: `${fontModalPosition.top}px`, left: `${fontModalPosition.left}px`, width: `${fontModalPosition.width}px` } : { position: 'absolute' }}
             />,
             document.body,
           )}
@@ -1744,22 +1702,22 @@ export function InspectorPanel() {
     <div className="inspector-panel__group inspector-panel__group--actions">
       <div className="inspector-section__header">
         <h3>Layer actions</h3>
-        <span className="inspector-section__meta">Visibility &amp; locking</span>
+        <span className="inspector-section__meta">Stacking, visibility &amp; locking</span>
       </div>
       <div className="inspector-field inspector-field--actions">
         <button
           type="button"
-          className={`builder-btn inspector-btn ${selectedLayer.side === 'front' ? 'is-active' : ''}`}
+          className={`builder-btn inspector-btn ${selectedLayerSide === 'front' ? 'is-active' : ''}`}
           onClick={() => handleLayerSideChange('front')}
         >
-          Front
+          Bring to front
         </button>
         <button
           type="button"
-          className={`builder-btn inspector-btn ${selectedLayer.side === 'back' ? 'is-active' : ''}`}
+          className={`builder-btn inspector-btn ${selectedLayerSide === 'back' ? 'is-active' : ''}`}
           onClick={() => handleLayerSideChange('back')}
         >
-          Back
+          Send to back
         </button>
       </div>
       <div className="inspector-field inspector-field--actions">
@@ -1948,7 +1906,7 @@ const FontPickerModal = React.forwardRef(function FontPickerModal(
   }, []);
 
   useEffect(() => {
-    fonts.slice(0, 32).forEach((font) => {
+    fonts.slice(0, 16).forEach((font) => {
       if (font?.family) {
         ensureFontLoaded(font.family, font.variants);
       }

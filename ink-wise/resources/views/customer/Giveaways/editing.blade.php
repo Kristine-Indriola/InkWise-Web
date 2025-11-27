@@ -5,7 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Edit Design - Inkwise</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" referrerpolicy="no-referrer">
-    <link rel="stylesheet" href="{{ asset('css/customer/editing.css') }}">
+    @vite([
+        'resources/css/customer/editing.css',
+        'resources/js/customer/editing.js',
+    ])
     <style>
         .canvas-status-bar {
             background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
@@ -344,9 +347,8 @@
             display: block;
         }
     </style>
-    <script src="{{ asset('js/customer/editing.js') }}" defer></script>
     <!-- SVG Template Editor for auto-parser enhanced editing -->
-    <script src="{{ asset('js/svg-template-editor.js') }}" defer></script>
+    @vite('resources/js/customer/studio/svg-template-editor.jsx')
     <!-- Fabric.js for SVG -> editable canvas support -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.2.4/fabric.min.js" defer integrity="sha512-HkRNCiaZYxQAkHpLFYI90ObSzL0vaIXL8Xe3bM51vhdYI79RDFMLTAsmVH1xVPREmTlUWexgrQMk+c3RBTsLGw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>

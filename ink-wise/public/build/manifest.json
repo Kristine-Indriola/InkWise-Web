@@ -1,0 +1,114 @@
+{
+  "_client-Cv0X-2PX.js": {
+    "file": "assets/client-Cv0X-2PX.js",
+    "name": "client"
+  },
+  "resources/css/admin/template/edit.css": {
+    "file": "assets/edit-CShXJca9.css",
+    "src": "resources/css/admin/template/edit.css",
+    "isEntry": true
+  },
+  "resources/css/admin/template/image.css": {
+    "file": "assets/image-DX1JsKfP.css",
+    "src": "resources/css/admin/template/image.css",
+    "isEntry": true
+  },
+  "resources/css/admin/template/template.css": {
+    "file": "assets/template-Cm6Cr1Qw.css",
+    "src": "resources/css/admin/template/template.css",
+    "isEntry": true
+  },
+  "resources/css/app.css": {
+    "file": "assets/app-KMDQAHUM.css",
+    "src": "resources/css/app.css",
+    "isEntry": true
+  },
+  "resources/css/customer/customer.css": {
+    "file": "assets/customer-BYbDMLiU.css",
+    "src": "resources/css/customer/customer.css",
+    "isEntry": true
+  },
+  "resources/css/customer/editing.css": {
+    "file": "assets/editing-tn0RQdqM.css",
+    "src": "resources/css/customer/editing.css",
+    "isEntry": true
+  },
+  "resources/css/customer/studio.css": {
+    "file": "assets/studio-CkkyVuCb.css",
+    "src": "resources/css/customer/studio.css",
+    "isEntry": true
+  },
+  "resources/js/admin/template/editor.js": {
+    "file": "assets/editor-B58b___x.js",
+    "name": "editor",
+    "src": "resources/js/admin/template/editor.js",
+    "isEntry": true
+  },
+  "resources/js/admin/template/template.js": {
+    "file": "assets/template-BQfTB3YT.js",
+    "name": "template",
+    "src": "resources/js/admin/template/template.js",
+    "isEntry": true
+  },
+  "resources/js/app.js": {
+    "file": "assets/app-GutwCy_4.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true
+  },
+  "resources/js/customer/customer.js": {
+    "file": "assets/customer-DGU99OZZ.js",
+    "name": "customer",
+    "src": "resources/js/customer/customer.js",
+    "isEntry": true
+  },
+  "resources/js/customer/editing.js": {
+    "file": "assets/editing-BjQi3bBh.js",
+    "name": "editing",
+    "src": "resources/js/customer/editing.js",
+    "isEntry": true
+  },
+  "resources/js/customer/studio/main.jsx": {
+    "file": "assets/main-D90A_XyZ.js",
+    "name": "main",
+    "src": "resources/js/customer/studio/main.jsx",
+    "isEntry": true,
+    "imports": [
+      "_client-Cv0X-2PX.js"
+    ],
+    "css": [
+      "assets/main-GbDmIJBe.css"
+    ]
+  },
+  "resources/js/customer/studio/svg-template-editor.jsx": {
+    "file": "assets/svg-template-editor-C1DJoYuc.js",
+    "name": "svg-template-editor",
+    "src": "resources/js/customer/studio/svg-template-editor.jsx",
+    "isEntry": true
+  },
+  "resources/js/staff/template-editor/main.jsx": {
+    "file": "assets/main-BsRWO3lQ.js",
+    "name": "main",
+    "src": "resources/js/staff/template-editor/main.jsx",
+    "isEntry": true,
+    "imports": [
+      "_client-Cv0X-2PX.js"
+    ],
+    "dynamicImports": [
+      "resources/js/staff/template-editor/utils/recentImagesDB.js",
+      "resources/js/staff/template-editor/utils/recentImagesDB.js",
+      "resources/js/staff/template-editor/utils/recentImagesDB.js",
+      "resources/js/staff/template-editor/utils/recentImagesDB.js",
+      "resources/js/staff/template-editor/utils/recentImagesDB.js"
+    ],
+    "css": [
+      "assets/main-DuNGlsMr.css"
+    ]
+  },
+  "resources/js/staff/template-editor/utils/recentImagesDB.js": {
+    "file": "assets/recentImagesDB-CO6kquVm.js",
+    "name": "recentImagesDB",
+    "src": "resources/js/staff/template-editor/utils/recentImagesDB.js",
+    "isDynamicEntry": true
+  }
+}

@@ -3,18 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ $product->name ?? 'InkWise Studio' }} &mdash; InkWise</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{{ $product->name ?? optional($template)->name ?? 'InkWise Studio' }} &mdash; InkWise</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="{{ asset('css/customer/studio.css') }}">
-    <script src="{{ asset('js/customer/studio.js') }}" defer></script>
+    @if(app()->environment('local'))
+        @viteReactRefresh
+    @endif
+    @vite([
+        'resources/css/customer/studio.css',
+        'resources/js/customer/studio/main.jsx',
+    ])
 </head>
 <body>
 @php
     $defaultFront = asset('Customerimages/invite/wedding2.png');
     $defaultBack = asset('Customerimages/invite/wedding3.jpg');
+
+    $templateModel = $template ?? $product?->template;
+
+    $normalizeToArray = static function ($value) {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if ($value instanceof \Illuminate\Contracts\Support\Arrayable) {
+            return $value->toArray();
+        }
+
+        if ($value instanceof \JsonSerializable) {
+            $serialized = $value->jsonSerialize();
+            if (is_array($serialized)) {
+                return $serialized;
+            }
+
+            if ($serialized instanceof \Illuminate\Contracts\Support\Arrayable) {
+                return $serialized->toArray();
+            }
+
+            return (array) $serialized;
+        }
+
+        if (is_string($value) && trim($value) !== '') {
+            $decoded = json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return [];
+    };
+
+    $formatDimension = static function ($value) {
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_numeric($value)) {
+            $numeric = (float) $value;
+            if ((int) $numeric == $numeric) {
+                return (string) ((int) $numeric);
+            }
+
+            return rtrim(rtrim(number_format($numeric, 6, '.', ''), '0'), '.');
+        }
+
+        return null;
+    };
+
+    $templateMetadata = $templateModel ? $normalizeToArray($templateModel->metadata ?? []) : [];
+    $rawCanvasSettings = [];
+    if (!empty($templateMetadata)) {
+        $rawCanvasSettings = $templateMetadata['canvas'] ?? ($templateMetadata['builder_canvas'] ?? []);
+    }
+
+    $canvasSettings = $normalizeToArray($rawCanvasSettings);
+    $canvasWidth = isset($canvasSettings['width']) ? (float) $canvasSettings['width'] : null;
+    $canvasHeight = isset($canvasSettings['height']) ? (float) $canvasSettings['height'] : null;
+
+    if ($canvasWidth !== null && $canvasWidth <= 0) {
+        $canvasWidth = null;
+    }
+
+    if ($canvasHeight !== null && $canvasHeight <= 0) {
+        $canvasHeight = null;
+    }
+
+    $canvasShape = $canvasSettings['shape'] ?? null;
+    if (!is_string($canvasShape) || trim($canvasShape) === '') {
+        $canvasShape = null;
+    }
+
+    $templateCanvas = ($canvasWidth && $canvasHeight)
+        ? [
+            'width' => $canvasWidth,
+            'height' => $canvasHeight,
+            'shape' => $canvasShape,
+            'unit' => $canvasSettings['unit'] ?? 'px',
+        ]
+        : null;
+
+    $canvasWidthAttr = $templateCanvas ? $formatDimension($templateCanvas['width']) : null;
+    $canvasHeightAttr = $templateCanvas ? $formatDimension($templateCanvas['height']) : null;
+    $canvasShapeAttr = $templateCanvas && $templateCanvas['shape'] ? $templateCanvas['shape'] : null;
+    $canvasUnitAttr = $templateCanvas ? ($templateCanvas['unit'] ?? 'px') : null;
 
     $resolveImage = static function ($path, $fallback) {
         if (!$path) {
@@ -28,24 +122,25 @@
         }
     };
 
-    $templateFront = $product?->template?->preview_front
-        ?? $product?->template?->front_image
-        ?? $product?->template?->preview
-        ?? $product?->template?->image;
+    $templateFront = $templateModel?->preview_front
+        ?? $templateModel?->front_image
+        ?? $templateModel?->preview
+        ?? $templateModel?->image;
 
-    $templateBack = $product?->template?->preview_back
-        ?? $product?->template?->back_image;
+    $templateBack = $templateModel?->preview_back
+        ?? $templateModel?->back_image;
 
-    $frontCandidates = [
-        $product?->template?->svg_path,
+    $frontSvg = $resolveImage($templateModel?->svg_path ?? null, null);
+    $backSvg = $resolveImage($templateModel?->back_svg_path ?? null, null);
+
+    $frontRasterCandidates = [
         $templateFront,
         $product?->images?->front,
         $product?->images?->preview,
         $product?->image,
     ];
 
-    $backCandidates = [
-        $product?->template?->back_svg_path,
+    $backRasterCandidates = [
         $templateBack,
         $product?->images?->back,
         $product?->image,
@@ -70,8 +165,8 @@
         return null;
     };
 
-    $frontSource = $pickFirst($frontCandidates);
-    $backSource = $pickFirst($backCandidates);
+    $frontSource = $pickFirst($frontRasterCandidates);
+    $backSource = $pickFirst($backRasterCandidates);
 
     $frontImage = is_string($frontSource) && str_starts_with($frontSource, 'data:')
         ? $frontSource
@@ -80,6 +175,32 @@
     $backImage = is_string($backSource) && str_starts_with($backSource, 'data:')
         ? $backSource
         : $resolveImage($backSource, $defaultBack);
+
+    $frontImage = $frontImage ?: $defaultFront;
+    $backImage = $backImage ?: ($frontImage ?: $defaultBack);
+
+    $templateBootstrap = null;
+    if ($templateModel) {
+        $templateBootstrap = [
+            'id' => $templateModel->id,
+            'name' => $templateModel->name,
+            'svg_path' => $templateModel->svg_path ? \App\Support\ImageResolver::url($templateModel->svg_path) : null,
+            'svg_source' => $templateModel->svg_path,
+            'preview' => $templateModel->preview ? \App\Support\ImageResolver::url($templateModel->preview) : null,
+            'front_image' => $templateModel->front_image ? \App\Support\ImageResolver::url($templateModel->front_image) : null,
+            'back_image' => $templateModel->back_image ? \App\Support\ImageResolver::url($templateModel->back_image) : null,
+            'updated_at' => optional($templateModel->updated_at)->toIso8601String(),
+            'canvas' => $templateCanvas,
+        ];
+    }
+
+    $productBootstrap = $product ? [
+        'id' => $product->id,
+        'name' => $product->name,
+        'slug' => $product->slug ?? null,
+        'event_type' => $product->event_type ?? null,
+        'product_type' => $product->product_type ?? null,
+    ] : null;
 @endphp
 <header class="studio-topbar">
     <div class="topbar-left">
@@ -87,7 +208,7 @@
         <div class="topbar-project">
             <span class="topbar-project-link">My Projects</span>
             <span class="topbar-divider">&ndash;</span>
-            <span class="topbar-project-name">{{ $product->name ?? 'Save the Date Cards' }}</span>
+            <span class="topbar-project-name">{{ $product->name ?? $templateModel?->name ?? 'Save the Date Cards' }}</span>
         </div>
     </div>
     <div class="topbar-center">
@@ -98,11 +219,17 @@
             <button type="button" class="topbar-icon-btn" aria-label="Undo"><i class="fa-solid fa-rotate-left"></i></button>
             <button type="button" class="topbar-icon-btn" aria-label="Redo"><i class="fa-solid fa-rotate-right"></i></button>
         </div>
+        <div id="inkwise-customer-studio-root" class="studio-react-root" aria-live="polite"></div>
     </div>
     <div class="topbar-actions">
         <button class="topbar-action-btn" type="button" onclick="window.location.href='{{ route('templates.wedding.invitations') }}'">Change Template</button>
         <button class="topbar-action-btn" type="button">Preview</button>
-        <button class="topbar-action-btn primary" type="button" onclick="window.location.href='{{ route('order.review') }}'">Next</button>
+        <button
+            class="topbar-action-btn primary"
+            type="button"
+            data-action="proceed-review"
+            data-destination="{{ route('order.review') }}"
+        >Next</button>
     </div>
 </header>
 <main class="studio-layout">
@@ -168,8 +295,25 @@
                     <span class="measure-line"></span>
                     <span class="measure-cap"></span>
                 </div>
-                <div class="preview-canvas-wrapper preview-guides">
-                    <div class="preview-card-bg" data-front-image="{{ $frontImage }}" data-back-image="{{ $backImage }}">
+                <div
+                    class="preview-canvas-wrapper preview-guides"
+                    @if($canvasWidthAttr !== null) data-canvas-width="{{ $canvasWidthAttr }}" @endif
+                    @if($canvasHeightAttr !== null) data-canvas-height="{{ $canvasHeightAttr }}" @endif
+                    @if($canvasShapeAttr) data-canvas-shape="{{ $canvasShapeAttr }}" @endif
+                    @if($canvasUnitAttr) data-canvas-unit="{{ $canvasUnitAttr }}" @endif
+                >
+                    <div
+                        class="preview-card-bg"
+                        data-front-image="{{ $frontImage }}"
+                        data-back-image="{{ $backImage }}"
+                        data-front-svg="{{ $frontSvg }}"
+                        data-back-svg="{{ $backSvg }}"
+                        style="background-image: url('{{ $frontImage }}');"
+                        @if($canvasWidthAttr !== null) data-canvas-width="{{ $canvasWidthAttr }}" @endif
+                        @if($canvasHeightAttr !== null) data-canvas-height="{{ $canvasHeightAttr }}" @endif
+                        @if($canvasShapeAttr) data-canvas-shape="{{ $canvasShapeAttr }}" @endif
+                        @if($canvasUnitAttr) data-canvas-unit="{{ $canvasUnitAttr }}" @endif
+                    >
                         <svg id="preview-svg" width="100%" height="100%" viewBox="0 0 433 559" preserveAspectRatio="xMidYMid meet"></svg>
                     </div>
                 </div>
@@ -204,21 +348,14 @@
                 </div>
                 <span class="thumb-label">Front</span>
             </button>
+            @if($backSource)
             <button type="button" class="preview-thumb" data-card-thumb="back" aria-pressed="false">
                 <div class="thumb-preview">
                     <span class="thumb-placeholder">Back</span>
                 </div>
                 <span class="thumb-label">Back</span>
             </button>
-        </div>
-        <div class="quick-upload-section">
-            <button type="button" id="quick-upload-button" class="quick-upload-button">
-                <i class="fa-solid fa-cloud-arrow-up"></i>
-                Quick Upload
-            </button>
-            <div class="quick-recent-uploads" id="quickRecentUploads">
-                <!-- Quick recently uploaded images will be populated here -->
-            </div>
+            @endif
         </div>
     </section>
 </main>
@@ -417,6 +554,17 @@
         </div>
     </div>
 </div>
+
+<script type="application/json" id="inkwise-customer-studio-bootstrap">
+    {!! json_encode([
+        'product' => $productBootstrap,
+        'template' => $templateBootstrap,
+        'routes' => [
+            'autosave' => route('order.design.autosave'),
+            'review' => route('order.review'),
+        ],
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) !!}
+</script>
 
 </body>
 </html>

@@ -100,11 +100,6 @@
         color: #15803d;
     }
 
-    .order-stage-chip--to-receive {
-        background: #f1f5f9;
-        color: #0f172a;
-    }
-
     .order-stage-chip--completed {
         background: #e0f2fe;
         color: #0369a1;
@@ -809,13 +804,10 @@
                                     Team is preparing the invitation or giveaway items.
                                     @break
                                 @case('confirmed')
-                                    Items are packed and ready to ship or arrange for pickup.
-                                    @break
-                                @case('to_receive')
-                                    Order is on the way to the customer. Share tracking updates if available.
+                                    Items are packed and ready for customer pickup at store.
                                     @break
                                 @case('completed')
-                                    Order delivered and marked as finished.
+                                    Order picked up and marked as finished.
                                     @break
                                 @default
                                     Status update in progress.
@@ -872,10 +864,6 @@
                 <dd>{{ $placedDateDisplay ?? 'Not available' }}</dd>
                 <dt>Last updated</dt>
                 <dd>{{ $lastUpdatedDisplay ?? 'Not available' }}</dd>
-                @if($trackingNumber)
-                <dt>Tracking number</dt>
-                <dd>{{ $trackingNumber }}</dd>
-                @endif
                 @if($statusNote)
                 <dt>Internal note</dt>
                 <dd>{{ $statusNote }}</dd>

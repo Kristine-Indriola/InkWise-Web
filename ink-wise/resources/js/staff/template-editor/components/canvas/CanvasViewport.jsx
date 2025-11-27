@@ -41,7 +41,7 @@ function constrainFrameToSafeZone(frame, page, safeInsets) {
   };
 }
 
-export function CanvasViewport({ page }) {
+export function CanvasViewport({ page, canvasRef }) {
   const { state, dispatch } = useBuilderStore();
   const dragStateRef = useRef(null);
   const panStateRef = useRef(null);
@@ -331,18 +331,6 @@ export function CanvasViewport({ page }) {
 
   const visibleLayers = Array.isArray(page.nodes) ? page.nodes : [];
 
-  // Sort layers by side property for proper z-index stacking
-  // 'back' layers render first (behind), 'front' layers render last (on top)
-  const sortedLayers = [...visibleLayers].sort((a, b) => {
-    const sideA = a.side || 'middle';
-    const sideB = b.side || 'middle';
-
-    // Define rendering order: back -> middle -> front
-    const order = { 'back': 0, 'middle': 1, 'front': 2 };
-
-    return order[sideA] - order[sideB];
-  });
-
   // Helper function to get shape styling based on variant
   const getShapeStyling = (shape) => {
     if (!shape) return {};
@@ -446,6 +434,7 @@ export function CanvasViewport({ page }) {
             }}
             onClick={() => handleSelectLayer(null)}
             data-zoom={zoom}
+            ref={canvasRef ?? null}
           >
             <div className="canvas-viewport__grid" aria-hidden="true" />
             <div
@@ -459,7 +448,7 @@ export function CanvasViewport({ page }) {
               aria-hidden="true"
             />
 
-            {sortedLayers.length === 0 && (
+            {visibleLayers.length === 0 && (
               <div className="canvas-viewport__empty-state">
                 <h2>Canvas ready</h2>
                 <p>
@@ -468,7 +457,7 @@ export function CanvasViewport({ page }) {
               </div>
             )}
 
-            {sortedLayers.map((layer, index) => {
+            {visibleLayers.map((layer, index) => {
               const frame = resolveFrame(layer, index, page);
               const isSelected = layer.id === selectedLayerId;
               const isHidden = layer.visible === false;
@@ -815,6 +804,11 @@ CanvasViewport.propTypes = {
     height: PropTypes.number.isRequired,
     nodes: PropTypes.array,
   }).isRequired,
+  canvasRef: PropTypes.shape({ current: PropTypes.any }),
+};
+
+CanvasViewport.defaultProps = {
+  canvasRef: null,
 };
 
 function buildStageStyle(zoom, page, panX, panY) {

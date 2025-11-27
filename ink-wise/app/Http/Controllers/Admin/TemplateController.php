@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use App\Notifications\TemplateUploadedNotification;
 
 class TemplateController extends Controller
@@ -180,12 +181,13 @@ class TemplateController extends Controller
             'template_video' => 'nullable|file|mimes:mp4,mov,avi,webm|max:51200',
         ];
 
-        // Require at least one design file
-        if ($type === 'invitation') {
-            $rules['front_image'] = 'required|file|mimes:jpeg,png,jpg,gif,svg|max:5120';
-            $rules['back_image'] = 'nullable|file|mimes:jpeg,png,jpg,gif,svg|max:5120';
-        } else {
-            $rules['front_image'] = 'required|file|mimes:svg,svg+xml,image/svg+xml,svgz|max:5120';
+        // Only require files if they are actually being uploaded
+        // Allow creating template without files for direct editor access
+        if ($request->hasFile('front_image')) {
+            $rules['front_image'] = 'file|mimes:jpeg,png,jpg,gif,svg|max:5120';
+        }
+        if ($request->hasFile('back_image')) {
+            $rules['back_image'] = 'file|mimes:jpeg,png,jpg,gif,svg|max:5120';
         }
 
         $validated = $request->validate($rules);
@@ -274,6 +276,7 @@ public function saveCanvas(Request $request, $id)
 {
     $template = Template::findOrFail($id);
 
+
     if ($request->has('canvas_image')) {
         $imageData = $request->input('canvas_image');
         // Remove base64 prefix
@@ -299,6 +302,70 @@ public function saveCanvas(Request $request, $id)
 
     return response()->json(['success' => false, 'message' => 'No image data provided'], 400);
 }
+
+    public function saveTemplate(Request $request, $id)
+    {
+        $template = Template::findOrFail($id);
+
+        $validated = $request->validate([
+            'design' => 'required|array',
+            'svg_markup' => 'nullable|string',
+            'preview_image' => 'nullable|string',
+            'template_name' => 'nullable|string|max:255',
+        ]);
+
+        if (!empty($validated['template_name'])) {
+            $template->name = $validated['template_name'];
+        }
+
+        $template->design = $validated['design'];
+
+        $metadata = $template->metadata ?? [];
+        if (!is_array($metadata)) {
+            $metadata = is_string($metadata) ? json_decode($metadata, true) ?? [] : (array) $metadata;
+        }
+
+        if (isset($validated['design']['canvas']) && is_array($validated['design']['canvas'])) {
+            $metadata['builder_canvas'] = $validated['design']['canvas'];
+        }
+
+        if (!empty($validated['preview_image'])) {
+            $template->preview = $this->persistDataUrl(
+                $validated['preview_image'],
+                'templates/previews',
+                'png',
+                $template->preview,
+                'preview_image'
+            );
+        }
+
+        if (!empty($validated['svg_markup'])) {
+            $template->svg_path = $this->persistDataUrl(
+                $validated['svg_markup'],
+                'templates/svg',
+                'svg',
+                $template->svg_path,
+                'svg_markup'
+            );
+        }
+
+        $template->metadata = $metadata;
+        $template->status = $template->status ?? 'draft';
+        $template->save();
+
+        $prefix = $request->route()->getPrefix();
+        $isStaff = str_contains($prefix ?? '', 'staff');
+        $isStaff = true;
+        $redirectRoute = $isStaff ? 'staff.templates.index' : 'admin.templates.index';
+
+        return response()->json([
+            'success' => true,
+            'template_id' => $template->id,
+            'redirect' => route($redirectRoute),
+            'preview_url' => $template->preview ? \App\Support\ImageResolver::url($template->preview) : null,
+            'svg_path' => $template->svg_path,
+        ]);
+    }
 
 public function uploadPreview(Request $request, $id)
 {
@@ -787,5 +854,59 @@ public function uploadToProduct(Request $request, $id)
         }
 
         return redirect()->route('staff.templates.create');
+    }
+
+    protected function persistDataUrl(string $dataUrl, string $directory, string $extension, ?string $existingPath, string $field): string
+    {
+        if (trim((string) $dataUrl) === '') {
+            throw ValidationException::withMessages([
+                $field => 'Missing data payload.',
+            ]);
+        }
+
+        try {
+            $contents = $this->decodeDataUrl($dataUrl);
+        } catch (\Throwable $e) {
+            throw ValidationException::withMessages([
+                $field => 'Invalid data payload provided.',
+            ]);
+        }
+
+        if ($existingPath && Storage::disk('public')->exists($existingPath)) {
+            Storage::disk('public')->delete($existingPath);
+        }
+
+        $directory = trim($directory, '/');
+        $filename = ($directory ? $directory . '/' : '') . 'template_' . Str::uuid() . '.' . $extension;
+
+        Storage::disk('public')->put($filename, $contents);
+
+        return $filename;
+    }
+
+    protected function decodeDataUrl(string $dataUrl): string
+    {
+        if (!Str::startsWith($dataUrl, 'data:')) {
+            throw new \InvalidArgumentException('Invalid data URL header.');
+        }
+
+        $parts = explode(',', $dataUrl, 2);
+        if (count($parts) !== 2) {
+            throw new \InvalidArgumentException('Invalid data URL structure.');
+        }
+
+        [$meta, $payload] = $parts;
+
+        if (str_contains($meta, ';base64')) {
+            $decoded = base64_decode($payload, true);
+        } else {
+            $decoded = rawurldecode($payload);
+        }
+
+        if ($decoded === false || $decoded === null) {
+            throw new \RuntimeException('Unable to decode payload.');
+        }
+
+        return $decoded;
     }
 }

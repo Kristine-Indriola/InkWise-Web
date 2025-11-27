@@ -14,12 +14,11 @@
 /auth.json
 /bootstrap/cache
 /node_modules
-/public/build
 /public/hot
 /public/storage
+/vendor
 /storage/*.key
 /storage/pail
-/vendor
 Homestead.json
 Homestead.yaml
 Thumbs.db

@@ -804,7 +804,7 @@
         <section class="card checkout-form checkout-section active" id="shipping">
             <header class="shipping-header">
                 <h1 class="section-title">Fulfillment Information</h1>
-                <p class="section-subtitle">Please provide your contact details and choose pickup or delivery</p>
+                <p class="section-subtitle">Please provide your contact details for order pickup</p>
             </header>
 
             {{-- If user has saved addresses, auto-fill shipping inputs from the first one but keep fields editable --}}
@@ -841,7 +841,7 @@
                 </label>
             </div>
 
-            <label id="addressLabel">Delivery address
+            <label id="addressLabel">Address (optional)
                 <input type="text" id="address" placeholder="House number, street, subdivision, barangay, city, province" value="{{ $shippingAddress }}">
             </label>
 
@@ -861,26 +861,11 @@
                 </div>
             </footer>
 
-            <div class="fieldset" id="shippingOptions">
-                <h2 class="section-title" style="font-size:16px; margin-bottom:12px;">Fulfillment Method</h2>
-
-                <label class="option-card" data-option="pickup">
-                    <input type="radio" name="shippingOption" value="pickup" data-cost="0" checked>
-                    <div class="option-content">
-                        <h3>Pickup at Store</h3>
-                        <p>Pick up your order at our store location. No delivery fee.</p>
-                        <span class="option-tag">Free</span>
-                    </div>
-                </label>
-
-                <label class="option-card" data-option="delivery">
-                    <input type="radio" name="shippingOption" value="delivery" data-cost="{{ $shippingFee }}">
-                    <div class="option-content">
-                        <h3>Home Delivery</h3>
-                        <p>We'll deliver your order to your doorstep.</p>
-                        <span class="option-tag">{{ $shippingFee > 0 ? '+ ₱' . number_format($shippingFee, 2) : 'Free' }}</span>
-                    </div>
-                </label>
+            <input type="hidden" name="shippingOption" value="pickup">
+            <div class="note" style="padding: 16px; background: #f0f9ff; border-radius: 8px; border: 1px solid #bae6fd; margin: 16px 0;">
+                <p style="margin: 0; color: #0c4a6e; font-size: 14px; line-height: 1.6;">
+                    <strong>📍 Pickup at Store:</strong> All orders are for pickup only at our store location. We'll notify you when your order is ready for collection.
+                </p>
             </div>
 
             <button type="button" class="btn-continue" id="continueToPayment">
@@ -1106,18 +1091,7 @@
                     return false;
                 }
 
-                // Only validate address fields for delivery
-                if (selectedShipping?.value === 'delivery') {
-                    const address = document.getElementById('address')?.value?.trim();
-                    const city = document.getElementById('city')?.value?.trim();
-                    const postalCode = document.getElementById('postalCode')?.value?.trim();
-
-                    if (!address || !city || !postalCode) {
-                        alert('Please fill in your complete delivery address.');
-                        return false;
-                    }
-                }
-
+                // Address fields are optional for pickup
                 return true;
             };
 
@@ -1132,33 +1106,12 @@
 
                 const shippingInfo = document.getElementById('reviewShippingInfo');
                 if (shippingInfo) {
-                    const selectedShipping = document.querySelector('input[name="shippingOption"]:checked');
-                    let fulfillmentDetails = '';
-
-                    if (selectedShipping?.value === 'pickup') {
-                        fulfillmentDetails = `
-                            <div><strong>Pickup at Store</strong></div>
-                            <div>Ready for pickup at our store location</div>
-                            <div style="color: var(--success); font-size: 14px;">No delivery fee</div>
-                        `;
-                    } else if (selectedShipping?.value === 'delivery') {
-                        fulfillmentDetails = `
-                            <div><strong>Home Delivery</strong></div>
-                            <div>${address}</div>
-                            <div>${city}, ${postalCode}</div>
-                            <div>${phone}</div>
-                            <div>${email}</div>
-                        `;
-                    } else {
-                        // Fallback to delivery
-                        fulfillmentDetails = `
-                            <div><strong>Home Delivery</strong></div>
-                            <div>${address}</div>
-                            <div>${city}, ${postalCode}</div>
-                            <div>${phone}</div>
-                            <div>${email}</div>
-                        `;
-                    }
+                    const fulfillmentDetails = `
+                        <div><strong>Pickup at Store</strong></div>
+                        <div>Ready for pickup at our store location</div>
+                        <div>${phone}</div>
+                        <div>${email}</div>
+                    `;
 
                     shippingInfo.innerHTML = `
                         <div><strong>${fullName}</strong></div>

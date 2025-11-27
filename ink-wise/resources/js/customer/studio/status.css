@@ -1,0 +1,89 @@
+.studio-status {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 0.75rem;
+  background: rgba(30, 64, 175, 0.12);
+  border: 1px solid rgba(30, 64, 175, 0.25);
+  color: #0f172a;
+  font-size: 0.85rem;
+  max-width: 18rem;
+}
+
+.studio-status__header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-size: 0.72rem;
+  color: #1d4ed8;
+}
+
+.studio-status__dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: #1d4ed8;
+  box-shadow: 0 0 0 4px rgba(29, 78, 216, 0.18);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.studio-status__dot[data-state="initializing"] {
+  background: #f97316;
+  box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.16);
+}
+
+.studio-status__dot[data-state="error"] {
+  background: #dc2626;
+  box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.18);
+}
+
+.studio-status__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  color: #0f172a;
+}
+
+.studio-status__template-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-status__badge {
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(30, 64, 175, 0.1);
+  color: #1e40af;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.studio-status__badge--svg {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+}
+
+.studio-status__badge--preview {
+  background: rgba(14, 165, 233, 0.12);
+  color: #0369a1;
+}
+
+.studio-status__meta {
+  font-size: 0.72rem;
+  color: #334155;
+}
+
+.studio-status__product {
+  font-size: 0.75rem;
+  color: #334155;
+}

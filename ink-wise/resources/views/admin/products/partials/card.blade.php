@@ -10,29 +10,26 @@
     data-product-type="{{ e($product->product_type ?? optional($product->template)->product_type ?? '-') }}"
     data-theme-style="{{ e($product->theme_style ?? optional($product->template)->theme_style ?? '-') }}"
     data-unit-price="{{ $product->base_price ?? $product->unit_price ?? '' }}"
-    data-image="{{ \App\Support\ImageResolver::url($product->image) }}"
+    data-image="{{ \App\Support\ImageResolver::url([
+        $product->image,
+        optional($product->images)->front ?? optional($product->images)->preview,
+        optional($product->template)->front_image,
+        optional($product->template)->preview_front,
+        optional($product->template)->preview,
+    ]) }}"
 >
     @php
         // front image fallback: envelope image -> product images -> product.image -> template front
-        $frontThumb = '';
         $imgRec = $product->images ?? $product->product_images ?? null;
-
-        // For envelopes, check envelope image first
-        if ($product->product_type === 'Envelope' && $product->envelope && $product->envelope->envelope_image) {
-            $frontThumb = \Illuminate\Support\Facades\Storage::url($product->envelope->envelope_image);
-        } elseif ($imgRec && (!empty($imgRec->front) || !empty($imgRec->preview))) {
-            $frontThumb = \App\Support\ImageResolver::url($imgRec->front ?? $imgRec->preview ?? null);
-        } elseif (!empty($product->image)) {
-            $frontThumb = \App\Support\ImageResolver::url($product->image);
-        } elseif ($product->template ?? null) {
-            $t = $product->template;
-            $tFront = $t->front_image ?? $t->preview_front ?? $t->image ?? null;
-            if ($tFront) {
-                $frontThumb = preg_match('/^(https?:)?\/\//i', $tFront) || strpos($tFront, '/') === 0
-                    ? $tFront
-                    : \Illuminate\Support\Facades\Storage::url($tFront);
-            }
-        }
+        $frontThumb = \App\Support\ImageResolver::url([
+            optional($product->envelope)->envelope_image,
+            $imgRec ? ($imgRec->front ?? $imgRec->preview ?? null) : null,
+            $product->image,
+            optional($product->template)->front_image,
+            optional($product->template)->preview_front,
+            optional($product->template)->preview,
+            optional($product->template)->image,
+        ]);
 
         $evType = $product->event_type ?? optional($product->template)->event_type ?? '—';
         $prodType = $product->product_type ?? optional($product->template)->product_type ?? '—';

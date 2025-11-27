@@ -13,13 +13,15 @@
   .welcome-message {
     background: rgba(16, 185, 129, 0.1); /* Transparent green background */
     color: #065f46; /* Dark green text */
-    padding: 12px 16px;
+    padding: 16px 22px;
     border-radius: 8px;
     margin: 16px 0;
     font-weight: 600;
     text-align: left; /* Align text to the left */
     opacity: 0;
     animation: fadeInOut 4s ease-in-out;
+    width: 100%;
+    box-sizing: border-box;
   }
   @keyframes fadeInOut {
     0% { opacity: 0; }
@@ -80,6 +82,14 @@
 
   .owner-dashboard-main .page-header {
     margin-bottom: 24px;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 12px;
+  }
+
+  .owner-dashboard-main .page-header > div {
+    width: 100%;
   }
   .summary-grid, .summary-card, .charts {
     /* placeholder for overrides if needed */
@@ -123,6 +133,42 @@
     align-items: center;
     margin-bottom: 8px;
   }
+
+  .summary-card-heading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .summary-card-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    flex-shrink: 0;
+    background: rgba(59, 130, 246, 0.18);
+    color: #2563eb;
+    transition: color 0.18s ease, background 0.18s ease;
+  }
+
+  .summary-card-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .summary-card-icon--orders { background: rgba(59, 130, 246, 0.18); color: #2563eb; }
+  .summary-card-icon--inventory { background: rgba(16, 185, 129, 0.20); color: #0f766e; }
+  .summary-card-icon--pending { background: rgba(245, 158, 11, 0.20); color: #b45309; }
+  .summary-card-icon--rating { background: rgba(250, 204, 21, 0.20); color: #ca8a04; }
+  .summary-card-icon--finance { background: rgba(129, 140, 248, 0.18); color: #4f46e5; }
+
+  .dark-mode .summary-card-icon--orders { background: rgba(59, 130, 246, 0.32); color: #93c5fd; }
+  .dark-mode .summary-card-icon--inventory { background: rgba(16, 185, 129, 0.32); color: #6ee7b7; }
+  .dark-mode .summary-card-icon--pending { background: rgba(245, 158, 11, 0.32); color: #fbbf24; }
+  .dark-mode .summary-card-icon--rating { background: rgba(250, 204, 21, 0.32); color: #facc15; }
+  .dark-mode .summary-card-icon--finance { background: rgba(129, 140, 248, 0.34); color: #c7d2fe; }
 
   .summary-card-label { font-size: 0.92rem; color: #475569; }
   .summary-card-value { display: block; font-size: 1.45rem; font-weight: 800; color: #0f172a; margin-top: 5px; }
@@ -215,39 +261,45 @@
     <main class="materials-page admin-page-shell materials-container owner-dashboard-main" role="main">
       <header class="page-header">
         <div>
-          <h1 class="page-title">Dashboard</h1>
-          <p class="page-subtitle">Overview and quick stats</p>
+        @if(session('success'))
+          <div id="welcome-message" class="welcome-message">
+            {{ session('success') }}
+          </div>
+          <script>
+            document.addEventListener('DOMContentLoaded', function () {
+              const welcomeMessage = document.getElementById('welcome-message');
+              if (!welcomeMessage) return;
+
+              const removeMessage = () => {
+                if (welcomeMessage && welcomeMessage.parentNode) {
+                  welcomeMessage.parentNode.removeChild(welcomeMessage);
+                }
+              };
+
+              welcomeMessage.addEventListener('animationend', removeMessage, { once: true });
+
+              // Fallback in case animationEnd doesn't fire (e.g., reduced motion settings)
+              setTimeout(removeMessage, 4500);
+            });
+          </script>
+        @endif
+            <h1 class="page-title">Dashboard</h1>
+            <p class="page-subtitle">Overview and quick stats</p>
         </div>
       </header>
-
-      @if(session('success'))
-        <div id="welcome-message" class="welcome-message">
-          {{ session('success') }}
-        </div>
-        <script>
-          document.addEventListener('DOMContentLoaded', function () {
-            const welcomeMessage = document.getElementById('welcome-message');
-            if (!welcomeMessage) return;
-
-            const removeMessage = () => {
-              if (welcomeMessage && welcomeMessage.parentNode) {
-                welcomeMessage.parentNode.removeChild(welcomeMessage);
-              }
-            };
-
-            welcomeMessage.addEventListener('animationend', removeMessage, { once: true });
-
-            // Fallback in case animationEnd doesn't fire (e.g., reduced motion settings)
-            setTimeout(removeMessage, 4500);
-          });
-        </script>
-      @endif
 
   <div class="page-inner owner-dashboard-inner">
   <section class="summary-grid" aria-label="Dashboard summary">
       <a href="{{ route('owner.order.workflow') }}" class="summary-card summary-card--link" style="text-decoration:none; color:inherit;">
         <div class="summary-card-header">
-          <span class="summary-card-label">New Orders</span>
+          <div class="summary-card-heading">
+            <span class="summary-card-icon summary-card-icon--orders" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
+            <span class="summary-card-label">New Orders Today</span>
+          </div>
           <span class="summary-card-chip">Orders</span>
         </div>
         <span class="summary-card-value">{{ number_format($newOrdersCount ?? 0) }}</span>
@@ -256,7 +308,16 @@
 
       <a href="{{ route('owner.inventory-track', ['status' => 'low']) }}" class="summary-card summary-card--link" style="text-decoration:none; color:inherit;">
         <div class="summary-card-header">
-          <span class="summary-card-label">Low Stock Materials</span>
+          <div class="summary-card-heading">
+            <span class="summary-card-icon summary-card-icon--inventory" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 7l9-4 9 4-9 4-9-4z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M3 7v10l9 4 9-4V7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M12 11v10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
+            <span class="summary-card-label">Low Stock Materials</span>
+          </div>
           <span class="summary-card-chip">Inventory</span>
         </div>
         <span class="summary-card-value">{{ number_format($lowStockCount ?? 0) }}</span>
@@ -265,7 +326,15 @@
 
       <a href="{{ route('owner.order.workflow', ['status' => 'pending']) }}" class="summary-card summary-card--link" style="text-decoration:none; color:inherit;">
         <div class="summary-card-header">
-          <span class="summary-card-label">Pending Orders</span>
+          <div class="summary-card-heading">
+            <span class="summary-card-icon summary-card-icon--pending" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M12 8v4l2.5 1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
+            <span class="summary-card-label">Pending Orders</span>
+          </div>
           <span class="summary-card-chip">Orders</span>
         </div>
         <span class="summary-card-value">{{ number_format($pendingOrdersCount ?? 0) }}</span>
@@ -274,7 +343,14 @@
 
       <a href="{{ route('owner.ratings.index') }}" class="summary-card summary-card--link" style="text-decoration:none; color:inherit;">
         <div class="summary-card-header">
-          <span class="summary-card-label">Average Rating</span>
+          <div class="summary-card-heading">
+            <span class="summary-card-icon summary-card-icon--rating" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 4.8l2.12 4.3 4.75.69-3.44 3.36.81 4.73L12 15.9l-4.24 2.28.81-4.73-3.44-3.36 4.75-.69L12 4.8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+              </svg>
+            </span>
+            <span class="summary-card-label">Average Rating</span>
+          </div>
           <span class="summary-card-chip">Feedback</span>
         </div>
         <span class="summary-card-value summary-card-value--rating">
@@ -297,7 +373,16 @@
 
       <div class="summary-card">
         <div class="summary-card-header">
-          <span class="summary-card-label">Revenue Growth</span>
+          <div class="summary-card-heading">
+            <span class="summary-card-icon summary-card-icon--finance" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M7 13l4-4 3 3 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M15 7h4v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
+            <span class="summary-card-label">Revenue Growth</span>
+          </div>
           <span class="summary-card-chip">Finance</span>
         </div>
         <span class="summary-card-value" style="color:#0f172a;">{{ $revenueGrowth ?? '+12.4%' }}</span>
