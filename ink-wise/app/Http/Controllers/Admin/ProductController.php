@@ -17,7 +17,9 @@ class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Product::query()->with(['template', 'images', 'envelope.material', 'materials.material', 'uploads']);
+        $query = Product::query()
+            ->with(['template', 'images', 'envelope.material', 'materials.material', 'uploads']);
+            // Removed ->published() to show all products, published and unpublished
 
         $currentFilter = 'All';
         $typeFilter = $request->query('type');
@@ -57,6 +59,7 @@ class ProductController extends Controller
         });
 
         $recentGiveaways = Product::with(['template', 'images', 'envelope.material', 'materials.material', 'uploads'])
+            ->published()
             ->where('product_type', 'Giveaway')
             ->latest()
             ->take(6)
@@ -65,12 +68,12 @@ class ProductController extends Controller
             $this->hydrateLegacyAttributes($product);
         });
 
-        $totalProducts = Product::count();
-        $invitationCount = Product::where('product_type', 'Invitation')->count();
-        $giveawayCount = Product::where('product_type', 'Giveaway')->count();
-        $envelopeCount = Product::where('product_type', 'Envelope')->count();
+        $totalProducts = Product::published()->count();
+        $invitationCount = Product::published()->where('product_type', 'Invitation')->count();
+        $giveawayCount = Product::published()->where('product_type', 'Giveaway')->count();
+        $envelopeCount = Product::published()->where('product_type', 'Envelope')->count();
         $totalUploads = Template::count();
-        $uploadedTemplatesCount = Product::whereHas('uploads')->count();
+        $uploadedTemplatesCount = Template::where('status', 'uploaded')->count();
         $totalQuantity = 0; // Column removed from table
         $totalSales = 0; // Column removed from table
         $activeProducts = 0; // Status column removed from table
@@ -176,12 +179,23 @@ class ProductController extends Controller
     // Add: Method to show the create invitation form
     public function createInvitation(Request $request)
     {
-        $templates = \App\Models\Template::where('product_type', 'Invitation')->get();
-        $materials = \App\Models\Material::all();
+        $materials = Material::all();
         $selectedTemplate = null;
+
         if ($request->has('template_id')) {
-            $selectedTemplate = \App\Models\Template::find($request->input('template_id'));
+            $selectedTemplate = Template::find($request->input('template_id'));
         }
+
+        $templatesQuery = Template::where('product_type', 'Invitation')
+            ->where('status', 'uploaded')
+            ->orderByDesc('updated_at');
+
+        $templates = $templatesQuery->get();
+
+        if ($selectedTemplate && $templates->where('id', $selectedTemplate->id)->isEmpty()) {
+            $templates->push($selectedTemplate);
+        }
+
         return view('admin.products.create-invitation', compact('templates', 'materials', 'selectedTemplate'));
     }
 
@@ -319,9 +333,9 @@ class ProductController extends Controller
         } elseif ($request->input('template_id')) {
             // No custom image, use template image from Template
             $template = Template::find($request->input('template_id'));
-            if ($template && $template->front_image) {
+            if ($template && $template->preview) {
                 // Copy template image to products directory
-                $templatePath = $template->front_image;
+                $templatePath = $template->preview;
                 if (!preg_match('/^(https?:)?\/\//i', $templatePath) && !str_starts_with($templatePath, '/')) {
                     // It's a relative path in storage
                     $sourcePath = storage_path('app/public/' . $templatePath);
@@ -338,7 +352,8 @@ class ProductController extends Controller
 
         // Create or update product and related records inside a transaction
         $product = null;
-        DB::transaction(function() use ($request, $validated, $imagePath, &$product) {
+        $previousTemplateId = null;
+        DB::transaction(function() use ($request, $validated, $imagePath, &$product, &$previousTemplateId) {
             $leadTimeInput = $validated['lead_time'] ?? null;
             $leadTimeDays = is_numeric($leadTimeInput) ? (int) $leadTimeInput : null;
 
@@ -361,6 +376,7 @@ class ProductController extends Controller
 
             if (!empty($validated['product_id'])) {
                 $product = Product::findOrFail($validated['product_id']);
+                $previousTemplateId = $product->template_id;
                 if ($imagePath) {
                     $data['image'] = $imagePath;
                 }
@@ -596,6 +612,32 @@ class ProductController extends Controller
                     $product->images()->updateOrCreate([], $previewData);
                 }
             }
+
+            if ($template) {
+                $template->forceFill([
+                    'status' => 'assigned',
+                    'status_note' => null,
+                    'status_updated_at' => now(),
+                ])->save();
+            }
+
+            if ($previousTemplateId && $product && $previousTemplateId !== $product->template_id) {
+                $previousTemplate = Template::find($previousTemplateId);
+                if ($previousTemplate) {
+                    $stillAssigned = Product::published()
+                        ->where('template_id', $previousTemplateId)
+                        ->where('id', '!=', $product->id)
+                        ->exists();
+
+                    if (!$stillAssigned) {
+                        $previousTemplate->forceFill([
+                            'status' => 'uploaded',
+                            'status_note' => null,
+                            'status_updated_at' => now(),
+                        ])->save();
+                    }
+                }
+            }
         });
 
         // Return JSON for AJAX or redirect for normal
@@ -608,8 +650,25 @@ class ProductController extends Controller
 
     public function destroy($id)
     {
-        $product = \App\Models\Product::findOrFail($id);
+        $product = Product::findOrFail($id);
+        $template = $product->template;
         $productName = $product->name;
+
+        if ($template) {
+            $stillAssigned = Product::published()
+                ->where('template_id', $template->id)
+                ->where('id', '!=', $product->id)
+                ->exists();
+
+            if (!$stillAssigned) {
+                $template->forceFill([
+                    'status' => 'uploaded',
+                    'status_note' => null,
+                    'status_updated_at' => now(),
+                ])->save();
+            }
+        }
+
         $product->delete();
 
         // Return JSON for AJAX requests
@@ -714,6 +773,11 @@ class ProductController extends Controller
                 'design_data' => null, // Could populate from product data if needed
             ]);
 
+            $product->forceFill([
+                'published_at' => now(),
+                'unpublished_reason' => null,
+            ])->save();
+
             return response()->json([
                 'success' => true,
                 'message' => 'Template published to customer pages successfully.',
@@ -762,6 +826,11 @@ class ProductController extends Controller
                 'design_data' => null,
             ]);
 
+            $product->forceFill([
+                'published_at' => now(),
+                'unpublished_reason' => null,
+            ])->save();
+
             return response()->json([
                 'success' => true,
                 'message' => 'File uploaded successfully.',
@@ -772,6 +841,38 @@ class ProductController extends Controller
         }
 
         return response()->json(['success' => false, 'message' => 'No file uploaded.'], 400);
+    }
+
+    public function unupload(Request $request, $id)
+    {
+        $product = Product::with(['template', 'uploads'])->findOrFail($id);
+        $reason = trim((string) $request->input('reason', ''));
+
+        DB::transaction(function () use ($product, $reason) {
+            $product->uploads()->delete();
+
+            $product->forceFill([
+                'published_at' => null,
+                'unpublished_reason' => $reason !== '' ? $reason : null,
+            ])->save();
+
+            if ($product->template) {
+                $product->template->forceFill([
+                    'status' => 'uploaded',
+                    'status_note' => null,
+                    'status_updated_at' => now(),
+                ])->save();
+            }
+        });
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Product unpublished successfully.',
+            ]);
+        }
+
+        return redirect()->route('admin.products.index')->with('success', 'Product unpublished successfully.');
     }
 
     public function weddinginvite($id)

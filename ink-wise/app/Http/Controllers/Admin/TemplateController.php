@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use App\Notifications\TemplateUploadedNotification;
@@ -27,8 +28,8 @@ class TemplateController extends Controller
             $query->where('product_type', ucfirst($type));
         }
 
-        // Exclude templates that have been uploaded (status = 'uploaded')
-        $query->where('status', '!=', 'uploaded');
+        // Exclude templates that are uploaded or already assigned to products
+        $query->whereNotIn('status', ['uploaded', 'assigned']);
 
         $templates = $query->paginate(12); // Show 12 per page
 
@@ -659,18 +660,8 @@ public function uploadToProduct(Request $request, $id)
     {
         $template = Template::findOrFail($id);
 
-        // Check if already uploaded to product_uploads
-        $existing = ProductUpload::where('template_id', $template->id)->first();
-        if ($existing) {
-            if ($request->expectsJson() || $request->ajax()) {
-                return response()->json(['success' => true, 'message' => 'Template already uploaded to products']);
-            }
-            return redirect()->back()->with('success', 'Template already uploaded to products');
-        }
-
-        // Create record in product_uploads table
-        $productUpload = ProductUpload::create([
-            'template_id' => $template->id,
+        $productUploadData = [
+            'product_id' => null,
             'template_name' => $template->name,
             'description' => $template->description,
             'product_type' => $template->product_type,
@@ -679,14 +670,23 @@ public function uploadToProduct(Request $request, $id)
             'front_image' => $template->front_image,
             'back_image' => $template->back_image,
             'preview_image' => $template->preview,
-            'design_data' => $template->metadata, // Use metadata instead of design
-        ]);
+            'design_data' => $template->metadata,
+        ];
 
-        // Update template status to uploaded
-        $template->update([
-            'status' => 'uploaded'
-        ]);
+        // Always refresh the upload entry so returned templates can be re-submitted
+        $productUpload = ProductUpload::updateOrCreate(
+            ['template_id' => $template->id],
+            $productUploadData
+        );
 
+        // Ensure the template returns to uploaded status with a fresh timestamp
+        $template->forceFill([
+            'status' => 'uploaded',
+            'status_note' => null,
+            'status_updated_at' => now(),
+        ])->save();
+
+        // Flip any related products back to published once the template is re-uploaded
         // Send notification to all admin users
         $admins = User::where('role', 'admin')->get();
         $staff = Auth::user(); // Get the current authenticated user (staff who uploaded)
@@ -704,6 +704,45 @@ public function uploadToProduct(Request $request, $id)
         }
 
         return redirect()->back()->with('success', 'Template uploaded to products successfully');
+    }
+
+    public function reback(Request $request, $id)
+    {
+        $template = Template::findOrFail($id);
+
+        $data = $request->validate([
+            'note' => 'required|string|max:2000',
+        ]);
+
+        DB::transaction(function () use ($template, $data) {
+            $template->forceFill([
+                'status' => 'returned',
+                'status_note' => $data['note'],
+                'status_updated_at' => now(),
+            ])->save();
+
+            $products = Product::with(['uploads'])->where('template_id', $template->id)->get();
+
+            // Remove stale uploads so staff can re-upload the returned template cleanly
+            ProductUpload::where('template_id', $template->id)->delete();
+
+            foreach ($products as $product) {
+                $product->uploads()->delete();
+                $product->forceFill([
+                    'published_at' => null,
+                    'unpublished_reason' => $data['note'],
+                ])->save();
+            }
+        });
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Template sent back to staff for revisions.',
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Template sent back to staff for revisions.');
     }
 
     // Create a preview of the template (store in session)

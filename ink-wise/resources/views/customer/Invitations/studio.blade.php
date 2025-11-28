@@ -9,6 +9,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css">
+    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-solid-rounded/css/uicons-solid-rounded.css">
+    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-solid-straight/css/uicons-solid-straight.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@flaticon/flaticon-uicons/css/all/all.css">
     @if(app()->environment('local'))
         @viteReactRefresh
     @endif
@@ -429,8 +433,40 @@
             </div>
         </div>
         <p class="modal-helper">Decorate your card with curated illustrations and icons.</p>
-        <div class="modal-placeholder">
-            <p>Graphic libraries are being prepared. Stay tuned!</p>
+        <div class="graphics-panel">
+            <div class="graphics-categories-labels">
+                <div class="category-row" data-category-row="shapes">
+                    <span class="category-label">Shapes</span>
+                    <button type="button" class="graphics-category-button" data-category="shapes" aria-expanded="false"><i class="fi fi-br-angle-small-right"></i></button>
+                </div>
+                <div class="category-row" data-category-row="image">
+                    <span class="category-label">Image</span>
+                    <button type="button" class="graphics-category-button" data-category="image" aria-expanded="false"><i class="fi fi-br-angle-small-right"></i></button>
+                </div>
+                <div class="category-row" data-category-row="icons">
+                    <span class="category-label">Icons</span>
+                    <button type="button" class="graphics-category-button" data-category="icons" aria-expanded="false"><i class="fi fi-br-angle-small-right"></i></button>
+                </div>
+                <div class="category-row" data-category-row="illustrations">
+                    <span class="category-label">Illustrations</span>
+                    <button type="button" class="graphics-category-button" data-category="illustrations" aria-expanded="false"><i class="fi fi-br-angle-small-right"></i></button>
+                </div>
+                <div class="category-row" data-category-row="patterns">
+                    <span class="category-label">Patterns</span>
+                    <button type="button" class="graphics-category-button" data-category="patterns" aria-expanded="false"><i class="fi fi-br-angle-small-right"></i></button>
+                </div>
+            </div>
+            <div class="graphics-browser" id="graphics-browser">
+                <form class="graphics-search is-hidden" id="graphics-search-form" role="search">
+                    <label for="graphics-search-input" class="visually-hidden">Search graphics</label>
+                    <div class="graphics-search-field">
+                        <i class="fi fi-rr-search graphics-search-icon" aria-hidden="true"></i>
+                        <input type="search" id="graphics-search-input" name="graphics-search" autocomplete="off" placeholder="Search graphics" />
+                    </div>
+                    <button type="submit" id="graphics-search-submit">Search</button>
+                </form>
+                <div class="graphics-samples" id="graphics-browser-samples" aria-live="polite"></div>
+            </div>
         </div>
     </div>
 </div>

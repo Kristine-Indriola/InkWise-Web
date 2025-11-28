@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { initializeCustomerStudioLegacy } from './legacy';
+import TextMiniToolbar from './TextMiniToolbar.jsx';
 import './status.css';
+import './text-toolbar.css';
 
 function readBootstrapPayload() {
   const script = document.getElementById('inkwise-customer-studio-bootstrap');
@@ -82,18 +84,111 @@ function StudioStatusBadge({ bootstrap, status }) {
 function CustomerStudioApp() {
   const bootstrap = useMemo(() => readBootstrapPayload(), []);
   const [status, setStatus] = useState('initializing');
+  const [activeElementType, setActiveElementType] = useState(null);
 
   useEffect(() => {
     initializeCustomerStudioLegacy();
     setStatus('ready');
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const handleActiveElement = (event) => {
+      const detail = event?.detail || {};
+      setActiveElementType(detail.type || null);
+    };
+
+    window.addEventListener('inkwise:active-element', handleActiveElement);
+
+    const bridge = window.inkwiseToolbar;
+    if (bridge && typeof bridge.getSelection === 'function') {
+      try {
+        const selection = bridge.getSelection();
+        if (selection && selection.type) {
+          setActiveElementType(selection.type);
+        }
+      } catch (error) {
+        console.debug('[InkWise Studio] Unable to read initial toolbar selection.', error);
+      }
+    }
+
+    return () => {
+      window.removeEventListener('inkwise:active-element', handleActiveElement);
+    };
+  }, []);
+
   if (!bootstrap || Object.keys(bootstrap).length === 0) {
     return null;
   }
 
+  const handleFontChange = (family) => {
+    const bridge = typeof window !== 'undefined' ? window.inkwiseToolbar : null;
+    if (!bridge || typeof bridge.setFontFamily !== 'function') {
+      console.debug('[InkWise Studio] Font change ignored (bridge unavailable).', family);
+      return;
+    }
+    bridge.setFontFamily(family);
+  };
+
+  const handleSizeChange = (size) => {
+    const bridge = typeof window !== 'undefined' ? window.inkwiseToolbar : null;
+    if (!bridge || typeof bridge.setFontSize !== 'function') {
+      console.debug('[InkWise Studio] Size change ignored (bridge unavailable).', size);
+      return;
+    }
+    bridge.setFontSize(size);
+  };
+
+  const handleColorChange = (color) => {
+    const bridge = typeof window !== 'undefined' ? window.inkwiseToolbar : null;
+    if (!bridge || typeof bridge.setColor !== 'function') {
+      console.debug('[InkWise Studio] Color change ignored (bridge unavailable).', color);
+      return;
+    }
+    bridge.setColor(color);
+  };
+
+  const handleToolbarAction = (action) => {
+    const bridge = typeof window !== 'undefined' ? window.inkwiseToolbar : null;
+    if (!bridge || typeof bridge.dispatch !== 'function') {
+      console.debug('[InkWise Studio] Toolbar action ignored (bridge unavailable).', action);
+      return () => {};
+    }
+
+    const actionsRequiringValue = new Set([
+      'line-spacing',
+      'letter-spacing',
+      'effect-style',
+      'effect-shape',
+      'opacity',
+      'rotation',
+      'layer',
+      'more',
+    ]);
+
+    if (actionsRequiringValue.has(action)) {
+      return (value) => {
+        bridge.dispatch(action, value);
+      };
+    }
+
+    bridge.dispatch(action);
+    return () => {};
+  };
+
   return (
-    null
+    <div className="studio-react-widgets">
+      <TextMiniToolbar
+        onAction={handleToolbarAction}
+        onFontChange={handleFontChange}
+        onSizeChange={handleSizeChange}
+        onColorChange={handleColorChange}
+        activeElementType={activeElementType}
+      />
+    </div>
   );
 }
 

@@ -154,24 +154,30 @@ export function PagesPanel() {
             <input
               ref={(node) => { inputRef.current = node; }}
               className="pages-panel__input"
+              type="text"
               value={draftName}
               onChange={(event) => setDraftName(event.target.value)}
               onBlur={() => handleInputBlur(page.id)}
               onKeyDown={(event) => handleInputKeyDown(event, page.id)}
+              onClick={(event) => event.stopPropagation()}
               aria-label="Rename page"
             />
           ) : (
             <span
               className="pages-panel__label"
-              onClick={(event) => beginEditingPage(event, page)}
+              onClick={(event) => {
+                event.stopPropagation();
+                beginEditingPage(event, page);
+              }}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
+                  event.stopPropagation();
                   beginEditingPage(event, page);
                 }
               }}
               role="button"
-              tabIndex={-1}
-              title="Rename page"
+              tabIndex={0}
+              title="Click to rename page"
             >
               {page.name}
             </span>

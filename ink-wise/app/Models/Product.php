@@ -26,7 +26,21 @@ class Product extends Model
         'lead_time',
         'lead_time_days',
         'date_available',
+        'published_at',
+        'unpublished_reason',
     ];
+
+    protected $casts = [
+        'published_at' => 'datetime',
+    ];
+
+    public function scopePublished($query)
+    {
+        return $query->where(function ($q) {
+            $q->whereNotNull('published_at')
+                ->orWhereHas('uploads');
+        });
+    }
 
 
     /**

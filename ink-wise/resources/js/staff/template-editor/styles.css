@@ -614,6 +614,11 @@
   cursor: grab;
 }
 
+.canvas-layer.is-image {
+  padding: 0;
+  overflow: hidden;
+}
+
 .canvas-layer__label {
   font-size: 0.75rem;
   font-weight: 600;
@@ -661,7 +666,14 @@
 }
 
 .canvas-layer.is-image {
-  background: repeating-linear-gradient(45deg, rgba(248, 250, 252, 0.6), rgba(248, 250, 252, 0.6) 10px, rgba(226, 232, 240, 0.6) 10px, rgba(226, 232, 240, 0.6) 20px);
+  border-width: 2px;
+  border-style: solid;
+  border-color: rgba(148, 163, 184, 0.4);
+}
+
+.canvas-layer.is-image.is-selected {
+  border-color: rgba(37, 99, 235, 0.9);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
 }
 
 .canvas-layer.is-selected {
@@ -798,6 +810,37 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
+  display: inline-block;
+  width: 100%;
+  user-select: none;
+}
+
+.pages-panel__label:hover {
+  text-decoration: underline;
+  color: rgba(37, 99, 235, 0.9);
+}
+
+.pages-panel__input {
+  border: 1px solid rgba(37, 99, 235, 0.5);
+  border-radius: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+  background: #ffffff;
+  color: var(--builder-text);
+  outline: none;
+  width: 100%;
+  font-family: inherit;
+}
+
+.pages-panel__input:focus {
+  border-color: rgba(37, 99, 235, 0.8);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.pages-panel__item.is-editing {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.25);
 }
 
 .pages-panel__item-wrapper {

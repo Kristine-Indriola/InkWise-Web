@@ -18,7 +18,6 @@ use App\Http\Controllers\TemplateController;
 
 use App\Http\Controllers\Admin\InkController;
 use App\Http\Controllers\Owner\HomeController;
-
 use App\Http\Controllers\Owner\OwnerController;
 use App\Http\Controllers\StaffProfileController;
 use App\Http\Controllers\VerificationController;
@@ -41,6 +40,8 @@ use App\Http\Controllers\Customer\CustomerController;
 use App\Http\Controllers\Owner\OwnerProductsController;
 use App\Http\Controllers\Owner\OwnerOrderWorkflowController;
 use App\Http\Controllers\Owner\OwnerTransactionsController;
+use App\Http\Controllers\Owner\OwnerSalesReportsController;
+use App\Http\Controllers\Owner\OwnerInventoryReportsController;
 use App\Http\Controllers\Staff\StaffCustomerController;
 use App\Http\Controllers\Staff\StaffOrderController;
 use App\Http\Controllers\Staff\StaffMaterialController;
@@ -60,6 +61,7 @@ use App\Services\OrderFlowService;
 
 use App\Http\Controllers\Admin\UserPasswordResetController;
 use App\Models\User as AppUser;
+use App\Http\Controllers\FigmaController;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Http\Request;
 
@@ -159,7 +161,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::post('{id}/save-canvas', [AdminTemplateController::class, 'saveCanvas'])->name('saveCanvas');
         Route::post('{id}/save-template', [AdminTemplateController::class, 'saveTemplate'])->name('saveTemplate');
         Route::post('{id}/upload-preview', [AdminTemplateController::class, 'uploadPreview'])->name('uploadPreview');
-    Route::post('{id}/autosave', [AdminTemplateController::class, 'autosave'])->name('autosave');
+        Route::post('{id}/autosave', [AdminTemplateController::class, 'autosave'])->name('autosave');
         // Add new API routes
         Route::get('{id}/load-design', [AdminTemplateController::class, 'loadDesign'])->name('loadDesign');
         Route::delete('{id}/delete-element', [AdminTemplateController::class, 'deleteElement'])->name('deleteElement');
@@ -169,6 +171,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
             return redirect()->route('admin.products.create.invitation', ['template_id' => $id]);
         });
         Route::post('{id}/upload-to-product-uploads', [AdminTemplateController::class, 'uploadTemplate'])->name('uploadToProductUploads');
+        Route::post('{id}/reback', [AdminTemplateController::class, 'reback'])->name('reback');
     // Session preview routes for staff (create -> preview -> save to templates)
     Route::post('preview', [AdminTemplateController::class, 'preview'])->name('preview');
     Route::post('preview/{preview}/save', [AdminTemplateController::class, 'savePreview'])->name('preview.save');
@@ -238,6 +241,7 @@ Route::prefix('users')->name('users.')->group(function () {
     // Show single product (AJAX slide panel)
     Route::get('/{id}/view', [ProductController::class, 'view'])->name('view');
     Route::post('/{id}/upload', [ProductController::class, 'upload'])->name('upload');
+    Route::post('/{id}/unupload', [ProductController::class, 'unupload'])->name('unupload');
     Route::get('/{id}', [ProductController::class, 'show'])->name('show');
     // Index (product listing)
     Route::get('/', [ProductController::class, 'index'])->name('index');
@@ -499,6 +503,12 @@ Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->post(
 Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->post('/customer/orders/{order}/confirm-received', [CustomerProfileController::class, 'confirmReceived'])
     ->name('customer.orders.confirm_received');
 
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/customer/orders/{order}/details', [CustomerProfileController::class, 'showOrderDetails'])
+    ->name('customer.orders.details');
+
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/customer/orders/{order}/invoice', [CustomerProfileController::class, 'showInvoice'])
+    ->name('customer.orders.invoice');
+
 Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->post('/customer/order-ratings', [CustomerProfileController::class, 'storeRating'])
     ->name('customer.order-ratings.store');
 
@@ -709,6 +719,7 @@ Route::post('/design/autosave', [OrderFlowController::class, 'autosaveDesign'])-
 /**Order Forms & Pages*/
 Route::get('/order/review', [OrderFlowController::class, 'review'])->name('order.review');
 Route::get('/order/finalstep', [OrderFlowController::class, 'finalStep'])->name('order.finalstep');
+Route::get('/order/addtocart', [OrderFlowController::class, 'addToCart'])->name('order.addtocart');
 Route::post('/order/finalstep/save', [OrderFlowController::class, 'saveFinalStep'])->name('order.finalstep.save');
 Route::get('/order/envelope', [OrderFlowController::class, 'envelope'])->name('order.envelope');
 Route::post('/order/envelope', [OrderFlowController::class, 'storeEnvelope'])->name('order.envelope.store');
@@ -804,8 +815,8 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
 
     Route::prefix('reports')->name('reports.')->group(function () {
         Route::get('/', fn () => redirect()->route('owner.reports.sales'))->name('index');
-        Route::get('/sales', fn () => view('owner.reports.sales'))->name('sales');
-        Route::get('/inventory', fn () => view('owner.reports.inventory'))->name('inventory');
+        Route::get('/sales', [OwnerSalesReportsController::class, 'index'])->name('sales');
+        Route::get('/inventory', [OwnerInventoryReportsController::class, 'index'])->name('inventory');
     });
 
     
@@ -828,7 +839,7 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
 
   
 
-Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
+Route::prefix('staff')->name('staff.')->group(function () {
     // Staff routes - updated for order list functionality
     Route::get('/dashboard', [StaffDashboardController::class, 'index'])->name('dashboard');
     Route::get('/assigned-orders', [StaffAssignedController::class, 'index'])->name('assigned.orders');
@@ -900,7 +911,7 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
         Route::post('{id}/save-canvas', [App\Http\Controllers\Admin\TemplateController::class, 'saveCanvas'])->name('saveCanvas');
         Route::post('{id}/save-template', [App\Http\Controllers\Admin\TemplateController::class, 'saveTemplate'])->name('saveTemplate');
         Route::post('{id}/upload-preview', [App\Http\Controllers\Admin\TemplateController::class, 'uploadPreview'])->name('uploadPreview');
-    Route::post('{id}/autosave', [App\Http\Controllers\Admin\TemplateController::class, 'autosave'])->name('autosave');
+        Route::post('{id}/autosave', [App\Http\Controllers\Admin\TemplateController::class, 'autosave'])->name('autosave');
         // Add new API routes
         Route::get('{id}/load-design', [App\Http\Controllers\Admin\TemplateController::class, 'loadDesign'])->name('loadDesign');
         Route::delete('{id}/delete-element', [App\Http\Controllers\Admin\TemplateController::class, 'deleteElement'])->name('deleteElement');

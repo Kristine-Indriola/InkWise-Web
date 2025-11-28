@@ -725,7 +725,7 @@
     </div>
 @endif
 
-@if($order && !$isFullyPaid && in_array($order->status, ['processing', 'confirmed']))
+@if($order && !$isFullyPaid && in_array($order->status, ['processing', 'in_production', 'confirmed']))
     <div class="status-banner" style="margin:16px auto; max-width:960px; padding:12px 18px; border-radius:16px; background:#fef3c7; color:#92400e; font-weight:600; text-align:center; border: 1px solid #f59e0b;">
         <div style="margin-bottom: 8px;">Your order has been confirmed! Please pay the remaining balance to complete your order.</div>
         <a href="{{ route('order.pay.remaining.balance', $order) }}" class="inline-block px-6 py-2 bg-[#ee4d2d] text-white rounded-lg hover:bg-[#d73211] transition-colors font-semibold">

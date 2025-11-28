@@ -722,6 +722,13 @@
         /* gentle overlay to make text pop */
         .hero-wrapper::after { content: ''; position: absolute; inset:0; background: linear-gradient(180deg, rgba(255,255,255,0.0), rgba(255,255,255,0.4)); pointer-events: none; z-index:5; }
 
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.08);
+        }
         header { position: fixed; top: 0; width: 100%; z-index: 50; }
         body { padding-top: 64px; }
 
@@ -731,7 +738,7 @@
 
     
    <!-- Top Navigation Bar -->
-<header class="shadow animate-fade-in-down bg-white w-full">
+<header class="shadow animate-fade-in-down glass-nav w-full">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between h-16">
         <!-- Logo -->
         <div class="flex items-center animate-bounce-slow flex-shrink-0">
@@ -857,7 +864,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const cart = document.createElement('a');
             cart.className = 'nav-icon-button';
-            cart.setAttribute('href', '#');
+            cart.setAttribute('href', '/order/addtocart');
             cart.setAttribute('aria-label', 'My cart');
             cart.setAttribute('title', 'My cart');
             cart.innerHTML = '<i class="bi bi-bag-heart-fill" aria-hidden="true"></i>';
@@ -885,7 +892,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     } catch (e) { /* ignore */ }
 
-    // Attach behavior: check server order, create from sessionStorage if missing, then redirect to /order/summary
+    // Attach behavior: check server order, create from sessionStorage if missing, then redirect to /order/addtocart
     const storageKey = 'inkwise-finalstep';
     const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
     const icons = Array.from(document.querySelectorAll('.nav-icon-button'));
@@ -938,16 +945,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
             try {
                 e.preventDefault();
-                if (await serverHasOrder()) { window.location.href = '/order/summary'; return; }
+                if (await serverHasOrder()) { window.location.href = '/order/addtocart'; return; }
                 let raw = null; try { raw = window.sessionStorage.getItem(storageKey); } catch (err) { raw = null; }
                 let summary = null; try { summary = raw ? JSON.parse(raw) : null; } catch (err) { summary = null; }
                 if (summary && (summary.productId || summary.product_id)) {
                     const created = await createOrderFromSummary(summary);
-                    if (created) { window.location.href = '/order/summary'; return; }
+                    if (created) { window.location.href = '/order/addtocart'; return; }
                 }
                 const href = icon.getAttribute('href');
                 if (href && href !== '#') { window.location.href = href; return; }
-                window.location.href = '/order/summary';
+                window.location.href = '/order/addtocart';
             } catch (err) { window.location.href = '/order/summary'; }
         });
     });

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 
 import { useBuilderStore } from '../../state/BuilderStore';
@@ -39,6 +39,80 @@ function constrainFrameToSafeZone(frame, page, safeInsets) {
     x: Math.max(minX, Math.min(maxX, frame.x)),
     y: Math.max(minY, Math.min(maxY, frame.y)),
   };
+}
+
+const BACKGROUND_KEYWORDS = ['background', 'page background', 'page-background', 'bg', 'backdrop', 'base layer'];
+
+function collectStringTokens(value, bucket) {
+  if (value === null || value === undefined) {
+    return;
+  }
+
+  if (typeof value === 'string') {
+    bucket.push(value.toLowerCase());
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((entry) => collectStringTokens(entry, bucket));
+    return;
+  }
+
+  if (typeof value === 'object') {
+    Object.values(value).forEach((entry) => collectStringTokens(entry, bucket));
+  }
+}
+
+function resolveLayerPriority(layer) {
+  if (!layer || typeof layer !== 'object') {
+    return 1;
+  }
+
+  const metadata = layer.metadata ?? {};
+  const normalizedName = typeof layer.name === 'string' ? layer.name.toLowerCase() : '';
+  const metadataTokens = [];
+  collectStringTokens(metadata, metadataTokens);
+
+  const hasBackgroundFlag = BACKGROUND_KEYWORDS.some((keyword) => {
+    if (!keyword) {
+      return false;
+    }
+
+    if (normalizedName.includes(keyword)) {
+      return true;
+    }
+
+    return metadataTokens.some((value) => value.includes(keyword));
+  });
+
+  if (hasBackgroundFlag || layer.type === 'background') {
+    return 0;
+  }
+
+  return 1;
+}
+
+function resolveExplicitStackIndex(layer) {
+  const metadata = layer?.metadata ?? {};
+
+  const candidateKeys = ['zIndex', 'z_index', 'stackIndex', 'stack_index', 'order', 'sortOrder', 'sort_order'];
+
+  for (const key of candidateKeys) {
+    if (Object.prototype.hasOwnProperty.call(metadata, key)) {
+      const value = metadata[key];
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+      }
+      if (typeof value === 'string') {
+        const parsed = Number.parseFloat(value);
+        if (Number.isFinite(parsed)) {
+          return parsed;
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 export function CanvasViewport({ page, canvasRef }) {
@@ -246,8 +320,12 @@ export function CanvasViewport({ page, canvasRef }) {
       return;
     }
 
-    const deltaX = (event.clientX - resizeState.start.x) / zoom;
-    const deltaY = (event.clientY - resizeState.start.y) / zoom;
+    // Adjust start position to account for handle offset (handles are 8px outside the frame)
+    const adjustedStartX = resizeState.start.x + 8;
+    const adjustedStartY = resizeState.start.y + 8;
+
+    const deltaX = (event.clientX - adjustedStartX) / zoom;
+    const deltaY = (event.clientY - adjustedStartY) / zoom;
 
     // Check if we've moved enough to consider this a resize operation
     const moveThreshold = 3; // pixels
@@ -329,7 +407,38 @@ export function CanvasViewport({ page, canvasRef }) {
   // Page-level shape/mask (set by shape picker when no layer is selected)
   const pageShape = page.shape ?? null;
 
-  const visibleLayers = Array.isArray(page.nodes) ? page.nodes : [];
+  const orderedLayers = useMemo(() => {
+    if (!Array.isArray(page.nodes)) {
+      return [];
+    }
+
+    return page.nodes
+      .map((layer, index) => ({
+        layer,
+        originalIndex: index,
+        priority: resolveLayerPriority(layer),
+        explicitStackIndex: resolveExplicitStackIndex(layer),
+      }))
+      .sort((a, b) => {
+        if (a.priority !== b.priority) {
+          return a.priority - b.priority;
+        }
+        const aStack = Number.isFinite(a.explicitStackIndex)
+          ? a.explicitStackIndex
+          : a.originalIndex;
+        const bStack = Number.isFinite(b.explicitStackIndex)
+          ? b.explicitStackIndex
+          : b.originalIndex;
+
+        if (aStack !== bStack) {
+          return aStack - bStack;
+        }
+
+        return a.originalIndex - b.originalIndex;
+      });
+  }, [page.nodes]);
+
+  const visibleLayers = orderedLayers;
 
   // Helper function to get shape styling based on variant
   const getShapeStyling = (shape) => {
@@ -457,8 +566,8 @@ export function CanvasViewport({ page, canvasRef }) {
               </div>
             )}
 
-            {visibleLayers.map((layer, index) => {
-              const frame = resolveFrame(layer, index, page);
+            {visibleLayers.map(({ layer, originalIndex, explicitStackIndex }, renderIndex) => {
+              const frame = resolveFrame(layer, originalIndex, page);
               const isSelected = layer.id === selectedLayerId;
               const isHidden = layer.visible === false;
               const isLocked = layer.locked === true;
@@ -481,10 +590,16 @@ export function CanvasViewport({ page, canvasRef }) {
 
               const isResizing = layer.id === resizingLayerId;
 
+              const stackHint = Number.isFinite(explicitStackIndex)
+                ? explicitStackIndex
+                : renderIndex;
+              const computedZIndex = Math.max(2, Math.round(10 + stackHint));
+
               const style = buildLayerStyle(layer, frame, {
                 hidden: isHidden,
                 opacity: layer.opacity,
                 isSelected,
+                zIndex: computedZIndex,
               });
 
               return (
@@ -525,10 +640,13 @@ export function CanvasViewport({ page, canvasRef }) {
                   aria-label={`${layer.name} layer`}
                   aria-pressed={isSelected}
                   data-layer-id={layer.id}
+                  data-preview-node={layer.id}
+                  data-changeable={isImage ? 'image' : undefined}
                 >
                   {isText && (
                     <div
                       className="canvas-layer__text"
+                      data-preview-node={layer.id}
                       style={{
                         color: layer.fill || '#0f172a',
                         fontSize: layer.fontSize ? `${layer.fontSize}px` : undefined,
@@ -546,6 +664,8 @@ export function CanvasViewport({ page, canvasRef }) {
                         src={layer.content}
                         alt={layer.name || 'Uploaded image'}
                         className="canvas-layer__image"
+                        data-preview-node={layer.id}
+                        data-changeable="image"
                         style={{
                           width: '100%',
                           height: '100%',
@@ -601,8 +721,8 @@ export function CanvasViewport({ page, canvasRef }) {
                     </div>
                   )}
 
-                  {/* Resize handles for selected images */}
-                  {isSelected && isImage && layer.content && (
+                  {/* Resize handles for selected images and text */}
+                  {isSelected && ((isImage && layer.content) || isText) && (
                     <>
                       {/* Northwest corner */}
                       <div
@@ -820,7 +940,7 @@ function buildStageStyle(zoom, page, panX, panY) {
   };
 }
 
-function buildLayerStyle(layer, frame, { hidden, opacity, isSelected }) {
+function buildLayerStyle(layer, frame, { hidden, opacity, isSelected, zIndex }) {
   const baseOpacity = hidden ? 0.35 : Math.max(0.1, opacity ?? 1);
 
   const style = {
@@ -835,6 +955,10 @@ function buildLayerStyle(layer, frame, { hidden, opacity, isSelected }) {
     transformOrigin: 'center',
   };
 
+  if (Number.isFinite(zIndex)) {
+    style.zIndex = zIndex;
+  }
+
   if (layer.type === 'text') {
     style.background = 'transparent';
     style.borderStyle = 'dashed';
@@ -844,7 +968,8 @@ function buildLayerStyle(layer, frame, { hidden, opacity, isSelected }) {
       style.background = 'transparent';
       style.borderStyle = 'solid';
       style.borderWidth = 2;
-      style.borderColor = isSelected ? '#3b82f6' : 'transparent';
+      style.borderColor = isSelected ? '#3b82f6' : 'rgba(148, 163, 184, 0.5)';
+      style.padding = 0;
     } else {
       style.background = 'transparent';
       style.borderStyle = 'dashed';

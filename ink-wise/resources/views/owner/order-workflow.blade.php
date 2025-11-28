@@ -66,13 +66,15 @@
   .summary-card-icon svg { width:18px; height:18px; }
 
   .summary-card-icon--total { background: rgba(59, 130, 246, 0.18); color:#2563eb; }
-  .summary-card-icon--confirmed { background: rgba(16, 185, 129, 0.20); color:#0f766e; }
+  .summary-card-icon--completed { background: rgba(16, 185, 129, 0.20); color:#0f766e; }
   .summary-card-icon--pending { background: rgba(245, 158, 11, 0.22); color:#b45309; }
+  .summary-card-icon--production { background: rgba(139, 92, 246, 0.20); color:#6d28d9; }
   .summary-card-icon--cancelled { background: rgba(239, 68, 68, 0.20); color:#b91c1c; }
 
   .dark-mode .summary-card-icon--total { background: rgba(59, 130, 246, 0.32); color:#93c5fd; }
-  .dark-mode .summary-card-icon--confirmed { background: rgba(16, 185, 129, 0.32); color:#6ee7b7; }
+  .dark-mode .summary-card-icon--completed { background: rgba(16, 185, 129, 0.32); color:#6ee7b7; }
   .dark-mode .summary-card-icon--pending { background: rgba(245, 158, 11, 0.32); color:#fbbf24; }
+  .dark-mode .summary-card-icon--production { background: rgba(139, 92, 246, 0.36); color:#c4b5fd; }
   .dark-mode .summary-card-icon--cancelled { background: rgba(239, 68, 68, 0.34); color:#fca5a5; }
   .summary-card-label { font-size:0.92rem; font-weight:600; color:#475569; }
   .summary-card-value { display:block; font-size:1.6rem; font-weight:800; color:#0f172a; margin-top:6px; }
@@ -118,6 +120,11 @@
     color: #6b7280;
     font-style: italic;
     background: rgba(148, 185, 255, 0.05);
+  }
+
+  .numeric-cell {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
   }
 
   .table-footnote {
@@ -171,12 +178,13 @@
 
   <div class="page-inner owner-dashboard-inner">
       @php
-        $counts = $counts ?? ['total' => 0, 'confirmed' => 0, 'pending' => 0, 'cancelled' => 0];
+        $counts = $counts ?? ['total' => 0, 'confirmed' => 0, 'completed' => 0, 'pending' => 0, 'in_production' => 0, 'cancelled' => 0];
         $orders = $orders ?? [];
         $filters = $filters ?? ['status' => null, 'search' => null, 'limit' => 50];
         $activeStatus = $filters['status'] ?? null;
-        $pendingStatuses = ['pending', 'in_production', 'processing', 'to_receive'];
-        $confirmedStatuses = ['confirmed', 'completed'];
+        $pendingStatuses = ['pending', 'processing', 'to_receive'];
+        $inProductionStatuses = ['in_production'];
+        $completedStatuses = ['completed', 'confirmed'];
         $cancelledStatuses = ['cancelled'];
         $queryBase = [];
         if (!empty($filters['search'])) {
@@ -204,21 +212,21 @@
           <span class="summary-card-meta">Orders recorded</span>
         </a>
 
-        <a href="{{ route('owner.order.workflow', array_merge($queryBase, ['status' => 'confirmed'])) }}" class="summary-card{{ in_array($activeStatus, $confirmedStatuses, true) ? ' is-active' : '' }}" data-summary-card="confirmed" data-status-filter="confirmed">
+        <a href="{{ route('owner.order.workflow', array_merge($queryBase, ['status' => 'completed'])) }}" class="summary-card{{ in_array($activeStatus, $completedStatuses, true) ? ' is-active' : '' }}" data-summary-card="completed" data-status-filter="completed">
           <div class="summary-card-header">
             <div class="summary-card-heading">
-              <span class="summary-card-icon summary-card-icon--confirmed" aria-hidden="true">
+              <span class="summary-card-icon summary-card-icon--completed" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M20 12a8 8 0 1 1-16 0 8 8 0 0 1 16 0z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
                   <path d="M9.5 12.5l1.8 1.8 4.2-4.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
               </span>
-              <span class="summary-card-label">Confirmed</span>
+              <span class="summary-card-label">Completed</span>
             </div>
             <span class="summary-card-chip accent">Done</span>
           </div>
-          <span class="summary-card-value" data-orders-stat="confirmed">{{ number_format($counts['confirmed'] ?? 0) }}</span>
-          <span class="summary-card-meta">Confirmed orders</span>
+          <span class="summary-card-value" data-orders-stat="completed">{{ number_format($counts['completed'] ?? 0) }}</span>
+          <span class="summary-card-meta">Completed orders</span>
         </a>
 
         <a href="{{ route('owner.order.workflow', array_merge($queryBase, ['status' => 'pending'])) }}" class="summary-card{{ in_array($activeStatus, $pendingStatuses, true) ? ' is-active' : '' }}" data-summary-card="pending" data-status-filter="pending">
@@ -236,6 +244,22 @@
           </div>
           <span class="summary-card-value" data-orders-stat="pending">{{ number_format($counts['pending'] ?? 0) }}</span>
           <span class="summary-card-meta">Awaiting action</span>
+        </a>
+
+        <a href="{{ route('owner.order.workflow', array_merge($queryBase, ['status' => 'in_production'])) }}" class="summary-card{{ in_array($activeStatus, $inProductionStatuses, true) ? ' is-active' : '' }}" data-summary-card="in_production" data-status-filter="in_production">
+          <div class="summary-card-header">
+            <div class="summary-card-heading">
+              <span class="summary-card-icon summary-card-icon--production" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 3.5l1.8 3.6 4 .58-2.9 2.83.68 4-3.58-1.89-3.58 1.89.68-4-2.9-2.83 4-.58L12 3.5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="summary-card-label">In Production</span>
+            </div>
+            <span class="summary-card-chip accent">Active</span>
+          </div>
+          <span class="summary-card-value" data-orders-stat="in_production">{{ number_format($counts['in_production'] ?? 0) }}</span>
+          <span class="summary-card-meta">Currently being produced</span>
         </a>
 
         <a href="{{ route('owner.order.workflow', array_merge($queryBase, ['status' => 'cancelled'])) }}" class="summary-card{{ in_array($activeStatus, $cancelledStatuses, true) ? ' is-active' : '' }}" data-summary-card="cancelled" data-status-filter="cancelled">
@@ -288,6 +312,7 @@
               <th>Customer</th>
               <th>Date Ordered</th>
               <th>Order Details</th>
+              <th>Total</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -298,13 +323,14 @@
                 <td>{{ $order['customer_name'] }}</td>
                 <td>{{ $order['ordered_at'] }}</td>
                 <td>{{ $order['summary'] }}</td>
+                <td class="numeric-cell">{{ $order['total'] }}</td>
                 <td>
                   <span class="{{ $order['status_badge_class'] }}">{{ $order['status_label'] }}</span>
                 </td>
               </tr>
             @empty
               <tr class="table-empty">
-                <td colspan="5">No orders found.</td>
+                <td colspan="6">No orders found.</td>
               </tr>
             @endforelse
           </tbody>
@@ -414,12 +440,16 @@ document.addEventListener('DOMContentLoaded', function () {
       return 'total';
     }
 
-    if (['confirmed', 'completed'].includes(normalized)) {
-      return 'confirmed';
+    if (['completed', 'confirmed'].includes(normalized)) {
+      return 'completed';
     }
 
-    if (['pending', 'in_production', 'processing', 'to_receive'].includes(normalized)) {
+    if (['pending', 'processing', 'to_receive'].includes(normalized)) {
       return 'pending';
+    }
+
+    if (['in_production'].includes(normalized)) {
+      return 'in_production';
     }
 
     if (['cancelled'].includes(normalized)) {
@@ -527,7 +557,7 @@ document.addEventListener('DOMContentLoaded', function () {
       const emptyRow = document.createElement('tr');
       emptyRow.className = 'table-empty';
       const emptyCell = document.createElement('td');
-      emptyCell.colSpan = 5;
+      emptyCell.colSpan = 6;
       emptyCell.textContent = 'No orders found.';
       emptyRow.appendChild(emptyCell);
       tbody.appendChild(emptyRow);
@@ -544,6 +574,7 @@ document.addEventListener('DOMContentLoaded', function () {
         { text: order.customer_name },
         { text: order.ordered_at },
         { text: order.summary },
+        { className: 'numeric-cell', text: order.total },
       ];
 
       columns.forEach((column) => {
