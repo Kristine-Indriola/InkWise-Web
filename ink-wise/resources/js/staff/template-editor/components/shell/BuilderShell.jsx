@@ -271,7 +271,7 @@ export function BuilderShell() {
         pendingSaveRef.current = null;
       }
     };
-  }, [state.pages, state.template?.name, state.zoom, state.panX, state.panY, state.activePageId, routes?.autosave, csrfToken]);
+  }, [state.pages, state.activePageId, state.zoom, state.panX, state.panY, state.template?.name, routes?.autosave, csrfToken]);
 
   const saveTemplateRoute = routes?.saveTemplate ?? routes?.saveCanvas;
 
@@ -331,6 +331,7 @@ export function BuilderShell() {
       try {
         svgDataUrl = await toSvg(canvasRef.current, {
           cacheBust: true,
+          filter: (node) => !node.classList?.contains('canvas-layer__resize-handle'),
         });
       } catch (captureError) {
         console.warn('[InkWise Builder] SVG snapshot capture failed.', captureError);

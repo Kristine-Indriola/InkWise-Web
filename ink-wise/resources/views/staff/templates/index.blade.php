@@ -293,6 +293,30 @@
             transform: translateY(-1px);
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+
+            .template-status {
+                display: inline-flex;
+                align-items: center;
+                padding: 2px 8px;
+                border-radius: 999px;
+                font-size: 0.7rem;
+                font-weight: 600;
+                margin-left: auto;
+            }
+
+            .template-status--returned {
+                background: rgba(220, 38, 38, 0.1);
+                color: #b91c1c;
+            }
+
+            .template-note {
+                margin-top: 8px;
+                font-size: 0.85rem;
+                color: #b91c1c;
+                background: rgba(254, 226, 226, 0.6);
+                border-radius: 6px;
+                padding: 8px;
+            }
     </style>
 @endpush
 
@@ -771,10 +795,18 @@
                                 @if($template->updated_at)
                                     <span class="template-date">{{ $template->updated_at->format('M d, Y') }}</span>
                                 @endif
+                                @if($template->status === 'returned')
+                                        <span class="template-status template-status--returned">Returned</span>
+                                @endif
                             </div>
                             <h3 class="template-title">{{ $template->name }}</h3>
                             @if($template->description)
                                 <p class="template-description">{{ $template->description }}</p>
+                            @endif
+                            @if($template->status === 'returned' && $template->status_note)
+                                    <div class="template-note">
+                                        <strong>Admin Note:</strong> {{ $template->status_note }}
+                                    </div>
                             @endif
                         </div>
                         <div class="template-actions">

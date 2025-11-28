@@ -1,3 +1,14 @@
+@php
+    $isPublished = !is_null($product->published_at) || ($product->relationLoaded('uploads') ? $product->uploads->isNotEmpty() : $product->uploads()->exists());
+    $catalogMap = [
+        'invitation' => url('/templates/wedding/invitations'),
+        'giveaway' => url('/templates/giveaways'),
+        'envelope' => url('/templates/envelopes'),
+    ];
+    $catalogKey = strtolower($product->product_type ?? optional($product->template)->product_type ?? '');
+    $customerCatalogUrl = $catalogMap[$catalogKey] ?? url('/templates/wedding/invitations');
+@endphp
+
 <div 
     class="product-card"
     role="listitem"
@@ -17,6 +28,9 @@
         optional($product->template)->preview_front,
         optional($product->template)->preview,
     ]) }}"
+    data-published="{{ $isPublished ? '1' : '0' }}"
+    data-unupload-url="{{ route('admin.products.unupload', $product->id) }}"
+    data-customer-url="{{ $customerCatalogUrl }}"
 >
     @php
         // front image fallback: envelope image -> product images -> product.image -> template front
@@ -92,20 +106,29 @@
         <div class="card-actions">
             <a href="{{ route('admin.products.view', $product->id) }}" class="btn-view" title="View {{ $product->name }}" aria-label="View {{ $product->name }}"><i class="fi fi-sr-eye"></i></a>
             <a href="{{ route('admin.products.edit', $product->id) }}" class="btn-update" title="Edit {{ $product->name }}" aria-label="Edit {{ $product->name }}"><i class="fa-solid fa-pen-to-square"></i></a>
+            @php $isPublished = $product->published_at !== null; @endphp
             <button
                 type="button"
-                class="btn-upload {{ $product->uploads->count() > 0 ? 'published' : '' }}"
+                class="btn-upload {{ $isPublished ? 'disabled' : '' }}"
                 data-id="{{ $product->id }}"
                 data-upload-url="{{ route('admin.products.upload', $product->id) }}"
-                title="{{ $product->uploads->count() > 0 ? 'Published to customer pages' : 'Upload' }}"
-                aria-label="{{ $product->uploads->count() > 0 ? 'Published to customer pages' : 'Upload assets for ' . $product->name }}"
-                {{ $product->uploads->count() > 0 ? 'disabled' : '' }}
+                data-customer-url="{{ $customerCatalogUrl }}"
+                title="Publish {{ $product->name }}"
+                aria-label="Publish {{ $product->name }}"
+                {{ $isPublished ? 'disabled' : '' }}
             >
-                @if($product->uploads->count() > 0)
-                    <i class="fas fa-check"></i>
-                @else
-                    <i class="fa-solid fa-upload"></i>
-                @endif
+                <i class="fa-solid fa-upload"></i>
+            </button>
+            <button
+                type="button"
+                class="btn-unupload {{ !$isPublished ? 'disabled' : '' }}"
+                data-id="{{ $product->id }}"
+                data-unupload-url="{{ route('admin.products.unupload', $product->id) }}"
+                title="Unpublish {{ $product->name }}"
+                aria-label="Unpublish {{ $product->name }}"
+                {{ !$isPublished ? 'disabled' : '' }}
+            >
+                <i class="fa-solid fa-rotate-left"></i>
             </button>
             <form method="POST" action="{{ route('admin.products.destroy', $product->id) }}" style="display:inline;" class="ajax-delete-form" data-id="{{ $product->id }}">
                 @csrf @method('DELETE')

@@ -345,6 +345,26 @@
         background: #28a745 !important;
         transform: none !important;
     }
+
+    .btn-unupload {
+        background: #f97316;
+        color: #fff;
+        padding: 8px 16px;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+        transition: background 0.2s ease, transform 0.2s ease;
+    }
+
+    .btn-unupload:hover {
+        background: #ea580c;
+        transform: translateY(-1px);
+    }
+    .btn-upload.disabled, .btn-unupload.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
 </style>
     @endpush
 
@@ -583,6 +603,13 @@
             let currentCard = null;
             let submitBtnOriginalLabel = '';
 
+            const unpublishConfirmModal = document.getElementById('unpublish-confirm-modal');
+            const proceedUnpublish = document.getElementById('proceed-unpublish');
+            const cancelUnpublish = document.getElementById('cancel-unpublish');
+            const unpublishReason = document.getElementById('unpublish-reason');
+            let currentUnpublishUrl = null;
+            let currentUnpublishBtn = null;
+
             function closeConfirmModal() {
                 if (!uploadConfirmModal) return;
                 uploadConfirmModal.classList.remove('show');
@@ -595,6 +622,21 @@
                 uploadConfirmModal.classList.add('show');
                 uploadConfirmModal.setAttribute('aria-hidden', 'false');
                 uploadConfirmModal.style.display = 'flex';
+            }
+
+            function closeUnpublishModal() {
+                if (!unpublishConfirmModal) return;
+                unpublishConfirmModal.classList.remove('show');
+                unpublishConfirmModal.setAttribute('aria-hidden', 'true');
+                unpublishConfirmModal.style.display = 'none';
+                if (unpublishReason) unpublishReason.value = '';
+            }
+
+            function showUnpublishModal() {
+                if (!unpublishConfirmModal) return;
+                unpublishConfirmModal.classList.add('show');
+                unpublishConfirmModal.setAttribute('aria-hidden', 'false');
+                unpublishConfirmModal.style.display = 'flex';
             }
 
             function showNotice(message, type = 'success', options = {}) {
@@ -636,6 +678,9 @@
                 currentUploadUrl = btn.getAttribute('data-upload-url');
                 currentProductId = btn.getAttribute('data-id');
                 currentCard = btn.closest('.product-card');
+                const catalogUrl = btn.getAttribute('data-customer-url')
+                    || currentCard?.getAttribute('data-customer-url')
+                    || `${window.location.origin}/templates/wedding/invitations`;
 
                 if (!currentUploadUrl || !csrfToken) {
                     showNotice('Upload configuration missing.', 'error');
@@ -645,17 +690,18 @@
                 // Get product details for confirmation message
                 const productType = currentCard ? currentCard.getAttribute('data-product-type') : '';
                 const productName = currentCard ? currentCard.getAttribute('data-name') : 'this product';
+                const catalogLink = `<a href="${catalogUrl}" target="_blank" rel="noopener">${catalogUrl}</a>`;
 
                 // Update confirmation message
                 const confirmMessage = uploadConfirmModal.querySelector('.confirm-message');
                 if (confirmMessage) {
                     confirmMessage.innerHTML = `
-                        <strong>Publish Template for "${productName}"</strong><br><br>
-                        This will publish the template to customer pages where users can:<br>
-                        • View and customize ${productType.toLowerCase()} designs<br>
-                        • Place orders for ${productType.toLowerCase()} products<br>
-                        • Access the template in the ${productType} catalog<br><br>
-                        <em>Are you sure you want to proceed?</em>
+                        <strong>Publish "${productName}" to customer catalog</strong><br><br>
+                        Once published, customers will be able to:<br>
+                        • Browse this ${productType.toLowerCase()} in the public catalog<br>
+                        • Preview and personalize the design<br>
+                        • Place orders directly from the listing<br><br>
+                        <em>Publish now?</em>
                     `;
                 }
 
@@ -685,19 +731,24 @@
                         return response.json();
                     }).then(function (data) {
                         if (data.success) {
-                            // Show success message
-                            const linkOptions = currentProductId ? { link: { href: `/admin/products/${currentProductId}/weddinginvite`, text: 'View preview' } } : {};
-                            showNotice(data.message || 'Template published to customer pages successfully.', 'success', linkOptions);
+                            const customerUrl = currentCard?.getAttribute('data-customer-url')
+                                || currentCard?.querySelector('.btn-upload')?.getAttribute('data-customer-url')
+                                || `${window.location.origin}/templates/wedding/invitations`;
+                            const linkOptions = customerUrl ? { link: { href: customerUrl, text: 'View customer page', target: '_blank', rel: 'noopener' } } : {};
+                            showNotice(data.message || 'Template published to customer catalog successfully.', 'success', linkOptions);
 
-                            // Update the button to show it's published
                             if (currentCard) {
                                 const uploadBtn = currentCard.querySelector('.btn-upload');
+                                const unuploadBtn = currentCard.querySelector('.btn-unupload');
                                 if (uploadBtn) {
-                                    uploadBtn.innerHTML = '<i class="fas fa-check"></i>';
-                                    uploadBtn.classList.add('published');
-                                    uploadBtn.disabled = true;
-                                    uploadBtn.title = 'Published to customer pages';
+                                    uploadBtn.classList.add('disabled');
+                                    uploadBtn.setAttribute('disabled', 'disabled');
                                 }
+                                if (unuploadBtn) {
+                                    unuploadBtn.classList.remove('disabled');
+                                    unuploadBtn.removeAttribute('disabled');
+                                }
+                                currentCard.setAttribute('data-published', '1');
                             }
 
                             closeConfirmModal();
@@ -722,6 +773,106 @@
                 });
             }
 
+            if (proceedUnpublish) {
+                proceedUnpublish.addEventListener('click', function (e) {
+                    e.preventDefault();
+
+                    const reason = unpublishReason ? unpublishReason.value.trim() : '';
+                    const payload = new URLSearchParams();
+                    payload.append('_token', csrfToken || '');
+                    if (reason) {
+                        payload.append('reason', reason);
+                    }
+
+                    const btn = currentUnpublishBtn;
+                    if (!btn || !currentUnpublishUrl) return;
+
+                    // Show loading state
+                    const originalText = proceedUnpublish.innerHTML;
+                    proceedUnpublish.disabled = true;
+                    proceedUnpublish.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Unpublishing...';
+
+                    fetch(currentUnpublishUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: payload.toString(),
+                    }).then(res => {
+                        if (!res.ok) {
+                            throw new Error('Request failed');
+                        }
+                        return res.json().catch(() => ({ success: true }));
+                    }).then(data => {
+                        if (!data || data.success !== true) {
+                            throw new Error(data?.message || 'Unable to unpublish product.');
+                        }
+
+                        closeUnpublishModal();
+
+                        btn.classList.add('disabled');
+                        btn.disabled = true;
+
+                        selectedProducts.delete(btn.getAttribute('data-id'));
+                        updateBulkDeleteButton();
+
+                        const card = btn.closest('.product-card');
+                        if (card) {
+                            const uploadBtn = card.querySelector('.btn-upload');
+                            const unuploadBtn = card.querySelector('.btn-unupload');
+                            if (uploadBtn) {
+                                uploadBtn.classList.remove('disabled');
+                                uploadBtn.removeAttribute('disabled');
+                            }
+                            if (unuploadBtn) {
+                                unuploadBtn.classList.add('disabled');
+                                unuploadBtn.setAttribute('disabled', 'disabled');
+                            }
+                            card.setAttribute('data-published', '0');
+                        }
+
+                        showNotice('Product unpublished successfully.', 'success');
+                    }).catch(err => {
+                        console.error(err);
+                        showNotice(err?.message || 'Failed to unpublish product.', 'error');
+                    }).finally(() => {
+                        // Restore button state
+                        proceedUnpublish.disabled = false;
+                        proceedUnpublish.innerHTML = originalText;
+                    });
+                });
+            }
+
+            if (cancelUnpublish) {
+                cancelUnpublish.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    closeUnpublishModal();
+                });
+            }
+
+            document.addEventListener('click', function (e) {
+                const btn = e.target.closest('.btn-unupload');
+                if (!btn) return;
+
+                e.preventDefault();
+
+                const card = btn.closest('.product-card');
+                const productName = card ? card.getAttribute('data-name') : 'this product';
+
+                // Update confirmation message
+                const confirmMessage = unpublishConfirmModal.querySelector('.confirm-message');
+                if (confirmMessage) {
+                    confirmMessage.innerHTML = `<strong>Unpublish "${productName}"?</strong><br><br>This will remove it from the customer catalog.`;
+                }
+
+                currentUnpublishUrl = btn.getAttribute('data-unupload-url');
+                currentUnpublishBtn = btn;
+
+                showUnpublishModal();
+            });
+
             if (uploadConfirmModal) {
                 uploadConfirmModal.addEventListener('click', function (e) {
                     if (e.target === uploadConfirmModal) {
@@ -730,10 +881,21 @@
                 });
             }
 
+            if (unpublishConfirmModal) {
+                unpublishConfirmModal.addEventListener('click', function (e) {
+                    if (e.target === unpublishConfirmModal) {
+                        closeUnpublishModal();
+                    }
+                });
+            }
+
             document.addEventListener('keydown', function (e) {
                 if (e.key === 'Escape') {
                     if (uploadConfirmModal?.classList.contains('show')) {
                         closeConfirmModal();
+                    }
+                    if (unpublishConfirmModal?.classList.contains('show')) {
+                        closeUnpublishModal();
                     }
                 }
             });
@@ -877,6 +1039,28 @@
                     <i class="fas fa-upload"></i> Publish to Customer Pages
                 </button>
                 <button type="button" id="cancel-confirm" class="btn-upload-cancel">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {{-- Unpublish confirmation modal --}}
+    <div id="unpublish-confirm-modal" class="upload-modal">
+        <div class="upload-modal-content">
+            <h3><i class="fas fa-cloud-download-alt"></i> Confirm Template Unpublish</h3>
+            <div class="confirm-message" style="text-align: left; margin: 20px 0; line-height: 1.6;">
+                <!-- Message will be populated by JavaScript -->
+            </div>
+            <div class="reason-input" style="margin: 15px 0;">
+                <label for="unpublish-reason" style="display: block; margin-bottom: 5px; font-weight: 500;">Add a note for staff (optional):</label>
+                <textarea id="unpublish-reason" rows="3" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; resize: vertical;" placeholder="Reason for unpublishing..."></textarea>
+            </div>
+            <div class="upload-buttons">
+                <button type="button" id="proceed-unpublish" class="btn-upload-submit" style="background: #dc3545;">
+                    <i class="fas fa-times"></i> Unpublish
+                </button>
+                <button type="button" id="cancel-unpublish" class="btn-upload-cancel">
                     <i class="fas fa-times"></i> Cancel
                 </button>
             </div>
