@@ -169,6 +169,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
             return redirect()->route('admin.products.create.invitation', ['template_id' => $id]);
         });
         Route::post('{id}/upload-to-product-uploads', [AdminTemplateController::class, 'uploadTemplate'])->name('uploadToProductUploads');
+        Route::post('{id}/reback', [AdminTemplateController::class, 'reback'])->name('reback');
     // Session preview routes for staff (create -> preview -> save to templates)
     Route::post('preview', [AdminTemplateController::class, 'preview'])->name('preview');
     Route::post('preview/{preview}/save', [AdminTemplateController::class, 'savePreview'])->name('preview.save');
@@ -238,6 +239,7 @@ Route::prefix('users')->name('users.')->group(function () {
     // Show single product (AJAX slide panel)
     Route::get('/{id}/view', [ProductController::class, 'view'])->name('view');
     Route::post('/{id}/upload', [ProductController::class, 'upload'])->name('upload');
+    Route::post('/{id}/unupload', [ProductController::class, 'unupload'])->name('unupload');
     Route::get('/{id}', [ProductController::class, 'show'])->name('show');
     // Index (product listing)
     Route::get('/', [ProductController::class, 'index'])->name('index');

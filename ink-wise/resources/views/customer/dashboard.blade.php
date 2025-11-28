@@ -722,6 +722,13 @@
         /* gentle overlay to make text pop */
         .hero-wrapper::after { content: ''; position: absolute; inset:0; background: linear-gradient(180deg, rgba(255,255,255,0.0), rgba(255,255,255,0.4)); pointer-events: none; z-index:5; }
 
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.08);
+        }
         header { position: fixed; top: 0; width: 100%; z-index: 50; }
         body { padding-top: 64px; }
 
@@ -731,7 +738,7 @@
 
     
    <!-- Top Navigation Bar -->
-<header class="shadow animate-fade-in-down bg-white w-full">
+<header class="shadow animate-fade-in-down glass-nav w-full">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between h-16">
         <!-- Logo -->
         <div class="flex items-center animate-bounce-slow flex-shrink-0">

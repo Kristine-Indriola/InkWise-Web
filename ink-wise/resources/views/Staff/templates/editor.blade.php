@@ -37,7 +37,7 @@
         }
 
         body {
-            margin: 0;
+            margin: 0;3
             font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
             background: #f8fafc;
             color: #0f172a;

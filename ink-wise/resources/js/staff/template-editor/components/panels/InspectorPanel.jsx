@@ -263,6 +263,18 @@ export function InspectorPanel() {
   const [shapeModalPosition, setShapeModalPosition] = useState(null);
   const [editingPageId, setEditingPageId] = useState(null);
   const [editingPageName, setEditingPageName] = useState('');
+  const [fontSizeInput, setFontSizeInput] = useState(() => {
+    return selectedLayer?.fontSize?.toString() ?? '48';
+  });
+
+  // Sync fontSizeInput with selectedLayer changes
+  useEffect(() => {
+    if (selectedLayer?.fontSize !== undefined) {
+      setFontSizeInput(selectedLayer.fontSize?.toString() ?? '48');
+    } else if (!selectedLayer) {
+      setFontSizeInput('48');
+    }
+  }, [selectedLayer?.fontSize, selectedLayer]);
 
   const ensureFontLoaded = useCallback((family, variants) => {
     const normalizedFamily = normalizeFontFamilyName(family);
@@ -935,11 +947,14 @@ export function InspectorPanel() {
   };
 
   const handleFontSizeChange = (event) => {
-    const nextValue = Number.parseInt(event.target.value, 10);
-    if (!Number.isFinite(nextValue)) {
-      return;
+    const inputValue = event.target.value;
+    setFontSizeInput(inputValue);
+
+    // Only update the layer if we have a valid number
+    const nextValue = Number.parseInt(inputValue, 10);
+    if (Number.isFinite(nextValue) && nextValue >= 8) {
+      handleLayerChange({ fontSize: nextValue });
     }
-    handleLayerChange({ fontSize: Math.max(8, nextValue) });
   };
 
   const handleFontWeightChange = (event) => {
@@ -1555,7 +1570,7 @@ export function InspectorPanel() {
           <input
             type="number"
             className="inspector-field__control"
-            value={selectedLayer.fontSize ?? 48}
+            value={fontSizeInput}
             onChange={handleFontSizeChange}
             min="8"
             step="1"

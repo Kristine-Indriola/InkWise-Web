@@ -18,8 +18,10 @@ class Template extends Model
         'front_image',
         'back_image',
         'status',
+        'status_note',
+        'status_updated_at',
         'metadata',
-    'design',
+        'design',
         'svg_path',
         'back_svg_path',
         'preview',
@@ -30,6 +32,7 @@ class Template extends Model
         'metadata' => 'array',
         'design' => 'array',
         'processed_at' => 'datetime',
+        'status_updated_at' => 'datetime',
     ];
 
     public function products()

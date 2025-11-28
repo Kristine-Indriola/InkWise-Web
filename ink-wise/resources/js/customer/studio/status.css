@@ -41,6 +41,10 @@
   box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.18);
 }
 
+.studio-status__header[data-state="error"] {
+  color: #dc2626;
+}
+
 .studio-status__summary {
   display: flex;
   flex-wrap: wrap;

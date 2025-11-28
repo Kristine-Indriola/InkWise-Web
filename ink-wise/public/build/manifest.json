@@ -19,7 +19,7 @@
     "isEntry": true
   },
   "resources/css/app.css": {
-    "file": "assets/app-KMDQAHUM.css",
+    "file": "assets/app-CSsVFHHv.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -34,7 +34,7 @@
     "isEntry": true
   },
   "resources/css/customer/studio.css": {
-    "file": "assets/studio-CkkyVuCb.css",
+    "file": "assets/studio-CpOb8AOv.css",
     "src": "resources/css/customer/studio.css",
     "isEntry": true
   },
@@ -69,7 +69,7 @@
     "isEntry": true
   },
   "resources/js/customer/studio/main.jsx": {
-    "file": "assets/main-D90A_XyZ.js",
+    "file": "assets/main-B9aXMjvS.js",
     "name": "main",
     "src": "resources/js/customer/studio/main.jsx",
     "isEntry": true,
@@ -77,7 +77,7 @@
       "_client-Cv0X-2PX.js"
     ],
     "css": [
-      "assets/main-GbDmIJBe.css"
+      "assets/main-BBZZIHaa.css"
     ]
   },
   "resources/js/customer/studio/svg-template-editor.jsx": {
@@ -87,7 +87,7 @@
     "isEntry": true
   },
   "resources/js/staff/template-editor/main.jsx": {
-    "file": "assets/main-Cel6EmK5.js",
+    "file": "assets/main-BNbTY51E.js",
     "name": "main",
     "src": "resources/js/staff/template-editor/main.jsx",
     "isEntry": true,
@@ -102,7 +102,7 @@
       "resources/js/staff/template-editor/utils/recentImagesDB.js"
     ],
     "css": [
-      "assets/main-DuNGlsMr.css"
+      "assets/main-DjWRC8ak.css"
     ]
   },
   "resources/js/staff/template-editor/utils/recentImagesDB.js": {
