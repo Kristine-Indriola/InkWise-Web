@@ -151,7 +151,8 @@ class OwnerOrderWorkflowController extends Controller
         }
 
         return match ($status) {
-            'pending' => ['pending', 'in_production', 'processing', 'to_receive'],
+            'pending' => ['pending', 'processing', 'to_receive'],
+            'in_production' => ['in_production'],
             'confirmed' => ['confirmed', 'completed'],
             default => [$status],
         };
@@ -162,7 +163,9 @@ class OwnerOrderWorkflowController extends Controller
         $row = Order::query()->selectRaw(<<<SQL
             COUNT(*) as total,
             SUM(CASE WHEN LOWER(COALESCE(status, '')) IN ('confirmed', 'completed') THEN 1 ELSE 0 END) as confirmed,
-            SUM(CASE WHEN LOWER(COALESCE(status, '')) IN ('pending', 'in_production', 'processing', 'to_receive') THEN 1 ELSE 0 END) as pending,
+            SUM(CASE WHEN LOWER(COALESCE(status, '')) = 'completed' THEN 1 ELSE 0 END) as completed,
+            SUM(CASE WHEN LOWER(COALESCE(status, '')) IN ('pending', 'processing', 'to_receive') THEN 1 ELSE 0 END) as pending,
+            SUM(CASE WHEN LOWER(COALESCE(status, '')) = 'in_production' THEN 1 ELSE 0 END) as in_production,
             SUM(CASE WHEN LOWER(COALESCE(status, '')) = 'cancelled' THEN 1 ELSE 0 END) as cancelled
 SQL
         )->first();
@@ -170,7 +173,9 @@ SQL
         return [
             'total' => (int) ($row->total ?? 0),
             'confirmed' => (int) ($row->confirmed ?? 0),
+            'completed' => (int) ($row->completed ?? 0),
             'pending' => (int) ($row->pending ?? 0),
+            'in_production' => (int) ($row->in_production ?? 0),
             'cancelled' => (int) ($row->cancelled ?? 0),
         ];
     }
@@ -224,6 +229,7 @@ SQL
             'customer_name' => $this->resolveCustomerName($order),
             'ordered_at' => $this->formatOrderDate($order),
             'summary' => $this->summarizeOrder($order),
+            'total' => $this->formatOrderTotal($order),
             'status' => $status,
             'status_label' => $this->formatStatusLabel($status),
             'status_badge_class' => $this->statusBadgeClass($status),
@@ -347,6 +353,13 @@ SQL
             'cancelled' => 'badge stock-critical',
             default => 'badge',
         };
+    }
+
+    protected function formatOrderTotal(Order $order): string
+    {
+        $amount = (float) ($order->total_amount ?? 0);
+
+        return number_format($amount, 2);
     }
 
     protected function timezone(): string
