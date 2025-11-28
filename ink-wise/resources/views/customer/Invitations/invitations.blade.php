@@ -108,8 +108,8 @@
 
                     $hasCartRoute = \Illuminate\Support\Facades\Route::has('customer.cart');
                     $cartLink = [
-                        'url' => $hasCartRoute ? route('customer.cart') : '#',
-                        'disabled' => !$hasCartRoute,
+                        'url' => '/order/addtocart',
+                        'disabled' => false,
                         'label' => 'My cart',
                     ];
                 @endphp
@@ -445,7 +445,7 @@
                         e.preventDefault();
 
                         if (await serverHasOrder()) {
-                            window.location.href = '/order/summary';
+                            window.location.href = '/order/addtocart';
                             return;
                         }
 
@@ -457,7 +457,7 @@
                         if (summary && (summary.productId || summary.product_id)) {
                             const created = await createOrderFromSummary(summary);
                             if (created) {
-                                window.location.href = '/order/summary';
+                                window.location.href = '/order/addtocart';
                                 return;
                             }
                         }
@@ -468,9 +468,9 @@
                             return;
                         }
 
-                        window.location.href = '/order/summary';
+                        window.location.href = '/order/addtocart';
                     } catch (err) {
-                        window.location.href = '/order/summary';
+                        window.location.href = '/order/addtocart';
                     }
                 });
             });

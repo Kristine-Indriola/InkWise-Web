@@ -319,9 +319,9 @@ class ProductController extends Controller
         } elseif ($request->input('template_id')) {
             // No custom image, use template image from Template
             $template = Template::find($request->input('template_id'));
-            if ($template && $template->front_image) {
+            if ($template && $template->preview) {
                 // Copy template image to products directory
-                $templatePath = $template->front_image;
+                $templatePath = $template->preview;
                 if (!preg_match('/^(https?:)?\/\//i', $templatePath) && !str_starts_with($templatePath, '/')) {
                     // It's a relative path in storage
                     $sourcePath = storage_path('app/public/' . $templatePath);

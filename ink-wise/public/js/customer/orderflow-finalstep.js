@@ -1,7 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
   const shell = document.querySelector('.finalstep-shell');
   const form = document.getElementById('finalOrderForm');
-  const quantitySelect = document.getElementById('quantitySelect');
+  const quantityInput = document.getElementById('quantityInput');
+  const priceDisplay = document.getElementById('priceDisplay');
   const paperStockIdInput = document.getElementById('paperStockId');
   const paperStockPriceInput = document.getElementById('paperStockPrice');
   const paperGrid = form?.querySelector('.paper-stocks-group .feature-grid.small');
@@ -350,8 +351,8 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const updateTotals = () => {
-    if (!quantitySelect) return;
-    const base = Number(quantitySelect.selectedOptions[0]?.dataset.price ?? 0);
+    if (!quantityInput) return;
+    const base = Number(priceDisplay?.textContent?.replace('₱', '') ?? 0);
     const paper = Number(paperStockPriceInput?.value ?? 0);
 
     const addonsFromInputs = addonCheckboxes
@@ -405,7 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  quantitySelect?.addEventListener('change', updateTotals);
+  quantityInput?.addEventListener('input', updateTotals);
 
   const paperCards = Array.from(document.querySelectorAll('.paper-stock-card'));
   paperCards.forEach((card) => {
@@ -472,12 +473,9 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    if (quantitySelect && summary.quantity) {
+    if (quantityInput && summary.quantity) {
       const desired = Number(summary.quantity);
-      const matchingOption = Array.from(quantitySelect.options).find((option) => Number(option.value) === desired);
-      if (matchingOption) {
-        quantitySelect.value = String(desired);
-      }
+      quantityInput.value = String(desired);
     }
 
     let paperMatched = false;
@@ -669,7 +667,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const summary = {
-      quantity: Number(quantitySelect?.value ?? 0),
+      quantity: Number(quantityInput?.value ?? 0),
+      estimated_date: document.getElementById('estimatedDate')?.value || null,
       paperStockId: paperStockIdInput?.value || null,
       paperStockPrice: roundCurrency(paperStockPriceValue),
       paperStockName,
@@ -754,11 +753,7 @@ document.addEventListener('DOMContentLoaded', () => {
       };
     }
 
-    const quantityOptionsSnapshot = Array.from(quantitySelect?.options ?? []).map((option) => ({
-      value: Number(option.value ?? option.dataset.value ?? 0),
-      label: option.textContent?.trim() ?? String(option.value ?? ''),
-      price: Number(option.dataset.price ?? 0)
-    })).filter((option) => Number.isFinite(option.value) && option.value > 0);
+    const quantityOptionsSnapshot = [];
     if (quantityOptionsSnapshot.length) {
       summary.quantityOptions = quantityOptionsSnapshot;
     }
@@ -780,10 +775,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    showToast('Added to cart — redirecting to envelope options...');
+    showToast('Added to cart — redirecting...');
 
     window.setTimeout(() => {
-      window.location.href = envelopeUrl;
+      window.location.href = '/order/addtocart';
     }, 600);
   });
 
