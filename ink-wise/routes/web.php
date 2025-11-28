@@ -499,6 +499,12 @@ Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->post(
 Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->post('/customer/orders/{order}/confirm-received', [CustomerProfileController::class, 'confirmReceived'])
     ->name('customer.orders.confirm_received');
 
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/customer/orders/{order}/details', [CustomerProfileController::class, 'showOrderDetails'])
+    ->name('customer.orders.details');
+
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/customer/orders/{order}/invoice', [CustomerProfileController::class, 'showInvoice'])
+    ->name('customer.orders.invoice');
+
 Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->post('/customer/order-ratings', [CustomerProfileController::class, 'storeRating'])
     ->name('customer.order-ratings.store');
 

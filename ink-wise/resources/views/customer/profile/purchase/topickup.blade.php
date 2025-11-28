@@ -73,6 +73,10 @@
                 $totalAmount = data_get($order, 'total_amount', 0);
                 $orderNumber = data_get($order, 'order_number', data_get($order, 'id'));
                 $confirmedDate = $formatDate(data_get($order, 'updated_at'));
+                $payments = collect($metadata['payments'] ?? []);
+                $paidAmount = $payments->filter(fn($payment) => ($payment['status'] ?? null) === 'paid')->sum(fn($payment) => (float)($payment['amount'] ?? 0));
+                $remainingBalance = max(($totalAmount ?? 0) - $paidAmount, 0);
+                $hasRemainingBalance = $remainingBalance > 0.01;
             @endphp
 
             <div class="bg-white border rounded-xl mb-4 shadow-sm">
@@ -123,9 +127,18 @@
                     <div class="text-sm text-gray-500 mb-2 md:mb-0">
                         Order Total: <span class="text-[#a6b7ff] font-bold text-lg">₱{{ number_format($totalAmount, 2) }}</span>
                     </div>
-                    <div class="flex gap-2">
-                        <button class="bg-[#a6b7ff] hover:bg-[#8b95e5] text-white px-6 py-2 rounded font-semibold transition-colors">View Details</button>
-                        <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white hover:bg-[#f0f4ff] transition-colors">Contact Shop</button>
+                    <div class="flex flex-col gap-3 md:flex-row md:items-center">
+                        <div class="flex gap-2">
+                            <a href="{{ route('customer.orders.details', ['order' => data_get($order, 'id')]) }}" class="bg-[#a6b7ff] hover:bg-[#8b95e5] text-white px-6 py-2 rounded font-semibold transition-colors">View Details</a>
+                            <button class="border border-[#a6b7ff] text-[#a6b7ff] px-5 py-2 rounded font-semibold bg-white hover:bg-[#f0f4ff] transition-colors">Contact Shop</button>
+                            @if($hasRemainingBalance)
+                                <a href="{{ route('customer.pay.remaining.balance', ['order' => data_get($order, 'id')]) }}" class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded font-semibold transition-colors">Pay Remaining Balance</a>
+                            @endif
+                        </div>
+                        <form action="{{ route('customer.orders.confirm_received', ['order' => data_get($order, 'id')]) }}" method="POST" class="md:ml-4">
+                            @csrf
+                            <button type="submit" class="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-semibold transition-colors" onclick="return confirm('Mark this order as completed?');">Order Picked Up</button>
+                        </form>
                     </div>
                 </div>
             </div>

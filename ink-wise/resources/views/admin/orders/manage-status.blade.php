@@ -612,6 +612,39 @@
     };
 
     $metadata = $normalizeToArray($metadata ?? []);
+    $statusFlow = array_values(array_filter(
+        $normalizeToArray($statusFlow ?? []),
+        function ($value) {
+            return is_string($value) && $value !== '';
+        }
+    ));
+
+    // Ensure "in_production" appears before "processing" for ordering-sensitive UI elements.
+    $processingIndex = array_search('processing', $statusFlow, true);
+    $productionIndex = array_search('in_production', $statusFlow, true);
+
+    if ($processingIndex !== false && $productionIndex !== false && $productionIndex > $processingIndex) {
+        $statusFlow[$processingIndex] = 'in_production';
+        $statusFlow[$productionIndex] = 'processing';
+    }
+
+    $statusOptions = $normalizeToArray($statusOptions ?? []);
+
+    if (!empty($statusFlow) && !empty($statusOptions)) {
+        $orderedOptions = [];
+        foreach ($statusFlow as $statusKey) {
+            if (array_key_exists($statusKey, $statusOptions)) {
+                $orderedOptions[$statusKey] = $statusOptions[$statusKey];
+            }
+        }
+        foreach ($statusOptions as $key => $label) {
+            if (!array_key_exists($key, $orderedOptions)) {
+                $orderedOptions[$key] = $label;
+            }
+        }
+        $statusOptions = $orderedOptions;
+    }
+
     $statusLabels = $statusOptions;
     $currentStatus = old('status', data_get($order, 'status', 'pending'));
     $flowIndex = array_search($currentStatus, $statusFlow, true);

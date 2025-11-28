@@ -12,6 +12,27 @@
             $paidAmount = $payments->filter(fn($payment) => ($payment['status'] ?? null) === 'paid')->sum(fn($payment) => (float)($payment['amount'] ?? 0));
             $remainingBalance = max(($order->total_amount ?? 0) - $paidAmount, 0);
         @endphp
+
+        <!-- Payment Steps -->
+        <div class="mb-8">
+            <div class="flex items-center justify-center space-x-4">
+                <div class="flex items-center">
+                    <div class="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center text-sm font-bold">1</div>
+                    <span class="ml-2 text-gray-600">Review Order</span>
+                </div>
+                <div class="w-8 h-1 bg-gray-300"></div>
+                <div class="flex items-center">
+                    <div class="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center text-sm font-bold">2</div>
+                    <span class="ml-2 text-gray-600">Payment Method</span>
+                </div>
+                <div class="w-8 h-1 bg-gray-300"></div>
+                <div class="flex items-center">
+                    <div class="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold">3</div>
+                    <span class="ml-2 text-gray-900 font-medium">Complete Payment</span>
+                </div>
+            </div>
+        </div>
+
         <!-- Header -->
         <div class="text-center mb-8">
             <h1 class="text-3xl font-bold text-gray-900 mb-2">Complete Your Payment</h1>
