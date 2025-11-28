@@ -36,6 +36,7 @@ class PaymentController extends Controller
     public function createGCashPayment(Request $request): JsonResponse
     {
         $validated = $request->validate([
+            'order_id' => ['nullable', 'integer'],
             'name' => ['nullable', 'string', 'max:120'],
             'email' => ['nullable', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:64'],
@@ -48,11 +49,21 @@ class PaymentController extends Controller
             ], 500);
         }
 
-        $order = $this->resolveCurrentOrder();
-        if (!$order) {
-            return response()->json([
-                'message' => 'We could not find an active order to charge.',
-            ], 404);
+        $orderId = $validated['order_id'] ?? null;
+        if ($orderId) {
+            $order = Order::find($orderId);
+            if (!$order || $order->customer_id !== Auth::user()->customer->customer_id) {
+                return response()->json([
+                    'message' => 'Order not found or does not belong to you.',
+                ], 404);
+            }
+        } else {
+            $order = $this->resolveCurrentOrder();
+            if (!$order) {
+                return response()->json([
+                    'message' => 'We could not find an active order to charge.',
+                ], 404);
+            }
         }
 
         $order->loadMissing('customerOrder');
@@ -355,6 +366,10 @@ class PaymentController extends Controller
 
         if ($resolvedBundle) {
             $options['verify'] = $resolvedBundle;
+        } else {
+            // Disable SSL verification if no CA bundle is available (development only)
+            $options['verify'] = false;
+            Log::warning('Disabling SSL verification for PayMongo API due to missing CA bundle.');
         }
 
         return Http::withOptions($options)->withHeaders([
@@ -592,7 +607,7 @@ class PaymentController extends Controller
             'payment_status' => $summary['balance'] <= 0 ? 'paid' : ($summary['total_paid'] > 0 ? 'partial' : $order->payment_status),
         ];
 
-        if (($summary['balance'] <= 0 || $summary['total_paid'] > 0) && $order->status !== 'completed') {
+        if (($summary['balance'] <= 0 || $summary['total_paid'] > 0) && $order->status !== 'completed' && $order->status !== 'confirmed') {
             $attributes['status'] = 'in_production';
         }
 

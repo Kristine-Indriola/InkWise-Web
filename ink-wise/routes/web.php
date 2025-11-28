@@ -17,9 +17,46 @@ use App\Http\Controllers\StaffAssignedController;
 use App\Http\Controllers\TemplateController;
 
 use App\Http\Controllers\Admin\InkController;
-use App\Http\Controllers\Owner\HomeController;
+use App\Http\Controllers\Owner\HomeContr    Route::pr    Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/', fn () => redirect()->route('owner.reports.sales'))->name('index');
+        Route::get('/sales', fn () => view('owner.reports.sales'))->name('sales');
+        Route::get('/inventory', fn () => view('owner.reports.inventory'))->name('inventory');
+    });
 
-use App\Http\Controllers\Owner\OwnerController;
+    Route::get('/materials/low-stock', [OwnerInventoryController::class, 'track'])
+    ->name('materials.lowStock')
+    ->defaults('status', 'low');
+
+    Route::get('/materials/out-stock', [OwnerInventoryController::class, 'track'])
+    ->name('materials.outStock')
+    ->defaults('status', 'out');
+
+    Route::get('/inventory-track', [OwnerInventoryController::class, 'inventoryTrack'])
+    ->name('inventory-track');ame('reports.')->group(function () {
+        Route::get('/', fn () => redirect()->route('owner.reports.sales'))->name('index');
+        Route::get('/sales', fn () => view('owner.reports.sales'))->name('sales');
+        Route::get('/inventory', fn () => view('owner.reports.inventory'))->name('inventory');
+    });
+
+    Route::get('/materials/low-stock', [OwnerInventoryController::class, 'track'])
+    ->name('materials.lowStock')
+    ->defaults('status', 'low');
+
+    Route::get('/materials/out-stock', [OwnerInventoryController::class, 'track'])
+    ->name('materials.outStock')
+    ->defaults('status', 'out');
+
+    Route::get('/inventory-track', [OwnerInventoryController::class, 'inventoryTrack'])
+    ->name('inventory-track');:get('/materials/low-stock', [OwnerInventoryController::class, 'track'])
+    ->name('materials.lowStock')
+    ->defaults('status', 'low');
+
+    Route::get('/materials/out-stock', [OwnerInventoryController::class, 'track'])
+    ->name('materials.outStock')
+    ->defaults('status', 'out');
+
+    Route::get('/inventory-track', [OwnerInventoryController::class, 'inventoryTrack'])
+    ->name('inventory-track');se App\Http\Controllers\Owner\OwnerController;
 use App\Http\Controllers\StaffProfileController;
 use App\Http\Controllers\VerificationController;
 use App\Http\Controllers\Admin\ProductController;
@@ -60,6 +97,7 @@ use App\Services\OrderFlowService;
 
 use App\Http\Controllers\Admin\UserPasswordResetController;
 use App\Models\User as AppUser;
+use App\Http\Controllers\FigmaController;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Http\Request;
 
@@ -159,7 +197,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::post('{id}/save-canvas', [AdminTemplateController::class, 'saveCanvas'])->name('saveCanvas');
         Route::post('{id}/save-template', [AdminTemplateController::class, 'saveTemplate'])->name('saveTemplate');
         Route::post('{id}/upload-preview', [AdminTemplateController::class, 'uploadPreview'])->name('uploadPreview');
-    Route::post('{id}/autosave', [AdminTemplateController::class, 'autosave'])->name('autosave');
+        Route::post('{id}/autosave', [AdminTemplateController::class, 'autosave'])->name('autosave');
         // Add new API routes
         Route::get('{id}/load-design', [AdminTemplateController::class, 'loadDesign'])->name('loadDesign');
         Route::delete('{id}/delete-element', [AdminTemplateController::class, 'deleteElement'])->name('deleteElement');
@@ -501,6 +539,12 @@ Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->post(
 Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->post('/customer/orders/{order}/confirm-received', [CustomerProfileController::class, 'confirmReceived'])
     ->name('customer.orders.confirm_received');
 
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/customer/orders/{order}/details', [CustomerProfileController::class, 'showOrderDetails'])
+    ->name('customer.orders.details');
+
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/customer/orders/{order}/invoice', [CustomerProfileController::class, 'showInvoice'])
+    ->name('customer.orders.invoice');
+
 Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->post('/customer/order-ratings', [CustomerProfileController::class, 'storeRating'])
     ->name('customer.order-ratings.store');
 
@@ -830,9 +874,11 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
 
   
 
-Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
+Route::prefix('staff')->name('staff.')->group(function () {
     // Staff routes - updated for order list functionality
     Route::get('/dashboard', [StaffDashboardController::class, 'index'])->name('dashboard');
+    // Temporarily comment out everything else to isolate the issue
+    /*
     Route::get('/assigned-orders', [StaffAssignedController::class, 'index'])->name('assigned.orders');
     Route::get('/order-list', [StaffOrderController::class, 'index'])->name('order_list.index');
     Route::get('/order-list/{id}', [StaffOrderController::class, 'show'])->name('order_list.show');
@@ -902,7 +948,7 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
         Route::post('{id}/save-canvas', [App\Http\Controllers\Admin\TemplateController::class, 'saveCanvas'])->name('saveCanvas');
         Route::post('{id}/save-template', [App\Http\Controllers\Admin\TemplateController::class, 'saveTemplate'])->name('saveTemplate');
         Route::post('{id}/upload-preview', [App\Http\Controllers\Admin\TemplateController::class, 'uploadPreview'])->name('uploadPreview');
-    Route::post('{id}/autosave', [App\Http\Controllers\Admin\TemplateController::class, 'autosave'])->name('autosave');
+        Route::post('{id}/autosave', [App\Http\Controllers\Admin\TemplateController::class, 'autosave'])->name('autosave');
         // Add new API routes
         Route::get('{id}/load-design', [App\Http\Controllers\Admin\TemplateController::class, 'loadDesign'])->name('loadDesign');
         Route::delete('{id}/delete-element', [App\Http\Controllers\Admin\TemplateController::class, 'deleteElement'])->name('deleteElement');
@@ -929,6 +975,7 @@ Route::middleware('auth')->prefix('staff')->name('staff.')->group(function () {
         Route::post('figma/preview', [\App\Http\Controllers\FigmaController::class, 'preview'])->name('figma.preview');
         Route::post('figma/import', [\App\Http\Controllers\FigmaController::class, 'import'])->name('figma.import');
     });
+    */
 });
 
 /*

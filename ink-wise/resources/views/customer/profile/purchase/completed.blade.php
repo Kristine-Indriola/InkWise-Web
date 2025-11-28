@@ -109,7 +109,7 @@
                 <div class="flex flex-col items-end gap-2">
                     <div class="text-gray-700 font-bold">₱{{ number_format($totalAmount, 2) }}</div>
                     <div class="flex gap-2">
-                        <a href="#" class="px-4 py-2 bg-[#e6f7fb] text-[#044e86] rounded font-semibold">View Invoice</a>
+                        <a href="{{ route('customer.orders.invoice', ['order' => $order->id]) }}" class="px-4 py-2 bg-[#e6f7fb] text-[#044e86] rounded font-semibold">View Invoice</a>
                         <a href="{{ $previewUrl }}" class="px-4 py-2 bg-white border text-[#044e86] rounded font-semibold">Order Again</a>
                         <a href="{{ $rateUrl }}" class="px-4 py-2 bg-[#ffdede] text-[#a80000] rounded font-semibold">Rate Inkwise</a>
                     </div>
