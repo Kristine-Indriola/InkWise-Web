@@ -2,9 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Address;
-use App\Models\Order;
-use App\Models\OrderRating;
+use App\Models\SiteSetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,6 +14,9 @@ use App\Models\PasswordChangeAttempt;
 use App\Mail\PasswordChangeVerification;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use App\Models\Address;
+use App\Models\Order;
+use App\Models\OrderRating;
 
 class CustomerProfileController extends Controller
 {
@@ -167,7 +168,7 @@ class CustomerProfileController extends Controller
             abort(403);
         }
 
-        $cancellableStatuses = ['pending', 'awaiting_payment', 'in_production', 'processing'];
+        $cancellableStatuses = ['pending', 'awaiting_payment', 'in_production'];
 
         if (!in_array($order->status, $cancellableStatuses, true)) {
             $errorMessage = 'Order can no longer be cancelled at this stage. Please contact InkWise support for assistance.';
@@ -198,7 +199,7 @@ class CustomerProfileController extends Controller
         $restockingFee = 0;
 
         // Apply restocking fee for orders in production
-        if (in_array($order->status, ['in_production', 'processing'], true) && $totalPaid > 0) {
+        if ($order->status === 'in_production' && $totalPaid > 0) {
             // 20% restocking fee for orders already in production
             $restockingFee = round($totalPaid * 0.20, 2);
             $metadata['restocking_fee'] = $restockingFee;
@@ -336,6 +337,98 @@ class CustomerProfileController extends Controller
         ]);
 
         return redirect()->back()->with('status', 'Thank you! The order is now marked as completed.');
+    }
+
+    public function showOrderDetails(Order $order)
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return redirect()->route('customer.login.form');
+        }
+
+        $customer = $user->customer;
+        if (!$customer) {
+            abort(403);
+        }
+
+        $ownsOrder = ((int) $order->customer_id === (int) $customer->customer_id)
+            || ((int) $order->user_id === (int) $user->id);
+
+        if (!$ownsOrder) {
+            abort(403);
+        }
+
+        // Load order with relationships
+        $order->load([
+            'items.product',
+            'items.paperStockSelection',
+            'payments',
+            'activities' => function($query) {
+                $query->orderBy('created_at', 'desc');
+            },
+            'rating'
+        ]);
+
+        $statusOptions = [
+            'pending' => 'Order Received',
+            'processing' => 'Processing',
+            'in_production' => 'In Production',
+            'confirmed' => 'Ready for Pickup',
+            'completed' => 'Completed',
+            'cancelled' => 'Cancelled',
+        ];
+
+        $statusFlow = ['pending', 'processing', 'in_production', 'confirmed', 'completed'];
+
+        return view('customer.profile.purchase.order_details', compact('order', 'statusOptions', 'statusFlow'));
+    }
+
+    public function showInvoice(Order $order)
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return redirect()->route('customer.login.form');
+        }
+
+        $customer = $user->customer;
+        if (!$customer) {
+            abort(403);
+        }
+
+        $ownsOrder = ((int) $order->customer_id === (int) $customer->customer_id)
+            || ((int) $order->user_id === (int) $user->id);
+
+        if (!$ownsOrder) {
+            abort(403);
+        }
+
+        // Load order with relationships
+        $order->load([
+            'items.product',
+            'items.paperStockSelection.paperStock',
+            'payments',
+            'activities' => function($query) {
+                $query->orderBy('created_at', 'desc');
+            },
+            'rating'
+        ]);
+
+        $statusOptions = [
+            'pending' => 'Order Received',
+            'processing' => 'Processing',
+            'in_production' => 'In Production',
+            'confirmed' => 'Ready for Pickup',
+            'completed' => 'Completed',
+            'cancelled' => 'Cancelled',
+        ];
+
+        $statusFlow = ['pending', 'processing', 'in_production', 'confirmed', 'completed'];
+
+        $settings = SiteSetting::current();
+
+        return view('customer.profile.purchase.invoice', compact('order', 'statusOptions', 'statusFlow', 'settings'));
     }
 
     public function rate()

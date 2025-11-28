@@ -1257,14 +1257,16 @@ class OrderFlowController extends Controller
         ];
 
         $order->update([
-            'status' => 'processing',
+            'status' => 'in_production',
             'payment_status' => 'paid',
             'metadata' => $metadata,
         ]);
 
         $this->updateSessionSummary($order);
 
-        return redirect()->route('customer.checkout')->with('status', 'Order marked as completed.');
+        return redirect()
+            ->route('customer.my_purchase.inproduction')
+            ->with('status', 'Thanks! Your order is now in production.');
     }
 
     public function cancelCheckout(): RedirectResponse
@@ -2017,7 +2019,7 @@ class OrderFlowController extends Controller
             ->with('status', 'Start a new invitation to continue through the order flow.');
     }
 
-    public function payRemainingBalance(Request $request, Order $order): ViewContract
+    public function payRemainingBalance(Request $request, Order $order): RedirectResponse|ViewContract
     {
         // Ensure the order belongs to the authenticated user
         if ($order->customer_id !== Auth::user()->customer_id) {
@@ -2025,7 +2027,7 @@ class OrderFlowController extends Controller
         }
 
         // Check if the order is in a state where remaining balance can be paid
-        if (!in_array($order->status, ['processing', 'confirmed'])) {
+        if (!in_array($order->status, ['processing', 'in_production', 'confirmed'], true)) {
             return redirect()->route('customer.checkout')->with('error', 'This order is not eligible for remaining balance payment.');
         }
 

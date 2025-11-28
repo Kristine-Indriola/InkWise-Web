@@ -41,7 +41,7 @@
         $ordersSource = $orders ?? optional(auth()->user())->customer->orders ?? [];
         $inProductionOrders = collect($ordersSource)->filter(function ($order) {
             $status = data_get($order, 'status', 'pending');
-            return $status === 'in_production';
+            return in_array($status, ['in_production', 'processing'], true);
         })->values();
     @endphp
 
@@ -64,6 +64,7 @@
                 $metadata = $normalizeMetadata(data_get($order, 'metadata', []));
                 $statusKey = data_get($order, 'status', 'pending');
                 $statusLabel = $statusOptions[$statusKey] ?? ucfirst(str_replace('_', ' ', $statusKey));
+                $customerCanCancel = $statusKey === 'in_production';
                 $flowIndex = array_search($statusKey, $statusFlow, true);
                 $nextStatusKey = $flowIndex !== false && $flowIndex < count($statusFlow) - 1 ? $statusFlow[$flowIndex + 1] : null;
                 $nextStatusLabel = $nextStatusKey ? ($statusOptions[$nextStatusKey] ?? ucfirst(str_replace('_', ' ', $nextStatusKey))) : null;
@@ -111,7 +112,11 @@
 
                         <button class="px-4 py-2 bg-[#a6b7ff] text-white rounded font-semibold">View Design Proof</button>
                         <button class="px-4 py-2 border border-[#a6b7ff] text-[#a6b7ff] rounded font-semibold">Message Inkwise</button>
+                        @if($customerCanCancel)
                         <button type="button" class="px-4 py-2 border border-red-500 text-red-500 hover:bg-red-50 rounded font-semibold js-cancel-production-order" data-order-id="{{ data_get($order, 'id') }}">Cancel Order</button>
+                        @else
+                        <button type="button" class="px-4 py-2 border border-gray-300 text-gray-400 rounded font-semibold cursor-not-allowed" disabled>Cancellation Locked</button>
+                        @endif
                     </div>
                 </div>
             </div>
