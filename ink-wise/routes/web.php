@@ -17,46 +17,8 @@ use App\Http\Controllers\StaffAssignedController;
 use App\Http\Controllers\TemplateController;
 
 use App\Http\Controllers\Admin\InkController;
-use App\Http\Controllers\Owner\HomeContr    Route::pr    Route::prefix('reports')->name('reports.')->group(function () {
-        Route::get('/', fn () => redirect()->route('owner.reports.sales'))->name('index');
-        Route::get('/sales', fn () => view('owner.reports.sales'))->name('sales');
-        Route::get('/inventory', fn () => view('owner.reports.inventory'))->name('inventory');
-    });
-
-    Route::get('/materials/low-stock', [OwnerInventoryController::class, 'track'])
-    ->name('materials.lowStock')
-    ->defaults('status', 'low');
-
-    Route::get('/materials/out-stock', [OwnerInventoryController::class, 'track'])
-    ->name('materials.outStock')
-    ->defaults('status', 'out');
-
-    Route::get('/inventory-track', [OwnerInventoryController::class, 'inventoryTrack'])
-    ->name('inventory-track');ame('reports.')->group(function () {
-        Route::get('/', fn () => redirect()->route('owner.reports.sales'))->name('index');
-        Route::get('/sales', fn () => view('owner.reports.sales'))->name('sales');
-        Route::get('/inventory', fn () => view('owner.reports.inventory'))->name('inventory');
-    });
-
-    Route::get('/materials/low-stock', [OwnerInventoryController::class, 'track'])
-    ->name('materials.lowStock')
-    ->defaults('status', 'low');
-
-    Route::get('/materials/out-stock', [OwnerInventoryController::class, 'track'])
-    ->name('materials.outStock')
-    ->defaults('status', 'out');
-
-    Route::get('/inventory-track', [OwnerInventoryController::class, 'inventoryTrack'])
-    ->name('inventory-track');:get('/materials/low-stock', [OwnerInventoryController::class, 'track'])
-    ->name('materials.lowStock')
-    ->defaults('status', 'low');
-
-    Route::get('/materials/out-stock', [OwnerInventoryController::class, 'track'])
-    ->name('materials.outStock')
-    ->defaults('status', 'out');
-
-    Route::get('/inventory-track', [OwnerInventoryController::class, 'inventoryTrack'])
-    ->name('inventory-track');se App\Http\Controllers\Owner\OwnerController;
+use App\Http\Controllers\Owner\HomeController;
+use App\Http\Controllers\Owner\OwnerController;
 use App\Http\Controllers\StaffProfileController;
 use App\Http\Controllers\VerificationController;
 use App\Http\Controllers\Admin\ProductController;
@@ -755,6 +717,7 @@ Route::post('/design/autosave', [OrderFlowController::class, 'autosaveDesign'])-
 /**Order Forms & Pages*/
 Route::get('/order/review', [OrderFlowController::class, 'review'])->name('order.review');
 Route::get('/order/finalstep', [OrderFlowController::class, 'finalStep'])->name('order.finalstep');
+Route::get('/order/addtocart', [OrderFlowController::class, 'addToCart'])->name('order.addtocart');
 Route::post('/order/finalstep/save', [OrderFlowController::class, 'saveFinalStep'])->name('order.finalstep.save');
 Route::get('/order/envelope', [OrderFlowController::class, 'envelope'])->name('order.envelope');
 Route::post('/order/envelope', [OrderFlowController::class, 'storeEnvelope'])->name('order.envelope.store');
@@ -877,8 +840,6 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
 Route::prefix('staff')->name('staff.')->group(function () {
     // Staff routes - updated for order list functionality
     Route::get('/dashboard', [StaffDashboardController::class, 'index'])->name('dashboard');
-    // Temporarily comment out everything else to isolate the issue
-    /*
     Route::get('/assigned-orders', [StaffAssignedController::class, 'index'])->name('assigned.orders');
     Route::get('/order-list', [StaffOrderController::class, 'index'])->name('order_list.index');
     Route::get('/order-list/{id}', [StaffOrderController::class, 'show'])->name('order_list.show');
@@ -975,7 +936,6 @@ Route::prefix('staff')->name('staff.')->group(function () {
         Route::post('figma/preview', [\App\Http\Controllers\FigmaController::class, 'preview'])->name('figma.preview');
         Route::post('figma/import', [\App\Http\Controllers\FigmaController::class, 'import'])->name('figma.import');
     });
-    */
 });
 
 /*

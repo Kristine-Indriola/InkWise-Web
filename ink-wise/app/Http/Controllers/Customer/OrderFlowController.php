@@ -279,7 +279,7 @@ class OrderFlowController extends Controller
                 ],
                 'placeholderItems' => $placeholderItems,
                 'continueHref' => route('order.finalstep'),
-                'editHref' => $product ? route('design.edit', ['product' => $product->id]) : route('design.edit'),
+                'editHref' => $product && $product->template ? route('design.studio', ['template' => $product->template->id]) : route('design.edit'),
                 'orderSummary' => $summary,
             ]);
         }
@@ -326,7 +326,55 @@ class OrderFlowController extends Controller
             ],
             'placeholderItems' => $placeholderItems,
             'continueHref' => route('order.finalstep'),
-            'editHref' => $product ? route('design.edit', ['product' => $product->id]) : route('design.edit'),
+            'editHref' => $product && $product->template ? route('design.studio', ['template' => $product->template->id]) : route('design.edit'),
+            'orderSummary' => session(static::SESSION_SUMMARY_KEY),
+        ]);
+    }
+
+    public function addToCart(Request $request): ViewContract
+    {
+        $order = $this->currentOrder();
+
+        // Session-only or product-preview path
+        if (!$order) {
+            $summary = session(static::SESSION_SUMMARY_KEY);
+            if (!$summary || empty($summary['productId'])) {
+                return $this->redirectToCatalog();
+            }
+
+            $product = $this->orderFlow->resolveProduct(null, $summary['productId']);
+            $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
+
+            return view('customer.orderflow.addtocart', [
+                'order' => null,
+                'product' => $product,
+                'finalArtworkFront' => $images['front'],
+                'finalArtworkBack' => $images['back'],
+                'finalArtwork' => [
+                    'front' => $images['front'],
+                    'back' => $images['back'],
+                ],
+                'envelopeUrl' => route('order.envelope'),
+                'orderSummary' => $summary,
+            ]);
+        }
+
+        $this->updateSessionSummary($order);
+
+        $item = $order->items->first();
+        $product = optional($item)->product;
+        $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
+
+        return view('customer.orderflow.addtocart', [
+            'order' => $order,
+            'product' => $product,
+            'finalArtworkFront' => $images['front'],
+            'finalArtworkBack' => $images['back'],
+            'finalArtwork' => [
+                'front' => $images['front'],
+                'back' => $images['back'],
+            ],
+            'envelopeUrl' => route('order.envelope'),
             'orderSummary' => session(static::SESSION_SUMMARY_KEY),
         ]);
     }
@@ -369,13 +417,18 @@ class OrderFlowController extends Controller
             }
 
             $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
-            $selectedQuantity = $summary['quantity'] ?? null;
+            $selectedQuantity = $summary['quantity'] ?? $request->input('quantity') ?? null;
             $selectedPaperStockId = $summary['paperStockId'] ?? null;
             $selectedAddonIds = $summary['addonIds'] ?? [];
 
             $quantityOptions = $this->orderFlow->buildQuantityOptions($product, $selectedQuantity);
             $paperStockOptions = $this->orderFlow->buildPaperStockOptions($product, $selectedPaperStockId);
             $addonGroups = $this->orderFlow->buildAddonGroups($product, $selectedAddonIds);
+
+            // Calculate quantity limits from bulk orders
+            $bulkOrders = $product->bulkOrders ?? collect();
+            $minQty = $bulkOrders->pluck('min_qty')->filter()->min() ?? 20;
+            $maxQty = $bulkOrders->pluck('max_qty')->filter()->max();
 
             $orderPlaceholder = (object) ['items' => collect()];
 
@@ -389,7 +442,14 @@ class OrderFlowController extends Controller
                 'quantityOptions' => $quantityOptions,
                 'paperStocks' => $paperStockOptions,
                 'addonGroups' => $addonGroups,
+                'bulkOrders' => $bulkOrders,
+                'basePrice' => $this->orderFlow->unitPriceFor($product),
+                'minQty' => $minQty,
+                'maxQty' => $maxQty,
                 'estimatedDeliveryDate' => Carbon::now()->addWeekdays(5)->format('F j, Y'),
+                'estimatedDeliveryDateFormatted' => Carbon::now()->addWeekdays(5)->format('Y-m-d'),
+                'estimatedDeliveryMinDate' => Carbon::now()->addWeekdays(5)->subDays(2)->format('Y-m-d'),
+                'estimatedDeliveryMaxDate' => Carbon::now()->addWeekdays(5)->format('Y-m-d'),
                 'orderSummary' => $summary,
             ]);
         }
@@ -420,6 +480,11 @@ class OrderFlowController extends Controller
         $paperStockOptions = $this->orderFlow->buildPaperStockOptions($product, $selectedPaperStockId);
         $addonGroups = $this->orderFlow->buildAddonGroups($product, $selectedAddonIds);
 
+        // Calculate quantity limits from bulk orders
+        $bulkOrders = $product->bulkOrders ?? collect();
+        $minQty = $bulkOrders->pluck('min_qty')->filter()->min() ?? 20;
+        $maxQty = $bulkOrders->pluck('max_qty')->filter()->max();
+
         return view('customer.orderflow.finalstep', [
             'order' => $order,
             'product' => $product,
@@ -430,7 +495,14 @@ class OrderFlowController extends Controller
             'quantityOptions' => $quantityOptions,
             'paperStocks' => $paperStockOptions,
             'addonGroups' => $addonGroups,
+            'bulkOrders' => $bulkOrders,
+            'basePrice' => $this->orderFlow->unitPriceFor($product),
+            'minQty' => $minQty,
+            'maxQty' => $maxQty,
             'estimatedDeliveryDate' => Carbon::now()->addWeekdays(5)->format('F j, Y'),
+            'estimatedDeliveryDateFormatted' => Carbon::now()->addWeekdays(5)->format('Y-m-d'),
+            'estimatedDeliveryMinDate' => Carbon::now()->addWeekdays(5)->subDays(2)->format('Y-m-d'),
+            'estimatedDeliveryMaxDate' => Carbon::now()->addWeekdays(5)->format('Y-m-d'),
             'orderSummary' => session(static::SESSION_SUMMARY_KEY),
         ]);
     }

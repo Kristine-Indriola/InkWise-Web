@@ -864,7 +864,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const cart = document.createElement('a');
             cart.className = 'nav-icon-button';
-            cart.setAttribute('href', '#');
+            cart.setAttribute('href', '/order/addtocart');
             cart.setAttribute('aria-label', 'My cart');
             cart.setAttribute('title', 'My cart');
             cart.innerHTML = '<i class="bi bi-bag-heart-fill" aria-hidden="true"></i>';
@@ -892,7 +892,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     } catch (e) { /* ignore */ }
 
-    // Attach behavior: check server order, create from sessionStorage if missing, then redirect to /order/summary
+    // Attach behavior: check server order, create from sessionStorage if missing, then redirect to /order/addtocart
     const storageKey = 'inkwise-finalstep';
     const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
     const icons = Array.from(document.querySelectorAll('.nav-icon-button'));
@@ -945,16 +945,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
             try {
                 e.preventDefault();
-                if (await serverHasOrder()) { window.location.href = '/order/summary'; return; }
+                if (await serverHasOrder()) { window.location.href = '/order/addtocart'; return; }
                 let raw = null; try { raw = window.sessionStorage.getItem(storageKey); } catch (err) { raw = null; }
                 let summary = null; try { summary = raw ? JSON.parse(raw) : null; } catch (err) { summary = null; }
                 if (summary && (summary.productId || summary.product_id)) {
                     const created = await createOrderFromSummary(summary);
-                    if (created) { window.location.href = '/order/summary'; return; }
+                    if (created) { window.location.href = '/order/addtocart'; return; }
                 }
                 const href = icon.getAttribute('href');
                 if (href && href !== '#') { window.location.href = href; return; }
-                window.location.href = '/order/summary';
+                window.location.href = '/order/addtocart';
             } catch (err) { window.location.href = '/order/summary'; }
         });
     });

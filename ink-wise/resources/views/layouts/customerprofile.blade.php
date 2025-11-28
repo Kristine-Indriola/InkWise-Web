@@ -93,10 +93,9 @@
             'label' => 'My favorites',
           ];
 
-          $hasCartRoute = \Illuminate\Support\Facades\Route::has('customer.cart');
           $cartLink = [
-            'url' => $hasCartRoute ? route('customer.cart') : '#',
-            'disabled' => !$hasCartRoute,
+            'url' => '/order/addtocart',
+            'disabled' => false,
             'label' => 'My cart',
           ];
         @endphp
@@ -196,10 +195,10 @@ document.addEventListener('DOMContentLoaded', function () {
           window.location.href = href;
           return;
         }
-        // Default: navigate to order summary page (no POST)
-        window.location.href = '/order/summary';
+        // Default: navigate to order addtocart page (no POST)
+        window.location.href = '/order/addtocart';
       } catch (err) {
-        window.location.href = '/order/summary';
+        window.location.href = '/order/addtocart';
       }
     });
   });

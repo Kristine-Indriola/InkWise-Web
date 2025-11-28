@@ -9,7 +9,44 @@
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 	<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 	<link rel="stylesheet" href="{{ asset('css/customer/orderflow-finalstep.css') }}">
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+	<style>
+		.flatpickr-calendar {
+			background: white;
+			box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+		}
+		.flatpickr-day {
+			color: black !important;
+		}
+		.flatpickr-day:hover {
+			background: #e0f2fe;
+		}
+		.flatpickr-day.selected {
+			background: #4f46e5;
+			color: white !important;
+		}
+		.flatpickr-months .flatpickr-month {
+			color: black;
+		}
+		.flatpickr-weekday {
+			color: #6b7280;
+		}
+	</style>
 	<script src="{{ asset('js/customer/orderflow-finalstep.js') }}" defer></script>
+	<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+	<script>
+		document.addEventListener('DOMContentLoaded', () => {
+			const dateInput = document.getElementById('estimatedDate');
+			if (dateInput) {
+				flatpickr(dateInput, {
+					dateFormat: 'Y-m-d',
+					minDate: '{{ $estimatedDeliveryMinDate }}',
+					maxDate: '{{ $estimatedDeliveryMaxDate }}',
+					defaultDate: '{{ $estimatedDeliveryDateFormatted }}'
+				});
+			}
+		});
+	</script>
 </head>
 <body data-product-id="{{ $product->id ?? '' }}">
 @php
@@ -246,18 +283,15 @@
 				<form id="finalOrderForm" class="finalstep-form" novalidate>
 					<div class="form-fixed-section">
 						<div class="form-group">
-							<label for="quantitySelect">Quantity (bulk — in tens)</label>
-							<select id="quantitySelect" name="quantity" required>
-								@foreach ($quantityOptions as $option)
-									<option
-										value="{{ $option->value }}"
-										data-price="{{ $option->price }}"
-										{{ $selectedQuantity && (string) $selectedQuantity === (string) $option->value ? 'selected' : '' }}
-									>
-										{{ $option->label }} — ₱{{ number_format($option->price, 2) }}
-									</option>
-								@endforeach
-							</select>
+							<label for="quantityInput">Quantity</label>
+							<div class="quantity-price-row">
+								<input type="number" id="quantityInput" name="quantity" value="{{ $selectedQuantity ?? $minQty }}" min="{{ $minQty }}" {{ $maxQty ? 'max="' . $maxQty . '"' : '' }} required>
+								<div class="price-display">
+									<span class="meta-label">Price:</span>
+									<span id="priceDisplay" class="meta-value">₱0.00</span>
+								</div>
+							</div>
+							<div id="quantityError" class="error-message" style="display: none;">Quantity must be at least {{ $minQty }}</div>
 							<p class="bulk-note">{{ $quantityNote }}</p>
 						</div>
 					</div>
@@ -347,11 +381,14 @@
 						</div>
 
 						<div class="delivery-info">
-							<span class="meta-label">Estimated delivery</span>
-							<span class="meta-value">{{ $estimatedDeliveryDate }}</span>
+							<label for="estimatedDate" class="meta-label">Estimated day</label>
+							<input type="date" id="estimatedDate" name="estimated_date" value="{{ $estimatedDeliveryDateFormatted }}" required>
 						</div>
 
-						<button type="button" id="addToCartBtn" class="primary-action" data-envelope-url="{{ $envelopeUrl }}">Add to cart</button>
+						<div class="action-buttons">
+							<button type="button" id="addToCartBtn" class="primary-action">Add to cart</button>
+							<a href="{{ $envelopeUrl }}" class="secondary-action">Continue to checkout</a>
+						</div>
 					</div>
 				</form>
 			</div>
@@ -368,5 +405,45 @@
 		});
 	</script>
 @endif
+<script>
+	document.addEventListener('DOMContentLoaded', () => {
+		const quantityInput = document.getElementById('quantityInput');
+		const priceDisplay = document.getElementById('priceDisplay');
+		const quantityError = document.getElementById('quantityError');
+		const bulkOrders = {!! $bulkOrders->toJson() !!};
+		const basePrice = {{ $basePrice }};
+		const minQty = {{ $minQty }};
+
+		function calculatePrice(quantity) {
+			if (!quantity || quantity < minQty) return 0;
+
+			let unitPrice = basePrice;
+			for (const tier of bulkOrders) {
+				const min = tier.min_qty || 0;
+				const max = tier.max_qty || Infinity;
+				if (quantity >= min && quantity <= max && tier.price_per_unit) {
+					unitPrice = parseFloat(tier.price_per_unit);
+					break;
+				}
+			}
+			return Math.round(quantity * unitPrice * 100) / 100;
+		}
+
+		function updatePrice() {
+			const quantity = parseInt(quantityInput.value) || 0;
+			const price = calculatePrice(quantity);
+			priceDisplay.textContent = '₱' + price.toFixed(2);
+			if (quantity < minQty) {
+				quantityError.style.display = 'block';
+			} else {
+				quantityError.style.display = 'none';
+			}
+		}
+
+		quantityInput.addEventListener('input', updatePrice);
+		// Initial update
+		updatePrice();
+	});
+</script>
 </body>
 </html>

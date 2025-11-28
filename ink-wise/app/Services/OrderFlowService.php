@@ -1102,6 +1102,46 @@ class OrderFlowService
         return $options->values()->all();
     }
 
+    public function getQuantityLimits(?Product $product): array
+    {
+        if (!$product || $product->bulkOrders->isEmpty()) {
+            return ['min' => 10, 'max' => 200];
+        }
+
+        $bulkOrders = $product->bulkOrders->sortBy('min_qty')->values();
+
+        $startQty = $bulkOrders
+            ->pluck('min_qty')
+            ->filter(fn ($qty) => $qty !== null && $qty > 0)
+            ->min();
+
+        $startQty = $startQty ? (int) ceil($startQty / 10) * 10 : 10;
+        $startQty = max(10, $startQty);
+
+        $maxQty = $bulkOrders
+            ->map(function ($tier) {
+                if ($tier->max_qty !== null && $tier->max_qty > 0) {
+                    return (int) $tier->max_qty;
+                }
+
+                if ($tier->min_qty !== null && $tier->min_qty > 0) {
+                    return (int) $tier->min_qty;
+                }
+
+                return null;
+            })
+            ->filter()
+            ->max();
+
+        if (!$maxQty || $maxQty < $startQty) {
+            $maxQty = $startQty;
+        }
+
+        $maxQty = (int) ceil($maxQty / 10) * 10;
+
+        return ['min' => $startQty, 'max' => $maxQty];
+    }
+
     public function buildPaperStockOptions(?Product $product, $selectedId = null): array
     {
         if (!$product) {
