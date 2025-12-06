@@ -356,6 +356,31 @@ export function initializeCustomerStudioLegacy() {
     let backgroundSelected = false;
     let activeCropSession = null;
 
+    const sideIsAvailable = (side) => {
+      if (!side || side === 'front') {
+        return true;
+      }
+
+      if (side !== 'back') {
+        return true;
+      }
+
+      if (!cardBg) {
+        return false;
+      }
+
+      if (uploadedBackImage) {
+        return true;
+      }
+
+      const dataset = cardBg.dataset || {};
+      if (dataset.hasBack === 'true') {
+        return true;
+      }
+
+      return Boolean(dataset.backImage || dataset.backSvg);
+    };
+
     const collectDesignSnapshot = () => {
       if (!cardBg) {
         return null;
@@ -1063,8 +1088,22 @@ export function initializeCustomerStudioLegacy() {
       }
     };
 
+    const hasTemplateCanvas = () => {
+      return Boolean(
+        templateCanvasPreference
+        && Number.isFinite(templateCanvasPreference.width)
+        && templateCanvasPreference.width > 0
+        && Number.isFinite(templateCanvasPreference.height)
+        && templateCanvasPreference.height > 0
+      );
+    };
+
     const loadRasterDimensions = (source) => {
       if (!source) {
+        return;
+      }
+
+      if (hasTemplateCanvas()) {
         return;
       }
 
@@ -3911,6 +3950,9 @@ export function initializeCustomerStudioLegacy() {
     openTextModalAndFocusRef = openTextModalAndFocus;
 
     const setActiveCard = async (side) => {
+      if (!sideIsAvailable(side)) {
+        return;
+      }
       currentSide = side;
       if (!cardBg) {
         return;
@@ -3950,9 +3992,9 @@ export function initializeCustomerStudioLegacy() {
         }
         hideSvgPreview();
         cardBg.style.backgroundImage = rasterSource ? `url('${rasterSource}')` : '';
-        cardBg.style.backgroundSize = '';
-        cardBg.style.backgroundPosition = '';
-        cardBg.style.backgroundRepeat = '';
+        cardBg.style.backgroundSize = rasterSource ? 'cover' : '';
+        cardBg.style.backgroundPosition = rasterSource ? 'center center' : '';
+        cardBg.style.backgroundRepeat = rasterSource ? 'no-repeat' : '';
         if (rasterSource) {
           loadRasterDimensions(rasterSource);
         }

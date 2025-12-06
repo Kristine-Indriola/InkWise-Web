@@ -648,6 +648,13 @@ body {
     background-size: contain;
 }
 
+/* Ensure template SVG text is visible regardless of inherited theme colors */
+.preview-card-bg svg text,
+.preview-card-bg svg tspan {
+    fill: #000 !important;
+    stroke: none;
+}
+
 .canvas-overlay-layer {
     position: absolute;
     inset: 0;

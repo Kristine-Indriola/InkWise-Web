@@ -25,6 +25,9 @@ class Template extends Model
         'svg_path',
         'back_svg_path',
         'preview',
+        'preview_front',
+        'preview_back',
+        'has_back_design',
         'processed_at',
     ];
 
@@ -33,6 +36,7 @@ class Template extends Model
         'design' => 'array',
         'processed_at' => 'datetime',
         'status_updated_at' => 'datetime',
+        'has_back_design' => 'boolean',
     ];
 
     public function products()

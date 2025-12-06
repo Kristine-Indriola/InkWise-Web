@@ -137,6 +137,23 @@
     $frontSvg = $resolveImage($templateModel?->svg_path ?? null, null);
     $backSvg = $resolveImage($templateModel?->back_svg_path ?? null, null);
 
+    $hasBackSide = false;
+    if ($templateModel) {
+        $hasBackSide = (bool) (
+            ($templateModel->has_back_design ?? false)
+            || !empty($templateBack)
+            || !empty($templateModel->back_image)
+            || !empty($backSvg)
+        );
+    }
+
+    if (!$hasBackSide) {
+        $productBack = data_get($product, 'images.back');
+        if (!empty($productBack)) {
+            $hasBackSide = true;
+        }
+    }
+
     $frontRasterCandidates = [
         $templateFront,
         $product?->images?->front,
@@ -147,7 +164,6 @@
     $backRasterCandidates = [
         $templateBack,
         $product?->images?->back,
-        $product?->image,
     ];
 
     $pickFirst = static function (array $candidates) {
@@ -170,29 +186,37 @@
     };
 
     $frontSource = $pickFirst($frontRasterCandidates);
-    $backSource = $pickFirst($backRasterCandidates);
+    $backSource = $hasBackSide ? $pickFirst($backRasterCandidates) : null;
 
     $frontImage = is_string($frontSource) && str_starts_with($frontSource, 'data:')
         ? $frontSource
         : $resolveImage($frontSource, $defaultFront);
 
-    $backImage = is_string($backSource) && str_starts_with($backSource, 'data:')
-        ? $backSource
-        : $resolveImage($backSource, $defaultBack);
+    $backImage = null;
+    if ($hasBackSide) {
+        $backImage = is_string($backSource) && str_starts_with($backSource, 'data:')
+            ? $backSource
+            : $resolveImage($backSource, $defaultBack);
+        $backImage = $backImage ?: $defaultBack;
+    }
 
     $frontImage = $frontImage ?: $defaultFront;
-    $backImage = $backImage ?: ($frontImage ?: $defaultBack);
 
     $templateBootstrap = null;
     if ($templateModel) {
         $templateBootstrap = [
             'id' => $templateModel->id,
             'name' => $templateModel->name,
+            'has_back_design' => $hasBackSide,
             'svg_path' => $templateModel->svg_path ? \App\Support\ImageResolver::url($templateModel->svg_path) : null,
+            'back_svg_path' => $hasBackSide && $templateModel->back_svg_path ? \App\Support\ImageResolver::url($templateModel->back_svg_path) : null,
             'svg_source' => $templateModel->svg_path,
+            'back_svg_source' => $hasBackSide ? $templateModel->back_svg_path : null,
             'preview' => $templateModel->preview ? \App\Support\ImageResolver::url($templateModel->preview) : null,
+            'preview_front' => $templateModel->preview_front ? \App\Support\ImageResolver::url($templateModel->preview_front) : null,
+            'preview_back' => $hasBackSide && $templateModel->preview_back ? \App\Support\ImageResolver::url($templateModel->preview_back) : null,
             'front_image' => $templateModel->front_image ? \App\Support\ImageResolver::url($templateModel->front_image) : null,
-            'back_image' => $templateModel->back_image ? \App\Support\ImageResolver::url($templateModel->back_image) : null,
+            'back_image' => $hasBackSide && $templateModel->back_image ? \App\Support\ImageResolver::url($templateModel->back_image) : null,
             'updated_at' => optional($templateModel->updated_at)->toIso8601String(),
             'canvas' => $templateCanvas,
         ];
@@ -308,10 +332,17 @@
                 >
                     <div
                         class="preview-card-bg"
+                        data-has-back="{{ $hasBackSide ? 'true' : 'false' }}"
                         data-front-image="{{ $frontImage }}"
+                        @if($hasBackSide && $backImage)
                         data-back-image="{{ $backImage }}"
+                        @endif
+                        @if($frontSvg)
                         data-front-svg="{{ $frontSvg }}"
+                        @endif
+                        @if($hasBackSide && $backSvg)
                         data-back-svg="{{ $backSvg }}"
+                        @endif
                         style="background-image: url('{{ $frontImage }}');"
                         @if($canvasWidthAttr !== null) data-canvas-width="{{ $canvasWidthAttr }}" @endif
                         @if($canvasHeightAttr !== null) data-canvas-height="{{ $canvasHeightAttr }}" @endif
@@ -348,14 +379,14 @@
         </div>
         <div class="preview-thumbs" role="tablist" aria-label="Card sides">
             <button type="button" class="preview-thumb active" data-card-thumb="front" aria-pressed="true">
-                <div class="thumb-preview">
+                <div class="thumb-preview" @if($frontImage) style="background-image: url('{{ $frontImage }}');" @endif>
                     <span class="thumb-placeholder">Front</span>
                 </div>
                 <span class="thumb-label">Front</span>
             </button>
-            @if($backSource)
+            @if($hasBackSide)
             <button type="button" class="preview-thumb" data-card-thumb="back" aria-pressed="false">
-                <div class="thumb-preview">
+                <div class="thumb-preview" @if($backImage) style="background-image: url('{{ $backImage }}');" @endif>
                     <span class="thumb-placeholder">Back</span>
                 </div>
                 <span class="thumb-label">Back</span>
