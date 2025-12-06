@@ -643,7 +643,35 @@
         </div>
         <div class="profile-dropdown" style="position: relative; display:flex; align-items:center; gap:6px;">
           <a href="{{ route('staff.profile.edit') }}" id="profileImageLink" style="display:flex; align-items:center; text-decoration:none; color:inherit;">
-            <img src="{{ asset('staffimage/FRECHY.jpg') }}" alt="Staff Profile" style="border-radius:50%; width:36px; height:36px; border:2px solid #6a2ebc; object-fit:cover;">
+            @php
+              $currentUser = Auth::user();
+              $profilePicUrl = null;
+              if ($currentUser && $currentUser->staff && $currentUser->staff->profile_pic) {
+                $profilePicUrl = asset('storage/' . $currentUser->staff->profile_pic);
+              } else {
+                // Generate initials for fallback using separate name components
+                $staff = $currentUser ? $currentUser->staff : null;
+                if ($staff && $staff->first_name) {
+                  $first = $staff->first_name;
+                  $last = $staff->last_name ?? '';
+                  $initials = strtoupper(substr($first, 0, 1) . substr($last, 0, 1));
+                } else {
+                  // Fallback to splitting full name if separate components not available
+                  $name = $currentUser ? $currentUser->name : 'Staff';
+                  $parts = preg_split('/\s+/', trim($name));
+                  $first = $parts[0] ?? '';
+                  $second = $parts[1] ?? '';
+                  $initials = strtoupper(substr($first, 0, 1) . ($second ? substr($second, 0, 1) : ''));
+                }
+              }
+            @endphp
+            @if($profilePicUrl)
+              <img src="{{ $profilePicUrl }}" alt="Staff Profile" style="border-radius:50%; width:36px; height:36px; border:2px solid #6a2ebc; object-fit:cover;">
+            @else
+              <div style="border-radius:50%; width:36px; height:36px; border:2px solid #6a2ebc; background: linear-gradient(135deg, #acd9b5, #6f94d6); display:flex; align-items:center; justify-content:center; color:white; font-weight:bold; font-size:14px;">
+                {{ $initials ?? 'ST' }}
+              </div>
+            @endif
           </a>
           <span id="profileDropdownToggle" style="cursor:pointer; display:inline-flex; align-items:center; margin-left:6px;">
             <i class="fi fi-rr-angle-small-down" style="font-size:18px;"></i>
