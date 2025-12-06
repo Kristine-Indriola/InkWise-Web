@@ -4,11 +4,11 @@
 @php
     // Get current admin user with staff relationship for profile image
     $currentAdmin = Auth::user();
+    $adminAbbr = '';
     if ($currentAdmin && $currentAdmin->role === 'admin') {
         $currentAdmin->load('staff');
 
         // Generate initials for fallback avatar
-        $adminAbbr = '';
         if ($currentAdmin->staff && $currentAdmin->staff->first_name) {
             $first = $currentAdmin->staff->first_name;
             $last = $currentAdmin->staff->last_name ?? '';
