@@ -9,7 +9,20 @@ class TransactionPresenter
 {
     public const STATUS_GROUPS = [
         'paid' => ['paid', 'complete', 'completed', 'settled'],
-        'pending' => ['pending', 'processing', 'unpaid', 'awaiting', 'awaiting payment'],
+        'pending' => [
+            'pending',
+            'pending payment',
+            'pending_payment',
+            'pending-payment',
+            'payment pending',
+            'processing',
+            'processing payment',
+            'unpaid',
+            'awaiting',
+            'awaiting payment',
+            'awaiting confirmation',
+            'awaiting_confirmation',
+        ],
         'failed' => ['failed', 'cancelled', 'canceled', 'refunded', 'void', 'declined'],
     ];
 

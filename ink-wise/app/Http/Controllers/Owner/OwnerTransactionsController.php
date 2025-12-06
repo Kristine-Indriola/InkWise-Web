@@ -9,6 +9,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -20,6 +21,8 @@ class OwnerTransactionsController extends Controller
 
         $transactionsQuery = $this->buildTransactionsQuery($request, $statusGroups);
 
+        $summary = $this->buildSummary(clone $transactionsQuery, $statusGroups);
+
         $transactions = $transactionsQuery
             ->orderByDesc('recorded_at')
             ->orderByDesc('created_at')
@@ -27,7 +30,6 @@ class OwnerTransactionsController extends Controller
             ->withQueryString();
 
         $transformedRows = $this->transformForView($transactions);
-        $summary = $this->buildSummary($statusGroups);
 
         return view('owner.transactions-view', [
             'transactions' => $transactions,
@@ -103,12 +105,9 @@ class OwnerTransactionsController extends Controller
                 ->values()
                 ->all();
 
-            $query->where(function ($statusQuery) use ($allowedStatuses) {
-                foreach ($allowedStatuses as $index => $value) {
-                    $method = $index === 0 ? 'whereRaw' : 'orWhereRaw';
-                    $statusQuery->{$method}('LOWER(status) = ?', [$value]);
-                }
-            });
+            if (!empty($allowedStatuses)) {
+                $query->whereIn(DB::raw('LOWER(status)'), $allowedStatuses);
+            }
         }
 
         if ($search !== '') {
@@ -187,27 +186,35 @@ class OwnerTransactionsController extends Controller
         };
     }
 
-    protected function buildSummary(array $statusGroups): array
+    protected function buildSummary(Builder $query, array $statusGroups): array
     {
-        $statusCase = static function (array $values): string {
-            return collect($values)
-                ->map(fn ($value) => "'" . Str::lower($value) . "'")
-                ->implode(', ');
-        };
+        $normalizeStatuses = static fn (array $values) => collect($values)
+            ->map(fn ($value) => Str::lower($value))
+            ->unique()
+            ->values()
+            ->all();
 
-        $summary = Payment::query()->selectRaw(<<<SQL
-            COUNT(*) as total_transactions,
-            COALESCE(SUM(amount), 0) as total_amount,
-            SUM(CASE WHEN LOWER(status) IN ({$statusCase($statusGroups['paid'])}) THEN 1 ELSE 0 END) as paid_count,
-            SUM(CASE WHEN LOWER(status) IN ({$statusCase($statusGroups['pending'])}) THEN 1 ELSE 0 END) as pending_count
-        SQL)->first();
+        $totalTransactions = (clone $query)->count();
+        $totalAmount = (clone $query)->sum('amount');
+
+        $paidCount = $this->countByStatuses(clone $query, $normalizeStatuses($statusGroups['paid'] ?? []));
+        $pendingCount = $this->countByStatuses(clone $query, $normalizeStatuses($statusGroups['pending'] ?? []));
 
         return [
-            'total_transactions' => (int) ($summary->total_transactions ?? 0),
-            'total_amount' => (float) ($summary->total_amount ?? 0),
-            'paid_count' => (int) ($summary->paid_count ?? 0),
-            'pending_count' => (int) ($summary->pending_count ?? 0),
+            'total_transactions' => (int) $totalTransactions,
+            'total_amount' => (float) $totalAmount,
+            'paid_count' => (int) $paidCount,
+            'pending_count' => (int) $pendingCount,
         ];
+    }
+
+    protected function countByStatuses(Builder $query, array $statuses): int
+    {
+        if (empty($statuses)) {
+            return 0;
+        }
+
+        return (clone $query)->whereIn(DB::raw('LOWER(status)'), $statuses)->count();
     }
 
     protected function transformForView(LengthAwarePaginator $paginator): Collection

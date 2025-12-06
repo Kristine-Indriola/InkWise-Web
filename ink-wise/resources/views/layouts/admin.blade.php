@@ -864,7 +864,7 @@ body.dark-mode .btn-warning {
           <li class="{{ request()->routeIs('admin.chatbot.index') ? 'active' : '' }}">
   <a href="{{ route('admin.chatbot.index') }}">
     <i class="fi fi-rr-comment-dots"></i>
-    <span class="label">Chatbot</span>
+    <span class="label">FAQ's</span>
   </a>
 </li>
 
