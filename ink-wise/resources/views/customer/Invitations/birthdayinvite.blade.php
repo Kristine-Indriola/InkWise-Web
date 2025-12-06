@@ -454,50 +454,179 @@
 @section('content')
 @php
     $birthdayTemplates = [
-        [
-            'id' => 'birthday-minimal-18th',
-            'name' => 'Pink & Black Minimal 18th Birthday Invitation',
-            'theme' => 'Modern glam',
-            'label' => 'Birthday',
-            'price' => null,
-            'image' => asset('customerimages/invite/birthday1.png'),
-            'video' => asset('customerVideo/birthday/birthday1.mp4'),
-            'swatches' => [
-                ['color' => '#fbcfe8', 'video' => asset('customerVideo/birthday/birthday1.mp4'), 'image' => asset('customerimages/invite/birthday1.png')],
-                ['color' => '#e9d5ff', 'video' => asset('customerVideo/birthday/birthday2.mp4'), 'image' => asset('customerimages/invite/birthday1-front.png')],
-                ['color' => '#c026d3', 'video' => asset('customerVideo/birthday/birthday3.mp4'), 'image' => asset('customerimages/invite/birthday1-back.png')],
-            ],
-        ],
-        [
-            'id' => 'birthday-watercolor',
-            'name' => 'Pink & White Watercolor Party Invitation',
-            'theme' => 'Whimsical florals',
-            'label' => 'Birthday',
-            'price' => null,
-            'image' => asset('customerimages/invite/birthday2.png'),
-            'video' => asset('customerVideo/birthday/birthday4.mp4'),
-            'swatches' => [
-                ['color' => '#fce7f3', 'video' => asset('customerVideo/birthday/birthday4.mp4'), 'image' => asset('customerimages/invite/birthday2.png')],
-                ['color' => '#b45309', 'video' => asset('customerVideo/birthday/birthday5.mp4'), 'image' => asset('customerimages/invite/birthday2-front.png')],
-                ['color' => '#1d4ed8', 'video' => asset('customerVideo/birthday/birthday6.mp4'), 'image' => asset('customerimages/invite/birthday2-back.png')],
-            ],
-        ],
-        [
-            'id' => 'birthday-blue-gold',
-            'name' => 'Blue & Gold Night Bash Invitation',
-            'theme' => 'Glam soirée',
-            'label' => 'Birthday',
-            'price' => null,
-            'image' => asset('customerimages/invite/birthday3.png'),
-            'video' => asset('customerVideo/birthday/birthday7.mp4'),
-            'swatches' => [
-                ['color' => '#38bdf8', 'video' => asset('customerVideo/birthday/birthday7.mp4'), 'image' => asset('customerimages/invite/birthday3.png')],
-                ['color' => '#facc15', 'video' => asset('customerVideo/birthday/birthday8.mp4'), 'image' => asset('customerimages/invite/birthday3-front.png')],
-                ['color' => '#1e3a8a', 'video' => asset('customerVideo/birthday/birthday9.mp4'), 'image' => asset('customerimages/invite/birthday3-back.png')],
-            ],
-        ],
+        // Add birthday templates here if needed
     ];
 @endphp
+<main class="birthday-page">
+    <section class="birthday-hero">
+        <div class="birthday-hero__content">
+            <div class="birthday-hero__eyebrow">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+                Birthday Invitations
+            </div>
+            <h1 class="birthday-hero__title">
+                <span class="highlight-primary">Celebrate</span> 
+                <span class="highlight-secondary">Milestones</span> with Style
+            </h1>
+            <p class="birthday-hero__subtitle">
+                Make every birthday unforgettable with our collection of festive and elegant invitation designs.
+            </p>
+        </div>
+    </section>
+
+    <section class="invitation-gallery">
+        <div class="layout-container">
+            <div class="invitation-grid">
+                @forelse($products as $product)
+                    @php
+                        $materials = $product->materials ?? collect();
+                        $hasLowStockMaterials = $materials->some(function($material) {
+                            return ($material->stock ?? 0) < 10; // Assuming 10 is low stock threshold
+                        });
+                        $priceValue = $product->base_price ?? $product->unit_price ?? optional($product->template)->base_price ?? optional($product->template)->unit_price;
+                        $averageRating = $product->ratings->avg('rating') ?? 0;
+                        $ratingCount = $product->ratings->count() ?? 0;
+                        $previewUrl = route('product.preview', ['product' => $product->id]);
+                    @endphp
+                    <article class="invitation-card">
+                        <div class="invitation-card__preview">
+                            @if($product->product_images && !empty($product->product_images->preview))
+                                <img src="{{ \App\Support\ImageResolver::url($product->product_images->preview) }}" 
+                                     alt="{{ $product->name }}" 
+                                     class="invitation-card__image">
+                            @elseif($product->uploads && $product->uploads->isNotEmpty())
+                                @php $primaryUpload = $product->uploads->first(); @endphp
+                                @if(str_starts_with($primaryUpload->mime_type ?? '', 'image/'))
+                                    <img src="{{ asset('storage/uploads/products/' . $product->id . '/' . $primaryUpload->filename) }}" 
+                                         alt="{{ $product->name }}" 
+                                         class="invitation-card__image">
+                                @endif
+                            @else
+                                <img src="{{ asset('images/placeholder.png') }}" 
+                                     alt="{{ $product->name }}" 
+                                     class="invitation-card__image">
+                            @endif
+                            <button type="button" class="favorite-toggle" aria-label="Add to favorites">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="invitation-card__body">
+                            <h3 class="invitation-card__title">{{ $product->name }}</h3>
+                            <p class="invitation-card__subtitle">Birthday Invitation</p>
+                            @if($priceValue)
+                                <p class="invitation-card__price">Starting at ₱{{ number_format($priceValue, 2) }}</p>
+                            @else
+                                <p class="invitation-card__muted">Pricing available on request</p>
+                            @endif
+                            @if($materials->count() > 0)
+                                <div class="invitation-card__materials">
+                                    <p class="invitation-card__materials-text">Materials: {{ $materials->pluck('name')->join(', ') }}</p>
+                                </div>
+                            @endif
+                            @if($hasLowStockMaterials)
+                                <p class="invitation-card__low-stock">Low stock - limited availability</p>
+                            @endif
+                            @if($ratingCount > 0)
+                                <div class="invitation-card__rating rating-trigger"
+                                     data-product-id="{{ $product->id }}"
+                                     data-product-name="{{ $product->name }}"
+                                     role="button"
+                                     tabindex="0"
+                                     aria-label="View {{ $ratingCount }} review{{ $ratingCount > 1 ? 's' : '' }} for {{ $product->name }}">
+                                    <div class="invitation-card__stars">
+                                        @for($i = 1; $i <= 5; $i++)
+                                            <span class="invitation-card__star {{ $i <= round($averageRating) ? 'filled' : '' }}">★</span>
+                                        @endfor
+                                    </div>
+                                    <span class="invitation-card__rating-text">{{ number_format($averageRating, 1) }} ({{ $ratingCount }})</span>
+                                </div>
+                                @php $latestReview = $product->ratings->sortByDesc('submitted_at')->first(); @endphp
+                                @if($latestReview && $latestReview->review)
+                                    <div class="invitation-card__review">
+                                        @if($latestReview->photos && count($latestReview->photos) > 0)
+                                            <div class="flex flex-wrap gap-1 mr-2">
+                                                @foreach(array_slice($latestReview->photos, 0, 3) as $photo)
+                                                    @php
+                                                        $photoUrl = str_starts_with($photo, 'http') ? $photo : \Illuminate\Support\Facades\Storage::disk('public')->url($photo);
+                                                    @endphp
+                                                    <img src="{{ $photoUrl }}" alt="Rating photo" class="w-8 h-8 object-cover rounded border border-gray-200">
+                                                @endforeach
+                                                @if(count($latestReview->photos) > 3)
+                                                    <div class="w-8 h-8 bg-gray-100 rounded border border-gray-200 flex items-center justify-center text-xs text-gray-500">+{{ count($latestReview->photos) - 3 }}</div>
+                                                @endif
+                                            </div>
+                                        @endif
+                                        <p class="invitation-card__review-text">"{{ Str::limit($latestReview->review, 80) }}" - {{ $latestReview->customer->name ?? 'Customer' }}</p>
+                                    </div>
+                                @endif
+                            @else
+                                <div class="invitation-card__rating">
+                                    <div class="invitation-card__stars">
+                                        @for($i = 1; $i <= 5; $i++)
+                                            <span class="invitation-card__star">★</span>
+                                        @endfor
+                                    </div>
+                                    <span class="invitation-card__rating-text">No reviews yet</span>
+                                </div>
+                            @endif
+                            <div class="invitation-card__actions">
+                                <button type="button"
+                                        class="invitation-card__action preview-trigger"
+                                        data-preview-url="{{ $previewUrl }}">
+                                    Quick preview
+                                </button>
+                            </div>
+                        </div>
+                    </article>
+                @empty
+                    <div class="invitation-empty">
+                        <h3>No birthday invitations yet</h3>
+                        <p>We’re curating new designs for you. Please check back soon or contact us for a bespoke concept.</p>
+                    </div>
+                @endforelse
+            </div>
+        </div>
+    </section>
+</main>
+
+<div id="productPreviewOverlay" class="preview-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="preview-frame-wrapper">
+        <div class="preview-frame-header">
+            <button type="button" class="preview-close-btn" id="productPreviewClose" aria-label="Close preview">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+                Close
+            </button>
+        </div>
+        <div class="preview-frame-body">
+            <iframe id="productPreviewFrame" title="Product preview"></iframe>
+        </div>
+    </div>
+</div>
+
+<!-- Rating Modal -->
+<div id="ratingModal" class="rating-modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="rating-modal">
+        <div class="rating-modal-header">
+            <h3 class="rating-modal-title" id="ratingModalTitle">Customer Reviews</h3>
+            <button type="button" class="rating-modal-close" id="ratingModalClose" aria-label="Close reviews">
+                ×
+            </button>
+        </div>
+        <div class="rating-modal-body" id="ratingModalBody">
+            <!-- Content will be populated by JavaScript -->
+        </div>
+    </div>
+</div>
 <main class="birthday-page">
     <section class="birthday-hero">
         <div class="birthday-hero__content">

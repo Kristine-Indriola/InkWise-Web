@@ -8,14 +8,28 @@
 
 @section('content')
 @php
+    // Generate initials from separate name components
     $abbr = '';
-    if (!empty($user->name)) {
+    if ($user->staff && $user->staff->first_name) {
+        $first = $user->staff->first_name;
+        $last = $user->staff->last_name ?? '';
+        $abbr = strtoupper(substr($first, 0, 1) . substr($last, 0, 1));
+    } elseif (!empty($user->name)) {
+        // Fallback to splitting full name
         $parts = preg_split('/\s+/', trim($user->name));
         $first = $parts[0] ?? '';
         $second = $parts[1] ?? '';
         $abbr = strtoupper(substr($first, 0, 1) . ($second ? substr($second, 0, 1) : ''));
     }
     $position = $user->staff->role ?? __('Staff Member');
+
+    // Construct display name from separate components
+    $displayName = '';
+    if ($user->staff && $user->staff->first_name) {
+        $displayName = trim($user->staff->first_name . ' ' . ($user->staff->middle_name ? $user->staff->middle_name . ' ' : '') . $user->staff->last_name);
+    } else {
+        $displayName = $user->name ?? 'Staff Member';
+    }
 @endphp
 
 <main class="materials-page admin-page-shell profile-page" role="main">
@@ -56,7 +70,7 @@
                 @endif
             </div>
             <div class="profile-form-header__details">
-                <h2>{{ $user->name ?? 'Staff Member' }}</h2>
+                <h2>{{ $displayName }}</h2>
                 <p>{{ $position }}</p>
             </div>
         </div>
@@ -65,8 +79,16 @@
             @csrf
             <div class="profile-form-grid">
                 <div class="profile-field">
-                    <label for="profileName">Full Name</label>
-                    <input id="profileName" type="text" name="name" value="{{ old('name', $user->name ?? '') }}" class="profile-input" required>
+                    <label for="profileFirstName">First Name</label>
+                    <input id="profileFirstName" type="text" name="first_name" value="{{ old('first_name', $user->staff->first_name ?? '') }}" class="profile-input" required>
+                </div>
+                <div class="profile-field">
+                    <label for="profileMiddleName">Middle Name</label>
+                    <input id="profileMiddleName" type="text" name="middle_name" value="{{ old('middle_name', $user->staff->middle_name ?? '') }}" class="profile-input" placeholder="Optional">
+                </div>
+                <div class="profile-field">
+                    <label for="profileLastName">Last Name</label>
+                    <input id="profileLastName" type="text" name="last_name" value="{{ old('last_name', $user->staff->last_name ?? '') }}" class="profile-input" required>
                 </div>
                 <div class="profile-field">
                     <label for="profileEmail">Email</label>
@@ -74,7 +96,7 @@
                 </div>
                 <div class="profile-field">
                     <label for="profilePhone">Phone</label>
-                    <input id="profilePhone" type="text" name="phone" value="{{ old('phone', $user->phone ?? '') }}" class="profile-input" placeholder="e.g. 09XX-XXX-XXXX">
+                    <input id="profilePhone" type="text" name="phone" value="{{ old('phone', $user->staff->contact_number ?? '') }}" class="profile-input" placeholder="e.g. 09XX-XXX-XXXX">
                 </div>
                 <div class="profile-field">
                     <label for="profileAddress">Address</label>
@@ -105,3 +127,97 @@
     </section>
 </main>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const profilePicInput = document.getElementById('profilePicInput');
+    const avatarFrame = document.querySelector('.profile-avatar-frame');
+    const currentPhotoPreview = document.querySelector('.profile-current-photo__img');
+
+    if (profilePicInput && avatarFrame) {
+        profilePicInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                // Validate file type
+                const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+                if (!validTypes.includes(file.type)) {
+                    alert('Please select a valid image file (PNG, JPG, or GIF).');
+                    profilePicInput.value = '';
+                    return;
+                }
+
+                // Validate file size (5MB)
+                if (file.size > 5120 * 1024) {
+                    alert('File size must be less than 5MB.');
+                    profilePicInput.value = '';
+                    return;
+                }
+
+                // Preview the image
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // Update the avatar frame
+                    let img = avatarFrame.querySelector('img');
+                    if (!img) {
+                        // Remove text content and add image
+                        avatarFrame.innerHTML = '';
+                        img = document.createElement('img');
+                        img.alt = 'Profile preview';
+                        avatarFrame.appendChild(img);
+                    }
+                    img.src = e.target.result;
+                    img.style.width = '100%';
+                    img.style.height = '100%';
+                    img.style.objectFit = 'cover';
+
+                    // Update current photo preview if it exists
+                    if (currentPhotoPreview) {
+                        currentPhotoPreview.src = e.target.result;
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+
+    // Form validation
+    const form = document.getElementById('staffProfileForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const firstNameInput = document.getElementById('profileFirstName');
+            const lastNameInput = document.getElementById('profileLastName');
+            const emailInput = document.getElementById('profileEmail');
+
+            if (firstNameInput && firstNameInput.value.trim() === '') {
+                alert('First name is required.');
+                e.preventDefault();
+                firstNameInput.focus();
+                return;
+            }
+
+            if (lastNameInput && lastNameInput.value.trim() === '') {
+                alert('Last name is required.');
+                e.preventDefault();
+                lastNameInput.focus();
+                return;
+            }
+
+            if (emailInput && emailInput.value.trim() === '') {
+                alert('Email is required.');
+                e.preventDefault();
+                emailInput.focus();
+                return;
+            }
+
+            // Show loading state
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.textContent = 'Saving...';
+                submitBtn.disabled = true;
+            }
+        });
+    }
+});
+</script>
+@endpush

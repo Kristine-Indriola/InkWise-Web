@@ -1,7 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  
+@php
+    // Get current admin user with staff relationship for profile image
+    $currentAdmin = Auth::user();
+    if ($currentAdmin && $currentAdmin->role === 'admin') {
+        $currentAdmin->load('staff');
+
+        // Generate initials for fallback avatar
+        $adminAbbr = '';
+        if ($currentAdmin->staff && $currentAdmin->staff->first_name) {
+            $first = $currentAdmin->staff->first_name;
+            $last = $currentAdmin->staff->last_name ?? '';
+            $adminAbbr = strtoupper(substr($first, 0, 1) . substr($last, 0, 1));
+        } elseif (!empty($currentAdmin->name)) {
+            $parts = preg_split('/\s+/', trim($currentAdmin->name));
+            $first = $parts[0] ?? '';
+            $second = $parts[1] ?? '';
+            $adminAbbr = strtoupper(substr($first, 0, 1) . ($second ? substr($second, 0, 1) : ''));
+        }
+    }
+@endphp
+
   @stack('styles')
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -958,10 +978,16 @@ body.dark-mode .btn-warning {
         </div>
         <!-- Admin Profile Dropdown -->
         <div class="profile-dropdown" style="position: relative; display:flex; align-items:center; gap:6px;">
-          <a href="{{ route('admin.profile.show') }}" id="profileImageLink" style="display:flex; align-items:center; text-decoration:none; color:inherit;">
-            <img src="/adminimage/LEANNE.jpg"
-                 alt="Admin Profile"
-                 style="border-radius:50%; width:36px; height:36px; border:2px solid #6a2ebc; object-fit:cover;">
+          <a href="{{ route('admin.profile.edit') }}" id="profileImageLink" style="display:flex; align-items:center; text-decoration:none; color:inherit;">
+            @if($currentAdmin && $currentAdmin->staff && $currentAdmin->staff->profile_pic)
+                <img src="{{ asset('storage/' . $currentAdmin->staff->profile_pic) }}"
+                     alt="Admin Profile"
+                     style="border-radius:50%; width:36px; height:36px; border:2px solid #6a2ebc; object-fit:cover;">
+            @else
+                <div style="border-radius:50%; width:36px; height:36px; border:2px solid #6a2ebc; background: linear-gradient(135deg, #acd9b5, #6f94d6); display:flex; align-items:center; justify-content:center; color:white; font-weight:bold; font-size:14px;">
+                    {{ $adminAbbr ?: 'AD' }}
+                </div>
+            @endif
           </a>
           <span id="profileDropdownToggle" style="cursor:pointer; display:inline-flex; align-items:center; margin-left:6px;">
             <i class="fi fi-rr-angle-small-down" style="font-size:18px;"></i>
@@ -981,6 +1007,10 @@ body.dark-mode .btn-warning {
                  padding: 8px 0;
                  border: 1px solid #eaeaea;
                  ">
+            <a href="{{ route('admin.profile.edit') }}"
+               style="display:block; color:#333; font-size:16px; padding:14px 22px; text-decoration:none;">
+              👤 My Profile
+            </a>
           <form id="logout-form" action="{{ route('logout') }}" method="POST" style="margin:0;">
             @csrf
             <button type="submit"
