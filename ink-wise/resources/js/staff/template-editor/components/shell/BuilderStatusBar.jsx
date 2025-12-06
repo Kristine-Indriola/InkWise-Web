@@ -1,12 +1,21 @@
 import React from 'react';
 
 import { useBuilderStore } from '../../state/BuilderStore';
+import { derivePageLabel } from '../../utils/pageFactory';
 
 export function BuilderStatusBar() {
   const { state } = useBuilderStore();
   const activePage = state.pages.find((page) => page.id === state.activePageId) ?? state.pages[0];
   const layers = Array.isArray(activePage?.nodes) ? activePage.nodes : [];
   const selectedLayer = layers.find((layer) => layer.id === state.selectedLayerId) ?? null;
+
+  const activePageIndex = state.pages.findIndex((page) => page.id === activePage?.id);
+  const sideLabel = derivePageLabel(activePage?.pageType, activePageIndex >= 0 ? activePageIndex : 0, state.pages.length);
+  const displayName = typeof activePage?.name === 'string' && activePage.name.trim() !== ''
+    ? activePage.name.trim()
+    : 'Untitled page';
+  const showSideLabel = sideLabel && sideLabel !== displayName;
+  const pageSummary = showSideLabel ? `${sideLabel} • ${displayName}` : displayName;
 
   const zoomPercent = Math.round((state.zoom ?? 1) * 100);
   const undoCount = state.history.undoStack.length;
@@ -16,7 +25,7 @@ export function BuilderStatusBar() {
   return (
     <footer className="builder-statusbar" role="contentinfo" aria-live="polite">
       <div className="builder-statusbar__segment">
-        Page: {activePage.name} ({activePage.width} × {activePage.height}px)
+        Page: {pageSummary} ({activePage.width} × {activePage.height}px)
       </div>
       <div className="builder-statusbar__segment">Layers: {layerCount}</div>
       <div className="builder-statusbar__segment">Zoom: {zoomPercent}%</div>

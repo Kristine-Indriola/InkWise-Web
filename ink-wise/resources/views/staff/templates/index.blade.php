@@ -317,6 +317,32 @@
                 border-radius: 6px;
                 padding: 8px;
             }
+
+        /* Multiple Previews */
+        .multiple-previews {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            gap: 8px;
+            height: 200px;
+            overflow: hidden;
+        }
+
+        .preview-item {
+            position: relative;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid #d1d5db;
+        }
+
+        .preview-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .preview-item:hover {
+            border-color: #9ca3af;
+        }
     </style>
 @endpush
 
@@ -715,16 +741,58 @@
 
                 @foreach($templates as $template)
                     <article class="template-card" role="listitem">
-                        <div class="template-preview">
-                            @php
-                                $front = $template->front_image ?? $template->preview;
-                                $back = $template->back_image ?? null;
-                                
-                                // Check if front image is an SVG file
-                                $isSvgFront = $template->svg_path || ($front && str_ends_with(strtolower($front), '.svg'));
-                                $isSvgBack = $template->back_svg_path || ($back && str_ends_with(strtolower($back), '.svg'));
-                            @endphp
-                            @if($front)
+                        @php
+                            $front = $template->front_image ?? $template->preview;
+                            $back = $template->back_image ?? null;
+                            
+                            // Check if front image is an SVG file
+                            $isSvgFront = $template->svg_path || ($front && str_ends_with(strtolower($front), '.svg'));
+                            $isSvgBack = $template->back_svg_path || ($back && str_ends_with(strtolower($back), '.svg'));
+
+                            // Check for multiple previews in metadata
+                            $multiplePreviews = is_array($template->metadata['previews'] ?? null)
+                                ? $template->metadata['previews']
+                                : [];
+                            $previewMeta = is_array($template->metadata['preview_images_meta'] ?? null)
+                                ? $template->metadata['preview_images_meta']
+                                : [];
+                            $hasMultiplePreviews = count($multiplePreviews) > 0;
+
+                            $templatePreviewClasses = 'template-preview' . ($hasMultiplePreviews ? ' template-preview--multi' : '');
+                        @endphp
+                        <div class="{{ $templatePreviewClasses }}">
+                            @if($hasMultiplePreviews)
+                                @php
+                                    $orderedPreviews = collect($multiplePreviews)
+                                        ->map(function ($path, $key) use ($previewMeta) {
+                                            $meta = $previewMeta[$key] ?? [];
+                                            $label = $meta['label'] ?? \Illuminate\Support\Str::title(str_replace(['-', '_'], ' ', $key));
+                                            $order = array_key_exists('order', $meta) ? (int) $meta['order'] : null;
+
+                                            return [
+                                                'key' => $key,
+                                                'path' => $path,
+                                                'label' => $label,
+                                                'order' => $order,
+                                            ];
+                                        })
+                                        ->sortBy(function ($item, $index) {
+                                            return $item['order'] ?? $index;
+                                        })
+                                        ->values();
+                                @endphp
+                                <div class="multiple-previews" role="list">
+                                    @foreach($orderedPreviews as $previewItem)
+                                        @php
+                                            $isPrimary = $previewItem['key'] === 'front' || $loop->first;
+                                        @endphp
+                                        <figure class="preview-item{{ $isPrimary ? ' preview-item--primary' : '' }}" role="listitem" aria-label="{{ $previewItem['label'] }}">
+                                            <img src="{{ \App\Support\ImageResolver::url($previewItem['path']) }}" alt="{{ $previewItem['label'] }}" loading="lazy">
+                                            <figcaption class="preview-item__label">{{ $previewItem['label'] }}</figcaption>
+                                        </figure>
+                                    @endforeach
+                                </div>
+                            @elseif($front)
                                 @if($isSvgFront)
                                     @php
                                         // Read SVG content from file
@@ -752,7 +820,7 @@
                                         {!! $svgContent !!}
                                     </div>
                                 @else
-                                    <img src="{{ \App\Support\ImageResolver::url($front) }}" alt="Preview of {{ $template->name }}">
+                                    <img src="{{ \App\Support\ImageResolver::url($front) }}" alt="Preview of {{ $template->name }}" loading="lazy">
                                 @endif
                             @else
                                 <span>No preview</span>
@@ -785,7 +853,7 @@
                                         {!! $backSvgContent !!}
                                     </div>
                                 @else
-                                    <img src="{{ \App\Support\ImageResolver::url($back) }}" alt="Back of {{ $template->name }}" class="back-thumb">
+                                    <img src="{{ \App\Support\ImageResolver::url($back) }}" alt="Back of {{ $template->name }}" class="back-thumb" loading="lazy">
                                 @endif
                             @endif
                         </div>

@@ -10,6 +10,7 @@ export function CanvasToolbar() {
   const { state, dispatch } = useBuilderStore();
   const zoomPercent = Math.round(state.zoom * 100);
   const activePage = state.pages.find((page) => page.id === state.activePageId) ?? state.pages[0];
+  const hasSelection = Boolean(state.selectedLayerId);
 
   const updateZoom = (value) => {
     dispatch({ type: 'UPDATE_ZOOM', value });
@@ -31,6 +32,13 @@ export function CanvasToolbar() {
     if (!isNaN(height) && height > 0 && activePage) {
       dispatch({ type: 'UPDATE_PAGE_PROPS', pageId: activePage.id, props: { height } });
     }
+  };
+
+  const alignSelection = (mode) => {
+    if (!hasSelection) {
+      return;
+    }
+    dispatch({ type: 'ALIGN_SELECTED_LAYER', alignment: mode });
   };
 
   return (
@@ -88,6 +96,65 @@ export function CanvasToolbar() {
         <button type="button" className="builder-btn" disabled aria-label="Fit to page">
           Fit
         </button>
+      </div>
+      <div className="canvas-toolbar__group canvas-toolbar__group--align">
+        <span className="canvas-toolbar__label">Align</span>
+        <div className="canvas-toolbar__align-controls" role="group" aria-label="Align selection">
+          <button
+            type="button"
+            className="builder-btn builder-btn--ghost"
+            disabled={!hasSelection}
+            onClick={() => alignSelection('left')}
+            aria-label="Align left"
+          >
+            L
+          </button>
+          <button
+            type="button"
+            className="builder-btn builder-btn--ghost"
+            disabled={!hasSelection}
+            onClick={() => alignSelection('horizontal-center')}
+            aria-label="Align center horizontally"
+          >
+            HC
+          </button>
+          <button
+            type="button"
+            className="builder-btn builder-btn--ghost"
+            disabled={!hasSelection}
+            onClick={() => alignSelection('right')}
+            aria-label="Align right"
+          >
+            R
+          </button>
+          <button
+            type="button"
+            className="builder-btn builder-btn--ghost"
+            disabled={!hasSelection}
+            onClick={() => alignSelection('top')}
+            aria-label="Align top"
+          >
+            T
+          </button>
+          <button
+            type="button"
+            className="builder-btn builder-btn--ghost"
+            disabled={!hasSelection}
+            onClick={() => alignSelection('vertical-center')}
+            aria-label="Align middle vertically"
+          >
+            VC
+          </button>
+          <button
+            type="button"
+            className="builder-btn builder-btn--ghost"
+            disabled={!hasSelection}
+            onClick={() => alignSelection('bottom')}
+            aria-label="Align bottom"
+          >
+            B
+          </button>
+        </div>
       </div>
     </div>
   );

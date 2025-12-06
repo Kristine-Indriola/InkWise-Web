@@ -312,6 +312,8 @@ public function saveCanvas(Request $request, $id)
             'design' => 'required|array',
             'svg_markup' => 'nullable|string',
             'preview_image' => 'nullable|string',
+            'preview_images' => 'nullable|array',
+            'preview_images_meta' => 'nullable|array',
             'template_name' => 'nullable|string|max:255',
         ]);
 
@@ -330,6 +332,7 @@ public function saveCanvas(Request $request, $id)
             $metadata['builder_canvas'] = $validated['design']['canvas'];
         }
 
+        // Handle single preview_image for backward compatibility
         if (!empty($validated['preview_image'])) {
             $template->preview = $this->persistDataUrl(
                 $validated['preview_image'],
@@ -338,6 +341,33 @@ public function saveCanvas(Request $request, $id)
                 $template->preview,
                 'preview_image'
             );
+        }
+
+        // Handle multiple preview_images
+        if (!empty($validated['preview_images']) && is_array($validated['preview_images'])) {
+            $previews = [];
+            foreach ($validated['preview_images'] as $key => $imageData) {
+                if (is_string($imageData) && !empty($imageData)) {
+                    $filename = $this->persistDataUrl(
+                        $imageData,
+                        'templates/previews',
+                        'png',
+                        null, // Don't overwrite existing
+                        "preview_{$key}"
+                    );
+                    if ($filename) {
+                        $previews[$key] = $filename;
+                    }
+                }
+            }
+            if (!empty($previews)) {
+                $metadata['previews'] = $previews;
+            }
+        }
+
+        // Store preview_images_meta if provided
+        if (!empty($validated['preview_images_meta']) && is_array($validated['preview_images_meta'])) {
+            $metadata['preview_images_meta'] = $validated['preview_images_meta'];
         }
 
         if (!empty($validated['svg_markup'])) {
