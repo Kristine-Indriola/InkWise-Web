@@ -93,6 +93,19 @@ function hexToRgb(hex) {
   return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '255,255,255';
 }
 
+function hslToHex(h, s, l) {
+  h /= 360;
+  s /= 100;
+  l /= 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => {
+    const k = (n + h * 12) % 12;
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color).toString(16).padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`.toUpperCase();
+}
+
 const TOOL_SECTIONS = [
   { id: 'text', label: 'Text', description: 'Add headings, body copy, and typography styles.', icon: 'fa-solid fa-t' },
   { id: 'images', label: 'Upload', description: 'Upload customer photos or choose from brand assets.', icon: 'fa-solid fa-cloud-arrow-up' },
@@ -105,6 +118,417 @@ const TOOL_SECTIONS = [
   { id: 'layers', label: 'Layers', description: 'Manage layers.', icon: 'fa-solid fa-layer-group' },
   { id: 'quotes', label: 'Quotes', description: 'Add quotes.', icon: 'fa-solid fa-quote-left' },
 ];
+
+
+const SHAPE_VARIANT_NORMALIZATION = {
+  rectangle: { variant: 'rectangle', mask: 'rectangle' },
+  square: { variant: 'rectangle', mask: 'rectangle' },
+  circle: { variant: 'circle', mask: 'circle' },
+  ellipse: { variant: 'circle', mask: 'circle' },
+  frame: { variant: 'frame', mask: 'frame' },
+  layout: { variant: 'layout', mask: 'layout' },
+  polygon: { variant: 'polygon', mask: 'polygon' },
+  triangle: { variant: 'polygon', mask: 'triangle' },
+  diamond: { variant: 'polygon', mask: 'diamond' },
+  hexagon: { variant: 'polygon', mask: 'hexagon' },
+  octagon: { variant: 'polygon', mask: 'octagon' },
+  pentagon: { variant: 'polygon', mask: 'pentagon' },
+  parallelogram: { variant: 'polygon', mask: 'parallelogram' },
+  trapezoid: { variant: 'polygon', mask: 'trapezoid' },
+  rhombus: { variant: 'polygon', mask: 'rhombus' },
+  star: { variant: 'polygon', mask: 'star' },
+  shield: { variant: 'polygon', mask: 'shield' },
+  badge: { variant: 'polygon', mask: 'badge' },
+  heart: { variant: 'organic', mask: 'heart' },
+  'cloud-shape': { variant: 'organic', mask: 'cloud-shape' },
+  flower: { variant: 'organic', mask: 'flower' },
+  butterfly: { variant: 'organic', mask: 'butterfly' },
+  leaf: { variant: 'organic', mask: 'leaf' },
+  balloon: { variant: 'organic', mask: 'balloon' },
+  crown: { variant: 'organic', mask: 'crown' },
+  'puzzle-piece': { variant: 'organic', mask: 'puzzle-piece' },
+  'ribbon-banner': { variant: 'organic', mask: 'ribbon-banner' },
+  blob: { variant: 'organic', mask: 'blob' },
+  wave: { variant: 'organic', mask: 'wave' },
+  sun: { variant: 'organic', mask: 'sun' },
+  moon: { variant: 'organic', mask: 'moon' },
+  'tag-shape': { variant: 'tag', mask: 'tag-shape' },
+  'ticket-shape': { variant: 'tag', mask: 'ticket-shape' },
+  'polaroid-frame': { variant: 'frame', mask: 'polaroid-frame' },
+  'film-strip-frame': { variant: 'frame', mask: 'film-strip-frame' },
+  'torn-paper-frame': { variant: 'frame', mask: 'torn-paper-frame' },
+  'curved-corner-frame': { variant: 'frame', mask: 'curved-corner-frame' },
+  'scalloped-frame': { variant: 'frame', mask: 'scalloped-frame' },
+  'collage-frame': { variant: 'frame', mask: 'collage-frame' },
+  'camera-frame': { variant: 'frame', mask: 'camera-frame' },
+  'phone-frame': { variant: 'frame', mask: 'phone-frame' },
+  'ribbon-frame': { variant: 'frame', mask: 'ribbon-frame' },
+};
+
+const DEFAULT_SHAPE_PLACEHOLDER_FILL = 'rgba(148, 163, 184, 0.16)';
+const DEFAULT_SHAPE_PLACEHOLDER_STROKE = 'rgba(148, 163, 184, 0.28)';
+
+const SHAPE_THUMB_FILL = '#374151';
+const SHAPE_THUMB_STROKE = '#111827';
+const SHAPE_THUMB_ACCENT = '#4b5563';
+
+function createSvgThumb(content) {
+  const svg = `<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">${content}</svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+function createRectThumb(rx = 0, ry = rx) {
+  return createSvgThumb(`<rect x="8" y="8" width="48" height="48" rx="${rx}" ry="${ry}" fill="${SHAPE_THUMB_FILL}" stroke="${SHAPE_THUMB_STROKE}" stroke-width="2" />`);
+}
+
+function createCircleThumb(r = 24) {
+  return createSvgThumb(`<circle cx="32" cy="32" r="${r}" fill="${SHAPE_THUMB_FILL}" stroke="${SHAPE_THUMB_STROKE}" stroke-width="2" />`);
+}
+
+function createEllipseThumb(rx = 24, ry = 18) {
+  return createSvgThumb(`<ellipse cx="32" cy="32" rx="${rx}" ry="${ry}" fill="${SHAPE_THUMB_FILL}" stroke="${SHAPE_THUMB_STROKE}" stroke-width="2" />`);
+}
+
+function createPolygonThumb(points) {
+  return createSvgThumb(`<polygon points="${points}" fill="${SHAPE_THUMB_FILL}" stroke="${SHAPE_THUMB_STROKE}" stroke-width="2" stroke-linejoin="round" />`);
+}
+
+function createPathThumb(d) {
+  return createSvgThumb(`<path d="${d}" fill="${SHAPE_THUMB_FILL}" stroke="${SHAPE_THUMB_STROKE}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />`);
+}
+
+function createMultiThumb(content) {
+  return createSvgThumb(content);
+}
+
+const DEFAULT_SHAPE_LIBRARY = [
+  {
+    id: 'rectangle',
+    label: 'Rectangle',
+    variant: 'rectangle',
+    maskVariant: 'rectangle',
+    thumb: createRectThumb(0),
+    tags: ['rectangle', 'box', 'quad'],
+  },
+  {
+    id: 'square',
+    label: 'Square',
+    variant: 'rectangle',
+    maskVariant: 'rectangle',
+    thumb: createRectThumb(0),
+    tags: ['square', 'box', 'even'],
+  },
+  {
+    id: 'circle',
+    label: 'Circle',
+    variant: 'circle',
+    maskVariant: 'circle',
+    thumb: createCircleThumb(24),
+    tags: ['circle', 'round'],
+  },
+  {
+    id: 'oval',
+    label: 'Oval',
+    variant: 'circle',
+    maskVariant: 'circle',
+    thumb: createEllipseThumb(24, 18),
+    tags: ['oval', 'ellipse'],
+  },
+  {
+    id: 'rounded-rectangle',
+    label: 'Rounded Rectangle',
+    variant: 'rectangle',
+    maskVariant: 'rectangle',
+    thumb: createRectThumb(12),
+    borderRadius: 24,
+    tags: ['rounded', 'rectangle', 'soft'],
+  },
+  {
+    id: 'triangle',
+    label: 'Triangle',
+    variant: 'polygon',
+    maskVariant: 'triangle',
+    thumb: createPolygonThumb('32 10 10 54 54 54'),
+    tags: ['triangle', 'polygon'],
+  },
+  {
+    id: 'diamond',
+    label: 'Diamond',
+    variant: 'polygon',
+    maskVariant: 'diamond',
+    thumb: createPolygonThumb('32 8 56 32 32 56 8 32'),
+    tags: ['diamond', 'rhombus'],
+  },
+  {
+    id: 'hexagon',
+    label: 'Hexagon',
+    variant: 'polygon',
+    maskVariant: 'hexagon',
+    thumb: createPolygonThumb('20 10 44 10 56 32 44 54 20 54 8 32'),
+    tags: ['hexagon', 'polygon'],
+  },
+  {
+    id: 'octagon',
+    label: 'Octagon',
+    variant: 'polygon',
+    maskVariant: 'octagon',
+    thumb: createPolygonThumb('22 8 42 8 56 22 56 42 42 56 22 56 8 42 8 22'),
+    tags: ['octagon', 'polygon'],
+  },
+  {
+    id: 'pentagon',
+    label: 'Pentagon',
+    variant: 'polygon',
+    maskVariant: 'pentagon',
+    thumb: createPolygonThumb('32 8 56 26 46 56 18 56 8 26'),
+    tags: ['pentagon', 'polygon'],
+  },
+  {
+    id: 'parallelogram',
+    label: 'Parallelogram',
+    variant: 'polygon',
+    maskVariant: 'parallelogram',
+    thumb: createPolygonThumb('18 12 56 8 46 56 8 60'),
+    tags: ['parallelogram', 'slanted', 'quadrilateral'],
+  },
+  {
+    id: 'trapezoid',
+    label: 'Trapezoid',
+    variant: 'polygon',
+    maskVariant: 'trapezoid',
+    thumb: createPolygonThumb('16 12 48 12 56 52 8 52'),
+    tags: ['trapezoid', 'quadrilateral'],
+  },
+  {
+    id: 'rhombus',
+    label: 'Rhombus',
+    variant: 'polygon',
+    maskVariant: 'rhombus',
+    thumb: createPolygonThumb('32 8 56 32 32 56 8 32'),
+    tags: ['rhombus', 'diamond'],
+  },
+  {
+    id: 'heart',
+    label: 'Heart',
+    variant: 'organic',
+    maskVariant: 'heart',
+    thumb: createPathThumb('M32 50 L14 30 C6 20 12 8 24 12 C28 14 32 18 32 18 C32 18 36 14 40 12 C52 8 58 20 50 30 Z'),
+    tags: ['heart', 'love'],
+  },
+  {
+    id: 'cloud',
+    label: 'Cloud',
+    variant: 'organic',
+    maskVariant: 'cloud-shape',
+    thumb: createPathThumb('M18 38 C12 38 8 34 8 28 C8 22 12 18 18 18 C20 10 28 6 36 10 C40 6 46 6 50 10 C56 10 60 14 60 20 C60 26 56 30 52 30 H18 Z'),
+    tags: ['cloud', 'organic'],
+  },
+  {
+    id: 'star',
+    label: 'Star',
+    variant: 'polygon',
+    maskVariant: 'star',
+    thumb: createPolygonThumb('32 10 39 26 56 26 42 36 48 52 32 42 16 52 22 36 8 26 25 26'),
+    tags: ['star', 'badge'],
+  },
+  {
+    id: 'flower',
+    label: 'Flower / Daisy',
+    variant: 'organic',
+    maskVariant: 'flower',
+    thumb: createMultiThumb(`<circle cx="32" cy="32" r="8" fill="${SHAPE_THUMB_ACCENT}" /><g fill="${SHAPE_THUMB_FILL}" stroke="${SHAPE_THUMB_STROKE}" stroke-width="2"><ellipse cx="32" cy="16" rx="8" ry="12" /><ellipse cx="32" cy="48" rx="8" ry="12" /><ellipse cx="16" cy="32" rx="12" ry="8" /><ellipse cx="48" cy="32" rx="12" ry="8" /><ellipse cx="20" cy="20" rx="10" ry="6" /><ellipse cx="44" cy="20" rx="10" ry="6" /><ellipse cx="20" cy="44" rx="10" ry="6" /><ellipse cx="44" cy="44" rx="10" ry="6" /></g>`),
+    tags: ['flower', 'daisy', 'organic'],
+  },
+  {
+    id: 'badge',
+    label: 'Badge Shape',
+    variant: 'polygon',
+    maskVariant: 'badge',
+    thumb: createPolygonThumb('12 10 50 10 56 6 62 18 62 46 56 58 50 54 12 54 6 58 2 46 2 18 8 6'),
+    tags: ['badge', 'emblem'],
+  },
+  {
+    id: 'blob',
+    label: 'Blob / Organic Shape',
+    variant: 'organic',
+    maskVariant: 'blob',
+    thumb: createPathThumb('M20 12 C30 4 46 6 52 20 C58 34 52 52 38 56 C24 60 10 50 10 36 C10 22 10 18 20 12 Z'),
+    tags: ['blob', 'organic'],
+  },
+  {
+    id: 'wave',
+    label: 'Wave / Curved Frame',
+    variant: 'organic',
+    maskVariant: 'wave',
+    thumb: createPathThumb('M6 20 C14 12 22 12 32 20 C42 28 50 28 58 20 V48 C50 56 42 56 32 48 C22 40 14 40 6 48 Z'),
+    tags: ['wave', 'curved', 'frame'],
+  },
+  {
+    id: 'polaroid',
+    label: 'Polaroid Frame',
+    variant: 'frame',
+    maskVariant: 'polaroid-frame',
+    thumb: createPolygonThumb('10 10 54 10 54 44 42 44 42 58 22 58 22 44 10 44'),
+    tags: ['polaroid', 'frame'],
+  },
+  {
+    id: 'film-strip',
+    label: 'Film Strip Frame',
+    variant: 'frame',
+    maskVariant: 'film-strip-frame',
+    thumb: createPathThumb('M10 14 L18 8 L30 14 L42 8 L54 14 V50 L46 56 L34 50 L22 56 L10 50 Z'),
+    tags: ['film', 'strip', 'frame'],
+  },
+  {
+    id: 'torn-paper',
+    label: 'Torn Paper Edge',
+    variant: 'frame',
+    maskVariant: 'torn-paper-frame',
+    thumb: createPathThumb('M8 16 L16 8 L26 18 L36 10 L46 20 L56 12 L58 18 L58 50 L46 46 L36 54 L26 46 L16 52 L8 46 Z'),
+    tags: ['torn', 'paper', 'frame'],
+  },
+  {
+    id: 'curved-corner',
+    label: 'Curved Corner Frame',
+    variant: 'frame',
+    maskVariant: 'curved-corner-frame',
+    thumb: createPathThumb('M16 12 Q12 12 12 16 V52 Q12 56 16 56 H36 Q40 56 40 60 V62 H48 Q52 62 52 58 V22 Q52 18 48 18 H40 Q36 18 36 14 V12 Z'),
+    tags: ['curved', 'corner', 'frame'],
+  },
+  {
+    id: 'scalloped',
+    label: 'Scalloped Edge Frame',
+    variant: 'frame',
+    maskVariant: 'scalloped-frame',
+    thumb: createPathThumb('M16 12 C18 8 22 8 24 12 C26 16 30 16 32 12 C34 8 38 8 40 12 C42 16 46 16 48 12 C50 8 54 8 56 12 V52 C54 56 50 56 48 52 C46 48 42 48 40 52 C38 56 34 56 32 52 C30 48 26 48 24 52 C22 56 18 56 16 52 Z'),
+    tags: ['scalloped', 'frame'],
+  },
+  {
+    id: 'collage',
+    label: 'Photo Collage Frames',
+    variant: 'frame',
+    maskVariant: 'collage-frame',
+    thumb: createMultiThumb(`<rect x="10" y="12" width="16" height="18" fill="${SHAPE_THUMB_FILL}" stroke="${SHAPE_THUMB_STROKE}" stroke-width="2" /><rect x="30" y="12" width="24" height="14" fill="${SHAPE_THUMB_ACCENT}" stroke="${SHAPE_THUMB_STROKE}" stroke-width="2" /><rect x="20" y="32" width="28" height="20" fill="${SHAPE_THUMB_FILL}" stroke="${SHAPE_THUMB_STROKE}" stroke-width="2" />`),
+    tags: ['collage', 'frame', 'grid'],
+  },
+  {
+    id: 'camera',
+    label: 'Camera Frame',
+    variant: 'frame',
+    maskVariant: 'camera-frame',
+    thumb: createPathThumb('M12 24 H20 L24 16 H40 L44 24 H52 V50 H12 Z'),
+    tags: ['camera', 'frame'],
+  },
+  {
+    id: 'phone',
+    label: 'Phone Screen Frame',
+    variant: 'frame',
+    maskVariant: 'phone-frame',
+    thumb: createPathThumb('M22 10 H42 C46 10 48 12 48 16 V50 C48 54 46 56 42 56 H22 C18 56 16 54 16 50 V16 C16 12 18 10 22 10 Z'),
+    borderRadius: 18,
+    tags: ['phone', 'screen', 'frame'],
+  },
+  {
+    id: 'sun',
+    label: 'Sun',
+    variant: 'organic',
+    maskVariant: 'sun',
+    thumb: createMultiThumb(`<circle cx="32" cy="32" r="16" fill="${SHAPE_THUMB_FILL}" stroke="${SHAPE_THUMB_STROKE}" stroke-width="2" /><g stroke="${SHAPE_THUMB_STROKE}" stroke-width="2" stroke-linecap="round"><line x1="32" y1="8" x2="32" y2="2" /><line x1="32" y1="62" x2="32" y2="56" /><line x1="8" y1="32" x2="2" y2="32" /><line x1="62" y1="32" x2="56" y2="32" /><line x1="14" y1="14" x2="8" y2="8" /><line x1="50" y1="50" x2="56" y2="56" /><line x1="14" y1="50" x2="8" y2="56" /><line x1="50" y1="14" x2="56" y2="8" /></g>`),
+    tags: ['sun', 'solar'],
+  },
+  {
+    id: 'moon',
+    label: 'Moon',
+    variant: 'organic',
+    maskVariant: 'moon',
+    thumb: createPathThumb('M42 10 A20 20 0 1 1 22 54 A16 16 0 1 0 42 10 Z'),
+    tags: ['moon', 'night', 'crescent'],
+  },
+  {
+    id: 'butterfly',
+    label: 'Butterfly',
+    variant: 'organic',
+    maskVariant: 'butterfly',
+    thumb: createPathThumb('M32 32 C38 24 44 12 54 16 C62 20 58 32 48 34 C58 40 60 52 48 52 C42 52 36 42 32 36 C28 42 22 52 16 52 C4 52 6 40 16 34 C6 32 2 20 10 16 C20 12 26 24 32 32 Z'),
+    tags: ['butterfly', 'organic'],
+  },
+  {
+    id: 'leaf',
+    label: 'Leaf',
+    variant: 'organic',
+    maskVariant: 'leaf',
+    thumb: createPathThumb('M32 8 C46 16 56 30 54 44 C52 58 40 60 28 56 C16 52 8 40 10 26 C12 12 22 8 32 8 Z'),
+    tags: ['leaf', 'nature'],
+  },
+  {
+    id: 'gift-tag',
+    label: 'Gift Tag',
+    variant: 'tag',
+    maskVariant: 'tag-shape',
+    thumb: createPolygonThumb('12 12 44 12 58 32 44 52 12 52 6 42 6 22'),
+    tags: ['gift', 'tag', 'label'],
+  },
+  {
+    id: 'ribbon-frame',
+    label: 'Ribbon Frame',
+    variant: 'frame',
+    maskVariant: 'ribbon-frame',
+    thumb: createPathThumb('M10 22 L22 12 H42 L54 22 V46 H42 V54 H22 V46 H10 Z'),
+    tags: ['ribbon', 'banner', 'frame'],
+  },
+];
+
+function buildShapeResult(preset) {
+  const base = {
+    id: `default-shape-${preset.id}`,
+    thumbUrl: preset.thumb,
+    previewUrl: preset.thumb,
+    downloadUrl: preset.thumb,
+    description: preset.label,
+    provider: 'default',
+    providerLabel: 'Built-in Shapes',
+    credit: 'Built-in Shapes',
+    variant: preset.variant,
+    maskVariant: preset.maskVariant,
+    placeholderFill: DEFAULT_SHAPE_PLACEHOLDER_FILL,
+    placeholderStroke: DEFAULT_SHAPE_PLACEHOLDER_STROKE,
+  };
+
+  if (preset.borderRadius !== undefined) {
+    base.borderRadius = preset.borderRadius;
+  }
+
+  if (preset.metadata) {
+    base.metadata = { ...preset.metadata };
+  }
+
+  if (preset.tags) {
+    base.tags = [...preset.tags];
+  }
+
+  return base;
+}
+
+function getDefaultShapeResults() {
+  return DEFAULT_SHAPE_LIBRARY.map((preset) => buildShapeResult(preset));
+}
+
+function searchDefaultShapes(query, limit = DEFAULT_SHAPE_LIBRARY.length) {
+  const normalized = (query || '').trim().toLowerCase();
+  if (!normalized) {
+    return getDefaultShapeResults().slice(0, limit);
+  }
+
+  const matches = DEFAULT_SHAPE_LIBRARY.filter((preset) => {
+    const haystack = [preset.label, ...(preset.tags || [])]
+      .filter(Boolean)
+      .map((value) => value.toLowerCase());
+    return haystack.some((value) => value.includes(normalized));
+  });
+
+  const selected = matches.length > 0 ? matches : DEFAULT_SHAPE_LIBRARY;
+  return selected.slice(0, limit).map((preset) => buildShapeResult(preset));
+}
 
 
 
@@ -206,20 +630,36 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
   const [activeGradientTheme, setActiveGradientTheme] = useState('birthday');
   const [backgroundColorInput, setBackgroundColorInput] = useState('#ffffff');
   const [isColorModalOpen, setIsColorModalOpen] = useState(false);
-  const [colorPickerTab, setColorPickerTab] = useState('solid');
+  const [colorPickerTab, setColorPickerTab] = useState('gradient');
   const [solidPickerColor, setSolidPickerColor] = useState('#ffffff');
   const [solidHexDraft, setSolidHexDraft] = useState('#ffffff');
-  const [gradientColorStops, setGradientColorStops] = useState(['#c97a8c', '#a855f7']);
-  const [selectedGradientStyle, setSelectedGradientStyle] = useState('soft-blend');
+  const [gradientColorStops, setGradientColorStops] = useState(['#C97A8C', '#A855F7']);
+  const [gradientInputs, setGradientInputs] = useState(['#C97A8C', '#A855F7']);
+  const [selectedGradientStyle, setSelectedGradientStyle] = useState('linear');
+  const [gradientAngle, setGradientAngle] = useState(120);
+  const [activeGradientStop, setActiveGradientStop] = useState(0);
   const [paletteContext, setPaletteContext] = useState('layers');
-  const [isGradientTrayOpen, setIsGradientTrayOpen] = useState(true);
   const [hueSliderValue, setHueSliderValue] = useState(0);
-  const [inlineOpacitySlider, setInlineOpacitySlider] = useState(100);
+  const [backgroundOpacity, setBackgroundOpacity] = useState(100);
   const colorModalRef = useRef(null);
 
   // Color picker and history state
-  const [colorHistory, setColorHistory] = useState(['#ffffff', '#000000', '#ef4444', '#22c55e', '#3b82f6']);
+  const [colorHistory, setColorHistory] = useState(['#FFFFFF', '#000000', '#EF4444', '#22C55E', '#3B82F6']);
 
+  const rememberColor = useCallback((color) => {
+    if (typeof color !== 'string') {
+      return;
+    }
+    const match = color.trim().match(/^#([0-9a-f]{6})$/i);
+    if (!match) {
+      return;
+    }
+    const normalized = `#${match[1].toUpperCase()}`;
+    setColorHistory((prev) => {
+      const filtered = prev.filter((entry) => entry !== normalized);
+      return [normalized, ...filtered].slice(0, 8);
+    });
+  }, []);
   const CURATED_PALETTE_LIBRARY = useMemo(() => ([
     {
       id: 'birthday-pop',
@@ -316,41 +756,136 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
   const QUICK_PICK_SWATCHES = useMemo(() => (
     ['#ffffff', '#000000', '#1f2937', '#8f384b', '#c97a8c', '#f9c5d1']
   ), []);
+  const DEFAULT_GRADIENTS = useMemo(() => ([
+    'linear-gradient(90deg, #FF73B9, #FFE66D)',
+    'linear-gradient(90deg, #6ECFFF, #D2B7FF)',
+    'linear-gradient(90deg, #A6F6C1, #FFB89A)',
+    'linear-gradient(90deg, #FF4FA7, #9C5CFF)',
+    'linear-gradient(90deg, #FF9C42, #FF6FAE)',
+    'linear-gradient(90deg, #4BB3FF, #A7FF57)',
+    'linear-gradient(90deg, #FF7A6E, #FFF07A)',
+    'linear-gradient(90deg, #54F3DA, #FF7EC7)',
+    'linear-gradient(90deg, #A46BFF, #6CFCFF)',
+    'linear-gradient(90deg, #FFB5E8, #BDE0FE)',
+    'linear-gradient(90deg, #0A1A3F, #1E4FFF)',
+    'linear-gradient(90deg, #232323, #C8C8C8)',
+    'linear-gradient(90deg, #0F6D72, #7C9AAF)',
+    'linear-gradient(90deg, #002B55, #6EB8FF)',
+    'linear-gradient(90deg, #000000, #5A5A5A)',
+    'linear-gradient(90deg, #054B41, #7CE7E0)',
+    'linear-gradient(90deg, #485767, #5C8BC6)',
+    'linear-gradient(90deg, #1B1F5F, #ADB5C1)',
+    'linear-gradient(90deg, #0C112B, #64748B)',
+    'linear-gradient(90deg, #4C5C68, #FFFFFF)',
+    'linear-gradient(90deg, #A3D8FF, #FFFFFF)',
+    'linear-gradient(90deg, #F9C6D3, #FFF8E7)',
+    'linear-gradient(90deg, #C6F7DF, #FFFFFF)',
+    'linear-gradient(90deg, #D8C9FF, #CAE9FF)',
+    'linear-gradient(90deg, #F3E3C9, #FFFDF4)',
+    'linear-gradient(90deg, #FFEEA9, #FFD6C5)',
+    'linear-gradient(90deg, #C8FAF4, #B3E5FF)',
+    'linear-gradient(90deg, #E5D4FF, #FFFFFF)',
+    'linear-gradient(90deg, #C6E8FF, #C9FDE6)',
+    'linear-gradient(90deg, #FFD5E3, #EBD6FF)',
+    'linear-gradient(90deg, #F9E7CF, #FFFDF4)',
+    'linear-gradient(90deg, #E8B7A5, #FAD6D6)',
+    'linear-gradient(90deg, #EAC56C, #FFFFFF)',
+    'linear-gradient(90deg, #FFF1DD, #FFD7E5)',
+    'linear-gradient(90deg, #8CAAC8, #DDE3EA)',
+    'linear-gradient(90deg, #C9A7B8, #F5CCD6)',
+    'linear-gradient(90deg, #FFFFFF, #F6E9C7)',
+    'linear-gradient(90deg, #FFFBE7, #E9DCC3)',
+    'linear-gradient(90deg, #FFD9C4, #F8CDB8)',
+    'linear-gradient(90deg, #D5DCE3, #FFFFFF)',
+  ]), []);
+  const DEFAULT_SOLID_COLORS = useMemo(() => ([
+    '#FFFFFF', '#000000', '#F8F9FA', '#E9ECEF', '#DEE2E6',
+    '#CED4DA', '#ADB5BD', '#6C757D', '#495057', '#343A40',
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+    '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+    '#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#D7BDE2',
+    '#AED6F1', '#A3E4D7', '#F9E79F', '#D2B4DE', '#A9DFBF',
+    '#FAD7A0', '#ABEBC6', '#F5B7B1', '#AED6F1', '#D7BDE2',
+    '#A9CCE3', '#A2D9CE', '#F7DC6F', '#C39BD3', '#7DCEA0',
+    '#F8C471', '#58D68D', '#EC7063', '#5DADE2', '#AF7AC5'
+  ]), []);
+  const DEFAULT_QUOTES = useMemo(() => ([
+    "Celebrate this moment with us—your presence makes it complete.",
+    "Join us as we turn today into a memory we'll treasure forever.",
+    "A special day becomes sweeter when shared with the people we love.",
+    "Let's gather, celebrate, and create moments that last a lifetime.",
+    "Because every joy is greater when shared—come celebrate with us.",
+    "Together is the best place to be—join us on our special day.",
+    "Your presence is our greatest gift—come and celebrate this milestone.",
+    "A day of love, joy, and gratitude—made brighter with you there.",
+    "Celebrate with us as we mark a new chapter filled with hope and happiness.",
+    "You are warmly invited to witness a moment we will cherish forever."
+  ]), []);
   const gradientStyleOptions = useMemo(() => ([
     {
-      id: 'soft-blend',
-      label: 'Soft blend',
-      generator: (stops) => `linear-gradient(135deg, ${stops.join(', ')})`,
+      id: 'linear',
+      label: 'Linear',
+      description: 'Directional blend',
+      icon: 'fa-solid fa-arrows-left-right',
+      supportsAngle: true,
+      generator: (stops, angle = 135) => `linear-gradient(${angle}deg, ${stops.join(', ')})`,
     },
     {
-      id: 'sunset-bloom',
-      label: 'Sunset bloom',
-      generator: (stops) => `linear-gradient(165deg, ${stops[0]}, ${stops[1]}, ${stops[0]})`,
+      id: 'radial',
+      label: 'Radial',
+      description: 'Soft center glow',
+      icon: 'fa-solid fa-circle-dot',
+      supportsAngle: false,
+      generator: (stops) => `radial-gradient(circle at center, ${stops.join(', ')})`,
     },
     {
-      id: 'radial-glow',
-      label: 'Radial glow',
-      generator: (stops) => `radial-gradient(circle at top, ${stops[0]}, ${stops[1]})`,
-    },
-    {
-      id: 'spotlight',
-      label: 'Spotlight',
-      generator: (stops) => `conic-gradient(from 90deg, ${stops[0]}, ${stops[1]}, ${stops[0]})`,
+      id: 'conic',
+      label: 'Angle',
+      description: 'Sweeping burst',
+      icon: 'fa-solid fa-rotate',
+      supportsAngle: true,
+      generator: (stops, angle = 0) => `conic-gradient(from ${angle}deg, ${stops.join(', ')})`,
     },
   ]), []);
-  const buildGradientValue = useCallback((styleId, stops) => {
-    const palette = Array.isArray(stops) && stops.length ? stops : ['#f472b6', '#9333ea'];
+  const normalizeColorForInput = useCallback((value) => {
+    if (typeof value !== 'string') {
+      return '#ffffff';
+    }
+    const trimmed = value.trim();
+    if (trimmed.startsWith('linear-gradient')) {
+      return '#ffffff';
+    }
+    if (/^#([0-9a-f]{3,4})$/i.test(trimmed)) {
+      const hex = trimmed.slice(1);
+      const expanded = hex.split('').map((ch) => ch + ch).join('').slice(0, 6);
+      return `#${expanded}`;
+    }
+    if (/^#([0-9a-f]{6})([0-9a-f]{2})?$/i.test(trimmed)) {
+      return trimmed.slice(0, 7);
+    }
+    return '#ffffff';
+  }, []);
+  const buildGradientValue = useCallback((styleId, stops, angle = 120, opacity = 1) => {
+    const palette = (Array.isArray(stops) && stops.length ? stops : ['#f472b6', '#9333ea']).map((stop) => {
+      const normalized = normalizeColorForInput(stop);
+      const alpha = clamp(opacity, 0, 1);
+      return alpha < 1 ? `rgba(${hexToRgb(normalized)}, ${alpha})` : normalized;
+    });
     const fallback = gradientStyleOptions[0];
     const target = gradientStyleOptions.find((option) => option.id === styleId) ?? fallback;
-    return target.generator(palette);
-  }, [gradientStyleOptions]);
+    return target.generator(palette, angle);
+  }, [gradientStyleOptions, normalizeColorForInput]);
   const gradientPreviewValue = useMemo(
-    () => buildGradientValue(selectedGradientStyle, gradientColorStops),
-    [buildGradientValue, selectedGradientStyle, gradientColorStops],
+    () => buildGradientValue(selectedGradientStyle, gradientColorStops, gradientAngle, backgroundOpacity / 100),
+    [backgroundOpacity, buildGradientValue, gradientAngle, gradientColorStops, selectedGradientStyle],
+  );
+  const selectedGradientDefinition = useMemo(
+    () => gradientStyleOptions.find((option) => option.id === selectedGradientStyle) ?? gradientStyleOptions[0],
+    [gradientStyleOptions, selectedGradientStyle],
   );
   const inlineShadeBackground = useMemo(
-    () => `linear-gradient(0deg, rgba(0, 0, 0, 1), transparent), linear-gradient(90deg, rgba(${hexToRgb(solidPickerColor)}, ${inlineOpacitySlider / 100}), ${solidPickerColor})`,
-    [solidPickerColor, inlineOpacitySlider],
+    () => `linear-gradient(0deg, rgba(0, 0, 0, 1), transparent), linear-gradient(90deg, rgba(${hexToRgb(solidPickerColor)}, ${backgroundOpacity / 100}), ${solidPickerColor})`,
+    [solidPickerColor, backgroundOpacity],
   );
   const PALETTES_PER_BATCH = 5;
 
@@ -2388,56 +2923,11 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
 
   // Shape search state
   const [shapeSearchQuery, setShapeSearchQuery] = useState('');
-  const [shapeSearchResults, setShapeSearchResults] = useState([
-    {
-      id: 'default-square',
-      thumbUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiB4PSI4IiB5PSI4IiBmaWxsPSIjMzc0MTUxIiBzdHJva2U9IiMxYTFhMWEiIHN0cm9rZS13aWR0aD0iMiIvPgo8L3N2Zz4=',
-      previewUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiB4PSI4IiB5PSI4IiBmaWxsPSIjMzc0MTUxIiBzdHJva2U9IiMxYTFhMWEiIHN0cm9rZS13aWR0aD0iMiIvPgo8L3N2Zz4=',
-      downloadUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiB4PSI4IiB5PSI4IiBmaWxsPSIjMzc0MTUxIiBzdHJva2U9IiMxYTFhMWEiIHN0cm9rZS13aWR0aD0iMiIvPgo8L3N2Zz4=',
-      description: 'Square',
-      provider: 'default',
-      providerLabel: 'Basic Shapes',
-      credit: 'Basic Shapes',
-      variant: 'rectangle'
-    },
-    {
-      id: 'default-circle',
-      thumbUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMjQiIGZpbGw9IiMzNzQxNTEiIHN0cm9rZT0iIzFhMWEwYSIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjwvc3ZnPg==',
-      previewUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMjQiIGZpbGw9IiMzNzQxNTEiIHN0cm9rZT0iIzFhMWEwYSIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjwvc3ZnPg==',
-      downloadUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMjQiIGZpbGw9IiMzNzQxNTEiIHN0cm9rZT0iIzFhMWEwYSIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjwvc3ZnPg==',
-      description: 'Circle',
-      provider: 'default',
-      providerLabel: 'Basic Shapes',
-      credit: 'Basic Shapes',
-      variant: 'circle'
-    },
-    {
-      id: 'default-triangle',
-      thumbUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBvbHlnb24gcG9pbnRzPSIzMiw4IDgsNTYgNTYsNTYiIGZpbGw9IiMzNzQxNTEiIHN0cm9rZT0iIzFhMWEwYSIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjwvc3ZnPg==',
-      previewUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBvbHlnb24gcG9pbnRzPSIzMiw4IDgsNTYgNTYsNTYiIGZpbGw9IiMzNzQxNTEiIHN0cm9rZT0iIzFhMWEwYSIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjwvc3ZnPg==',
-      downloadUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBvbHlnb24gcG9pbnRzPSIzMiw4IDgsNTYgNTYsNTYiIGZpbGw9IiMzNzQxNTEiIHN0cm9rZT0iIzFhMWEwYSIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjwvc3ZnPg==',
-      description: 'Triangle',
-      provider: 'default',
-      providerLabel: 'Basic Shapes',
-      credit: 'Basic Shapes',
-      variant: 'triangle'
-    },
-    {
-      id: 'default-star-shape',
-      thumbUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBvbHlnb24gcG9pbnRzPSIzMiwxOSA0OSwxOSA1OCwzNiAzMiwzNiIgcG9pbnRzPSIyMCwxNiAzMiwzNiA0MiwzNiA0OCwzNiA0OCwxNiAzOCwxNiAzOCwyNiAyMCwyNiIgZmlsbD0iIzM3NDE1MSIgc3Ryb2tlPSIjMWExYTBhIiBzdHJva2Utd2lkdGg9IjIiLz4KPC9zdmc+',
-      previewUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBvbHlnb24gcG9pbnRzPSIzMiwxOSA0OSwxOSA1OCwzNiAzMiwzNiIgcG9pbnRzPSIyMCwxNiAzMiwzNiA0MiwzNiA0OCwzNiA0OCwxNiAzOCwxNiAzOCwyNiAyMCwyNiIgZmlsbD0iIzM3NDE1MSIgc3Ryb2tlPSIjMWExYTBhIiBzdHJva2Utd2lkdGg9IjIiLz4KPC9zdmc+',
-      downloadUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBvbHlnb24gcG9pbnRzPSIzMiwxOSA0OSwxOSA1OCwzNiAzMiwzNiIgcG9pbnRzPSIyMCwxNiAzMiwzNiA0MiwzNiA0OCwzNiA0OCwxNiAzOCwxNiAzOCwyNiAyMCwyNiIgZmlsbD0iIzM3NDE1MSIgc3Ryb2tlPSIjMWExYTBhIiBzdHJva2Utd2lkdGg9IjIiLz4KPC9zdmc+',
-      description: 'Star',
-      provider: 'default',
-      providerLabel: 'Basic Shapes',
-      credit: 'Basic Shapes',
-      variant: 'star'
-    },
-  ]);
+  const [shapeSearchResults, setShapeSearchResults] = useState(() => getDefaultShapeResults());
   const [isSearchingShapes, setIsSearchingShapes] = useState(false);
   const [shapeCurrentPage, setShapeCurrentPage] = useState(1);
   const [isLoadingMoreShapes, setIsLoadingMoreShapes] = useState(false);
-  const [hasMoreShapes, setHasMoreShapes] = useState(true);
+  const [hasMoreShapes, setHasMoreShapes] = useState(false);
   const shapeCurrentPageRef = useRef(1);
   const activeShapeSearchQueryRef = useRef('');
   const hasTriggeredShapeSearchRef = useRef(false);
@@ -2458,25 +2948,6 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
   const activeGradientThemeConfig = useMemo(() => (
     LINEAR_GRADIENT_LIBRARY.find((theme) => theme.id === activeGradientTheme) ?? LINEAR_GRADIENT_LIBRARY[0]
   ), [LINEAR_GRADIENT_LIBRARY, activeGradientTheme]);
-  const normalizeColorForInput = useCallback((value) => {
-    if (typeof value !== 'string') {
-      return '#ffffff';
-    }
-    const trimmed = value.trim();
-    if (trimmed.startsWith('linear-gradient')) {
-      return '#ffffff';
-    }
-    if (/^#([0-9a-f]{3,4})$/i.test(trimmed)) {
-      const hex = trimmed.slice(1);
-      const expanded = hex.split('').map((ch) => ch + ch).join('').slice(0, 6);
-      return `#${expanded}`;
-    }
-    if (/^#([0-9a-f]{6})([0-9a-f]{2})?$/i.test(trimmed)) {
-      return trimmed.slice(0, 7);
-    }
-    return '#ffffff';
-  }, []);
-
   useEffect(() => {
     setBackgroundColorInput(normalizeColorForInput(activePage?.background ?? '#ffffff'));
   }, [activePage?.background, normalizeColorForInput]);
@@ -2488,6 +2959,17 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
   useEffect(() => {
     setSolidHexDraft(solidPickerColor.toUpperCase());
   }, [solidPickerColor]);
+
+  useEffect(() => {
+    setGradientInputs(gradientColorStops.map((stop) => {
+      if (typeof stop !== 'string') {
+        return '#FFFFFF';
+      }
+      const trimmed = stop.trim();
+      const prefixed = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+      return prefixed.substring(0, 7).toUpperCase();
+    }));
+  }, [gradientColorStops]);
 
   useEffect(() => {
     const { h } = hexToHsl(solidPickerColor);
@@ -2557,18 +3039,91 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
     }
   }, []);
 
-  const handleAddShape = (variant, imageDataUrl = null) => {
+  const handleAddShape = (shapeInput, imageDataUrl = null) => {
     if (!activePage) {
       return;
     }
 
+    const shapeConfig = typeof shapeInput === 'string' || !shapeInput
+      ? { variant: shapeInput || 'rectangle' }
+      : shapeInput;
+
+    const rawVariant = shapeConfig.variant ?? 'rectangle';
+    const normalization = SHAPE_VARIANT_NORMALIZATION[rawVariant] || {};
+    const normalizedVariant = normalization.variant ?? rawVariant;
+    const fallbackLabelSource = shapeConfig.maskVariant || normalization.mask || rawVariant || 'shape';
+    const friendlyLabel = typeof fallbackLabelSource === 'string'
+      ? fallbackLabelSource
+        .replace(/[-_]+/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase())
+      : 'Shape';
+    const name = shapeConfig.description || shapeConfig.label || shapeConfig.name || friendlyLabel || 'Shape';
+
+    let borderRadius = shapeConfig.borderRadius;
+    if (borderRadius === undefined || borderRadius === null) {
+      if (normalizedVariant === 'circle') {
+        borderRadius = 9999;
+      } else if (normalizedVariant === 'rectangle') {
+        borderRadius = 16;
+      } else {
+        borderRadius = 0;
+      }
+    }
+
     const layer = createLayer('shape', activePage, {
-      name: variant === 'circle' ? 'Circle' : 'Rectangle',
-      variant,
-      borderRadius: variant === 'circle' ? 9999 : 16,
+      name,
+      variant: normalizedVariant,
+      borderRadius,
+      fill: shapeConfig.fill ?? shapeConfig.placeholderFill ?? undefined,
+      stroke: shapeConfig.stroke ?? shapeConfig.placeholderStroke ?? undefined,
+      metadata: { ...(shapeConfig.metadata ?? {}) },
     });
 
-    if (variant === 'circle') {
+    const baseMetadata = { ...(layer.metadata ?? {}) };
+    const maskVariant = shapeConfig.maskVariant
+      ?? baseMetadata.maskVariant
+      ?? normalization.mask
+      ?? normalizedVariant;
+    const placeholderFill = shapeConfig.placeholderFill
+      ?? baseMetadata.placeholderFill
+      ?? layer.fill
+      ?? DEFAULT_SHAPE_PLACEHOLDER_FILL;
+    const placeholderStroke = shapeConfig.placeholderStroke
+      ?? baseMetadata.placeholderStroke
+      ?? layer.stroke
+      ?? DEFAULT_SHAPE_PLACEHOLDER_STROKE;
+    const placeholderLabel = shapeConfig.placeholderLabel
+      ?? baseMetadata.placeholderLabel
+      ?? 'Add image';
+    const placeholderIcon = shapeConfig.placeholderIcon
+      ?? baseMetadata.placeholderIcon
+      ?? 'fa-solid fa-image';
+
+    layer.metadata = {
+      ...baseMetadata,
+      placeholderFill,
+      placeholderStroke,
+      placeholderLabel,
+      placeholderIcon,
+      maskVariant,
+      isImageFrame: true,
+      objectFit: baseMetadata.objectFit ?? 'cover',
+      imageScale: Number.isFinite(baseMetadata.imageScale) ? baseMetadata.imageScale : 1,
+      imageOffsetX: Number.isFinite(baseMetadata.imageOffsetX) ? baseMetadata.imageOffsetX : 0,
+      imageOffsetY: Number.isFinite(baseMetadata.imageOffsetY) ? baseMetadata.imageOffsetY : 0,
+      originalVariant: rawVariant,
+    };
+
+    layer.fill = placeholderFill;
+    layer.stroke = placeholderStroke;
+
+    layer.shape = {
+      id: maskVariant,
+      variant: normalizedVariant,
+      borderRadius,
+    };
+
+    if (normalizedVariant === 'circle') {
       layer.frame = {
         ...layer.frame,
         width: Math.min(activePage.width * 0.3, layer.frame?.width ?? 280),
@@ -2576,18 +3131,20 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       };
     }
 
-    // If image data is provided, set it as the shape's fill/background
-    if (imageDataUrl) {
-      layer.metadata = {
-        ...layer.metadata,
-        backgroundImage: imageDataUrl,
-        objectFit: 'cover',
-        imageScale: 1,
-        imageOffsetX: 0,
-        imageOffsetY: 0,
-      };
-      // Set fill to transparent so the background image shows through
+    const resolvedImage = typeof imageDataUrl === 'string' && imageDataUrl
+      ? imageDataUrl
+      : typeof shapeConfig.imageDataUrl === 'string' && shapeConfig.imageDataUrl
+        ? shapeConfig.imageDataUrl
+        : typeof shapeConfig.content === 'string' && shapeConfig.content
+          ? shapeConfig.content
+          : null;
+
+    if (resolvedImage) {
+      layer.content = resolvedImage;
       layer.fill = 'transparent';
+      layer.stroke = 'transparent';
+    } else {
+      layer.content = '';
     }
 
     if (layer.frame) {
@@ -3064,17 +3621,17 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
     const perPage = ITEMS_PER_PAGE.flaticon;
     console.log('Fetching shapes:', { query: trimmedQuery, pageNumber, perPage });
 
-    // Try reliable icon/shape APIs
+    // Try reliable icon APIs
     const apis = [
       {
         name: 'Iconify',
-        searchUrl: `https://api.iconify.design/search?query=${encodeURIComponent(trimmedQuery + ' shape')}&limit=${perPage}&start=${(pageNumber - 1) * perPage}`,
+        searchUrl: `https://api.iconify.design/search?query=${encodeURIComponent(trimmedQuery)}&limit=${perPage}&start=${(pageNumber - 1) * perPage}`,
         noAuth: true,
         type: 'iconify'
       },
       {
         name: 'Simple Icons Search',
-        searchUrl: `https://api.github.com/search/code?q=${encodeURIComponent(trimmedQuery + ' shape')}+repo:simple-icons/simple-icons&per_page=${Math.min(perPage, 30)}&page=${pageNumber}`,
+        searchUrl: `https://api.github.com/search/code?q=${encodeURIComponent(trimmedQuery)}+repo:simple-icons/simple-icons&per_page=${Math.min(perPage, 30)}&page=${pageNumber}`,
         noAuth: true,
         type: 'github'
       }
@@ -3118,7 +3675,6 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
           let downloadUrl = '';
           let description = '';
           let credit = '';
-          let variant = 'rectangle'; // default
 
           if (api.name === 'Iconify') {
             // Iconify returns icon names like "mdi:home" or "fa:heart"
@@ -3128,15 +3684,6 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
             downloadUrl = `https://api.iconify.design/${shape}.svg`;
             description = name.replace(/([A-Z])/g, ' $1').trim() || shape;
             credit = `Iconify (${prefix})`;
-            
-            // Determine shape variant based on name
-            if (description.toLowerCase().includes('circle') || description.toLowerCase().includes('round')) {
-              variant = 'circle';
-            } else if (description.toLowerCase().includes('triangle')) {
-              variant = 'triangle';
-            } else if (description.toLowerCase().includes('star')) {
-              variant = 'star';
-            }
           } else if (api.name === 'Simple Icons Search') {
             // GitHub code search returns items with path or name
             let shapeName = '';
@@ -3151,19 +3698,10 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
             downloadUrl = thumbUrl;
             description = shapeName.replace(/([A-Z])/g, ' $1').trim() || 'Shape';
             credit = 'Simple Icons';
-            
-            // Determine shape variant based on name
-            if (description.toLowerCase().includes('circle') || description.toLowerCase().includes('round')) {
-              variant = 'circle';
-            } else if (description.toLowerCase().includes('triangle')) {
-              variant = 'triangle';
-            } else if (description.toLowerCase().includes('star')) {
-              variant = 'star';
-            }
           }
 
           return {
-            id: `${api.name.toLowerCase()}-shape-${shape}-${index}`,
+            id: `${api.name.toLowerCase()}-${shape}-${index}`,
             thumbUrl,
             previewUrl,
             downloadUrl,
@@ -3171,7 +3709,6 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
             provider: api.name.toLowerCase(),
             providerLabel: api.name,
             credit,
-            variant,
             raw: shape,
           };
         }).filter(shape => shape.thumbUrl); // Only include shapes with valid URLs
@@ -3200,12 +3737,60 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
     // If all APIs fail, provide fallback shapes that always work
     console.log('All APIs failed, providing fallback shapes');
     const commonShapes = [
-      { name: 'square', variant: 'rectangle', url: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiB4PSI4IiB5PSI4IiBmaWxsPSIjMzc0MTUxIiBzdHJva2U9IiMxYTFhMWEiIHN0cm9rZS13aWR0aD0iMiIvPgo8L3N2Zz4=', tags: ['rectangle', 'square', 'box'] },
-      { name: 'circle', variant: 'circle', url: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMjQiIGZpbGw9IiMzNzQxNTEiIHN0cm9rZT0iIzFhMWEwYSIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjwvc3ZnPg==', tags: ['circle', 'round', 'oval'] },
-      { name: 'triangle', variant: 'triangle', url: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBvbHlnb24gcG9pbnRzPSIzMiw4IDgsNTYgNTYsNTYiIGZpbGw9IiMzNzQxNTEiIHN0cm9rZT0iIzFhMWEwYSIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjwvc3ZnPg==', tags: ['triangle', 'polygon', 'geometric'] },
-      { name: 'star', variant: 'star', url: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBvbHlnb24gcG9pbnRzPSIyMCwxNiAzMiwzNiA0MiwzNiA0OCwzNiA0OCwxNiAzOCwxNiAzOCwyNiAyMCwyNiIgZmlsbD0iIzM3NDE1MSIgc3Ryb2tlPSIjMWExYTBhIiBzdHJva2Utd2lkdGg9IjIiLz4KPC9zdmc+', tags: ['star', 'rating', 'favorite'] },
-      { name: 'hexagon', variant: 'hexagon', url: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBvbHlnb24gcG9pbnRzPSIxNiwyMCA4LDM2IDI0LDUyIDQwLDUyIDQ4LDM2IDQwLDIwIiBmaWxsPSIjMzc0MTUxIiBzdHJva2U9IiMxYTFhMWEiIHN0cm9rZS13aWR0aD0iMiIvPgo8L3N2Zz4=', tags: ['hexagon', 'polygon', 'geometric'] },
-      { name: 'diamond', variant: 'diamond', url: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBvbHlnb24gcG9pbnRzPSIzMiwyMCAyMCw4IDQ0LDg1MiA0NCIgZmlsbD0iIzM3NDE1MSIgc3Ryb2tlPSIjMWExYTBhIiBzdHJva2Utd2lkdGg9IjIiLz4KPC9zdmc+', tags: ['diamond', 'rhombus', 'geometric'] },
+      {
+        name: 'square',
+        variant: 'rectangle',
+        maskVariant: 'rectangle',
+        url: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiB4PSI4IiB5PSI4IiBmaWxsPSIjMzc0MTUxIiBzdHJva2U9IiMxYTFhMWEiIHN0cm9rZS13aWR0aD0iMiIvPgo8L3N2Zz4=',
+        tags: ['rectangle', 'square', 'box'],
+        placeholderFill: DEFAULT_SHAPE_PLACEHOLDER_FILL,
+        placeholderStroke: DEFAULT_SHAPE_PLACEHOLDER_STROKE,
+      },
+      {
+        name: 'circle',
+        variant: 'circle',
+        maskVariant: 'circle',
+        url: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMjQiIGZpbGw9IiMzNzQxNTEiIHN0cm9rZT0iIzFhMWEwYSIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjwvc3ZnPg==',
+        tags: ['circle', 'round', 'oval'],
+        placeholderFill: DEFAULT_SHAPE_PLACEHOLDER_FILL,
+        placeholderStroke: DEFAULT_SHAPE_PLACEHOLDER_STROKE,
+      },
+      {
+        name: 'triangle',
+        variant: 'polygon',
+        maskVariant: 'triangle',
+        url: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBvbHlnb24gcG9pbnRzPSIzMiw4IDgsNTYgNTYsNTYiIGZpbGw9IiMzNzQxNTEiIHN0cm9rZT0iIzFhMWEwYSIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjwvc3ZnPg==',
+        tags: ['triangle', 'polygon', 'geometric'],
+        placeholderFill: DEFAULT_SHAPE_PLACEHOLDER_FILL,
+        placeholderStroke: DEFAULT_SHAPE_PLACEHOLDER_STROKE,
+      },
+      {
+        name: 'star',
+        variant: 'polygon',
+        maskVariant: 'star',
+        url: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBvbHlnb24gcG9pbnRzPSIyMCwxNiAzMiwzNiA0MiwzNiA0OCwzNiA0OCwxNiAzOCwxNiAzOCwyNiAyMCwyNiIgZmlsbD0iIzM3NDE1MSIgc3Ryb2tlPSIjMWExYTBhIiBzdHJva2Utd2lkdGg9IjIiLz4KPC9zdmc+',
+        tags: ['star', 'rating', 'favorite'],
+        placeholderFill: DEFAULT_SHAPE_PLACEHOLDER_FILL,
+        placeholderStroke: DEFAULT_SHAPE_PLACEHOLDER_STROKE,
+      },
+      {
+        name: 'hexagon',
+        variant: 'polygon',
+        maskVariant: 'hexagon',
+        url: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBvbHlnb24gcG9pbnRzPSIxNiwyMCA4LDM2IDI0LDUyIDQwLDUyIDQ4LDM2IDQwLDIwIiBmaWxsPSIjMzc0MTUxIiBzdHJva2U9IiMxYTFhMWEiIHN0cm9rZS13aWR0aD0iMiIvPgo8L3N2Zz4=',
+        tags: ['hexagon', 'polygon', 'geometric'],
+        placeholderFill: DEFAULT_SHAPE_PLACEHOLDER_FILL,
+        placeholderStroke: DEFAULT_SHAPE_PLACEHOLDER_STROKE,
+      },
+      {
+        name: 'diamond',
+        variant: 'polygon',
+        maskVariant: 'diamond',
+        url: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBvbHlnb24gcG9pbnRzPSIzMiwyMCAyMCw4IDQ0LDg1MiA0NCIgZmlsbD0iIzM3NDE1MSIgc3Ryb2tlPSIjMWExYTBhIiBzdHJva2Utd2lkdGg9IjIiLz4KPC9zdmc+',
+        tags: ['diamond', 'rhombus', 'geometric'],
+        placeholderFill: DEFAULT_SHAPE_PLACEHOLDER_FILL,
+        placeholderStroke: DEFAULT_SHAPE_PLACEHOLDER_STROKE,
+      },
     ];
 
     // Filter fallback shapes based on search query
@@ -3224,6 +3809,9 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       providerLabel: 'Basic Shapes',
       credit: 'Basic Shapes',
       variant: shape.variant,
+      maskVariant: shape.maskVariant,
+      placeholderFill: shape.placeholderFill,
+      placeholderStroke: shape.placeholderStroke,
       raw: shape,
     }));
 
@@ -3237,54 +3825,11 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
   const handleShapeSearch = useCallback(async (rawQuery) => {
     const trimmedQuery = (rawQuery ?? '').trim();
 
+    const defaultMatches = searchDefaultShapes(trimmedQuery);
+    setShapeSearchResults(defaultMatches);
+
     // If empty query, reset to default shapes
     if (!trimmedQuery) {
-      setShapeSearchResults([
-        {
-          id: 'default-square',
-          thumbUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiB4PSI4IiB5PSI4IiBmaWxsPSIjMzc0MTUxIiBzdHJva2U9IiMxYTFhMWEiIHN0cm9rZS13aWR0aD0iMiIvPgo8L3N2Zz4=',
-          previewUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiB4PSI4IiB5PSI4IiBmaWxsPSIjMzc0MTUxIiBzdHJva2U9IiMxYTFhMWEiIHN0cm9rZS13aWR0aD0iMiIvPgo8L3N2Zz4=',
-          downloadUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiB4PSI4IiB5PSI4IiBmaWxsPSIjMzc0MTUxIiBzdHJva2U9IiMxYTFhMWEiIHN0cm9rZS13aWR0aD0iMiIvPgo8L3N2Zz4=',
-          description: 'Square',
-          provider: 'default',
-          providerLabel: 'Basic Shapes',
-          credit: 'Basic Shapes',
-          variant: 'rectangle'
-        },
-        {
-          id: 'default-circle',
-          thumbUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMjQiIGZpbGw9IiMzNzQxNTEiIHN0cm9rZT0iIzFhMWEwYSIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjwvc3ZnPg==',
-          previewUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMjQiIGZpbGw9IiMzNzQxNTEiIHN0cm9rZT0iIzFhMWEwYSIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjwvc3ZnPg==',
-          downloadUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMjQiIGZpbGw9IiMzNzQxNTEiIHN0cm9rZT0iIzFhMWEwYSIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjwvc3ZnPg==',
-          description: 'Circle',
-          provider: 'default',
-          providerLabel: 'Basic Shapes',
-          credit: 'Basic Shapes',
-          variant: 'circle'
-        },
-        {
-          id: 'default-triangle',
-          thumbUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBvbHlnb24gcG9pbnRzPSIzMiw4IDgsNTYgNTYsNTYiIGZpbGw9IiMzNzQxNTEiIHN0cm9rZT0iIzFhMWEwYSIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjwvc3ZnPg==',
-          previewUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBvbHlnb24gcG9pbnRzPSIzMiw4IDgsNTYgNTYsNTYiIGZpbGw9IiMzNzQxNTEiIHN0cm9rZT0iIzFhMWEwYSIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjwvc3ZnPg==',
-          downloadUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBvbHlnb24gcG9pbnRzPSIzMiw4IDgsNTYgNTYsNTYiIGZpbGw9IiMzNzQxNTEiIHN0cm9rZT0iIzFhMWEwYSIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjwvc3ZnPg==',
-          description: 'Triangle',
-          provider: 'default',
-          providerLabel: 'Basic Shapes',
-          credit: 'Basic Shapes',
-          variant: 'triangle'
-        },
-        {
-          id: 'default-star-shape',
-          thumbUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBvbHlnb24gcG9pbnRzPSIyMCwxNiAzMiwzNiA0MiwzNiA0OCwzNiA0OCwxNiAzOCwxNiAzOCwyNiAyMCwyNiIgZmlsbD0iIzM3NDE1MSIgc3Ryb2tlPSIjMWExYTBhIiBzdHJva2Utd2lkdGg9IjIiLz4KPC9zdmc+',
-          previewUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBvbHlnb24gcG9pbnRzPSIyMCwxNiAzMiwzNiA0MiwzNiA0OCwzNiA0OCwxNiAzOCwxNiAzOCwyNiAyMCwyNiIgZmlsbD0iIzM3NDE1MSIgc3Ryb2tlPSIjMWExYTBhIiBzdHJva2Utd2lkdGg9IjIiLz4KPC9zdmc+',
-          downloadUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBvbHlnb24gcG9pbnRzPSIyMCwxNiAzMiwzNiA0MiwzNiA0OCwzNiA0OCwxNiAzOCwxNiAzOCwyNiAyMCwyNiIgZmlsbD0iIzM3NDE1MSIgc3Ryb2tlPSIjMWExYTBhIiBzdHJva2Utd2lkdGg9IjIiLz4KPC9zdmc+',
-          description: 'Star',
-          provider: 'default',
-          providerLabel: 'Basic Shapes',
-          credit: 'Basic Shapes',
-          variant: 'star'
-        },
-      ]);
       hasTriggeredShapeSearchRef.current = false;
       setShapeCurrentPage(1);
       shapeCurrentPageRef.current = 1;
@@ -3300,16 +3845,26 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
     setHasMoreShapes(true);
     try {
       const { items, hasMore: nextHasMore } = await fetchShapes(trimmedQuery, 1);
-      setShapeSearchResults(items);
+      if (items.length > 0) {
+        setShapeSearchResults((prev) => {
+          const seen = new Set(prev.map((shape) => shape.id));
+          const merged = [...prev];
+          for (const item of items) {
+            if (!seen.has(item.id)) {
+              merged.push(item);
+            }
+          }
+          return merged;
+        });
+      }
       const nextPage = items.length > 0 ? 2 : 1;
       setShapeCurrentPage(nextPage);
       shapeCurrentPageRef.current = nextPage;
       setHasMoreShapes(nextHasMore);
     } catch (error) {
       console.error('Shape search failed:', error);
-      // Even on error, we should have fallback shapes, but let's show a warning
-      alert('Some shape providers are unavailable. Showing fallback shapes instead.');
-      // Don't clear results - fetchShapes should always return fallback shapes
+      // Even on error, default matches still displayed; optional warning for debugging
+      console.error('Showing default shape results due to provider failure.');
       setHasMoreShapes(false);
     } finally {
       setIsSearchingShapes(false);
@@ -3328,7 +3883,16 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
     try {
       const { items, hasMore: nextHasMore } = await fetchShapes(activeQuery, shapeCurrentPageRef.current);
       if (items.length > 0) {
-        setShapeSearchResults((prev) => [...prev, ...items]);
+        setShapeSearchResults((prev) => {
+          const seen = new Set(prev.map((shape) => shape.id));
+          const merged = [...prev];
+          for (const item of items) {
+            if (!seen.has(item.id)) {
+              merged.push(item);
+            }
+          }
+          return merged;
+        });
         const nextPage = shapeCurrentPageRef.current + 1;
         setShapeCurrentPage(nextPage);
         shapeCurrentPageRef.current = nextPage;
@@ -3648,7 +4212,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
     // For shapes, we can either use the shape variant directly or load the icon
     if (shape.variant) {
       // Use the built-in shape variant - now supports image content
-      handleAddShape(shape.variant);
+      handleAddShape(shape);
     } else {
       // Handle shape as an icon/image
       const sourceUrl = shape?.downloadUrl || shape?.previewUrl || shape?.thumbUrl;
@@ -3737,7 +4301,11 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
           }
 
           // Create shape with image content
-          handleAddShape(variant, imageUrl);
+          const normalization = SHAPE_VARIANT_NORMALIZATION[variant] || {};
+          handleAddShape({
+            variant,
+            maskVariant: normalization.mask,
+          }, imageUrl);
 
           // Persist the file to IndexedDB for recent images
           try {
@@ -3797,7 +4365,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
 
       const statusMessage = displayQuery
         ? `Showing palettes for “${displayQuery}”`
-        : 'Showing AI + curated palettes.';
+        : '';
       setPaletteStatus(statusMessage);
     } catch (error) {
       console.error('Failed to generate color palettes:', error);
@@ -3886,14 +4454,10 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       props: { fill: color },
     });
 
-    // Track color in history
-    setColorHistory(prev => {
-      const newHistory = [color, ...prev.filter(c => c !== color)];
-      return newHistory.slice(0, 20); // Keep only the most recent 20 colors
-    });
+    rememberColor(color);
 
     setPaletteError('');
-  }, [activePage, dispatch, state.selectedLayerId]);
+  }, [activePage, dispatch, rememberColor, state.selectedLayerId]);
 
   const applyColorToBackground = useCallback((color) => {
     if (!activePage) {
@@ -3916,9 +4480,10 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
     setBackgroundColorInput(normalized);
     setSolidPickerColor(normalized);
     setSolidHexDraft(normalized.toUpperCase());
+    rememberColor(normalized);
     const colorWithAlpha = alpha < 1 ? `rgba(${hexToRgb(normalized)}, ${alpha})` : normalized;
     applyColorToBackground(colorWithAlpha);
-  }, [applyColorToBackground, normalizeColorForInput]);
+  }, [applyColorToBackground, normalizeColorForInput, rememberColor]);
 
   const handleSolidHexInput = useCallback((rawValue) => {
     if (!rawValue) {
@@ -3928,43 +4493,48 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
     const nextValue = (rawValue.startsWith('#') ? rawValue : `#${rawValue}`).toUpperCase();
     setSolidHexDraft(nextValue);
     if (/^#([0-9A-F]{3}|[0-9A-F]{6})$/.test(nextValue)) {
-      handleSolidColorImmediateApply(nextValue);
+      handleSolidColorImmediateApply(nextValue, backgroundOpacity / 100);
     }
-  }, [handleSolidColorImmediateApply]);
+  }, [backgroundOpacity, handleSolidColorImmediateApply]);
 
   const handleHueSliderChange = useCallback((nextHue) => {
     const numericHue = Number(nextHue);
     setHueSliderValue(numericHue);
-    const { s, l } = hexToHsl(solidPickerColor);
-    const updatedHex = hslToHex(numericHue, s, l);
-    handleSolidColorImmediateApply(updatedHex);
-  }, [handleSolidColorImmediateApply, solidPickerColor]);
+    const updatedHex = hslToHex(numericHue, 100, 50);
+    setSolidPickerColor(updatedHex);
+    setSolidHexDraft(updatedHex);
+    handleSolidColorImmediateApply(updatedHex, backgroundOpacity / 100);
+  }, [backgroundOpacity, handleSolidColorImmediateApply]);
 
   const handleColorTabChange = useCallback((tab) => {
     setColorPickerTab(tab);
     if (tab === 'gradient') {
-      applyColorToBackground(buildGradientValue(selectedGradientStyle, gradientColorStops));
+      applyColorToBackground(buildGradientValue(selectedGradientStyle, gradientColorStops, gradientAngle, backgroundOpacity / 100));
       return;
     }
-    handleSolidColorImmediateApply(solidPickerColor);
-  }, [applyColorToBackground, buildGradientValue, gradientColorStops, handleSolidColorImmediateApply, selectedGradientStyle, solidPickerColor]);
+    handleSolidColorImmediateApply(solidPickerColor, backgroundOpacity / 100);
+  }, [applyColorToBackground, backgroundOpacity, buildGradientValue, gradientAngle, gradientColorStops, handleSolidColorImmediateApply, selectedGradientStyle, solidPickerColor]);
 
   const handleGradientColorChange = useCallback((index, value) => {
+    const normalized = normalizeColorForInput(value);
     setGradientColorStops((prevStops) => {
       const nextStops = [...prevStops];
-      nextStops[index] = value;
+      nextStops[index] = normalized;
       if (colorPickerTab === 'gradient') {
-        applyColorToBackground(buildGradientValue(selectedGradientStyle, nextStops));
+        applyColorToBackground(
+          buildGradientValue(selectedGradientStyle, nextStops, gradientAngle, backgroundOpacity / 100),
+        );
       }
       return nextStops;
     });
-  }, [applyColorToBackground, buildGradientValue, colorPickerTab, selectedGradientStyle]);
+    rememberColor(normalized);
+  }, [applyColorToBackground, backgroundOpacity, buildGradientValue, colorPickerTab, gradientAngle, normalizeColorForInput, rememberColor, selectedGradientStyle]);
 
   const handleGradientStyleSelect = useCallback((styleId) => {
     setSelectedGradientStyle(styleId);
     setColorPickerTab('gradient');
-    applyColorToBackground(buildGradientValue(styleId, gradientColorStops));
-  }, [applyColorToBackground, buildGradientValue, gradientColorStops]);
+    applyColorToBackground(buildGradientValue(styleId, gradientColorStops, gradientAngle, backgroundOpacity / 100));
+  }, [applyColorToBackground, backgroundOpacity, buildGradientValue, gradientAngle, gradientColorStops]);
 
   const handleAddGradientStop = useCallback(() => {
     setGradientColorStops((prevStops) => {
@@ -3975,6 +4545,79 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       return [...prevStops, duplicate];
     });
   }, []);
+
+  const handleGradientInputChange = useCallback((index, rawValue) => {
+    const cleaned = (rawValue ?? '').replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
+    const sanitized = `#${cleaned}`.toUpperCase();
+    setGradientInputs((prev) => {
+      const next = [...prev];
+      next[index] = sanitized;
+      return next;
+    });
+    if (/^#([0-9A-F]{6})$/.test(sanitized)) {
+      handleGradientColorChange(index, sanitized);
+    }
+  }, [handleGradientColorChange]);
+
+  const handleGradientAngleChange = useCallback((nextAngle) => {
+    const numeric = Math.max(0, Math.min(360, Number(nextAngle)));
+    setGradientAngle(numeric);
+    if (colorPickerTab === 'gradient') {
+      applyColorToBackground(
+        buildGradientValue(selectedGradientStyle, gradientColorStops, numeric, backgroundOpacity / 100),
+      );
+    }
+  }, [applyColorToBackground, backgroundOpacity, buildGradientValue, colorPickerTab, gradientColorStops, selectedGradientStyle]);
+
+  const handleBackgroundOpacityChange = useCallback((nextValue) => {
+    const numeric = Math.max(0, Math.min(100, Number(nextValue)));
+    setBackgroundOpacity(numeric);
+    if (colorPickerTab === 'gradient') {
+      applyColorToBackground(
+        buildGradientValue(selectedGradientStyle, gradientColorStops, gradientAngle, numeric / 100),
+      );
+    } else {
+      handleSolidColorImmediateApply(solidPickerColor, numeric / 100);
+    }
+  }, [applyColorToBackground, buildGradientValue, colorPickerTab, gradientAngle, gradientColorStops, handleSolidColorImmediateApply, selectedGradientStyle, solidPickerColor]);
+
+  const handleRecentColorClick = useCallback((color) => {
+    if (colorPickerTab === 'solid') {
+      handleSolidColorImmediateApply(color, backgroundOpacity / 100);
+      return;
+    }
+    handleGradientColorChange(activeGradientStop, color);
+  }, [activeGradientStop, backgroundOpacity, colorPickerTab, handleGradientColorChange, handleSolidColorImmediateApply]);
+
+  const handleApplyBackground = useCallback(() => {
+    if (colorPickerTab === 'gradient') {
+      applyColorToBackground(
+        buildGradientValue(selectedGradientStyle, gradientColorStops, gradientAngle, backgroundOpacity / 100),
+      );
+      gradientColorStops.forEach((stop) => rememberColor(stop));
+      return;
+    }
+    handleSolidColorImmediateApply(solidPickerColor, backgroundOpacity / 100);
+  }, [applyColorToBackground, backgroundOpacity, buildGradientValue, colorPickerTab, gradientAngle, gradientColorStops, handleSolidColorImmediateApply, rememberColor, selectedGradientStyle, solidPickerColor]);
+
+  const handleDefaultGradientClick = useCallback((gradient) => {
+    const match = gradient.match(/linear-gradient\(90deg, ([^,]+), ([^)]+)\)/);
+    if (!match) return;
+    const color1 = match[1].trim();
+    const color2 = match[2].trim();
+    setGradientColorStops([color1, color2]);
+    setSelectedGradientStyle('linear');
+    setGradientAngle(90);
+    setBackgroundOpacity(100);
+    setColorPickerTab('gradient');
+    handleApplyBackground();
+  }, [handleApplyBackground]);
+
+  const handleDefaultSolidColorClick = useCallback((color) => {
+    setSolidPickerColor(color);
+    setSolidHexDraft(color);
+    handleSolidColorImmediateApply(color, backgroundOpacity / 100);
+  }, [backgroundOpacity, handleSolidColorImmediateApply]);
 
   const toggleColorModal = useCallback(() => {
     setIsColorModalOpen((prev) => !prev);
@@ -4041,11 +4684,6 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
               </div>
             </div>
           ))}
-        </div>
-      )}
-      {isLoadingMorePalettes && (
-        <div className="builder-sidebar__hint" style={{ color: '#0f172a', fontWeight: 600 }}>
-          Loading more palettes...
         </div>
       )}
       {paletteStatus && (
@@ -4539,14 +5177,13 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
           quotes = fallbackQuotes;
         }
 
-        setQuoteSearchResults(quotes);
+        setQuoteSearchResults((prev) => [...prev, ...quotes]);
         const nextPage = quotes.length > 0 ? 2 : 1;
         setQuoteCurrentPage(nextPage);
         quoteCurrentPageRef.current = nextPage;
-        setHasMoreQuotes(false); // ZenQuotes doesn't support pagination
+        setHasMoreQuotes(true); // Allow loading more quotes
       } catch (error) {
         console.error('Quote generation failed:', error);
-        alert('Some quote providers are unavailable. Showing fallback quotes instead.');
         // Show fallback quotes on error
         const fallbackQuotes = [
           {
@@ -4568,8 +5205,8 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
             category: 'dreams',
           },
         ];
-        setQuoteSearchResults(fallbackQuotes);
-        setHasMoreQuotes(false);
+        setQuoteSearchResults((prev) => [...prev, ...fallbackQuotes]);
+        setHasMoreQuotes(true);
       } finally {
         setIsSearchingQuotes(false);
       }
@@ -4629,7 +5266,6 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       setQuoteSearchResults(filteredQuotes.length > 0 ? filteredQuotes : fallbackQuotes);
     } catch (error) {
       console.error('Quote search failed:', error);
-      alert('Some quote providers are unavailable. Showing fallback quotes instead.');
       setHasMoreQuotes(false);
     } finally {
       setIsSearchingQuotes(false);
@@ -4684,11 +5320,10 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
         }
 
         setQuoteSearchResults((prev) => [...prev, ...newQuotes]);
-        setHasMoreQuotes(false); // ZenQuotes doesn't support pagination
+        setHasMoreQuotes(true); // Allow loading more quotes
       } catch (error) {
         console.error('Load more quotes failed:', error);
-        alert('Unable to load more quotes. Using available quotes.');
-        setHasMoreQuotes(false);
+        setHasMoreQuotes(true); // Allow retrying to load more quotes
       } finally {
         setIsLoadingMoreQuotes(false);
       }
@@ -4792,6 +5427,26 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
     const layer = createLayer('text', activePage, {
       name: 'Quote',
       content: `"${quote.content}"\n\n— ${quote.author}`,
+      fontSize: 28,
+      fontFamily: 'Georgia, serif',
+      fontWeight: '400',
+      textAlign: 'center',
+    });
+
+    if (layer.frame) {
+      layer.frame = constrainFrameToSafeZone(layer.frame, activePage, safeInsets);
+    }
+
+    dispatch({ type: 'ADD_LAYER', pageId: activePage.id, layer });
+  };
+
+  const handleUseDefaultQuote = (quote) => {
+    if (!activePage) return;
+
+    // Create text layer with the default quote
+    const layer = createLayer('text', activePage, {
+      name: 'Quote',
+      content: quote,
       fontSize: 28,
       fontFamily: 'Georgia, serif',
       fontWeight: '400',
@@ -5185,76 +5840,6 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
                 Popular shapes (search above for more options):
               </div>
             )}
-            {!hasTriggeredShapeSearchRef.current && (
-              <div className="builder-sidebar__shape-presets" style={{ marginBottom: '15px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                  <button
-                    type="button"
-                    className="tool-action-btn"
-                    onClick={() => handleAddShape('rectangle')}
-                    style={{ padding: '8px', fontSize: '12px' }}
-                  >
-                    □ Rectangle
-                  </button>
-                  <button
-                    type="button"
-                    className="tool-action-btn"
-                    onClick={() => handleShapeWithImage('rectangle')}
-                    style={{ padding: '8px', fontSize: '12px' }}
-                  >
-                    □ + Image
-                  </button>
-                  <button
-                    type="button"
-                    className="tool-action-btn"
-                    onClick={() => handleAddShape('circle')}
-                    style={{ padding: '8px', fontSize: '12px' }}
-                  >
-                    ○ Circle
-                  </button>
-                  <button
-                    type="button"
-                    className="tool-action-btn"
-                    onClick={() => handleShapeWithImage('circle')}
-                    style={{ padding: '8px', fontSize: '12px' }}
-                  >
-                    ○ + Image
-                  </button>
-                  <button
-                    type="button"
-                    className="tool-action-btn"
-                    onClick={() => handleAddShape('triangle')}
-                    style={{ padding: '8px', fontSize: '12px' }}
-                  >
-                    △ Triangle
-                  </button>
-                  <button
-                    type="button"
-                    className="tool-action-btn"
-                    onClick={() => handleShapeWithImage('triangle')}
-                    style={{ padding: '8px', fontSize: '12px' }}
-                  >
-                    △ + Image
-                  </button>
-                  <button
-                    type="button"
-                    className="tool-action-btn"
-                    onClick={() => handleAddShape('star')}
-                    style={{ padding: '8px', fontSize: '12px' }}
-                  >
-                    ★ Star
-                  </button>
-                  <button
-                    type="button"
-                    className="tool-action-btn"
-                    onClick={() => handleShapeWithImage('star')}
-                    style={{ padding: '8px', fontSize: '12px' }}
-                  >
-                    ★ + Image
-                  </button>
-                </div>
-              </div>
-            )}
             {shapeSearchResults.length > 0 ? (
               <div className="builder-sidebar__shape-results">
                 {shapeSearchResults.map((shape) => (
@@ -5286,28 +5871,6 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
                     )}
                   </button>
                 ))}
-                {hasMoreShapes && (
-                  <>
-                    <div className="shape-loading-indicator">
-                      <div className={`spinner ${isLoadingMoreShapes ? 'loading' : ''}`}></div>
-                      <span>
-                        {isLoadingMoreShapes
-                          ? 'Loading more shapes...'
-                          : 'Scroll for more shapes'}
-                      </span>
-                    </div>
-                    <div className="load-more-container">
-                      <button
-                        type="button"
-                        className="load-more-btn"
-                        onClick={handleLoadMoreShapes}
-                        disabled={isLoadingMoreShapes}
-                      >
-                        {isLoadingMoreShapes ? 'Loading...' : 'Load More Shapes'}
-                      </button>
-                    </div>
-                  </>
-                )}
               </div>
             ) : hasTriggeredShapeSearchRef.current ? (
               <div className="builder-sidebar__empty-state">
@@ -5316,7 +5879,9 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
             ) : null}
           </div>
         );
-      case 'images':
+      case 'images': {
+        const recentImages = Array.isArray(state.recentlyUploadedImages) ? state.recentlyUploadedImages : [];
+        const recentCount = recentImages.length;
         return (
           <div className="builder-sidebar__content">
             <div className="builder-sidebar__header">
@@ -5331,73 +5896,109 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
                 <i className="fas fa-chevron-left" aria-hidden="true"></i>
               </button>
             </div>
-            <p>Upload and add images to enhance your design.</p>
-            <div className="builder-sidebar__tool-actions">
-              <button type="button" className="tool-action-btn" onClick={handleAddImagePlaceholder}>
-                Upload image
-              </button>
+
+            <div className="builder-upload-card">
+              <div className="builder-upload-card__icon" aria-hidden="true">
+                <i className="fa-solid fa-cloud-arrow-up"></i>
+              </div>
+              <div className="builder-upload-card__body">
+                <h3 className="builder-upload-card__title">Add photos &amp; artwork</h3>
+                <div className="builder-upload-card__actions">
+                  <button
+                    type="button"
+                    className="tool-action-btn builder-upload-card__button"
+                    onClick={handleAddImagePlaceholder}
+                  >
+                    Upload image
+                  </button>
+                </div>
+                <ul className="builder-upload-card__guidelines">
+                  <li>Supports PNG, JPG, and SVG</li>
+                  <li>Recommended up to 10&nbsp;MB per file</li>
+                </ul>
+              </div>
             </div>
+
+            <div className="builder-upload-divider" role="presentation"></div>
+
             <div className="builder-sidebar__recently-uploaded">
-              <h3>Recently Upload</h3>
+              <div className="builder-sidebar__section-heading">
+                <h3>Recent uploads</h3>
+                {recentCount > 0 && (
+                  <span className="builder-sidebar__section-count" aria-label={`${recentCount} recent uploads`}>
+                    {recentCount}
+                  </span>
+                )}
+              </div>
+              <p className="builder-sidebar__section-help">Click any image to place it back onto the canvas.</p>
               <div className="builder-sidebar__recent-items">
-                {state.recentlyUploadedImages && state.recentlyUploadedImages.length > 0 ? (
-                  <div className="inspector-recent-images">
-                    {state.recentlyUploadedImages.map((image) => (
-                      <div key={image.id} className="inspector-recent-image__tile">
+                {recentCount > 0 ? (
+                  <div className="builder-recent-upload-grid">
+                    {recentImages.map((image) => (
+                      <div key={image.id} className="builder-recent-upload-grid__item">
                         <button
                           type="button"
-                          className="inspector-recent-image"
+                          className="builder-recent-upload-grid__button"
                           onClick={() => handleUseRecentFromSidebar(image)}
-                          title={image.fileName}
-                          aria-label={`Use recently uploaded image: ${image.fileName}`}
+                          title={image.fileName || 'Uploaded image'}
+                          aria-label={`Use recent upload ${image.fileName || 'image'}`}
                         >
                           <img
                             src={image.dataUrl}
-                            alt={image.fileName}
-                            className="inspector-recent-image__thumb"
-                            onError={(e) => { e.target.style.display = 'none'; }}
+                            alt={image.fileName || 'Uploaded image'}
+                            className="builder-recent-upload-grid__thumb"
+                            onError={(e) => { e.target.style.visibility = 'hidden'; }}
                           />
                         </button>
-                        <button
-                          type="button"
-                          className="inspector-recent-image__delete"
-                          title="Delete recent upload"
-                          aria-label={`Delete recent upload ${image.fileName}`}
-                          onClick={async (evt) => {
-                            evt.stopPropagation();
-                            try {
-                              const dbModule = await import('../../utils/recentImagesDB');
-                              if (image.dataUrl && image.dataUrl.startsWith('blob:')) {
-                                try { URL.revokeObjectURL(image.dataUrl); } catch (e) { /* ignore */ }
+                        <div className="builder-recent-upload-grid__footer">
+                          <span className="builder-recent-upload-grid__name" title={image.fileName || 'Uploaded image'}>
+                            {image.fileName || 'Uploaded image'}
+                          </span>
+                          <button
+                            type="button"
+                            className="builder-recent-upload-grid__delete"
+                            title="Delete recent upload"
+                            aria-label={`Delete recent upload ${image.fileName || 'image'}`}
+                            onClick={async (evt) => {
+                              evt.stopPropagation();
+                              try {
+                                const dbModule = await import('../../utils/recentImagesDB');
+                                if (image.dataUrl && image.dataUrl.startsWith('blob:')) {
+                                  try { URL.revokeObjectURL(image.dataUrl); } catch (e) { /* ignore */ }
+                                }
+                                await dbModule.deleteImage(image.id);
+                                dispatch({ type: 'DELETE_RECENTLY_UPLOADED_IMAGE', id: image.id });
+                              } catch (err) {
+                                console.error('Failed to delete recent image', err);
+                                alert('Failed to delete recent image. See console for details.');
                               }
-                              await dbModule.deleteImage(image.id);
-                              dispatch({ type: 'DELETE_RECENTLY_UPLOADED_IMAGE', id: image.id });
-                            } catch (err) {
-                              console.error('Failed to delete recent image', err);
-                              alert('Failed to delete recent image. See console for details.');
-                            }
-                          }}
-                        >
-                          {/* Minimal outline trash icon (stroke-only) */}
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ width: 14, height: 14 }}>
-                            <path d="M3 6h18" />
-                            <path d="M8 6v14a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V6" />
-                            <line x1="10" y1="11" x2="10" y2="17" />
-                            <line x1="14" y1="11" x2="14" y2="17" />
-                            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                          </svg>
-                        </button>
+                            }}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M3 6h18" />
+                              <path d="M8 6v14a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V6" />
+                              <line x1="10" y1="11" x2="10" y2="17" />
+                              <line x1="14" y1="11" x2="14" y2="17" />
+                              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="builder-sidebar__empty-state">Recently uploaded images will appear here.</div>
+                  <div className="builder-sidebar__empty-state builder-upload-empty">
+                    <i className="fa-solid fa-image" aria-hidden="true"></i>
+                    <p>No uploads yet. Use the button above to add your first image.</p>
+                  </div>
                 )}
               </div>
             </div>
+
             <div className="builder-sidebar__hint">Image uploads will connect to the asset library in a future release.</div>
           </div>
         );
+      }
       case 'photos':
         return (
           <div className="builder-sidebar__content">
@@ -5510,8 +6111,207 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
                 <i className="fas fa-chevron-left" aria-hidden="true"></i>
               </button>
             </div>
-            <div className="builder-sidebar__empty-state">
-              Background controls have been removed.
+            <div className="background-panel">
+              <p className="background-panel__subtitle">
+                Define a clean canvas foundation with precise color, gradient, and opacity controls.
+              </p>
+
+              <div className="background-panel__toggle" role="group" aria-label="Background mode">
+                {['solid', 'gradient'].map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={`background-panel__toggle-btn ${colorPickerTab === mode ? 'is-active' : ''}`}
+                    onClick={() => handleColorTabChange(mode)}
+                    aria-pressed={colorPickerTab === mode}
+                  >
+                    {mode === 'solid' ? 'Solid' : 'Gradient'}
+                  </button>
+                ))}
+              </div>
+
+              <div className="background-panel__preview-card">
+                {colorPickerTab === 'solid' ? (
+                  <input
+                    type="range"
+                    min="0"
+                    max="360"
+                    value={hueSliderValue}
+                    onChange={(e) => handleHueSliderChange(e.target.value)}
+                    className="background-panel__spectrum-slider"
+                    aria-label="Color spectrum slider"
+                  />
+                ) : (
+                  <>
+                    <div
+                      className="background-panel__preview"
+                      style={{ background: gradientPreviewValue }}
+                    ></div>
+                    <div className="background-panel__preview-info">
+                      <span>Gradient preview</span>
+                      <span>
+                        {gradientInputs[0]} → {gradientInputs[1]}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {colorPickerTab === 'gradient' ? (
+                <>
+                  <div className="background-panel__section">
+                    <div className="background-panel__color-grid">
+                      {gradientInputs.slice(0, 2).map((value, index) => (
+                        <div key={`gradient-color-${index}`} className="background-panel__color-field">
+                          <label htmlFor={`gradient-color-input-${index}`}>
+                            {index === 0 ? 'Start color' : 'End color'}
+                          </label>
+                          <div className="background-panel__color-input">
+                            <input
+                              id={`gradient-color-input-${index}`}
+                              type="text"
+                              value={value}
+                              onFocus={() => setActiveGradientStop(index)}
+                              onChange={(e) => handleGradientInputChange(index, e.target.value)}
+                              aria-label={`Hex value for ${index === 0 ? 'start' : 'end'} color`}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="background-panel__section">
+                    <span className="background-panel__label">Direction</span>
+                    <div className="background-panel__direction-tabs">
+                      {gradientStyleOptions.map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          className={`background-panel__direction-btn ${selectedGradientStyle === option.id ? 'is-active' : ''}`}
+                          onClick={() => handleGradientStyleSelect(option.id)}
+                        >
+                          <span className="background-panel__direction-btn-label">
+                            <i className={option.icon} aria-hidden="true"></i>
+                            {option.label}
+                          </span>
+                          <small>{option.description}</small>
+                        </button>
+                      ))}
+                    </div>
+                    {selectedGradientDefinition?.supportsAngle && (
+                      <div className="background-panel__slider-block">
+                        <div className="background-panel__slider-header">
+                          <span>Angle</span>
+                          <span>{gradientAngle}°</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="360"
+                          value={gradientAngle}
+                          onChange={(e) => handleGradientAngleChange(e.target.value)}
+                          className="background-panel__slider"
+                          aria-label="Gradient angle"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="background-panel__section">
+                  <div className="background-panel__color-field">
+                    <label htmlFor="solid-color-hex">Hex value</label>
+                    <div className="background-panel__color-input">
+                      <input
+                        id="solid-color-hex"
+                        type="text"
+                        value={solidHexDraft}
+                        onChange={(e) => handleSolidHexInput(e.target.value)}
+                        aria-label="Solid hex color"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="background-panel__section">
+                <span className="background-panel__label">Opacity</span>
+                <div className="background-panel__slider-block">
+                  <div className="background-panel__slider-header">
+                    <span>Background opacity</span>
+                    <span>{backgroundOpacity}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={backgroundOpacity}
+                    onChange={(e) => handleBackgroundOpacityChange(e.target.value)}
+                    className="background-panel__slider background-panel__slider--accent"
+                    aria-label="Background opacity"
+                  />
+                </div>
+              </div>
+
+              <div className="background-panel__section">
+                <span className="background-panel__label">Recent colors</span>
+                {colorHistory.length ? (
+                  <div className="background-panel__swatches" role="list">
+                    {colorHistory.slice(0, 8).map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        className="background-panel__swatch"
+                        style={{ background: color }}
+                        title={color}
+                        onClick={() => handleRecentColorClick(color)}
+                        aria-label={`Apply ${color} to ${colorPickerTab === 'solid' ? 'solid fill' : 'gradient stop'}`}
+                      ></button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="background-panel__recent-empty">
+                    Pick colors to populate your quick history.
+                  </div>
+                )}
+              </div>
+
+              {colorPickerTab === 'gradient' ? (
+                <div className="background-panel__section">
+                  <span className="background-panel__label">Default gradients</span>
+                  <div className="background-panel__swatches" role="list">
+                    {DEFAULT_GRADIENTS.map((gradient, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        className="background-panel__swatch"
+                        style={{ background: gradient }}
+                        title={gradient}
+                        onClick={() => handleDefaultGradientClick(gradient)}
+                        aria-label={`Apply default gradient ${index + 1}`}
+                      ></button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="background-panel__section">
+                  <span className="background-panel__label">Default solid colors</span>
+                  <div className="background-panel__swatches" role="list">
+                    {DEFAULT_SOLID_COLORS.map((color, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        className="background-panel__swatch"
+                        style={{ background: color }}
+                        title={color}
+                        onClick={() => handleDefaultSolidColorClick(color)}
+                        aria-label={`Apply default solid color ${color}`}
+                      ></button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -5519,7 +6319,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
         return (
           <div className="builder-sidebar__content">
             <div className="builder-sidebar__header">
-              <h2>Colors</h2>
+              <h2>Palette Color</h2>
               <button
                 type="button"
                 className="builder-sidebar-toggle"
@@ -5561,9 +6361,28 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
             </div>
             <div className="builder-sidebar__tool-actions">
               <button type="button" className="tool-action-btn" onClick={() => handleQuoteSearch('')} disabled={isSearchingQuotes}>
-                {isSearchingQuotes ? 'Generating...' : 'Generate Quotes'}
+                {isSearchingQuotes ? 'Generating...' : (quoteSearchResults.length > 0 ? 'Load More Quotes' : 'Generate Quotes')}
               </button>
             </div>
+            {!hasTriggeredQuoteSearchRef.current && (
+              <div className="builder-sidebar__section">
+                <div className="builder-sidebar__quote-list">
+                  {DEFAULT_QUOTES.map((quote, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      className="quote-result-item"
+                      onClick={() => handleUseDefaultQuote(quote)}
+                      title={quote}
+                    >
+                      <div className="quote-content">
+                        <blockquote>"{quote}"</blockquote>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {!hasTriggeredQuoteSearchRef.current && (
               <div className="builder-sidebar__hint" style={{ marginBottom: '10px', fontSize: '12px', color: '#666' }}>
                 Click "Generate Quotes" to get inspirational quotes:
@@ -5583,9 +6402,6 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
                       <blockquote>"{quote.content}"</blockquote>
                       <cite>— {quote.author}</cite>
                     </div>
-                    {quote.category && (
-                      <span className="quote-category">{quote.category}</span>
-                    )}
                   </button>
                 ))}
                 {hasMoreQuotes && (

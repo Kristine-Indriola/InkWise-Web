@@ -338,8 +338,8 @@ body {
 .canvas-pill-group {
     /* position pills above the canvas, right-aligned */
     position: fixed;
-    /* moved down further so pills sit lower on the canvas */
-    top: 280px;
+    /* adjusted position for the pills */
+    top: 240px;
     right: 979px;
     display: flex;
     gap: 8px;

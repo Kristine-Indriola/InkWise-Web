@@ -1,4 +1,7 @@
-@php $invitationType = 'Birthday'; @endphp
+@php
+    $invitationType = 'Birthday';
+    $products = $products ?? collect();
+@endphp
 @extends('customer.Invitations.invitations')
 
 @section('title', 'Birthday Invitations')
@@ -7,11 +10,11 @@
     <link rel="stylesheet" href="{{ asset('css/customer/preview-modal.css') }}">
     <style>
         :root {
-            --invite-accent: #f9a8d4;
+            --invite-accent: #fbcfe8;
             --invite-accent-dark: #f472b6;
             --invite-surface: #ffffff;
             --invite-muted: #6b7280;
-            --invite-shadow: 0 24px 48px rgba(244, 114, 182, 0.22);
+            --invite-shadow: 0 24px 48px rgba(244, 114, 182, 0.2);
         }
 
         .birthday-page {
@@ -23,40 +26,9 @@
 
         .birthday-hero {
             position: relative;
-            overflow: hidden;
-            border-radius: 32px;
             padding: clamp(1.75rem, 5vw, 3.25rem);
-            background:
-                radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.95), rgba(249, 168, 212, 0.55)),
-                linear-gradient(135deg, #fff0f6, #fdf2f8 55%, #fff7ed);
-            box-shadow: 0 28px 55px rgba(244, 114, 182, 0.22);
             color: #111827;
-            isolation: isolate;
-        }
-
-        .birthday-hero::before,
-        .birthday-hero::after {
-            content: "";
-            position: absolute;
-            border-radius: 50%;
-            opacity: 0.55;
-            transform: translate3d(0, 0, 0);
-        }
-
-        .birthday-hero::before {
-            width: clamp(180px, 28vw, 320px);
-            height: clamp(180px, 28vw, 320px);
-            background: radial-gradient(circle, rgba(255, 255, 255, 0.9), rgba(249, 168, 212, 0));
-            top: -12%;
-            right: 10%;
-        }
-
-        .birthday-hero::after {
-            width: clamp(220px, 32vw, 380px);
-            height: clamp(220px, 32vw, 380px);
-            background: radial-gradient(circle, rgba(252, 211, 77, 0.35), rgba(255, 255, 255, 0));
-            bottom: -18%;
-            left: 8%;
+            text-align: center;
         }
 
         .birthday-hero__content {
@@ -67,55 +39,47 @@
             z-index: 1;
         }
 
-        .birthday-hero__eyebrow {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.45rem 1rem;
-            border-radius: 999px;
-            background: rgba(249, 168, 212, 0.2);
-            color: #db2777;
-            font-weight: 600;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            font-size: 0.75rem;
-        }
-
         .birthday-hero__title {
-            margin-top: 1rem;
-            font-size: clamp(2rem, 5vw, 2.8rem);
-            font-family: 'Playfair Display', serif;
+            margin-top: 0.5rem;
+            font-size: clamp(1.8rem, 4vw, 2.5rem);
+            font-family: 'ITC New Baskerville', 'Baskerville', 'Times New Roman', serif;
             font-weight: 700;
-            line-height: 1.1;
-        }
-
-        .birthday-hero__title span {
-            display: inline-block;
-        }
-
-        .birthday-hero__title .highlight-primary {
-            color: var(--invite-accent-dark);
-        }
-
-        .birthday-hero__title .highlight-secondary {
-            color: #f97316;
+            line-height: 1.05;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            white-space: nowrap;
         }
 
         .birthday-hero__subtitle {
-            margin-top: 0.85rem;
-            font-size: clamp(0.95rem, 2vw, 1.1rem);
-            color: var(--invite-muted);
+            margin-top: 0.75rem;
+            font-size: clamp(0.8rem, 2vw, 1.1rem);
+            font-family: 'ITC New Baskerville', 'Baskerville', 'Times New Roman', serif;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: #374151;
         }
 
         .invitation-gallery {
             position: relative;
+            padding-bottom: 2rem;
         }
 
         .invitation-gallery::before {
             content: "";
             position: absolute;
             inset: 0;
-            background: linear-gradient(180deg, rgba(249, 168, 212, 0.08), transparent 35%, transparent 65%, rgba(253, 186, 116, 0.08));
+            background: radial-gradient(circle at top, rgba(249, 168, 212, 0.18), transparent 55%);
+            pointer-events: none;
+        }
+
+        .invitation-gallery::after {
+            content: "";
+            position: absolute;
+            inset: auto 8% -10% 8%;
+            height: 220px;
+            background: rgba(255, 255, 255, 0.5);
+            filter: blur(80px);
             pointer-events: none;
         }
 
@@ -126,22 +90,23 @@
 
         .invitation-grid {
             display: grid;
-            gap: clamp(1.75rem, 3.5vw, 2.5rem);
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: clamp(1.25rem, 3vw, 2.5rem);
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            justify-items: center;
         }
 
         .invitation-card {
             position: relative;
-            display: flex;
-            flex-direction: column;
-            background: var(--invite-surface);
-            border-radius: 24px;
-            padding: 1.25rem;
-            box-shadow: 0 18px 40px rgba(244, 114, 182, 0.14);
-            border: 1px solid rgba(249, 168, 212, 0.28);
-            transition: transform 0.35s ease, box-shadow 0.35s ease;
+            width: min(300px, 100%);
+            aspect-ratio: 2 / 3.4;
+            border-radius: 26px;
+            overflow: hidden;
+            background: linear-gradient(135deg, rgba(249, 168, 212, 0.25), rgba(255, 255, 255, 0.65));
+            box-shadow: 0 18px 40px rgba(244, 114, 182, 0.18);
+            transition: transform 0.35s ease, box-shadow 0.35s ease, filter 0.35s ease;
+            isolation: isolate;
             opacity: 0;
-            transform: translateY(28px) scale(0.98);
+            transform: translateY(24px) scale(0.98);
         }
 
         .invitation-card.is-visible {
@@ -149,129 +114,325 @@
             transform: translateY(0) scale(1);
         }
 
-        .invitation-card:hover {
-            transform: translateY(-8px) scale(1.01);
-            box-shadow: var(--invite-shadow);
+        .invitation-card::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.25));
+            opacity: 0;
+            transition: opacity 0.35s ease;
+            pointer-events: none;
         }
 
-        .invitation-card__preview {
-            position: relative;
-            border-radius: 18px;
-            overflow: hidden;
-            aspect-ratio: 3 / 4;
-            background: linear-gradient(135deg, rgba(249, 168, 212, 0.15), rgba(253, 186, 116, 0.1));
+        .invitation-card:hover {
+            transform: translateY(-6px) scale(1.02);
+            box-shadow: 0 32px 60px rgba(236, 72, 153, 0.35);
+            filter: drop-shadow(0 12px 25px rgba(214, 31, 105, 0.15));
+        }
+
+        .invitation-card:hover::after {
+            opacity: 1;
         }
 
         .invitation-card__image {
             width: 100%;
             height: 100%;
-            object-fit: contain;
-            mix-blend-mode: multiply;
-            transition: transform 0.35s ease;
+            object-fit: cover;
+            display: block;
+            transform: scale(1.05);
+            transition: transform 0.35s ease, filter 0.35s ease;
+            cursor: pointer;
+            border-radius: inherit;
         }
 
         .invitation-card:hover .invitation-card__image {
-            transform: scale(1.04);
+            transform: scale(1.08);
+            filter: saturate(1.05) contrast(1.05);
+        }
+
+        .invitation-card__info {
+            position: absolute;
+            inset: auto 0 0;
+            padding: 1rem 1.1rem 1.1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0), rgba(15, 23, 42, 0.9));
+            color: #fff;
+            z-index: 1;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            transform: translateY(40%);
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .invitation-card:hover .invitation-card__info,
+        .invitation-card:focus-within .invitation-card__info {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .invitation-card__info::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.5));
+            border-radius: 0 0 26px 26px;
+            z-index: -1;
+        }
+
+        .invitation-card__name {
+            font-family: 'The Seasons', 'Playfair Display', serif;
+            font-size: 1rem;
+            letter-spacing: 0.02em;
+            margin: 0;
+        }
+
+        .invitation-card__price-tag {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.85);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
         }
 
         .favorite-toggle {
             position: absolute;
-            top: 0.9rem;
-            right: 0.9rem;
+            top: 0.75rem;
+            right: 0.75rem;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 2.5rem;
-            height: 2.5rem;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.92);
-            box-shadow: 0 14px 26px rgba(249, 168, 212, 0.28);
-            color: var(--invite-accent-dark);
-            transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
-        }
-
-        .favorite-toggle:hover {
-            transform: translateY(-2px) scale(1.03);
-            background: var(--invite-accent-dark);
-            color: #ffffff;
+            width: 2.3rem;
+            height: 2.3rem;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.85);
+            color: #f472b6;
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 12px 26px rgba(244, 114, 182, 0.18);
+            z-index: 2;
+            transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
         }
 
         .favorite-toggle svg {
-            width: 1.25rem;
-            height: 1.25rem;
+            width: 1.1rem;
+            height: 1.1rem;
             fill: currentColor;
             stroke: currentColor;
         }
 
+        .favorite-toggle:hover,
+        .favorite-toggle:focus-visible {
+            transform: translateY(-3px) scale(1.04);
+            box-shadow: 0 18px 32px rgba(244, 114, 182, 0.35);
+        }
+
         .favorite-toggle.is-active {
-            background: var(--invite-accent-dark);
+            background: linear-gradient(135deg, #f472b6, #fb7185);
             color: #ffffff;
-            box-shadow: 0 18px 32px rgba(249, 168, 212, 0.38);
+            box-shadow: 0 20px 36px rgba(244, 114, 182, 0.45);
         }
 
-        .invitation-card__body {
-            margin-top: 1.15rem;
+        .rating-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
             display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-            text-align: left;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
         }
 
-        .invitation-card__title {
-            font-size: 1.05rem;
+        .rating-modal-overlay.is-visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .rating-modal {
+            background: #ffffff;
+            border-radius: 24px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 28px 55px rgba(244, 114, 182, 0.22);
+            transform: scale(0.9) translateY(20px);
+            transition: transform 0.3s ease;
+        }
+
+        .rating-modal-overlay.is-visible .rating-modal {
+            transform: scale(1) translateY(0);
+        }
+
+        .rating-modal-header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid rgba(249, 168, 212, 0.25);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .rating-modal-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #111827;
+            margin: 0;
+        }
+
+        .rating-modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--invite-muted);
+            cursor: pointer;
+            padding: 0.25rem;
+            border-radius: 50%;
+            transition: background 0.2s ease, color 0.2s ease;
+        }
+
+        .rating-modal-close:hover {
+            background: rgba(249, 168, 212, 0.15);
+            color: #be185d;
+        }
+
+        .rating-modal-body {
+            padding: 1.5rem 2rem;
+        }
+
+        .rating-modal-summary {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid rgba(249, 168, 212, 0.25);
+        }
+
+        .rating-modal-stars {
+            display: flex;
+            justify-content: center;
+            gap: 2px;
+            margin: 0.5rem 0;
+        }
+
+        .rating-modal-star {
+            font-size: 1.5rem;
+            color: #ddd;
+        }
+
+        .rating-modal-star.filled {
+            color: #f59e0b;
+        }
+
+        .rating-modal-average {
+            font-size: 1.1rem;
             font-weight: 600;
             color: #111827;
+            margin: 0.25rem 0;
         }
 
-        .invitation-card__subtitle {
+        .rating-modal-count {
             color: var(--invite-muted);
             font-size: 0.9rem;
         }
 
-        .invitation-card__badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.35rem;
-            padding: 0.35rem 0.75rem;
-            border-radius: 999px;
-            background: rgba(253, 186, 116, 0.2);
-            color: #f97316;
-            font-size: 0.75rem;
-            font-weight: 600;
-            letter-spacing: 0.05em;
-            text-transform: uppercase;
+        .rating-modal-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
         }
 
-        .invitation-card__price {
-            font-size: 1rem;
-            font-weight: 700;
-            color: #10b981;
+        .rating-modal-item {
+            border-bottom: 1px solid rgba(249, 168, 212, 0.2);
+            padding: 1.5rem 0;
         }
 
-        .invitation-card__muted {
-            color: var(--invite-muted);
-            font-size: 0.85rem;
+        .rating-modal-item:last-child {
+            border-bottom: none;
         }
 
-        .swatch-list {
+        .rating-modal-item-header {
             display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+            gap: 1rem;
         }
 
-        .swatch-button {
-            width: 2.25rem;
-            height: 2.25rem;
-            border-radius: 999px;
-            border: 2px solid rgba(249, 168, 212, 0.35);
-            box-shadow: 0 6px 14px rgba(249, 168, 212, 0.18);
-            transition: transform 0.2s ease, border-color 0.2s ease;
+        .rating-modal-item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            flex: 1;
         }
 
-        .swatch-button:hover,
-        .swatch-button.is-active {
-            transform: translateY(-1px);
-            border-color: var(--invite-accent-dark);
+        .rating-modal-item-customer {
+            font-weight: 600;
+            color: #111827;
+            font-size: 0.9rem;
+        }
+
+        .rating-modal-item-stars {
+            display: flex;
+            gap: 1px;
+        }
+
+        .rating-modal-item-star {
+            font-size: 1rem;
+            color: #ddd;
+        }
+
+        .rating-modal-item-star.filled {
+            color: #f59e0b;
+        }
+
+        .rating-modal-item-date {
+            font-size: 0.85rem;
+            color: var(--invite-muted);
+        }
+
+        .rating-modal-item-review {
+            margin: 0.75rem 0;
+            line-height: 1.5;
+            color: #374151;
+        }
+
+        .rating-modal-item-photos {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            gap: 8px;
+            margin-top: 0.75rem;
+            padding: 0.5rem;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .rating-modal-item-photo {
+            width: 100%;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
+        }
+
+        .rating-modal-item-photo:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .rating-modal-empty {
+            text-align: center;
+            color: var(--invite-muted);
+            padding: 2rem;
         }
 
         .invitation-card__actions {
@@ -286,8 +447,8 @@
             border-radius: 999px;
             border: 1px solid rgba(249, 168, 212, 0.45);
             padding: 0.6rem 1rem;
-            background: rgba(249, 168, 212, 0.18);
-            color: #db2777;
+            background: rgba(249, 168, 212, 0.15);
+            color: #be185d;
             font-weight: 600;
             font-size: 0.9rem;
             transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
@@ -303,9 +464,9 @@
             text-align: center;
             border-radius: 24px;
             padding: clamp(2.5rem, 6vw, 4rem);
-            background: rgba(249, 168, 212, 0.08);
+            background: rgba(249, 168, 212, 0.15);
             border: 1px dashed rgba(249, 168, 212, 0.45);
-            color: #db2777;
+            color: #be185d;
         }
 
         .invitation-empty p {
@@ -319,17 +480,18 @@
             }
 
             .invitation-card {
-                padding: 1.1rem;
+                width: min(240px, 100%);
                 border-radius: 20px;
             }
 
             .favorite-toggle {
-                width: 2.25rem;
-                height: 2.25rem;
+                width: 2rem;
+                height: 2rem;
             }
 
-            .invitation-card__actions {
-                flex-direction: column;
+            .invitation-card__info {
+                transform: none;
+                opacity: 1;
             }
         }
     </style>
@@ -383,194 +545,200 @@
                 });
             });
 
-            const cardObserver = () => {
-                if ('IntersectionObserver' in window) {
-                    const observer = new IntersectionObserver((entries, obs) => {
-                        entries.forEach((entry) => {
-                            if (entry.isIntersecting) {
-                                entry.target.classList.add('is-visible');
-                                obs.unobserve(entry.target);
-                            }
-                        });
-                    }, {
-                        rootMargin: '0px 0px -5%',
-                        threshold: 0.15,
+            if ('IntersectionObserver' in window) {
+                const observer = new IntersectionObserver((entries, obs) => {
+                    entries.forEach((entry) => {
+                        if (entry.isIntersecting) {
+                            entry.target.classList.add('is-visible');
+                            obs.unobserve(entry.target);
+                        }
                     });
-
-                    document.querySelectorAll('.invitation-card').forEach((card) => observer.observe(card));
-                } else {
-                    document.querySelectorAll('.invitation-card').forEach((card) => card.classList.add('is-visible'));
-                }
-            };
-
-            const handleSwatches = () => {
-                document.querySelectorAll('.invitation-card').forEach((card) => {
-                    const previewImage = card.querySelector('.invitation-card__image');
-                    const previewTriggers = card.querySelectorAll('.preview-trigger');
-                    const previewVideo = card.querySelector('video.invitation-card__video');
-                    const source = previewVideo ? previewVideo.querySelector('source') : null;
-                    const swatches = card.querySelectorAll('.swatch-button');
-
-                    if (!swatches.length) return;
-
-                    swatches.forEach((button) => {
-                        button.addEventListener('click', () => {
-                            const newImage = button.getAttribute('data-image');
-                            const newVideo = button.getAttribute('data-video');
-
-                            swatches.forEach((sw) => sw.classList.remove('is-active'));
-                            button.classList.add('is-active');
-
-                            if (newImage && previewImage) {
-                                previewImage.src = newImage;
-                            }
-
-                            if (newVideo && source && previewVideo) {
-                                if (source.src !== newVideo) {
-                                    source.src = newVideo;
-                                    previewVideo.load();
-                                }
-                                previewVideo.dataset.active = 'true';
-                                previewTriggers.forEach((trigger) => {
-                                    trigger.setAttribute('data-preview-url', newVideo);
-                                });
-                            }
-                        });
-                    });
-
-                    const firstSwatch = swatches[0];
-                    if (firstSwatch) {
-                        firstSwatch.classList.add('is-active');
-                    }
+                }, {
+                    rootMargin: '0px 0px -5%',
+                    threshold: 0.15,
                 });
-            };
 
-            cardObserver();
-            handleSwatches();
+                document.querySelectorAll('.invitation-card').forEach((card) => observer.observe(card));
+            } else {
+                document.querySelectorAll('.invitation-card').forEach((card) => card.classList.add('is-visible'));
+            }
+
+            const ratingModal = document.getElementById('ratingModal');
+            const ratingModalClose = document.getElementById('ratingModalClose');
+            const ratingModalTitle = document.getElementById('ratingModalTitle');
+            const ratingModalBody = document.getElementById('ratingModalBody');
+
+            window.productRatings = @json($ratingsData ?? []);
+
+            function showRatingModal(productId) {
+                const productData = window.productRatings[productId];
+                if (!productData) return;
+
+                ratingModalTitle.textContent = `Reviews for ${productData.name}`;
+
+                let modalContent = '';
+
+                if (productData.rating_count > 0) {
+                    modalContent += `
+                        <div class="rating-modal-summary">
+                            <div class="rating-modal-stars">
+                                ${Array.from({length: 5}, (_, i) =>
+                                    `<span class="rating-modal-star ${i < Math.round(productData.average_rating) ? 'filled' : ''}">★</span>`
+                                ).join('')}
+                            </div>
+                            <p class="rating-modal-average">${productData.average_rating.toFixed(1)} out of 5</p>
+                            <p class="rating-modal-count">Based on ${productData.rating_count} review${productData.rating_count > 1 ? 's' : ''}</p>
+                        </div>
+                    `;
+
+                    modalContent += '<ul class="rating-modal-list">';
+                    productData.ratings.forEach(rating => {
+                        modalContent += `
+                            <li class="rating-modal-item">
+                                <div class="rating-modal-item-header">
+                                    <div class="rating-modal-item-info">
+                                        <strong class="rating-modal-item-customer">${rating.customer_name}</strong>
+                                        <div class="rating-modal-item-stars">
+                                            ${Array.from({length: 5}, (_, i) =>
+                                                `<span class="rating-modal-item-star ${i < rating.rating ? 'filled' : ''}">★</span>`
+                                            ).join('')}
+                                        </div>
+                                    </div>
+                                    <span class="rating-modal-item-date">${rating.submitted_at || 'Recent'}</span>
+                                </div>
+                                ${rating.review ? `<p class="rating-modal-item-review">${rating.review}</p>` : ''}
+                                ${rating.photos && rating.photos.length > 0 ? `
+                                    <div class="rating-modal-item-photos">
+                                        ${rating.photos.map(photo => {
+                                            const photoUrl = photo.startsWith('http') ? photo : '/storage/' + photo;
+                                            return `<img src="${photoUrl}" alt="Rating photo" class="rating-modal-item-photo" onclick="window.open('${photoUrl}', '_blank')">`;
+                                        }).join('')}
+                                    </div>
+                                ` : ''}
+                            </li>
+                        `;
+                    });
+                    modalContent += '</ul>';
+                } else {
+                    modalContent = '<div class="rating-modal-empty">No reviews yet for this product.</div>';
+                }
+
+                ratingModalBody.innerHTML = modalContent;
+                ratingModal.classList.add('is-visible');
+                ratingModal.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
+            }
+
+            function hideRatingModal() {
+                ratingModal.classList.remove('is-visible');
+                ratingModal.setAttribute('aria-hidden', 'true');
+                document.body.style.overflow = '';
+            }
+
+            document.addEventListener('click', (e) => {
+                if (e.target.classList.contains('rating-trigger') || e.target.closest('.rating-trigger')) {
+                    const trigger = e.target.classList.contains('rating-trigger') ? e.target : e.target.closest('.rating-trigger');
+                    const productId = trigger.dataset.productId;
+                    if (productId) {
+                        showRatingModal(productId);
+                    }
+                }
+            });
+
+            ratingModalClose.addEventListener('click', hideRatingModal);
+            ratingModal.addEventListener('click', (e) => {
+                if (e.target === ratingModal) {
+                    hideRatingModal();
+                }
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && ratingModal.classList.contains('is-visible')) {
+                    hideRatingModal();
+                }
+            });
         });
     </script>
 @endpush
 
 @section('content')
-@php
-    $birthdayTemplates = [
-        [
-            'id' => 'birthday-minimal-18th',
-            'name' => 'Pink & Black Minimal 18th Birthday Invitation',
-            'theme' => 'Modern glam',
-            'label' => 'Birthday',
-            'price' => null,
-            'image' => asset('customerimages/invite/birthday1.png'),
-            'video' => asset('customerVideo/birthday/birthday1.mp4'),
-            'swatches' => [
-                ['color' => '#fbcfe8', 'video' => asset('customerVideo/birthday/birthday1.mp4'), 'image' => asset('customerimages/invite/birthday1.png')],
-                ['color' => '#e9d5ff', 'video' => asset('customerVideo/birthday/birthday2.mp4'), 'image' => asset('customerimages/invite/birthday1-front.png')],
-                ['color' => '#c026d3', 'video' => asset('customerVideo/birthday/birthday3.mp4'), 'image' => asset('customerimages/invite/birthday1-back.png')],
-            ],
-        ],
-        [
-            'id' => 'birthday-watercolor',
-            'name' => 'Pink & White Watercolor Party Invitation',
-            'theme' => 'Whimsical florals',
-            'label' => 'Birthday',
-            'price' => null,
-            'image' => asset('customerimages/invite/birthday2.png'),
-            'video' => asset('customerVideo/birthday/birthday4.mp4'),
-            'swatches' => [
-                ['color' => '#fce7f3', 'video' => asset('customerVideo/birthday/birthday4.mp4'), 'image' => asset('customerimages/invite/birthday2.png')],
-                ['color' => '#b45309', 'video' => asset('customerVideo/birthday/birthday5.mp4'), 'image' => asset('customerimages/invite/birthday2-front.png')],
-                ['color' => '#1d4ed8', 'video' => asset('customerVideo/birthday/birthday6.mp4'), 'image' => asset('customerimages/invite/birthday2-back.png')],
-            ],
-        ],
-        [
-            'id' => 'birthday-blue-gold',
-            'name' => 'Blue & Gold Night Bash Invitation',
-            'theme' => 'Glam soirée',
-            'label' => 'Birthday',
-            'price' => null,
-            'image' => asset('customerimages/invite/birthday3.png'),
-            'video' => asset('customerVideo/birthday/birthday7.mp4'),
-            'swatches' => [
-                ['color' => '#38bdf8', 'video' => asset('customerVideo/birthday/birthday7.mp4'), 'image' => asset('customerimages/invite/birthday3.png')],
-                ['color' => '#facc15', 'video' => asset('customerVideo/birthday/birthday8.mp4'), 'image' => asset('customerimages/invite/birthday3-front.png')],
-                ['color' => '#1e3a8a', 'video' => asset('customerVideo/birthday/birthday9.mp4'), 'image' => asset('customerimages/invite/birthday3-back.png')],
-            ],
-        ],
-    ];
-@endphp
 <main class="birthday-page">
     <section class="birthday-hero">
         <div class="birthday-hero__content">
-            <span class="birthday-hero__eyebrow">Celebrate in style</span>
-            <h1 class="birthday-hero__title">
-                <span class="highlight-primary">Birthday invitations</span>
-                <span class="highlight-secondary">for every milestone</span>
-            </h1>
-            <p class="birthday-hero__subtitle">
-                Cue the confetti with playful designs, luxe finishes, and bright color stories crafted for unforgettable parties.
-            </p>
+            <h1 class="birthday-hero__title">BIRTHDAY INVITATIONS</h1>
+            <p class="birthday-hero__subtitle">CELEBRATE EVERY MILESTONE</p>
         </div>
     </section>
 
     <section class="invitation-gallery">
         <div class="layout-container">
             <div class="invitation-grid" role="list">
-                @forelse($birthdayTemplates as $template)
-                    <article class="invitation-card" role="listitem" data-product-id="{{ $template['id'] }}">
-                        <div class="invitation-card__preview">
-                            <button type="button"
-                                    class="favorite-toggle"
-                                    data-product-id="{{ $template['id'] }}"
-                                    aria-label="Save {{ $template['name'] }} to favorites"
-                                    aria-pressed="false">
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M12 21s-6.5-4.35-9-8.5C1.33 9.5 2.15 6 5 4.8 7.38 3.77 9.55 4.89 12 7.4c2.45-2.51 4.62-3.63 7-2.6 2.85 1.2 3.68 4.7 2 7.7-2.5 4.15-9 8.5-9 8.5Z"/>
-                                </svg>
-                            </button>
-                            <img src="{{ $template['image'] }}"
-                                 alt="{{ $template['name'] }} invitation design"
-                                 class="invitation-card__image preview-trigger"
-                                 loading="lazy"
-                                 data-preview-url="{{ $template['video'] }}"
-                                 data-template="{{ $template['name'] }}">
-                            <video class="hidden invitation-card__video" muted playsinline>
-                                <source src="{{ $template['video'] }}" type="video/mp4">
-                            </video>
-                        </div>
-                        <div class="invitation-card__body">
-                            <h2 class="invitation-card__title">{{ $template['name'] }}</h2>
-                            <p class="invitation-card__subtitle">{{ $template['theme'] }}</p>
-                            <span class="invitation-card__badge">{{ $template['label'] }}</span>
-                            @if(!is_null($template['price']))
-                                <p class="invitation-card__price">Starting at ₱{{ number_format($template['price'], 2) }}</p>
-                            @else
-                                <p class="invitation-card__muted">Pricing available on request</p>
-                            @endif
+                @forelse($products as $product)
+                    @php
+                        $uploads = $product->uploads ?? collect();
+                        $firstUpload = $uploads->first();
+                        $images = $product->product_images ?? $product->images ?? null;
+                        $templateRef = $product->template ?? null;
 
-                            @if(!empty($template['swatches']))
-                                <div class="swatch-list" role="list">
-                                    @foreach($template['swatches'] as $swatch)
-                                        <button type="button"
-                                                class="swatch-button"
-                                                style="background: {{ $swatch['color'] }};"
-                                                data-video="{{ $swatch['video'] }}"
-                                                data-image="{{ $swatch['image'] }}"
-                                                aria-label="Switch to {{ $template['name'] }} colorway">
-                                        </button>
-                                    @endforeach
-                                </div>
-                            @endif
+                        $previewSrc = null;
+                        if ($firstUpload && str_starts_with($firstUpload->mime_type ?? '', 'image/')) {
+                            $previewSrc = asset('storage/uploads/products/' . $product->id . '/' . $firstUpload->filename);
+                        } elseif ($images && ($images->front || $images->preview)) {
+                            $candidate = $images->front ?: $images->preview;
+                            $previewSrc = \App\Support\ImageResolver::url($candidate);
+                        } elseif (!empty($product->image)) {
+                            $previewSrc = \App\Support\ImageResolver::url($product->image);
+                        } elseif ($templateRef) {
+                            $templatePreview = $templateRef->preview_front ?? $templateRef->front_image ?? $templateRef->preview ?? $templateRef->image ?? null;
+                            if ($templatePreview) {
+                                $previewSrc = preg_match('/^(https?:)?\/\//i', $templatePreview) || str_starts_with($templatePreview, '/')
+                                    ? $templatePreview
+                                    : \Illuminate\Support\Facades\Storage::url($templatePreview);
+                            }
+                        }
 
-                            <div class="invitation-card__actions">
-                                <a href="{{ route('design.edit') }}" class="invitation-card__action">
-                                    Start order
-                                </a>
-                                <button type="button"
-                                        class="invitation-card__action preview-trigger"
-                                        data-preview-url="{{ $template['video'] }}">
-                                    Quick preview
-                                </button>
-                            </div>
+                        if (!$previewSrc) {
+                            $previewSrc = asset('images/placeholder.png');
+                        }
+
+                        $previewUrl = route('product.preview', $product->id);
+                        $priceValue = $product->base_price
+                            ?? $product->unit_price
+                            ?? optional($templateRef)->base_price
+                            ?? optional($templateRef)->unit_price;
+                    @endphp
+                    <article class="invitation-card" role="listitem" data-product-id="{{ $product->id }}">
+                        <button type="button"
+                                class="favorite-toggle"
+                                data-product-id="{{ $product->id }}"
+                                aria-label="Save {{ $product->name }} to favorites"
+                                aria-pressed="false">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M12 21s-6.5-4.35-9-8.5C1.33 9.5 2.15 6 5 4.8 7.38 3.77 9.55 4.89 12 7.4c2.45-2.51 4.62-3.63 7-2.6 2.85 1.2 3.68 4.7 2 7.7-2.5 4.15-9 8.5-9 8.5Z" />
+                            </svg>
+                        </button>
+                        <img src="{{ $previewSrc }}"
+                             alt="{{ $product->name }} birthday invitation design"
+                             class="invitation-card__image preview-trigger"
+                             loading="lazy"
+                             data-product-id="{{ $product->id }}"
+                             data-preview-url="{{ $previewUrl }}"
+                             data-template="{{ $product->name }}"
+                             data-reflection>
+                        <div class="invitation-card__info preview-trigger"
+                             data-product-id="{{ $product->id }}"
+                             data-preview-url="{{ $previewUrl }}"
+                             data-template="{{ $product->name }}"
+                             role="button"
+                             tabindex="0">
+                            <h3 class="invitation-card__name">{{ \Illuminate\Support\Str::limit($product->name, 28) }}</h3>
+                            <span class="invitation-card__price-tag">
+                                @if(!is_null($priceValue))
+                                    ₱{{ number_format($priceValue, 2) }}
+                                @else
+                                    Custom quote
+                                @endif
+                            </span>
                         </div>
                     </article>
                 @empty
@@ -598,6 +766,16 @@
         <div class="preview-frame-body">
             <iframe id="productPreviewFrame" title="Product preview"></iframe>
         </div>
+    </div>
+</div>
+
+<div id="ratingModal" class="rating-modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="rating-modal">
+        <div class="rating-modal-header">
+            <h3 class="rating-modal-title" id="ratingModalTitle">Customer Reviews</h3>
+            <button type="button" class="rating-modal-close" id="ratingModalClose" aria-label="Close reviews">×</button>
+        </div>
+        <div class="rating-modal-body" id="ratingModalBody"></div>
     </div>
 </div>
 @endsection

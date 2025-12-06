@@ -11,12 +11,88 @@ import { BuilderStatusBar } from './BuilderStatusBar';
 import { BuilderHotkeys } from './BuilderHotkeys';
 import { PreviewModal } from '../modals/PreviewModal';
 import { serializeDesign } from '../../utils/serializeDesign';
+import { derivePageLabel, normalizePageTypeValue } from '../../utils/pageFactory';
 import { BuilderErrorBoundary } from './BuilderErrorBoundary';
 
-const MAX_DEVICE_PIXEL_RATIO = 1.2;
-const PREVIEW_MAX_EDGE = 960;
-const PREVIEW_JPEG_QUALITY = 0.62;
-const PREVIEW_MAX_BYTES = 1_500_000;
+const MAX_DEVICE_PIXEL_RATIO = 1.8;
+const PREVIEW_MAX_EDGE = 1400;
+const PREVIEW_JPEG_QUALITY = 0.82;
+const PREVIEW_MIN_JPEG_QUALITY = 0.6;
+const PREVIEW_MAX_BYTES = 2_100_000;
+
+const waitForNextFrame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)))));
+
+async function captureCanvasRaster(canvas, pixelRatio) {
+  if (!canvas) {
+    return null;
+  }
+
+  try {
+    return await toJpeg(canvas, {
+      cacheBust: true,
+      pixelRatio,
+      quality: PREVIEW_JPEG_QUALITY,
+      backgroundColor: '#ffffff',
+    });
+  } catch (jpegError) {
+    console.warn('[InkWise Builder] JPEG preview capture failed, falling back to PNG.', jpegError);
+    try {
+      return await toPng(canvas, {
+        cacheBust: true,
+        pixelRatio,
+        quality: PREVIEW_JPEG_QUALITY,
+      });
+    } catch (pngError) {
+      console.warn('[InkWise Builder] PNG preview capture failed.', pngError);
+      return null;
+    }
+  }
+}
+
+function derivePreviewKey(page, index) {
+  const candidates = [
+    page?.pageType,
+    page?.metadata?.pageType,
+    page?.metadata?.side,
+    page?.metadata?.sideLabel,
+    page?.name,
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizePageTypeValue(candidate);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  if (index === 0) {
+    return 'front';
+  }
+  if (index === 1) {
+    return 'back';
+  }
+  return `page-${index + 1}`;
+}
+
+function derivePreviewLabel(page, index, totalPages) {
+  if (typeof page?.metadata?.sideLabel === 'string' && page.metadata.sideLabel.trim() !== '') {
+    return page.metadata.sideLabel.trim();
+  }
+
+  const normalized = normalizePageTypeValue(
+    page?.pageType ?? page?.metadata?.pageType ?? page?.metadata?.side ?? page?.name ?? null,
+  );
+
+  if (normalized) {
+    return derivePageLabel(normalized, index, totalPages);
+  }
+
+  if (typeof page?.name === 'string' && page.name.trim() !== '') {
+    return page.name.trim();
+  }
+
+  return `Page ${index + 1}`;
+}
 
 function estimateBase64Bytes(dataUrl) {
   if (typeof dataUrl !== 'string') {
@@ -73,7 +149,7 @@ async function compressPreviewImage(dataUrl, options = {}) {
 
     while (estimateBase64Bytes(output) > maxBytes && scale > 0.3) {
       scale = Math.max(0.3, scale * 0.85);
-      currentQuality = Math.max(0.4, currentQuality - 0.08);
+      currentQuality = Math.max(PREVIEW_MIN_JPEG_QUALITY, currentQuality - 0.08);
       const attempt = renderCompressedImage(image, scale, currentQuality);
       if (!attempt) {
         break;
@@ -275,7 +351,7 @@ export function BuilderShell() {
 
   const saveTemplateRoute = routes?.saveTemplate ?? routes?.saveCanvas;
 
-  const handleSaveTemplate = useCallback(async () => {
+  const handleSaveTemplate = useCallback(async (options = {}) => {
     if (!saveTemplateRoute) {
       setSaveTemplateError('Save route is unavailable.');
       return;
@@ -296,6 +372,7 @@ export function BuilderShell() {
     setSaveTemplateError(null);
 
     const bodyEl = typeof document !== 'undefined' ? document.body : null;
+    const requestedPageId = options?.pageId ?? null;
     const pixelRatio = typeof window !== 'undefined'
       ? Math.min(Math.max(window.devicePixelRatio || 1, 1), MAX_DEVICE_PIXEL_RATIO)
       : MAX_DEVICE_PIXEL_RATIO;
@@ -304,40 +381,118 @@ export function BuilderShell() {
       dispatch({ type: 'SHOW_PREVIEW_MODAL' });
       bodyEl?.classList.add('builder-exporting');
 
+      // Allow layout/styles to flush before snapshotting so export-only CSS applies.
+      await waitForNextFrame();
+
       const designSnapshot = serializeDesign(state);
-      let pngDataUrl = null;
+      const allPages = Array.isArray(state.pages) ? state.pages : [];
+      const selectedPages = requestedPageId
+        ? allPages.filter((page) => page.id === requestedPageId)
+        : allPages;
+      const fallbackActivePage = allPages.find((page) => page.id === state.activePageId) ?? null;
+
+      let pagesToCapture = (selectedPages.length > 0 ? selectedPages : allPages).filter(Boolean);
+      if (pagesToCapture.length === 0 && fallbackActivePage) {
+        pagesToCapture = [fallbackActivePage];
+      }
+
+      const totalPages = allPages.length > 0 ? allPages.length : pagesToCapture.length;
+
+      const previewImages = {};
+      const previewImagesMeta = {};
+      let primaryPreviewCandidate = null;
       let svgDataUrl = null;
 
-      try {
-        pngDataUrl = await toJpeg(canvasRef.current, {
-          cacheBust: true,
-          pixelRatio,
-          quality: PREVIEW_JPEG_QUALITY,
-          backgroundColor: '#ffffff',
-        });
-      } catch (jpegError) {
-        console.warn('[InkWise Builder] JPEG preview capture failed, falling back to PNG.', jpegError);
-        try {
-          pngDataUrl = await toPng(canvasRef.current, {
-            cacheBust: true,
-            pixelRatio,
-            quality: PREVIEW_JPEG_QUALITY,
-          });
-        } catch (pngError) {
-          console.warn('[InkWise Builder] PNG preview capture failed.', pngError);
+      const originalActivePageId = state.activePageId;
+      const originalSelectedLayerId = state.selectedLayerId;
+      let currentActivePageId = originalActivePageId;
+
+      // Temporarily deselect any layer to hide bounding boxes during capture
+      dispatch({ type: 'SELECT_LAYER', layerId: null });
+      await waitForNextFrame();
+
+      const ensurePageActive = async (pageId) => {
+        if (!pageId || pageId === currentActivePageId) {
+          return;
+        }
+        dispatch({ type: 'SELECT_PAGE', pageId });
+        currentActivePageId = pageId;
+        // Ensure no layer is selected when switching pages during export
+        dispatch({ type: 'SELECT_LAYER', layerId: null });
+        await waitForNextFrame();
+      };
+
+      for (let index = 0; index < pagesToCapture.length; index += 1) {
+        const page = pagesToCapture[index];
+        if (!page) {
+          continue;
+        }
+
+        await ensurePageActive(page.id);
+        await waitForNextFrame();
+
+        const rasterDataUrl = await captureCanvasRaster(canvasRef.current, pixelRatio);
+        if (!rasterDataUrl) {
+          continue;
+        }
+
+        const compressedImage = await compressPreviewImage(rasterDataUrl);
+        if (!compressedImage) {
+          continue;
+        }
+
+        const keyBase = derivePreviewKey(page, index);
+        const safeKeyBase = typeof keyBase === 'string' && keyBase.trim() !== '' ? keyBase : null;
+        const fallbackKey = `page-${index + 1}`;
+
+        let uniqueKey = safeKeyBase ?? fallbackKey;
+        let suffix = 2;
+        while (previewImages[uniqueKey]) {
+          uniqueKey = safeKeyBase ? `${safeKeyBase}-${suffix}` : `${fallbackKey}-${suffix}`;
+          suffix += 1;
+        }
+
+        previewImages[uniqueKey] = compressedImage;
+        previewImagesMeta[uniqueKey] = {
+          label: derivePreviewLabel(page, index, totalPages || pagesToCapture.length || 1),
+          pageId: page.id,
+          pageType: safeKeyBase ?? uniqueKey,
+          order: index,
+        };
+
+        if (!primaryPreviewCandidate) {
+          primaryPreviewCandidate = compressedImage;
+        }
+        if (uniqueKey === 'front') {
+          primaryPreviewCandidate = compressedImage;
+        }
+
+        if (!svgDataUrl) {
+          try {
+            svgDataUrl = await toSvg(canvasRef.current, {
+              cacheBust: true,
+              filter: (node) => !node.classList?.contains('canvas-layer__resize-handle'),
+            });
+          } catch (captureError) {
+            console.warn('[InkWise Builder] SVG snapshot capture failed.', captureError);
+          }
         }
       }
 
-      try {
-        svgDataUrl = await toSvg(canvasRef.current, {
-          cacheBust: true,
-          filter: (node) => !node.classList?.contains('canvas-layer__resize-handle'),
-        });
-      } catch (captureError) {
-        console.warn('[InkWise Builder] SVG snapshot capture failed.', captureError);
+      await ensurePageActive(originalActivePageId);
+
+      const originalLayerStillExists = allPages.some((page) => (
+        page.id === originalActivePageId
+        && Array.isArray(page.nodes)
+        && page.nodes.some((node) => node.id === originalSelectedLayerId)
+      ));
+
+      if (originalLayerStillExists && originalSelectedLayerId) {
+        dispatch({ type: 'SELECT_LAYER', layerId: originalSelectedLayerId });
+        await waitForNextFrame();
       }
 
-      const previewImage = await compressPreviewImage(pngDataUrl);
+      const previewImage = previewImages.front ?? primaryPreviewCandidate ?? null;
       const svgMarkup = extractSvgMarkup(svgDataUrl);
       const svgPayload = encodeSvgMarkup(svgMarkup);
 
@@ -348,8 +503,20 @@ export function BuilderShell() {
         template_name: state.template?.name ?? null,
       };
 
+      if (requestedPageId) {
+        payload.save_context = {
+          scope: 'page',
+          page_id: requestedPageId,
+        };
+      }
+
       if (shouldIncludePreview) {
         payload.preview_image = previewImage;
+      }
+
+      if (Object.keys(previewImages).length > 0) {
+        payload.preview_images = previewImages;
+        payload.preview_images_meta = previewImagesMeta;
       }
 
       if (svgPayload) {

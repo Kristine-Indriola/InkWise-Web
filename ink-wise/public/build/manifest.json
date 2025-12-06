@@ -14,12 +14,12 @@
     "isEntry": true
   },
   "resources/css/admin/template/template.css": {
-    "file": "assets/template-Cm6Cr1Qw.css",
+    "file": "assets/template-BLSwoGHH.css",
     "src": "resources/css/admin/template/template.css",
     "isEntry": true
   },
   "resources/css/app.css": {
-    "file": "assets/app-DLoVfHMk.css",
+    "file": "assets/app-SRqCmVlz.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -34,7 +34,7 @@
     "isEntry": true
   },
   "resources/css/customer/studio.css": {
-    "file": "assets/studio-DRkU9fE0.css",
+    "file": "assets/studio-D9Tjmf0-.css",
     "src": "resources/css/customer/studio.css",
     "isEntry": true
   },
@@ -69,7 +69,7 @@
     "isEntry": true
   },
   "resources/js/customer/studio/main.jsx": {
-    "file": "assets/main-CZnKzAPF.js",
+    "file": "assets/main-WQMI3Qsy.js",
     "name": "main",
     "src": "resources/js/customer/studio/main.jsx",
     "isEntry": true,
@@ -81,13 +81,13 @@
     ]
   },
   "resources/js/customer/studio/svg-template-editor.jsx": {
-    "file": "assets/svg-template-editor-C1DJoYuc.js",
+    "file": "assets/svg-template-editor-BqTHRGij.js",
     "name": "svg-template-editor",
     "src": "resources/js/customer/studio/svg-template-editor.jsx",
     "isEntry": true
   },
   "resources/js/staff/template-editor/main.jsx": {
-    "file": "assets/main-BNbTY51E.js",
+    "file": "assets/main-CAficTZv.js",
     "name": "main",
     "src": "resources/js/staff/template-editor/main.jsx",
     "isEntry": true,
@@ -98,11 +98,10 @@
       "resources/js/staff/template-editor/utils/recentImagesDB.js",
       "resources/js/staff/template-editor/utils/recentImagesDB.js",
       "resources/js/staff/template-editor/utils/recentImagesDB.js",
-      "resources/js/staff/template-editor/utils/recentImagesDB.js",
       "resources/js/staff/template-editor/utils/recentImagesDB.js"
     ],
     "css": [
-      "assets/main-DjWRC8ak.css"
+      "assets/main-GFpeMJPp.css"
     ]
   },
   "resources/js/staff/template-editor/utils/recentImagesDB.js": {

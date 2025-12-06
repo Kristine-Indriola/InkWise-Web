@@ -561,13 +561,15 @@ Route::prefix('templates')->group(function () {
 
     // Invitations
     Route::get('/wedding/invitations', [InvitationController::class, 'weddingInvitations'])->name('templates.wedding.invitations');
-    Route::get('/birthday/invitations', fn () => view('customer.Invitations.birthdayinvite'))->name('templates.birthday.invitations');
-    Route::get('/corporate/invitations', fn () => view('customer.Invitations.corporateinvite'))->name('templates.corporate.invitations');
-    Route::get('/baptism/invitations', fn () => view('customer.Invitations.baptisminvite'))->name('templates.baptism.invitations');
+    Route::get('/birthday/invitations', [InvitationController::class, 'birthdayInvitations'])->name('templates.birthday.invitations');
+    Route::get('/corporate/invitations', [InvitationController::class, 'corporateInvitations'])->name('templates.corporate.invitations');
+    Route::get('/baptism/invitations', [InvitationController::class, 'baptismInvitations'])->name('templates.baptism.invitations');
 
     // Giveaways
     Route::get('/wedding/giveaways', [InvitationController::class, 'weddingGiveaways'])->name('templates.wedding.giveaways');
-    Route::get('/birthday/giveaways', fn () => view('customer.Giveaways.birthdaygive'))->name('templates.birthday.giveaways');
+    Route::get('/birthday/giveaways', [InvitationController::class, 'birthdayGiveaways'])->name('templates.birthday.giveaways');
+    Route::get('/corporate/giveaways', [InvitationController::class, 'corporateGiveaways'])->name('templates.corporate.giveaways');
+    Route::get('/baptism/giveaways', [InvitationController::class, 'baptismGiveaways'])->name('templates.baptism.giveaways');
 });
 
 /** Product Preview & Design Editing*/
@@ -839,7 +841,7 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
 
   
 
-Route::prefix('staff')->name('staff.')->group(function () {
+Route::prefix('staff')->name('staff.')->middleware(\App\Http\Middleware\RoleMiddleware::class.':staff')->group(function () {
     // Staff routes - updated for order list functionality
     Route::get('/dashboard', [StaffDashboardController::class, 'index'])->name('dashboard');
     Route::get('/assigned-orders', [StaffAssignedController::class, 'index'])->name('assigned.orders');

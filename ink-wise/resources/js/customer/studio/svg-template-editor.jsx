@@ -1,6 +1,9 @@
 // SVG Template Editor (Vite module version)
 // Provides interactive editing capabilities for SVG templates
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const XLINK_NS = 'http://www.w3.org/1999/xlink';
+
 class SvgTemplateEditor {
     constructor(svgElement, options = {}) {
         console.log('SvgTemplateEditor: Constructor called for SVG element:', svgElement);
@@ -23,6 +26,12 @@ class SvgTemplateEditor {
 
         this.changeableImages = [];
         this.textElements = [];
+        this.imageClassTokens = new Set([
+            'canvas-layer__image',
+            'changeable-image',
+            'svg-changeable-image',
+            'inkwise-image',
+        ]);
         this.init();
     }
 
@@ -38,9 +47,218 @@ class SvgTemplateEditor {
     parseSvgData() {
         const svgData = this.svg.dataset.svgData;
         if (svgData) {
-            const data = JSON.parse(svgData);
-            this.changeableImages = data.changeable_images || [];
-            this.textElements = data.text_elements || [];
+            try {
+                const data = JSON.parse(svgData);
+                this.changeableImages = data.changeable_images || [];
+                this.textElements = data.text_elements || [];
+            } catch (error) {
+                console.warn('SvgTemplateEditor: Failed to parse data-svg-data payload', error);
+            }
+        }
+    }
+
+    readDatasetTokens(node) {
+        if (!node || !node.dataset) {
+            return [];
+        }
+        const keys = ['changeable', 'editableType', 'elementType', 'layerType', 'previewType', 'fieldType'];
+        return keys
+            .map((key) => node.dataset[key])
+            .filter((value) => typeof value === 'string' && value.trim() !== '')
+            .map((value) => value.trim().toLowerCase());
+    }
+
+    findImageContentNode(node) {
+        if (!node || typeof node.querySelector !== 'function') {
+            return null;
+        }
+        return node.querySelector('[data-changeable="image"], [data-editable-image], .canvas-layer__image, img, image');
+    }
+
+    nodeRepresentsImage(node) {
+        if (!node) {
+            return false;
+        }
+        const tagName = typeof node.tagName === 'string' ? node.tagName.toLowerCase() : '';
+        if (tagName === 'image' || tagName === 'img') {
+            return true;
+        }
+        const datasetHints = this.readDatasetTokens(node);
+        if (datasetHints.some((hint) => hint === 'image' || hint === 'photo' || hint === 'graphic')) {
+            return true;
+        }
+        if (typeof node.hasAttribute === 'function') {
+            if (node.hasAttribute('data-editable-image') || node.hasAttribute('data-changeable-image')) {
+                return true;
+            }
+        }
+        if (node.classList) {
+            for (const token of this.imageClassTokens) {
+                if (node.classList.contains(token)) {
+                    return true;
+                }
+            }
+        }
+        if (tagName === 'foreignobject') {
+            return !!this.findImageContentNode(node);
+        }
+        return false;
+    }
+
+    resolveImageNode(node) {
+        if (!node) {
+            return null;
+        }
+        if (this.nodeRepresentsImage(node)) {
+            return node;
+        }
+        if (typeof node.closest === 'function') {
+            const ancestor = node.closest('[data-preview-node]');
+            if (ancestor && ancestor !== node && this.nodeRepresentsImage(ancestor)) {
+                return ancestor;
+            }
+        }
+        return this.findImageContentNode(node);
+    }
+
+    resolveImageHandleNodes(node) {
+        const contentNode = this.resolveImageNode(node);
+        if (!contentNode) {
+            return null;
+        }
+        const interactionNode = (typeof contentNode.closest === 'function' && contentNode.closest('foreignObject'))
+            || contentNode;
+        return { interactionNode, contentNode };
+    }
+
+    applyImageSourceToNode(node, dataUrl) {
+        if (!node || !dataUrl) {
+            return null;
+        }
+        const tagName = typeof node.tagName === 'string' ? node.tagName.toLowerCase() : '';
+        if (tagName === 'image') {
+            node.setAttributeNS(XLINK_NS, 'href', dataUrl);
+            node.setAttribute('href', dataUrl);
+            if (node.dataset) {
+                node.dataset.src = dataUrl;
+            }
+            return node;
+        }
+        if (tagName === 'img') {
+            node.setAttribute('src', dataUrl);
+            if (node.dataset) {
+                node.dataset.src = dataUrl;
+            }
+            return node;
+        }
+        if (tagName === 'foreignobject') {
+            const innerNode = this.findImageContentNode(node);
+            if (innerNode && innerNode !== node) {
+                return this.applyImageSourceToNode(innerNode, dataUrl);
+            }
+            return null;
+        }
+        if (tagName === 'rect') {
+            return this.convertRectToImage(node, dataUrl);
+        }
+        if (node.style && typeof node.style.setProperty === 'function') {
+            node.style.backgroundImage = `url('${dataUrl}')`;
+        }
+        if (node.dataset) {
+            node.dataset.src = dataUrl;
+            node.dataset.replacedImage = 'true';
+        }
+        return node;
+    }
+
+    convertRectToImage(rectNode, dataUrl) {
+        if (!rectNode || !rectNode.parentNode) {
+            return null;
+        }
+        const image = document.createElementNS(SVG_NS, 'image');
+        const transferableAttributes = ['x', 'y', 'width', 'height', 'transform', 'preserveAspectRatio'];
+        transferableAttributes.forEach((attr) => {
+            if (rectNode.hasAttribute && rectNode.hasAttribute(attr)) {
+                image.setAttribute(attr, rectNode.getAttribute(attr));
+            }
+        });
+        Array.from(rectNode.attributes || []).forEach((attr) => {
+            if (attr.name === 'id' || attr.name.startsWith('data-')) {
+                image.setAttribute(attr.name, attr.value);
+            }
+        });
+        if (rectNode.classList && rectNode.classList.length) {
+            rectNode.classList.forEach((className) => image.classList.add(className));
+        }
+        image.setAttribute('href', dataUrl);
+        image.setAttributeNS(XLINK_NS, 'href', dataUrl);
+        if (!image.hasAttribute('preserveAspectRatio')) {
+            image.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+        }
+        rectNode.parentNode.replaceChild(image, rectNode);
+        return image;
+    }
+
+    escapeSelector(value) {
+        if (typeof value !== 'string' || !value.length) {
+            return '';
+        }
+        if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+            return CSS.escape(value);
+        }
+        return value.replace(/([^a-zA-Z0-9_-])/g, '\\$1');
+    }
+
+    resolveNodeFromMetadata(entry) {
+        if (!entry || typeof entry !== 'object') {
+            return null;
+        }
+        const preferredId = entry.id || entry.element_id || entry.node_id;
+        if (preferredId) {
+            const selector = `#${this.escapeSelector(preferredId)}`;
+            const match = this.svg.querySelector(selector);
+            if (match) {
+                return match;
+            }
+        }
+        const selector = entry.selector || entry.css_selector;
+        if (selector) {
+            try {
+                const match = this.svg.querySelector(selector);
+                if (match) {
+                    return match;
+                }
+            } catch (error) {
+                console.warn('SvgTemplateEditor: Invalid selector in changeable image metadata', selector, error);
+            }
+        }
+        return null;
+    }
+
+    collectImageCandidates() {
+        const candidates = new Set();
+        this.changeableImages.forEach((entry) => {
+            const node = this.resolveNodeFromMetadata(entry);
+            if (node) {
+                candidates.add(node);
+            }
+        });
+        const fallbackSelectors = '[data-changeable="image"], [data-editable-image], .changeable-image, .canvas-layer__image, image, img, foreignObject';
+        this.svg.querySelectorAll(fallbackSelectors).forEach((node) => {
+            candidates.add(node);
+        });
+        return Array.from(candidates);
+    }
+
+    getBBoxSafe(element) {
+        if (!element || typeof element.getBBox !== 'function') {
+            return null;
+        }
+        try {
+            return element.getBBox();
+        } catch (error) {
+            console.warn('SvgTemplateEditor: Unable to compute bounding box for element', error, element);
+            return null;
         }
     }
 
@@ -62,54 +280,79 @@ class SvgTemplateEditor {
     }
 
     setupImageHandlers() {
-        const self = this;
-        const changeableElements = this.svg.querySelectorAll('[data-changeable="image"], [data-editable-image]');
+        const changeableElements = this.collectImageCandidates();
 
         console.log('SvgTemplateEditor: Found', changeableElements.length, 'changeable image elements');
 
         if (!this.allowCanvasImageTools) {
             changeableElements.forEach((element) => {
-                element.style.cursor = 'default';
-                element.classList.remove('svg-changeable-image');
-                element.classList.remove('changeable-image-hover');
-                if (element._boundingBox) {
-                    try { element._boundingBox.remove(); } catch (err) {}
-                    element._boundingBox = null;
+                const resolved = this.resolveImageHandleNodes(element);
+                if (!resolved) {
+                    return;
+                }
+                const { interactionNode } = resolved;
+                interactionNode.style.cursor = 'default';
+                interactionNode.classList.remove('svg-changeable-image');
+                interactionNode.classList.remove('changeable-image-hover');
+                if (interactionNode._boundingBox) {
+                    try {
+                        interactionNode._boundingBox.remove();
+                    } catch (err) {}
+                    interactionNode._boundingBox = null;
                 }
             });
             return;
         }
 
-        // Create bounding boxes after a short delay to allow layout
         setTimeout(() => {
             changeableElements.forEach((element, index) => {
-                console.log('SvgTemplateEditor: Setting up element', index, element);
-                element.style.cursor = 'pointer';
-                element.classList.add('svg-changeable-image');
-                element.classList.add('changeable-image-hover');
+                const resolved = this.resolveImageHandleNodes(element);
+                if (!resolved) {
+                    return;
+                }
+                const { interactionNode, contentNode } = resolved;
+                if (!interactionNode || interactionNode.__inkwiseSvgImageBound) {
+                    return;
+                }
+                console.log('SvgTemplateEditor: Setting up element', index, interactionNode);
+                interactionNode.__inkwiseSvgImageBound = true;
+                interactionNode.__inkwiseImageContent = contentNode || interactionNode;
+                interactionNode.style.cursor = 'pointer';
+                interactionNode.classList.add('svg-changeable-image');
+                interactionNode.classList.add('changeable-image-hover');
 
-                element.addEventListener('mouseenter', function() {
-                    element.classList.add('changeable-image-active');
+                interactionNode.addEventListener('mouseenter', () => {
+                    interactionNode.classList.add('changeable-image-active');
                 });
 
-                element.addEventListener('mouseleave', function() {
-                    element.classList.remove('changeable-image-active');
+                interactionNode.addEventListener('mouseleave', () => {
+                    interactionNode.classList.remove('changeable-image-active');
                 });
 
-                const boundingBox = this.createBoundingBox(element);
-                element._boundingBox = boundingBox;
+                interactionNode.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    this.showImageUploadDialog(interactionNode);
+                });
 
-                this.makeDraggable(element);
+                const boundingBox = this.createBoundingBox(interactionNode);
+                if (boundingBox) {
+                    interactionNode._boundingBox = boundingBox;
+                }
+
+                this.makeDraggable(interactionNode);
             });
         }, 200);
     }
 
     createBoundingBox(element) {
-        const bbox = element.getBBox();
-        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        const bbox = this.getBBoxSafe(element);
+        if (!bbox) {
+            return null;
+        }
+        const group = document.createElementNS(SVG_NS, 'g');
         group.classList.add('svg-bounding-box');
 
-        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        const rect = document.createElementNS(SVG_NS, 'rect');
         rect.classList.add('svg-bounding-box__rect');
         rect.setAttribute('fill', 'none');
         rect.setAttribute('stroke', '#007cba');
@@ -138,7 +381,7 @@ class SvgTemplateEditor {
         ];
 
         positions.forEach((pos) => {
-            const handle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            const handle = document.createElementNS(SVG_NS, 'circle');
             handle.setAttribute('r', '4');
             handle.setAttribute('fill', '#007cba');
             handle.setAttribute('stroke', '#ffffff');
@@ -153,6 +396,9 @@ class SvgTemplateEditor {
     }
 
     positionBoundingElements(group, rawBBox) {
+        if (!group || !rawBBox) {
+            return;
+        }
         const rect = group.querySelector('.svg-bounding-box__rect');
         if (!rect) {
             return;
@@ -200,11 +446,54 @@ class SvgTemplateEditor {
     }
 
     updateBoundingBox(element) {
-        if (!element._boundingBox) {
+        if (!element || !element._boundingBox) {
             return;
         }
-        const bbox = element.getBBox();
+        const bbox = this.getBBoxSafe(element);
         this.positionBoundingElements(element._boundingBox, bbox);
+    }
+
+    focusElementById(elementId) {
+        if (!elementId || !this.svg) {
+            return false;
+        }
+        const selector = `#${this.escapeSelector(elementId)}`;
+        let target = null;
+        try {
+            target = this.svg.querySelector(selector);
+        } catch (error) {
+            console.warn('SvgTemplateEditor: Invalid selector generated for element id', elementId, error);
+            return false;
+        }
+        if (!target) {
+            target = this.svg.querySelector(`[data-element-id="${elementId}"]`);
+        }
+        if (!target) {
+            return false;
+        }
+        const resolved = this.resolveImageHandleNodes(target) || { interactionNode: target };
+        const focusNode = resolved.interactionNode || target;
+        const bbox = this.getBBoxSafe(focusNode);
+        if (!bbox) {
+            return false;
+        }
+
+        this.updateBoundingBox(focusNode);
+        if (focusNode._boundingBox) {
+            focusNode._boundingBox.classList.add('svg-bounding-box--pulse');
+            setTimeout(() => {
+                if (focusNode._boundingBox) {
+                    focusNode._boundingBox.classList.remove('svg-bounding-box--pulse');
+                }
+            }, 1000);
+        }
+
+        if (typeof focusNode.scrollIntoView === 'function') {
+            focusNode.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        }
+        focusNode.classList.add('changeable-image-active');
+        setTimeout(() => focusNode.classList.remove('changeable-image-active'), 1200);
+        return true;
     }
 
     makeDraggable(element) {
@@ -226,18 +515,28 @@ class SvgTemplateEditor {
                 return;
             }
 
-            const bbox = element.getBBox();
-            originalX = parseFloat(element.getAttribute('x'));
-            originalY = parseFloat(element.getAttribute('y'));
+            const bbox = this.getBBoxSafe(element);
+            if (!bbox) {
+                return;
+            }
+
+            const canReadAttribute = typeof element.getAttribute === 'function';
+            const canMutateAttribute = typeof element.setAttribute === 'function';
+            originalX = canReadAttribute ? parseFloat(element.getAttribute('x')) : bbox.x;
+            originalY = canReadAttribute ? parseFloat(element.getAttribute('y')) : bbox.y;
 
             if (Number.isNaN(originalX)) {
                 originalX = bbox.x;
-                element.setAttribute('x', originalX);
+                if (canMutateAttribute) {
+                    element.setAttribute('x', originalX);
+                }
             }
 
             if (Number.isNaN(originalY)) {
                 originalY = bbox.y;
-                element.setAttribute('y', originalY);
+                if (canMutateAttribute) {
+                    element.setAttribute('y', originalY);
+                }
             }
 
             grabOffsetX = startPoint.x - originalX;
@@ -266,9 +565,13 @@ class SvgTemplateEditor {
             currentX = point.x - grabOffsetX;
             currentY = point.y - grabOffsetY;
 
-            element.removeAttribute('transform');
-            element.setAttribute('x', currentX);
-            element.setAttribute('y', currentY);
+            if (typeof element.removeAttribute === 'function') {
+                element.removeAttribute('transform');
+            }
+            if (typeof element.setAttribute === 'function') {
+                element.setAttribute('x', currentX);
+                element.setAttribute('y', currentY);
+            }
 
             this.updateBoundingBox(element);
 
@@ -303,10 +606,12 @@ class SvgTemplateEditor {
         document.addEventListener('mousemove', drag);
         document.addEventListener('mouseup', endDrag);
 
-        const handles = element._boundingBox.querySelectorAll('.resize-handle');
-        handles.forEach((handle) => {
-            this.makeResizable(element, handle);
-        });
+        if (element._boundingBox) {
+            const handles = element._boundingBox.querySelectorAll('.resize-handle');
+            handles.forEach((handle) => {
+                this.makeResizable(element, handle);
+            });
+        }
     }
 
     makeResizable(element, handle) {
@@ -325,20 +630,29 @@ class SvgTemplateEditor {
                 return;
             }
 
-            const bbox = element.getBBox();
+            const bbox = this.getBBoxSafe(element);
+            if (!bbox) {
+                return;
+            }
             originalWidth = bbox.width;
             originalHeight = bbox.height;
-            originalX = parseFloat(element.getAttribute('x'));
-            originalY = parseFloat(element.getAttribute('y'));
+            const canReadAttribute = typeof element.getAttribute === 'function';
+            const canMutateAttribute = typeof element.setAttribute === 'function';
+            originalX = canReadAttribute ? parseFloat(element.getAttribute('x')) : bbox.x;
+            originalY = canReadAttribute ? parseFloat(element.getAttribute('y')) : bbox.y;
 
             if (Number.isNaN(originalX)) {
                 originalX = bbox.x;
-                element.setAttribute('x', originalX);
+                if (canMutateAttribute) {
+                    element.setAttribute('x', originalX);
+                }
             }
 
             if (Number.isNaN(originalY)) {
                 originalY = bbox.y;
-                element.setAttribute('y', originalY);
+                if (canMutateAttribute) {
+                    element.setAttribute('y', originalY);
+                }
             }
 
             originalFontSize = parseFloat(element.getAttribute('font-size'))
@@ -404,7 +718,7 @@ class SvgTemplateEditor {
             newHeight = Math.max(20, newHeight);
 
             const tag = element.tagName.toLowerCase();
-            if (tag === 'image' || tag === 'rect') {
+            if ((tag === 'image' || tag === 'rect') && typeof element.setAttribute === 'function') {
                 element.setAttribute('width', newWidth);
                 element.setAttribute('height', newHeight);
                 element.setAttribute('x', newX);
@@ -416,7 +730,9 @@ class SvgTemplateEditor {
                 const scaleY = newHeight / initialHeight;
                 const scale = Math.max(scaleX, scaleY);
                 const newFontSize = Math.max(6, originalFontSize * scale);
-                element.setAttribute('font-size', newFontSize);
+                if (typeof element.setAttribute === 'function') {
+                    element.setAttribute('font-size', newFontSize);
+                }
             }
 
             this.updateBoundingBox(element);
@@ -437,10 +753,10 @@ class SvgTemplateEditor {
 
             const detail = {
                 element,
-                width: parseFloat(element.getAttribute('width')),
-                height: parseFloat(element.getAttribute('height')),
-                x: parseFloat(element.getAttribute('x')),
-                y: parseFloat(element.getAttribute('y')),
+                width: parseFloat(element.getAttribute ? element.getAttribute('width') : '') || originalWidth,
+                height: parseFloat(element.getAttribute ? element.getAttribute('height') : '') || originalHeight,
+                x: parseFloat(element.getAttribute ? element.getAttribute('x') : '') || originalX,
+                y: parseFloat(element.getAttribute ? element.getAttribute('y') : '') || originalY,
             };
 
             const event = new CustomEvent('svgImageResized', { detail });
@@ -490,42 +806,36 @@ class SvgTemplateEditor {
             if (file) {
                 self.handleImageUpload(file, element);
             }
-            document.body.removeChild(input);
+            if (input.parentNode) {
+                input.parentNode.removeChild(input);
+            }
         });
 
         document.body.appendChild(input);
         input.click();
     }
 
-    handleImageUpload(file, element) {
+    handleImageUpload(file, triggerElement) {
         const self = this;
         const reader = new FileReader();
+        const resolvedTarget = triggerElement && triggerElement.__inkwiseImageContent
+            ? triggerElement.__inkwiseImageContent
+            : triggerElement;
 
         reader.onload = function(e) {
             const imageUrl = e.target.result;
+            if (!imageUrl) {
+                return;
+            }
 
-            if (element.tagName.toLowerCase() === 'image') {
-                element.setAttribute('href', imageUrl);
-                if (element.hasAttribute('xlink:href')) {
-                    element.removeAttribute('xlink:href');
-                }
-            } else if (element.tagName.toLowerCase() === 'rect') {
-                const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
-                image.setAttribute('x', element.getAttribute('x') || '0');
-                image.setAttribute('y', element.getAttribute('y') || '0');
-                image.setAttribute('width', element.getAttribute('width') || '100');
-                image.setAttribute('height', element.getAttribute('height') || '100');
-                image.setAttribute('href', imageUrl);
-                image.setAttribute('preserveAspectRatio', 'xMidYMid slice');
-                image.classList.add('uploaded-image');
-
-                element.parentNode.replaceChild(image, element);
-                element = image;
+            const updatedElement = self.applyImageSourceToNode(resolvedTarget, imageUrl) || resolvedTarget;
+            if (triggerElement && updatedElement && triggerElement.__inkwiseImageContent !== updatedElement) {
+                triggerElement.__inkwiseImageContent = updatedElement;
             }
 
             const event = new CustomEvent('svgImageChanged', {
                 detail: {
-                    element,
+                    element: updatedElement,
                     imageUrl,
                     file,
                 },
@@ -533,8 +843,21 @@ class SvgTemplateEditor {
             self.svg.dispatchEvent(event);
 
             if (self.options.onImageChange) {
-                self.options.onImageChange(element, imageUrl, file);
+                self.options.onImageChange(updatedElement, imageUrl, file);
             }
+
+            self.updateBoundingBox(triggerElement || updatedElement);
+        };
+
+        reader.onerror = function(error) {
+            console.error('SvgTemplateEditor: Failed to read selected image file', error);
+            const uploadErrorEvent = new CustomEvent('svgImageUploadFailed', {
+                detail: {
+                    error,
+                    file,
+                },
+            });
+            self.svg.dispatchEvent(uploadErrorEvent);
         };
 
         reader.readAsDataURL(file);
@@ -673,13 +996,62 @@ class SvgTemplateEditor {
             .svg-text-editor:focus {
                 box-shadow: 0 0 5px rgba(0, 124, 186, 0.5);
             }
+                .svg-bounding-box--pulse .svg-bounding-box__rect {
+                    animation: svgBoundingBoxPulse 1s ease-out;
+                }
+
+                @keyframes svgBoundingBoxPulse {
+                    0% {
+                        stroke-width: 2;
+                        opacity: 1;
+                    }
+                    50% {
+                        stroke-width: 4;
+                        opacity: 0.4;
+                    }
+                    100% {
+                        stroke-width: 2;
+                        opacity: 1;
+                    }
+                }
         `;
 
         document.head.appendChild(style);
     }
 
     getSvgString() {
-        return new XMLSerializer().serializeToString(this.svg);
+        // Temporarily hide editor overlays for clean SVG export
+        const overlayLayer = this.svg.closest('.preview-card-bg')?.querySelector('.canvas-overlay-layer');
+        const wasVisible = overlayLayer?.style.display !== 'none';
+        if (overlayLayer && wasVisible) {
+            overlayLayer.style.display = 'none';
+        }
+
+        // Temporarily remove SVG bounding boxes
+        const boundingBoxes = this.svg.querySelectorAll('.svg-bounding-box');
+        const removedBoxes = [];
+        boundingBoxes.forEach(box => {
+            if (box.parentNode) {
+                removedBoxes.push({ element: box, parent: box.parentNode });
+                box.parentNode.removeChild(box);
+            }
+        });
+
+        const svgString = new XMLSerializer().serializeToString(this.svg);
+
+        // Restore bounding boxes
+        removedBoxes.forEach(({ element, parent }) => {
+            if (parent) {
+                parent.appendChild(element);
+            }
+        });
+
+        // Restore overlay visibility
+        if (overlayLayer && wasVisible) {
+            overlayLayer.style.display = '';
+        }
+
+        return svgString;
     }
 
     getSvgDataUrl() {
@@ -703,7 +1075,18 @@ class SvgTemplateEditor {
                 }),
             });
 
-            const result = await response.json();
+            if (!response.ok) {
+                const errorText = await response.text().catch(() => '');
+                throw new Error(errorText || `Request failed with status ${response.status}`);
+            }
+
+            let result;
+            try {
+                result = await response.json();
+            } catch (parseError) {
+                console.warn('SvgTemplateEditor: Failed to parse save response', parseError);
+                result = { success: false, error: 'Invalid response from server' };
+            }
             return result;
         } catch (error) {
             console.error('Failed to save SVG:', error);

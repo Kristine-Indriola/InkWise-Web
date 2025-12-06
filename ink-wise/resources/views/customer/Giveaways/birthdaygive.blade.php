@@ -1,17 +1,20 @@
-@php $invitationType = 'Wedding'; @endphp
+@php
+    $invitationType = 'Birthday';
+    $products = $products ?? collect();
+@endphp
 @extends('customer.Invitations.invitations')
 
-@section('title', 'Wedding Giveaways')
+@section('title', 'Birthday Giveaways')
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('css/customer/preview-modal.css') }}">
     <style>
         :root {
-            --give-accent: #a6b7ff;
-            --give-accent-dark: #8f9dff;
+            --give-accent: #fbcfe8;
+            --give-accent-dark: #f472b6;
             --give-surface: #ffffff;
             --give-muted: #6b7280;
-            --give-shadow: 0 24px 48px rgba(70, 89, 182, 0.18);
+            --give-shadow: 0 24px 48px rgba(244, 114, 182, 0.2);
         }
 
         .giveaway-page {
@@ -54,7 +57,7 @@
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.12em;
-            color: #374151;
+            color: #be185d;
         }
 
         .giveaway-gallery {
@@ -66,7 +69,7 @@
             content: "";
             position: absolute;
             inset: 0;
-            background: radial-gradient(circle at top, rgba(166, 183, 255, 0.18), transparent 55%);
+            background: radial-gradient(circle at top, rgba(251, 207, 232, 0.2), transparent 55%);
             pointer-events: none;
         }
 
@@ -98,8 +101,8 @@
             aspect-ratio: 2 / 3.4;
             border-radius: 26px;
             overflow: hidden;
-            background: linear-gradient(135deg, rgba(166, 183, 255, 0.25), rgba(255, 255, 255, 0.6));
-            box-shadow: 0 18px 40px rgba(79, 70, 229, 0.14);
+            background: linear-gradient(135deg, rgba(251, 207, 232, 0.3), rgba(255, 255, 255, 0.7));
+            box-shadow: 0 18px 40px rgba(244, 114, 182, 0.18);
             transition: transform 0.35s ease, box-shadow 0.35s ease, filter 0.35s ease;
             isolation: isolate;
             opacity: 0;
@@ -123,8 +126,8 @@
 
         .giveaway-card:hover {
             transform: translateY(-6px) scale(1.02);
-            box-shadow: 0 32px 60px rgba(79, 70, 229, 0.35);
-            filter: drop-shadow(0 12px 25px rgba(31, 41, 55, 0.15));
+            box-shadow: 0 32px 60px rgba(236, 72, 153, 0.35);
+            filter: drop-shadow(0 12px 25px rgba(190, 24, 93, 0.2));
         }
 
         .giveaway-card:hover::after {
@@ -203,10 +206,10 @@
             width: 2.3rem;
             height: 2.3rem;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.85);
-            color: #c084fc;
-            border: 1px solid rgba(255, 255, 255, 0.6);
-            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.18);
+            background: rgba(255, 255, 255, 0.9);
+            color: #f472b6;
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            box-shadow: 0 12px 26px rgba(244, 114, 182, 0.25);
             z-index: 2;
             transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
             cursor: pointer;
@@ -222,22 +225,22 @@
         .favorite-toggle:hover,
         .favorite-toggle:focus-visible {
             transform: translateY(-3px) scale(1.04);
-            box-shadow: 0 18px 32px rgba(192, 132, 252, 0.35);
+            box-shadow: 0 18px 32px rgba(244, 114, 182, 0.35);
         }
 
         .favorite-toggle.is-active {
-            background: linear-gradient(135deg, #f472b6, #c084fc);
+            background: linear-gradient(135deg, #f472b6, #fb7185);
             color: #ffffff;
-            box-shadow: 0 20px 36px rgba(192, 132, 252, 0.45);
+            box-shadow: 0 20px 36px rgba(244, 114, 182, 0.45);
         }
 
         .giveaway-empty {
             text-align: center;
             border-radius: 24px;
             padding: clamp(2.5rem, 6vw, 4rem);
-            background: rgba(166, 183, 255, 0.08);
-            border: 1px dashed rgba(166, 183, 255, 0.45);
-            color: #4338ca;
+            background: rgba(251, 207, 232, 0.15);
+            border: 1px dashed rgba(244, 114, 182, 0.35);
+            color: #be185d;
         }
 
         .giveaway-empty p {
@@ -272,14 +275,14 @@
     <script src="{{ asset('js/customer/preview-modal.js') }}" defer></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const FAVORITES_KEY = 'inkwise:wedding:giveaways:favorites';
+            const FAVORITES_KEY = 'inkwise:birthday:giveaways:favorites';
             let favorites;
 
             try {
                 const stored = JSON.parse(window.localStorage.getItem(FAVORITES_KEY) || '[]');
                 favorites = new Set(stored);
             } catch (error) {
-                console.warn('Unable to parse wedding giveaway favorites from storage.', error);
+                console.warn('Unable to parse birthday giveaway favorites from storage.', error);
                 favorites = new Set();
             }
 
@@ -344,13 +347,13 @@
 
 @section('content')
 @php
-    $hasProducts = isset($products) && $products->count();
+    $hasProducts = $products->count();
 @endphp
 <main class="giveaway-page">
     <section class="giveaway-hero">
         <div class="giveaway-hero__content">
-            <h1 class="giveaway-hero__title">WEDDING GIVEAWAYS</h1>
-            <p class="giveaway-hero__subtitle">ELEVATE YOUR THANK-YOU MOMENTS</p>
+            <h1 class="giveaway-hero__title">BIRTHDAY GIVEAWAYS</h1>
+            <p class="giveaway-hero__subtitle">CELEBRATE WITH PLAYFUL FAVORS</p>
         </div>
     </section>
 
@@ -359,7 +362,7 @@
             @if(!$hasProducts)
                 <div class="giveaway-empty">
                     <h2>No giveaways available yet</h2>
-                    <p>We’re crafting new keepsakes. Check back soon for fresh designs, or message us for a custom concept.</p>
+                    <p>We’re crafting joyful party keepsakes. Check back soon or message us for a custom concept.</p>
                 </div>
             @else
                 <div class="giveaway-grid" role="list">
