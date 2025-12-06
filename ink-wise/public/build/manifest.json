@@ -19,7 +19,7 @@
     "isEntry": true
   },
   "resources/css/app.css": {
-    "file": "assets/app-CSsVFHHv.css",
+    "file": "assets/app-DLoVfHMk.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -34,7 +34,7 @@
     "isEntry": true
   },
   "resources/css/customer/studio.css": {
-    "file": "assets/studio-CpOb8AOv.css",
+    "file": "assets/studio-DRkU9fE0.css",
     "src": "resources/css/customer/studio.css",
     "isEntry": true
   },
@@ -69,7 +69,7 @@
     "isEntry": true
   },
   "resources/js/customer/studio/main.jsx": {
-    "file": "assets/main-B9aXMjvS.js",
+    "file": "assets/main-CZnKzAPF.js",
     "name": "main",
     "src": "resources/js/customer/studio/main.jsx",
     "isEntry": true,
@@ -87,7 +87,7 @@
     "isEntry": true
   },
   "resources/js/staff/template-editor/main.jsx": {
-    "file": "assets/main-Cel6EmK5.js",
+    "file": "assets/main-BNbTY51E.js",
     "name": "main",
     "src": "resources/js/staff/template-editor/main.jsx",
     "isEntry": true,
