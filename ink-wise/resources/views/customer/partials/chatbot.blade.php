@@ -2,14 +2,14 @@
 <div class="chat-widget" x-data="chatBot" x-init="loadQAs()" @keydown.window.escape="open=false">
   <!-- Toggle button -->
   <div class="chat-btn" @click="open = !open; if(open) loadQAs()" aria-label="Open chat">
-    <div class="chat-inner"><img src="{{ asset('Customerimages/bots.png') }}" alt="AI Bot"></div>
+    <div class="chat-inner"><i class="bi bi-question-circle-fill text-3xl text-cyan-500"></i></div>
   </div>
 
   <!-- Chat panel -->
   <div x-show="open" x-cloak x-transition class="chat-panel" @click.away="open = false">
     <div class="chat-header">
-      <div class="chat-avatar"><img src="{{ asset('Customerimages/bots.png') }}" alt="Bot"></div>
-      <div><h4>InkWise Assistant</h4><div class="chat-subtitle">AI help for templates & orders</div></div>
+      <div class="chat-avatar"><i class="bi bi-question-circle-fill text-2xl text-cyan-500"></i></div>
+      <div><h4>InkWise Assistant</h4><div class="chat-subtitle">FAQ help for templates & orders</div></div>
     </div>
 
     <!-- Fixed Question List -->
@@ -31,7 +31,7 @@
         <!-- single element per message; class bound by sender -->
         <div :class="m.from === 'user' ? 'msg user' : 'msg bot'">
           <template x-if="m.from !== 'user'">
-            <div class="avatar"><img src="{{ asset('Customerimages/bots.png') }}" alt="bot"></div>
+            <div class="avatar"><i class="bi bi-question-circle-fill text-xl text-cyan-500"></i></div>
           </template>
           <div class="bubble">
             <div class="text" x-text="m.text" x-show="m.text"></div>
@@ -60,6 +60,8 @@
   .faq-btn { background:#f9fafb; border:1px solid #e5e7eb; font-size:.9rem; cursor:pointer; }
   .faq-btn:hover { background:#2563eb; color:#fff; border-color:#2563eb; }
 
+  .chat-subtitle { font-size: 0.85rem; color: #6b7280; font-weight: 400; }
+
   .chat-body {
     padding:16px;
     max-height:400px;
@@ -72,7 +74,7 @@
   }
 
   .msg { display:inline-flex; position:relative; max-width:78%; padding:12px 14px; border-radius:16px; font-size:15px; line-height:1.4; word-break:break-word; box-shadow:0 4px 12px rgba(4,29,66,0.08); align-items:flex-start; gap:10px; }
-  .msg .avatar { width:32px; height:32px; border-radius:50%; overflow:hidden; flex-shrink:0; }
+  .msg .avatar { width:32px; height:32px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .msg .bubble { display:flex; flex-direction:column; gap:6px; }
 
   .msg.bot { background: linear-gradient(180deg,#f4f8ff,#eaf3ff); align-self:flex-start; color:#03305a; border-bottom-left-radius:6px; }

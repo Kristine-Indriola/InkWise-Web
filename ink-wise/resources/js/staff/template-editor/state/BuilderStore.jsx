@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useMemo, useReducer } from 'react';
 import PropTypes from 'prop-types';
 
-import { createLayer, createPage } from '../utils/pageFactory';
+import { createLayer, createPage, derivePageLabel, normalizePageTypeValue } from '../utils/pageFactory';
 
 const BuilderStoreContext = createContext(null);
 
@@ -9,14 +9,14 @@ function normalizePages(template) {
   const rawPages = template?.design?.pages;
 
   if (Array.isArray(rawPages) && rawPages.length > 0) {
-    return rawPages.map((page, index) => createPage(page, index));
+    return rawPages.map((page, index) => createPage(page, index, rawPages.length));
   }
 
-  return [createPage(null, 0)];
+  return [createPage(null, 0, 1)];
 }
 
 const initialState = ({ template }) => {
-  const pages = normalizePages(template);
+  const pages = applyPageStructure(normalizePages(template), template);
   const fallbackPageId = pages[0]?.id ?? 'page-0';
   const configuredActiveId = template?.design?.activePageId;
   const activePageExists = pages.some((page) => page.id === configuredActiveId);
@@ -50,7 +50,8 @@ function reducer(state, action) {
         selectedLayerId: getFirstLayerId(state.pages, action.pageId),
       };
     case 'ADD_PAGE': {
-      const newPage = createPage(action.page, state.pages.length);
+      const nextTotal = state.pages.length + 1;
+      const newPage = createPage(action.page, state.pages.length, nextTotal);
       const nextPages = [...state.pages, newPage];
       return commitPages(state, nextPages, {
         activePageId: newPage.id,
@@ -116,6 +117,50 @@ function reducer(state, action) {
 
       return commitPages(state, pages, {
         selectedLayerId: ensureSelectedLayer(state, pages, action.layerId),
+      });
+    }
+    case 'ALIGN_SELECTED_LAYER': {
+      if (!state.selectedLayerId) {
+        return state;
+      }
+
+      const activePage = state.pages.find((page) => page.id === state.activePageId);
+      if (!activePage) {
+        return state;
+      }
+
+      const targetLayer = activePage.nodes.find((node) => node.id === state.selectedLayerId);
+      if (!targetLayer) {
+        return state;
+      }
+
+      const baseFrame = targetLayer.frame ? { ...targetLayer.frame } : createFallbackFrame(activePage);
+      const nextFrame = alignFrameToSafeArea(baseFrame, activePage, action.alignment);
+
+      if (!nextFrame || (nextFrame.x === baseFrame.x && nextFrame.y === baseFrame.y)) {
+        return state;
+      }
+
+      const pages = state.pages.map((page) => {
+        if (page.id !== activePage.id) {
+          return page;
+        }
+
+        const nodes = page.nodes.map((node) => {
+          if (node.id !== targetLayer.id) {
+            return node;
+          }
+          return {
+            ...node,
+            frame: nextFrame,
+          };
+        });
+
+        return { ...page, nodes };
+      });
+
+      return commitPages(state, pages, {
+        selectedLayerId: targetLayer.id,
       });
     }
     case 'ADD_LAYER': {
@@ -464,6 +509,173 @@ export function BuilderStoreProvider({ template, routes, flags, user, csrfToken,
   );
 }
 
+function applyPageStructure(pages, template) {
+  if (!Array.isArray(pages)) {
+    return [];
+  }
+
+  const templateMeta = extractTemplateMeta(template);
+  const expectedPageTypes = Array.isArray(templateMeta.expectedPageTypes)
+    ? templateMeta.expectedPageTypes.map((type) => normalizePageTypeValue(type)).filter(Boolean)
+    : [];
+  const total = pages.length;
+  const usageCount = Object.create(null);
+
+  return pages.map((page, index) => {
+    const metadata = { ...(page.metadata ?? {}) };
+    const candidateTypes = [
+      page.pageType,
+      metadata.pageType,
+      metadata.side,
+      metadata.role,
+      expectedPageTypes[index],
+    ];
+
+    let pageType = null;
+    for (const candidate of candidateTypes) {
+      const normalized = normalizePageTypeValue(candidate);
+      if (normalized) {
+        pageType = normalized;
+        break;
+      }
+    }
+
+    if (!pageType) {
+      pageType = fallbackPageTypeForIndex(index, total);
+    }
+
+    const repetitions = usageCount[pageType] ?? 0;
+    usageCount[pageType] = repetitions + 1;
+    if (repetitions > 0) {
+      pageType = `${pageType}-${repetitions + 1}`;
+    }
+
+    const normalizedName = typeof page.name === 'string' ? page.name.trim() : '';
+    const label = derivePageLabel(pageType, index, total);
+    const previousGenerated = metadata.generatedName;
+    const isDefaultName =
+      !normalizedName ||
+      /^Page\s+\d+$/i.test(normalizedName) ||
+      previousGenerated === normalizedName;
+    const nextName = isDefaultName ? label : normalizedName;
+
+    return {
+      ...page,
+      pageType,
+      name: nextName,
+      metadata: {
+        ...metadata,
+        pageType,
+        side: metadata.side ?? pageType,
+        sideLabel: label,
+        generatedName: label,
+      },
+    };
+  });
+}
+
+function extractTemplateMeta(template) {
+  const designMeta = template?.design?.meta;
+  if (designMeta && typeof designMeta === 'object') {
+    return designMeta;
+  }
+  if (template?.meta && typeof template.meta === 'object') {
+    return template.meta;
+  }
+  return {};
+}
+
+function fallbackPageTypeForIndex(index, total) {
+  if (total <= 1) {
+    return 'front';
+  }
+  if (index === 0) {
+    return 'front';
+  }
+  if (index === 1) {
+    return 'back';
+  }
+  return `page-${index + 1}`;
+}
+
+function resolveSafeInsets(zone) {
+  if (!zone) {
+    return { top: 0, right: 0, bottom: 0, left: 0 };
+  }
+
+  const toNumber = (value) => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const parsed = Number.parseFloat(value);
+      return Number.isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
+  };
+
+  const fallback = toNumber(zone.margin ?? zone.all ?? 0);
+
+  return {
+    top: toNumber(zone.top ?? fallback),
+    right: toNumber(zone.right ?? fallback),
+    bottom: toNumber(zone.bottom ?? fallback),
+    left: toNumber(zone.left ?? fallback),
+  };
+}
+
+function alignFrameToSafeArea(frame, page, alignment) {
+  if (!page || !frame) {
+    return null;
+  }
+
+  const safe = resolveSafeInsets(page.safeZone);
+  const safeWidth = Math.max(0, page.width - safe.left - safe.right);
+  const safeHeight = Math.max(0, page.height - safe.top - safe.bottom);
+  const bounds = {
+    left: safe.left,
+    right: safe.left + safeWidth,
+    top: safe.top,
+    bottom: safe.top + safeHeight,
+  };
+
+  let nextX = frame.x;
+  let nextY = frame.y;
+
+  switch (alignment) {
+    case 'left':
+      nextX = bounds.left;
+      break;
+    case 'right':
+      nextX = Math.max(bounds.left, bounds.right - frame.width);
+      break;
+    case 'horizontal-center':
+      nextX = bounds.left + (safeWidth - frame.width) / 2;
+      break;
+    case 'top':
+      nextY = bounds.top;
+      break;
+    case 'bottom':
+      nextY = Math.max(bounds.top, bounds.bottom - frame.height);
+      break;
+    case 'vertical-center':
+      nextY = bounds.top + (safeHeight - frame.height) / 2;
+      break;
+    default:
+      return frame;
+  }
+
+  // Clamp to overall page bounds as a fallback
+  nextX = Math.min(Math.max(0, nextX), page.width - frame.width);
+  nextY = Math.min(Math.max(0, nextY), page.height - frame.height);
+
+  return {
+    ...frame,
+    x: Math.round(nextX),
+    y: Math.round(nextY),
+  };
+}
+
 BuilderStoreProvider.propTypes = {
   template: PropTypes.object,
   routes: PropTypes.object,
@@ -499,11 +711,12 @@ function getFirstLayerId(pages, pageId) {
 }
 
 function commitPages(state, pages, overrides = {}, trackHistory = true) {
+  const normalizedPages = applyPageStructure(pages, state.template);
   const history = trackHistory ? pushHistory(state) : state.history;
   return {
     ...state,
     ...overrides,
-    pages,
+    pages: normalizedPages,
     history,
   };
 }

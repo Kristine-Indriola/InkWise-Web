@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { createPortal } from 'react-dom';
 
 import { useBuilderStore } from '../../state/BuilderStore';
+import { getShapeMaskStyles, getShapeVisualStyles } from '../../utils/pageShapes';
 
 function resolveInsets(zone) {
 	if (!zone) {
@@ -185,6 +186,8 @@ export function PreviewModal({ isOpen, onClose }) {
 	}, [rawLayers]);
 
 	const pageShape = activePage.shape ?? null;
+	const pageShapeStyles = useMemo(() => getShapeVisualStyles(pageShape), [pageShape]);
+	const pageShapeMaskStyles = useMemo(() => getShapeMaskStyles(pageShape), [pageShape]);
 
 	const safeZoneStyle = showSafeZone && hasSafeZone ? {
 		position: 'absolute',
@@ -193,8 +196,8 @@ export function PreviewModal({ isOpen, onClose }) {
 		bottom: safeZone.bottom,
 		left: safeZone.left,
 		border: '1px dashed rgba(37, 99, 235, 0.55)',
-		borderRadius: 'inherit',
 		pointerEvents: 'none',
+		...pageShapeMaskStyles,
 	} : null;
 
 	const bleedStyle = showBleed && hasBleed ? {
@@ -204,8 +207,8 @@ export function PreviewModal({ isOpen, onClose }) {
 		bottom: -bleed.bottom,
 		left: -bleed.left,
 		border: '1px solid rgba(220, 38, 38, 0.4)',
-		borderRadius: 'inherit',
 		pointerEvents: 'none',
+		...pageShapeMaskStyles,
 	} : null;
 
 	const handlePageSelect = (pageId) => {
@@ -215,57 +218,6 @@ export function PreviewModal({ isOpen, onClose }) {
 		dispatch({ type: 'SELECT_PAGE', pageId });
 	};
 
-	const getShapeStyling = (shape) => {
-		if (!shape) return {};
-
-		const { variant, id, borderRadius } = shape;
-
-		switch (variant) {
-			case 'circle':
-				return { borderRadius: '50%', overflow: 'hidden' };
-			case 'polygon': {
-				const polygonClips = {
-					triangle: 'polygon(50% 0%, 0% 100%, 100% 100%)',
-					diamond: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
-					hexagon: 'polygon(30% 0%, 70% 0%, 100% 50%, 70% 100%, 30% 100%, 0% 50%)',
-					octagon: 'polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%)',
-					star: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)',
-					shield: 'polygon(50% 0%, 100% 20%, 100% 80%, 50% 100%, 0% 80%, 0% 20%)',
-				};
-				return { clipPath: polygonClips[id] || 'none', overflow: 'hidden' };
-			}
-			case 'organic': {
-				const organicClips = {
-					heart: 'path("M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z")',
-					'cloud-shape': 'ellipse(60% 40% at 50% 50%)',
-					flower: 'polygon(50% 0%, 65% 35%, 100% 50%, 65% 65%, 50% 100%, 35% 65%, 0% 50%, 35% 35%)',
-					butterfly: 'polygon(50% 0%, 70% 20%, 90% 40%, 70% 60%, 50% 80%, 30% 60%, 10% 40%, 30% 20%)',
-					leaf: 'polygon(50% 0%, 100% 30%, 90% 70%, 50% 100%, 10% 70%, 0% 30%)',
-					balloon: 'ellipse(50% 60% at 50% 50%)',
-					crown: 'polygon(50% 0%, 60% 25%, 85% 25%, 75% 50%, 95% 50%, 80% 75%, 100% 75%, 85% 100%, 15% 100%, 0% 75%, 20% 75%, 5% 50%, 25% 50%, 15% 25%, 40% 25%)',
-					'puzzle-piece': 'polygon(0% 0%, 70% 0%, 70% 30%, 100% 30%, 100% 70%, 70% 70%, 70% 100%, 30% 100%, 30% 70%, 0% 70%)',
-					'ribbon-banner': 'polygon(0% 0%, 10% 50%, 0% 100%, 100% 100%, 90% 50%, 100% 0%)',
-				};
-				return { clipPath: organicClips[id] || 'none', overflow: 'hidden' };
-			}
-			case 'frame':
-			case 'layout':
-			case 'rectangle':
-				return {
-					borderRadius: typeof borderRadius === 'number' ? `${borderRadius}px` : borderRadius || 0,
-					overflow: 'hidden',
-				};
-			case 'tag': {
-				const tagClips = {
-					'tag-shape': 'polygon(0% 0%, 85% 0%, 100% 50%, 85% 100%, 0% 100%)',
-					'ticket-shape': 'polygon(0% 0%, 85% 0%, 100% 50%, 85% 100%, 0% 100%)',
-				};
-				return { clipPath: tagClips[id] || 'none', overflow: 'hidden' };
-			}
-			default:
-				return {};
-		}
-	};
 
 	const modalContent = (
 		<div className="preview-modal-overlay" onClick={onClose}>
@@ -410,11 +362,11 @@ export function PreviewModal({ isOpen, onClose }) {
 											width: pageWidth,
 											height: pageHeight,
 											background: activePage.background || '#ffffff',
-											...getShapeStyling(pageShape),
 											borderRadius: '12px',
 											boxShadow: '0 18px 40px rgba(15, 23, 42, 0.25)',
 											transform: `scale(${previewScale})`,
 											transformOrigin: 'top left',
+											...pageShapeStyles,
 										}}
 									>
 										{bleedStyle && <div className="preview-bleed-guide" style={bleedStyle} />}
@@ -440,6 +392,30 @@ export function PreviewModal({ isOpen, onClose }) {
 											const flipVertical = Boolean(metadata.flipVertical);
 											const scaleX = flipHorizontal ? -imageScale : imageScale;
 											const scaleY = flipVertical ? -imageScale : imageScale;
+
+											const isShapeImageFrame = layer.type === 'shape' && Boolean(metadata.isImageFrame);
+											const shapeMaskKey = metadata.maskVariant ?? layer.shape?.id ?? layer.variant;
+											const rawImageContent = isImage
+												? layer.content
+												: isShapeImageFrame
+													? (layer.content || metadata.backgroundImage || '')
+													: '';
+											const trimmedImageContent = typeof rawImageContent === 'string' ? rawImageContent.trim() : '';
+											const hasImageSource = Boolean(
+												trimmedImageContent &&
+												(trimmedImageContent.startsWith('data:') ||
+													trimmedImageContent.startsWith('blob:') ||
+													/^https?:/i.test(trimmedImageContent)),
+											);
+											const imageSource = hasImageSource ? trimmedImageContent : null;
+											const shapeDescriptor = layer.type === 'shape'
+												? layer.shape ?? {
+													id: shapeMaskKey,
+													variant: layer.variant,
+													borderRadius: layer.borderRadius,
+												}
+												: null;
+											const shapeVisualStyles = layer.type === 'shape' ? getShapeVisualStyles(shapeDescriptor) : null;
 
 											const layerStyle = {
 												position: 'absolute',
@@ -482,15 +458,15 @@ export function PreviewModal({ isOpen, onClose }) {
 														</div>
 													)}
 
-													{isImage && layer.content && typeof layer.content === 'string' && (layer.content.startsWith('data:') || layer.content.startsWith('blob:')) && (
+													{(isImage || isShapeImageFrame) && hasImageSource && (
 														<img
-															src={layer.content}
+															src={imageSource}
 															alt={layer.name || 'Template image'}
 															style={{
 																width: '100%',
 																height: '100%',
 																objectFit: objectFitMode,
-																borderRadius: layer.borderRadius ?? 0,
+																borderRadius: isShapeImageFrame ? 0 : layer.borderRadius ?? 0,
 																display: 'block',
 																transform: `translate(${imageOffsetX}px, ${imageOffsetY}px) scale(${scaleX}, ${scaleY})`,
 																transformOrigin: 'center',
@@ -498,16 +474,24 @@ export function PreviewModal({ isOpen, onClose }) {
 														/>
 													)}
 
-													{layer.type === 'shape' && !isText && !isImage && (
+													{layer.type === 'shape' && (
 														<div
+															className="canvas-shape-frame"
 															style={{
 																width: '100%',
 																height: '100%',
-																backgroundColor: layer.fill || 'rgba(37, 99, 235, 0.12)',
-																borderRadius: layer.borderRadius ?? 0,
-																...getShapeStyling(layer.shape),
+																overflow: 'hidden',
+																backgroundColor: hasImageSource ? 'transparent' : layer.fill || 'rgba(37, 99, 235, 0.12)',
+																...(shapeVisualStyles ?? {}),
 															}}
-														/>
+														>
+															{isShapeImageFrame && !hasImageSource && (
+																<div className="canvas-shape-frame__placeholder">
+																	<i className="fa-solid fa-image" aria-hidden="true"></i>
+																	<span>Add image</span>
+																</div>
+															)}
+														</div>
 													)}
 												</div>
 											);

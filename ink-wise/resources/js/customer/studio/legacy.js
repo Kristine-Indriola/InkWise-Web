@@ -25,6 +25,146 @@ export function initializeCustomerStudioLegacy() {
     const canvasWrapper = document.querySelector('.preview-canvas-wrapper');
     let customIndex = 1;
 
+    const imageClassTokens = new Set([
+      'canvas-layer__image',
+      'changeable-image',
+      'svg-changeable-image',
+      'inkwise-image',
+    ]);
+
+    const readDatasetTokens = (node) => {
+      if (!node || !node.dataset) {
+        return [];
+      }
+      const keys = ['changeable', 'editableType', 'elementType', 'layerType', 'previewType', 'fieldType'];
+      return keys
+        .map((key) => node.dataset[key])
+        .filter((value) => typeof value === 'string' && value.trim() !== '')
+        .map((value) => value.trim().toLowerCase());
+    };
+
+    const findImageContentNode = (node) => {
+      if (!node || typeof node.querySelector !== 'function') {
+        return null;
+      }
+      return node.querySelector('[data-changeable="image"], [data-editable-image], .canvas-layer__image, img, image');
+    };
+
+    const nodeRepresentsImage = (node) => {
+      if (!node) {
+        return false;
+      }
+
+      const tagName = typeof node.tagName === 'string' ? node.tagName.toLowerCase() : '';
+      if (tagName === 'image' || tagName === 'img') {
+        return true;
+      }
+
+      const datasetHints = readDatasetTokens(node);
+      if (datasetHints.some((hint) => hint === 'image' || hint === 'photo' || hint === 'graphic')) {
+        return true;
+      }
+
+      if (typeof node.hasAttribute === 'function') {
+        if (node.hasAttribute('data-editable-image') || node.hasAttribute('data-changeable-image')) {
+          return true;
+        }
+      }
+
+      if (node.classList) {
+        for (const token of imageClassTokens) {
+          if (node.classList.contains(token)) {
+            return true;
+          }
+        }
+      }
+
+      if (tagName === 'foreignobject') {
+        const inner = findImageContentNode(node);
+        if (inner) {
+          return true;
+        }
+      }
+
+      return false;
+    };
+
+    const nodeRepresentsText = (node) => {
+      if (!node || nodeRepresentsImage(node)) {
+        return false;
+      }
+      const tagName = typeof node.tagName === 'string' ? node.tagName.toLowerCase() : '';
+      if (tagName === 'text' || tagName === 'tspan') {
+        return true;
+      }
+
+      const datasetHints = readDatasetTokens(node);
+      if (datasetHints.some((hint) => hint.includes('text') || hint === 'names' || hint === 'heading')) {
+        return true;
+      }
+
+      if (node.textContent && node.textContent.trim() !== '') {
+        return true;
+      }
+
+      return true;
+    };
+
+    const resolveImageLikeNode = (node) => {
+      if (!node) {
+        return null;
+      }
+      if (nodeRepresentsImage(node)) {
+        return node;
+      }
+      if (typeof node.closest === 'function') {
+        const ancestor = node.closest('[data-preview-node]');
+        if (ancestor && ancestor !== node && nodeRepresentsImage(ancestor)) {
+          return ancestor;
+        }
+      }
+      const fallback = findImageContentNode(node);
+      if (fallback) {
+        return fallback;
+      }
+      return null;
+    };
+
+    const applyImageSourceToNode = (node, dataUrl) => {
+      if (!node || !dataUrl) {
+        return false;
+      }
+
+      const tagName = typeof node.tagName === 'string' ? node.tagName.toLowerCase() : '';
+      if (tagName === 'image') {
+        node.setAttributeNS('http://www.w3.org/1999/xlink', 'href', dataUrl);
+        node.setAttribute('href', dataUrl);
+        node.dataset.src = dataUrl;
+        return true;
+      }
+      if (tagName === 'img') {
+        node.setAttribute('src', dataUrl);
+        node.dataset.src = dataUrl;
+        return true;
+      }
+      if (tagName === 'foreignobject') {
+        const inner = findImageContentNode(node);
+        if (inner && inner !== node) {
+          return applyImageSourceToNode(inner, dataUrl);
+        }
+        return false;
+      }
+
+      if (node.style) {
+        node.style.backgroundImage = `url('${dataUrl}')`;
+      }
+      if (node.dataset) {
+        node.dataset.src = dataUrl;
+        node.dataset.replacedImage = 'true';
+      }
+      return true;
+    };
+
     const bootstrapPayload = (typeof window !== 'undefined' && window.inkwiseStudioBootstrap)
       ? window.inkwiseStudioBootstrap
       : {};
@@ -366,6 +506,10 @@ export function initializeCustomerStudioLegacy() {
     }
 
     const requestImageReplacement = (node) => {
+      const targetNode = resolveImageLikeNode(node);
+      if (!targetNode) {
+        return;
+      }
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'image/*';
@@ -380,14 +524,11 @@ export function initializeCustomerStudioLegacy() {
           if (!dataUrl) {
             return;
           }
-          if (node instanceof SVGImageElement) {
-            node.setAttributeNS('http://www.w3.org/1999/xlink', 'href', dataUrl);
-            node.setAttribute('href', dataUrl);
-          } else if (node instanceof HTMLImageElement) {
-            node.src = dataUrl;
+          const updated = applyImageSourceToNode(targetNode, dataUrl);
+          if (updated) {
+            scheduleOverlaySync();
+            autosave?.schedule('image-replace');
           }
-          scheduleOverlaySync();
-          autosave?.schedule('image-replace');
         };
         reader.readAsDataURL(file);
       };
@@ -748,8 +889,7 @@ export function initializeCustomerStudioLegacy() {
         return data;
       }
 
-      const nodeName = typeof node.tagName === 'string' ? node.tagName.toLowerCase() : '';
-      const type = nodeName === 'image' || nodeName === 'img' ? 'image' : 'text';
+      const type = nodeRepresentsImage(node) ? 'image' : 'text';
       const previewKey = node.getAttribute('data-preview-node') || '';
 
       const overlay = document.createElement('div');
@@ -3128,20 +3268,18 @@ export function initializeCustomerStudioLegacy() {
       const selector = `[data-preview-node="${activeTextKey}"]`;
       const collected = new Set();
       root.querySelectorAll(selector).forEach((candidate) => {
-        if (!candidate) {
+        if (!candidate || nodeRepresentsImage(candidate)) {
           return;
         }
         const tag = (candidate.tagName || '').toLowerCase();
-        if (tag === 'text') {
-          collected.add(candidate);
-          return;
-        }
         if (tag === 'tspan' || tag === 'g') {
           const parentText = candidate.closest('text');
           if (parentText) {
             collected.add(parentText);
+            return;
           }
         }
+        collected.add(candidate);
       });
       return Array.from(collected);
     };
@@ -3155,13 +3293,14 @@ export function initializeCustomerStudioLegacy() {
         return [];
       }
       const selector = `[data-preview-node="${activeImageKey}"]`;
-      return Array.from(root.querySelectorAll(selector)).filter((candidate) => {
-        if (!candidate) {
-          return false;
+      const collected = new Set();
+      root.querySelectorAll(selector).forEach((candidate) => {
+        const target = resolveImageLikeNode(candidate);
+        if (target) {
+          collected.add(target);
         }
-        const tag = (candidate.tagName || '').toLowerCase();
-        return tag === 'image' || tag === 'img';
       });
+      return Array.from(collected);
     };
 
     const getActiveInputElement = () => getPreviewInputForKey(activeTextKey);
@@ -3599,9 +3738,8 @@ export function initializeCustomerStudioLegacy() {
                 return;
               }
 
-              const nodeName = typeof node.tagName === 'string' ? node.tagName.toLowerCase() : '';
-              const isImageNode = nodeName === 'image' || nodeName === 'img';
-              const isTextNode = !isImageNode;
+              const isImageNode = nodeRepresentsImage(node);
+              const isTextNode = nodeRepresentsText(node);
 
               if (isTextNode) {
                 createdTextField = true;
@@ -3623,9 +3761,8 @@ export function initializeCustomerStudioLegacy() {
           const key = node.getAttribute('data-preview-node');
           if (!key) return;
 
-          const nodeName = typeof node.tagName === 'string' ? node.tagName.toLowerCase() : '';
-          const isImageNode = nodeName === 'image' || nodeName === 'img';
-          const isTextNode = !isImageNode;
+          const isImageNode = nodeRepresentsImage(node);
+          const isTextNode = nodeRepresentsText(node);
 
           if (isImageNode) {
             node.setAttribute('data-changeable', 'image');
@@ -3868,8 +4005,7 @@ export function initializeCustomerStudioLegacy() {
           ev.stopPropagation();
           const name = node.dataset.previewNode;
           if (name) {
-            const tag = (node.tagName || '').toLowerCase();
-            if (tag === 'image' || tag === 'img') {
+            if (nodeRepresentsImage(node)) {
               setActiveImageKey(name);
             } else {
               setActiveTextKey(name);

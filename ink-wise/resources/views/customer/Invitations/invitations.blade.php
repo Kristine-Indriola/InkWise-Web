@@ -1,20 +1,17 @@
-{{-- resources/views/customerinvitations/invitations.blade.php --}}
+{{-- resources/views/customer/Invitations/invitations.blade.php --}}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Inkwise Invitations')</title>
 
-    <!-- Fonts -->
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Seasons&display=swap');
         @import url('https://fonts.cdnfonts.com/css/edwardian-script-itc');
     </style>
 
-
-
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-bold-rounded/css/uicons-bold-rounded.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
@@ -27,18 +24,18 @@
             height: 2.75rem;
             border-radius: 9999px;
             border: 1px solid #dbeafe;
-            background-color: rgba(255, 255, 255, 0.9);
+            background-color: rgba(255, 255, 255, 0.92);
             color: #f472b6;
             transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
             box-shadow: 0 12px 24px rgba(166, 183, 255, 0.25);
         }
 
         .nav-icon-button:hover {
-            transform: translateY(-2px);
-            background-color: #f8f5ff;
+            transform: translateY(-1px);
+            background-color: #fdf2ff;
         }
 
-        .nav-icon-button:focus {
+        .nav-icon-button:focus-visible {
             outline: 2px solid #a6b7ff;
             outline-offset: 2px;
         }
@@ -58,401 +55,437 @@
             }
         }
     </style>
-    
+
     @stack('styles')
-    <!-- Custom CSS -->
+
     <link rel="stylesheet" href="{{ asset('css/customer/customer.css') }}">
     <link rel="stylesheet" href="{{ asset('css/customer/template.css') }}">
-    
-    <!-- Custom JS -->
+
     <script src="{{ asset('js/customer/customer.js') }}" defer></script>
     <script src="{{ asset('js/customer/template.js') }}" defer></script>
 
-    
-    <!-- Alpine.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.10.2/cdn.min.js" defer></script>
 </head>
-<body class="antialiased bg-white">
+<body class="antialiased bg-white min-h-screen">
+    @php
+        $resolvedInvitationType = $invitationType
+            ?? (request()->routeIs('templates.corporate.*') ? 'Corporate'
+                : (request()->routeIs('templates.baptism.*') ? 'Baptism'
+                    : (request()->routeIs('templates.birthday.*') ? 'Birthday'
+                        : 'Wedding')));
 
-    <!-- Top Navigation Bar -->
-    <header class="fixed top-0 z-40 bg-white/95 backdrop-blur border-b border-[#c7d2fe] shadow-sm w-full">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-16">
-                <!-- Logo -->
-                <a href="{{ route('dashboard') }}" class="flex items-center gap-2 group">
-                    <span class="text-4xl font-bold text-[#a6b7ff] transition-transform duration-200 group-hover:-translate-y-0.5"
-                          style="font-family: Edwardian Script ITC;">I</span>
-                    <span class="text-2xl font-bold text-gray-900" style="font-family: 'Playfair Display', serif;">nkwise</span>
-                </a>
+        $eventRoutes = [
+            'wedding' => [
+                'label' => 'Wedding',
+                'invitations' => route('templates.wedding.invitations'),
+                'giveaways' => route('templates.wedding.giveaways'),
+            ],
+            'corporate' => [
+                'label' => 'Corporate',
+                'invitations' => route('templates.corporate.invitations'),
+                'giveaways' => route('templates.corporate.giveaways'),
+            ],
+            'baptism' => [
+                'label' => 'Baptism',
+                'invitations' => route('templates.baptism.invitations'),
+                'giveaways' => route('templates.baptism.giveaways'),
+            ],
+            'birthday' => [
+                'label' => 'Birthday',
+                'invitations' => route('templates.birthday.invitations'),
+                'giveaways' => route('templates.birthday.giveaways'),
+            ],
+        ];
 
-                @php
-                    $invitationType = $invitationType ?? (
-                        request()->routeIs('templates.wedding.invitations') ? 'Wedding' :
-                        (request()->routeIs('templates.corporate.invitations') ? 'Corporate' :
-                        (request()->routeIs('templates.baptism.invitations') ? 'Baptism' :
-                        (request()->routeIs('templates.birthday.invitations') ? 'Birthday' : 'Invitations')))
-                    );
+        $currentEventKey = strtolower($resolvedInvitationType);
+        if (! array_key_exists($currentEventKey, $eventRoutes)) {
+            $currentEventKey = 'wedding';
+        }
+        $currentEventRoutes = $eventRoutes[$currentEventKey];
 
-                    $navLinks = [
-                        ['label' => 'Home', 'route' => route('dashboard'), 'active' => request()->routeIs('dashboard'), 'icon' => null],
-                        ['label' => 'Invitations', 'route' => route('templates.wedding.invitations'), 'active' => request()->routeIs('templates.*.invitations'), 'icon' => null],
-                        ['label' => 'Giveaways', 'route' => route('templates.wedding.giveaways'), 'active' => request()->routeIs('templates.*.giveaways'), 'icon' => null],
-                    ];
+        $navLinks = [
+            [
+                'label' => 'Home',
+                'route' => route('dashboard'),
+                'isActive' => request()->routeIs('dashboard'),
+            ],
+            [
+                'label' => 'Invitations',
+                'route' => $currentEventRoutes['invitations'],
+                'isActive' => request()->routeIs('templates.' . $currentEventKey . '.invitations'),
+            ],
+            [
+                'label' => 'Giveaways',
+                'route' => $currentEventRoutes['giveaways'],
+                'isActive' => request()->routeIs('templates.' . $currentEventKey . '.giveaways'),
+            ],
+        ];
 
-                    $hasFavoritesRoute = \Illuminate\Support\Facades\Route::has('customer.favorites');
-                    $favoritesLink = [
-                        'url' => $hasFavoritesRoute ? route('customer.favorites') : '#',
-                        'disabled' => !$hasFavoritesRoute,
-                        'label' => 'My favorites',
-                    ];
+        $categoryLinks = [];
+        foreach ($eventRoutes as $key => $config) {
+            $categoryLinks[] = [
+                'key' => $key,
+                'label' => $config['label'],
+                'route' => $config['invitations'],
+                'isActive' => $key === $currentEventKey,
+            ];
+        }
 
-                    $hasCartRoute = \Illuminate\Support\Facades\Route::has('customer.cart');
-                    $cartLink = [
-                        'url' => '/order/addtocart',
-                        'disabled' => false,
-                        'label' => 'My cart',
-                    ];
-                @endphp
+        $favoritesEnabled = \Illuminate\Support\Facades\Route::has('customer.favorites');
+        $cartRoute = \Illuminate\Support\Facades\Route::has('customer.cart')
+            ? route('customer.cart')
+            : '/order/addtocart';
+        $searchValue = request('query', '');
+    @endphp
 
-                <div class="flex items-center gap-3 lg:gap-6">
-                    <button id="navToggle" class="inline-flex items-center justify-center lg:hidden w-10 h-10 rounded-full border border-[#c7d2fe] text-[#4f46e5] hover:bg-[#eef2ff] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#a6b7ff]"
-                            aria-expanded="false" aria-controls="primaryNav">
-                        <span class="sr-only">Toggle navigation</span>
-                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                    </button>
+    <header class="fixed top-0 z-40 w-full border-b border-[#c7d2fe] bg-white/95 backdrop-blur shadow-sm">
+        <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+            <a href="{{ route('dashboard') }}" class="group flex items-center gap-2" aria-label="Inkwise home">
+                <span class="text-4xl font-bold text-[#a6b7ff] transition-transform duration-200 group-hover:-translate-y-0.5" style="font-family: Edwardian Script ITC;">I</span>
+                <span class="text-2xl font-bold text-gray-900" style="font-family: 'Playfair Display', serif;">nkwise</span>
+            </a>
 
-                    <nav id="primaryNav" class="nav-menu hidden lg:flex lg:items-center">
-                        <ul class="flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-7 text-sm font-semibold text-gray-700">
-                            @foreach ($navLinks as $link)
-                                <li>
-                                    <a href="{{ $link['route'] }}"
-                                       class="inline-flex items-center gap-2 px-3 py-2 rounded-full transition {{ $link['active'] ? 'text-[#4338ca] bg-[#eef2ff] shadow-sm' : 'hover:text-[#4338ca]' }}">
-                                        @if(!empty($link['icon']))
-                                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                                {!! $link['icon'] !!}
-                                            </svg>
-                                        @endif
-                                        {{ $link['label'] }}
-                                    </a>
-                                </li>
-                            @endforeach
-                            <li class="relative">
-                                <button id="categoryToggle" type="button"
-                                        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-transparent hover:border-[#c7d2fe] text-gray-700 hover:text-[#4338ca] transition"
-                                        aria-expanded="false" aria-haspopup="true">
-                                    {{ $invitationType }}
-                                    <svg class="w-4 h-4 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round" />
-                                    </svg>
-                                </button>
-                                <div id="categoryMenu" class="hidden absolute left-0 lg:left-auto lg:right-0 mt-2 w-52 rounded-2xl border border-[#dbeafe] bg-white/95 backdrop-blur shadow-xl overflow-hidden" role="menu">
-                                    <a href="{{ route('templates.wedding.invitations') }}" class="block px-4 py-2.5 text-gray-700 hover:bg-[#eef2ff]" role="menuitem">Wedding</a>
-                                    <a href="{{ route('templates.corporate.invitations') }}" class="block px-4 py-2.5 text-gray-700 hover:bg-[#eef2ff]" role="menuitem">Corporate</a>
-                                    <a href="{{ route('templates.baptism.invitations') }}" class="block px-4 py-2.5 text-gray-700 hover:bg-[#eef2ff]" role="menuitem">Baptism</a>
-                                    <a href="{{ route('templates.birthday.invitations') }}" class="block px-4 py-2.5 text-gray-700 hover:bg-[#eef2ff]" role="menuitem">Birthday</a>
-                                </div>
+            <div class="flex items-center gap-3 lg:gap-6">
+                <button id="navToggle" aria-controls="mobileNavPanel" aria-expanded="false" type="button"
+                        class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#c7d2fe] text-[#4f46e5] transition hover:bg-[#eef2ff] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#a6b7ff] lg:hidden">
+                    <span class="sr-only">Toggle navigation menu</span>
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </button>
+
+                <nav id="primaryNav" class="hidden lg:flex">
+                    <ul class="flex items-center gap-4 text-sm font-semibold text-gray-700">
+                        @foreach ($navLinks as $link)
+                            <li>
+                                <a href="{{ $link['route'] }}"
+                                   class="inline-flex items-center gap-2 rounded-full px-4 py-2 transition {{ $link['isActive'] ? 'bg-[#eef2ff] text-[#4338ca] shadow-sm' : 'hover:text-[#4338ca]' }}"
+                                   aria-current="{{ $link['isActive'] ? 'page' : 'false' }}">
+                                    {{ $link['label'] }}
+                                </a>
                             </li>
-                        </ul>
-                    </nav>
-
-                    <div class="flex items-center gap-3">
-                        <form action="{{ url('/search') }}" method="GET" class="hidden lg:flex">
-                            <label class="sr-only" for="invitation-search">Search</label>
-                            <input id="invitation-search" type="text" name="query" placeholder="Search templates..."
-                                   class="w-48 border border-[#dbeafe] rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#a6b7ff] focus:border-transparent placeholder:text-gray-400">
-                        </form>
-
-                        <div class="hidden lg:flex items-center gap-2">
-                            <a href="{{ $favoritesLink['url'] }}"
-                               class="nav-icon-button"
-                               aria-label="{{ $favoritesLink['label'] }}"
-                               title="{{ $favoritesLink['label'] }}"
-                               @if($favoritesLink['disabled']) aria-disabled="true" @endif>
-                                <i class="fi fi-br-comment-heart" aria-hidden="true"></i>
-                            </a>
-                            <a href="{{ $cartLink['url'] }}"
-                               class="nav-icon-button"
-                               aria-label="{{ $cartLink['label'] }}"
-                               title="{{ $cartLink['label'] }}"
-                               @if($cartLink['disabled']) aria-disabled="true" @endif>
-                                <i class="bi bi-bag-heart-fill" aria-hidden="true"></i>
-                            </a>
-                        </div>
-
-                        @guest
-                            <a href="{{ route('customer.login') }}"
-                               id="openLogin"
-                               class="hidden sm:inline-flex items-center text-white px-5 py-2 font-semibold rounded-full bg-gradient-to-r from-[#6366f1] via-[#7c83ff] to-[#a6b7ff] shadow focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#a6b7ff]"
-                               style="font-family: 'Seasons', serif;">
-                                Sign in
-                            </a>
-                        @endguest
-
-                        @auth
-                            <div class="relative">
-                                <button id="userDropdownBtn" class="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-full bg-[#4f46e5] text-white hover:bg-[#4338ca] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#a6b7ff]">
-                                    {{ Auth::user()->customer?->first_name ?? Auth::user()->email }}
-                                    <svg id="dropdownArrow" class="w-3.5 h-3.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                        <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round" />
-                                    </svg>
-                                </button>
-                                <div id="userDropdownMenu" class="hidden absolute right-0 mt-3 w-48 rounded-2xl border border-[#dbeafe] bg-white shadow-xl overflow-hidden">
-                                    <a href="{{ route('customer.dashboard') }}" class="block px-4 py-2.5 text-gray-700 hover:bg-[#eef2ff]">Profile</a>
-                                    <form id="logout-form" action="{{ route('customer.logout') }}" method="POST">
-                                        @csrf
-                                        <button type="submit" class="block w-full text-left px-4 py-2.5 text-gray-700 hover:bg-[#eef2ff]">
-                                            Logout
-                                        </button>
-                                    </form>
-                                </div>
+                        @endforeach
+                        <li class="relative">
+                            <button id="categoryToggle" type="button" aria-haspopup="true" aria-expanded="false"
+                                    class="inline-flex items-center gap-2 rounded-full px-3 py-2 text-gray-700 transition hover:border-[#c7d2fe] hover:text-[#4338ca]">
+                                {{ $resolvedInvitationType }}
+                                <svg class="h-4 w-4 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </button>
+                            <div id="categoryMenu" class="absolute left-0 right-auto mt-2 hidden w-56 rounded-2xl border border-[#dbeafe] bg-white/95 backdrop-blur shadow-2xl lg:right-0">
+                                <ul>
+                                    @foreach ($categoryLinks as $category)
+                                        <li>
+                                            <a href="{{ $category['route'] }}"
+                                               class="flex items-center justify-between px-5 py-2.5 text-sm text-gray-700 transition hover:bg-[#eef2ff] {{ $category['isActive'] ? 'font-semibold text-[#4338ca]' : '' }}">
+                                                <span>{{ $category['label'] }}</span>
+                                                @if($category['isActive'])
+                                                    <span class="text-xs text-[#4338ca]">Current</span>
+                                                @endif
+                                            </a>
+                                        </li>
+                                    @endforeach
+                                </ul>
                             </div>
-                        @endauth
-                    </div>
-                </div>
-            </div>
+                        </li>
+                    </ul>
+                </nav>
 
-            <div id="mobileNavPanel" class="lg:hidden hidden pb-6">
-                <div class="flex flex-col gap-4 pt-4 border-t border-[#e0e7ff] mt-4">
-                    <form action="{{ url('/search') }}" method="GET" class="flex">
-                        <label class="sr-only" for="mobile-invitation-search">Search templates</label>
-                        <input id="mobile-invitation-search" type="text" name="query" placeholder="Search templates..."
-                               class="flex-1 border border-[#dbeafe] rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#a6b7ff] focus:border-transparent">
+                <div class="flex items-center gap-3">
+                    <form action="{{ url('/search') }}" method="GET" class="hidden lg:flex">
+                        <label for="desktop-invitation-search" class="sr-only">Search templates</label>
+                        <input id="desktop-invitation-search" type="text" name="query" value="{{ $searchValue }}" placeholder="Search templates..."
+                               class="w-52 rounded-full border border-[#dbeafe] px-4 py-2 text-sm placeholder:text-gray-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#a6b7ff]">
                     </form>
 
-                    <div class="flex items-center gap-3">
-                        <a href="{{ $favoritesLink['url'] }}"
+                    <div class="hidden items-center gap-2 lg:flex">
+                        <a href="{{ $favoritesEnabled ? route('customer.favorites') : '#' }}"
                            class="nav-icon-button"
-                           aria-label="{{ $favoritesLink['label'] }}"
-                           title="{{ $favoritesLink['label'] }}"
-                           @if($favoritesLink['disabled']) aria-disabled="true" @endif>
+                           aria-label="My favorites"
+                           title="My favorites"
+                           @unless($favoritesEnabled) aria-disabled="true" @endunless>
                             <i class="fi fi-br-comment-heart" aria-hidden="true"></i>
                         </a>
-                        <a href="{{ $cartLink['url'] }}"
+                        <a href="{{ $cartRoute }}"
                            class="nav-icon-button"
-                           aria-label="{{ $cartLink['label'] }}"
-                           title="{{ $cartLink['label'] }}"
-                           @if($cartLink['disabled']) aria-disabled="true" @endif>
+                           aria-label="My cart"
+                           title="My cart">
                             <i class="bi bi-bag-heart-fill" aria-hidden="true"></i>
                         </a>
                     </div>
 
-                    <ul class="flex flex-col gap-2 text-sm font-semibold text-gray-700">
-                        @foreach ($navLinks as $link)
-                            <li>
-                                <a href="{{ $link['route'] }}" class="flex items-center gap-3 px-3 py-2 rounded-lg {{ $link['active'] ? 'bg-[#eef2ff] text-[#4338ca]' : 'hover:bg-[#eef2ff] hover:text-[#4338ca]' }}">
-                                    @if(!empty($link['icon']))
-                                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                            {!! $link['icon'] !!}
-                                        </svg>
-                                    @endif
-                                    <span>{{ $link['label'] }}</span>
-                                </a>
-                            </li>
-                        @endforeach
-                        <li>
-                            <button id="mobileCategoryToggle" type="button" aria-expanded="false" class="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-[#dbeafe] text-gray-700">
-                                {{ $invitationType }}
-                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                    <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round" />
-                                </svg>
-                            </button>
-                            <div id="mobileCategoryMenu" class="hidden mt-2 rounded-lg border border-[#dbeafe] bg-white shadow-lg overflow-hidden">
-                                <a href="{{ route('templates.wedding.invitations') }}" class="block px-4 py-2 text-gray-700 hover:bg-[#eef2ff]">Wedding</a>
-                                <a href="{{ route('templates.corporate.invitations') }}" class="block px-4 py-2 text-gray-700 hover:bg-[#eef2ff]">Corporate</a>
-                                <a href="{{ route('templates.baptism.invitations') }}" class="block px-4 py-2 text-gray-700 hover:bg-[#eef2ff]">Baptism</a>
-                                <a href="{{ route('templates.birthday.invitations') }}" class="block px-4 py-2 text-gray-700 hover:bg-[#eef2ff]">Birthday</a>
-                            </div>
-                        </li>
-                    </ul>
-
                     @guest
-                        <a href="{{ route('customer.login') }}" class="inline-flex items-center justify-center text-white px-4 py-2 font-semibold rounded-full bg-gradient-to-r from-[#6366f1] via-[#7c83ff] to-[#a6b7ff]">
+                        <a href="{{ route('customer.login') }}"
+                           class="hidden items-center rounded-full bg-gradient-to-r from-[#6366f1] via-[#7c83ff] to-[#a6b7ff] px-5 py-2 font-semibold text-white shadow focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#a6b7ff] sm:inline-flex"
+                           style="font-family: 'Seasons', serif;">
                             Sign in
                         </a>
                     @endguest
+
+                    @auth
+                        <div class="relative">
+                            <button id="userDropdownBtn" type="button" aria-expanded="false"
+                                    class="inline-flex items-center gap-2 rounded-full bg-[#4f46e5] px-3 py-2 text-sm text-white transition hover:bg-[#4338ca] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#a6b7ff]">
+                                <span>{{ Auth::user()->customer?->first_name ?? Auth::user()->email }}</span>
+                                <svg class="h-3.5 w-3.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </button>
+                            <div id="userDropdownMenu" class="absolute right-0 mt-3 hidden w-48 rounded-2xl border border-[#dbeafe] bg-white shadow-xl">
+                                <a href="{{ route('customer.dashboard') }}" class="block px-4 py-2.5 text-sm text-gray-700 transition hover:bg-[#eef2ff]">Profile</a>
+                                <form action="{{ route('customer.logout') }}" method="POST">
+                                    @csrf
+                                    <button type="submit" class="block w-full px-4 py-2.5 text-left text-sm text-gray-700 transition hover:bg-[#eef2ff]">Logout</button>
+                                </form>
+                            </div>
+                        </div>
+                    @endauth
                 </div>
+            </div>
+        </div>
+        <div id="mobileNavPanel" class="mx-auto hidden w-full max-w-7xl border-t border-[#e0e7ff] bg-white px-4 pb-6 pt-4 shadow-inner lg:hidden">
+            <div class="space-y-5">
+                <form action="{{ url('/search') }}" method="GET">
+                    <label for="mobile-invitation-search" class="sr-only">Search templates</label>
+                    <input id="mobile-invitation-search" type="text" name="query" value="{{ $searchValue }}" placeholder="Search templates..."
+                           class="w-full rounded-full border border-[#dbeafe] px-4 py-2 text-sm placeholder:text-gray-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#a6b7ff]">
+                </form>
+
+                <div class="flex items-center gap-3">
+                    <a href="{{ $favoritesEnabled ? route('customer.favorites') : '#' }}"
+                       class="nav-icon-button"
+                       aria-label="My favorites"
+                       title="My favorites"
+                       @unless($favoritesEnabled) aria-disabled="true" @endunless>
+                        <i class="fi fi-br-comment-heart" aria-hidden="true"></i>
+                    </a>
+                    <a href="{{ $cartRoute }}" class="nav-icon-button" aria-label="My cart" title="My cart">
+                        <i class="bi bi-bag-heart-fill" aria-hidden="true"></i>
+                    </a>
+                </div>
+
+                <ul class="space-y-2 text-sm font-semibold text-gray-700">
+                    @foreach ($navLinks as $link)
+                        <li>
+                            <a href="{{ $link['route'] }}"
+                               class="flex items-center justify-between rounded-lg px-4 py-2 {{ $link['isActive'] ? 'bg-[#eef2ff] text-[#4338ca]' : 'hover:bg-[#eef2ff] hover:text-[#4338ca]' }}"
+                               aria-current="{{ $link['isActive'] ? 'page' : 'false' }}">
+                                <span>{{ $link['label'] }}</span>
+                                @if($link['isActive'])
+                                    <i class="bi bi-dot text-2xl"></i>
+                                @endif
+                            </a>
+                        </li>
+                    @endforeach
+                    <li>
+                        <button id="mobileCategoryToggle" type="button" aria-expanded="false"
+                                class="flex w-full items-center justify-between rounded-lg border border-[#dbeafe] px-4 py-2 text-gray-700">
+                            {{ $resolvedInvitationType }}
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </button>
+                        <div id="mobileCategoryMenu" class="mt-2 hidden rounded-xl border border-[#dbeafe] bg-white shadow-lg">
+                            @foreach ($categoryLinks as $category)
+                                <a href="{{ $category['route'] }}" class="flex items-center justify-between px-4 py-2 text-sm text-gray-700 transition hover:bg-[#eef2ff] {{ $category['isActive'] ? 'font-semibold text-[#4338ca]' : '' }}">
+                                    <span>{{ $category['label'] }}</span>
+                                    @if($category['isActive'])
+                                        <i class="bi bi-check-lg"></i>
+                                    @endif
+                                </a>
+                            @endforeach
+                        </div>
+                    </li>
+                </ul>
+
+                @guest
+                    <a href="{{ route('customer.login') }}" class="inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-[#6366f1] via-[#7c83ff] to-[#a6b7ff] px-5 py-2 font-semibold text-white">
+                        Sign in
+                    </a>
+                @endguest
+
+                @auth
+                    <div class="rounded-2xl border border-[#dbeafe] px-4 py-3 text-sm text-gray-700">
+                        <p class="font-semibold text-gray-900">{{ Auth::user()->customer?->first_name ?? Auth::user()->email }}</p>
+                        <div class="mt-3 flex flex-col gap-2">
+                            <a href="{{ route('customer.dashboard') }}" class="rounded-lg border border-transparent px-3 py-2 text-left transition hover:border-[#dbeafe]">Profile</a>
+                            <form action="{{ route('customer.logout') }}" method="POST">
+                                @csrf
+                                <button type="submit" class="w-full rounded-lg px-3 py-2 text-left transition hover:bg-[#eef2ff]">Logout</button>
+                            </form>
+                        </div>
+                    </div>
+                @endauth
             </div>
         </div>
     </header>
 
-    <!-- Page Content -->
-    <main class="py-12 px-6">
-        @yield('content')
+    <main class="pt-24 sm:pt-28">
+        <div class="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
+            @yield('content')
+        </div>
     </main>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            const dropdownControllers = [];
             const navToggle = document.getElementById('navToggle');
             const mobilePanel = document.getElementById('mobileNavPanel');
-            const categoryToggle = document.getElementById('categoryToggle');
-            const categoryMenu = document.getElementById('categoryMenu');
-            const mobileCategoryToggle = document.getElementById('mobileCategoryToggle');
-            const mobileCategoryMenu = document.getElementById('mobileCategoryMenu');
-            const userDropdownBtn = document.getElementById('userDropdownBtn');
-            const userDropdownMenu = document.getElementById('userDropdownMenu');
-            const dropdownArrow = document.getElementById('dropdownArrow');
 
-            const toggleHidden = (element, force) => {
-                if (!element) return;
-                if (typeof force === 'boolean') {
-                    element.classList.toggle('hidden', force);
-                } else {
-                    element.classList.toggle('hidden');
+            const registerDropdown = ({ triggerId, menuId }) => {
+                const trigger = document.getElementById(triggerId);
+                const menu = document.getElementById(menuId);
+                if (!trigger || !menu) {
+                    return null;
                 }
+
+                const indicator = trigger.querySelector('svg');
+
+                const open = () => {
+                    menu.classList.remove('hidden');
+                    trigger.setAttribute('aria-expanded', 'true');
+                    indicator?.classList.add('rotate-180');
+                };
+
+                const close = () => {
+                    menu.classList.add('hidden');
+                    trigger.setAttribute('aria-expanded', 'false');
+                    indicator?.classList.remove('rotate-180');
+                };
+
+                trigger.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    const willOpen = menu.classList.contains('hidden');
+                    closeAllDropdowns();
+                    if (willOpen) {
+                        open();
+                    }
+                });
+
+                return { trigger, menu, close };
             };
 
-            const hideCategoryMenu = () => {
-                if (!categoryMenu) return;
-                categoryMenu.classList.add('hidden');
-                categoryToggle?.setAttribute('aria-expanded', 'false');
-                categoryToggle?.querySelector('svg')?.classList.remove('rotate-180');
+            const closeAllDropdowns = () => {
+                dropdownControllers.forEach((controller) => controller.close());
             };
 
-            const hideMobileCategoryMenu = () => {
-                if (!mobileCategoryMenu) return;
-                mobileCategoryMenu.classList.add('hidden');
-                mobileCategoryToggle?.setAttribute('aria-expanded', 'false');
-            };
-
-            const hideUserMenu = () => {
-                if (!userDropdownMenu) return;
-                userDropdownMenu.classList.add('hidden');
-                dropdownArrow?.classList.remove('rotate-180');
-            };
-
-            navToggle?.addEventListener('click', () => {
-                const expanded = navToggle.getAttribute('aria-expanded') === 'true';
-                navToggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-                toggleHidden(mobilePanel, expanded);
-                if (!expanded) {
-                    hideCategoryMenu();
-                    hideMobileCategoryMenu();
-                    hideUserMenu();
-                }
-            });
-
-            categoryToggle?.addEventListener('click', (event) => {
-                event.stopPropagation();
-                const willOpen = categoryMenu?.classList.contains('hidden');
-                hideCategoryMenu();
-                if (willOpen && categoryMenu) {
-                    categoryMenu.classList.remove('hidden');
-                    categoryToggle.setAttribute('aria-expanded', 'true');
-                    categoryToggle.querySelector('svg')?.classList.add('rotate-180');
-                }
-            });
-
-            mobileCategoryToggle?.addEventListener('click', () => {
-                const willOpen = mobileCategoryMenu?.classList.contains('hidden');
-                hideMobileCategoryMenu();
-                if (willOpen && mobileCategoryMenu) {
-                    mobileCategoryMenu.classList.remove('hidden');
-                    mobileCategoryToggle.setAttribute('aria-expanded', 'true');
-                }
-            });
-
-            userDropdownBtn?.addEventListener('click', (event) => {
-                event.stopPropagation();
-                const willOpen = userDropdownMenu?.classList.contains('hidden');
-                hideUserMenu();
-                if (willOpen && userDropdownMenu) {
-                    userDropdownMenu.classList.remove('hidden');
-                    dropdownArrow?.classList.add('rotate-180');
+            [
+                { triggerId: 'categoryToggle', menuId: 'categoryMenu' },
+                { triggerId: 'mobileCategoryToggle', menuId: 'mobileCategoryMenu' },
+                { triggerId: 'userDropdownBtn', menuId: 'userDropdownMenu' },
+            ].forEach((config) => {
+                const controller = registerDropdown(config);
+                if (controller) {
+                    dropdownControllers.push(controller);
                 }
             });
 
             document.addEventListener('click', (event) => {
-                if (!event.target.closest('#categoryToggle') && !event.target.closest('#categoryMenu')) {
-                    hideCategoryMenu();
-                }
-                if (!event.target.closest('#mobileCategoryToggle') && !event.target.closest('#mobileCategoryMenu')) {
-                    hideMobileCategoryMenu();
-                }
-                if (!event.target.closest('#userDropdownBtn') && !event.target.closest('#userDropdownMenu')) {
-                    hideUserMenu();
-                }
+                dropdownControllers.forEach((controller) => {
+                    if (controller.menu.classList.contains('hidden')) {
+                        return;
+                    }
+                    if (controller.menu.contains(event.target) || controller.trigger.contains(event.target)) {
+                        return;
+                    }
+                    controller.close();
+                });
             });
 
             document.addEventListener('keydown', (event) => {
-                if (event.key === 'Escape') {
-                    hideCategoryMenu();
-                    hideMobileCategoryMenu();
-                    hideUserMenu();
-                    if (mobilePanel && !mobilePanel.classList.contains('hidden')) {
-                        mobilePanel.classList.add('hidden');
-                        navToggle?.setAttribute('aria-expanded', 'false');
-                    }
+                if (event.key !== 'Escape') {
+                    return;
+                }
+                closeAllDropdowns();
+                if (mobilePanel && !mobilePanel.classList.contains('hidden')) {
+                    mobilePanel.classList.add('hidden');
+                    navToggle?.setAttribute('aria-expanded', 'false');
                 }
             });
-        });
-    </script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
+
+            navToggle?.addEventListener('click', () => {
+                const isOpen = navToggle.getAttribute('aria-expanded') === 'true';
+                navToggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+                mobilePanel?.classList.toggle('hidden', isOpen);
+                if (!isOpen) {
+                    closeAllDropdowns();
+                }
+            });
+
             const storageKey = 'inkwise-finalstep';
             const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
-            const icons = Array.from(document.querySelectorAll('.nav-icon-button'));
-            if (!icons.length) return;
+            const navIcons = Array.from(document.querySelectorAll('.nav-icon-button'));
 
             const serverHasOrder = async () => {
                 try {
-                    const res = await fetch('/order/summary.json', { method: 'GET', headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
-                    return res.ok;
-                } catch (e) {
+                    const response = await fetch('/order/summary.json', {
+                        method: 'GET',
+                        headers: { Accept: 'application/json' },
+                        credentials: 'same-origin',
+                    });
+                    return response.ok;
+                } catch (error) {
                     return false;
                 }
             };
 
             const createOrderFromSummary = async (summary) => {
-                if (!summary) return false;
-                const pid = summary.productId ?? summary.product_id ?? null;
+                if (!summary) {
+                    return false;
+                }
+                const productId = summary.productId ?? summary.product_id;
+                if (!productId) {
+                    return false;
+                }
                 const quantity = Number(summary.quantity ?? 10);
-                if (!pid) return false;
-
                 try {
-                    const res = await fetch('/order/cart/items', {
+                    const response = await fetch('/order/cart/items', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {})
+                            Accept: 'application/json',
+                            ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
                         },
                         credentials: 'same-origin',
-                        body: JSON.stringify({ product_id: Number(pid), quantity: Number(quantity) })
+                        body: JSON.stringify({ product_id: Number(productId), quantity }),
                     });
-                    return res.ok;
-                } catch (e) {
+                    return response.ok;
+                } catch (error) {
                     return false;
                 }
             };
 
-            icons.forEach((icon) => {
-                // If the server rendered this anchor as aria-disabled, enable it for JS handling and remember original state
-                try {
-                    if (icon.getAttribute && icon.getAttribute('aria-disabled') === 'true') {
-                        icon.setAttribute('data-was-aria-disabled', 'true');
-                        icon.removeAttribute('aria-disabled');
-                        try { icon.style.pointerEvents = 'auto'; } catch (e) {}
-                        try { icon.setAttribute('tabindex', '0'); } catch (e) {}
-                        try { icon.setAttribute('role', 'button'); } catch (e) {}
-                        icon.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); icon.click(); } });
-                    }
-                } catch (e) {
-                    // ignore
+            navIcons.forEach((icon) => {
+                if (icon.getAttribute('aria-disabled') === 'true') {
+                    icon.setAttribute('data-was-aria-disabled', 'true');
+                    icon.removeAttribute('aria-disabled');
+                    icon.style.pointerEvents = 'auto';
+                    icon.setAttribute('tabindex', '0');
+                    icon.setAttribute('role', 'button');
+                    icon.addEventListener('keydown', (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            icon.click();
+                        }
+                    });
                 }
-                icon.addEventListener('click', async (e) => {
-                    try {
-                        e.preventDefault();
 
+                icon.addEventListener('click', async (event) => {
+                    event.preventDefault();
+                    try {
                         if (await serverHasOrder()) {
                             window.location.href = '/order/addtocart';
                             return;
                         }
 
-                        let raw = null;
-                        try { raw = window.sessionStorage.getItem(storageKey); } catch (err) { raw = null; }
                         let summary = null;
-                        try { summary = raw ? JSON.parse(raw) : null; } catch (err) { summary = null; }
+                        try {
+                            const raw = window.sessionStorage.getItem(storageKey);
+                            summary = raw ? JSON.parse(raw) : null;
+                        } catch (error) {
+                            summary = null;
+                        }
 
                         if (summary && (summary.productId || summary.product_id)) {
                             const created = await createOrderFromSummary(summary);
@@ -469,13 +502,14 @@
                         }
 
                         window.location.href = '/order/addtocart';
-                    } catch (err) {
+                    } catch (error) {
                         window.location.href = '/order/addtocart';
                     }
                 });
             });
         });
     </script>
-@stack('scripts')
+
+    @stack('scripts')
 </body>
 </html>

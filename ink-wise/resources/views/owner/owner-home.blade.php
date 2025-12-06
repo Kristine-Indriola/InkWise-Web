@@ -298,7 +298,7 @@
                 <path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
             </span>
-            <span class="summary-card-label">New Orders Today</span>
+            <span class="summary-card-label">New Orders</span>
           </div>
           <span class="summary-card-chip">Orders</span>
         </div>

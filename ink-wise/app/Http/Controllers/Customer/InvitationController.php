@@ -4,191 +4,113 @@ namespace App\Http\Controllers\Customer;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
-use Illuminate\Http\Request;
 
 class InvitationController extends Controller
 {
     public function weddingInvitations()
     {
-        $products = Product::where('event_type', 'Wedding')
-                          ->where('product_type', 'Invitation')
-                          ->whereHas('uploads') // Only show products that have been uploaded/published
-                          ->with('materials') // if needed
-                          ->get();
-
-        // Set product_images attribute for view compatibility
-        $products->each(function (Product $product) {
-            $product->setAttribute('product_images', $product->images);
-            $product->setAttribute('product_bulk_orders', $product->bulkOrders);
-            $product->setAttribute('product_uploads', $product->uploads);
-            $product->setAttribute('envelope', $product->envelope);
-        });
-
-        // Load ratings for each product
-        foreach ($products as $product) {
-            $product->ratings = \App\Models\OrderRating::whereHas('order.items', function($query) use ($product) {
-                $query->where('product_id', $product->id);
-            })->with('customer')->get();
-        }
-
-        // Prepare ratings data for JavaScript
-        $ratingsData = [];
-        foreach ($products as $product) {
-            $ratings = $product->ratings ?? collect();
-            $ratingsData[$product->id] = [
-                'name' => $product->name,
-                'ratings' => $ratings->map(function($rating) {
-                    return [
-                        'rating' => $rating->rating,
-                        'review' => $rating->review,
-                        'submitted_at' => $rating->submitted_at?->format('M d, Y'),
-                        'customer_name' => $rating->customer->name ?? 'Customer',
-                        'photos' => $rating->photos ?? []
-                    ];
-                })->toArray(),
-                'average_rating' => $ratings->avg('rating'),
-                'rating_count' => $ratings->count()
-            ];
-        }
+        [$products, $ratingsData] = $this->invitationDataForEvent('Wedding');
 
         return view('customer.Invitations.weddinginvite', compact('products', 'ratingsData'));
     }
 
-    public function baptismInvitations()
+    public function weddingGiveaways()
     {
-        $products = Product::where('event_type', 'Baptism')
-                          ->where('product_type', 'Invitation')
-                          ->whereHas('uploads') // Only show products that have been uploaded/published
-                          ->with('materials') // if needed
-                          ->get();
+        $products = $this->giveawayProductsForEvent('Wedding');
 
-        // Set product_images attribute for view compatibility
-        $products->each(function (Product $product) {
-            $product->setAttribute('product_images', $product->images);
-            $product->setAttribute('product_bulk_orders', $product->bulkOrders);
-            $product->setAttribute('product_uploads', $product->uploads);
-            $product->setAttribute('envelope', $product->envelope);
-        });
-
-        // Load ratings for each product
-        foreach ($products as $product) {
-            $product->ratings = \App\Models\OrderRating::whereHas('order.items', function($query) use ($product) {
-                $query->where('product_id', $product->id);
-            })->with('customer')->get();
-        }
-
-        // Prepare ratings data for JavaScript
-        $ratingsData = [];
-        foreach ($products as $product) {
-            $ratings = $product->ratings ?? collect();
-            $ratingsData[$product->id] = [
-                'name' => $product->name,
-                'ratings' => $ratings->map(function($rating) {
-                    return [
-                        'rating' => $rating->rating,
-                        'review' => $rating->review,
-                        'submitted_at' => $rating->submitted_at?->format('M d, Y'),
-                        'customer_name' => $rating->customer->name ?? 'Customer',
-                        'photos' => $rating->photos ?? []
-                    ];
-                })->toArray(),
-                'average_rating' => $ratings->avg('rating'),
-                'rating_count' => $ratings->count()
-            ];
-        }
-
-        return view('customer.Invitations.baptisminvite', compact('products', 'ratingsData'));
+        return view('customer.Giveaways.weddinggive', compact('products'));
     }
 
-    public function birthdayInvitations()
+    public function birthdayGiveaways()
     {
-        $products = Product::where('event_type', 'Birthday')
-                          ->where('product_type', 'Invitation')
-                          ->whereHas('uploads') // Only show products that have been uploaded/published
-                          ->with('materials') // if needed
-                          ->get();
+        $products = $this->giveawayProductsForEvent('Birthday');
 
-        // Set product_images attribute for view compatibility
-        $products->each(function (Product $product) {
-            $product->setAttribute('product_images', $product->images);
-            $product->setAttribute('product_bulk_orders', $product->bulkOrders);
-            $product->setAttribute('product_uploads', $product->uploads);
-            $product->setAttribute('envelope', $product->envelope);
-        });
+        return view('customer.Giveaways.birthdaygive', compact('products'));
+    }
 
-        // Load ratings for each product
-        foreach ($products as $product) {
-            $product->ratings = \App\Models\OrderRating::whereHas('order.items', function($query) use ($product) {
-                $query->where('product_id', $product->id);
-            })->with('customer')->get();
-        }
+    public function corporateGiveaways()
+    {
+        $products = $this->giveawayProductsForEvent('Corporate');
 
-        // Prepare ratings data for JavaScript
-        $ratingsData = [];
-        foreach ($products as $product) {
-            $ratings = $product->ratings ?? collect();
-            $ratingsData[$product->id] = [
-                'name' => $product->name,
-                'ratings' => $ratings->map(function($rating) {
-                    return [
-                        'rating' => $rating->rating,
-                        'review' => $rating->review,
-                        'submitted_at' => $rating->submitted_at?->format('M d, Y'),
-                        'customer_name' => $rating->customer->name ?? 'Customer',
-                        'photos' => $rating->photos ?? []
-                    ];
-                })->toArray(),
-                'average_rating' => $ratings->avg('rating'),
-                'rating_count' => $ratings->count()
-            ];
-        }
+        return view('customer.Giveaways.corporategive', compact('products'));
+    }
 
-        return view('customer.Invitations.birthdayinvite', compact('products', 'ratingsData'));
+    public function baptismGiveaways()
+    {
+        $products = $this->giveawayProductsForEvent('Baptism');
+
+        return view('customer.Giveaways.baptismgive', compact('products'));
     }
 
     public function corporateInvitations()
     {
-        $products = Product::where('event_type', 'Corporate')
-                          ->where('product_type', 'Invitation')
-                          ->whereHas('uploads') // Only show products that have been uploaded/published
-                          ->with('materials') // if needed
-                          ->get();
+        [$products, $ratingsData] = $this->invitationDataForEvent('Corporate');
 
-        // Set product_images attribute for view compatibility
-        $products->each(function (Product $product) {
-            $product->setAttribute('product_images', $product->images);
-            $product->setAttribute('product_bulk_orders', $product->bulkOrders);
-            $product->setAttribute('product_uploads', $product->uploads);
-            $product->setAttribute('envelope', $product->envelope);
-        });
+        return view('customer.Invitations.corporateinvite', compact('products', 'ratingsData'));
+    }
 
-        // Load ratings for each product
-        foreach ($products as $product) {
-            $product->ratings = \App\Models\OrderRating::whereHas('order.items', function($query) use ($product) {
-                $query->where('product_id', $product->id);
-            })->with('customer')->get();
-        }
+    public function birthdayInvitations()
+    {
+        [$products, $ratingsData] = $this->invitationDataForEvent('Birthday');
 
-        // Prepare ratings data for JavaScript
+        return view('customer.Invitations.birthdayinvite', compact('products', 'ratingsData'));
+    }
+
+    public function baptismInvitations()
+    {
+        [$products, $ratingsData] = $this->invitationDataForEvent('Baptism');
+
+        return view('customer.Invitations.baptisminvite', compact('products', 'ratingsData'));
+    }
+
+    protected function invitationDataForEvent(string $eventType): array
+    {
+        $products = Product::query()
+            ->with(['template', 'uploads', 'images', 'materials'])
+            ->where('product_type', 'Invitation')
+            ->where('event_type', $eventType)
+            ->orderByDesc('updated_at')
+            ->get();
+
         $ratingsData = [];
         foreach ($products as $product) {
-            $ratings = $product->ratings ?? collect();
+            $ratings = \App\Models\OrderRating::whereHas('order.items', function ($query) use ($product) {
+                $query->where('product_id', $product->id);
+            })->with('customer')->get();
+
+            $product->setRelation('ratings', $ratings);
+
             $ratingsData[$product->id] = [
                 'name' => $product->name,
-                'ratings' => $ratings->map(function($rating) {
+                'ratings' => $ratings->map(function ($rating) {
                     return [
                         'rating' => $rating->rating,
                         'review' => $rating->review,
                         'submitted_at' => $rating->submitted_at?->format('M d, Y'),
                         'customer_name' => $rating->customer->name ?? 'Customer',
-                        'photos' => $rating->photos ?? []
+                        'photos' => $rating->photos ?? [],
                     ];
                 })->toArray(),
                 'average_rating' => $ratings->avg('rating'),
-                'rating_count' => $ratings->count()
+                'rating_count' => $ratings->count(),
             ];
         }
 
-        return view('customer.Invitations.corporateinvite', compact('products', 'ratingsData'));
+        return [$products, $ratingsData];
+    }
+
+    protected function giveawayProductsForEvent(string $eventType)
+    {
+        return Product::query()
+            ->with(['template', 'uploads', 'images', 'materials', 'bulkOrders'])
+            ->where('product_type', 'Giveaway')
+            ->whereHas('uploads')
+            ->where(function ($query) use ($eventType) {
+                $query->where('event_type', $eventType)
+                      ->orWhereNull('event_type')
+                      ->orWhere('event_type', '');
+            })
+            ->orderByDesc('updated_at')
+            ->get();
     }
 }

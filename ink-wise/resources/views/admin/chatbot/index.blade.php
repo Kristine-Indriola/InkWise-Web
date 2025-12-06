@@ -1,6 +1,6 @@
 @extends('layouts.admin')
 
-@section('title', 'Manage Chatbot Q&A')
+@section('title', 'Manage FAQ')
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
@@ -23,48 +23,48 @@
 
     <header class="page-header">
         <div>
-            <h1 class="page-title">Chatbot Knowledge Base</h1>
-            <p class="page-subtitle">Manage automated replies so guests and customers get answers fast.</p>
+            <h1 class="page-title">FAQ Management</h1>
+            <p class="page-subtitle">Manage frequently asked questions to help customers find answers quickly.</p>
         </div>
         <a href="#chatbotForm" class="btn btn-primary" data-scroll-to="chatbotForm">
             <i class="fa-solid fa-plus" aria-hidden="true"></i>
-            <span>Add Q&amp;A</span>
+            <span>Add FAQ</span>
         </a>
     </header>
 
     <section class="summary-grid chatbot-summary" aria-label="Chatbot highlights">
         <article class="summary-card summary-card--knowledge">
             <div class="summary-card-header">
-                <span class="summary-card-label">Total Entries</span>
-                <span class="summary-card-chip accent">Knowledge</span>
+                <span class="summary-card-label">Total FAQs</span>
+                <span class="summary-card-chip accent">FAQs</span>
             </div>
             <div class="summary-card-body">
                 <span class="summary-card-value" data-summary="total" data-total="{{ $totalEntries }}">{{ number_format($totalEntries) }}</span>
                 <span class="summary-card-icon" aria-hidden="true"><i class="fi fi-rr-book"></i></span>
             </div>
-            <span class="summary-card-meta" data-summary-meta="total">Active questions stored</span>
+            <span class="summary-card-meta" data-summary-meta="total">FAQs available</span>
         </article>
         <article class="summary-card summary-card--media">
             <div class="summary-card-header">
-                <span class="summary-card-label">Answers w/ Media</span>
-                <span class="summary-card-chip accent">Rich replies</span>
+                <span class="summary-card-label">FAQs with Media</span>
+                <span class="summary-card-chip accent">Enhanced FAQs</span>
             </div>
             <div class="summary-card-body">
                 <span class="summary-card-value" data-summary="media" data-total-media="{{ $entriesWithImage }}">{{ number_format($entriesWithImage) }}</span>
                 <span class="summary-card-icon" aria-hidden="true"><i class="fi fi-rr-picture"></i></span>
             </div>
-            <span class="summary-card-meta" data-summary-meta="media">Entries enhanced with images</span>
+            <span class="summary-card-meta" data-summary-meta="media">FAQs with images</span>
         </article>
         <article class="summary-card summary-card--updated">
             <div class="summary-card-header">
                 <span class="summary-card-label">Last Updated</span>
-                <span class="summary-card-chip accent">Freshness</span>
+                <span class="summary-card-chip accent">Maintenance</span>
             </div>
             <div class="summary-card-body">
                 <span class="summary-card-value" data-summary="updated" data-initial-updated="{{ $lastUpdated ? e(optional($lastUpdated)->diffForHumans()) : '—' }}">{{ $lastUpdated ? optional($lastUpdated)->diffForHumans() : '—' }}</span>
                 <span class="summary-card-icon" aria-hidden="true"><i class="fi fi-rr-refresh"></i></span>
             </div>
-            <span class="summary-card-meta">Most recent change</span>
+            <span class="summary-card-meta">Most recent update</span>
         </article>
     </section>
 
@@ -78,13 +78,13 @@
                     id="qaSearch"
                     type="search"
                     class="form-control"
-                    placeholder="Search questions or answers..."
-                    aria-label="Search chatbot entries"
+                    placeholder="Search FAQs..."
+                    aria-label="Search FAQs"
                 >
             </div>
         </div>
         <p class="chatbot-toolbar__hint" id="chatbotEntriesHint" data-total="{{ $totalEntries }}">
-            <strong>{{ number_format($totalEntries) }}</strong> entries available for the assistant.
+            <strong>{{ number_format($totalEntries) }}</strong> FAQs available.
         </p>
     </section>
 
@@ -92,7 +92,7 @@
 
     <div class="chatbot-grid">
         <section id="chatbotForm" class="chatbot-card chatbot-card--form" tabindex="-1" aria-labelledby="chatbotFormTitle">
-            <h2 id="chatbotFormTitle" class="card-title">Add New Q&amp;A</h2>
+            <h2 id="chatbotFormTitle" class="card-title">Add New FAQ</h2>
             <form action="{{ route('admin.chatbot.store') }}" method="POST" class="chatbot-form" enctype="multipart/form-data">
                 @csrf
                 <div class="form-group">
@@ -123,7 +123,7 @@
                     </div>
                 </div>
                 <div class="chatbot-form__actions">
-                    <button type="submit" class="btn btn-primary">Add Q&amp;A</button>
+                    <button type="submit" class="btn btn-primary">Add FAQ</button>
                 </div>
             </form>
         </section>
@@ -131,8 +131,8 @@
         <section class="chatbot-card chatbot-card--list" tabindex="-1" aria-labelledby="chatbotListTitle">
             <div class="section-header">
                 <div>
-                    <h2 class="section-title" id="chatbotListTitle">Existing Q&amp;A</h2>
-                    <p class="section-subtitle">Edit responses or delete entries that are no longer relevant.</p>
+                    <h2 class="section-title" id="chatbotListTitle">Existing FAQs</h2>
+                    <p class="section-subtitle">Edit answers or delete FAQs that are no longer relevant.</p>
                 </div>
             </div>
 
@@ -174,7 +174,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="3" class="text-muted small">No Q&amp;A found.</td>
+                                <td colspan="3" class="text-muted small">No FAQs found.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -193,7 +193,7 @@
         @csrf
         @method('PUT')
         <div class="modal-header">
-          <h5 class="modal-title" id="editModalLabel">Edit Q&amp;A</h5>
+          <h5 class="modal-title" id="editModalLabel">Edit FAQ</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
@@ -226,7 +226,7 @@
           <input type="hidden" id="removeImage" name="remove_image" value="0">
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn btn-primary">Save changes</button>
+          <button type="submit" class="btn btn-primary">Save FAQ</button>
           <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
         </div>
       </form>
@@ -332,8 +332,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (summaryTotalMeta) {
             const metaText = visibleCount === totalCount
-                ? 'Active questions stored'
-                : `Showing ${numberFormatter.format(visibleCount)} of ${numberFormatter.format(totalCount)} active questions`;
+                ? 'FAQs available'
+                : `Showing ${numberFormatter.format(visibleCount)} of ${numberFormatter.format(totalCount)} FAQs`;
             summaryTotalMeta.textContent = metaText;
         }
 
@@ -344,7 +344,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (summaryMediaMeta) {
             const metaText = visibleCount === totalCount
-                ? 'Entries enhanced with images'
+                ? 'FAQs with images'
                 : `Showing ${numberFormatter.format(visibleMediaCount)} with media (of ${numberFormatter.format(totalMediaCount)})`;
             summaryMediaMeta.textContent = metaText;
         }
@@ -374,18 +374,18 @@ document.addEventListener('DOMContentLoaded', function () {
         if (entriesHint) {
             const totalDisplay = numberFormatter.format(totalCount);
             if (visibleCount === totalCount) {
-                entriesHint.innerHTML = `<strong>${totalDisplay}</strong> entries available for the assistant.`;
+                entriesHint.innerHTML = `<strong>${totalDisplay}</strong> FAQs available.`;
             } else {
-                entriesHint.innerHTML = `Showing <strong>${numberFormatter.format(visibleCount)}</strong> of <strong>${totalDisplay}</strong> entries.`;
+                entriesHint.innerHTML = `Showing <strong>${numberFormatter.format(visibleCount)}</strong> of <strong>${totalDisplay}</strong> FAQs.`;
             }
             entriesHint.dataset.total = totalCount;
         }
 
         if (liveRegion) {
             if (visibleCount === totalCount) {
-                liveRegion.textContent = `${visibleCount} entries shown.`;
+                liveRegion.textContent = `${visibleCount} FAQs shown.`;
             } else {
-                liveRegion.textContent = `${visibleCount} of ${totalCount} entries shown.`;
+                liveRegion.textContent = `${visibleCount} of ${totalCount} FAQs shown.`;
             }
         }
     }
@@ -686,7 +686,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         rows.splice(index, 1);
                     }
                     updateSummary();
-                    showFlash('Q&A deleted successfully.');
+                    showFlash('FAQ deleted successfully.');
                 } else {
                     throw new Error('Failed to delete');
                 }
