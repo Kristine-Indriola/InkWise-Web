@@ -87,6 +87,6 @@ class SiteContentController extends Controller
 			}
 		}
 
-		return back()->with('status', 'Site content updated successfully.');
+		return back()->with('status', 'YOU UPDATED THE SITE CONTENT');
 	}
 }

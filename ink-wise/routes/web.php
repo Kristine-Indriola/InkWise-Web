@@ -27,7 +27,8 @@ use App\Http\Controllers\Admin\MaterialController;
 use App\Http\Controllers\Auth\RoleLoginController;
 use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\MaterialsController;
-use App\Http\Controllers\Admin\SiteContentController;
+use App\Http\Controllers\Admin\SiteContentController as AdminSiteContentController;
+use App\Http\Controllers\Owner\SiteContentController as OwnerSiteContentController;
 use App\Http\Controllers\CustomerProfileController;
 use App\Http\Controllers\Owner\OwnerStaffController;
 use App\Http\Controllers\Auth\CustomerAuthController;
@@ -298,8 +299,8 @@ Route::prefix('users')->name('users.')->group(function () {
     });
 
     Route::prefix('settings')->name('settings.')->group(function () {
-        Route::get('site-content', [SiteContentController::class, 'edit'])->name('site-content.edit');
-        Route::put('site-content', [SiteContentController::class, 'update'])->name('site-content.update');
+        Route::get('site-content', [AdminSiteContentController::class, 'edit'])->name('site-content.edit');
+        Route::put('site-content', [AdminSiteContentController::class, 'update'])->name('site-content.update');
     });
 
     // Font Management Routes
@@ -814,6 +815,11 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/transactions/view', [OwnerTransactionsController::class, 'index'])->name('transactions-view');
     Route::get('/transactions/export', [OwnerTransactionsController::class, 'export'])->name('transactions-export');
     Route::get('/ratings', [OwnerRatingsController::class, 'index'])->name('ratings.index');
+
+    Route::prefix('settings')->name('settings.')->group(function () {
+        Route::get('site-content', [OwnerSiteContentController::class, 'edit'])->name('site-content.edit');
+        Route::put('site-content', [OwnerSiteContentController::class, 'update'])->name('site-content.update');
+    });
 
     Route::prefix('reports')->name('reports.')->group(function () {
         Route::get('/', fn () => redirect()->route('owner.reports.sales'))->name('index');
