@@ -2,6 +2,49 @@
 
 @section('title', 'SVG Template Editor - ' . ($template->name ?? 'New Template'))
 
+@push('styles')
+<style>
+    .svg-editor-container .svg-display-area {
+        position: relative;
+        min-height: 600px;
+        background-color: #fff;
+        overflow: auto;
+        padding: 1.5rem;
+    }
+
+    .svg-editor-container .svg-wrapper {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .svg-editor-container .svg-wrapper svg {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.08);
+        border-radius: 6px;
+        background-color: #fff;
+    }
+
+    .svg-editor-container .svg-wrapper--normalized svg {
+        max-width: clamp(320px, 100%, 960px);
+    }
+
+    .svg-editor-container svg text {
+        fill: #000 !important;
+        font-family: inherit;
+        font-size: inherit;
+    }
+
+    .svg-editor-container svg {
+        background-color: #fff;
+    }
+</style>
+@endpush
+
 @section('content')
 <div class="container-fluid">
     <div class="row">
@@ -77,7 +120,7 @@
                                         </button>
                                     </div>
 
-                                    <div class="svg-display-area border rounded" style="min-height: 600px; background-color: #fff;">
+                                    <div class="svg-display-area border rounded">
                                         <!-- Front Design -->
                                         <div class="svg-wrapper front-design" id="front-design">
                                             @if($template->svg_path)
@@ -230,6 +273,53 @@
 @vite('resources/js/customer/studio/svg-template-editor.jsx')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const parseSvgDimension = (value) => {
+        if (typeof value !== 'string') {
+            return null;
+        }
+        const trimmed = value.trim();
+        if (!trimmed.length) {
+            return null;
+        }
+        const numeric = parseFloat(trimmed.replace(/[^0-9.\-]/g, ''));
+        return Number.isFinite(numeric) ? numeric : null;
+    };
+
+    const normalizeSvgCanvas = (wrapper, svgElement) => {
+        if (!svgElement) {
+            return null;
+        }
+
+        const width = parseSvgDimension(svgElement.getAttribute('width'));
+        const height = parseSvgDimension(svgElement.getAttribute('height'));
+
+        if (!svgElement.hasAttribute('viewBox') && width && height) {
+            svgElement.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        }
+
+        svgElement.style.width = '100%';
+        svgElement.style.height = 'auto';
+        svgElement.style.maxWidth = '100%';
+        svgElement.style.display = 'block';
+
+        if (width && height) {
+            svgElement.style.aspectRatio = `${width} / ${height}`;
+            svgElement.dataset.canvasWidth = width;
+            svgElement.dataset.canvasHeight = height;
+            if (wrapper) {
+                wrapper.style.aspectRatio = `${width} / ${height}`;
+                wrapper.dataset.canvasWidth = width;
+                wrapper.dataset.canvasHeight = height;
+            }
+        }
+
+        if (wrapper) {
+            wrapper.classList.add('svg-wrapper--normalized');
+        }
+
+        return { width, height };
+    };
+
     const designPayload = window.__inkwiseStaffEditorDesignData || {};
     const frontWrapper = document.getElementById('front-design');
     const backWrapper = document.getElementById('back-design');
@@ -258,6 +348,9 @@ document.addEventListener('DOMContentLoaded', function() {
             console.warn('SvgTemplateEditor: Failed to serialize design payload', error);
         }
     };
+
+    normalizeSvgCanvas(frontWrapper, frontSvgElement);
+    normalizeSvgCanvas(backWrapper, backSvgElement);
 
     attachDesignData(frontSvgElement, designPayload.front || null);
     attachDesignData(backSvgElement, designPayload.back || null);

@@ -424,19 +424,99 @@
 
 
 @php
-    $templatePayload = collect($templates ?? [])->map(function ($template) {
+    $placeholderImage = \App\Support\ImageResolver::url(null);
+    $resolveAsset = function ($candidates) use ($placeholderImage) {
+        foreach ((array) $candidates as $candidate) {
+            if (!$candidate) {
+                continue;
+            }
+
+            if (is_string($candidate) && \Illuminate\Support\Str::startsWith(trim($candidate), 'data:image')) {
+                return $candidate;
+            }
+
+            $url = \App\Support\ImageResolver::url($candidate);
+            if ($url && $url !== $placeholderImage) {
+                return $url;
+            }
+        }
+
+        return null;
+    };
+
+    $templatePayload = collect($templates ?? [])->map(function ($template) use ($resolveAsset) {
         $data = is_array($template) ? $template : $template->toArray();
-        $previewSource = $data['preview'] ?? $data['preview_image'] ?? $data['image'] ?? null;
-        $imageSource = $data['image'] ?? $data['preview'] ?? null;
-        $frontSource = $data['front_image'] ?? $data['preview_front'] ?? $previewSource;
-        $backSource = $data['back_image'] ?? $data['preview_back'] ?? null;
+        $design = $data['design'] ?? [];
+        $metadata = $data['metadata'] ?? [];
+        $pages = is_array(data_get($design, 'pages')) ? data_get($design, 'pages', []) : [];
+
+        $collectPageSources = function ($page) {
+            return [
+                data_get($page, 'preview'),
+                data_get($page, 'preview_url'),
+                data_get($page, 'previewUrl'),
+                data_get($page, 'thumbnail'),
+                data_get($page, 'thumbnail_url'),
+                data_get($page, 'thumbnailUrl'),
+                data_get($page, 'image'),
+                data_get($page, 'image_url'),
+                data_get($page, 'imageUrl'),
+            ];
+        };
+
+        $frontCandidates = [
+            $data['front_image'] ?? null,
+            $data['preview_front'] ?? null,
+            data_get($metadata, 'front_image'),
+            data_get($metadata, 'preview_front'),
+            data_get($design, 'front_image'),
+            data_get($design, 'preview_front'),
+            data_get($design, 'front.preview'),
+            $data['preview'] ?? null,
+            $data['image'] ?? null,
+        ];
+
+        $backCandidates = [
+            $data['back_image'] ?? null,
+            $data['preview_back'] ?? null,
+            data_get($metadata, 'back_image'),
+            data_get($metadata, 'preview_back'),
+            data_get($design, 'back_image'),
+            data_get($design, 'preview_back'),
+            data_get($design, 'back.preview'),
+        ];
+
+        foreach ($pages as $index => $page) {
+            $side = strtolower((string) data_get($page, 'side', ''));
+            $sources = $collectPageSources($page);
+
+            if ($side === 'front' || ($side === '' && $index === 0)) {
+                $frontCandidates = array_merge($frontCandidates, $sources);
+            }
+
+            if ($side === 'back' || ($side === '' && $index === 1)) {
+                $backCandidates = array_merge($backCandidates, $sources);
+            }
+        }
+
+        $frontUrl = $resolveAsset($frontCandidates);
+        $backUrl = $resolveAsset($backCandidates);
+        $previewUrl = $resolveAsset([
+            $data['preview'] ?? null,
+            $data['preview_image'] ?? null,
+            $frontUrl,
+        ]);
 
         $data['preview'] = $data['preview'] ?? $data['preview_image'] ?? null;
         $data['preview_image'] = $data['preview'];
-        $data['preview_url'] = $previewSource ? \App\Support\ImageResolver::url($previewSource) : null;
-        $data['image_url'] = $imageSource ? \App\Support\ImageResolver::url($imageSource) : null;
-        $data['front_url'] = $frontSource ? \App\Support\ImageResolver::url($frontSource) : null;
-        $data['back_url'] = ($backSource ?: $previewSource) ? \App\Support\ImageResolver::url($backSource ?: $previewSource) : null;
+        $data['preview_url'] = $previewUrl;
+        $data['image_url'] = $resolveAsset([
+            $data['image'] ?? null,
+            $data['preview'] ?? null,
+            $frontUrl,
+        ]);
+        $data['front_url'] = $frontUrl;
+        $data['back_url'] = $backUrl;
 
         return $data;
     })->values();
