@@ -2,6 +2,49 @@
 
 @section('title', 'SVG Template Editor - ' . ($template->name ?? 'New Template'))
 
+@push('styles')
+<style>
+    .svg-editor-container .svg-display-area {
+        position: relative;
+        min-height: 600px;
+        background-color: #fff;
+        overflow: auto;
+        padding: 1.5rem;
+    }
+
+    .svg-editor-container .svg-wrapper {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .svg-editor-container .svg-wrapper svg {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.08);
+        border-radius: 6px;
+        background-color: #fff;
+    }
+
+    .svg-editor-container .svg-wrapper--normalized svg {
+        max-width: clamp(320px, 100%, 960px);
+    }
+
+    .svg-editor-container svg text {
+        fill: #000 !important;
+        font-family: inherit;
+        font-size: inherit;
+    }
+
+    .svg-editor-container svg {
+        background-color: #fff;
+    }
+</style>
+@endpush
+
 @section('content')
 <div class="container-fluid">
     <div class="row">
@@ -23,10 +66,36 @@
                 </div>
 
                 <div class="card-body">
+                    @php
+                        $rawDesignData = ($template && $template->design)
+                            ? (json_decode($template->design, true) ?: [])
+                            : [];
+                        $normalizeDesign = function ($value) {
+                            return is_array($value) ? $value : null;
+                        };
+                        $frontDesignData = $normalizeDesign(
+                            $rawDesignData['front']
+                            ?? data_get($rawDesignData, 'front_design')
+                            ?? data_get($rawDesignData, 'sides.front')
+                        );
+                        if (!$frontDesignData && !empty($rawDesignData)) {
+                            $frontDesignData = $normalizeDesign($rawDesignData);
+                        }
+                        $backDesignData = $normalizeDesign(
+                            $rawDesignData['back']
+                            ?? data_get($rawDesignData, 'back_design')
+                            ?? data_get($rawDesignData, 'sides.back')
+                        );
+                        $countElements = function ($data, $key) {
+                            return is_array($data) ? count($data[$key] ?? []) : 0;
+                        };
+                        $frontTextCount = $countElements($frontDesignData, 'text_elements');
+                        $frontImageCount = $countElements($frontDesignData, 'changeable_images');
+                        $backTextCount = $countElements($backDesignData, 'text_elements');
+                        $backImageCount = $countElements($backDesignData, 'changeable_images');
+                    @endphp
+
                     @if($template && $template->design)
-                        @php
-                            $designData = json_decode($template->design, true);
-                        @endphp
 
                         <div class="row">
                             <div class="col-md-8">
@@ -51,7 +120,7 @@
                                         </button>
                                     </div>
 
-                                    <div class="svg-display-area border rounded p-3 bg-light" style="min-height: 600px;">
+                                    <div class="svg-display-area border rounded">
                                         <!-- Front Design -->
                                         <div class="svg-wrapper front-design" id="front-design">
                                             @if($template->svg_path)
@@ -101,26 +170,64 @@
                                                 </span>
                                             </td>
                                         </tr>
-                                        @if($designData)
+                                        @if($frontDesignData)
                                         <tr>
-                                            <th>Text Elements:</th>
-                                            <td>{{ count($designData['text_elements'] ?? []) }}</td>
+                                            <th>Front Text Elements:</th>
+                                            <td>{{ $frontTextCount }}</td>
                                         </tr>
                                         <tr>
-                                            <th>Changeable Images:</th>
-                                            <td>{{ count($designData['changeable_images'] ?? []) }}</td>
+                                            <th>Front Changeable Images:</th>
+                                            <td>{{ $frontImageCount }}</td>
+                                        </tr>
+                                        @endif
+                                        @if($backDesignData)
+                                        <tr>
+                                            <th>Back Text Elements:</th>
+                                            <td>{{ $backTextCount }}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Back Changeable Images:</th>
+                                            <td>{{ $backImageCount }}</td>
                                         </tr>
                                         @endif
                                     </table>
 
-                                    @if($designData && isset($designData['changeable_images']))
-                                    <h6 class="mt-4">Changeable Images</h6>
+                                    @if($frontImageCount)
+                                    <h6 class="mt-4">Front Changeable Images</h6>
                                     <div class="changeable-images-list">
-                                        @foreach($designData['changeable_images'] as $image)
+                                        @foreach($frontDesignData['changeable_images'] ?? [] as $image)
+                                        @php $elementId = $image['id'] ?? null; @endphp
                                         <div class="changeable-image-item mb-2 p-2 border rounded">
-                                            <small class="text-muted">{{ $image['id'] ?? 'Unknown ID' }}</small>
-                                            <div class="mt-1">
-                                                <span class="badge bg-info">{{ $image['type'] ?? 'image' }}</span>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <small class="text-muted d-block">{{ $elementId ?? 'Unknown ID' }}</small>
+                                                    <span class="badge bg-info">{{ $image['type'] ?? 'image' }}</span>
+                                                </div>
+                                                <button type="button" class="btn btn-outline-primary btn-sm ms-2"
+                                                    data-focus-side="front"
+                                                    data-element-id="{{ $elementId }}"
+                                                    @disabled(!$elementId)>Focus</button>
+                                            </div>
+                                        </div>
+                                        @endforeach
+                                    </div>
+                                    @endif
+
+                                    @if($backImageCount)
+                                    <h6 class="mt-4">Back Changeable Images</h6>
+                                    <div class="changeable-images-list">
+                                        @foreach($backDesignData['changeable_images'] ?? [] as $image)
+                                        @php $elementId = $image['id'] ?? null; @endphp
+                                        <div class="changeable-image-item mb-2 p-2 border rounded">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <small class="text-muted d-block">{{ $elementId ?? 'Unknown ID' }}</small>
+                                                    <span class="badge bg-info">{{ $image['type'] ?? 'image' }}</span>
+                                                </div>
+                                                <button type="button" class="btn btn-outline-primary btn-sm ms-2"
+                                                    data-focus-side="back"
+                                                    data-element-id="{{ $elementId }}"
+                                                    @disabled(!$elementId)>Focus</button>
                                             </div>
                                         </div>
                                         @endforeach
@@ -156,152 +263,263 @@
 @endsection
 
 @section('scripts')
+<script>
+    window.__inkwiseSvgTemplateEditorAutoInit = true;
+    window.__inkwiseStaffEditorDesignData = @json([
+        'front' => $frontDesignData,
+        'back' => $backDesignData,
+    ]);
+</script>
 @vite('resources/js/customer/studio/svg-template-editor.jsx')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    let currentSide = 'front';
-    let frontEditor = null;
-    let backEditor = null;
+    const parseSvgDimension = (value) => {
+        if (typeof value !== 'string') {
+            return null;
+        }
+        const trimmed = value.trim();
+        if (!trimmed.length) {
+            return null;
+        }
+        const numeric = parseFloat(trimmed.replace(/[^0-9.\-]/g, ''));
+        return Number.isFinite(numeric) ? numeric : null;
+    };
 
-    // Initialize editors for both sides if they exist
-    function initializeEditors() {
-        const frontSvgElement = document.querySelector('#front-design svg');
-        const backSvgElement = document.querySelector('#back-design svg');
-
-        if (frontSvgElement) {
-            // Add data attributes for the editor
-            @if($designData)
-            frontSvgElement.setAttribute('data-svg-data', '{{ json_encode($designData) }}');
-            @endif
-            frontSvgElement.setAttribute('data-svg-editor', 'true');
-
-            // Initialize front editor
-            frontEditor = new SvgTemplateEditor(frontSvgElement, {
-                onImageChange: function(element, imageUrl, file) {
-                    console.log('Front image changed:', element, imageUrl, file);
-                    showNotification('Front image replaced successfully', 'success');
-                },
-                onTextChange: function(element, oldText, newText) {
-                    console.log('Front text changed:', oldText, '->', newText);
-                    showNotification('Front text updated successfully', 'success');
-                }
-            });
+    const normalizeSvgCanvas = (wrapper, svgElement) => {
+        if (!svgElement) {
+            return null;
         }
 
-        @if($template->has_back_design)
-        if (backSvgElement) {
-            // For back design, we might need different design data or use the same
-            @if($designData)
-            backSvgElement.setAttribute('data-svg-data', '{{ json_encode($designData) }}');
-            @endif
-            backSvgElement.setAttribute('data-svg-editor', 'true');
+        const width = parseSvgDimension(svgElement.getAttribute('width'));
+        const height = parseSvgDimension(svgElement.getAttribute('height'));
 
-            // Initialize back editor
-            backEditor = new SvgTemplateEditor(backSvgElement, {
-                onImageChange: function(element, imageUrl, file) {
-                    console.log('Back image changed:', element, imageUrl, file);
-                    showNotification('Back image replaced successfully', 'success');
-                },
-                onTextChange: function(element, oldText, newText) {
-                    console.log('Back text changed:', oldText, '->', newText);
-                    showNotification('Back text updated successfully', 'success');
-                }
-            });
+        if (!svgElement.hasAttribute('viewBox') && width && height) {
+            svgElement.setAttribute('viewBox', `0 0 ${width} ${height}`);
         }
-        @endif
+
+        svgElement.style.width = '100%';
+        svgElement.style.height = 'auto';
+        svgElement.style.maxWidth = '100%';
+        svgElement.style.display = 'block';
+
+        if (width && height) {
+            svgElement.style.aspectRatio = `${width} / ${height}`;
+            svgElement.dataset.canvasWidth = width;
+            svgElement.dataset.canvasHeight = height;
+            if (wrapper) {
+                wrapper.style.aspectRatio = `${width} / ${height}`;
+                wrapper.dataset.canvasWidth = width;
+                wrapper.dataset.canvasHeight = height;
+            }
+        }
+
+        if (wrapper) {
+            wrapper.classList.add('svg-wrapper--normalized');
+        }
+
+        return { width, height };
+    };
+
+    const designPayload = window.__inkwiseStaffEditorDesignData || {};
+    const frontWrapper = document.getElementById('front-design');
+    const backWrapper = document.getElementById('back-design');
+    const frontSvgElement = frontWrapper ? frontWrapper.querySelector('svg') : null;
+    const backSvgElement = backWrapper ? backWrapper.querySelector('svg') : null;
+    const state = {
+        currentSide: 'front',
+        editors: {
+            front: null,
+            back: null,
+        },
+    };
+
+    const attachDesignData = (svgElement, payload) => {
+        if (!svgElement) {
+            return;
+        }
+        svgElement.setAttribute('data-svg-editor', 'true');
+        if (!payload) {
+            return;
+        }
+        try {
+            const serialized = typeof payload === 'string' ? payload : JSON.stringify(payload);
+            svgElement.dataset.svgData = serialized;
+        } catch (error) {
+            console.warn('SvgTemplateEditor: Failed to serialize design payload', error);
+        }
+    };
+
+    normalizeSvgCanvas(frontWrapper, frontSvgElement);
+    normalizeSvgCanvas(backWrapper, backSvgElement);
+
+    attachDesignData(frontSvgElement, designPayload.front || null);
+    attachDesignData(backSvgElement, designPayload.back || null);
+
+    const instantiateEditor = (side) => {
+        if (state.editors[side]) {
+            return state.editors[side];
+        }
+        const svgElement = side === 'back' ? backSvgElement : frontSvgElement;
+        if (!svgElement) {
+            return null;
+        }
+        const readableSide = side === 'back' ? 'Back' : 'Front';
+        const editor = new SvgTemplateEditor(svgElement, {
+            onImageChange: function(element, imageUrl, file) {
+                console.log(readableSide + ' image changed:', element, imageUrl, file);
+                showNotification(readableSide + ' image replaced successfully', 'success');
+            },
+            onTextChange: function(element, oldText, newText) {
+                console.log(readableSide + ' text changed:', oldText, '->', newText);
+                showNotification(readableSide + ' text updated successfully', 'success');
+            }
+        });
+        state.editors[side] = editor;
+        return editor;
+    };
+
+    if (frontSvgElement) {
+        instantiateEditor('front');
     }
 
-    // Handle design side switching
-    @if($template->has_back_design)
-    document.querySelectorAll('input[name="design-side"]').forEach(radio => {
-        radio.addEventListener('change', function() {
-            const selectedSide = this.id.replace('-side', ''); // 'front' or 'back'
-            currentSide = selectedSide;
-
-            // Hide all designs
-            document.querySelectorAll('.svg-wrapper').forEach(wrapper => {
-                wrapper.style.display = 'none';
-            });
-
-            // Show selected design
-            const selectedDesign = document.getElementById(selectedSide + '-design');
-            if (selectedDesign) {
-                selectedDesign.style.display = 'block';
+    const switchSide = (targetSide) => {
+        state.currentSide = targetSide;
+        if (frontWrapper) {
+            frontWrapper.style.display = targetSide === 'front' ? 'block' : 'none';
+        }
+        if (backWrapper) {
+            backWrapper.style.display = targetSide === 'back' ? 'block' : 'none';
+            if (targetSide === 'back') {
+                instantiateEditor('back');
             }
+        }
+        updateSaveButton();
+    };
 
-            // Update toolbar text
-            const saveBtn = document.getElementById('save-svg-btn');
-            const sideText = selectedSide.charAt(0).toUpperCase() + selectedSide.slice(1);
-            saveBtn.innerHTML = `<i class="fas fa-save me-1"></i>Save ${sideText} Changes`;
+    const updateSaveButton = () => {
+        const saveBtn = document.getElementById('save-svg-btn');
+        if (!saveBtn) {
+            return;
+        }
+        const sideText = state.currentSide.charAt(0).toUpperCase() + state.currentSide.slice(1);
+        saveBtn.innerHTML = `<i class="fas fa-save me-1"></i>Save ${sideText} Changes`;
+    };
+
+    const sideRadios = document.querySelectorAll('input[name="design-side"]');
+    sideRadios.forEach((radio) => {
+        radio.addEventListener('change', function() {
+            if (!this.checked) {
+                return;
+            }
+            const selectedSide = this.id.replace('-side', '');
+            switchSide(selectedSide);
         });
     });
-    @endif
 
-    // Initialize editors
-    initializeEditors();
+    updateSaveButton();
 
-    // Save button handler
-    document.getElementById('save-svg-btn').addEventListener('click', async function() {
-        const currentEditor = currentSide === 'front' ? frontEditor : backEditor;
+    const getCurrentEditor = () => {
+        return state.currentSide === 'front' ? state.editors.front : state.editors.back;
+    };
 
-        if (!currentEditor) {
-            showNotification('No SVG editor available for ' + currentSide + ' side', 'error');
-            return;
-        }
-
-        const saveBtn = this;
-        const originalText = saveBtn.innerHTML;
-        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
-        saveBtn.disabled = true;
-
-        try {
-            const sideText = currentSide.charAt(0).toUpperCase() + currentSide.slice(1);
-            const result = await currentEditor.saveSvg({{ $template->id }}, currentSide);
-
-            if (result.success) {
-                showNotification(sideText + ' design saved successfully', 'success');
-            } else {
-                showNotification('Failed to save ' + currentSide + ' design: ' + result.error, 'error');
+    const saveButton = document.getElementById('save-svg-btn');
+    if (saveButton) {
+        saveButton.addEventListener('click', async function() {
+            const currentEditor = getCurrentEditor();
+            if (!currentEditor) {
+                showNotification('No SVG editor available for ' + state.currentSide + ' side', 'error');
+                return;
             }
-        } catch (error) {
-            showNotification('Error saving ' + currentSide + ' design: ' + error.message, 'error');
-        } finally {
-            saveBtn.innerHTML = originalText;
-            saveBtn.disabled = false;
-        }
+
+            const originalText = saveButton.innerHTML;
+            saveButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+            saveButton.disabled = true;
+
+            try {
+                const result = await currentEditor.saveSvg({{ $template->id }}, state.currentSide);
+                const sideText = state.currentSide.charAt(0).toUpperCase() + state.currentSide.slice(1);
+                if (result.success) {
+                    showNotification(sideText + ' design saved successfully', 'success');
+                } else {
+                    const errorMessage = result.error || 'Unknown error';
+                    showNotification('Failed to save ' + state.currentSide + ' design: ' + errorMessage, 'error');
+                }
+            } catch (error) {
+                showNotification('Error saving ' + state.currentSide + ' design: ' + error.message, 'error');
+            } finally {
+                saveButton.innerHTML = originalText;
+                saveButton.disabled = false;
+            }
+        });
+    }
+
+    const resetButton = document.getElementById('reset-svg-btn');
+    if (resetButton) {
+        resetButton.addEventListener('click', function() {
+            if (confirm('Are you sure you want to reset all changes on the ' + state.currentSide + ' side? This will reload the original SVG.')) {
+                location.reload();
+            }
+        });
+    }
+
+    const downloadButton = document.getElementById('download-svg-btn');
+    if (downloadButton) {
+        downloadButton.addEventListener('click', function() {
+            const currentEditor = getCurrentEditor();
+            if (!currentEditor) {
+                showNotification('No SVG available to download for ' + state.currentSide + ' side', 'error');
+                return;
+            }
+
+            const sideText = state.currentSide.charAt(0).toUpperCase() + state.currentSide.slice(1);
+            const svgData = currentEditor.getSvgDataUrl();
+            const link = document.createElement('a');
+            link.href = svgData;
+            link.download = '{{ $template->name ?? "template" }} - ' + sideText + '.svg';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            showNotification(sideText + ' SVG downloaded successfully', 'success');
+        });
+    }
+
+    const focusButtons = document.querySelectorAll('[data-focus-side][data-element-id]');
+    focusButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            const targetSide = button.dataset.focusSide;
+            const elementId = button.dataset.elementId;
+            if (!targetSide || !elementId) {
+                showNotification('This entry does not have a valid element reference.', 'error');
+                return;
+            }
+
+            const runFocus = () => {
+                const editor = instantiateEditor(targetSide);
+                if (!editor) {
+                    showNotification('Editor for ' + targetSide + ' side is not available yet.', 'error');
+                    return;
+                }
+
+                const success = editor.focusElementById(elementId);
+                if (!success) {
+                    showNotification('Unable to find element #' + elementId + ' on the ' + targetSide + ' design.', 'error');
+                } else {
+                    const sideLabel = targetSide.charAt(0).toUpperCase() + targetSide.slice(1);
+                    showNotification(sideLabel + ' element ' + elementId + ' highlighted.', 'success');
+                }
+            };
+
+            if (targetSide !== state.currentSide) {
+                switchSide(targetSide);
+                setTimeout(runFocus, 100);
+            } else {
+                runFocus();
+            }
+        });
     });
 
-    // Reset button handler
-    document.getElementById('reset-svg-btn').addEventListener('click', function() {
-        if (confirm('Are you sure you want to reset all changes on the ' + currentSide + ' side? This will reload the original SVG.')) {
-            location.reload();
-        }
-    });
-
-    // Download button handler
-    document.getElementById('download-svg-btn').addEventListener('click', function() {
-        const currentEditor = currentSide === 'front' ? frontEditor : backEditor;
-
-        if (!currentEditor) {
-            showNotification('No SVG available to download for ' + currentSide + ' side', 'error');
-            return;
-        }
-
-        const sideText = currentSide.charAt(0).toUpperCase() + currentSide.slice(1);
-        const svgData = currentEditor.getSvgDataUrl();
-        const link = document.createElement('a');
-        link.href = svgData;
-        link.download = '{{ $template->name ?? "template" }} - ' + sideText + '.svg';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        showNotification(sideText + ' SVG downloaded successfully', 'success');
-    });
-
-    // Notification helper
     function showNotification(message, type = 'info') {
-        // Create notification element
         const notification = document.createElement('div');
         notification.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show position-fixed`;
         notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
@@ -309,10 +527,7 @@ document.addEventListener('DOMContentLoaded', function() {
             ${message}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         `;
-
         document.body.appendChild(notification);
-
-        // Auto remove after 5 seconds
         setTimeout(() => {
             if (notification.parentNode) {
                 notification.remove();

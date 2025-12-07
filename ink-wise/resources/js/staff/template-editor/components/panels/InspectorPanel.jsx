@@ -159,6 +159,13 @@ const ALIGNMENT_CONTROLS = [
   },
 ];
 
+const TEXT_ALIGN_OPTIONS = [
+  { value: 'left', label: 'Left', icon: 'fa-solid fa-align-left' },
+  { value: 'center', label: 'Center', icon: 'fa-solid fa-align-center' },
+  { value: 'right', label: 'Right', icon: 'fa-solid fa-align-right' },
+  { value: 'justify', label: 'Justified', icon: 'fa-solid fa-align-justify' },
+];
+
 const SHAPE_CATEGORIES = [
   { value: 'all', label: 'All Shapes' },
   { value: 'basic', label: 'Basic Shapes' },
@@ -251,9 +258,6 @@ export function InspectorPanel() {
   const fontModalRef = useRef(null);
   const fontTriggerRef = useRef(null);
   const [fontModalPosition, setFontModalPosition] = useState(null);
-  const [pendingImageScale, setPendingImageScale] = useState(1);
-  const [pendingImageOffsetX, setPendingImageOffsetX] = useState(0);
-  const [pendingImageOffsetY, setPendingImageOffsetY] = useState(0);
   const replaceImageInputRef = useRef(null);
   const [isShapePaletteOpen, setShapePaletteOpen] = useState(false);
   const [shapeSearchTerm, setShapeSearchTerm] = useState('');
@@ -266,6 +270,14 @@ export function InspectorPanel() {
   const [fontSizeInput, setFontSizeInput] = useState(() => {
     return selectedLayer?.fontSize?.toString() ?? '48';
   });
+  const [collapsedSections, setCollapsedSections] = useState(() => ({
+    position: false,
+    layout: false,
+    typography: false,
+    image: false,
+    appearance: false,
+    actions: false,
+  }));
 
   // Sync fontSizeInput with selectedLayer changes
   useEffect(() => {
@@ -664,25 +676,13 @@ export function InspectorPanel() {
   const layerFrame = selectedLayer ? ensureFrame(selectedLayer.frame, activePage) : null;
   const isTextLayer = selectedLayer?.type === 'text';
   const isImageLayer = selectedLayer?.type === 'image';
+  const isShapeLayer = selectedLayer?.type === 'shape';
+  const isShapeImageFrame = isShapeLayer && Boolean(selectedLayer?.metadata?.isImageFrame);
+  const isImageLikeLayer = isImageLayer || isShapeImageFrame;
   const clipContent = Boolean(selectedLayer?.metadata?.clipContent);
-  const rawImageScale = Number(selectedLayer?.metadata?.imageScale);
-  const imageScale = Number.isFinite(rawImageScale) ? clamp(rawImageScale, 0.25, 4) : 1;
-  const imageScalePercent = Math.round(imageScale * 100);
-  const rawOffsetX = Number(selectedLayer?.metadata?.imageOffsetX);
-  const rawOffsetY = Number(selectedLayer?.metadata?.imageOffsetY);
-  const imageOffsetX = Number.isFinite(rawOffsetX) ? clamp(rawOffsetX, -500, 500) : 0;
-  const imageOffsetY = Number.isFinite(rawOffsetY) ? clamp(rawOffsetY, -500, 500) : 0;
   const flipHorizontal = Boolean(selectedLayer?.metadata?.flipHorizontal);
   const flipVertical = Boolean(selectedLayer?.metadata?.flipVertical);
-
-  // Sync pending image state with layer values
-  useEffect(() => {
-    if (selectedLayer?.type === 'image') {
-      setPendingImageScale(imageScale);
-      setPendingImageOffsetX(imageOffsetX);
-      setPendingImageOffsetY(imageOffsetY);
-    }
-  }, [selectedLayer?.id, imageScale, imageOffsetX, imageOffsetY]);
+  const layerFill = typeof selectedLayer?.fill === 'string' ? selectedLayer.fill : null;
 
   // Debug: log recently uploaded images for development troubleshooting
   useEffect(() => {
@@ -914,6 +914,13 @@ export function InspectorPanel() {
     handleLayerChange({ frame: nextFrame });
   };
 
+  const toggleSection = (sectionId) => {
+    setCollapsedSections((prev) => ({
+      ...prev,
+      [sectionId]: !prev[sectionId],
+    }));
+  };
+
   const updateOpacity = (percent) => {
     if (!Number.isFinite(percent)) {
       return;
@@ -1001,8 +1008,12 @@ export function InspectorPanel() {
     setShapeCategoryFilter(event.target.value);
   };
 
-  const handleTextAlignChange = (event) => {
-    handleLayerChange({ textAlign: event.target.value });
+  const handleTextAlignChange = (valueOrEvent) => {
+    const nextValue = typeof valueOrEvent === 'string' ? valueOrEvent : valueOrEvent?.target?.value;
+    if (!nextValue) {
+      return;
+    }
+    handleLayerChange({ textAlign: nextValue });
   };
 
   const handleClipToggle = () => {
@@ -1014,46 +1025,23 @@ export function InspectorPanel() {
     handleLayerChange({ metadata: { objectFit: nextFit } });
   };
 
-  const handleImageScaleChange = (event) => {
-    const nextPercent = Number.parseInt(event.target.value, 10);
-    if (!Number.isFinite(nextPercent)) {
-      return;
-    }
-    const clampedPercent = clamp(nextPercent, 25, 400);
-    setPendingImageScale(clampedPercent / 100);
-  };
-
-  const handleImageOffsetChange = (axis) => (event) => {
-    const nextValue = Number.parseInt(event.target.value, 10);
-    if (!Number.isFinite(nextValue)) {
-      return;
-    }
-    const clampedValue = clamp(nextValue, -500, 500);
-    if (axis === 'x') {
-      setPendingImageOffsetX(clampedValue);
-    } else {
-      setPendingImageOffsetY(clampedValue);
-    }
-  };
-
-  const handleApplyCrop = () => {
-    handleLayerChange({
+  const handleResetImageAdjustments = () => {
+    const nextProps = {
       metadata: {
-        imageScale: pendingImageScale,
-        imageOffsetX: pendingImageOffsetX,
-        imageOffsetY: pendingImageOffsetY,
+        brightness: 100,
+        contrast: 100,
+        saturation: 100,
+        flipHorizontal: false,
+        flipVertical: false,
+        objectFit: 'cover',
       },
-    });
-  };
+    };
 
-  const handleImageCropReset = () => {
-    const resetScale = 1;
-    const resetOffsetX = 0;
-    const resetOffsetY = 0;
-    setPendingImageScale(resetScale);
-    setPendingImageOffsetX(resetOffsetX);
-    setPendingImageOffsetY(resetOffsetY);
-    handleLayerChange({ metadata: { imageScale: resetScale, imageOffsetX: resetOffsetX, imageOffsetY: resetOffsetY } });
+    if (layerFrame) {
+      nextProps.frame = { ...layerFrame, rotation: 0 };
+    }
+
+    handleLayerChange(nextProps);
   };
 
   const handleRotate = (delta) => () => {
@@ -1134,11 +1122,35 @@ export function InspectorPanel() {
           dispatch({ type: 'ADD_RECENTLY_UPLOADED_IMAGE', dataUrl, fileName: file.name });
         }
 
-        handleLayerChange({
-              content: dataUrl,
-              name: file.name || selectedLayer.name,
-              metadata: { objectFit: 'contain', imageScale: 1, imageOffsetX: 0, imageOffsetY: 0 },
-            });
+        if (selectedLayer.type === 'shape') {
+              const placeholderFill = selectedLayer.metadata?.placeholderFill ?? selectedLayer.fill ?? 'rgba(148, 163, 184, 0.12)';
+              const placeholderStroke = selectedLayer.metadata?.placeholderStroke ?? selectedLayer.stroke ?? 'transparent';
+              handleLayerChange({
+                content: dataUrl,
+                name: file.name || selectedLayer.name,
+                fill: 'transparent',
+                stroke: 'transparent',
+                metadata: {
+                  objectFit: 'cover',
+                  imageScale: 1,
+                  imageOffsetX: 0,
+                  imageOffsetY: 0,
+                  flipHorizontal: false,
+                  flipVertical: false,
+                  isImageFrame: true,
+                  maskVariant: selectedLayer.metadata?.maskVariant ?? selectedLayer.shape?.id ?? selectedLayer.variant,
+                  placeholderFill,
+                  placeholderStroke,
+                  backgroundImage: '',
+                },
+              });
+            } else {
+              handleLayerChange({
+                content: dataUrl,
+                name: file.name || selectedLayer.name,
+                metadata: { objectFit: 'contain', imageScale: 1, imageOffsetX: 0, imageOffsetY: 0 },
+              });
+            }
       };
       testImg.onerror = () => {
         console.error('Preload failed for data URL');
@@ -1161,9 +1173,34 @@ export function InspectorPanel() {
       return;
     }
 
-    setPendingImageScale(1);
-    setPendingImageOffsetX(0);
-    setPendingImageOffsetY(0);
+    if (isShapeImageFrame) {
+      const placeholderFill = selectedLayer.metadata?.placeholderFill ?? selectedLayer.fill ?? 'rgba(148, 163, 184, 0.12)';
+      const placeholderStroke = selectedLayer.metadata?.placeholderStroke ?? selectedLayer.stroke ?? 'transparent';
+      handleLayerChange({
+        content: '',
+        fill: placeholderFill,
+        stroke: placeholderStroke,
+        metadata: {
+          imageScale: 1,
+          imageOffsetX: 0,
+          imageOffsetY: 0,
+          brightness: 100,
+          contrast: 100,
+          saturation: 100,
+          flipHorizontal: false,
+          flipVertical: false,
+          isImageFrame: true,
+          maskVariant: selectedLayer.metadata?.maskVariant ?? selectedLayer.shape?.id ?? selectedLayer.variant,
+          backgroundImage: '',
+        },
+      });
+
+      if (replaceImageInputRef.current) {
+        replaceImageInputRef.current.value = '';
+      }
+
+      return;
+    }
 
     handleLayerChange({
       content: '',
@@ -1171,6 +1208,11 @@ export function InspectorPanel() {
         imageScale: 1,
         imageOffsetX: 0,
         imageOffsetY: 0,
+        brightness: 100,
+        contrast: 100,
+        saturation: 100,
+        flipHorizontal: false,
+        flipVertical: false,
       },
     });
 
@@ -1179,16 +1221,12 @@ export function InspectorPanel() {
     }
   };
 
-  const handleUseRecentImage = (imageDataUrl, fileName) => {
+  const handleLayerDuplicate = () => {
     if (!selectedLayer) {
       return;
     }
 
-    handleLayerChange({
-      content: imageDataUrl,
-      name: fileName || selectedLayer.name,
-      metadata: { objectFit: 'contain', imageScale: 1, imageOffsetX: 0, imageOffsetY: 0 },
-    });
+    dispatch({ type: 'DUPLICATE_LAYER', pageId: activePage.id, layerId: selectedLayer.id });
   };
 
   const handleLayerDelete = () => {
@@ -1320,446 +1358,615 @@ export function InspectorPanel() {
     </div>
   );
 
-  const renderPositionSection = () => (
-    <div className="inspector-panel__group">
-      <div className="inspector-section__header">
-        <h3>Position</h3>
-        <span className="inspector-section__meta">X/Y &amp; rotation</span>
-      </div>
-      <div className="inspector-alignment" role="group" aria-label="Alignment controls">
-        {ALIGNMENT_CONTROLS.map((control) => (
-          <button
-            key={control.id}
-            type="button"
-            className="inspector-alignment__action"
-            onClick={handleAlignment(control.apply)}
-            aria-label={control.label}
-          >
-            <i className={control.icon} aria-hidden="true"></i>
-          </button>
-        ))}
-      </div>
 
-      <div className="inspector-grid inspector-grid--three">
-        <label className="inspector-field">
-          <span className="inspector-field__label">X</span>
-          <input
-            type="number"
-            className="inspector-field__control"
-            value={layerFrame.x}
-            onChange={handleFrameChange('x')}
-            step="1"
-          />
-        </label>
-        <label className="inspector-field">
-          <span className="inspector-field__label">Y</span>
-          <input
-            type="number"
-            className="inspector-field__control"
-            value={layerFrame.y}
-            onChange={handleFrameChange('y')}
-            step="1"
-          />
-        </label>
-        <label className="inspector-field">
-          <span className="inspector-field__label">Rotation</span>
-          <input
-            type="number"
-            className="inspector-field__control"
-            value={layerFrame.rotation}
-            onChange={handleFrameChange('rotation')}
-            step="1"
-          />
-        </label>
-      </div>
-    </div>
-  );
-
-  const renderLayoutSection = () => (
-    <div className="inspector-panel__group">
-      <div className="inspector-section__header">
-        <h3>Layout</h3>
-        <span className="inspector-section__meta">Dimensions &amp; flow</span>
-      </div>
-      <div className="inspector-grid inspector-grid--two">
-        <label className="inspector-field">
-          <span className="inspector-field__label">Width</span>
-          <input
-            type="number"
-            className="inspector-field__control"
-            value={layerFrame.width}
-            onChange={handleFrameChange('width')}
-            min="1"
-            step="1"
-          />
-        </label>
-        <label className="inspector-field">
-          <span className="inspector-field__label">Height</span>
-          <input
-            type="number"
-            className="inspector-field__control"
-            value={layerFrame.height}
-            onChange={handleFrameChange('height')}
-            min="1"
-            step="1"
-          />
-        </label>
-      </div>
-
-      <label className="inspector-toggle">
-        <input
-          type="checkbox"
-          checked={clipContent}
-          onChange={handleClipToggle}
-        />
-        <span>Clip content</span>
-      </label>
-    </div>
-  );
-
-  const renderAppearanceSection = () => (
-    <div className="inspector-panel__group">
-      <div className="inspector-section__header">
-        <h3>Appearance</h3>
-        <span className="inspector-section__meta">Color &amp; effects</span>
-      </div>
-
-      <label className="inspector-field">
-        <span className="inspector-field__label">Fill</span>
-        <input
-          type="color"
-          className="inspector-field__control inspector-field__control--color"
-          value={normalizeColorInput(selectedLayer.fill, '#2563eb')}
-          onChange={handleFillChange}
-        />
-      </label>
-
-      <div className="inspector-opacity">
-        <label className="inspector-field inspector-opacity__slider">
-          <span className="inspector-field__label">Opacity</span>
-          <input
-            type="range"
-            className="inspector-field__control inspector-field__control--range"
-            min="0"
-            max="100"
-            step="5"
-            value={Math.round((selectedLayer.opacity ?? 1) * 100)}
-            onChange={handleOpacitySliderChange}
-          />
-        </label>
-        <label className="inspector-field inspector-opacity__input">
-          <span className="inspector-field__label">%</span>
-          <input
-            type="number"
-            className="inspector-field__control"
-            min="0"
-            max="100"
-            step="5"
-            value={Math.round((selectedLayer.opacity ?? 1) * 100)}
-            onChange={handleOpacityInputChange}
-          />
-        </label>
-      </div>
-
-      <label className="inspector-field">
-        <span className="inspector-field__label">Corner radius</span>
-        <input
-          type="number"
-          className="inspector-field__control"
-          value={selectedLayer.borderRadius ?? 0}
-          onChange={handleBorderRadiusChange}
-          min="0"
-          step="1"
-        />
-      </label>
-    </div>
-  );
-
-  const renderTypographySection = () => (
-    <div className="inspector-panel__group">
-      <div className="inspector-section__header">
-        <h3>Typography</h3>
-  <span className="inspector-section__meta">{fontsLoading ? 'Loading fonts...' : 'Text content & styling'}</span>
-      </div>
-      <label className="inspector-field">
-        <span className="inspector-field__label">Content</span>
-        <textarea
-          className="inspector-field__control inspector-field__control--textarea"
-          value={selectedLayer.content ?? ''}
-          onChange={handleTextContentChange}
-          rows={3}
-        />
-      </label>
-      <label className="inspector-field">
-        <span className="inspector-field__label">Font</span>
-        <div className="inspector-font-picker">
-          <button
-            type="button"
-            className={`inspector-field__control inspector-font-picker__trigger${isFontModalOpen ? ' is-open' : ''}`}
-            onClick={() => {
-              // Toggle modal and calculate position when opening
-              if (!isFontModalOpen && fontTriggerRef.current && panelRef.current) {
-                try {
-  const triggerRect = fontTriggerRef.current.getBoundingClientRect();
-  const panelRect = panelRef.current.getBoundingClientRect();
-  const preferredWidth = Math.min(320, Math.max(200, triggerRect.width * 1.6));
-                  // Position to the left of the inspector panel, aligned to trigger top if possible
-                  let left = panelRect.left - preferredWidth - 12 + window.scrollX;
-                  let top = triggerRect.top + window.scrollY - 6;
-
-                  // If not enough space on left, place to the right of panel
-                  if (left < 8) {
-                    left = panelRect.right + 12 + window.scrollX;
-                  }
-
-                  // Keep within viewport vertically
-                  const maxTop = window.scrollY + window.innerHeight - 48;
-                  if (top > maxTop) top = Math.max(window.scrollY + 8, maxTop - 8);
-                  if (top < window.scrollY + 8) top = window.scrollY + 8;
-
-                  setFontModalPosition({ top, left, width: preferredWidth });
-                } catch (err) {
-                  setFontModalPosition(null);
-                }
-              }
-              setFontModalOpen((open) => !open);
-            }}
-            ref={fontTriggerRef}
-            aria-expanded={isFontModalOpen}
-          >
-            <span className="inspector-font-picker__preview">
-              <span
-                className="inspector-font-picker__preview-name"
-                style={{ fontFamily: selectedLayer?.fontFamily || primaryFontFamily || 'Inter, sans-serif' }}
-              >
-                {primaryFontFamily || 'Select font'}
-              </span>
-              <span className="inspector-font-picker__preview-meta">
-                {primaryFontFamily ? formatFontCategory(currentFontMeta?.category) : 'Choose a font'}
-              </span>
-            </span>
-            <span className="inspector-font-picker__chevron" aria-hidden="true">
-              <i className={`fa-solid ${isFontModalOpen ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
-            </span>
-          </button>
-
-          {isFontModalOpen && createPortal(
-            <FontPickerModal
-              ref={fontModalRef}
-              fonts={filteredFonts}
-              categories={fontCategories}
-              categoryValue={fontCategoryFilter}
-              onCategoryChange={handleFontCategoryChange}
-              searchTerm={fontSearchTerm}
-              onSearchChange={handleFontSearchChange}
-              onSelect={handleFontFamilyClick}
-              isLoading={fontsLoading}
-              currentFamily={primaryFontFamily}
-              ensureFontLoaded={ensureFontLoaded}
-              loadMoreFonts={loadMoreFonts}
-              loadingMore={loadingMore}
-              style={fontModalPosition ? { position: 'absolute', top: `${fontModalPosition.top}px`, left: `${fontModalPosition.left}px`, width: `${fontModalPosition.width}px` } : { position: 'absolute' }}
-            />,
-            document.body,
-          )}
-        </div>
-      </label>
-      <div className="inspector-grid inspector-grid--two">
-        <label className="inspector-field">
-          <span className="inspector-field__label">Font size</span>
-          <input
-            type="number"
-            className="inspector-field__control"
-            value={fontSizeInput}
-            onChange={handleFontSizeChange}
-            min="8"
-            step="1"
-          />
-        </label>
-        <label className="inspector-field">
-          <span className="inspector-field__label">Font weight</span>
-          <select
-            className="inspector-field__control"
-            value={String(selectedLayer.fontWeight ?? '400')}
-            onChange={handleFontWeightChange}
-          >
-            <option value="100">Thin</option>
-            <option value="200">Extra Light / Ultra Light</option>
-            <option value="300">Light</option>
-            <option value="400">Regular / Normal</option>
-            <option value="500">Medium</option>
-            <option value="600">Semi Bold / Demi Bold</option>
-            <option value="700">Bold</option>
-            <option value="800">Extra Bold / Ultra Bold</option>
-            <option value="900">Black / Heavy</option>
-            <option value="normal">normal</option>
-            <option value="bold">bold</option>
-          </select>
-        </label>
-      </div>
-    </div>
-  );
-
-  const renderImageSection = () => (
-    <div className="inspector-panel__group">
-      <div className="inspector-section__header">
-        <h3>Image</h3>
-        <span className="inspector-section__meta">Source &amp; display</span>
-      </div>
-
-      <div className="inspector-field inspector-field--actions">
+  const renderPositionSection = () => {
+    const collapsed = collapsedSections.position;
+    return (
+      <div className={`inspector-panel__group ${collapsed ? 'is-collapsed' : ''}`}>
         <button
           type="button"
-          className="builder-btn inspector-btn"
-          onClick={handleReplaceImageClick}
+          className="inspector-section__header inspector-section__header--toggle"
+          onClick={() => toggleSection('position')}
+          aria-expanded={!collapsed}
         >
-          Replace image
+          <span className="inspector-section__title-block">
+            <h3>Position</h3>
+            <span className="inspector-section__meta">X/Y &amp; rotation</span>
+          </span>
+          <span className="inspector-section__chevron" aria-hidden="true">
+            <i className={`fa-solid ${collapsed ? 'fa-chevron-down' : 'fa-chevron-up'}`}></i>
+          </span>
         </button>
-        {selectedLayer?.content && (
-          <button
-            type="button"
-            className="builder-btn inspector-btn is-muted"
-            onClick={handleClearImage}
-          >
-            Remove image
-          </button>
+        {!collapsed && (
+          <div className="inspector-section__content">
+            <div className="inspector-alignment" role="group" aria-label="Alignment controls">
+              {ALIGNMENT_CONTROLS.map((control) => (
+                <button
+                  key={control.id}
+                  type="button"
+                  className="inspector-alignment__action"
+                  onClick={handleAlignment(control.apply)}
+                  aria-label={control.label}
+                >
+                  <i className={control.icon} aria-hidden="true"></i>
+                </button>
+              ))}
+            </div>
+
+            <div className="inspector-grid inspector-grid--three">
+              <label className="inspector-field">
+                <span className="inspector-field__label">X</span>
+                <input
+                  type="number"
+                  className="inspector-field__control"
+                  value={layerFrame.x}
+                  onChange={handleFrameChange('x')}
+                  step="1"
+                />
+              </label>
+              <label className="inspector-field">
+                <span className="inspector-field__label">Y</span>
+                <input
+                  type="number"
+                  className="inspector-field__control"
+                  value={layerFrame.y}
+                  onChange={handleFrameChange('y')}
+                  step="1"
+                />
+              </label>
+              <label className="inspector-field">
+                <span className="inspector-field__label">Rotation</span>
+                <input
+                  type="number"
+                  className="inspector-field__control"
+                  value={layerFrame.rotation}
+                  onChange={handleFrameChange('rotation')}
+                  step="1"
+                />
+              </label>
+            </div>
+          </div>
         )}
       </div>
+    );
+  };
 
-      <div className="inspector-field inspector-field--actions">
+  const renderLayoutSection = () => {
+    const collapsed = collapsedSections.layout;
+    const allowClipToggle = !isTextLayer;
+    return (
+      <div className={`inspector-panel__group ${collapsed ? 'is-collapsed' : ''}`}>
         <button
           type="button"
-          className="builder-btn inspector-btn"
-          onClick={handleRotate(90)}
+          className="inspector-section__header inspector-section__header--toggle"
+          onClick={() => toggleSection('layout')}
+          aria-expanded={!collapsed}
         >
-          Rotate +90°
+          <span className="inspector-section__title-block">
+            <h3>Layout</h3>
+            <span className="inspector-section__meta">Dimensions &amp; flow</span>
+          </span>
+          <span className="inspector-section__chevron" aria-hidden="true">
+            <i className={`fa-solid ${collapsed ? 'fa-chevron-down' : 'fa-chevron-up'}`}></i>
+          </span>
         </button>
-      </div>
+        {!collapsed && (
+          <div className="inspector-section__content">
+            <div className="inspector-grid inspector-grid--two">
+              <label className="inspector-field">
+                <span className="inspector-field__label">Width</span>
+                <input
+                  type="number"
+                  className="inspector-field__control"
+                  value={layerFrame.width}
+                  onChange={handleFrameChange('width')}
+                  min="1"
+                  step="1"
+                />
+              </label>
+              <label className="inspector-field">
+                <span className="inspector-field__label">Height</span>
+                <input
+                  type="number"
+                  className="inspector-field__control"
+                  value={layerFrame.height}
+                  onChange={handleFrameChange('height')}
+                  min="1"
+                  step="1"
+                />
+              </label>
+            </div>
 
-      <div className="inspector-field inspector-field--actions">
-        <button
-          type="button"
-          className={`builder-btn inspector-btn ${flipHorizontal ? 'is-active' : ''}`}
-          onClick={handleFlipToggle('horizontal')}
-        >
-          Flip horizontal
-        </button>
-        <button
-          type="button"
-          className={`builder-btn inspector-btn ${flipVertical ? 'is-active' : ''}`}
-          onClick={handleFlipToggle('vertical')}
-        >
-          Flip vertical
-        </button>
+            {allowClipToggle && (
+              <label className="inspector-toggle">
+                <input
+                  type="checkbox"
+                  checked={clipContent}
+                  onChange={handleClipToggle}
+                />
+                <span>Clip content</span>
+              </label>
+            )}
+          </div>
+        )}
       </div>
+    );
+  };
 
-      <div className="inspector-field inspector-field--actions">
-        <button
-          type="button"
-          className="builder-btn inspector-btn"
-          onClick={handleApplyCrop}
-        >
-          Crop
-        </button>
-        <button
-          type="button"
-          className="builder-btn inspector-btn"
-          onClick={handleImageCropReset}
-        >
-          Reset adjustments
-        </button>
-      </div>
+  const renderAppearanceSection = () => {
+    const collapsed = collapsedSections.appearance;
+    const opacityPercent = Math.round((selectedLayer.opacity ?? 1) * 100);
+    const fillLabel = isTextLayer ? 'Text color' : 'Fill color';
+    const showCornerRadius = isShapeLayer || isImageLayer;
 
-      <div className="inspector-grid inspector-grid--three">
-        <label className="inspector-field">
-          <span className="inspector-field__label">Brightness</span>
-          <input
-            type="range"
-            className="inspector-field__control inspector-field__control--range"
-            min="0"
-            max="200"
-            step="5"
-            value={selectedLayer.metadata?.brightness ?? 100}
-            onChange={(e) => handleLayerChange({ metadata: { brightness: Number.parseInt(e.target.value, 10) } })}
-          />
-        </label>
-        <label className="inspector-field">
-          <span className="inspector-field__label">Contrast</span>
-          <input
-            type="range"
-            className="inspector-field__control inspector-field__control--range"
-            min="0"
-            max="200"
-            step="5"
-            value={selectedLayer.metadata?.contrast ?? 100}
-            onChange={(e) => handleLayerChange({ metadata: { contrast: Number.parseInt(e.target.value, 10) } })}
-          />
-        </label>
-        <label className="inspector-field">
-          <span className="inspector-field__label">Saturation</span>
-          <input
-            type="range"
-            className="inspector-field__control inspector-field__control--range"
-            min="0"
-            max="200"
-            step="5"
-            value={selectedLayer.metadata?.saturation ?? 100}
-            onChange={(e) => handleLayerChange({ metadata: { saturation: Number.parseInt(e.target.value, 10) } })}
-          />
-        </label>
-      </div>
+    return (
+      <div className={`inspector-panel__group ${collapsed ? 'is-collapsed' : ''}`}>
+        <button
+          type="button"
+          className="inspector-section__header inspector-section__header--toggle"
+          onClick={() => toggleSection('appearance')}
+          aria-expanded={!collapsed}
+        >
+          <span className="inspector-section__title-block">
+            <h3>Appearance</h3>
+            <span className="inspector-section__meta">Color &amp; effects</span>
+          </span>
+          <span className="inspector-section__chevron" aria-hidden="true">
+            <i className={`fa-solid ${collapsed ? 'fa-chevron-down' : 'fa-chevron-up'}`}></i>
+          </span>
+        </button>
+        {!collapsed && (
+          <div className="inspector-section__content">
+            <label className="inspector-field">
+              <span className="inspector-field__label">{fillLabel}</span>
+              <input
+                type="color"
+                className="inspector-field__control inspector-field__control--color"
+                value={normalizeColorInput(selectedLayer.fill, '#2563eb')}
+                onChange={handleFillChange}
+                aria-label={fillLabel}
+              />
+              {isTextLayer && (
+                <span className="inspector-field__description">Adjusts the selected text color.</span>
+              )}
+            </label>
 
-      {/* Recently Uploaded removed from Inspector UI per preference */}
-    </div>
-  );
+            <div className="inspector-opacity">
+              <label className="inspector-field inspector-opacity__slider">
+                <span className="inspector-field__label">Opacity</span>
+                <input
+                  type="range"
+                  className="inspector-field__control inspector-field__control--range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={opacityPercent}
+                  onChange={handleOpacitySliderChange}
+                />
+              </label>
+              <label className="inspector-field inspector-opacity__input">
+                <span className="inspector-field__label">%</span>
+                <input
+                  type="number"
+                  className="inspector-field__control"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={opacityPercent}
+                  onChange={handleOpacityInputChange}
+                />
+              </label>
+            </div>
 
-  const renderActionsSection = () => (
-    <div className="inspector-panel__group inspector-panel__group--actions">
-      <div className="inspector-section__header">
-        <h3>Layer actions</h3>
-        <span className="inspector-section__meta">Stacking, visibility &amp; locking</span>
+            {showCornerRadius && (
+              <label className="inspector-field">
+                <span className="inspector-field__label">Corner radius</span>
+                <input
+                  type="number"
+                  className="inspector-field__control"
+                  value={selectedLayer.borderRadius ?? 0}
+                  onChange={handleBorderRadiusChange}
+                  min="0"
+                  step="1"
+                />
+              </label>
+            )}
+          </div>
+        )}
       </div>
-      <div className="inspector-field inspector-field--actions">
+    );
+  };
+
+  const renderTypographySection = () => {
+    const collapsed = collapsedSections.typography;
+    const textAlignValue = selectedLayer?.textAlign ?? 'center';
+    const fontWeightValue = String(selectedLayer.fontWeight ?? '400');
+
+    return (
+      <div className={`inspector-panel__group ${collapsed ? 'is-collapsed' : ''}`}>
         <button
           type="button"
-          className={`builder-btn inspector-btn ${selectedLayerSide === 'front' ? 'is-active' : ''}`}
-          onClick={() => handleLayerSideChange('front')}
+          className="inspector-section__header inspector-section__header--toggle"
+          onClick={() => toggleSection('typography')}
+          aria-expanded={!collapsed}
         >
-          Bring to front
+          <span className="inspector-section__title-block">
+            <h3>Typography</h3>
+            <span className="inspector-section__meta">{fontsLoading ? 'Fetching fonts...' : 'Text content &amp; styling'}</span>
+          </span>
+          <span className="inspector-section__chevron" aria-hidden="true">
+            <i className={`fa-solid ${collapsed ? 'fa-chevron-down' : 'fa-chevron-up'}`}></i>
+          </span>
         </button>
-        <button
-          type="button"
-          className={`builder-btn inspector-btn ${selectedLayerSide === 'back' ? 'is-active' : ''}`}
-          onClick={() => handleLayerSideChange('back')}
-        >
-          Send to back
-        </button>
+        {!collapsed && (
+          <div className="inspector-section__content">
+            <label className="inspector-field">
+              <span className="inspector-field__label">Content</span>
+              <textarea
+                className="inspector-field__control inspector-field__control--textarea"
+                value={selectedLayer.content ?? ''}
+                onChange={handleTextContentChange}
+                rows={3}
+              />
+            </label>
+            <label className="inspector-field">
+              <span className="inspector-field__label">Font</span>
+              <div className="inspector-font-picker">
+                <button
+                  type="button"
+                  className={`inspector-field__control inspector-font-picker__trigger${isFontModalOpen ? ' is-open' : ''}`}
+                  onClick={() => {
+                    if (!isFontModalOpen && fontTriggerRef.current && panelRef.current) {
+                      try {
+                        const triggerRect = fontTriggerRef.current.getBoundingClientRect();
+                        const panelRect = panelRef.current.getBoundingClientRect();
+                        const preferredWidth = Math.min(320, Math.max(200, triggerRect.width * 1.6));
+                        let left = panelRect.left - preferredWidth - 12 + window.scrollX;
+                        let top = triggerRect.top + window.scrollY - 6;
+
+                        if (left < 8) {
+                          left = panelRect.right + 12 + window.scrollX;
+                        }
+
+                        const maxTop = window.scrollY + window.innerHeight - 48;
+                        if (top > maxTop) top = Math.max(window.scrollY + 8, maxTop - 8);
+                        if (top < window.scrollY + 8) top = window.scrollY + 8;
+
+                        setFontModalPosition({ top, left, width: preferredWidth });
+                      } catch (err) {
+                        setFontModalPosition(null);
+                      }
+                    }
+                    setFontModalOpen((open) => !open);
+                  }}
+                  ref={fontTriggerRef}
+                  aria-expanded={isFontModalOpen}
+                >
+                  <span className="inspector-font-picker__preview">
+                    <span
+                      className="inspector-font-picker__preview-name"
+                      style={{ fontFamily: selectedLayer?.fontFamily || primaryFontFamily || 'Inter, sans-serif' }}
+                    >
+                      {primaryFontFamily || 'Select font'}
+                    </span>
+                    <span className="inspector-font-picker__preview-meta">
+                      {primaryFontFamily ? formatFontCategory(currentFontMeta?.category) : 'Choose a font'}
+                    </span>
+                  </span>
+                  <span className="inspector-font-picker__chevron" aria-hidden="true">
+                    <i className={`fa-solid ${isFontModalOpen ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
+                  </span>
+                </button>
+
+                {isFontModalOpen && createPortal(
+                  <FontPickerModal
+                    ref={fontModalRef}
+                    fonts={filteredFonts}
+                    categories={fontCategories}
+                    categoryValue={fontCategoryFilter}
+                    onCategoryChange={handleFontCategoryChange}
+                    searchTerm={fontSearchTerm}
+                    onSearchChange={handleFontSearchChange}
+                    onSelect={handleFontFamilyClick}
+                    isLoading={fontsLoading}
+                    currentFamily={primaryFontFamily}
+                    ensureFontLoaded={ensureFontLoaded}
+                    loadMoreFonts={loadMoreFonts}
+                    loadingMore={loadingMore}
+                    style={fontModalPosition ? { position: 'absolute', top: `${fontModalPosition.top}px`, left: `${fontModalPosition.left}px`, width: `${fontModalPosition.width}px` } : { position: 'absolute' }}
+                  />,
+                  document.body,
+                )}
+              </div>
+            </label>
+            <div className="inspector-grid inspector-grid--two">
+              <label className="inspector-field">
+                <span className="inspector-field__label">Font size</span>
+                <input
+                  type="number"
+                  className="inspector-field__control"
+                  value={fontSizeInput}
+                  onChange={handleFontSizeChange}
+                  min="8"
+                  step="1"
+                />
+              </label>
+              <label className="inspector-field">
+                <span className="inspector-field__label">Font weight</span>
+                <select
+                  className="inspector-field__control"
+                  value={fontWeightValue}
+                  onChange={handleFontWeightChange}
+                >
+                  <option value="100">Thin</option>
+                  <option value="200">Extra Light / Ultra Light</option>
+                  <option value="300">Light</option>
+                  <option value="400">Regular / Normal</option>
+                  <option value="500">Medium</option>
+                  <option value="600">Semi Bold / Demi Bold</option>
+                  <option value="700">Bold</option>
+                  <option value="800">Extra Bold / Ultra Bold</option>
+                  <option value="900">Black / Heavy</option>
+                  <option value="normal">normal</option>
+                  <option value="bold">bold</option>
+                </select>
+              </label>
+            </div>
+            <div className="inspector-field">
+              <span className="inspector-field__label">Alignment</span>
+              <div className="inspector-segmented" role="radiogroup" aria-label="Text alignment">
+                {TEXT_ALIGN_OPTIONS.map((option) => {
+                  const isActive = textAlignValue === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`inspector-segmented__option ${isActive ? 'is-active' : ''}`}
+                      onClick={() => handleTextAlignChange(option.value)}
+                      role="radio"
+                      aria-checked={isActive}
+                    >
+                      <i className={option.icon} aria-hidden="true"></i>
+                      <span>{option.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-      <div className="inspector-field inspector-field--actions">
+    );
+  };
+
+  const renderImageSection = () => {
+    const collapsed = collapsedSections.image;
+    const metadata = selectedLayer?.metadata ?? {};
+    const parsePercent = (value, fallback = 100) => {
+      const parsed = Number.parseInt(value, 10);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+    const brightness = parsePercent(metadata.brightness);
+    const contrast = parsePercent(metadata.contrast);
+    const saturation = parsePercent(metadata.saturation);
+    const fitValue = metadata.objectFit ?? 'cover';
+    const imageContent = isShapeImageFrame
+      ? selectedLayer?.content || metadata.backgroundImage || ''
+      : selectedLayer?.content || '';
+    const hasImageContent = typeof imageContent === 'string' && imageContent.length > 0;
+
+    return (
+      <div className={`inspector-panel__group ${collapsed ? 'is-collapsed' : ''}`}>
         <button
           type="button"
-          className={`builder-btn inspector-btn ${selectedLayer.visible === false ? 'is-muted' : ''}`}
-          onClick={handleLayerVisibilityToggle}
+          className="inspector-section__header inspector-section__header--toggle"
+          onClick={() => toggleSection('image')}
+          aria-expanded={!collapsed}
         >
-          {selectedLayer.visible === false ? 'Show layer' : 'Hide layer'}
+          <span className="inspector-section__title-block">
+            <h3>Image</h3>
+            <span className="inspector-section__meta">Source &amp; display</span>
+          </span>
+          <span className="inspector-section__chevron" aria-hidden="true">
+            <i className={`fa-solid ${collapsed ? 'fa-chevron-down' : 'fa-chevron-up'}`}></i>
+          </span>
         </button>
-        <button
-          type="button"
-          className={`builder-btn inspector-btn ${selectedLayer.locked ? 'is-active' : ''}`}
-          onClick={handleLayerLockToggle}
-        >
-          {selectedLayer.locked ? 'Unlock layer' : 'Lock layer'}
-        </button>
-        <button
-          type="button"
-          className="builder-btn inspector-btn inspector-btn--danger"
-          onClick={handleLayerDelete}
-        >
-          Delete layer
-        </button>
+        {!collapsed && (
+          <div className="inspector-section__content">
+            <div className="inspector-field inspector-field--actions inspector-field--wrap">
+              <button
+                type="button"
+                className="builder-btn inspector-btn"
+                onClick={handleReplaceImageClick}
+              >
+                Replace image
+              </button>
+              {hasImageContent && (
+                <button
+                  type="button"
+                  className="builder-btn inspector-btn inspector-btn--ghost"
+                  onClick={handleClearImage}
+                >
+                  Remove image
+                </button>
+              )}
+            </div>
+
+            <div className="inspector-grid inspector-grid--two">
+              <label className="inspector-field">
+                <span className="inspector-field__label">Object fit</span>
+                <select
+                  className="inspector-field__control"
+                  value={fitValue}
+                  onChange={handleImageFitChange}
+                >
+                  <option value="cover">Cover</option>
+                  <option value="contain">Contain</option>
+                  <option value="fill">Fill</option>
+                  <option value="scale-down">Scale down</option>
+                </select>
+              </label>
+              <label className="inspector-field">
+                <span className="inspector-field__label">Rotate</span>
+                <div className="inspector-field__inline-actions">
+                  <button
+                    type="button"
+                    className="builder-btn inspector-btn"
+                    onClick={handleRotate(90)}
+                  >
+                    +90°
+                  </button>
+                  <button
+                    type="button"
+                    className="builder-btn inspector-btn inspector-btn--ghost"
+                    onClick={handleResetImageAdjustments}
+                  >
+                    Reset image
+                  </button>
+                </div>
+              </label>
+            </div>
+
+            <div className="inspector-field">
+              <span className="inspector-field__label">Flip</span>
+              <div className="inspector-segmented inspector-segmented--compact" role="group" aria-label="Flip image">
+                <button
+                  type="button"
+                  className={`inspector-segmented__option ${flipHorizontal ? 'is-active' : ''}`}
+                  onClick={handleFlipToggle('horizontal')}
+                >
+                  <i className="fa-solid fa-arrows-left-right" aria-hidden="true"></i>
+                  <span>Horizontal</span>
+                </button>
+                <button
+                  type="button"
+                  className={`inspector-segmented__option ${flipVertical ? 'is-active' : ''}`}
+                  onClick={handleFlipToggle('vertical')}
+                >
+                  <i className="fa-solid fa-arrows-up-down" aria-hidden="true"></i>
+                  <span>Vertical</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="inspector-grid inspector-grid--three inspector-grid--with-outputs">
+              <label className="inspector-field">
+                <span className="inspector-field__label">Brightness</span>
+                <input
+                  type="range"
+                  className="inspector-field__control inspector-field__control--range"
+                  min="0"
+                  max="200"
+                  step="5"
+                  value={brightness}
+                  onChange={(e) => handleLayerChange({ metadata: { brightness: Number.parseInt(e.target.value, 10) } })}
+                />
+                <span className="inspector-field__value">{brightness}%</span>
+              </label>
+              <label className="inspector-field">
+                <span className="inspector-field__label">Contrast</span>
+                <input
+                  type="range"
+                  className="inspector-field__control inspector-field__control--range"
+                  min="0"
+                  max="200"
+                  step="5"
+                  value={contrast}
+                  onChange={(e) => handleLayerChange({ metadata: { contrast: Number.parseInt(e.target.value, 10) } })}
+                />
+                <span className="inspector-field__value">{contrast}%</span>
+              </label>
+              <label className="inspector-field">
+                <span className="inspector-field__label">Saturation</span>
+                <input
+                  type="range"
+                  className="inspector-field__control inspector-field__control--range"
+                  min="0"
+                  max="200"
+                  step="5"
+                  value={saturation}
+                  onChange={(e) => handleLayerChange({ metadata: { saturation: Number.parseInt(e.target.value, 10) } })}
+                />
+                <span className="inspector-field__value">{saturation}%</span>
+              </label>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
+
+  const renderActionsSection = () => {
+    const collapsed = collapsedSections.actions;
+    return (
+      <div className={`inspector-panel__group inspector-panel__group--actions ${collapsed ? 'is-collapsed' : ''}`}>
+        <button
+          type="button"
+          className="inspector-section__header inspector-section__header--toggle"
+          onClick={() => toggleSection('actions')}
+          aria-expanded={!collapsed}
+        >
+          <span className="inspector-section__title-block">
+            <h3>Layer actions</h3>
+            <span className="inspector-section__meta">Stacking, visibility &amp; locking</span>
+          </span>
+          <span className="inspector-section__chevron" aria-hidden="true">
+            <i className={`fa-solid ${collapsed ? 'fa-chevron-down' : 'fa-chevron-up'}`}></i>
+          </span>
+        </button>
+        {!collapsed && (
+          <div className="inspector-section__content">
+            <div className="inspector-field inspector-field--actions inspector-field--wrap">
+              <button
+                type="button"
+                className={`builder-btn inspector-btn ${selectedLayerSide === 'front' ? 'is-active' : ''}`}
+                onClick={() => handleLayerSideChange('front')}
+              >
+                Front stack
+              </button>
+              <button
+                type="button"
+                className={`builder-btn inspector-btn ${selectedLayerSide === 'back' ? 'is-active' : ''}`}
+                onClick={() => handleLayerSideChange('back')}
+              >
+                Back stack
+              </button>
+              <button
+                type="button"
+                className="builder-btn inspector-btn inspector-btn--ghost"
+                onClick={handleLayerDuplicate}
+              >
+                Duplicate
+              </button>
+            </div>
+            <div className="inspector-field inspector-field--actions inspector-field--wrap">
+              <button
+                type="button"
+                className={`builder-btn inspector-btn ${selectedLayer.visible === false ? 'is-muted' : ''}`}
+                onClick={handleLayerVisibilityToggle}
+              >
+                {selectedLayer.visible === false ? 'Show layer' : 'Hide layer'}
+              </button>
+              <button
+                type="button"
+                className={`builder-btn inspector-btn ${selectedLayer.locked ? 'is-active' : ''}`}
+                onClick={handleLayerLockToggle}
+              >
+                {selectedLayer.locked ? 'Unlock layer' : 'Lock layer'}
+              </button>
+              <button
+                type="button"
+                className="builder-btn inspector-btn inspector-btn--danger"
+                onClick={handleLayerDelete}
+              >
+                Delete layer
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -1785,20 +1992,17 @@ export function InspectorPanel() {
         <div className="inspector-panel__body inspector-panel__body--unified">
           {renderPagesSection()}
           {renderPageSection()}
-
-          {!selectedLayer && (
-            <p className="inspector-panel__empty">Select a layer on the canvas to adjust its position, layout, and appearance.</p>
-          )}
-
-          {selectedLayer && (
+          {selectedLayer ? (
             <>
               {renderPositionSection()}
               {renderLayoutSection()}
               {isTextLayer && renderTypographySection()}
-              {isImageLayer && renderImageSection()}
+              {isImageLikeLayer && renderImageSection()}
               {renderAppearanceSection()}
               {renderActionsSection()}
             </>
+          ) : (
+            <p className="inspector-panel__empty">Select a layer on the canvas to adjust its position, layout, and appearance.</p>
           )}
         </div>
 

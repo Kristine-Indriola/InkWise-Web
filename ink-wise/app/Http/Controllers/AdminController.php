@@ -6,6 +6,7 @@ use App\Models\Material;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\Staff;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -278,7 +279,20 @@ class AdminController extends Controller
     public function show()
     {
         /** @var User $admin */
-        $admin = Auth::user(); // current logged-in admin
+        $admin = Auth::user()->load(['staff', 'address']);
+
+        // Ensure admin has a staff record (create if missing)
+        if (!$admin->staff) {
+            $admin->staff()->create([
+                'first_name' => 'Super',
+                'last_name' => 'Admin',
+                'role' => 'admin',
+                'contact_number' => '0917-000-0000',
+            ]);
+            // Reload the relationship
+            $admin->load(['staff', 'address']);
+        }
+
         return view('admin.profile.show', compact('admin'));
     }
 
@@ -286,7 +300,20 @@ class AdminController extends Controller
     public function edit()
     {
         /** @var User $admin */
-        $admin = Auth::user();
+        $admin = Auth::user()->load(['staff', 'address']);
+
+        // Ensure admin has a staff record (create if missing)
+        if (!$admin->staff) {
+            $admin->staff()->create([
+                'first_name' => 'Super',
+                'last_name' => 'Admin',
+                'role' => 'admin',
+                'contact_number' => '0917-000-0000',
+            ]);
+            // Reload the relationship
+            $admin->load(['staff', 'address']);
+        }
+
         return view('admin.profile.edit', compact('admin'));
     }
 
@@ -294,7 +321,19 @@ class AdminController extends Controller
     public function update(Request $request)
     {
         /** @var User $admin */
-        $admin = Auth::user();
+        $admin = Auth::user()->load(['staff', 'address']);
+
+        // Ensure admin has a staff record (create if missing)
+        if (!$admin->staff) {
+            $admin->staff()->create([
+                'first_name' => $request->first_name ?: 'Super',
+                'last_name' => $request->last_name ?: 'Admin',
+                'role' => 'admin',
+                'contact_number' => $request->contact_number ?: '0917-000-0000',
+            ]);
+            // Reload the relationship
+            $admin->load(['staff', 'address']);
+        }
 
         // ✅ Validation
         $request->validate([
@@ -303,14 +342,9 @@ class AdminController extends Controller
             'middle_name'    => 'nullable|string|max:100',
             'last_name'      => 'required|string|max:100',
             'contact_number' => 'required|string|max:20',
+            'address'        => 'nullable|string|max:255',
             'password'       => 'nullable|min:6|confirmed', // expects password_confirmation
-            // Address validation
-            'street'         => 'nullable|string|max:255',
-            'barangay'       => 'nullable|string|max:255',
-            'city'           => 'nullable|string|max:100',
-            'province'       => 'nullable|string|max:100',
-            'postal_code'    => 'nullable|string|max:20',
-            'country'        => 'nullable|string|max:100',
+            'profile_pic'    => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120', // 5MB
         ]);
 
         // ✅ Update users table (email + optional password)
@@ -322,33 +356,21 @@ class AdminController extends Controller
 
         // ✅ Update staff table
         if ($admin->staff) {
-            $admin->staff->update([
+            $staffUpdateData = [
                 'first_name'     => $request->first_name,
                 'middle_name'    => $request->middle_name,
                 'last_name'      => $request->last_name,
                 'contact_number' => $request->contact_number,
-            ]);
-        }
+                'address'        => $request->address,
+            ];
 
-        // ✅ Update or create address table
-        if ($admin->address) {
-            $admin->address->update([
-                'street'      => $request->street,
-                'barangay'    => $request->barangay,
-                'city'        => $request->city,
-                'province'    => $request->province,
-                'postal_code' => $request->postal_code,
-                'country'     => $request->country,
-            ]);
-        } else {
-            $admin->address()->create([
-                'street'      => $request->street,
-                'barangay'    => $request->barangay,
-                'city'        => $request->city,
-                'province'    => $request->province,
-                'postal_code' => $request->postal_code,
-                'country'     => $request->country,
-            ]);
+            // Handle profile picture upload
+            if ($request->hasFile('profile_pic')) {
+                $path = $request->file('profile_pic')->store('staff_profiles', 'public');
+                $staffUpdateData['profile_pic'] = $path;
+            }
+
+            $admin->staff->update($staffUpdateData);
         }
 
         

@@ -27,7 +27,8 @@ use App\Http\Controllers\Admin\MaterialController;
 use App\Http\Controllers\Auth\RoleLoginController;
 use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\MaterialsController;
-use App\Http\Controllers\Admin\SiteContentController;
+use App\Http\Controllers\Admin\SiteContentController as AdminSiteContentController;
+use App\Http\Controllers\Owner\SiteContentController as OwnerSiteContentController;
 use App\Http\Controllers\CustomerProfileController;
 use App\Http\Controllers\Owner\OwnerStaffController;
 use App\Http\Controllers\Auth\CustomerAuthController;
@@ -298,8 +299,8 @@ Route::prefix('users')->name('users.')->group(function () {
     });
 
     Route::prefix('settings')->name('settings.')->group(function () {
-        Route::get('site-content', [SiteContentController::class, 'edit'])->name('site-content.edit');
-        Route::put('site-content', [SiteContentController::class, 'update'])->name('site-content.update');
+        Route::get('site-content', [AdminSiteContentController::class, 'edit'])->name('site-content.edit');
+        Route::put('site-content', [AdminSiteContentController::class, 'update'])->name('site-content.update');
     });
 
     // Font Management Routes
@@ -561,13 +562,15 @@ Route::prefix('templates')->group(function () {
 
     // Invitations
     Route::get('/wedding/invitations', [InvitationController::class, 'weddingInvitations'])->name('templates.wedding.invitations');
-    Route::get('/birthday/invitations', fn () => view('customer.Invitations.birthdayinvite'))->name('templates.birthday.invitations');
-    Route::get('/corporate/invitations', fn () => view('customer.Invitations.corporateinvite'))->name('templates.corporate.invitations');
-    Route::get('/baptism/invitations', fn () => view('customer.Invitations.baptisminvite'))->name('templates.baptism.invitations');
+    Route::get('/birthday/invitations', [InvitationController::class, 'birthdayInvitations'])->name('templates.birthday.invitations');
+    Route::get('/corporate/invitations', [InvitationController::class, 'corporateInvitations'])->name('templates.corporate.invitations');
+    Route::get('/baptism/invitations', [InvitationController::class, 'baptismInvitations'])->name('templates.baptism.invitations');
 
     // Giveaways
     Route::get('/wedding/giveaways', [InvitationController::class, 'weddingGiveaways'])->name('templates.wedding.giveaways');
-    Route::get('/birthday/giveaways', fn () => view('customer.Giveaways.birthdaygive'))->name('templates.birthday.giveaways');
+    Route::get('/birthday/giveaways', [InvitationController::class, 'birthdayGiveaways'])->name('templates.birthday.giveaways');
+    Route::get('/corporate/giveaways', [InvitationController::class, 'corporateGiveaways'])->name('templates.corporate.giveaways');
+    Route::get('/baptism/giveaways', [InvitationController::class, 'baptismGiveaways'])->name('templates.baptism.giveaways');
 });
 
 /** Product Preview & Design Editing*/
@@ -813,6 +816,11 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     Route::get('/transactions/export', [OwnerTransactionsController::class, 'export'])->name('transactions-export');
     Route::get('/ratings', [OwnerRatingsController::class, 'index'])->name('ratings.index');
 
+    Route::prefix('settings')->name('settings.')->group(function () {
+        Route::get('site-content', [OwnerSiteContentController::class, 'edit'])->name('site-content.edit');
+        Route::put('site-content', [OwnerSiteContentController::class, 'update'])->name('site-content.update');
+    });
+
     Route::prefix('reports')->name('reports.')->group(function () {
         Route::get('/', fn () => redirect()->route('owner.reports.sales'))->name('index');
         Route::get('/sales', [OwnerSalesReportsController::class, 'index'])->name('sales');
@@ -839,7 +847,7 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
 
   
 
-Route::prefix('staff')->name('staff.')->group(function () {
+Route::prefix('staff')->name('staff.')->middleware(\App\Http\Middleware\RoleMiddleware::class.':staff')->group(function () {
     // Staff routes - updated for order list functionality
     Route::get('/dashboard', [StaffDashboardController::class, 'index'])->name('dashboard');
     Route::get('/assigned-orders', [StaffAssignedController::class, 'index'])->name('assigned.orders');

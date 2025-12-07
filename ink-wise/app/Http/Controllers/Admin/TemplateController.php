@@ -124,21 +124,25 @@ class TemplateController extends Controller
             $rules['back_image'] = 'file|mimes:jpeg,png,jpg,gif,svg|max:5120';
         }
 
-    $validated = $request->validate($rules);
+        $validated = $request->validate($rules);
 
         // Handle front image upload
         if ($request->hasFile('front_image')) {
             $frontImagePath = $request->file('front_image')->store('templates', 'public');
             $validated['front_image'] = $frontImagePath;
+            $validated['preview_front'] = $frontImagePath;
         }
 
         // Handle back image upload
         if ($request->hasFile('back_image')) {
             $backImagePath = $request->file('back_image')->store('templates', 'public');
             $validated['back_image'] = $backImagePath;
+            $validated['preview_back'] = $backImagePath;
         }
 
-        $template->update($validated);
+        $template->fill($validated);
+        $this->synchronizeTemplateSideState($template);
+        $template->save();
 
         if ($request->expectsJson() || $request->ajax()) {
             // Determine if this is admin or staff route
@@ -223,7 +227,19 @@ class TemplateController extends Controller
             $validated['metadata'] = $metadata;
         }
 
-        $template = \App\Models\Template::create($validated);
+        $validated['has_back_design'] = !empty($validated['back_image']);
+
+        if (!empty($validated['front_image'])) {
+            $validated['preview_front'] = $validated['front_image'];
+        }
+
+        if (!empty($validated['back_image'])) {
+            $validated['preview_back'] = $validated['back_image'];
+        }
+
+        $template = new Template($validated);
+        $this->synchronizeTemplateSideState($template);
+        $template->save();
 
         // Determine if this is admin or staff route
         $isStaff = str_contains(request()->route()->getPrefix(), 'staff');
@@ -292,6 +308,7 @@ public function saveCanvas(Request $request, $id)
 
         // Update DB preview column
         $template->preview = $filePath;
+        $this->synchronizeTemplateSideState($template);
         $template->save();
 
         return response()->json([
@@ -312,6 +329,8 @@ public function saveCanvas(Request $request, $id)
             'design' => 'required|array',
             'svg_markup' => 'nullable|string',
             'preview_image' => 'nullable|string',
+            'preview_images' => 'nullable|array',
+            'preview_images_meta' => 'nullable|array',
             'template_name' => 'nullable|string|max:255',
         ]);
 
@@ -330,6 +349,7 @@ public function saveCanvas(Request $request, $id)
             $metadata['builder_canvas'] = $validated['design']['canvas'];
         }
 
+        // Handle single preview_image for backward compatibility
         if (!empty($validated['preview_image'])) {
             $template->preview = $this->persistDataUrl(
                 $validated['preview_image'],
@@ -338,6 +358,37 @@ public function saveCanvas(Request $request, $id)
                 $template->preview,
                 'preview_image'
             );
+        }
+
+        // Handle multiple preview_images
+        if (!empty($validated['preview_images']) && is_array($validated['preview_images'])) {
+            $previews = [];
+            foreach ($validated['preview_images'] as $key => $imageData) {
+                if (is_string($imageData) && !empty($imageData)) {
+                    $filename = $this->persistDataUrl(
+                        $imageData,
+                        'templates/previews',
+                        'png',
+                        null,
+                        "preview_{$key}"
+                    );
+                    if ($filename) {
+                        $previews[$key] = $filename;
+                    }
+                }
+            }
+            if (!empty($previews)) {
+                $metadata['previews'] = $previews;
+            }
+        } elseif (array_key_exists('preview_images', $validated)) {
+            unset($metadata['previews']);
+        }
+
+        // Store preview_images_meta if provided
+        if (!empty($validated['preview_images_meta']) && is_array($validated['preview_images_meta'])) {
+            $metadata['preview_images_meta'] = $validated['preview_images_meta'];
+        } elseif (array_key_exists('preview_images_meta', $validated)) {
+            unset($metadata['preview_images_meta']);
         }
 
         if (!empty($validated['svg_markup'])) {
@@ -351,6 +402,7 @@ public function saveCanvas(Request $request, $id)
         }
 
         $template->metadata = $metadata;
+        $this->synchronizeTemplateSideState($template, $metadata);
         $template->status = $template->status ?? 'draft';
         $template->save();
 
@@ -383,6 +435,7 @@ public function uploadPreview(Request $request, $id)
 
     // Update preview column (store path)
     $template->preview = $filename;
+    $this->synchronizeTemplateSideState($template);
     $template->save();
 
     return response()->json(['success' => true, 'preview' => $filename]);
@@ -455,14 +508,20 @@ public function uploadPreview(Request $request, $id)
     $backPath = str_replace(["\r", "\n", "\t"], '', trim($backPath));
 
         // Create Template record and store front/back image paths on template
-        $template = Template::create([
+        $template = new Template([
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
             'product_type' => 'Invitation',
-            'preview' => 'invitation_templates/' . ltrim($frontPath, '/'), // keep front as preview
+            'preview' => 'invitation_templates/' . ltrim($frontPath, '/'),
             'front_image' => 'invitation_templates/' . ltrim($frontPath, '/'),
             'back_image' => 'invitation_templates/' . ltrim($backPath, '/'),
+            'preview_front' => 'invitation_templates/' . ltrim($frontPath, '/'),
+            'preview_back' => 'invitation_templates/' . ltrim($backPath, '/'),
+            'has_back_design' => true,
         ]);
+
+        $this->synchronizeTemplateSideState($template);
+        $template->save();
 
         // Create product from template (no separate product_images table usage)
         $product = Product::create([
@@ -813,7 +872,7 @@ public function uploadToProduct(Request $request, $id)
         $previewData = $previews[$previewId];
 
         // Create the template
-        $template = Template::create([
+        $template = new Template([
             'name' => $previewData['name'],
             'event_type' => $previewData['event_type'] ?? null,
             'product_type' => $previewData['product_type'] ?? 'Invitation',
@@ -823,10 +882,7 @@ public function uploadToProduct(Request $request, $id)
 
         // Prepare metadata array for additional preview assets
 
-        $metadata = $template->metadata ?? [];
-        if (!is_array($metadata)) {
-            $metadata = (array) $metadata;
-        }
+        $metadata = [];
 
         // Handle file storage - move from temp to permanent location
         if (isset($previewData['template_video_path'])) {
@@ -856,6 +912,8 @@ public function uploadToProduct(Request $request, $id)
         if (!empty($metadata)) {
             $template->metadata = $metadata;
         }
+
+        $this->synchronizeTemplateSideState($template, $metadata);
 
         $template->save();
 
@@ -893,6 +951,231 @@ public function uploadToProduct(Request $request, $id)
         }
 
         return redirect()->route('staff.templates.create');
+    }
+
+    /**
+     * Align preview assets and back-side flags with the latest template data.
+     */
+    protected function synchronizeTemplateSideState(Template $template, ?array $metadata = null): void
+    {
+        $metadataArray = $metadata ?? $this->normalizeTemplateMetadata($template->metadata ?? []);
+
+        $previews = [];
+        if (isset($metadataArray['previews']) && is_array($metadataArray['previews'])) {
+            $previews = $metadataArray['previews'];
+        }
+
+        $previewMeta = [];
+        if (isset($metadataArray['preview_images_meta']) && is_array($metadataArray['preview_images_meta'])) {
+            $previewMeta = $metadataArray['preview_images_meta'];
+        }
+
+        if (array_key_exists('front', $previews)) {
+            $template->preview_front = $this->normalizePreviewPath($previews['front']);
+        }
+
+        $hasBackPreview = $this->previewCollectionHasBack($previews, $previewMeta);
+
+        if ($hasBackPreview) {
+            if (array_key_exists('back', $previews)) {
+                $template->preview_back = $this->normalizePreviewPath($previews['back']);
+            } elseif (!$this->isNonEmptyString($template->preview_back)) {
+                $candidate = $this->findBackPreviewCandidate($previews, $previewMeta);
+                if ($candidate !== null) {
+                    $template->preview_back = $candidate;
+                }
+            }
+        } elseif (!$this->isNonEmptyString($template->back_image)) {
+            $template->preview_back = null;
+        }
+
+        if (!$this->isNonEmptyString($template->preview_front)) {
+            $template->preview_front = $this->resolvePreviewFallback(
+                $template,
+                $previews,
+                $template->front_image ?? null
+            );
+        }
+
+        if ($this->isNonEmptyString($template->back_image) && !$this->isNonEmptyString($template->preview_back)) {
+            $template->preview_back = $this->normalizePreviewPath($template->back_image);
+        }
+
+        if (!$this->isNonEmptyString($template->preview)) {
+            if ($this->isNonEmptyString($template->preview_front)) {
+                $template->preview = $template->preview_front;
+            } elseif ($this->isNonEmptyString($template->front_image)) {
+                $template->preview = $this->normalizePreviewPath($template->front_image);
+            }
+        }
+
+        $template->has_back_design = $hasBackPreview
+            || $this->isNonEmptyString($template->back_image)
+            || $this->isNonEmptyString($template->back_svg_path);
+    }
+
+    protected function normalizeTemplateMetadata($metadata): array
+    {
+        if (is_array($metadata)) {
+            return $metadata;
+        }
+
+        if ($metadata instanceof \Illuminate\Support\Collection) {
+            return $metadata->toArray();
+        }
+
+        if ($metadata instanceof \JsonSerializable) {
+            $encoded = $metadata->jsonSerialize();
+            return is_array($encoded) ? $encoded : [];
+        }
+
+        if (is_string($metadata) && $metadata !== '') {
+            $decoded = json_decode($metadata, true);
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        if (is_object($metadata)) {
+            if (method_exists($metadata, 'toArray')) {
+                $result = $metadata->toArray();
+                return is_array($result) ? $result : (array) $result;
+            }
+
+            return (array) $metadata;
+        }
+
+        if ($metadata === null) {
+            return [];
+        }
+
+        return (array) $metadata;
+    }
+
+    protected function previewCollectionHasBack(array $previews, array $previewMeta): bool
+    {
+        foreach ($previews as $key => $path) {
+            if (!$this->isNonEmptyString($path)) {
+                continue;
+            }
+
+            if ($this->isBackDescriptor((string) $key)) {
+                return true;
+            }
+
+            $meta = $previewMeta[$key] ?? [];
+            if (is_array($meta)) {
+                foreach (['label', 'pageType', 'page_type'] as $field) {
+                    if (isset($meta[$field]) && $this->isBackDescriptor((string) $meta[$field])) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    protected function findBackPreviewCandidate(array $previews, array $previewMeta): ?string
+    {
+        foreach ($previews as $key => $path) {
+            if (!$this->isNonEmptyString($path)) {
+                continue;
+            }
+
+            if ($this->isBackDescriptor((string) $key)) {
+                return $this->normalizePreviewPath($path);
+            }
+
+            $meta = $previewMeta[$key] ?? [];
+            if (is_array($meta)) {
+                foreach (['label', 'pageType', 'page_type'] as $field) {
+                    if (isset($meta[$field]) && $this->isBackDescriptor((string) $meta[$field])) {
+                        return $this->normalizePreviewPath($path);
+                    }
+                }
+            }
+        }
+
+        $entries = [];
+        foreach ($previews as $key => $path) {
+            if (!$this->isNonEmptyString($path)) {
+                continue;
+            }
+
+            $order = isset($previewMeta[$key]['order']) ? (int) $previewMeta[$key]['order'] : PHP_INT_MAX;
+            $entries[] = [
+                'order' => $order,
+                'key' => (string) $key,
+                'path' => $this->normalizePreviewPath($path),
+            ];
+        }
+
+        if (count($entries) < 2) {
+            return null;
+        }
+
+        usort($entries, function (array $left, array $right) {
+            if ($left['order'] === $right['order']) {
+                return strcmp($left['key'], $right['key']);
+            }
+
+            return $left['order'] <=> $right['order'];
+        });
+
+        return $entries[1]['path'] ?? null;
+    }
+
+    protected function resolvePreviewFallback(Template $template, array $previews, ?string $directFallback = null): ?string
+    {
+        if ($this->isNonEmptyString($directFallback)) {
+            return $this->normalizePreviewPath($directFallback);
+        }
+
+        if ($this->isNonEmptyString($template->preview)) {
+            return $this->normalizePreviewPath($template->preview);
+        }
+
+        foreach ($previews as $path) {
+            if ($this->isNonEmptyString($path)) {
+                return $this->normalizePreviewPath($path);
+            }
+        }
+
+        return null;
+    }
+
+    protected function isBackDescriptor(?string $value): bool
+    {
+        if (!is_string($value)) {
+            return false;
+        }
+
+        $normalized = strtolower(trim($value));
+        if ($normalized === '') {
+            return false;
+        }
+
+        $keywords = ['back', 'reverse', 'rear', 'backside', 'back-side', 'back_cover', 'backcover'];
+        foreach ($keywords as $keyword) {
+            if (str_contains($normalized, $keyword)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function normalizePreviewPath($value): ?string
+    {
+        if (!$this->isNonEmptyString($value)) {
+            return null;
+        }
+
+        return str_replace(["\r", "\n", "\t"], '', trim((string) $value));
+    }
+
+    protected function isNonEmptyString($value): bool
+    {
+        return is_string($value) && trim($value) !== '';
     }
 
     protected function persistDataUrl(string $dataUrl, string $directory, string $extension, ?string $existingPath, string $field): string

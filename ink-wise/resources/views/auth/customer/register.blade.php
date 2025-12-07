@@ -584,7 +584,7 @@
             const statusElement = document.getElementById('verificationStatus');
             const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
             const csrfToken = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : '';
-            const sendCodeUrl = @json(route('customer.register.send-code'));
+            const sendCodeUrl = '/customer/register/send-code';
 
             if (verificationCodeInput && verificationCodeInput.value.trim().length === 6) {
                 verificationSent = true;

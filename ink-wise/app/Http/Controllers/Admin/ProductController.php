@@ -204,20 +204,100 @@ class ProductController extends Controller
     {
         $template = Template::findOrFail($id);
 
-        $frontPath = $template->front_image ?: $template->preview;
-        $backPath = $template->back_image ?: null;
+        $placeholder = \App\Support\ImageResolver::url(null);
+
+        $design = $template->design ?? [];
+        $metadata = $template->metadata ?? [];
+        $pages = is_array(data_get($design, 'pages')) ? data_get($design, 'pages', []) : [];
+
+        $collectPageSources = function ($page) {
+            return [
+                data_get($page, 'preview'),
+                data_get($page, 'preview_url'),
+                data_get($page, 'previewUrl'),
+                data_get($page, 'thumbnail'),
+                data_get($page, 'thumbnail_url'),
+                data_get($page, 'thumbnailUrl'),
+                data_get($page, 'image'),
+                data_get($page, 'image_url'),
+                data_get($page, 'imageUrl'),
+            ];
+        };
+
+        $frontCandidates = [
+            $template->front_image,
+            data_get($template, 'preview_front'),
+            data_get($metadata, 'front_image'),
+            data_get($metadata, 'preview_front'),
+            data_get($design, 'preview_front'),
+            data_get($design, 'front_image'),
+            data_get($design, 'front.preview'),
+            $template->preview,
+        ];
+
+        $backCandidates = [
+            $template->back_image,
+            data_get($template, 'preview_back'),
+            data_get($metadata, 'back_image'),
+            data_get($metadata, 'preview_back'),
+            data_get($design, 'preview_back'),
+            data_get($design, 'back_image'),
+            data_get($design, 'back.preview'),
+        ];
+
+        foreach ($pages as $index => $page) {
+            $side = strtolower((string) data_get($page, 'side', ''));
+            $sources = $collectPageSources($page);
+
+            if ($side === 'front' || ($side === '' && $index === 0)) {
+                $frontCandidates = array_merge($frontCandidates, $sources);
+            }
+
+            if ($side === 'back' || ($side === '' && $index === 1)) {
+                $backCandidates = array_merge($backCandidates, $sources);
+            }
+        }
+
+        $resolveAsset = function (array $candidates) use ($placeholder) {
+            foreach ($candidates as $candidate) {
+                if (!$candidate) {
+                    continue;
+                }
+
+                if (is_string($candidate) && Str::startsWith(trim($candidate), 'data:image')) {
+                    return $candidate;
+                }
+
+                $url = \App\Support\ImageResolver::url($candidate);
+                if ($url && $url !== $placeholder) {
+                    return $url;
+                }
+            }
+
+            return null;
+        };
+
+        $frontUrl = $resolveAsset($frontCandidates);
+        $backUrl = $resolveAsset($backCandidates);
+        $previewUrl = $resolveAsset([
+            $template->preview,
+            data_get($design, 'preview'),
+            data_get($metadata, 'preview'),
+            $frontUrl,
+        ]);
 
         return response()->json([
             'template_name' => $template->name,
+            'name' => $template->name,
             'description' => $template->description,
             'product_type' => $template->product_type,
             'event_type' => $template->event_type,
             'theme_style' => $template->theme_style,
-            'front_image' => $frontPath ? \App\Support\ImageResolver::url($frontPath) : null,
-            'back_image' => $backPath ? \App\Support\ImageResolver::url($backPath) : null,
-            'preview_image' => $template->preview
-                ? \App\Support\ImageResolver::url($template->preview)
-                : ($frontPath ? \App\Support\ImageResolver::url($frontPath) : null),
+            'front_image' => $frontUrl,
+            'back_image' => $backUrl,
+            'front_preview' => $frontUrl,
+            'back_preview' => $backUrl,
+            'preview_image' => $previewUrl,
             'design_data' => $template->design,
         ]);
     }
@@ -325,6 +405,105 @@ class ProductController extends Controller
             'preview_images_existing.preview' => 'nullable|string',
         ]);
 
+        $resolveTemplatePreviews = function (?Template $template): array {
+            if (!$template) {
+                return [
+                    'front' => null,
+                    'back' => null,
+                    'preview' => null,
+                ];
+            }
+
+            $placeholder = \App\Support\ImageResolver::url(null);
+
+            $resolveCandidate = function ($candidates) use ($placeholder) {
+                foreach ((array) $candidates as $candidate) {
+                    if (!$candidate) {
+                        continue;
+                    }
+
+                    if (is_string($candidate) && Str::startsWith(trim($candidate), 'data:image')) {
+                        return $candidate;
+                    }
+
+                    $url = \App\Support\ImageResolver::url($candidate);
+                    if ($url && $url !== $placeholder) {
+                        return $url;
+                    }
+                }
+
+                return null;
+            };
+
+            $design = $template->design ?? [];
+            $metadata = $template->metadata ?? [];
+            $pages = is_array(data_get($design, 'pages')) ? data_get($design, 'pages', []) : [];
+
+            $collectPageSources = function ($page) {
+                return [
+                    data_get($page, 'preview'),
+                    data_get($page, 'preview_url'),
+                    data_get($page, 'previewUrl'),
+                    data_get($page, 'thumbnail'),
+                    data_get($page, 'thumbnail_url'),
+                    data_get($page, 'thumbnailUrl'),
+                    data_get($page, 'image'),
+                    data_get($page, 'image_url'),
+                    data_get($page, 'imageUrl'),
+                ];
+            };
+
+            $frontCandidates = [
+                $template->front_image,
+                data_get($template, 'preview_front'),
+                data_get($metadata, 'front_image'),
+                data_get($metadata, 'preview_front'),
+                data_get($design, 'front_image'),
+                data_get($design, 'preview_front'),
+                data_get($design, 'front.preview'),
+                $template->preview,
+                $template->image,
+            ];
+
+            $backCandidates = [
+                $template->back_image,
+                data_get($template, 'preview_back'),
+                data_get($metadata, 'back_image'),
+                data_get($metadata, 'preview_back'),
+                data_get($design, 'back_image'),
+                data_get($design, 'preview_back'),
+                data_get($design, 'back.preview'),
+            ];
+
+            foreach ($pages as $index => $page) {
+                $side = strtolower((string) data_get($page, 'side', ''));
+                $sources = $collectPageSources($page);
+
+                if ($side === 'front' || ($side === '' && $index === 0)) {
+                    $frontCandidates = array_merge($frontCandidates, $sources);
+                }
+
+                if ($side === 'back' || ($side === '' && $index === 1)) {
+                    $backCandidates = array_merge($backCandidates, $sources);
+                }
+            }
+
+            $front = $resolveCandidate($frontCandidates);
+            $back = $resolveCandidate($backCandidates);
+            $preview = $resolveCandidate([
+                $template->preview,
+                data_get($design, 'preview'),
+                data_get($metadata, 'preview'),
+                $front,
+            ]);
+
+            return [
+                'front' => $front,
+                'back' => $back,
+                'preview' => $preview ?? $front,
+            ];
+        };
+
         // Handle image upload
         $imagePath = null;
         if ($request->hasFile('image')) {
@@ -353,7 +532,7 @@ class ProductController extends Controller
         // Create or update product and related records inside a transaction
         $product = null;
         $previousTemplateId = null;
-        DB::transaction(function() use ($request, $validated, $imagePath, &$product, &$previousTemplateId) {
+        DB::transaction(function() use ($request, $validated, $imagePath, &$product, &$previousTemplateId, $resolveTemplatePreviews) {
             $leadTimeInput = $validated['lead_time'] ?? null;
             $leadTimeDays = is_numeric($leadTimeInput) ? (int) $leadTimeInput : null;
 
@@ -599,11 +778,7 @@ class ProductController extends Controller
 
                 // If no preview images provided but we have template data, use template images
                 if (empty(array_filter($previewData)) && $template) {
-                    $previewData = [
-                        'front' => $template->front_image,
-                        'back' => $template->back_image,
-                        'preview' => $template->front_image, // Use front image as preview if no specific preview
-                    ];
+                    $previewData = $resolveTemplatePreviews($template);
                 }
 
                 $hasPreviewValues = array_filter($previewData, fn ($value) => !empty($value));
