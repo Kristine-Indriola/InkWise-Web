@@ -168,7 +168,7 @@ class CustomerProfileController extends Controller
             abort(403);
         }
 
-        $cancellableStatuses = ['pending', 'awaiting_payment', 'in_production'];
+        $cancellableStatuses = ['draft', 'pending', 'processing'];
 
         if (!in_array($order->status, $cancellableStatuses, true)) {
             $errorMessage = 'Order can no longer be cancelled at this stage. Please contact InkWise support for assistance.';
@@ -371,6 +371,7 @@ class CustomerProfileController extends Controller
         ]);
 
         $statusOptions = [
+            'draft' => 'New Order',
             'pending' => 'Order Received',
             'processing' => 'Processing',
             'in_production' => 'In Production',
@@ -379,7 +380,7 @@ class CustomerProfileController extends Controller
             'cancelled' => 'Cancelled',
         ];
 
-        $statusFlow = ['pending', 'processing', 'in_production', 'confirmed', 'completed'];
+        $statusFlow = ['draft', 'pending', 'processing', 'in_production', 'confirmed', 'completed'];
 
         return view('customer.profile.purchase.order_details', compact('order', 'statusOptions', 'statusFlow'));
     }
@@ -416,6 +417,7 @@ class CustomerProfileController extends Controller
         ]);
 
         $statusOptions = [
+            'draft' => 'New Order',
             'pending' => 'Order Received',
             'processing' => 'Processing',
             'in_production' => 'In Production',
@@ -424,7 +426,7 @@ class CustomerProfileController extends Controller
             'cancelled' => 'Cancelled',
         ];
 
-        $statusFlow = ['pending', 'processing', 'in_production', 'confirmed', 'completed'];
+        $statusFlow = ['draft', 'pending', 'processing', 'in_production', 'confirmed', 'completed'];
 
         $settings = SiteSetting::current();
 

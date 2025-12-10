@@ -1,10 +1,34 @@
-@extends('layouts.admin')
+@extends('layouts.owner.app')
 
 @section('title', 'Site Content')
 
 @push('styles')
 <link rel="stylesheet" href="{{ asset('css/admin-css/site-content.css') }}">
 <style>
+.owner-site-content-clone-active {
+  background: #f4f6f9 !important;
+  color: #0f172a;
+}
+
+.owner-site-content-clone-wrapper,
+.owner-site-content-clone-wrapper * {
+  font-family: 'Nunito', sans-serif !important;
+  box-sizing: border-box;
+}
+
+.owner-site-content-clone-wrapper {
+  position: relative;
+  z-index: 1;
+}
+
+.owner-site-content-clone-wrapper::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(120deg, #eef2ff 0%, #fef3f7 50%, #f0f9ff 100%);
+  z-index: -1;
+}
+
 .content-preview {
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
   border: 1px solid #e2e8f0;
@@ -59,12 +83,160 @@
 .about-section::before {
   background: linear-gradient(90deg, #8b5cf6, #7c3aed);
 }
+
+.owner-site-content-clone-wrapper {
+  margin-left: var(--owner-sidebar-width, 230px);
+  padding: calc(var(--owner-topbar-height, 64px) + 24px) clamp(8px, 6vw, 28px) 32px;
+  min-height: 100vh;
+  background: #f4f6f9;
+  transition: margin-left 0.32s ease;
+}
+
+body.sidebar-collapsed .owner-site-content-clone-wrapper {
+  margin-left: var(--owner-sidebar-collapsed-width, 70px);
+}
+
+.owner-site-content-clone {
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
+  background: transparent;
+}
+
+.owner-site-content-clone .page-header {
+  margin-bottom: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.owner-site-content-clone .content-form {
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 185, 255, 0.24);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.08);
+  padding: 32px;
+}
+
+.owner-site-content-clone .page-title {
+  font-size: clamp(28px, 4vw, 36px);
+  font-weight: 800;
+  margin-bottom: 8px;
+  color: #0f172a;
+}
+
+.owner-site-content-clone .page-subtitle {
+  font-size: 16px;
+  color: #475569;
+  margin: 0;
+}
+
+.owner-site-content-clone .header-actions .last-updated {
+  font-size: 13px;
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-weight: 600;
+}
+
+.owner-site-content-clone .alert {
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #4facfe, #00f2fe);
+  color: #fff;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+}
+
+.owner-site-content-clone .card {
+  border: none;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 28px 40px rgba(15, 23, 42, 0.12);
+  margin-bottom: 32px;
+}
+
+.owner-site-content-clone .card-header {
+  border-bottom: none;
+  padding: 32px 32px 0;
+}
+
+.owner-site-content-clone .card-body {
+  padding: 32px;
+}
+
+.owner-site-content-clone .form-field input,
+.owner-site-content-clone .form-field textarea {
+  border: 2px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 16px 18px;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  background: #fff;
+}
+
+.owner-site-content-clone .form-field input:focus,
+.owner-site-content-clone .form-field textarea:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+.owner-site-content-clone .btn-primary {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border: none;
+  border-radius: 999px;
+  padding: 16px 32px;
+  font-size: 15px;
+  font-weight: 700;
+  box-shadow: 0 18px 30px rgba(99, 102, 241, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.owner-site-content-clone .btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 24px 36px rgba(99, 102, 241, 0.4);
+}
+
+.owner-site-content-clone .form-actions {
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: linear-gradient(135deg, #eef2ff, #f8fafc);
+}
+
+
+.owner-site-content-clone-active .content-form .field-help {
+  color: #64748b;
+}
+
+body.owner-layout {
+  background: #f4f6f9;
+  font-family: 'Nunito', sans-serif;
+  color: #0f172a;
+}
+
+@media (max-width: 1024px) {
+  .owner-site-content-clone-wrapper {
+    margin-left: 0;
+    padding: calc(var(--owner-topbar-height, 64px) + 16px) clamp(12px, 4vw, 24px) 28px;
+  }
+}
+
+@media (max-width: 600px) {
+  .owner-site-content-clone .content-form {
+    padding: 20px;
+  }
+}
 </style>
 @endpush
 
 @section('content')
+@include('layouts.owner.sidebar')
 
-<div class="page-header">
+<section class="owner-site-content-clone-wrapper" role="main">
+  <div class="owner-site-content-clone">
+    <div class="page-header">
   <div>
     <h1 class="page-title">Site Content</h1>
     <p class="page-subtitle">Update the information displayed on the customer "About" and "Contact" sections.</p>
@@ -86,6 +258,17 @@
   @method('PUT')
 
   <section class="card form-section contact-section">
+    <header class="card-header">
+      <div>
+        <span class="section-badge">
+          <svg class="field-icon" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path>
+          </svg>
+          Contact Section
+        </span>
+        <h2>Contact Information</h2>
+        <p>Manage the contact details and information displayed to your customers.</p>
+      </div>
     </header>
     <div class="card-body" style="display: grid; grid-template-columns: 1fr 2fr; gap: 24px;">
       <div class="content-preview">
@@ -167,7 +350,9 @@
         @enderror
       </div>
     </div>
-  </section>  <section class="card form-section about-section">
+  </section>
+
+  <section class="card form-section about-section">
     <header class="card-header">
       <div>
         <span class="section-badge">
@@ -224,12 +409,20 @@
       </button>
     </div>
   </div>
-      </form>
+  </form>
+    </div>
+  </section>
 @endsection
 
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  document.body.classList.add('owner-site-content-clone-active');
+
+  window.addEventListener('beforeunload', function() {
+    document.body.classList.remove('owner-site-content-clone-active');
+  });
+
     // Real-time preview updates
     const fields = [
         { input: 'contact_heading', preview: '.contact-section .content-preview strong' },

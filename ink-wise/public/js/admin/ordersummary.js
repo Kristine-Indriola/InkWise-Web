@@ -624,5 +624,63 @@
         }
       });
     });
+
+    // Archive order handler
+    page.querySelectorAll('.btn-archive').forEach((button) => {
+      button.addEventListener('click', () => {
+        const orderId = button.dataset.orderId;
+        if (!orderId) return;
+        if (!confirm('Archive this order? This will hide it from the active orders list.')) return;
+
+        const tokenMeta = document.querySelector('meta[name="csrf-token"]');
+        const token = tokenMeta ? tokenMeta.getAttribute('content') : null;
+        fetch('/staff/orders/' + orderId + '/archive', {
+          method: 'PATCH',
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': token || '',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+          }
+        }).then(async resp => {
+          const contentType = resp.headers.get('content-type') || '';
+          let body = null;
+          if (contentType.indexOf('application/json') !== -1) {
+            body = await resp.json().catch(() => null);
+          } else {
+            body = await resp.text().catch(() => null);
+          }
+
+          if (resp.ok) {
+            showToast('Order archived successfully.', toastEl);
+            // Redirect back to order list after a short delay
+            setTimeout(() => {
+              window.location.href = '{{ $ordersIndexUrl }}';
+            }, 1500);
+            return;
+          }
+
+          if (resp.status === 419) {
+            alert('Session expired or CSRF token mismatch. Please refresh the page and try again.');
+            return;
+          }
+          if (resp.status === 403) {
+            alert((body && body.error) ? body.error : 'You are not authorized to archive this order.');
+            return;
+          }
+          if (resp.status >= 300 && resp.status < 400) {
+            alert('Server redirected — you may need to login.');
+            return;
+          }
+
+          const errMsg = (body && (body.error || body.message)) ? (body.error || body.message) : (typeof body === 'string' ? body : 'Unknown error');
+          alert('Failed to archive order: ' + errMsg);
+        }).catch(err => {
+          alert('Network error while archiving order');
+          console.error(err);
+        });
+      });
+    });
   });
 })();

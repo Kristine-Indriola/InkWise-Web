@@ -121,6 +121,8 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
 
         $orders = \App\Models\Order::query()
             ->select(['id', 'order_number', 'customer_id', 'total_amount', 'order_date', 'status', 'payment_status'])
+            ->where('archived', false)
+            ->with(['customer'])
             ->latest('order_date')
             ->latest()
             ->paginate($perPage)
@@ -129,6 +131,30 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         // Render the table view inside the ordersummary folder
         return view('admin.ordersummary.tables', compact('orders'));
     })->name('orders.index');
+
+    // Archived orders
+    Route::get('/orders/archived', function () {
+        $allowed = [10, 20, 25, 50, 100];
+        $default = 20;
+        $perPage = (int) request()->query('per_page', $default);
+        if (!in_array($perPage, $allowed, true)) {
+            $perPage = $default;
+        }
+
+        $orders = \App\Models\Order::query()
+            ->select(['id', 'order_number', 'customer_id', 'total_amount', 'order_date', 'status', 'payment_status'])
+            ->where('archived', true)
+            ->with(['customer', 'activities' => function ($query) {
+                $query->latest()->limit(1); // Get the most recent activity
+            }])
+            ->latest('order_date')
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        // Render the archived table view
+        return view('admin.ordersummary.archived', compact('orders'));
+    })->name('orders.archived');
 
     // Delete an order (AJAX / API-friendly)
     Route::get('/orders/{order}/status', [\App\Http\Controllers\Admin\OrderController::class, 'editStatus'])
@@ -139,8 +165,9 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         ->name('orders.payment.edit');
     Route::put('/orders/{order}/payment', [\App\Http\Controllers\Admin\OrderController::class, 'updatePayment'])
         ->name('orders.payment.update');
-    Route::delete('/orders/{order}', [\App\Http\Controllers\Admin\OrderController::class, 'destroy'])
-        ->name('orders.destroy');
+    // Archive an order (AJAX / API-friendly)
+    Route::patch('/orders/{order}/archive', [\App\Http\Controllers\Admin\OrderController::class, 'archive'])
+        ->name('orders.archive');
 
     // Payments
     Route::get('/payments', [\App\Http\Controllers\Admin\PaymentController::class, 'index'])
@@ -862,6 +889,8 @@ Route::prefix('staff')->name('staff.')->middleware(\App\Http\Middleware\RoleMidd
     Route::put('/orders/{id}/status', [StaffOrderController::class, 'updateStatus'])->name('orders.status.update');
     Route::get('/orders/{id}/payment', [StaffOrderController::class, 'editPayment'])->name('orders.payment.edit');
     Route::put('/orders/{id}/payment', [StaffOrderController::class, 'updatePayment'])->name('orders.payment.update');
+    Route::patch('/orders/{order}/archive', [StaffOrderController::class, 'archive'])->name('orders.archive');
+    Route::get('/orders/archived', [StaffOrderController::class, 'archived'])->name('orders.archived');
     Route::get('/notify-customers', fn () => view('staff.notify_customers'))->name('notify.customers');
     Route::get('/profile/edit', [StaffProfileController::class, 'edit'])->name('profile.edit');
     Route::post('/profile/update', [StaffProfileController::class, 'update'])->name('profile.update');

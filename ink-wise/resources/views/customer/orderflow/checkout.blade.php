@@ -705,6 +705,7 @@
     $pendingPaymentUrl = $paymongoMeta['next_action_url'] ?? null;
     $paymentMode = $paymongoMeta['mode'] ?? 'half';
     $isFullyPaid = $balanceDueDisplay <= 0.01;
+    $hasRemainingBalance = !$isFullyPaid;
     $formatPaymentDate = static function ($date) {
         try {
             return $date ? \Illuminate\Support\Carbon::parse($date)->format('M j, Y g:i A') : null;
@@ -1013,16 +1014,22 @@
                 <span>Total paid via GCash</span>
                 <strong id="paidAmount">₱{{ number_format($paidAmountDisplay, 2) }}</strong>
             </div>
+            @if(!$isFullyPaid)
             <div class="summary-item">
                 <span>Balance remaining</span>
                 <strong id="balanceAmount">₱{{ number_format($balanceDueDisplay, 2) }}</strong>
             </div>
+            @endif
             <div class="summary-total">
                 <span>Total due</span>
                 <span id="grandTotal">₱{{ number_format($totalAmount, 2) }}</span>
             </div>
             <div id="paymentAlert" class="payment-alert"></div>
+            @if($isFullyPaid)
+            <p class="note">Order fully paid. Recorded payments total ₱{{ number_format($paidAmountDisplay, 2) }}.</p>
+            @else
             <p class="note">Recorded payments total ₱{{ number_format($paidAmountDisplay, 2) }}. Outstanding balance: ₱{{ number_format($balanceDueDisplay, 2) }}.</p>
+            @endif
         </aside>
     </div>
 

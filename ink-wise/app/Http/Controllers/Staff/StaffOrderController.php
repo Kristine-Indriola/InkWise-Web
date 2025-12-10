@@ -22,6 +22,8 @@ class StaffOrderController extends Controller
 
         $ordersQuery = Order::query()
             ->select(['id', 'order_number', 'customer_order_id', 'customer_id', 'total_amount', 'order_date', 'status', 'payment_status', 'created_at'])
+            ->where('archived', false)
+            ->with(['customer'])
             ->latest('order_date')
             ->latest();
 
@@ -30,7 +32,7 @@ class StaffOrderController extends Controller
         }
 
         // Calculate status counts from all orders (not just paginated)
-        $allOrdersQuery = Order::query()->select('status');
+        $allOrdersQuery = Order::query()->select('status')->where('archived', false);
         if ($statusFilter && $statusFilter !== 'all') {
             $allOrdersQuery->where('status', $statusFilter);
         }
@@ -193,6 +195,80 @@ class StaffOrderController extends Controller
             ->with('success', 'Order status updated successfully.');
     }
 
+    public function archive(Request $request, Order $order)
+    {
+        // Only allow archiving cancelled or completed orders
+        if (!in_array(strtolower($order->status), ['cancelled', 'completed'])) {
+            return response()->json(['error' => 'Only cancelled or completed orders can be archived'], 400);
+        }
+
+        try {
+            $order->update(['archived' => true]);
+            
+            // Log the archive activity
+            $user = Auth::user();
+            $userName = 'System';
+            if ($user) {
+                $userName = $user->name ?? $user->email ?? 'Staff';
+            }
+            
+            \App\Models\OrderActivity::create([
+                'order_id' => $order->id,
+                'activity_type' => 'order_archived',
+                'old_value' => 'active',
+                'new_value' => 'archived',
+                'description' => 'Order archived',
+                'user_id' => $user ? $user->user_id : null,
+                'user_name' => $userName,
+                'user_role' => 'Staff',
+            ]);
+            
+            return response()->json(['success' => true], 200);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Unable to archive order'], 500);
+        }
+    }
+
+    public function archived(Request $request)
+    {
+        $statusFilter = $request->query('status');
+
+        $ordersQuery = Order::query()
+            ->select(['id', 'order_number', 'customer_order_id', 'customer_id', 'total_amount', 'order_date', 'status', 'payment_status', 'created_at'])
+            ->where('archived', true)
+            ->with(['customer', 'activities' => function ($query) {
+                $query->latest()->limit(1); // Get the most recent activity
+            }])
+            ->latest('order_date')
+            ->latest();
+
+        if ($statusFilter && $statusFilter !== 'all') {
+            $ordersQuery->where('status', $statusFilter);
+        }
+
+        // Calculate status counts from archived orders
+        $allOrdersQuery = Order::query()->select('status')->where('archived', true);
+        if ($statusFilter && $statusFilter !== 'all') {
+            $allOrdersQuery->where('status', $statusFilter);
+        }
+        $statusCounts = $allOrdersQuery->get()->groupBy('status')->map->count();
+
+        $orders = $ordersQuery->paginate(10)->through(function (Order $order) {
+            $order->display_customer_name = $this->formatCustomerName($order->effective_customer);
+            $order->display_items_count = $this->calculateItemsCount($order);
+            $order->display_total_amount = (float) ($order->total_amount ?? 0);
+            return $order;
+        });
+
+        return view('staff.order_list', [
+            'orders' => $orders,
+            'statusFilter' => $statusFilter,
+            'statusOptions' => $this->statusOptions(),
+            'statusCounts' => $statusCounts,
+            'isArchived' => true,
+        ]);
+    }
+
     public function update(Request $request, Order $order)
     {
         $allowedStatuses = array_keys($this->statusOptions());
@@ -227,9 +303,83 @@ class StaffOrderController extends Controller
             ->with('success', 'Order status updated successfully.');
     }
 
-    protected function statusOptions(): array 
+    protected function paymentStatusOptions(): array
     {
         return [
+            'pending' => 'Pending',
+            'paid' => 'Paid',
+            'failed' => 'Failed',
+            'refunded' => 'Refunded',
+        ];
+    }
+
+    public function editPayment(Order $order)
+    {
+        $order->loadMissing(['payments', 'rating']);
+
+        $paymentStatusOptions = $this->paymentStatusOptions();
+        $metadata = $this->normalizeMetadata($order->metadata);
+
+        return view('admin.orders.manage-payment', [
+            'order' => $order,
+            'paymentStatusOptions' => $paymentStatusOptions,
+            'metadata' => $metadata,
+        ]);
+    }
+
+    public function updatePayment(Request $request, Order $order)
+    {
+        $allowedPaymentStatuses = array_keys($this->paymentStatusOptions());
+
+        $validated = $request->validate([
+            'payment_status' => ['required', Rule::in($allowedPaymentStatuses)],
+            'payment_note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        try {
+            $oldPaymentStatus = $order->payment_status;
+            $order->payment_status = $validated['payment_status'];
+
+            $metadata = $this->normalizeMetadata($order->metadata);
+
+            if (array_key_exists('payment_note', $validated)) {
+                $metadata['payment_note'] = $validated['payment_note'] ?: null;
+            }
+
+            $order->metadata = array_filter($metadata, function ($value) {
+                return $value !== null && $value !== '';
+            });
+
+            $saved = $order->save();
+
+            if (!$saved) {
+                return redirect()
+                    ->back()
+                    ->withInput()
+                    ->with('error', 'Failed to update payment status. Please try again.');
+            }
+
+            return redirect()
+                ->route('staff.orders.payment.edit', $order->id)
+                ->with('success', 'Payment status updated successfully.');
+        } catch (\Exception $e) {
+            \Log::error('Failed to update payment status', [
+                'order_id' => $order->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', 'An error occurred while updating payment status: ' . $e->getMessage());
+        }
+    }
+
+    protected function statusOptions(): array
+    {
+        return [
+            'draft' => 'New Order',
             'pending' => 'Order Received',
             'processing' => 'Processing',
             'in_production' => 'In Progress',
@@ -241,7 +391,7 @@ class StaffOrderController extends Controller
 
     protected function statusFlow(): array
     {
-        return ['pending', 'processing', 'in_production', 'confirmed', 'completed'];
+        return ['draft', 'pending', 'processing', 'in_production', 'confirmed', 'completed'];
     }
 
     protected function normalizeMetadata($metadata): array
