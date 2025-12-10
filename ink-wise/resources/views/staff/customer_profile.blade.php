@@ -61,10 +61,10 @@
                             <td class="profile-pic-cell">
                                 <img src="{{ $customer->profile_picture ?? 'https://via.placeholder.com/50' }}" alt="Profile" class="profile-pic">
                             </td>
-                            <td class="customer-name">{{ $customer->name }}</td>
+                            <td class="customer-name">{{ $customer->customer ? ($customer->customer->first_name . ' ' . $customer->customer->last_name) : ($customer->name ?? 'N/A') }}</td>
                             <td>{{ $customer->email }}</td>
-                            <td>{{ $customer->contact_number ?? '—' }}</td>
-                            <td>{{ $customer->address ?? '—' }}</td>
+                            <td>{{ $customer->customer->contact_number ?? '—' }}</td>
+                            <td>{{ $customer->address ? ($customer->address->street . ', ' . $customer->address->city . ', ' . $customer->address->province) : '—' }}</td>
                             <td>{{ $customer->created_at->format('M d, Y') }}</td>
                         </tr>
                     @empty
