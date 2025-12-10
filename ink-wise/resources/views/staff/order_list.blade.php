@@ -145,6 +145,12 @@
     border: 1px solid #f59e0b;
   }
 
+  .status-badge.status-draft {
+    background: #e0e7ff;
+    color: #5b21b6;
+    border: 1px solid #8b5cf6;
+  }
+
   .status-badge.status-processing,
   .status-badge.status-in_production {
     background: #dbeafe;
@@ -211,19 +217,26 @@
 <main class="admin-page-shell">
   <header class="page-header">
     <div>
-      <h1 class="page-title">Orders</h1>
-      <p class="page-subtitle">All orders in the system. Use the table to inspect and navigate to individual order summaries.</p>
+      <h1 class="page-title">{{ isset($isArchived) && $isArchived ? 'Archived Orders' : 'Orders' }}</h1>
+      <p class="page-subtitle">{{ isset($isArchived) && $isArchived ? 'Archived cancelled and completed orders.' : 'All orders in the system. Use the table to inspect and navigate to individual order summaries.' }}</p>
     </div>
     <div class="page-header__quick-actions">
-      <a href="#" class="pill-link">Export</a>
+      @if(isset($isArchived) && $isArchived)
+        <a href="{{ route('staff.order_list.index') }}" class="pill-link">Active Orders</a>
+      @else
+        <a href="{{ route('staff.orders.archived') }}" class="pill-link">Archived Orders</a>
+        <a href="#" class="pill-link">Export</a>
+      @endif
     </div>
   </header>
 
+  @if(!isset($isArchived) || !$isArchived)
   <!-- Summary cards + controls -->
   <section class="orders-controls">
     <div class="summary-cards">
       @php
         $totalOrders = $orders->total();
+        $draftCount = $statusCounts->get('draft', 0);
         $pendingCount = $statusCounts->get('pending', 0);
         $processingCount = $statusCounts->get('processing', 0);
         $inProductionCount = $statusCounts->get('in_production', 0);
@@ -238,6 +251,12 @@
         <div class="summary-card" data-summary-count="{{ $totalOrders }}">
           <div class="summary-card__label">Total orders</div>
           <div class="summary-card__value">{{ $totalOrders }}</div>
+        </div>
+      </button>
+      <button type="button" class="summary-card-button" data-summary-filter="draft" data-summary-label="New Orders" data-summary-description="Fresh orders that need attention.">
+        <div class="summary-card" data-summary-count="{{ $draftCount }}">
+          <div class="summary-card__label">New Orders</div>
+          <div class="summary-card__value">{{ $draftCount }}</div>
         </div>
       </button>
       <button type="button" class="summary-card-button" data-summary-filter="pending" data-summary-label="Pending" data-summary-description="Orders awaiting confirmation or updates.">
@@ -278,6 +297,7 @@
 
     {{-- controls moved into the table container for closer context --}}
   </section>
+  @endif
 
   <section class="card">
     <div class="card-body">
@@ -312,6 +332,9 @@
                 <th scope="col">Payment</th>
                 <th scope="col">Status</th>
                 <th scope="col">Placed</th>
+                @if(isset($isArchived) && $isArchived)
+                  <th scope="col">Archived By</th>
+                @endif
                 <th scope="col">Actions</th>
               </tr>
             </thead>
@@ -338,25 +361,31 @@
                     @php
                       $orderStatus = strtolower($order->status ?? 'processing');
                       $statusClass = 'status-' . $orderStatus;
+                      $statusLabel = $statusOptions[$orderStatus] ?? ucfirst(str_replace('_', ' ', $orderStatus));
                     @endphp
                     <span class="status-badge {{ $statusClass }}">
-                      {{ ucfirst(str_replace('_', ' ', $orderStatus)) }}
+                      {{ $statusLabel }}
                     </span>
                   </td>
                   <td>{{ optional($order->order_date)->format('M j, Y') ?? optional($order->created_at)->format('M j, Y') }}</td>
+                  @if(isset($isArchived) && $isArchived)
+                    <td>
+                      @php
+                        $latestActivity = $order->activities->first();
+                        $archivedBy = $latestActivity ? ($latestActivity->user_name ?? 'System') : 'Unknown';
+                      @endphp
+                      {{ $archivedBy }}
+                    </td>
+                  @endif
                   <td class="actions-cell">
                     <a href="{{ route('staff.orders.summary', ['id' => $order->id]) }}" class="btn btn-outline btn-sm btn-icon" aria-label="View order {{ $order->order_number ?? $order->id }}">
                       <i class="fa-solid fa-eye" aria-hidden="true"></i>
                     </a>
-                    <a href="{{ route('staff.orders.status.edit', ['id' => $order->id]) }}" class="btn btn-outline btn-sm btn-icon" aria-label="Manage status for order {{ $order->order_number ?? $order->id }}" title="Update status">
-                      <i class="fa-solid fa-bars-progress" aria-hidden="true"></i>
-                    </a>
-                    <a href="{{ route('staff.orders.payment.edit', ['id' => $order->id]) }}" class="btn btn-outline btn-sm btn-icon" aria-label="Manage payment for order {{ $order->order_number ?? $order->id }}" title="Update payment">
-                      <i class="fa-solid fa-credit-card" aria-hidden="true"></i>
-                    </a>
-                    <button type="button" class="btn btn-outline btn-sm btn-icon btn-delete" data-order-id="{{ $order->id }}" aria-label="Delete order {{ $order->order_number ?? $order->id }}" title="Delete order">
-                      <i class="fa-solid fa-trash" aria-hidden="true"></i>
-                    </button>
+                    @if(in_array(strtolower($order->status ?? ''), ['cancelled', 'completed']))
+                      <button type="button" class="btn btn-outline btn-sm btn-icon btn-archive" data-order-id="{{ $order->id }}" aria-label="Archive order {{ $order->order_number ?? $order->id }}" title="Archive order">
+                        <i class="fa-solid fa-archive" aria-hidden="true"></i>
+                      </button>
+                    @endif
                   </td>
                 </tr>
               @endforeach
@@ -409,6 +438,7 @@
 
     const statusMap = {
       all: null,
+      draft: ['draft'],
       pending: ['pending'],
       in_progress: ['processing', 'in_production'],
       ready_pickup: ['confirmed'],
@@ -426,6 +456,7 @@
     function computeCounts() {
       const counts = {
         total: 0,
+        draft: 0,
         pending: 0,
         in_progress: 0,
         ready_pickup: 0,
@@ -442,6 +473,7 @@
         }
         const status = row.dataset.status || 'processing';
         counts.total += 1;
+        if (status === 'draft') counts.draft += 1;
         if (status === 'pending') counts.pending += 1;
         if (inProgressStatuses.includes(status)) counts.in_progress += 1;
         if (readyPickupStatuses.includes(status)) counts.ready_pickup += 1;
@@ -454,6 +486,7 @@
 
     function getCountForFilter(filterKey, counts) {
       switch (filterKey) {
+        case 'draft': return counts.draft;
         case 'pending': return counts.pending;
         case 'in_progress': return counts.in_progress;
         case 'ready_pickup': return counts.ready_pickup;

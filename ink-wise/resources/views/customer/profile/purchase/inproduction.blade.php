@@ -15,6 +15,7 @@
 
     @php
         $statusOptions = [
+            'draft' => 'Pending',
             'pending' => 'Order Received',
             'processing' => 'Processing',
             'in_production' => 'In Production',
@@ -22,7 +23,7 @@
             'completed' => 'Completed',
             'cancelled' => 'Cancelled',
         ];
-        $statusFlow = ['pending', 'processing', 'in_production', 'confirmed', 'completed'];
+        $statusFlow = ['draft', 'pending', 'processing', 'in_production', 'confirmed', 'completed'];
         $normalizeMetadata = function ($metadata) {
             if (is_array($metadata)) {
                 return $metadata;
@@ -41,7 +42,7 @@
         $ordersSource = $orders ?? optional(auth()->user())->customer->orders ?? [];
         $inProductionOrders = collect($ordersSource)->filter(function ($order) {
             $status = data_get($order, 'status', 'pending');
-            return in_array($status, ['in_production', 'processing'], true);
+            return !in_array($status, ['completed', 'cancelled'], true);
         })->values();
     @endphp
 
@@ -64,7 +65,7 @@
                 $metadata = $normalizeMetadata(data_get($order, 'metadata', []));
                 $statusKey = data_get($order, 'status', 'pending');
                 $statusLabel = $statusOptions[$statusKey] ?? ucfirst(str_replace('_', ' ', $statusKey));
-                $customerCanCancel = $statusKey === 'in_production';
+                $customerCanCancel = in_array($statusKey, ['draft', 'pending', 'processing']);
                 $flowIndex = array_search($statusKey, $statusFlow, true);
                 $nextStatusKey = $flowIndex !== false && $flowIndex < count($statusFlow) - 1 ? $statusFlow[$flowIndex + 1] : null;
                 $nextStatusLabel = $nextStatusKey ? ($statusOptions[$nextStatusKey] ?? ucfirst(str_replace('_', ' ', $nextStatusKey))) : null;
@@ -92,16 +93,21 @@
                 </div>
                 <div class="flex flex-col items-end gap-2">
                     <div class="text-gray-700 font-bold">₱{{ number_format($totalAmount, 2) }}</div>
+                    @php
+                        // Check if order has remaining balance to pay
+                        $hasRemainingBalance = false;
+                        $metadata = $normalizeMetadata(data_get($order, 'metadata', []));
+                        $payments = collect($metadata['payments'] ?? []);
+                        $paidAmount = $payments->filter(fn($payment) => ($payment['status'] ?? null) === 'paid')->sum(fn($payment) => (float)($payment['amount'] ?? 0));
+                        $remainingBalance = max(($totalAmount ?? 0) - $paidAmount, 0);
+                        $hasRemainingBalance = $remainingBalance > 0.01; // More than 1 cent remaining
+                    @endphp
+                    @if($hasRemainingBalance)
+                    <div class="text-sm text-red-500">Balance remaining: ₱{{ number_format($remainingBalance, 2) }}</div>
+                    @else
+                    <div class="text-sm text-green-500">Fully paid</div>
+                    @endif
                     <div class="flex gap-2">
-                        @php
-                            // Check if order has remaining balance to pay
-                            $hasRemainingBalance = false;
-                            $metadata = $normalizeMetadata(data_get($order, 'metadata', []));
-                            $payments = collect($metadata['payments'] ?? []);
-                            $paidAmount = $payments->filter(fn($payment) => ($payment['status'] ?? null) === 'paid')->sum(fn($payment) => (float)($payment['amount'] ?? 0));
-                            $remainingBalance = max(($totalAmount ?? 0) - $paidAmount, 0);
-                            $hasRemainingBalance = $remainingBalance > 0.01; // More than 1 cent remaining
-                        @endphp
 
                         @if($hasRemainingBalance)
                         <a href="{{ route('customer.pay.remaining.balance', ['order' => data_get($order, 'id')]) }}"
@@ -223,10 +229,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            // Show warning for orders in production
+            // Show confirmation for cancelling order
             const confirmed = confirm(
-                'This order is already in production. Cancelling may result in a restocking fee or partial refund.\n\n' +
-                'Are you sure you want to cancel this order? For immediate assistance, please contact InkWise support.'
+                'Are you sure you want to cancel this order? This action cannot be undone and may result in cancellation fees or loss of deposit.\n\n' +
+                'For immediate assistance, please contact InkWise support.'
             );
 
             if (!confirmed) {

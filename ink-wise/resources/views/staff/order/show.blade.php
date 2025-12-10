@@ -497,6 +497,7 @@
 	$ordersBackUrl = $statusManageUrl ?? $ordersIndexUrl;
 
 	$statusOptions = [
+		'draft' => 'New Order',
 		'pending' => 'Order Received',
 		'processing' => 'Processing',
 		'in_production' => 'In Progress',
@@ -504,7 +505,7 @@
 		'completed' => 'Completed',
 		'cancelled' => 'Cancelled',
 	];
-	$statusFlow = ['pending', 'processing', 'in_production', 'confirmed', 'completed'];
+	$statusFlow = ['draft', 'pending', 'processing', 'in_production', 'confirmed', 'completed'];
 	$currentStatus = strtolower((string) data_get($order, 'status', 'pending'));
 	$flowIndex = array_search($currentStatus, $statusFlow, true);
 	$currentChipModifier = str_replace('_', '-', $currentStatus);
@@ -565,6 +566,11 @@
 			<button type="button" class="btn btn-primary" data-order-action="print">
 				<i class="fi fi-rr-print" aria-hidden="true"></i> Print
 			</button>
+			@if(in_array(strtolower($order->status ?? 'processing'), ['cancelled', 'completed']))
+				<button type="button" class="btn btn-outline btn-archive" data-order-id="{{ $order->id }}" title="Archive order">
+					<i class="fa-solid fa-archive" aria-hidden="true"></i> Archive
+				</button>
+			@endif
 		</div>
 	</header>
 

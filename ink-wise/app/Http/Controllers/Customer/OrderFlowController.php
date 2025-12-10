@@ -1215,7 +1215,7 @@ class OrderFlowController extends Controller
             if ($order->status === 'cancelled') {
                 return redirect()->route('customer.my_purchase.cancelled');
             }
-            // For other statuses like 'pending', continue with checkout
+            // For other statuses like 'draft' or 'pending', continue with checkout
         }
 
         // If there is no persisted Order yet, but we have a session summary,
@@ -1238,7 +1238,7 @@ class OrderFlowController extends Controller
                     'customer_id' => $customerOrder->customer_id,
                     'user_id' => optional(Auth::user())->user_id,
                     'order_number' => $this->orderFlow->generateOrderNumber(),
-                    'status' => 'pending',
+                    'status' => 'draft',
                     'subtotal_amount' => $summary['subtotalAmount'] ?? 0,
                     'tax_amount' => $summary['taxAmount'] ?? 0,
                     'shipping_fee' => $summary['shippingFee'] ?? static::DEFAULT_SHIPPING_FEE,
@@ -1329,7 +1329,6 @@ class OrderFlowController extends Controller
         ];
 
         $order->update([
-            'status' => 'in_production',
             'payment_status' => 'paid',
             'metadata' => $metadata,
         ]);

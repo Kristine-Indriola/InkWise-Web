@@ -44,7 +44,7 @@ class AdminCustomerController extends Controller
         // Calculate statistics
         $totalOrders = $orders->count();
         $completedOrders = $orders->where('status', 'completed')->count();
-        $pendingOrders = $orders->whereIn('status', ['pending', 'processing', 'confirmed', 'in_production'])->count();
+        $pendingOrders = $orders->whereIn('status', ['draft', 'pending', 'processing', 'confirmed', 'in_production'])->count();
         $cancelledOrders = $orders->where('status', 'cancelled')->count();
         $totalSpent = $orders->where('status', 'completed')->sum('total_amount');
         

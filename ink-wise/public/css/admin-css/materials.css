@@ -186,6 +186,7 @@
 .summary-card-chip.warning { color: var(--warning); background: rgba(249, 115, 22, 0.16); }
 .summary-card-chip.danger { color: var(--danger); background: rgba(239, 68, 68, 0.16); }
 .summary-card-chip.accent { color: var(--accent-strong); background: rgba(148, 185, 255, 0.22); }
+.summary-card-chip.info { color: #06b6d4; background: rgba(6, 182, 212, 0.16); }
 
 .summary-card-value {
     font-size: 2.2rem;

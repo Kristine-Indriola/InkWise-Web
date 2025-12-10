@@ -49,6 +49,10 @@ class AdminController extends Controller
             ->where('status', 'pending')
             ->count();
 
+        $newOrders = Order::query()
+            ->where('status', 'draft')
+            ->count();
+
         $inventorySummary = $this->summariseInventory($materials);
 
         $dashboardMetrics = [
@@ -56,6 +60,7 @@ class AdminController extends Controller
             'revenueThisWeek' => round((float) $revenueThisWeek, 2),
             'averageOrderValue' => $averageOrderValue,
             'pendingOrders' => $pendingOrders,
+            'newOrders' => $newOrders,
             'lowStock' => $inventorySummary['lowStock'],
             'outOfStock' => $inventorySummary['outStock'],
             'totalStockUnits' => $inventorySummary['totalStock'],

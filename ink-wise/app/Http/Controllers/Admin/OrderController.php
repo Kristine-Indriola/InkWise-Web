@@ -23,7 +23,7 @@ class OrderController extends Controller
         $order->loadMissing('rating');
 
         $statusOptions = $this->statusOptions();
-        $statusFlow = ['pending', 'processing', 'in_production', 'confirmed', 'completed'];
+        $statusFlow = ['draft', 'pending', 'processing', 'in_production', 'confirmed', 'completed'];
         $metadata = $this->normalizeMetadata($order->metadata);
 
         return view('admin.orders.manage-status', [
@@ -183,19 +183,44 @@ class OrderController extends Controller
     /**
      * Remove the specified order from storage.
      */
-    public function destroy(Request $request, Order $order)
+    public function archive(Request $request, Order $order)
     {
+        // Only allow archiving cancelled or completed orders
+        if (!in_array(strtolower($order->status), ['cancelled', 'completed'])) {
+            return response()->json(['error' => 'Only cancelled or completed orders can be archived'], 400);
+        }
+
         try {
-            $order->delete();
+            $order->update(['archived' => true]);
+            
+            // Log the archive activity
+            $user = Auth::user();
+            $userName = 'System';
+            if ($user) {
+                $userName = $user->name ?? $user->email ?? 'Admin';
+            }
+            
+            \App\Models\OrderActivity::create([
+                'order_id' => $order->id,
+                'activity_type' => 'order_archived',
+                'old_value' => 'active',
+                'new_value' => 'archived',
+                'description' => 'Order archived',
+                'user_id' => $user ? $user->user_id : null,
+                'user_name' => $userName,
+                'user_role' => 'Admin',
+            ]);
+            
             return response()->json(['success' => true], 200);
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Unable to delete order'], 500);
+            return response()->json(['error' => 'Unable to archive order'], 500);
         }
     }
 
     protected function statusOptions(): array
     {
         return [
+            'draft' => 'New Order',
             'pending' => 'Order Received',
             'processing' => 'Processing',
             'in_production' => 'In Progress',
