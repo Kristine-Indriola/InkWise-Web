@@ -19,7 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const previewPlaceholder = '/images/placeholder.png';
   const storageKey = shell?.dataset?.storageKey ?? 'inkwise-finalstep';
-  const envelopeUrl = addToCartBtn?.dataset?.envelopeUrl ?? shell?.dataset?.envelopeUrl ?? '/order/envelope';
+  const envelopeUrl = shell?.dataset?.envelopeUrl ?? addToCartBtn?.dataset?.envelopeUrl ?? '/order/envelope';
+  const addToCartUrl = addToCartBtn?.dataset?.cartUrl ?? shell?.dataset?.cartUrl ?? '/order/addtocart';
   const allowFallbackSamples = shell?.dataset?.fallbackSamples === 'true';
   const finalStepSaveUrl = shell?.dataset?.saveUrl ?? null;
   const DEFAULT_TAX_RATE = 0;
@@ -775,10 +776,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    showToast('Added to cart — redirecting...');
+    showToast('Adding to cart — redirecting...');
 
     window.setTimeout(() => {
-      window.location.href = '/order/addtocart';
+      window.location.href = addToCartUrl;
     }, 600);
   });
 

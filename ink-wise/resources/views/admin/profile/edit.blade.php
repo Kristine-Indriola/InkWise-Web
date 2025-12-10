@@ -108,7 +108,7 @@
                 </div>
                 <div class="profile-field">
                     <label for="profileEmail">Email</label>
-                    <input id="profileEmail" type="email" name="email" value="{{ old('email', $admin->email ?? '') }}" class="profile-input" required>
+                    <input id="profileEmail" type="email" value="admin@example.com" class="profile-input" readonly>
                 </div>
                 <div class="profile-field">
                     <label for="profilePhone">Phone</label>
@@ -212,7 +212,6 @@ document.addEventListener('DOMContentLoaded', function() {
         form.addEventListener('submit', function(e) {
             const firstNameInput = document.getElementById('profileFirstName');
             const lastNameInput = document.getElementById('profileLastName');
-            const emailInput = document.getElementById('profileEmail');
             const passwordInput = document.getElementById('profilePassword');
             const passwordConfirmationInput = document.getElementById('profilePasswordConfirmation');
 
@@ -227,13 +226,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('Last name is required.');
                 e.preventDefault();
                 lastNameInput.focus();
-                return;
-            }
-
-            if (emailInput && emailInput.value.trim() === '') {
-                alert('Email is required.');
-                e.preventDefault();
-                emailInput.focus();
                 return;
             }
 

@@ -349,7 +349,17 @@
                         @if($canvasShapeAttr) data-canvas-shape="{{ $canvasShapeAttr }}" @endif
                         @if($canvasUnitAttr) data-canvas-unit="{{ $canvasUnitAttr }}" @endif
                     >
-                        <svg id="preview-svg" width="100%" height="100%" viewBox="0 0 433 559" preserveAspectRatio="xMidYMid meet"></svg>
+                        <svg
+                            id="preview-svg"
+                            width="100%"
+                            height="100%"
+                            @if($canvasWidthAttr && $canvasHeightAttr)
+                                viewBox="0 0 {{ $canvasWidthAttr }} {{ $canvasHeightAttr }}"
+                            @else
+                                viewBox="0 0 433 559"
+                            @endif
+                            preserveAspectRatio="xMidYMid meet"
+                        ></svg>
                     </div>
                 </div>
                 <div class="canvas-measure canvas-measure-horizontal" aria-hidden="true">

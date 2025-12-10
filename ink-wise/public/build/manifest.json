@@ -24,7 +24,7 @@
     "isEntry": true
   },
   "resources/css/customer/customer.css": {
-    "file": "assets/customer-BYbDMLiU.css",
+    "file": "assets/customer-D3miewRM.css",
     "src": "resources/css/customer/customer.css",
     "isEntry": true
   },
@@ -34,7 +34,7 @@
     "isEntry": true
   },
   "resources/css/customer/studio.css": {
-    "file": "assets/studio-PAITD9U9.css",
+    "file": "assets/studio-C2tpczYf.css",
     "src": "resources/css/customer/studio.css",
     "isEntry": true
   },
@@ -56,11 +56,14 @@
     "src": "resources/js/app.js",
     "isEntry": true
   },
-  "resources/js/customer/customer.js": {
-    "file": "assets/customer-DGU99OZZ.js",
+  "resources/js/customer/customer.jsx": {
+    "file": "assets/customer-lKXmFgIn.js",
     "name": "customer",
-    "src": "resources/js/customer/customer.js",
-    "isEntry": true
+    "src": "resources/js/customer/customer.jsx",
+    "isEntry": true,
+    "imports": [
+      "_client-Cv0X-2PX.js"
+    ]
   },
   "resources/js/customer/editing.js": {
     "file": "assets/editing-BjQi3bBh.js",
@@ -69,7 +72,7 @@
     "isEntry": true
   },
   "resources/js/customer/studio/main.jsx": {
-    "file": "assets/main-BEKVxjE3.js",
+    "file": "assets/main-DDDcRPyD.js",
     "name": "main",
     "src": "resources/js/customer/studio/main.jsx",
     "isEntry": true,
@@ -87,7 +90,7 @@
     "isEntry": true
   },
   "resources/js/staff/template-editor/main.jsx": {
-    "file": "assets/main-CAficTZv.js",
+    "file": "assets/main-BqUynN_C.js",
     "name": "main",
     "src": "resources/js/staff/template-editor/main.jsx",
     "isEntry": true,
@@ -101,7 +104,7 @@
       "resources/js/staff/template-editor/utils/recentImagesDB.js"
     ],
     "css": [
-      "assets/main-GFpeMJPp.css"
+      "assets/main-C1tHU29u.css"
     ]
   },
   "resources/js/staff/template-editor/utils/recentImagesDB.js": {
