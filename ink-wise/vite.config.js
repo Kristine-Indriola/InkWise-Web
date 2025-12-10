@@ -18,7 +18,7 @@ export default defineConfig({
         'resources/js/admin/template/editor.js',
         'resources/js/admin/template/template.js',
         'resources/js/customer/editing.js',
-        'resources/js/customer/customer.js',
+        'resources/js/customer/customer.jsx',
         'resources/js/customer/studio/main.jsx',
         'resources/js/customer/studio/svg-template-editor.jsx',
         'resources/js/staff/template-editor/main.jsx',

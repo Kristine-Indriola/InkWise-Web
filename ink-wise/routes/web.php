@@ -370,8 +370,9 @@ Route::get('/auth/google/callback', function () {
 */
 
 /**Dashboard & Home*/
-Route::get('/', fn () => view('customer.dashboard'))->name('dashboard');
-Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');  // Protected
+Route::redirect('/', '/landingpage');
+Route::get('/landingpage', fn () => view('customer.dashboard'))->name('dashboard');
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/landingpage/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');  // Protected
  Route::get('/search', function (\Illuminate\Http\Request $request) {
      return 'Search for: ' . e($request->query('query', ''));
  })->name('search');
@@ -389,7 +390,9 @@ Route::post('/customer/forgot-password', [App\Http\Controllers\Auth\CustomerPass
 Route::get('/customer/reset-password', [App\Http\Controllers\Auth\CustomerNewPasswordController::class, 'create'])->name('customer.password.reset');
 Route::post('/customer/reset-password', [App\Http\Controllers\Auth\CustomerNewPasswordController::class, 'store'])->name('customer.password.store');
 
-Route::get('/customer/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard.guest');
+Route::redirect('/dashboard', '/landingpage/dashboard');
+Route::redirect('/customer/dashboard', '/landingpage');
+Route::get('/landingpage/guest', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard.guest');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

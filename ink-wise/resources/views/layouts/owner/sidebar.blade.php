@@ -302,7 +302,13 @@
       $owner = auth('owner')->user();
     }
 
-    $ownerName = $owner?->name ?? 'Owner';
+    $ownerStaff = optional($owner?->staff);
+
+    $ownerName = trim(($ownerStaff->first_name ?? '') . ' ' . ($ownerStaff->last_name ?? ''));
+    if ($ownerName === '') {
+      $ownerName = $owner?->name ?? 'Owner';
+    }
+
     $ownerInitials = collect(explode(' ', $ownerName))
       ->filter(fn ($segment) => strlen($segment) > 0)
       ->map(fn ($segment) => \Illuminate\Support\Str::substr($segment, 0, 1))
@@ -322,8 +328,7 @@
     }
 
     $unreadCount = $unreadNotifications->count();
-    $ownerAvatarRelativePath = 'ownerimage/KRISTINE.png';
-    $ownerAvatarUrl = file_exists(public_path($ownerAvatarRelativePath)) ? asset($ownerAvatarRelativePath) : null;
+    $ownerAvatarUrl = $ownerStaff->profile_pic ? asset('storage/' . ltrim($ownerStaff->profile_pic, '/')) : null;
   @endphp
 
 
@@ -365,7 +370,7 @@
       </div>
       <!-- Profile Dropdown -->
       <div class="profile-dropdown" style="position: relative;">
-        <a href="{{ route('owner.profile.show') }}" id="profileImageLink" style="display:flex; align-items:center; text-decoration:none; color:inherit;">
+        <a href="{{ route('owner.profile.edit') }}" id="profileImageLink" style="display:flex; align-items:center; text-decoration:none; color:inherit;">
           @if($ownerAvatarUrl)
             <img src="{{ $ownerAvatarUrl }}" alt="Owner Profile" style="border-radius:50%; width:36px; height:36px; border:2px solid #6a2ebc; object-fit:cover;">
           @else

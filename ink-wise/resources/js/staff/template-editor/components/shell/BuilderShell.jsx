@@ -14,36 +14,38 @@ import { serializeDesign } from '../../utils/serializeDesign';
 import { derivePageLabel, normalizePageTypeValue } from '../../utils/pageFactory';
 import { BuilderErrorBoundary } from './BuilderErrorBoundary';
 
-const MAX_DEVICE_PIXEL_RATIO = 1.8;
-const PREVIEW_MAX_EDGE = 1400;
-const PREVIEW_JPEG_QUALITY = 0.82;
-const PREVIEW_MIN_JPEG_QUALITY = 0.6;
-const PREVIEW_MAX_BYTES = 2_100_000;
+const MAX_DEVICE_PIXEL_RATIO = 2.5; // allow higher density captures for crisper exports
+const PREVIEW_MAX_EDGE = 2400; // keep a larger edge for higher-resolution previews
+const PREVIEW_JPEG_QUALITY = 0.94; // favor quality over size for saved previews
+const PREVIEW_MIN_JPEG_QUALITY = 0.85;
+const PREVIEW_MAX_BYTES = 4_500_000; // permit larger payloads to avoid aggressive downscaling
 
 const waitForNextFrame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)))));
 
-async function captureCanvasRaster(canvas, pixelRatio) {
+async function captureCanvasRaster(canvas, pixelRatio, backgroundColor = '#ffffff') {
   if (!canvas) {
     return null;
   }
 
   try {
-    return await toJpeg(canvas, {
+    // Prefer lossless PNG first for maximum fidelity.
+    return await toPng(canvas, {
       cacheBust: true,
       pixelRatio,
       quality: PREVIEW_JPEG_QUALITY,
-      backgroundColor: '#ffffff',
+      backgroundColor,
     });
-  } catch (jpegError) {
-    console.warn('[InkWise Builder] JPEG preview capture failed, falling back to PNG.', jpegError);
+  } catch (pngError) {
+    console.warn('[InkWise Builder] PNG preview capture failed, falling back to JPEG.', pngError);
     try {
-      return await toPng(canvas, {
+      return await toJpeg(canvas, {
         cacheBust: true,
         pixelRatio,
         quality: PREVIEW_JPEG_QUALITY,
+        backgroundColor,
       });
-    } catch (pngError) {
-      console.warn('[InkWise Builder] PNG preview capture failed.', pngError);
+    } catch (jpegError) {
+      console.warn('[InkWise Builder] JPEG preview capture failed.', jpegError);
       return null;
     }
   }
@@ -134,6 +136,11 @@ async function compressPreviewImage(dataUrl, options = {}) {
     return dataUrl;
   }
 
+  // Preserve lossless PNG captures as-is to avoid quality loss.
+  if (dataUrl.startsWith('data:image/png')) {
+    return dataUrl;
+  }
+
   const {
     maxEdge = PREVIEW_MAX_EDGE,
     quality = PREVIEW_JPEG_QUALITY,
@@ -147,9 +154,9 @@ async function compressPreviewImage(dataUrl, options = {}) {
     let currentQuality = quality;
     let output = renderCompressedImage(image, scale, currentQuality) || dataUrl;
 
-    while (estimateBase64Bytes(output) > maxBytes && scale > 0.3) {
-      scale = Math.max(0.3, scale * 0.85);
-      currentQuality = Math.max(PREVIEW_MIN_JPEG_QUALITY, currentQuality - 0.08);
+    while (estimateBase64Bytes(output) > maxBytes && scale > 0.4) {
+      scale = Math.max(0.4, scale * 0.9);
+      currentQuality = Math.max(PREVIEW_MIN_JPEG_QUALITY, currentQuality - 0.04);
       const attempt = renderCompressedImage(image, scale, currentQuality);
       if (!attempt) {
         break;
@@ -431,7 +438,8 @@ export function BuilderShell() {
         await ensurePageActive(page.id);
         await waitForNextFrame();
 
-        const rasterDataUrl = await captureCanvasRaster(canvasRef.current, pixelRatio);
+        const backgroundColor = page?.background || '#ffffff';
+        const rasterDataUrl = await captureCanvasRaster(canvasRef.current, pixelRatio, backgroundColor);
         if (!rasterDataUrl) {
           continue;
         }

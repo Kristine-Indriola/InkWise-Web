@@ -22,8 +22,29 @@ function resolveInsets(zone) {
   const fallback = toNumber(zone.margin ?? zone.all ?? 0);
 
   return {
-    top: toNumber(zone.top ?? fallback),
-    right: toNumber(zone.right ?? fallback),
+    thumb: createPathThumb('M12 16 L44 16 L56 32 L44 48 L12 48 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      maskVariant: 'tag-shape',
+      dropShadow: SHAPE_DEFAULT_SHADOW,
+      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
+    },
+    tags: ['gift', 'tag'],
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      maskVariant: 'leaf',
+      dropShadow: SHAPE_DEFAULT_SHADOW,
+      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
+    },
+    tags: ['leaf', 'organic'],
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      maskVariant: 'butterfly',
+      dropShadow: SHAPE_DEFAULT_SHADOW,
+      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
+    },
+    tags: ['butterfly', 'organic'],
     bottom: toNumber(zone.bottom ?? fallback),
     left: toNumber(zone.left ?? fallback),
   };
@@ -109,7 +130,8 @@ function hslToHex(h, s, l) {
 const TOOL_SECTIONS = [
   { id: 'text', label: 'Text', description: 'Add headings, body copy, and typography styles.', icon: 'fa-solid fa-t' },
   { id: 'images', label: 'Upload', description: 'Upload customer photos or choose from brand assets.', icon: 'fa-solid fa-cloud-arrow-up' },
-  { id: 'shapes', label: 'Shapes', description: 'Insert vector shapes, lines, and frames.', icon: 'fa-solid fa-shapes' },
+  { id: 'frames', label: 'Frames', description: 'Insert vector shapes, lines, and frames.', icon: 'fas fa-images' },
+  { id: 'shapes', label: 'Shape', description: 'Add basic geometric shapes.', icon: 'fa-solid fa-shapes' },
   { id: 'photos', label: 'Photos', description: 'Add photos and images.', icon: 'fa-solid fa-image' },
   { id: 'icons', label: 'Icons', description: 'Insert icons and symbols.', icon: 'fa-solid fa-icons' },
   { id: 'draw', label: 'Draw', description: 'Draw shapes and lines.', icon: 'fa-solid fa-pencil' },
@@ -139,6 +161,10 @@ const SHAPE_VARIANT_NORMALIZATION = {
   star: { variant: 'polygon', mask: 'star' },
   shield: { variant: 'polygon', mask: 'shield' },
   badge: { variant: 'polygon', mask: 'badge' },
+  'triangle-equilateral': { variant: 'polygon', mask: 'triangle-equilateral' },
+  'triangle-right': { variant: 'polygon', mask: 'triangle-right' },
+  'triangle-isosceles': { variant: 'polygon', mask: 'triangle-isosceles' },
+  'triangle-scalene': { variant: 'polygon', mask: 'triangle-scalene' },
   heart: { variant: 'organic', mask: 'heart' },
   'cloud-shape': { variant: 'organic', mask: 'cloud-shape' },
   flower: { variant: 'organic', mask: 'flower' },
@@ -160,6 +186,7 @@ const SHAPE_VARIANT_NORMALIZATION = {
   'curved-corner-frame': { variant: 'frame', mask: 'curved-corner-frame' },
   'scalloped-frame': { variant: 'frame', mask: 'scalloped-frame' },
   'collage-frame': { variant: 'frame', mask: 'collage-frame' },
+  'arch-shape': { variant: 'frame', mask: 'arch-shape' },
   'camera-frame': { variant: 'frame', mask: 'camera-frame' },
   'phone-frame': { variant: 'frame', mask: 'phone-frame' },
   'ribbon-frame': { variant: 'frame', mask: 'ribbon-frame' },
@@ -171,6 +198,10 @@ const DEFAULT_SHAPE_PLACEHOLDER_STROKE = 'rgba(148, 163, 184, 0.28)';
 const SHAPE_THUMB_FILL = '#374151';
 const SHAPE_THUMB_STROKE = '#111827';
 const SHAPE_THUMB_ACCENT = '#4b5563';
+const SHAPE_DEFAULT_FILL = '#f8fafc';
+const SHAPE_DEFAULT_STROKE = 'rgba(15, 23, 42, 0.18)';
+const SHAPE_DEFAULT_SHADOW = '0 12px 24px rgba(15, 23, 42, 0.12)';
+const SHAPE_DEFAULT_HIGHLIGHT = 'inset 0 1px 0 rgba(255, 255, 255, 0.55)';
 
 function createSvgThumb(content) {
   const svg = `<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">${content}</svg>`;
@@ -242,6 +273,22 @@ const DEFAULT_SHAPE_LIBRARY = [
     thumb: createRectThumb(12),
     borderRadius: 24,
     tags: ['rounded', 'rectangle', 'soft'],
+  },
+  {
+    id: 'arch-shape',
+    label: 'Rounded Arch Frame',
+    variant: 'frame',
+    maskVariant: 'arch-shape',
+    thumb: createPathThumb('M20 58 V30 A12 12 0 0 1 44 30 V58 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      maskVariant: 'arch-shape',
+      dropShadow: SHAPE_DEFAULT_SHADOW,
+      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
+      isImageFrame: true,
+    },
+    tags: ['arch', 'rounded', 'frame'],
   },
   {
     id: 'triangle',
@@ -333,11 +380,18 @@ const DEFAULT_SHAPE_LIBRARY = [
   },
   {
     id: 'flower',
-    label: 'Flower / Daisy',
+    label: 'Flower / Daisy Badge',
     variant: 'organic',
     maskVariant: 'flower',
-    thumb: createMultiThumb(`<circle cx="32" cy="32" r="8" fill="${SHAPE_THUMB_ACCENT}" /><g fill="${SHAPE_THUMB_FILL}" stroke="${SHAPE_THUMB_STROKE}" stroke-width="2"><ellipse cx="32" cy="16" rx="8" ry="12" /><ellipse cx="32" cy="48" rx="8" ry="12" /><ellipse cx="16" cy="32" rx="12" ry="8" /><ellipse cx="48" cy="32" rx="12" ry="8" /><ellipse cx="20" cy="20" rx="10" ry="6" /><ellipse cx="44" cy="20" rx="10" ry="6" /><ellipse cx="20" cy="44" rx="10" ry="6" /><ellipse cx="44" cy="44" rx="10" ry="6" /></g>`),
-    tags: ['flower', 'daisy', 'organic'],
+    thumb: createPathThumb('M32 8 C36 8 40 11 42 16 C48 14 54 18 56 24 C58 30 56 36 52 38 C52 44 48 50 42 52 C40 56 36 58 32 58 C28 58 24 56 22 52 C16 50 12 44 12 38 C8 36 6 30 8 24 C10 18 16 14 22 16 C24 11 28 8 32 8 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      maskVariant: 'flower',
+      dropShadow: SHAPE_DEFAULT_SHADOW,
+      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
+    },
+    tags: ['flower', 'badge', 'organic'],
   },
   {
     id: 'badge',
@@ -352,7 +406,14 @@ const DEFAULT_SHAPE_LIBRARY = [
     label: 'Blob / Organic Shape',
     variant: 'organic',
     maskVariant: 'blob',
-    thumb: createPathThumb('M20 12 C30 4 46 6 52 20 C58 34 52 52 38 56 C24 60 10 50 10 36 C10 22 10 18 20 12 Z'),
+    thumb: createPathThumb('M16 18 C20 8 38 6 50 14 C60 22 60 38 48 50 C36 62 18 58 10 44 C6 34 8 24 16 18 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      maskVariant: 'blob',
+      dropShadow: SHAPE_DEFAULT_SHADOW,
+      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
+    },
     tags: ['blob', 'organic'],
   },
   {
@@ -360,7 +421,14 @@ const DEFAULT_SHAPE_LIBRARY = [
     label: 'Wave / Curved Frame',
     variant: 'organic',
     maskVariant: 'wave',
-    thumb: createPathThumb('M6 20 C14 12 22 12 32 20 C42 28 50 28 58 20 V48 C50 56 42 56 32 48 C22 40 14 40 6 48 Z'),
+    thumb: createPathThumb('M8 48 V22 C16 12 28 12 32 20 C40 32 52 32 56 22 V48 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      maskVariant: 'wave',
+      dropShadow: SHAPE_DEFAULT_SHADOW,
+      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
+    },
     tags: ['wave', 'curved', 'frame'],
   },
   {
@@ -368,7 +436,15 @@ const DEFAULT_SHAPE_LIBRARY = [
     label: 'Polaroid Frame',
     variant: 'frame',
     maskVariant: 'polaroid-frame',
-    thumb: createPolygonThumb('10 10 54 10 54 44 42 44 42 58 22 58 22 44 10 44'),
+    thumb: createPathThumb('M12 10 H52 V44 H40 V56 H24 V44 H12 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      maskVariant: 'polaroid-frame',
+      dropShadow: SHAPE_DEFAULT_SHADOW,
+      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
+      isImageFrame: true,
+    },
     tags: ['polaroid', 'frame'],
   },
   {
@@ -376,7 +452,15 @@ const DEFAULT_SHAPE_LIBRARY = [
     label: 'Film Strip Frame',
     variant: 'frame',
     maskVariant: 'film-strip-frame',
-    thumb: createPathThumb('M10 14 L18 8 L30 14 L42 8 L54 14 V50 L46 56 L34 50 L22 56 L10 50 Z'),
+    thumb: createPathThumb('M12 12 H52 V52 H12 Z M18 18 V46 M26 18 V46 M38 18 V46 M46 18 V46'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      maskVariant: 'film-strip-frame',
+      dropShadow: SHAPE_DEFAULT_SHADOW,
+      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
+      isImageFrame: true,
+    },
     tags: ['film', 'strip', 'frame'],
   },
   {
@@ -384,7 +468,14 @@ const DEFAULT_SHAPE_LIBRARY = [
     label: 'Torn Paper Edge',
     variant: 'frame',
     maskVariant: 'torn-paper-frame',
-    thumb: createPathThumb('M8 16 L16 8 L26 18 L36 10 L46 20 L56 12 L58 18 L58 50 L46 46 L36 54 L26 46 L16 52 L8 46 Z'),
+    thumb: createPathThumb('M10 14 L18 8 L26 18 L36 10 L46 20 L56 12 L58 20 L58 50 L46 46 L36 54 L26 48 L18 54 L10 46 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      maskVariant: 'torn-paper-frame',
+      dropShadow: SHAPE_DEFAULT_SHADOW,
+      highlightInset: 'inset 0 2px 4px rgba(255, 255, 255, 0.35)',
+    },
     tags: ['torn', 'paper', 'frame'],
   },
   {
@@ -392,7 +483,14 @@ const DEFAULT_SHAPE_LIBRARY = [
     label: 'Curved Corner Frame',
     variant: 'frame',
     maskVariant: 'curved-corner-frame',
-    thumb: createPathThumb('M16 12 Q12 12 12 16 V52 Q12 56 16 56 H36 Q40 56 40 60 V62 H48 Q52 62 52 58 V22 Q52 18 48 18 H40 Q36 18 36 14 V12 Z'),
+    thumb: createPathThumb('M16 12 Q12 12 12 20 V52 Q12 60 20 60 H44 Q52 60 52 52 V24 Q52 16 44 16 H32 Q24 16 24 12 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      maskVariant: 'curved-corner-frame',
+      dropShadow: SHAPE_DEFAULT_SHADOW,
+      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
+    },
     tags: ['curved', 'corner', 'frame'],
   },
   {
@@ -400,7 +498,14 @@ const DEFAULT_SHAPE_LIBRARY = [
     label: 'Scalloped Edge Frame',
     variant: 'frame',
     maskVariant: 'scalloped-frame',
-    thumb: createPathThumb('M16 12 C18 8 22 8 24 12 C26 16 30 16 32 12 C34 8 38 8 40 12 C42 16 46 16 48 12 C50 8 54 8 56 12 V52 C54 56 50 56 48 52 C46 48 42 48 40 52 C38 56 34 56 32 52 C30 48 26 48 24 52 C22 56 18 56 16 52 Z'),
+    thumb: createPathThumb('M16 12 C18 8 24 8 26 12 C28 16 30 16 32 12 C34 8 38 8 40 12 C42 16 46 16 48 12 C50 8 56 8 56 12 V52 C54 56 50 56 48 52 C46 48 42 48 40 52 C38 56 34 56 32 52 C30 48 28 48 26 52 C24 56 18 56 16 52 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      maskVariant: 'scalloped-frame',
+      dropShadow: SHAPE_DEFAULT_SHADOW,
+      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
+    },
     tags: ['scalloped', 'frame'],
   },
   {
@@ -408,7 +513,15 @@ const DEFAULT_SHAPE_LIBRARY = [
     label: 'Photo Collage Frames',
     variant: 'frame',
     maskVariant: 'collage-frame',
-    thumb: createMultiThumb(`<rect x="10" y="12" width="16" height="18" fill="${SHAPE_THUMB_FILL}" stroke="${SHAPE_THUMB_STROKE}" stroke-width="2" /><rect x="30" y="12" width="24" height="14" fill="${SHAPE_THUMB_ACCENT}" stroke="${SHAPE_THUMB_STROKE}" stroke-width="2" /><rect x="20" y="32" width="28" height="20" fill="${SHAPE_THUMB_FILL}" stroke="${SHAPE_THUMB_STROKE}" stroke-width="2" />`),
+    thumb: createMultiThumb(`<g stroke="${SHAPE_THUMB_STROKE}" stroke-width="2" fill="${SHAPE_THUMB_FILL}" stroke-linejoin="round"><rect x="10" y="12" width="18" height="18" rx="4" /><rect x="32" y="12" width="20" height="16" rx="4" /><rect x="20" y="34" width="28" height="18" rx="6" /></g>`),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      maskVariant: 'collage-frame',
+      dropShadow: SHAPE_DEFAULT_SHADOW,
+      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
+      isImageFrame: true,
+    },
     tags: ['collage', 'frame', 'grid'],
   },
   {
@@ -416,7 +529,15 @@ const DEFAULT_SHAPE_LIBRARY = [
     label: 'Camera Frame',
     variant: 'frame',
     maskVariant: 'camera-frame',
-    thumb: createPathThumb('M12 24 H20 L24 16 H40 L44 24 H52 V50 H12 Z'),
+    thumb: createPathThumb('M16 22 H24 L28 16 H40 L44 22 H52 V50 H12 V22 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      maskVariant: 'camera-frame',
+      dropShadow: SHAPE_DEFAULT_SHADOW,
+      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
+      isImageFrame: true,
+    },
     tags: ['camera', 'frame'],
   },
   {
@@ -426,6 +547,14 @@ const DEFAULT_SHAPE_LIBRARY = [
     maskVariant: 'phone-frame',
     thumb: createPathThumb('M22 10 H42 C46 10 48 12 48 16 V50 C48 54 46 56 42 56 H22 C18 56 16 54 16 50 V16 C16 12 18 10 22 10 Z'),
     borderRadius: 18,
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      maskVariant: 'phone-frame',
+      dropShadow: SHAPE_DEFAULT_SHADOW,
+      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
+      isImageFrame: true,
+    },
     tags: ['phone', 'screen', 'frame'],
   },
   {
@@ -434,6 +563,13 @@ const DEFAULT_SHAPE_LIBRARY = [
     variant: 'organic',
     maskVariant: 'sun',
     thumb: createMultiThumb(`<circle cx="32" cy="32" r="16" fill="${SHAPE_THUMB_FILL}" stroke="${SHAPE_THUMB_STROKE}" stroke-width="2" /><g stroke="${SHAPE_THUMB_STROKE}" stroke-width="2" stroke-linecap="round"><line x1="32" y1="8" x2="32" y2="2" /><line x1="32" y1="62" x2="32" y2="56" /><line x1="8" y1="32" x2="2" y2="32" /><line x1="62" y1="32" x2="56" y2="32" /><line x1="14" y1="14" x2="8" y2="8" /><line x1="50" y1="50" x2="56" y2="56" /><line x1="14" y1="50" x2="8" y2="56" /><line x1="50" y1="14" x2="56" y2="8" /></g>`),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      maskVariant: 'sun',
+      dropShadow: SHAPE_DEFAULT_SHADOW,
+      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
+    },
     tags: ['sun', 'solar'],
   },
   {
@@ -441,7 +577,14 @@ const DEFAULT_SHAPE_LIBRARY = [
     label: 'Moon',
     variant: 'organic',
     maskVariant: 'moon',
-    thumb: createPathThumb('M42 10 A20 20 0 1 1 22 54 A16 16 0 1 0 42 10 Z'),
+    thumb: createPathThumb('M44 10 A22 22 0 1 1 20 54 A16 16 0 1 0 44 10 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      maskVariant: 'moon',
+      dropShadow: SHAPE_DEFAULT_SHADOW,
+      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
+    },
     tags: ['moon', 'night', 'crescent'],
   },
   {
@@ -450,6 +593,13 @@ const DEFAULT_SHAPE_LIBRARY = [
     variant: 'organic',
     maskVariant: 'butterfly',
     thumb: createPathThumb('M32 32 C38 24 44 12 54 16 C62 20 58 32 48 34 C58 40 60 52 48 52 C42 52 36 42 32 36 C28 42 22 52 16 52 C4 52 6 40 16 34 C6 32 2 20 10 16 C20 12 26 24 32 32 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      maskVariant: 'butterfly',
+      dropShadow: SHAPE_DEFAULT_SHADOW,
+      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
+    },
     tags: ['butterfly', 'organic'],
   },
   {
@@ -458,6 +608,13 @@ const DEFAULT_SHAPE_LIBRARY = [
     variant: 'organic',
     maskVariant: 'leaf',
     thumb: createPathThumb('M32 8 C46 16 56 30 54 44 C52 58 40 60 28 56 C16 52 8 40 10 26 C12 12 22 8 32 8 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      maskVariant: 'leaf',
+      dropShadow: SHAPE_DEFAULT_SHADOW,
+      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
+    },
     tags: ['leaf', 'nature'],
   },
   {
@@ -466,6 +623,13 @@ const DEFAULT_SHAPE_LIBRARY = [
     variant: 'tag',
     maskVariant: 'tag-shape',
     thumb: createPolygonThumb('12 12 44 12 58 32 44 52 12 52 6 42 6 22'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      maskVariant: 'tag-shape',
+      dropShadow: SHAPE_DEFAULT_SHADOW,
+      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
+    },
     tags: ['gift', 'tag', 'label'],
   },
   {
@@ -478,6 +642,610 @@ const DEFAULT_SHAPE_LIBRARY = [
   },
 ];
 
+const NATURAL_SHAPE_LIBRARY = [
+  {
+    id: 'natural-circle',
+    label: 'Circle',
+    variant: 'circle',
+    maskVariant: 'circle',
+    thumb: createCircleThumb(24),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['circle', 'round'],
+  },
+  {
+    id: 'natural-ellipse',
+    label: 'Ellipse',
+    variant: 'circle',
+    maskVariant: 'circle',
+    thumb: createEllipseThumb(24, 18),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['ellipse', 'oval'],
+  },
+  {
+    id: 'natural-square',
+    label: 'Square',
+    variant: 'rectangle',
+    maskVariant: 'rectangle',
+    thumb: createRectThumb(0),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['square', 'box', 'even'],
+  },
+  {
+    id: 'natural-rectangle',
+    label: 'Rectangle',
+    variant: 'rectangle',
+    maskVariant: 'rectangle',
+    thumb: createRectThumb(0),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['rectangle', 'box', 'quad'],
+  },
+  {
+    id: 'natural-rounded-rectangle',
+    label: 'Rounded Rectangle',
+    variant: 'rectangle',
+    maskVariant: 'rectangle',
+    thumb: createRectThumb(12),
+    borderRadius: 24,
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['rounded', 'rectangle', 'soft'],
+  },
+  {
+    id: 'natural-triangle-equilateral',
+    label: 'Equilateral Triangle',
+    variant: 'polygon',
+    maskVariant: 'triangle-equilateral',
+    thumb: createPolygonThumb('32 10 10 54 54 54'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['triangle', 'equilateral', 'polygon'],
+  },
+  {
+    id: 'natural-triangle-right',
+    label: 'Right Triangle',
+    variant: 'polygon',
+    maskVariant: 'triangle-right',
+    thumb: createPolygonThumb('12 12 52 52 12 52'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['triangle', 'right', 'polygon'],
+  },
+  {
+    id: 'natural-triangle-isosceles',
+    label: 'Isosceles Triangle',
+    variant: 'polygon',
+    maskVariant: 'triangle-isosceles',
+    thumb: createPolygonThumb('32 8 12 56 52 56'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['triangle', 'isosceles', 'polygon'],
+  },
+  {
+    id: 'natural-triangle-scalene',
+    label: 'Scalene Triangle',
+    variant: 'polygon',
+    maskVariant: 'triangle-scalene',
+    thumb: createPolygonThumb('16 12 54 44 12 56'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['triangle', 'scalene', 'polygon'],
+  },
+  {
+    id: 'natural-pentagon',
+    label: 'Pentagon',
+    variant: 'polygon',
+    maskVariant: 'pentagon',
+    thumb: createPolygonThumb('32 8 56 26 46 56 18 56 8 26'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['pentagon', 'polygon', '5-sided'],
+  },
+  {
+    id: 'natural-hexagon',
+    label: 'Hexagon',
+    variant: 'polygon',
+    maskVariant: 'hexagon',
+    thumb: createPolygonThumb('20 10 44 10 56 32 44 54 20 54 8 32'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['hexagon', 'polygon', '6-sided'],
+  },
+  {
+    id: 'natural-heptagon',
+    label: 'Heptagon',
+    variant: 'polygon',
+    maskVariant: 'heptagon',
+    thumb: createPolygonThumb('32 6 52 16 56 36 44 54 20 54 8 36 12 16'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['heptagon', 'polygon', '7-sided'],
+  },
+  {
+    id: 'natural-octagon',
+    label: 'Octagon',
+    variant: 'polygon',
+    maskVariant: 'octagon',
+    thumb: createPolygonThumb('22 8 42 8 56 22 56 42 42 56 22 56 8 42 8 22'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['octagon', 'polygon', '8-sided'],
+  },
+  {
+    id: 'natural-star-5',
+    label: 'Star (5-pointed)',
+    variant: 'polygon',
+    maskVariant: 'star',
+    thumb: createPolygonThumb('32 8 38 26 56 26 42 38 48 56 32 44 16 56 22 38 8 26 26 26'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['star', '5-pointed', 'polygon'],
+  },
+  {
+    id: 'natural-star-6',
+    label: 'Star (6-pointed)',
+    variant: 'polygon',
+    maskVariant: 'hexagram',
+    thumb: createPolygonThumb('32 6 42 18 54 18 48 30 54 42 42 36 32 48 22 36 6 42 12 30 6 18 18 18'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['star', '6-pointed', 'hexagram', 'polygon'],
+  },
+  {
+    id: 'natural-star-8',
+    label: 'Star (8-pointed)',
+    variant: 'polygon',
+    maskVariant: 'octagram',
+    thumb: createPolygonThumb('32 4 40 12 52 12 48 20 56 28 48 36 52 44 40 44 32 52 24 44 12 44 16 36 8 28 16 20 12 12 24 12'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['star', '8-pointed', 'octagram', 'polygon'],
+  },
+  {
+    id: 'natural-heart',
+    label: 'Heart',
+    variant: 'organic',
+    maskVariant: 'heart',
+    thumb: createPathThumb('M16 28 C16 22 12 18 8 18 C4 18 0 22 0 28 C0 32 4 36 8 40 L16 46 L24 40 C28 36 32 32 32 28 C32 22 28 18 24 18 C20 18 16 22 16 28 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['heart', 'love', 'organic'],
+  },
+  {
+    id: 'natural-diamond',
+    label: 'Diamond (Rhombus)',
+    variant: 'polygon',
+    maskVariant: 'diamond',
+    thumb: createPolygonThumb('32 8 56 32 32 56 8 32'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['diamond', 'rhombus', 'polygon'],
+  },
+  {
+    id: 'natural-parallelogram',
+    label: 'Parallelogram',
+    variant: 'polygon',
+    maskVariant: 'parallelogram',
+    thumb: createPolygonThumb('16 12 48 12 56 52 8 52'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['parallelogram', 'polygon', 'slanted'],
+  },
+  {
+    id: 'natural-trapezoid',
+    label: 'Trapezoid',
+    variant: 'polygon',
+    maskVariant: 'trapezoid',
+    thumb: createPolygonThumb('18 12 46 12 56 52 8 52'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['trapezoid', 'polygon', 'trapezium'],
+  },
+  {
+    id: 'natural-crescent',
+    label: 'Crescent',
+    variant: 'organic',
+    maskVariant: 'crescent',
+    thumb: createPathThumb('M32 8 A24 24 0 1 1 8 32 A16 16 0 1 0 32 8 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['crescent', 'moon', 'organic'],
+  },
+  {
+    id: 'natural-arrow-right',
+    label: 'Arrow (right)',
+    variant: 'polygon',
+    maskVariant: 'arrow-right',
+    thumb: createPolygonThumb('8 16 40 16 40 8 56 24 40 40 40 32 8 32'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['arrow', 'right', 'direction', 'polygon'],
+  },
+  {
+    id: 'natural-arrow-left',
+    label: 'Arrow (left)',
+    variant: 'polygon',
+    maskVariant: 'arrow-left',
+    thumb: createPolygonThumb('48 16 16 16 16 8 0 24 16 40 16 32 48 32'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['arrow', 'left', 'direction', 'polygon'],
+  },
+  {
+    id: 'natural-arrow-up',
+    label: 'Arrow (up)',
+    variant: 'polygon',
+    maskVariant: 'arrow-up',
+    thumb: createPolygonThumb('16 48 16 16 8 16 24 0 40 16 32 16 32 48'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['arrow', 'up', 'direction', 'polygon'],
+  },
+  {
+    id: 'natural-arrow-down',
+    label: 'Arrow (down)',
+    variant: 'polygon',
+    maskVariant: 'arrow-down',
+    thumb: createPolygonThumb('16 8 16 40 8 40 24 56 40 40 32 40 32 8'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['arrow', 'down', 'direction', 'polygon'],
+  },
+  {
+    id: 'natural-cross-plus',
+    label: 'Cross (plus sign)',
+    variant: 'polygon',
+    maskVariant: 'cross-plus',
+    thumb: createPolygonThumb('24 8 40 8 40 24 56 24 56 40 40 40 40 56 24 56 24 40 8 40 8 24 24 24'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['cross', 'plus', 'add', 'polygon'],
+  },
+  {
+    id: 'natural-cross-x',
+    label: 'Cross (X shape)',
+    variant: 'polygon',
+    maskVariant: 'cross-x',
+    thumb: createPolygonThumb('16 12 24 20 12 28 20 36 16 44 24 36 32 44 40 36 44 28 32 20 40 12 32 20'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['cross', 'x', 'multiply', 'polygon'],
+  },
+  {
+    id: 'natural-cloud',
+    label: 'Cloud shape',
+    variant: 'organic',
+    maskVariant: 'cloud-shape',
+    thumb: createPathThumb('M44 32 C44 24 38 18 30 18 C26 18 22 20 20 24 C18 20 14 18 10 18 C4 18 0 24 0 30 C0 36 4 40 10 40 L34 40 C40 40 44 36 44 32 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['cloud', 'weather', 'organic'],
+  },
+  {
+    id: 'natural-speech-bubble-rounded',
+    label: 'Speech bubble (rounded rectangle)',
+    variant: 'organic',
+    maskVariant: 'speech-bubble-rounded',
+    thumb: createPathThumb('M8 16 L8 40 Q8 48 16 48 L40 48 Q48 48 48 40 L48 16 Q48 8 40 8 L32 8 L28 0 L24 8 L16 8 Q8 8 8 16 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['speech', 'bubble', 'chat', 'rounded', 'organic'],
+  },
+  {
+    id: 'natural-speech-bubble-oval',
+    label: 'Speech bubble (oval)',
+    variant: 'organic',
+    maskVariant: 'speech-bubble-oval',
+    thumb: createPathThumb('M16 8 Q8 8 8 16 L8 32 Q8 40 16 40 L32 40 Q40 40 40 32 L40 16 Q40 8 32 8 L24 8 L28 0 L20 0 L24 8 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['speech', 'bubble', 'chat', 'oval', 'organic'],
+  },
+  {
+    id: 'natural-polygon-custom',
+    label: 'Polygon (custom n-sides)',
+    variant: 'polygon',
+    maskVariant: 'polygon-custom',
+    thumb: createPolygonThumb('32 4 56 16 52 44 32 56 12 44 8 16'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['polygon', 'custom', 'n-sides', 'variable'],
+  },
+  {
+    id: 'natural-spiral',
+    label: 'Spiral',
+    variant: 'organic',
+    maskVariant: 'spiral',
+    thumb: createPathThumb('M32 32 Q40 32 40 24 Q40 16 48 16 Q56 16 56 24 Q56 32 48 32 Q40 32 40 40 Q40 48 32 48 Q24 48 24 40 Q24 32 32 32 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['spiral', 'coil', 'organic'],
+  },
+  {
+    id: 'natural-wave',
+    label: 'Wave',
+    variant: 'organic',
+    maskVariant: 'wave',
+    thumb: createPathThumb('M0 32 Q16 16 32 32 T64 32 L64 64 L0 64 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['wave', 'sine', 'organic'],
+  },
+  {
+    id: 'natural-chevron',
+    label: 'Chevron',
+    variant: 'polygon',
+    maskVariant: 'chevron',
+    thumb: createPolygonThumb('8 16 24 8 40 16 56 8 56 24 40 32 24 24 8 32 8 16'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['chevron', 'zigzag', 'polygon'],
+  },
+  {
+    id: 'natural-hexagram',
+    label: 'Hexagram (Star of David shape)',
+    variant: 'polygon',
+    maskVariant: 'hexagram',
+    thumb: createPolygonThumb('32 6 42 18 54 18 48 30 54 42 42 36 32 48 22 36 6 42 12 30 6 18 18 18'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['hexagram', 'star of david', 'jewish', 'polygon'],
+  },
+  {
+    id: 'natural-kite',
+    label: 'Kite shape',
+    variant: 'polygon',
+    maskVariant: 'kite',
+    thumb: createPolygonThumb('32 8 48 32 32 56 16 32'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['kite', 'diamond', 'polygon'],
+  },
+  {
+    id: 'natural-teardrop',
+    label: 'Teardrop',
+    variant: 'organic',
+    maskVariant: 'teardrop',
+    thumb: createPathThumb('M32 8 Q48 8 48 24 Q48 40 32 56 Q16 40 16 24 Q16 8 32 8 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['teardrop', 'drop', 'organic'],
+  },
+  {
+    id: 'natural-lightning',
+    label: 'Lightning bolt',
+    variant: 'polygon',
+    maskVariant: 'lightning',
+    thumb: createPolygonThumb('16 8 24 8 20 20 32 20 16 40 24 32 12 32 20 20 8 20'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['lightning', 'bolt', 'thunder', 'polygon'],
+  },
+  {
+    id: 'natural-banner-ribbon',
+    label: 'Banner/Ribbon shape',
+    variant: 'organic',
+    maskVariant: 'ribbon-banner',
+    thumb: createPolygonThumb('8 16 24 8 40 16 56 24 40 32 24 24 8 24'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['banner', 'ribbon', 'organic'],
+  },
+  {
+    id: 'natural-gear',
+    label: 'Gear shape',
+    variant: 'organic',
+    maskVariant: 'gear',
+    thumb: createPathThumb('M32 4 L36 12 L44 8 L40 16 L48 20 L40 24 L44 32 L36 28 L32 36 L28 28 L20 32 L24 24 L16 20 L24 16 L20 8 L28 12 Z'),
+    fill: SHAPE_DEFAULT_FILL,
+    stroke: SHAPE_DEFAULT_STROKE,
+    metadata: {
+      isImageFrame: false,
+      allowImageFill: false,
+      allowColorFill: true,
+    },
+    tags: ['gear', 'cog', 'mechanical', 'organic'],
+  },
+];
+
 function buildShapeResult(preset) {
   const base = {
     id: `default-shape-${preset.id}`,
@@ -486,13 +1254,21 @@ function buildShapeResult(preset) {
     downloadUrl: preset.thumb,
     description: preset.label,
     provider: 'default',
-    providerLabel: 'Built-in Shapes',
-    credit: 'Built-in Shapes',
+    providerLabel: '',
+    credit: '',
     variant: preset.variant,
     maskVariant: preset.maskVariant,
     placeholderFill: DEFAULT_SHAPE_PLACEHOLDER_FILL,
     placeholderStroke: DEFAULT_SHAPE_PLACEHOLDER_STROKE,
   };
+
+  if (preset.fill !== undefined) {
+    base.fill = preset.fill;
+  }
+
+  if (preset.stroke !== undefined) {
+    base.stroke = preset.stroke;
+  }
 
   if (preset.borderRadius !== undefined) {
     base.borderRadius = preset.borderRadius;
@@ -513,6 +1289,10 @@ function getDefaultShapeResults() {
   return DEFAULT_SHAPE_LIBRARY.map((preset) => buildShapeResult(preset));
 }
 
+function getNaturalShapeResults() {
+  return NATURAL_SHAPE_LIBRARY.map((preset) => buildShapeResult(preset));
+}
+
 function searchDefaultShapes(query, limit = DEFAULT_SHAPE_LIBRARY.length) {
   const normalized = (query || '').trim().toLowerCase();
   if (!normalized) {
@@ -529,10 +1309,6 @@ function searchDefaultShapes(query, limit = DEFAULT_SHAPE_LIBRARY.length) {
   const selected = matches.length > 0 ? matches : DEFAULT_SHAPE_LIBRARY;
   return selected.slice(0, limit).map((preset) => buildShapeResult(preset));
 }
-
-
-
-
 const PHOTO_FILTERS = [
   { id: 'all', label: 'All images', value: null },
   { id: 'photos', label: 'Photos', value: 'photos' },
@@ -612,7 +1388,8 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState('all');
-  const [photoProvider, setPhotoProvider] = useState('unsplash');
+  // Photos: always search both Unsplash and Pixabay together (no provider toggle needed)
+  const photoProvider = 'combined';
   const currentPageRef = useRef(1);
   const activeSearchQueryRef = useRef('');
   const hasTriggeredSearchRef = useRef(false);
@@ -1058,68 +1835,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
 
   // Icon search state
   const [iconSearchQuery, setIconSearchQuery] = useState('');
-  const [iconSearchResults, setIconSearchResults] = useState([
-    {
-      id: 'default-heart',
-      thumbUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/heart.svg',
-      previewUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/heart.svg',
-      downloadUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/heart.svg',
-      description: 'Heart',
-      provider: 'default',
-      providerLabel: 'Simple Icons',
-      credit: 'Simple Icons',
-    },
-    {
-      id: 'default-star',
-      thumbUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/star.svg',
-      previewUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/star.svg',
-      downloadUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/star.svg',
-      description: 'Star',
-      provider: 'default',
-      providerLabel: 'Simple Icons',
-      credit: 'Simple Icons',
-    },
-    {
-      id: 'default-home',
-      thumbUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/home.svg',
-      previewUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/home.svg',
-      downloadUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/home.svg',
-      description: 'Home',
-      provider: 'default',
-      providerLabel: 'Simple Icons',
-      credit: 'Simple Icons',
-    },
-    {
-      id: 'default-user',
-      thumbUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/user.svg',
-      previewUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/user.svg',
-      downloadUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/user.svg',
-      description: 'User',
-      provider: 'default',
-      providerLabel: 'Simple Icons',
-      credit: 'Simple Icons',
-    },
-    {
-      id: 'default-search',
-      thumbUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/search.svg',
-      previewUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/search.svg',
-      downloadUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/search.svg',
-      description: 'Search',
-      provider: 'default',
-      providerLabel: 'Simple Icons',
-      credit: 'Simple Icons',
-    },
-    {
-      id: 'default-settings',
-      thumbUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/settings.svg',
-      previewUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/settings.svg',
-      downloadUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/settings.svg',
-      description: 'Settings',
-      provider: 'default',
-      providerLabel: 'Simple Icons',
-      credit: 'Simple Icons',
-    },
-  ]);
+  const [iconSearchResults, setIconSearchResults] = useState([]);
   const [isSearchingIcons, setIsSearchingIcons] = useState(false);
   const [iconCurrentPage, setIconCurrentPage] = useState(1);
   const [isLoadingMoreIcons, setIsLoadingMoreIcons] = useState(false);
@@ -2944,7 +3660,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
   );
 
   const safeInsets = useMemo(() => resolveInsets(activePage?.safeZone), [activePage?.safeZone]);
-  const activeProviderLabel = PROVIDER_LABELS[photoProvider] ?? PROVIDER_LABELS.unsplash;
+  const activeProviderLabel = 'Unsplash + Pixabay';
   const activeGradientThemeConfig = useMemo(() => (
     LINEAR_GRADIENT_LIBRARY.find((theme) => theme.id === activeGradientTheme) ?? LINEAR_GRADIENT_LIBRARY[0]
   ), [LINEAR_GRADIENT_LIBRARY, activeGradientTheme]);
@@ -3084,38 +3800,60 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       ?? baseMetadata.maskVariant
       ?? normalization.mask
       ?? normalizedVariant;
-    const placeholderFill = shapeConfig.placeholderFill
-      ?? baseMetadata.placeholderFill
-      ?? layer.fill
-      ?? DEFAULT_SHAPE_PLACEHOLDER_FILL;
-    const placeholderStroke = shapeConfig.placeholderStroke
-      ?? baseMetadata.placeholderStroke
-      ?? layer.stroke
-      ?? DEFAULT_SHAPE_PLACEHOLDER_STROKE;
-    const placeholderLabel = shapeConfig.placeholderLabel
-      ?? baseMetadata.placeholderLabel
-      ?? 'Add image';
-    const placeholderIcon = shapeConfig.placeholderIcon
-      ?? baseMetadata.placeholderIcon
-      ?? 'fa-solid fa-image';
+    const resolvedIsImageFrame = (baseMetadata.isImageFrame ?? shapeConfig.isImageFrame ?? normalization.isImageFrame);
+    const isImageFrame = resolvedIsImageFrame === undefined ? true : resolvedIsImageFrame;
 
-    layer.metadata = {
-      ...baseMetadata,
-      placeholderFill,
-      placeholderStroke,
-      placeholderLabel,
-      placeholderIcon,
-      maskVariant,
-      isImageFrame: true,
-      objectFit: baseMetadata.objectFit ?? 'cover',
-      imageScale: Number.isFinite(baseMetadata.imageScale) ? baseMetadata.imageScale : 1,
-      imageOffsetX: Number.isFinite(baseMetadata.imageOffsetX) ? baseMetadata.imageOffsetX : 0,
-      imageOffsetY: Number.isFinite(baseMetadata.imageOffsetY) ? baseMetadata.imageOffsetY : 0,
-      originalVariant: rawVariant,
-    };
+    if (isImageFrame) {
+      const placeholderFill = shapeConfig.placeholderFill
+        ?? baseMetadata.placeholderFill
+        ?? layer.fill
+        ?? DEFAULT_SHAPE_PLACEHOLDER_FILL;
+      const placeholderStroke = shapeConfig.placeholderStroke
+        ?? baseMetadata.placeholderStroke
+        ?? layer.stroke
+        ?? DEFAULT_SHAPE_PLACEHOLDER_STROKE;
+      const placeholderLabel = shapeConfig.placeholderLabel
+        ?? baseMetadata.placeholderLabel
+        ?? 'Add image';
+      const placeholderIcon = shapeConfig.placeholderIcon
+        ?? baseMetadata.placeholderIcon
+        ?? 'fa-solid fa-image';
 
-    layer.fill = placeholderFill;
-    layer.stroke = placeholderStroke;
+      layer.metadata = {
+        ...baseMetadata,
+        placeholderFill,
+        placeholderStroke,
+        placeholderLabel,
+        placeholderIcon,
+        maskVariant,
+        isImageFrame: true,
+        objectFit: baseMetadata.objectFit ?? 'cover',
+        imageScale: Number.isFinite(baseMetadata.imageScale) ? baseMetadata.imageScale : 1,
+        imageOffsetX: Number.isFinite(baseMetadata.imageOffsetX) ? baseMetadata.imageOffsetX : 0,
+        imageOffsetY: Number.isFinite(baseMetadata.imageOffsetY) ? baseMetadata.imageOffsetY : 0,
+        originalVariant: rawVariant,
+      };
+
+      layer.fill = placeholderFill;
+      layer.stroke = placeholderStroke;
+    } else {
+      layer.metadata = {
+        ...baseMetadata,
+        maskVariant,
+        isImageFrame: false,
+        allowImageFill: baseMetadata.allowImageFill ?? false,
+        allowColorFill: baseMetadata.allowColorFill ?? true,
+        originalVariant: rawVariant,
+      };
+
+      if (layer.fill === undefined) {
+        layer.fill = DEFAULT_SHAPE_PLACEHOLDER_FILL;
+      }
+
+      if (layer.stroke === undefined) {
+        layer.stroke = DEFAULT_SHAPE_PLACEHOLDER_STROKE;
+      }
+    }
 
     layer.shape = {
       id: maskVariant,
@@ -3139,7 +3877,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
           ? shapeConfig.content
           : null;
 
-    if (resolvedImage) {
+    if (resolvedImage && isImageFrame) {
       layer.content = resolvedImage;
       layer.fill = 'transparent';
       layer.stroke = 'transparent';
@@ -3328,23 +4066,23 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       return { items: [], hasMore: false };
     }
 
-    if (photoProvider === 'unsplash') {
-      const perPage = ITEMS_PER_PAGE.unsplash;
-      const filterParam = selectedFilter !== 'all' ? `&content_filter=${selectedFilter}` : '';
-      const response = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(trimmedQuery)}&client_id=iFpUZ_6aTnLGz0Voz0MYlprq9i_RBl83ux9DzV6EMOs&per_page=${perPage}&page=${pageNumber}${filterParam}`);
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
-      const data = await response.json();
-      const formattedResults = normalizeUnsplashResults(data.results || []);
-      const totalPages = data.total_pages ?? (formattedResults.length === perPage ? pageNumber + 1 : pageNumber);
-      return {
-        items: formattedResults,
-        hasMore: pageNumber < totalPages && formattedResults.length > 0,
-      };
-    }
+    // Fetch Unsplash and Pixabay in parallel, then merge results.
+    const perPageUnsplash = ITEMS_PER_PAGE.unsplash;
+    const filterParam = selectedFilter !== 'all' ? `&content_filter=${selectedFilter}` : '';
+    const unsplashPromise = fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(trimmedQuery)}&client_id=iFpUZ_6aTnLGz0Voz0MYlprq9i_RBl83ux9DzV6EMOs&per_page=${perPageUnsplash}&page=${pageNumber}${filterParam}`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Unsplash API error: ${response.status}`);
+        const data = await response.json();
+        const formatted = normalizeUnsplashResults(data.results || []);
+        const totalPages = data.total_pages ?? (formatted.length === perPageUnsplash ? pageNumber + 1 : pageNumber);
+        return { items: formatted, hasMore: pageNumber < totalPages && formatted.length > 0 };
+      })
+      .catch((err) => {
+        console.warn('Unsplash fetch failed', err);
+        return { items: [], hasMore: false };
+      });
 
-    const perPage = ITEMS_PER_PAGE.pixabay;
+    const perPagePixabay = ITEMS_PER_PAGE.pixabay;
     const pixabayRule = PIXABAY_FILTER_RULES[selectedFilter] ?? PIXABAY_FILTER_RULES.all;
     const queryPieces = [trimmedQuery, pixabayRule?.querySuffix].filter(Boolean);
     const combinedQuery = queryPieces.join(' ');
@@ -3353,7 +4091,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       q: combinedQuery || trimmedQuery,
       safesearch: 'true',
       page: String(pageNumber),
-      per_page: String(perPage),
+      per_page: String(perPagePixabay),
     });
 
     if (pixabayRule?.imageType && pixabayRule.imageType !== 'all') {
@@ -3366,20 +4104,29 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       params.set('order', pixabayRule.order);
     }
 
-    const response = await fetch(`https://pixabay.com/api/?${params.toString()}`);
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-    const data = await response.json();
-    const formattedResults = normalizePixabayResults(data.hits || []);
-    const cappedTotal = Math.min(data.totalHits ?? 0, 500);
-    const fetchedCount = (pageNumber - 1) * perPage + formattedResults.length;
+    const pixabayPromise = fetch(`https://pixabay.com/api/?${params.toString()}`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Pixabay API error: ${response.status}`);
+        const data = await response.json();
+        const formatted = normalizePixabayResults(data.hits || []);
+        const cappedTotal = Math.min(data.totalHits ?? 0, 500);
+        const fetchedCount = (pageNumber - 1) * perPagePixabay + formatted.length;
+        return { items: formatted, hasMore: cappedTotal > 0 && fetchedCount < cappedTotal };
+      })
+      .catch((err) => {
+        console.warn('Pixabay fetch failed', err);
+        return { items: [], hasMore: false };
+      });
+
+    const [unsplashResult, pixabayResult] = await Promise.all([unsplashPromise, pixabayPromise]);
+    const mergedItems = [...unsplashResult.items, ...pixabayResult.items];
+    const hasMoreCombined = (unsplashResult.hasMore || pixabayResult.hasMore) && mergedItems.length > 0;
 
     return {
-      items: formattedResults,
-      hasMore: cappedTotal > 0 && fetchedCount < cappedTotal,
+      items: mergedItems,
+      hasMore: hasMoreCombined,
     };
-  }, [photoProvider, selectedFilter]);
+  }, [selectedFilter]);
 
   const handleSearch = useCallback(async (rawQuery) => {
     const trimmedQuery = (rawQuery ?? '').trim();
@@ -5472,7 +6219,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       return;
     }
     handleSearch(activeSearchQueryRef.current);
-  }, [handleSearch, photoProvider, selectedFilter]);
+  }, [handleSearch, selectedFilter]);
 
   // IntersectionObserver for infinite scroll
   useEffect(() => {
@@ -5803,11 +6550,11 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
             </div>
           </div>
         );
-      case 'shapes':
+      case 'frames':
         return (
           <div className="builder-sidebar__content">
             <div className="builder-sidebar__header">
-              <h2>Shapes</h2>
+              <h2>Frames</h2>
               <button
                 type="button"
                 className="builder-sidebar-toggle"
@@ -5818,26 +6565,13 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
                 <i className="fas fa-chevron-left" aria-hidden="true"></i>
               </button>
             </div>
-            <p>Search for shapes from multiple providers.</p>
+            <p>Choose from a variety of frames and shapes.</p>
             <div className="builder-sidebar__provider-note">
-              Shapes from Iconify and Simple Icons. Please display attribution when publishing your design.
-            </div>
-            <div className="builder-sidebar__search">
-              <input
-                ref={(input) => { searchInputRef.current = input; }}
-                type="text"
-                placeholder="Search for shapes..."
-                value={shapeSearchQuery}
-                onChange={(e) => setShapeSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleShapeSearch(e.target.value)}
-              />
-              <button type="button" onClick={() => handleShapeSearch(searchInputRef.current?.value || shapeSearchQuery)} disabled={isSearchingShapes}>
-                {isSearchingShapes ? 'Searching...' : 'Search'}
-              </button>
+              Built-in frames for your designs.
             </div>
             {!hasTriggeredShapeSearchRef.current && (
               <div className="builder-sidebar__hint" style={{ marginBottom: '10px', fontSize: '12px', color: '#666' }}>
-                Popular shapes (search above for more options):
+                Available frames:
               </div>
             )}
             {shapeSearchResults.length > 0 ? (
@@ -5848,11 +6582,10 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
                     type="button"
                     className="search-result-thumb"
                     onClick={() => handleUseShape(shape)}
-                    title={`${shape.description} (${shape.providerLabel})`}
                   >
                     <img
                       src={shape.thumbUrl}
-                      alt={shape.description}
+                      alt=""
                       style={{ width: 64, height: 64, objectFit: 'contain', backgroundColor: '#fff' }}
                       onError={(e) => {
                         // Replace broken/missing shape image with a tiny inline SVG placeholder
@@ -5877,6 +6610,51 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
                 {isSearchingShapes ? 'Searching for shapes...' : 'No shapes found. Try a different search term.'}
               </div>
             ) : null}
+          </div>
+        );
+      case 'shapes':
+        return (
+          <div className="builder-sidebar__content">
+            <div className="builder-sidebar__header">
+              <h2>Shape</h2>
+              <button
+                type="button"
+                className="builder-sidebar-toggle"
+                onClick={onToggleSidebar}
+                aria-label="Hide sidebar"
+                title="Hide sidebar"
+              >
+                <i className="fas fa-chevron-left" aria-hidden="true"></i>
+              </button>
+            </div>
+            <p>Add basic geometric shapes to your design.</p>
+            <div className="builder-sidebar__shape-results">
+              {getNaturalShapeResults().map((shape) => (
+                <button
+                  key={shape.id}
+                  type="button"
+                  className="search-result-thumb"
+                  onClick={() => handleUseShape(shape)}
+                >
+                  <img
+                    src={shape.thumbUrl}
+                    alt=""
+                    style={{ width: 64, height: 64, objectFit: 'contain', backgroundColor: '#fff' }}
+                    onError={(e) => {
+                      // Replace broken/missing shape image with a tiny inline SVG placeholder
+                      try {
+                        e.target.onerror = null;
+                        const label = (shape.description || 'sh').toUpperCase().slice(0, 2);
+                        const fallbackSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='100%' height='100%' fill='%23f3f4f6'/><text x='50%' y='50%' font-size='14' dominant-baseline='middle' text-anchor='middle' fill='%236b7280' font-family='Arial,Helvetica,sans-serif'>${label}</text></svg>`;
+                        e.target.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(fallbackSvg);
+                      } catch (err) {
+                        /* ignore fallback errors */
+                      }
+                    }}
+                  />
+                </button>
+              ))}
+            </div>
           </div>
         );
       case 'images': {
@@ -6014,21 +6792,9 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
                 <i className="fas fa-chevron-left" aria-hidden="true"></i>
               </button>
             </div>
-            <p>Search for royalty-free images from Unsplash and Pixabay.</p>
-            <div className="builder-sidebar__provider-toggle" role="group" aria-label="Choose image provider">
-              {PHOTO_PROVIDERS.map((provider) => (
-                <button
-                  key={provider.id}
-                  type="button"
-                  className={`filter-btn ${photoProvider === provider.id ? 'active' : ''}`}
-                  onClick={() => setPhotoProvider(provider.id)}
-                >
-                  {provider.label}
-                </button>
-              ))}
-            </div>
+            <p>Searches Unsplash and Pixabay together automatically.</p>
             <div className="builder-sidebar__provider-note">
-              Showing results from {activeProviderLabel}. Please display attribution when publishing your design.
+              Showing combined results from Unsplash + Pixabay. Please display attribution when publishing your design.
             </div>
             <div className="builder-sidebar__filters" role="group" aria-label="Filter results">
               {PHOTO_FILTERS.map((filter) => (
@@ -6466,11 +7232,6 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
                 {isSearchingIcons ? 'Searching...' : 'Search'}
               </button>
             </div>
-            {!hasTriggeredIconSearchRef.current && (
-              <div className="builder-sidebar__hint" style={{ marginBottom: '10px', fontSize: '12px', color: '#666' }}>
-                Popular icons (search above for more options):
-              </div>
-            )}
             {iconSearchResults.length > 0 ? (
               <div className="builder-sidebar__icon-results">
                 {iconSearchResults.map((icon) => (
@@ -6509,7 +7270,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
                       <span>
                         {isLoadingMoreIcons
                           ? 'Loading more icons...'
-                          : 'Scroll for more icons'}
+                          : ''}
                       </span>
                     </div>
                     <div className="load-more-container">
@@ -6519,7 +7280,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
                         onClick={handleLoadMoreIcons}
                         disabled={isLoadingMoreIcons}
                       >
-                        {isLoadingMoreIcons ? 'Loading...' : 'Load More Icons'}
+                        {isLoadingMoreIcons ? 'Loading...' : ''}
                       </button>
                     </div>
                   </>

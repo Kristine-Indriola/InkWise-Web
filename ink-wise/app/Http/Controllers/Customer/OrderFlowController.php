@@ -446,10 +446,10 @@ class OrderFlowController extends Controller
                 'basePrice' => $this->orderFlow->unitPriceFor($product),
                 'minQty' => $minQty,
                 'maxQty' => $maxQty,
-                'estimatedDeliveryDate' => Carbon::now()->addWeekdays(5)->format('F j, Y'),
-                'estimatedDeliveryDateFormatted' => Carbon::now()->addWeekdays(5)->format('Y-m-d'),
-                'estimatedDeliveryMinDate' => Carbon::now()->addWeekdays(5)->subDays(2)->format('Y-m-d'),
-                'estimatedDeliveryMaxDate' => Carbon::now()->addWeekdays(5)->format('Y-m-d'),
+                'estimatedDeliveryDate' => Carbon::now()->addMonth()->format('F j, Y'),
+                'estimatedDeliveryDateFormatted' => Carbon::now()->addMonth()->format('Y-m-d'),
+                'estimatedDeliveryMinDate' => Carbon::tomorrow()->format('Y-m-d'),
+                'estimatedDeliveryMaxDate' => Carbon::now()->addMonths(2)->format('Y-m-d'),
                 'orderSummary' => $summary,
             ]);
         }
@@ -499,10 +499,10 @@ class OrderFlowController extends Controller
             'basePrice' => $this->orderFlow->unitPriceFor($product),
             'minQty' => $minQty,
             'maxQty' => $maxQty,
-            'estimatedDeliveryDate' => Carbon::now()->addWeekdays(5)->format('F j, Y'),
-            'estimatedDeliveryDateFormatted' => Carbon::now()->addWeekdays(5)->format('Y-m-d'),
-            'estimatedDeliveryMinDate' => Carbon::now()->addWeekdays(5)->subDays(2)->format('Y-m-d'),
-            'estimatedDeliveryMaxDate' => Carbon::now()->addWeekdays(5)->format('Y-m-d'),
+            'estimatedDeliveryDate' => Carbon::now()->addMonth()->format('F j, Y'),
+            'estimatedDeliveryDateFormatted' => Carbon::now()->addMonth()->format('Y-m-d'),
+            'estimatedDeliveryMinDate' => Carbon::tomorrow()->format('Y-m-d'),
+            'estimatedDeliveryMaxDate' => Carbon::now()->addMonths(2)->format('Y-m-d'),
             'orderSummary' => session(static::SESSION_SUMMARY_KEY),
         ]);
     }

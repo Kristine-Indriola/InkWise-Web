@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const toggleButtons = Array.from(document.querySelectorAll('.preview-toggle button'));
 
   const previewPlaceholder = '/images/placeholder.png';
-  const storageKey = shell?.dataset?.storageKey ?? 'inkwise-addtocart';
+  const storageKey = shell?.dataset?.storageKey ?? 'inkwise-finalstep';
   const envelopeUrl = addToCartBtn?.dataset?.envelopeUrl ?? shell?.dataset?.envelopeUrl ?? '/order/envelope';
   const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
 
@@ -14,7 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const readSummary = () => {
     try {
-      const raw = window.sessionStorage.getItem(storageKey);
+      // Try the page's storage key first, then fall back to the finalstep key
+      const raw = window.sessionStorage.getItem(storageKey) || window.sessionStorage.getItem('inkwise-finalstep');
       return raw ? JSON.parse(raw) : null;
     } catch (error) {
       console.warn('Unable to parse stored order summary', error);
@@ -76,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Store the summary for the next step
     writeSummary(summary);
 
-    showToast('Added to cart — redirecting to envelope options...');
+    showToast('Continuing to checkout — redirecting to envelope options...');
 
     window.setTimeout(() => {
       window.location.href = envelopeUrl;

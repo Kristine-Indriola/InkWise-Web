@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use App\Notifications\TemplateUploadedNotification;
+use App\Notifications\TemplateReturnedNotification;
 
 class TemplateController extends Controller
 {
@@ -738,11 +739,18 @@ public function uploadToProduct(Request $request, $id)
             $productUploadData
         );
 
+        // Capture who uploaded and when for downstream notifications
+        $metadata = $template->metadata ?? [];
+        $metadata['last_uploaded_by_user_id'] = $staff->id ?? null;
+        $metadata['last_uploaded_by_name'] = $staff->name ?? null;
+        $metadata['last_uploaded_at'] = now()->toIso8601String();
+
         // Ensure the template returns to uploaded status with a fresh timestamp
         $template->forceFill([
             'status' => 'uploaded',
             'status_note' => null,
             'status_updated_at' => now(),
+            'metadata' => $metadata,
         ])->save();
 
         // Flip any related products back to published once the template is re-uploaded
@@ -793,6 +801,15 @@ public function uploadToProduct(Request $request, $id)
                 ])->save();
             }
         });
+
+        // Notify the last uploader (staff) that the template was returned
+        $metadata = $template->metadata ?? [];
+        $staffUserId = $metadata['last_uploaded_by_user_id'] ?? null;
+        $staffUser = $staffUserId ? User::find($staffUserId) : null;
+        if ($staffUser) {
+            $adminUser = Auth::user();
+            $staffUser->notify(new TemplateReturnedNotification($template, $adminUser, $data['note'] ?? null));
+        }
 
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([

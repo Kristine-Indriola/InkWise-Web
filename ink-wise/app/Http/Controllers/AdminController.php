@@ -281,17 +281,7 @@ class AdminController extends Controller
         /** @var User $admin */
         $admin = Auth::user()->load(['staff', 'address']);
 
-        // Ensure admin has a staff record (create if missing)
-        if (!$admin->staff) {
-            $admin->staff()->create([
-                'first_name' => 'Super',
-                'last_name' => 'Admin',
-                'role' => 'admin',
-                'contact_number' => '0917-000-0000',
-            ]);
-            // Reload the relationship
-            $admin->load(['staff', 'address']);
-        }
+        $this->attachAdminStaffRecord($admin);
 
         return view('admin.profile.show', compact('admin'));
     }
@@ -302,17 +292,7 @@ class AdminController extends Controller
         /** @var User $admin */
         $admin = Auth::user()->load(['staff', 'address']);
 
-        // Ensure admin has a staff record (create if missing)
-        if (!$admin->staff) {
-            $admin->staff()->create([
-                'first_name' => 'Super',
-                'last_name' => 'Admin',
-                'role' => 'admin',
-                'contact_number' => '0917-000-0000',
-            ]);
-            // Reload the relationship
-            $admin->load(['staff', 'address']);
-        }
+        $this->attachAdminStaffRecord($admin);
 
         return view('admin.profile.edit', compact('admin'));
     }
@@ -323,21 +303,10 @@ class AdminController extends Controller
         /** @var User $admin */
         $admin = Auth::user()->load(['staff', 'address']);
 
-        // Ensure admin has a staff record (create if missing)
-        if (!$admin->staff) {
-            $admin->staff()->create([
-                'first_name' => $request->first_name ?: 'Super',
-                'last_name' => $request->last_name ?: 'Admin',
-                'role' => 'admin',
-                'contact_number' => $request->contact_number ?: '0917-000-0000',
-            ]);
-            // Reload the relationship
-            $admin->load(['staff', 'address']);
-        }
+        $this->attachAdminStaffRecord($admin, $request);
 
         // ✅ Validation
         $request->validate([
-            'email'          => 'required|email|unique:users,email,' . $admin->user_id . ',user_id',
             'first_name'     => 'required|string|max:100',
             'middle_name'    => 'nullable|string|max:100',
             'last_name'      => 'required|string|max:100',
@@ -347,14 +316,16 @@ class AdminController extends Controller
             'profile_pic'    => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120', // 5MB
         ]);
 
-        // ✅ Update users table (email + optional password)
-        $updateData = ['email' => $request->email];
+        // ✅ Update users table (only optional password). Email stays fixed.
         if (!empty($request->password)) {
-            $updateData['password'] = Hash::make($request->password);
+            $admin->update([
+                'password' => Hash::make($request->password),
+            ]);
         }
-        $admin->update($updateData);
 
-        // ✅ Update staff table
+        // ✅ Ensure we are updating the dedicated admin staff record (ID 6112)
+        $this->attachAdminStaffRecord($admin);
+
         if ($admin->staff) {
             $staffUpdateData = [
                 'first_name'     => $request->first_name,
@@ -362,6 +333,7 @@ class AdminController extends Controller
                 'last_name'      => $request->last_name,
                 'contact_number' => $request->contact_number,
                 'address'        => $request->address,
+                'role'           => 'admin',
             ];
 
             // Handle profile picture upload
@@ -377,6 +349,32 @@ class AdminController extends Controller
 
         return redirect()->route('admin.profile.show')
                          ->with('success', 'Profile updated successfully.');
+    }
+
+    /**
+     * Ensure we attach the dedicated admin staff row (ID 6112).
+     */
+    private function attachAdminStaffRecord(User $admin, ?Request $request = null): void
+    {
+        $adminStaffId = 6112;
+
+        // Prefer the dedicated admin staff record when it exists
+        $adminStaff = Staff::find($adminStaffId);
+        if ($adminStaff) {
+            $admin->setRelation('staff', $adminStaff);
+            return;
+        }
+
+        // Otherwise ensure there is at least one staff record linked to this admin
+        if (!$admin->staff) {
+            $adminStaff = $admin->staff()->create([
+                'first_name' => $request?->first_name ?: 'Super',
+                'last_name' => $request?->last_name ?: 'Admin',
+                'role' => 'admin',
+                'contact_number' => $request?->contact_number ?: '0917-000-0000',
+            ]);
+            $admin->setRelation('staff', $adminStaff);
+        }
     }
 
     public function notifications()

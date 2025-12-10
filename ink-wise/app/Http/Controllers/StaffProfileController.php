@@ -44,7 +44,6 @@ class StaffProfileController extends Controller
             'first_name' => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
             'last_name' => 'required|string|max:255',
-            'email' => 'required|email|max:255', //|unique:users,email,' . $user->user_id . ',user_id',
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:255',
             'profile_pic' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120', // 5MB
@@ -54,7 +53,6 @@ class StaffProfileController extends Controller
         $fullName = trim($request->first_name . ' ' . ($request->middle_name ? $request->middle_name . ' ' : '') . $request->last_name);
 
         $user->name = $fullName;
-        $user->email = $request->email;
         $user->save();
 
         // Update staff table with separate name fields

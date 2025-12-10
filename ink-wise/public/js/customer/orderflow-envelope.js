@@ -22,10 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const sampleEnvelopes = [
-    { id: 'env_sample_1', name: 'Classic White', price: 8.5, image: '/images/no-image.png', material: 'Uncoated smooth', min_qty: 10, max_qty: 200 },
-    { id: 'env_sample_2', name: 'Natural Kraft', price: 9.25, image: '/images/no-image.png', material: 'Kraft paper', min_qty: 10, max_qty: 300 },
-    { id: 'env_sample_3', name: 'Pearl Shimmer', price: 14.0, image: '/images/no-image.png', material: 'Pearlescent shimmer', min_qty: 10, max_qty: 150 },
-    { id: 'env_sample_4', name: 'Black Luxe', price: 16.5, image: '/images/no-image.png', material: 'Premium matte', min_qty: 10, max_qty: 120 }
+    // Removed default samples as per request
   ];
 
   const state = {
@@ -427,7 +424,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!items.length) {
       const empty = document.createElement('div');
       empty.className = 'envelope-item envelope-item--empty';
-      empty.innerHTML = '<p>No envelopes available yet. Please check back soon.</p>';
+      empty.innerHTML = '<p>No stocks available.</p>';
       envelopeGrid.appendChild(empty);
       return;
     }
@@ -457,7 +454,7 @@ document.addEventListener('DOMContentLoaded', () => {
             max_qty: item.max_qty
           }));
         } else {
-          state.envelopes = sampleEnvelopes;
+          state.envelopes = [];
         }
       } else {
         console.warn('Envelope API returned status', response.status);
@@ -466,7 +463,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch (error) {
       console.error('Error loading envelopes', error);
-      state.envelopes = sampleEnvelopes;
+      state.envelopes = [];
       setBadgeState({ label: 'Offline', tone: 'summary-badge--alert' });
     } finally {
       clearSkeleton();
@@ -481,7 +478,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   skipBtn?.addEventListener('click', async () => {
+    console.log('Skip envelopes button clicked');
     if (state.isSaving) return;
+
+    // Allow skipping even when no envelopes loaded or selected
+    // by proceeding without checking selection state.
 
     state.isSaving = true;
     setContinueState(true);

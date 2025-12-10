@@ -94,6 +94,9 @@ export function initializeCustomerStudioLegacy() {
         return false;
       }
       const tagName = typeof node.tagName === 'string' ? node.tagName.toLowerCase() : '';
+      if (tagName === 'style' || tagName === 'script' || tagName === 'defs' || tagName === 'title' || tagName === 'metadata') {
+        return false;
+      }
       if (tagName === 'text' || tagName === 'tspan') {
         return true;
       }
@@ -103,12 +106,48 @@ export function initializeCustomerStudioLegacy() {
         return true;
       }
 
-      if (node.textContent && node.textContent.trim() !== '') {
-        return true;
+      const rawText = (node.textContent || '').trim();
+      if (!rawText) {
+        return false;
+      }
+      const looksLikeCss = /\{[^}]*\}|;/.test(rawText) && rawText.length > 80;
+      if (looksLikeCss) {
+        return false;
       }
 
       return true;
     };
+
+    const readNodeTextValue = (node) => {
+      if (!node) {
+        return '';
+      }
+      const tspans = node.querySelectorAll('tspan');
+      if (tspans && tspans.length > 0) {
+        return sanitizeTextValue(Array.from(tspans).map((span) => span.textContent || '').join('\n'));
+      }
+      return sanitizeTextValue(node.textContent || '');
+    };
+
+    const writeNodeTextValue = (node, value) => {
+      if (!node) {
+        return;
+      }
+      const cleanValue = sanitizeTextValue(value);
+      const tspans = node.querySelectorAll('tspan');
+      if (tspans && tspans.length > 0) {
+        const parts = String(cleanValue ?? '').split(/\r?\n/);
+        tspans.forEach((span, index) => {
+          span.textContent = parts[index] ?? '';
+        });
+      } else {
+        node.textContent = cleanValue ?? '';
+      }
+      if (node.dataset) {
+        node.dataset.currentText = cleanValue ?? '';
+      }
+    };
+
 
     const resolveImageLikeNode = (node) => {
       if (!node) {
@@ -163,6 +202,26 @@ export function initializeCustomerStudioLegacy() {
         node.dataset.replacedImage = 'true';
       }
       return true;
+    };
+
+    const ensureSolidBackground = (root) => {
+      if (!root || typeof root.insertBefore !== 'function') {
+        return;
+      }
+
+      const existing = root.querySelector('[data-inkwise-bg="true"]');
+      if (existing) {
+        return;
+      }
+
+      const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      bg.setAttribute('x', '0');
+      bg.setAttribute('y', '0');
+      bg.setAttribute('width', '100%');
+      bg.setAttribute('height', '100%');
+      bg.setAttribute('fill', '#ffffff');
+      bg.setAttribute('data-inkwise-bg', 'true');
+      root.insertBefore(bg, root.firstChild);
     };
 
     const bootstrapPayload = (typeof window !== 'undefined' && window.inkwiseStudioBootstrap)
@@ -355,6 +414,21 @@ export function initializeCustomerStudioLegacy() {
     let activeImageKey = null;
     let backgroundSelected = false;
     let activeCropSession = null;
+
+    const SNAP_SIZE = 8;
+    const SNAP_THRESHOLD = 4;
+
+    const sanitizeTextValue = (raw) => {
+      const value = (raw || '').toString();
+      const trimmed = value.trim();
+
+      const looksLikeCss = /::before|\{[^}]*\}|;/.test(trimmed) && trimmed.length > 120;
+      if (looksLikeCss) {
+        return '';
+      }
+
+      return trimmed;
+    };
 
     const sideIsAvailable = (side) => {
       if (!side || side === 'front') {
@@ -1010,6 +1084,16 @@ export function initializeCustomerStudioLegacy() {
         cardBg.dataset.canvasShape = shape;
       }
 
+      if (previewSvg) {
+        previewSvg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        previewSvg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+      }
+
+      if (currentSvgRoot && !currentSvgRoot.getAttribute('viewBox')) {
+        currentSvgRoot.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        currentSvgRoot.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+      }
+
       if (previewStage) {
         previewStage.style.setProperty('--stage-width', `${displayWidth + 112}px`);
       }
@@ -1244,7 +1328,11 @@ export function initializeCustomerStudioLegacy() {
         }
       });
 
-      // Return all elements with data-preview-node
+      // Return only elements with data-preview-node, preferring text/tspan first to populate the text panel reliably
+      const prioritized = Array.from(rootElement.querySelectorAll('text[data-preview-node], tspan[data-preview-node]'));
+      if (prioritized.length > 0) {
+        return prioritized;
+      }
       return Array.from(rootElement.querySelectorAll('[data-preview-node]'));
     };
 
@@ -2739,6 +2827,36 @@ export function initializeCustomerStudioLegacy() {
       let dragState = null;
       let resizeState = null;
 
+      const getSafetyInset = () => {
+        const width = overlayWidth || overlayRect?.width || cardBg?.clientWidth || 0;
+        const height = overlayHeight || overlayRect?.height || cardBg?.clientHeight || 0;
+        const base = Math.min(width, height);
+        return Math.max(8, Math.round(base * 0.02));
+      };
+
+      const snapCoordinate = (value, limit) => {
+        const candidates = [];
+        const gridSnap = Math.round(value / SNAP_SIZE) * SNAP_SIZE;
+        candidates.push(gridSnap);
+
+        // center lines for easy alignment
+        if (Number.isFinite(limit) && limit > 0) {
+          candidates.push(limit / 2);
+        }
+
+        let best = value;
+        let bestDelta = Number.POSITIVE_INFINITY;
+        candidates.forEach((candidate) => {
+          const delta = Math.abs(candidate - value);
+          if (delta < bestDelta && delta <= SNAP_THRESHOLD) {
+            best = candidate;
+            bestDelta = delta;
+          }
+        });
+
+        return best;
+      };
+
       const onPointerDown = (event) => {
         if (event.button !== 0) {
           return;
@@ -2771,11 +2889,18 @@ export function initializeCustomerStudioLegacy() {
         const dx = event.clientX - dragState.startX;
         const dy = event.clientY - dragState.startY;
 
-        const maxLeft = Math.max(0, dragState.widthLimit - frameRect.width);
-        const maxTop = Math.max(0, dragState.heightLimit - frameRect.height);
+        const inset = getSafetyInset();
+        const maxLeft = Math.max(0, dragState.widthLimit - frameRect.width - inset * 2);
+        const maxTop = Math.max(0, dragState.heightLimit - frameRect.height - inset * 2);
 
-        frameRect.left = clamp(dragState.startLeft + dx, 0, maxLeft);
-        frameRect.top = clamp(dragState.startTop + dy, 0, maxTop);
+        const rawLeft = dragState.startLeft + dx;
+        const rawTop = dragState.startTop + dy;
+
+        const snappedLeft = snapCoordinate(rawLeft, dragState.widthLimit);
+        const snappedTop = snapCoordinate(rawTop, dragState.heightLimit);
+
+        frameRect.left = clamp(snappedLeft, inset, inset + maxLeft);
+        frameRect.top = clamp(snappedTop, inset, inset + maxTop);
         applyFrameRect();
       };
 
@@ -2839,6 +2964,7 @@ export function initializeCustomerStudioLegacy() {
         const localX = event.clientX - overlayRect.left;
         const localY = event.clientY - overlayRect.top;
         const anchor = resizeState.anchor;
+        const inset = getSafetyInset();
 
         let newLeft = anchor.left;
         let newTop = anchor.top;
@@ -2869,8 +2995,8 @@ export function initializeCustomerStudioLegacy() {
 
         newWidth = clamp(newWidth, minWidth, overlayWidth);
         newHeight = clamp(newHeight, minHeight, overlayHeight);
-        newLeft = clamp(newLeft, 0, overlayWidth - newWidth);
-        newTop = clamp(newTop, 0, overlayHeight - newHeight);
+        newLeft = snapCoordinate(clamp(newLeft, inset, overlayWidth - inset - newWidth), overlayWidth);
+        newTop = snapCoordinate(clamp(newTop, inset, overlayHeight - inset - newHeight), overlayHeight);
 
         frameRect.left = newLeft;
         frameRect.top = newTop;
@@ -2935,6 +3061,7 @@ export function initializeCustomerStudioLegacy() {
         const localX = event.clientX - overlayRect.left;
         const localY = event.clientY - overlayRect.top;
         const anchor = resizeState.anchor;
+        const inset = getSafetyInset();
 
         let newLeft = anchor.left;
         let newTop = anchor.top;
@@ -2984,8 +3111,8 @@ export function initializeCustomerStudioLegacy() {
 
         newWidth = clamp(newWidth, minWidth, overlayWidth);
         newHeight = clamp(newHeight, minHeight, overlayHeight);
-        newLeft = clamp(newLeft, 0, overlayWidth - newWidth);
-        newTop = clamp(newTop, 0, overlayHeight - newHeight);
+        newLeft = snapCoordinate(clamp(newLeft, inset, overlayWidth - inset - newWidth), overlayWidth);
+        newTop = snapCoordinate(clamp(newTop, inset, overlayHeight - inset - newHeight), overlayHeight);
 
         frameRect.left = newLeft;
         frameRect.top = newTop;
@@ -3593,6 +3720,32 @@ export function initializeCustomerStudioLegacy() {
       return /\.svg($|\?)/i.test(trimmed);
     };
 
+    const normalizeSvgTextVisibility = (root) => {
+      if (!root) return;
+      const texts = root.querySelectorAll('text, tspan');
+      texts.forEach((node) => {
+        node.removeAttribute('opacity');
+        node.style.opacity = '1';
+        if (node.style && node.style.mixBlendMode) {
+          node.style.mixBlendMode = 'normal';
+        }
+        const fill = node.getAttribute('fill');
+        if (!fill || fill === 'none') {
+          node.setAttribute('fill', '#111');
+        }
+        node.removeAttribute('fill-opacity');
+        node.removeAttribute('stroke-opacity');
+        node.style.fillOpacity = '1';
+        node.style.strokeOpacity = '1';
+        if (!node.getAttribute('stroke')) {
+          node.setAttribute('stroke', 'none');
+        }
+        if (!node.getAttribute('paint-order')) {
+          node.setAttribute('paint-order', 'stroke fill');
+        }
+      });
+    };
+
     // Load an SVG file and bind any text/image elements (with data-preview-node) into the UI and make them editable
     const loadSVGAndBind = async (url) => {
       if (!previewSvg || !url) {
@@ -3646,6 +3799,11 @@ export function initializeCustomerStudioLegacy() {
           currentSvgRoot = nestedSvg;
         } else {
           currentSvgRoot = previewSvg;
+        }
+
+        if (currentSvgRoot) {
+          ensureSolidBackground(currentSvgRoot);
+          normalizeSvgTextVisibility(currentSvgRoot);
         }
 
         if (currentSvgRoot) {
@@ -3770,6 +3928,7 @@ export function initializeCustomerStudioLegacy() {
 
           if (nodes.length > 0) {
             let createdTextField = false;
+            const seenKeys = new Set();
 
             nodes.forEach((node) => {
               const key = node.getAttribute('data-preview-node');
@@ -3777,13 +3936,18 @@ export function initializeCustomerStudioLegacy() {
                 return;
               }
 
+              if (seenKeys.has(key)) {
+                return;
+              }
+              seenKeys.add(key);
+
               const isImageNode = nodeRepresentsImage(node);
               const isTextNode = nodeRepresentsText(node);
 
               if (isTextNode) {
                 createdTextField = true;
                 const labelText = node.dataset?.previewLabel || key;
-                const defaultValue = node.dataset?.defaultText || node.textContent || '';
+                const defaultValue = node.dataset?.defaultText || readNodeTextValue(node) || '';
                 createFieldItem(key, defaultValue, labelText);
               }
             });
@@ -3821,9 +3985,9 @@ export function initializeCustomerStudioLegacy() {
             node.addEventListener('input', () => {
               const input = document.querySelector(`#textFieldList input[data-preview-target="${key}"]`);
               if (input) {
-                input.value = node.textContent;
+                input.value = readNodeTextValue(node);
               }
-              node.dataset.currentText = node.textContent || '';
+              node.dataset.currentText = readNodeTextValue(node) || '';
               scheduleOverlaySync();
               autosave?.schedule('text-edit');
             });
@@ -3848,16 +4012,15 @@ export function initializeCustomerStudioLegacy() {
           if (input && isTextNode) {
             // avoid adding duplicate listeners
             input.addEventListener('input', () => {
-              node.textContent = input.value;
-              node.dataset.currentText = input.value;
+              writeNodeTextValue(node, input.value);
               autosave?.schedule('text-change');
             });
             // initialize SVG text from input if present
             if (input.value && input.value.trim() !== '') {
-              node.textContent = input.value;
+              writeNodeTextValue(node, input.value);
             } else {
               // otherwise keep existing node text (or blank)
-              input.value = node.textContent || '';
+              input.value = readNodeTextValue(node) || '';
             }
           }
         });
@@ -3873,6 +4036,77 @@ export function initializeCustomerStudioLegacy() {
         return false;
       }
     };
+
+    const exportCurrentCanvasAsPng = async (options = {}) => {
+      const {
+        scale = 3,
+        filename = 'inkwise-template.png',
+        download = true,
+      } = options;
+
+      const root = currentSvgRoot || previewSvg;
+      if (!root) {
+        throw new Error('No active canvas to export.');
+      }
+
+      ensureSolidBackground(root);
+
+      const serializer = new XMLSerializer();
+      const markup = serializer.serializeToString(root);
+
+      const parseNumber = (value) => {
+        const num = Number(value);
+        return Number.isFinite(num) ? num : null;
+      };
+
+      const viewBox = (root.getAttribute('viewBox') || '').split(/[\s,]+/).map(parseNumber);
+      const vbWidth = viewBox.length === 4 ? viewBox[2] : null;
+      const vbHeight = viewBox.length === 4 ? viewBox[3] : null;
+
+      const baseWidth = parseNumber(cardBg?.dataset?.canvasWidth)
+        || parseNumber(canvasWrapper?.dataset?.canvasWidth)
+        || vbWidth
+        || 1080;
+      const baseHeight = parseNumber(cardBg?.dataset?.canvasHeight)
+        || parseNumber(canvasWrapper?.dataset?.canvasHeight)
+        || vbHeight
+        || 1527;
+
+      const exportWidth = Math.max(1, Math.round(baseWidth * Math.max(1, scale)));
+      const exportHeight = Math.max(1, Math.round(baseHeight * Math.max(1, scale)));
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
+
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = exportWidth;
+      canvas.height = exportHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, exportWidth, exportHeight);
+      ctx.drawImage(img, 0, 0, exportWidth, exportHeight);
+
+      const dataUrl = canvas.toDataURL('image/png', 1.0);
+
+      if (download) {
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = filename;
+        link.click();
+      }
+
+      return { dataUrl, width: exportWidth, height: exportHeight };
+    };
+
+    if (typeof window !== 'undefined') {
+      window.inkwiseExportCurrentSide = (opts = {}) => exportCurrentCanvasAsPng(opts);
+    }
 
     // Attach delete handlers to existing text-field-items (initial fields)
     const attachDeleteHandler = (wrapper) => {
@@ -3982,6 +4216,7 @@ export function initializeCustomerStudioLegacy() {
           usingSvg = true;
           cardBg.style.backgroundImage = 'none';
           cardBg.style.backgroundSize = '';
+          normalizeSvgTextVisibility(currentSvgRoot);
         }
       }
 

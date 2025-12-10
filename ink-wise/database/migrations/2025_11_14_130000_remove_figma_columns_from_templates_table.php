@@ -18,7 +18,6 @@ return new class extends Migration
                 'figma_url',
                 'figma_metadata',
                 'figma_synced_at',
-                'has_back_design',
             ]);
         });
     }
@@ -34,7 +33,6 @@ return new class extends Migration
             $table->text('figma_url')->nullable()->after('figma_node_id');
             $table->json('figma_metadata')->nullable()->after('figma_url');
             $table->timestamp('figma_synced_at')->nullable()->after('figma_metadata');
-            $table->boolean('has_back_design')->default(false)->after('figma_synced_at');
         });
     }
 };

@@ -4,21 +4,21 @@
 @php
     // Get current admin user with staff relationship for profile image
     $currentAdmin = Auth::user();
+    $adminAbbr = '';
     if ($currentAdmin && $currentAdmin->role === 'admin') {
-        $currentAdmin->load('staff');
+      $currentAdmin->load('staff');
 
-        // Generate initials for fallback avatar
-        $adminAbbr = '';
-        if ($currentAdmin->staff && $currentAdmin->staff->first_name) {
-            $first = $currentAdmin->staff->first_name;
-            $last = $currentAdmin->staff->last_name ?? '';
-            $adminAbbr = strtoupper(substr($first, 0, 1) . substr($last, 0, 1));
-        } elseif (!empty($currentAdmin->name)) {
-            $parts = preg_split('/\s+/', trim($currentAdmin->name));
-            $first = $parts[0] ?? '';
-            $second = $parts[1] ?? '';
-            $adminAbbr = strtoupper(substr($first, 0, 1) . ($second ? substr($second, 0, 1) : ''));
-        }
+      // Generate initials for fallback avatar
+      if ($currentAdmin->staff && $currentAdmin->staff->first_name) {
+        $first = $currentAdmin->staff->first_name;
+        $last = $currentAdmin->staff->last_name ?? '';
+        $adminAbbr = strtoupper(substr($first, 0, 1) . substr($last, 0, 1));
+      } elseif (!empty($currentAdmin->name)) {
+        $parts = preg_split('/\s+/', trim($currentAdmin->name));
+        $first = $parts[0] ?? '';
+        $second = $parts[1] ?? '';
+        $adminAbbr = strtoupper(substr($first, 0, 1) . ($second ? substr($second, 0, 1) : ''));
+      }
     }
 @endphp
 
