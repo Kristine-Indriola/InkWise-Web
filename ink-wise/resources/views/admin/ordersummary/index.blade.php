@@ -398,7 +398,7 @@
 	$orderId = data_get($order, 'id');
 	$orderNumber = data_get($order, 'order_number')
 		?? data_get($order, 'reference')
-		?? ($orderId ? 'ORD-' . str_pad((string) $orderId, 5, '0', STR_PAD_LEFT) : 'Draft order');
+		?? ($orderId ? 'ORD-' . str_pad((string) $orderId, 5, '0', STR_PAD_LEFT) : 'New Order');
 	$orderTitle = $orderNumber ? 'Order ' . $orderNumber : 'Order Summary';
 
 	$placedAtRaw = data_get($order, 'created_at');
@@ -542,6 +542,7 @@
 	$ordersBackUrl = $statusManageUrl ?? $ordersIndexUrl;
 
 	$statusOptions = [
+		'draft' => 'New Order',
 		'pending' => 'Order Received',
 		'processing' => 'Processing',
 		'in_production' => 'In Progress',
@@ -549,8 +550,8 @@
 		'completed' => 'Completed',
 		'cancelled' => 'Cancelled',
 	];
-	$statusFlow = ['pending', 'processing', 'in_production', 'confirmed', 'completed'];
-	$currentStatus = strtolower((string) data_get($order, 'status', 'pending'));
+	$statusFlow = ['draft', 'pending', 'processing', 'in_production', 'confirmed', 'completed'];
+	$currentStatus = strtolower((string) data_get($order, 'status', 'draft'));
 	$flowIndex = array_search($currentStatus, $statusFlow, true);
 	$currentChipModifier = str_replace('_', '-', $currentStatus);
 	$currentStatusLabel = $statusOptions[$currentStatus] ?? ucfirst(str_replace('_', ' ', $currentStatus));

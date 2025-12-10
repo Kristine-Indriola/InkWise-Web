@@ -24,12 +24,19 @@ class OrderStatusUpdatedTest extends TestCase
         ]);
 
         $statusLabels = [
+            'draft' => 'New Order',
             'pending' => 'Order Received',
             'processing' => 'Processing',
             'completed' => 'Completed',
         ];
 
-        $notification = new OrderStatusUpdated($order, 'pending', 'processing', $statusLabels);
+        $notification = new OrderStatusUpdated(
+            $order->id,
+            $order->order_number,
+            'pending',
+            'processing',
+            'Processing'
+        );
 
         $channels = $notification->via($user);
 
@@ -52,12 +59,19 @@ class OrderStatusUpdatedTest extends TestCase
         ]);
 
         $statusLabels = [
+            'draft' => 'New Order',
             'pending' => 'Order Received',
             'processing' => 'Processing',
             'completed' => 'Completed',
         ];
 
-        $notification = new OrderStatusUpdated($order, 'pending', 'processing', $statusLabels);
+        $notification = new OrderStatusUpdated(
+            $order->id,
+            $order->order_number,
+            'pending',
+            'processing',
+            'Processing'
+        );
 
         $data = $notification->toArray($user);
 
@@ -67,7 +81,7 @@ class OrderStatusUpdatedTest extends TestCase
         $this->assertSame('pending', $data['old_status']);
         $this->assertSame('processing', $data['new_status']);
         $this->assertSame('Processing', $data['status_label']);
-        $this->assertSame(route('customer.my_purchase'), $data['url']);
+        $this->assertSame('order_status_update', $data['type']);
     }
 
     public function test_notification_handles_order_without_order_number(): void
@@ -85,14 +99,22 @@ class OrderStatusUpdatedTest extends TestCase
         ]);
 
         $statusLabels = [
+            'draft' => 'New Order',
             'pending' => 'Order Received',
             'processing' => 'Processing',
+            'completed' => 'Completed',
         ];
 
-        $notification = new OrderStatusUpdated($order, 'pending', 'processing', $statusLabels);
+        $notification = new OrderStatusUpdated(
+            $order->id,
+            $order->order_number,
+            'pending',
+            'processing',
+            'Processing'
+        );
 
         $data = $notification->toArray($user);
 
-        $this->assertSame('Your order #123 status has been updated to: Processing', $data['message']);
+        $this->assertSame('Your order 123 status has been updated to: Processing', $data['message']);
     }
 }

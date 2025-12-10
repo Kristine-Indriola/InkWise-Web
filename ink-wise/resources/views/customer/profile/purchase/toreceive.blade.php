@@ -21,7 +21,7 @@
             'completed' => 'Completed',
             'cancelled' => 'Cancelled',
         ];
-        $statusFlow = ['pending', 'processing', 'in_production', 'confirmed', 'completed'];
+        $statusFlow = ['draft', 'pending', 'processing', 'in_production', 'confirmed', 'completed'];
         $normalizeMetadata = function ($metadata) {
             if (is_array($metadata)) {
                 return $metadata;

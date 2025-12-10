@@ -288,6 +288,7 @@
     'revenueThisWeek' => 0,
     'averageOrderValue' => 0,
     'pendingOrders' => 0,
+    'newOrders' => 0,
     'lowStock' => 0,
     'outOfStock' => 0,
     'totalStockUnits' => 0,
@@ -462,17 +463,17 @@
             </div>
             <span class="summary-card-meta">Gross sales generated</span>
         </div>
-        <div class="summary-card">
+        <a href="{{ route('admin.orders.index') }}" class="summary-card" style="text-decoration: none; color: inherit;">
             <div class="summary-card-header">
-                <span class="summary-card-label">Pending</span>
-                <span class="summary-card-chip warning">Action Needed</span>
+                <span class="summary-card-label">New Orders</span>
+                <span class="summary-card-chip info">Action Required</span>
             </div>
             <div class="summary-card-body">
-                <span class="summary-card-value">{{ number_format($metrics['pendingOrders']) }}</span>
-                <span class="summary-card-icon" aria-hidden="true">⏳</span>
+                <span class="summary-card-value">{{ number_format($metrics['newOrders']) }}</span>
+                <span class="summary-card-icon" aria-hidden="true">📋</span>
             </div>
-            <span class="summary-card-meta">Awaiting fulfillment</span>
-        </div>
+            <span class="summary-card-meta">Awaiting confirmation</span>
+        </a>
         <div class="summary-card">
             <div class="summary-card-header">
                 <span class="summary-card-label">Avg. Order</span>

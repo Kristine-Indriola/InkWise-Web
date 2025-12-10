@@ -19,6 +19,7 @@ class Order extends Model
 		'date_needed' => 'date',
 		'summary_snapshot' => 'array',
 		'metadata' => 'array',
+		'archived' => 'boolean',
 		'created_at' => 'datetime',
 		'updated_at' => 'datetime',
 	];
