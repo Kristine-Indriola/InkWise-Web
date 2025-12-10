@@ -13,7 +13,9 @@ class StaffCustomerController extends Controller
     public function index()
     {
         // get all customers (adjust if you have a different role system)
-        $customers = User::where('role', 'customer')->get(); 
+        $customers = User::where('role', 'customer')
+            ->with(['customer', 'address'])
+            ->get(); 
 
         return view('staff.customer_profile', compact('customers'));
     }
