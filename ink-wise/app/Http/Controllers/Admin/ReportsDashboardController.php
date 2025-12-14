@@ -44,6 +44,128 @@ class ReportsDashboardController extends Controller
         return view('admin.reports.inventory', $context);
     }
 
+    public function pickupCalendar(Request $request)
+    {
+        $period = $request->input('period', 'week'); // day, week, month, year
+
+        $now = Carbon::now();
+
+        switch ($period) {
+            case 'day':
+                $start = $now->copy()->startOfDay();
+                $end = $now->copy()->endOfDay();
+                break;
+            case 'week':
+                $start = $now->copy()->startOfWeek();
+                $end = $now->copy()->endOfWeek();
+                break;
+            case 'month':
+                $nextMonth = $now->copy()->addMonth();
+                $start = $nextMonth->copy()->startOfMonth();
+                $end = $nextMonth->copy()->endOfMonth();
+                break;
+            case 'year':
+                $start = $now->copy()->startOfYear();
+                $end = $now->copy()->endOfYear();
+                break;
+            default:
+                $start = $now->copy()->startOfWeek();
+                $end = $now->copy()->endOfWeek();
+                break;
+        }
+
+        $orders = Order::query()
+            ->with(['customer:customer_id,first_name,last_name', 'items:id,order_id,product_name,quantity'])
+            ->whereNotNull('date_needed')
+            ->where('date_needed', '>=', $start)
+            ->where('date_needed', '<=', $end)
+            ->orderBy('date_needed')
+            ->get()
+            ->groupBy(function (Order $order) {
+                return $order->date_needed->format('Y-m-d');
+            })
+            ->map(function (Collection $dayOrders) {
+                return $dayOrders->map(function (Order $order) {
+                    $customer = $order->customer;
+                    $customerName = collect([
+                        optional($customer)->first_name,
+                        optional($customer)->last_name,
+                    ])->filter()->implode(' ');
+
+                    if (trim($customerName) === '') {
+                        $customerName = optional($order->customerOrder)->name ?? '-';
+                    }
+
+                    return [
+                        'id' => $order->id,
+                        'inv' => 'INV' . $order->id,
+                        'customer_name' => $customerName,
+                        'total_amount' => (float) $order->total_amount,
+                        'items_count' => $order->items->sum('quantity'),
+                        'items_list' => $order->items->pluck('product_name')->filter()->implode(', '),
+                        'date_needed' => $order->date_needed->format('Y-m-d H:i:s'),
+                        'status' => $order->status,
+                    ];
+                });
+            });
+
+        if ($period === 'year') {
+            // For year view, group by month instead of individual days
+            $calendarData = [];
+            $current = $start->copy();
+
+            while ($current <= $end) {
+                $monthKey = $current->format('Y-m');
+                $monthStart = $current->copy()->startOfMonth();
+                $monthEnd = $current->copy()->endOfMonth();
+
+                $monthOrders = collect();
+                $monthTotalAmount = 0;
+                $monthTotalOrders = 0;
+
+                // Collect all orders for this month
+                while ($monthStart <= $monthEnd) {
+                    $dayKey = $monthStart->format('Y-m-d');
+                    if ($orders->has($dayKey)) {
+                        $dayOrders = $orders->get($dayKey);
+                        $monthOrders = $monthOrders->merge($dayOrders);
+                        $monthTotalOrders += $dayOrders->count();
+                        $monthTotalAmount += $dayOrders->sum('total_amount');
+                    }
+                    $monthStart->addDay();
+                }
+
+                $calendarData[$monthKey] = [
+                    'date' => $current->format('Y-m-01'), // First day of month
+                    'month_name' => $current->format('F Y'),
+                    'orders' => $monthOrders->values()->toArray(),
+                    'total_orders' => $monthTotalOrders,
+                    'total_amount' => $monthTotalAmount,
+                ];
+
+                $current->addMonth();
+            }
+        } else {
+            // For day/week/month views, show individual days
+            $calendarData = [];
+            $current = $start->copy();
+
+            while ($current <= $end) {
+                $dateKey = $current->format('Y-m-d');
+                $calendarData[$dateKey] = [
+                    'date' => $current->format('Y-m-d'),
+                    'day_name' => $current->format('l'),
+                    'orders' => $orders->get($dateKey, collect())->toArray(),
+                    'total_orders' => $orders->get($dateKey, collect())->count(),
+                    'total_amount' => $orders->get($dateKey, collect())->sum('total_amount'),
+                ];
+                $current->addDay();
+            }
+        }
+
+        return view('admin.reports.pickup-calendar', compact('calendarData', 'period', 'start', 'end'));
+    }
+
     private function buildReportContext(?Carbon $startDate = null, ?Carbon $endDate = null): array
     {
         $materials = Material::with('inventory')

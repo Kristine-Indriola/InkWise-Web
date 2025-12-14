@@ -109,8 +109,17 @@ document.addEventListener('DOMContentLoaded', () => {
       total: summary.totalAmount
     };
 
+    const estimatedDateValue = summary.estimated_date ?? summary.dateNeeded ?? null;
+    if (estimatedDateValue) {
+      metadataPayload.estimated_date = estimatedDateValue;
+      if (summary.dateNeededLabel) {
+        metadataPayload.estimated_date_label = summary.dateNeededLabel;
+      }
+    }
+
     const payload = {
       quantity: summary.quantity,
+      estimated_date: estimatedDateValue,
       paper_stock_id: toNumericOrNull(summary.paperStockId),
       paper_stock_price: summary.paperStockPrice,
       paper_stock_name: summary.paperStockName,
@@ -127,6 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (payload.paper_stock_price === null || Number.isNaN(payload.paper_stock_price)) delete payload.paper_stock_price;
     if (!payload.paper_stock_name) delete payload.paper_stock_name;
     if (!payload.addons.length) delete payload.addons;
+    if (!payload.estimated_date) delete payload.estimated_date;
     if (!Object.keys(metadataPayload).length) delete payload.metadata;
 
     const csrfToken = getCsrfToken();
@@ -687,6 +697,22 @@ document.addEventListener('DOMContentLoaded', () => {
         addons: roundCurrency(computedTotals.addons)
       }
     };
+
+    if (summary.estimated_date) {
+      summary.dateNeeded = summary.estimated_date;
+      try {
+        const parsedDate = new Date(summary.estimated_date);
+        if (!Number.isNaN(parsedDate.getTime())) {
+          summary.dateNeededLabel = parsedDate.toLocaleDateString('en-US', {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric'
+          });
+        }
+      } catch (error) {
+        // ignore formatting errors
+      }
+    }
 
     Object.entries(previewSelectionSnapshot).forEach(([group, payload]) => {
       if (!payload || typeof payload !== 'object') return;

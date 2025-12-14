@@ -18,6 +18,7 @@ class FinalizeOrderRequest extends FormRequest
             'paper_stock_id' => ['nullable', 'integer', 'exists:product_paper_stocks,id'],
             'paper_stock_price' => ['nullable', 'numeric', 'min:0'],
             'paper_stock_name' => ['nullable', 'string', 'max:255'],
+            'estimated_date' => ['nullable', 'date', 'after:today'],
             'addons' => ['nullable', 'array'],
             'addons.*' => ['integer', 'exists:product_addons,id'],
             'addon_quantities' => ['nullable', 'array'],

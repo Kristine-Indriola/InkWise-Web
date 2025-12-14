@@ -15,6 +15,7 @@ use App\Models\ProductPaperStock;
 use App\Models\ProductEnvelope;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -869,6 +870,20 @@ class OrderFlowService
 
         $this->syncMaterialUsage($initialized);
 
+        $pickupCandidate = Arr::get($summary, 'estimated_date')
+            ?? Arr::get($summary, 'dateNeeded')
+            ?? Arr::get($summary, 'metadata.final_step.estimated_date');
+
+        if ($pickupCandidate && !$order->date_needed) {
+            try {
+                $pickupDate = Carbon::parse($pickupCandidate)->format('Y-m-d');
+                $order->update(['date_needed' => $pickupDate]);
+                $order->refresh();
+            } catch (\Throwable $e) {
+                // ignore parse failures
+            }
+        }
+
         return $initialized;
     }
 
@@ -972,6 +987,40 @@ class OrderFlowService
 
         if (!empty($summary['giveaway']) && is_array($summary['giveaway'])) {
             $metadata['giveaway'] = $summary['giveaway'];
+        }
+
+        $estimatedPickupCandidate = Arr::get($summary, 'estimated_date')
+            ?? Arr::get($summary, 'dateNeeded')
+            ?? Arr::get($summary, 'metadata.final_step.estimated_date')
+            ?? Arr::get($summary, 'metadata.final_step.metadata.estimated_date');
+
+        if ($estimatedPickupCandidate) {
+            try {
+                $pickupDate = Carbon::parse($estimatedPickupCandidate)->format('Y-m-d');
+
+                $finalStepMeta = Arr::get($metadata, 'final_step', []);
+                if (!is_array($finalStepMeta)) {
+                    $finalStepMeta = [];
+                }
+
+                $finalStepMeta['estimated_date'] = $pickupDate;
+                if (!empty($summary['dateNeededLabel'])) {
+                    $finalStepMeta['estimated_date_label'] = $summary['dateNeededLabel'];
+                }
+                $metadata['final_step'] = $finalStepMeta;
+
+                $deliveryMeta = Arr::get($metadata, 'delivery', []);
+                if (!is_array($deliveryMeta)) {
+                    $deliveryMeta = [];
+                }
+                $deliveryMeta['estimated_pickup_date'] = $pickupDate;
+                if (!empty($summary['dateNeededLabel'])) {
+                    $deliveryMeta['estimated_pickup_label'] = $summary['dateNeededLabel'];
+                }
+                $metadata['delivery'] = $deliveryMeta;
+            } catch (\Throwable $e) {
+                // Ignore pickup date parse failures
+            }
         }
 
         return array_filter($metadata, function ($value) {
@@ -1344,6 +1393,31 @@ class OrderFlowService
             'metadata' => $orderMeta,
         ];
 
+        $pickupDate = $order->date_needed instanceof Carbon
+            ? $order->date_needed->copy()->startOfDay()
+            : null;
+
+        if (!$pickupDate) {
+            $pickupCandidate = Arr::get($orderMeta, 'final_step.estimated_date')
+                ?? Arr::get($orderMeta, 'final_step.metadata.estimated_date')
+                ?? Arr::get($orderMeta, 'delivery.estimated_pickup_date')
+                ?? Arr::get($orderMeta, 'delivery.estimated_ship_date');
+
+            if ($pickupCandidate) {
+                try {
+                    $pickupDate = Carbon::parse($pickupCandidate)->startOfDay();
+                } catch (\Throwable $e) {
+                    $pickupDate = null;
+                }
+            }
+        }
+
+        $summary['dateNeeded'] = $pickupDate ? $pickupDate->format('Y-m-d') : null;
+        $summary['dateNeededLabel'] = $pickupDate ? $pickupDate->format('F j, Y') : null;
+        $summary['dateNeededRelative'] = $pickupDate ? $pickupDate->diffForHumans(null, true) : null;
+        $summary['estimatedDate'] = $summary['dateNeeded'];
+        $summary['estimatedDateLabel'] = $summary['dateNeededLabel'];
+
         if ($invitationItem?->design_metadata) {
             $itemDesignMeta = $invitationItem->design_metadata;
             if (is_string($itemDesignMeta)) {
@@ -1590,6 +1664,26 @@ class OrderFlowService
         $metadataPayload = $payload['metadata'] ?? [];
         $previewSelections = $payload['preview_selections'] ?? [];
 
+        $estimatedDateInput = $payload['estimated_date']
+            ?? ($metadataPayload['estimated_date'] ?? null);
+        $pickupDate = null;
+        if ($estimatedDateInput) {
+            try {
+                $pickupDate = Carbon::parse($estimatedDateInput)->startOfDay();
+            } catch (\Throwable $e) {
+                $pickupDate = null;
+            }
+        }
+
+        if ($pickupDate) {
+            $metadataPayload['estimated_date'] = $pickupDate->toDateString();
+            $metadataPayload['estimated_date_label'] = $metadataPayload['estimated_date_label']
+                ?? $pickupDate->format('F j, Y');
+        } else {
+            unset($metadataPayload['estimated_date']);
+            unset($metadataPayload['estimated_date_label']);
+        }
+
         $addonQuantitiesPayload = collect($payload['addon_quantities'] ?? [])
             ->mapWithKeys(function ($value, $key) {
                 $id = null;
@@ -1677,6 +1771,11 @@ class OrderFlowService
 
         $meta = $order->metadata ?? [];
         $bulkSelection = $item->bulkSelections->first();
+        $previousFinalStep = Arr::get($meta, 'final_step');
+        if (!is_array($previousFinalStep)) {
+            $previousFinalStep = [];
+        }
+        $pickupDateLabel = $pickupDate ? $pickupDate->format('F j, Y') : null;
         $meta['final_step'] = [
             'quantity' => $item->quantity,
             'paper_stock_id' => $item->paperStockSelection?->paper_stock_id,
@@ -1687,6 +1786,8 @@ class OrderFlowService
                 ->filter(fn ($addon) => $addon->addon_id !== null)
                 ->mapWithKeys(fn ($addon) => [$addon->addon_id => max(1, (int) ($addon->quantity ?? 1))])
                 ->all(),
+            'estimated_date' => $pickupDate ? $pickupDate->toDateString() : Arr::get($previousFinalStep, 'estimated_date'),
+            'estimated_date_label' => $pickupDateLabel ?? Arr::get($previousFinalStep, 'estimated_date_label'),
             'bulk' => $bulkSelection ? [
                 'product_bulk_order_id' => $bulkSelection->product_bulk_order_id,
                 'qty_selected' => $bulkSelection->qty_selected,
@@ -1710,7 +1811,25 @@ class OrderFlowService
             'updated_at' => now()->toIso8601String(),
         ];
 
-        $order->update(['metadata' => $meta]);
+        if ($pickupDate) {
+            $deliveryMeta = Arr::get($meta, 'delivery');
+            if (!is_array($deliveryMeta)) {
+                $deliveryMeta = [];
+            }
+
+            $deliveryMeta['estimated_pickup_date'] = $pickupDate->toDateString();
+            $deliveryMeta['estimated_pickup_label'] = $pickupDateLabel;
+            $deliveryMeta['estimated_ship_date'] = $deliveryMeta['estimated_ship_date'] ?? $pickupDate->toDateString();
+
+            $meta['delivery'] = array_filter($deliveryMeta, fn ($value) => $value !== null && $value !== '');
+        }
+
+        $updatePayload = ['metadata' => $meta];
+        if ($pickupDate) {
+            $updatePayload['date_needed'] = $pickupDate->toDateString();
+        }
+
+        $order->update($updatePayload);
 
         $order->refresh();
         $this->recalculateOrderTotals($order);
