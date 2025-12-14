@@ -432,6 +432,10 @@ class OrderFlowController extends Controller
 
             $orderPlaceholder = (object) ['items' => collect()];
 
+            $minPickupDate = Carbon::tomorrow();
+            $maxPickupDate = Carbon::now()->addMonths(2);
+            $resolvedPickupDate = $this->resolvePickupDate(null, $summary, $minPickupDate, $maxPickupDate);
+
             return view('customer.orderflow.finalstep', [
                 'order' => $orderPlaceholder,
                 'product' => $product,
@@ -446,10 +450,10 @@ class OrderFlowController extends Controller
                 'basePrice' => $this->orderFlow->unitPriceFor($product),
                 'minQty' => $minQty,
                 'maxQty' => $maxQty,
-                'estimatedDeliveryDate' => Carbon::now()->addMonth()->format('F j, Y'),
-                'estimatedDeliveryDateFormatted' => Carbon::now()->addMonth()->format('Y-m-d'),
-                'estimatedDeliveryMinDate' => Carbon::tomorrow()->format('Y-m-d'),
-                'estimatedDeliveryMaxDate' => Carbon::now()->addMonths(2)->format('Y-m-d'),
+                'estimatedDeliveryDate' => $resolvedPickupDate->format('F j, Y'),
+                'estimatedDeliveryDateFormatted' => $resolvedPickupDate->format('Y-m-d'),
+                'estimatedDeliveryMinDate' => $minPickupDate->format('Y-m-d'),
+                'estimatedDeliveryMaxDate' => $maxPickupDate->format('Y-m-d'),
                 'orderSummary' => $summary,
             ]);
         }
@@ -485,6 +489,11 @@ class OrderFlowController extends Controller
         $minQty = $bulkOrders->pluck('min_qty')->filter()->min() ?? 20;
         $maxQty = $bulkOrders->pluck('max_qty')->filter()->max();
 
+        $summaryPayload = session(static::SESSION_SUMMARY_KEY);
+        $minPickupDate = Carbon::tomorrow();
+        $maxPickupDate = Carbon::now()->addMonths(2);
+        $resolvedPickupDate = $this->resolvePickupDate($order, $summaryPayload, $minPickupDate, $maxPickupDate);
+
         return view('customer.orderflow.finalstep', [
             'order' => $order,
             'product' => $product,
@@ -499,11 +508,11 @@ class OrderFlowController extends Controller
             'basePrice' => $this->orderFlow->unitPriceFor($product),
             'minQty' => $minQty,
             'maxQty' => $maxQty,
-            'estimatedDeliveryDate' => Carbon::now()->addMonth()->format('F j, Y'),
-            'estimatedDeliveryDateFormatted' => Carbon::now()->addMonth()->format('Y-m-d'),
-            'estimatedDeliveryMinDate' => Carbon::tomorrow()->format('Y-m-d'),
-            'estimatedDeliveryMaxDate' => Carbon::now()->addMonths(2)->format('Y-m-d'),
-            'orderSummary' => session(static::SESSION_SUMMARY_KEY),
+            'estimatedDeliveryDate' => $resolvedPickupDate->format('F j, Y'),
+            'estimatedDeliveryDateFormatted' => $resolvedPickupDate->format('Y-m-d'),
+            'estimatedDeliveryMinDate' => $minPickupDate->format('Y-m-d'),
+            'estimatedDeliveryMaxDate' => $maxPickupDate->format('Y-m-d'),
+            'orderSummary' => $summaryPayload,
         ]);
     }
 
@@ -1855,6 +1864,70 @@ class OrderFlowController extends Controller
             $recipients,
             new NewOrderPlaced($order->id, $order->order_number, $customerName, $totalAmount, $orderSummaryUrl)
         );
+    }
+
+    private function resolvePickupDate(?Order $order, ?array $summaryPayload, Carbon $minDate, Carbon $maxDate): Carbon
+    {
+        $candidate = null;
+
+        if ($order && $order->date_needed instanceof Carbon) {
+            $candidate = $order->date_needed->copy();
+        }
+
+        if (!$candidate && $order) {
+            $metadata = $order->metadata;
+            if (is_string($metadata)) {
+                $decoded = json_decode($metadata, true);
+                $metadata = is_array($decoded) ? $decoded : [];
+            } elseif (!is_array($metadata)) {
+                $metadata = [];
+            }
+
+            $metadataCandidate = Arr::get($metadata, 'final_step.estimated_date')
+                ?? Arr::get($metadata, 'final_step.metadata.estimated_date')
+                ?? Arr::get($metadata, 'delivery.estimated_pickup_date')
+                ?? Arr::get($metadata, 'delivery.estimated_ship_date');
+
+            if ($metadataCandidate) {
+                try {
+                    $candidate = Carbon::parse($metadataCandidate);
+                } catch (\Throwable $e) {
+                    $candidate = null;
+                }
+            }
+        }
+
+        if (!$candidate && $summaryPayload) {
+            $summaryCandidate = Arr::get($summaryPayload, 'dateNeeded')
+                ?? Arr::get($summaryPayload, 'estimatedDate')
+                ?? Arr::get($summaryPayload, 'estimated_date')
+                ?? Arr::get($summaryPayload, 'metadata.final_step.estimated_date')
+                ?? Arr::get($summaryPayload, 'metadata.final_step.metadata.estimated_date');
+
+            if ($summaryCandidate) {
+                try {
+                    $candidate = Carbon::parse($summaryCandidate);
+                } catch (\Throwable $e) {
+                    $candidate = null;
+                }
+            }
+        }
+
+        if (!$candidate) {
+            $candidate = Carbon::now()->addMonth();
+        }
+
+        $candidate = $candidate->copy()->startOfDay();
+
+        if ($candidate->lt($minDate)) {
+            $candidate = $minDate->copy();
+        }
+
+        if ($candidate->gt($maxDate)) {
+            $candidate = $maxDate->copy();
+        }
+
+        return $candidate;
     }
 
     private function readInlineSvg(?string $path): array

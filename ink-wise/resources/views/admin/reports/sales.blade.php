@@ -58,6 +58,9 @@
 			<a href="{{ route('admin.reports.inventory') }}" class="pill-link">
 				<i class="fi fi-rr-boxes" aria-hidden="true"></i> Inventory insights
 			</a>
+			<a href="{{ route('admin.reports.pickup-calendar') }}" class="pill-link">
+				<i class="fi fi-rr-calendar" aria-hidden="true"></i> Pickup calendar
+			</a>
 			<button type="button" class="pill-link" data-report-action="refresh">
 				<i class="fi fi-rr-rotate-right" aria-hidden="true"></i> Refresh data
 			</button>

@@ -391,7 +391,7 @@
 	$resolveImage = function ($candidate) {
 		if (!$candidate) return null;
 		if (preg_match('/^(https?:)?\/\//i', $candidate) || str_starts_with($candidate, '/')) return $candidate;
-		try { return Illuminate\Support\Facades\Storage::url($candidate); } catch (\Throwable $e) { return null; }
+		try { return \Illuminate\Support\Facades\Storage::url($candidate); } catch (\Throwable $e) { return null; }
 	};
 
 	if (!$frontImage && $images) {
@@ -523,6 +523,21 @@
 	} catch (\Throwable $_eSave) {
 		$finalStepSaveUrl = url('/order/finalstep/save');
 	}
+
+	// Define date variables for pickup date input
+	$estimatedDeliveryMinDate = \Carbon\Carbon::now()->addDay()->format('Y-m-d');
+	$estimatedDeliveryMaxDate = \Carbon\Carbon::now()->addMonths(3)->format('Y-m-d');
+	$estimatedDeliveryDateFormatted = \Carbon\Carbon::now()->addWeekdays(5)->format('Y-m-d');
+
+	// Define pricing variables
+	$bulkOrders = collect([
+		(object)['min_qty' => 1, 'max_qty' => 49, 'price_per_unit' => 6.00],
+		(object)['min_qty' => 50, 'max_qty' => 99, 'price_per_unit' => 5.50],
+		(object)['min_qty' => 100, 'max_qty' => 199, 'price_per_unit' => 5.00],
+		(object)['min_qty' => 200, 'max_qty' => null, 'price_per_unit' => 4.50],
+	]);
+	$basePrice = 6.00;
+	$minQty = 10;
 @endphp
 <main class="finalstep-shell" data-storage-key="inkwise-finalstep" data-envelope-url="{{ $envelopeUrl }}" data-cart-url="{{ route('order.addtocart') }}" data-save-url="{{ $finalStepSaveUrl }}" data-fallback-samples="false" data-product-id="{{ $product->id ?? '' }}" data-product-name="{{ $resolvedProductName }}">
 	<header class="finalstep-header">
@@ -675,8 +690,9 @@
 						</div>
 
 						<div class="delivery-info">
-							<label for="estimatedDate" class="meta-label">Estimated day</label>
-							<input type="date" id="estimatedDate" name="estimated_date" value="{{ $estimatedDeliveryDateFormatted }}" required>
+							<label for="estimatedDate" class="meta-label">Pick-up date</label>
+							<input type="date" id="estimatedDate" name="estimated_date" value="{{ $estimatedDeliveryDateFormatted }}" min="{{ $estimatedDeliveryMinDate }}" max="{{ $estimatedDeliveryMaxDate }}" required aria-describedby="estimatedDateHint">
+							<p id="estimatedDateHint" class="meta-hint">Available from {{ \Illuminate\Support\Carbon::parse($estimatedDeliveryMinDate)->format('F j, Y') }} to {{ \Illuminate\Support\Carbon::parse($estimatedDeliveryMaxDate)->format('F j, Y') }}.</p>
 						</div>
 
 						<div class="action-buttons">
