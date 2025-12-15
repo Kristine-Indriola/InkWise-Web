@@ -317,6 +317,7 @@ Route::prefix('users')->name('users.')->group(function () {
         Route::get('/', [ReportsDashboardController::class, 'index'])->name('index');
         Route::get('/sales', [ReportsDashboardController::class, 'sales'])->name('sales');
         Route::get('/inventory', [ReportsDashboardController::class, 'inventory'])->name('inventory');
+        Route::get('/pickup-calendar', [ReportsDashboardController::class, 'pickupCalendar'])->name('pickup-calendar');
 
         Route::get('/sales/export/{type}', [ReportsDashboardController::class, 'exportSales'])
             ->name('sales.export');
