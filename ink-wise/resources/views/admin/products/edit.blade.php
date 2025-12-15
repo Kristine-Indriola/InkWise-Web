@@ -101,9 +101,7 @@
         @if(isset($product) && $product->id)
             <input type="hidden" name="product_id" value="{{ $product->id }}">
         @endif
-        @if($product && $product->template_id)
-            <input type="hidden" name="template_id" value="{{ $product->template_id }}">
-        @endif
+        {{-- Template selector will populate template_id --}}
 
         {{-- Basic Product Information --}}
         <div class="form-section">
@@ -156,6 +154,37 @@
                 <div class="field full-width">
                     <label for="description">Description</label>
                     <textarea id="description" name="description" rows="4">{{ $defaults['description'] }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        {{-- Envelope Material Selection --}}
+        <div class="form-section" id="envelope-fields" style="display: {{ $defaults['product_type'] === 'Envelope' ? 'block' : 'none' }};">
+            <h2>Material</h2>
+            <div class="form-grid grid-2-cols">
+                <div class="field">
+                    <label for="materialType">Material</label>
+                    <select id="materialType" name="material_type" required>
+                        <option value="">Select Material Type</option>
+                        @foreach($materialTypes ?? [] as $mt)
+                            <option value="{{ $mt }}" {{ (old('material_type', $envelopeDefaults['material_type'] ?? '') == $mt) ? 'selected' : '' }}>{{ strtoupper($mt) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="envelopeMaterial">Envelope Material Name*</label>
+                    <select id="envelopeMaterial" name="envelope_material_id" required>
+                        <option value="">Select Envelope Material</option>
+                        @foreach($envelopeMaterials ?? collect() as $em)
+                            <option value="{{ $em->material_id }}" {{ (old('envelope_material_id', $envelopeDefaults['envelope_material_id'] ?? '') == $em->material_id) ? 'selected' : '' }}>{{ $em->material_name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="pricePerUnit">Price per Unit</label>
+                    <input type="number" step="0.01" id="pricePerUnit" name="price_per_unit" value="{{ $envelopeDefaults['price_per_unit'] }}">
                 </div>
             </div>
         </div>
@@ -254,33 +283,7 @@
         </div>
         @endif
 
-        {{-- Colors Section --}}
-        <div class="form-section">
-            <h2>Colors</h2>
-            <div id="colors-container">
-                @foreach($colorRows as $index => $color)
-                    <div class="dynamic-row color-row" data-index="{{ $index }}">
-                        <div class="form-grid grid-3-cols">
-                            <div class="field">
-                                <label>Name *</label>
-                                <input type="text" name="colors[{{ $index }}][name]" required value="{{ $color['name'] ?? '' }}">
-                            </div>
-                            <div class="field">
-                                <label>Color Code *</label>
-                                <input type="color" name="colors[{{ $index }}][color_code]" required value="{{ $color['color_code'] ?? '#000000' }}">
-                            </div>
-                            <div class="field actions">
-                                <button type="button" class="btn-remove remove-color" {{ $index === 0 ? 'disabled' : '' }}>Remove</button>
-                            </div>
-                        </div>
-                        @if(isset($color['id']))
-                            <input type="hidden" name="colors[{{ $index }}][id]" value="{{ $color['id'] }}">
-                        @endif
-                    </div>
-                @endforeach
-            </div>
-            <button type="button" id="add-color" class="btn-add">Add Color</button>
-        </div>
+        {{-- Colors removed: not required for envelope products per request --}}
 
         {{-- Bulk Orders Section --}}
         <div class="form-section">
@@ -316,44 +319,110 @@
 
         {{-- Product Template Section --}}
         <div class="form-section">
-            <h2>Product Template</h2>
-            @if($product && $product->template)
-                <div class="template-preview">
-                    <h3>Selected Template: {{ $product->template->name }}</h3>
+            <h2>Product Preview</h2>
+            <div class="template-preview">
+                @if($product && $product->template)
+                    <h3>{{ $product->template->name }}</h3>
+                    @php
+                        $template = $product->template;
+                        $placeholder = \App\Support\ImageResolver::url(null);
+
+                        $design = $template->design ?? [];
+                        $metadata = $template->metadata ?? [];
+                        $pages = is_array(data_get($design, 'pages')) ? data_get($design, 'pages', []) : [];
+
+                        $collectPageSources = function ($page) {
+                            return [
+                                data_get($page, 'preview'),
+                                data_get($page, 'preview_url'),
+                                data_get($page, 'previewUrl'),
+                                data_get($page, 'thumbnail'),
+                                data_get($page, 'thumbnail_url'),
+                                data_get($page, 'thumbnailUrl'),
+                                data_get($page, 'image'),
+                                data_get($page, 'image_url'),
+                                data_get($page, 'imageUrl'),
+                            ];
+                        };
+
+                        $frontCandidates = [
+                            $template->front_image,
+                            data_get($template, 'preview_front'),
+                            data_get($metadata, 'front_image'),
+                            data_get($metadata, 'preview_front'),
+                            data_get($design, 'preview_front'),
+                            data_get($design, 'front_image'),
+                            data_get($design, 'front.preview'),
+                            $template->preview,
+                        ];
+
+                        $backCandidates = [
+                            $template->back_image,
+                            data_get($template, 'preview_back'),
+                            data_get($metadata, 'back_image'),
+                            data_get($metadata, 'preview_back'),
+                            data_get($design, 'preview_back'),
+                            data_get($design, 'back_image'),
+                            data_get($design, 'back.preview'),
+                        ];
+
+                        foreach ($pages as $index => $page) {
+                            $side = strtolower((string) data_get($page, 'side', ''));
+                            $sources = $collectPageSources($page);
+
+                            if ($side === 'front' || ($side === '' && $index === 0)) {
+                                $frontCandidates = array_merge($frontCandidates, $sources);
+                            }
+
+                            if ($side === 'back' || ($side === '' && $index === 1)) {
+                                $backCandidates = array_merge($backCandidates, $sources);
+                            }
+                        }
+
+                        $resolveAsset = function (array $candidates) use ($placeholder) {
+                            foreach ($candidates as $candidate) {
+                                if (!$candidate) {
+                                    continue;
+                                }
+
+                                if (is_string($candidate) && \Illuminate\Support\Str::startsWith(trim($candidate), 'data:image')) {
+                                    return $candidate;
+                                }
+
+                                $url = \App\Support\ImageResolver::url($candidate);
+                                if ($url && $url !== $placeholder) {
+                                    return $url;
+                                }
+                            }
+
+                            return null;
+                        };
+
+                        $frontUrl = $resolveAsset($frontCandidates);
+                        $backUrl = $resolveAsset($backCandidates);
+                    @endphp
                     <div class="template-svg-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 16px;">
-                        @if($product->template->front_image)
+                        @if($frontUrl)
                             <div class="template-svg-item">
                                 <h4>Front Design</h4>
                                 <div class="svg-container" style="width: 100%; height: 200px; border: 1px solid #eee; background: #fff; padding: 8px; border-radius: 4px;">
-                                    @php
-                                        $frontSvgPath = $product->template->front_image;
-                                        if (!preg_match('/^(https?:)?\/\//i', $frontSvgPath) && !str_starts_with($frontSvgPath, '/')) {
-                                            $frontSvgPath = \Illuminate\Support\Facades\Storage::url($frontSvgPath);
-                                        }
-                                    @endphp
-                                    <img src="{{ $frontSvgPath }}" alt="Front template" style="width: 100%; height: 100%; object-fit: contain;">
+                                    <img src="{{ $frontUrl }}" alt="Front template" style="width: 100%; height: 100%; object-fit: contain;">
                                 </div>
                             </div>
                         @endif
-                        @if($product->template->back_image)
+                        @if($backUrl)
                             <div class="template-svg-item">
                                 <h4>Back Design</h4>
                                 <div class="svg-container" style="width: 100%; height: 200px; border: 1px solid #eee; background: #fff; padding: 8px; border-radius: 4px;">
-                                    @php
-                                        $backSvgPath = $product->template->back_image;
-                                        if (!preg_match('/^(https?:)?\/\//i', $backSvgPath) && !str_starts_with($backSvgPath, '/')) {
-                                            $backSvgPath = \Illuminate\Support\Facades\Storage::url($backSvgPath);
-                                        }
-                                    @endphp
-                                    <img src="{{ $backSvgPath }}" alt="Back template" style="width: 100%; height: 100%; object-fit: contain;">
+                                    <img src="{{ $backUrl }}" alt="Back template" style="width: 100%; height: 100%; object-fit: contain;">
                                 </div>
                             </div>
                         @endif
                     </div>
-                </div>
-            @else
-                <p class="muted">No template selected for this product.</p>
-            @endif
+                @else
+                    <p class="muted">No template selected for this product.</p>
+                @endif
+            </div>
         </div>
 
         <div class="form-section">

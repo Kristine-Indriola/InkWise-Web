@@ -80,19 +80,6 @@
 	</style>
 	<script src="{{ asset('js/customer/orderflow-finalstep.js') }}" defer></script>
 	<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-	<script>
-		document.addEventListener('DOMContentLoaded', () => {
-			const dateInput = document.getElementById('estimatedDate');
-			if (dateInput) {
-				flatpickr(dateInput, {
-					dateFormat: 'Y-m-d',
-					minDate: '{{ $estimatedDeliveryMinDate }}',
-					maxDate: '{{ $estimatedDeliveryMaxDate }}',
-					defaultDate: '{{ $estimatedDeliveryDateFormatted }}'
-				});
-			}
-		});
-	</script>
 </head>
 <body class="finalstep-body bg-white" data-product-id="{{ $product->id ?? '' }}">
 @php
@@ -450,12 +437,9 @@
 		$maxQuantity = null;
 	}
 
-	$quantityNote = 'Select bulk quantities in increments of 10.';
-	if ($minQuantity !== null && $maxQuantity !== null) {
-		$quantityNote = $minQuantity === $maxQuantity
-			? 'Available bulk quantity: ' . number_format($minQuantity) . '.'
-			: 'Select bulk quantities from ' . number_format($minQuantity) . ' up to ' . number_format($maxQuantity) . ' (increments of 10).';
-	}
+	// Show a simple minimum-order note instead of the previous bulk-range wording
+	$effectiveMin = $minQuantity ?? 20;
+	$quantityNote = 'Select a quantities. Minimum order is ' . number_format($effectiveMin);
 
 	$paperStocks = collect($paperStocks ?? [])->map(function ($stock, $i) use ($fallbackImage) {
 		$stock = (object) $stock;
@@ -539,7 +523,10 @@
 	$basePrice = 6.00;
 	$minQty = 10;
 @endphp
-<main class="finalstep-shell" data-storage-key="inkwise-finalstep" data-envelope-url="{{ $envelopeUrl }}" data-cart-url="{{ route('order.addtocart') }}" data-save-url="{{ $finalStepSaveUrl }}" data-fallback-samples="false" data-product-id="{{ $product->id ?? '' }}" data-product-name="{{ $resolvedProductName }}">
+@php
+	$processingDays = $estimatedDeliveryDays ?? ($processingDays ?? null) ?? 7;
+@endphp
+<main class="finalstep-shell" data-storage-key="inkwise-finalstep" data-envelope-url="{{ $envelopeUrl }}" data-cart-url="{{ route('order.addtocart') }}" data-save-url="{{ $finalStepSaveUrl }}" data-fallback-samples="false" data-product-id="{{ $product->id ?? '' }}" data-product-name="{{ $resolvedProductName }}" data-processing-days="{{ $processingDays }}">
 	<header class="finalstep-header">
 		<div class="finalstep-header__content">
 			<a href="{{ $reviewUrl }}" class="finalstep-header__back" aria-label="Back to review">
@@ -596,7 +583,7 @@
 							<div class="quantity-price-row">
 								<input type="number" id="quantityInput" name="quantity" value="{{ $selectedQuantity ?? $minQty }}" min="{{ $minQty }}" {{ $maxQty ? 'max="' . $maxQty . '"' : '' }} required>
 								<div class="price-display">
-									<span class="meta-label">Price:</span>
+									<span class="meta-label">Total:</span>
 									<span id="priceDisplay" class="meta-value">₱0.00</span>
 								</div>
 							</div>
@@ -609,6 +596,8 @@
 						<div class="form-group paper-stocks-group">
 							<label>Paper stock</label>
 							<p class="selection-hint">Choose your preferred stock.</p>
+							<p id="paperStockAvailable" class="stock-available" style="display:none;">Available: <span id="paperStockAvailableCount">0</span></p>
+							<div id="stockError" class="error-message" style="display:none; margin-top:6px;"></div>
 							<div class="feature-grid small">
 								@forelse($paperStocks as $stock)
 									<button
@@ -616,6 +605,7 @@
 										class="feature-card selectable-card paper-stock-card"
 										data-id="{{ $stock->id }}"
 										data-price="{{ $stock->price ?? 0 }}"
+										data-available="{{ $stock->available ?? $stock->quantity ?? $stock->stock ?? 0 }}"
 										aria-pressed="{{ $stock->selected ? 'true' : 'false' }}"
 									>
 										<div class="feature-card-media">
@@ -641,11 +631,10 @@
 						</div>
 
 						<div class="form-group addons-group">
-							<label>Add-ons</label>
-							<p class="selection-hint">Optional finishes and trim options.</p>
+							<label>Size</label>
 							@forelse($addonGroups as $group)
 								<div class="addon-section" data-addon-type="{{ $group->type }}">
-									<h4 class="addon-title">{{ $group->label }}</h4>
+									<h4 class="addon-title">{{ trim(str_ireplace('Additional', '', $group->label)) }}</h4>
 									<div class="feature-grid small addon-grid" data-addon-type="{{ $group->type }}">
 										@forelse($group->items as $addon)
 											<button
@@ -690,14 +679,24 @@
 						</div>
 
 						<div class="delivery-info">
-							<label for="estimatedDate" class="meta-label">Pick-up date</label>
-							<input type="date" id="estimatedDate" name="estimated_date" value="{{ $estimatedDeliveryDateFormatted }}" min="{{ $estimatedDeliveryMinDate }}" max="{{ $estimatedDeliveryMaxDate }}" required aria-describedby="estimatedDateHint">
-							<p id="estimatedDateHint" class="meta-hint">Available from {{ \Illuminate\Support\Carbon::parse($estimatedDeliveryMinDate)->format('F j, Y') }} to {{ \Illuminate\Support\Carbon::parse($estimatedDeliveryMaxDate)->format('F j, Y') }}.</p>
+							<div class="delivery-group">
+								<label for="estimatedDate" class="meta-label">Estimated day</label>
+								<div class="delivery-inputs">
+									<div class="delivery-row">
+										<input type="date" id="estimatedDate" name="estimated_date" value="{{ $estimatedDeliveryDateFormatted }}" required>
+										<span id="estimatedDateFinalLabel" class="final-date-label" aria-hidden="true"></span>
+									</div>
+									<p id="estimatedDateHint" class="date-hint">Choose an estimated date at least 10 days from today, up to 1 month ahead. Past dates are not allowed.</p>
+									<div id="estimatedDateError" class="date-error" style="display: none;" aria-live="polite"></div>
+									<p id="estimatedArrival" class="arrival-label" style="display:none;" aria-live="polite"></p>
+								</div>
+							</div>
 						</div>
 
 						<div class="action-buttons">
 							<button type="button" id="addToCartBtn" class="primary-action" data-envelope-url="{{ $envelopeUrl }}" data-cart-url="{{ route('order.addtocart') }}">Add to cart</button>
-							<a href="{{ $envelopeUrl }}" class="secondary-action">Continue to checkout</a>
+							<a id="continueToCheckout" href="{{ $envelopeUrl }}" class="btn btn-secondary">Continue to checkout</a>
+							<div id="paperSelectError" class="error-message" style="display:none; margin-left:8px;">Please select a paper type to continue.</div>
 						</div>
 					</div>
 				</form>
@@ -913,5 +912,19 @@
 		updatePrice();
 	});
 </script>
+
+<!-- Pre-order Confirmation Modal -->
+<div id="preOrderModal" class="modal" style="display: none;" role="dialog" aria-labelledby="preOrderTitle" aria-describedby="preOrderMessage" aria-hidden="true">
+	<div class="modal-backdrop" tabindex="-1"></div>
+	<div class="modal-content">
+		<h2 id="preOrderTitle" class="modal-title">Pre-order Confirmation</h2>
+		<p id="preOrderMessage" class="modal-message">Pre-order: 15 days estimated delivery. Proceed with the order?</p>
+		<div class="modal-actions">
+			<button id="preOrderConfirm" class="primary-action" type="button">Confirm</button>
+			<button id="preOrderCancel" class="secondary-action" type="button">Cancel</button>
+		</div>
+	</div>
+</div>
+
 </body>
 </html>

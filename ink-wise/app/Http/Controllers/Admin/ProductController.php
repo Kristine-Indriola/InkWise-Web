@@ -310,7 +310,7 @@ class ProductController extends Controller
         }
 
         $templates = Template::where('product_type', 'Giveaway')->get();
-        $materials = Material::all();
+        $materials = Material::whereIn('product_type', ['Giveaway', 'Souvenir'])->where('stock_qty', '>', 0)->get();
         $selectedTemplate = null;
         if ($request->has('template_id')) {
             $selectedTemplate = Template::find($request->input('template_id'));
@@ -871,11 +871,20 @@ class ProductController extends Controller
             'materials',
             'envelope.material'
         ])->findOrFail($id);
-        $this->hydrateLegacyAttributes($product);
-        $templates = Template::all();
-        $materials = Material::all();
-        // Return the dedicated edit view (single-container form)
-        return view('admin.products.edit', compact('product', 'templates', 'materials'));
+                $this->hydrateLegacyAttributes($product);
+                $templates = Template::all();
+                $materials = Material::all();
+                // Distinct material types for selector
+                $materialTypes = Material::distinct()->pluck('material_type')->filter()->values();
+                // Envelope-specific materials
+                $envelopeMaterials = Material::where(function ($q) {
+                        $q->where('material_type', 'like', '%envelope%')
+                            ->orWhere('material_type', 'like', '%paper%')
+                            ->orWhere('material_name', 'like', '%envelope%');
+                })->get();
+
+                // Return the dedicated edit view (single-container form)
+                return view('admin.products.edit', compact('product', 'templates', 'materials', 'materialTypes', 'envelopeMaterials'));
     }
 
     public function show($id)

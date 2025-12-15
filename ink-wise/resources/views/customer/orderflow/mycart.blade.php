@@ -10,6 +10,20 @@
 	<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 	<link rel="stylesheet" href="{{ asset('css/customer/orderflow-ordersummary.css') }}">
 	<script src="{{ asset('js/customer/orderflow-ordersummary.js') }}" defer></script>
+
+	<style>
+		@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Seasons&display=swap');
+		@import url('https://fonts.cdnfonts.com/css/edwardian-script-itc');
+	</style>
+
+	<script src="https://cdn.tailwindcss.com"></script>
+	<link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-bold-rounded/css/uicons-bold-rounded.css">
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+	<link rel="stylesheet" href="{{ asset('css/customer/customer.css') }}">
+	<link rel="stylesheet" href="{{ asset('css/customer/template.css') }}">
+	<script src="{{ asset('js/customer/customer.js') }}" defer></script>
+	<script src="{{ asset('js/customer/template.js') }}" defer></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.10.2/cdn.min.js" defer></script>
 </head>
 <body>
 @php
@@ -36,9 +50,64 @@ $summarySyncUrl = $resolveRoute('order.summary.sync', '/order/summary/sync');
 
 $hasEnvelope = (bool) data_get($orderSummary, 'hasEnvelope', !empty(data_get($orderSummary, 'envelope')));
 $hasGiveaway = (bool) data_get($orderSummary, 'hasGiveaway', !empty(data_get($orderSummary, 'giveaway')));
+
+// Topbar nav variables (from invitations layout)
+$resolvedInvitationType = $invitationType
+	?? (request()->routeIs('templates.corporate.*') ? 'Corporate'
+		: (request()->routeIs('templates.baptism.*') ? 'Baptism'
+			: (request()->routeIs('templates.birthday.*') ? 'Birthday'
+				: 'Wedding')));
+
+$eventRoutes = [
+	'wedding' => [
+		'label' => 'Wedding',
+		'invitations' => route('templates.wedding.invitations'),
+		'giveaways' => route('templates.wedding.giveaways'),
+	],
+	'corporate' => [
+		'label' => 'Corporate',
+		'invitations' => route('templates.corporate.invitations'),
+		'giveaways' => route('templates.corporate.giveaways'),
+	],
+	'baptism' => [
+		'label' => 'Baptism',
+		'invitations' => route('templates.baptism.invitations'),
+		'giveaways' => route('templates.baptism.giveaways'),
+	],
+	'birthday' => [
+		'label' => 'Birthday',
+		'invitations' => route('templates.birthday.invitations'),
+		'giveaways' => route('templates.birthday.giveaways'),
+	],
+];
+
+$currentEventKey = strtolower($resolvedInvitationType);
+if (! array_key_exists($currentEventKey, $eventRoutes)) {
+	$currentEventKey = 'wedding';
+}
+$currentEventRoutes = $eventRoutes[$currentEventKey];
+
+$navLinks = [];
+foreach ($eventRoutes as $key => $config) {
+	$navLinks[] = [
+		'key' => $key,
+		'label' => $config['label'],
+		'route' => $config['invitations'],
+		'isActive' => $key === $currentEventKey,
+	];
+}
+
+$favoritesEnabled = \Illuminate\Support\Facades\Route::has('customer.favorites');
+$cartRoute = \Illuminate\Support\Facades\Route::has('customer.cart')
+	? route('customer.cart')
+	: '/order/addtocart';
+$searchValue = request('query', '');
 @endphp
+
+	@include('partials.topbar')
 	<main
 		class="os-shell ordersummary-shell"
+		style="padding-top: 160px;"
 		data-storage-key="inkwise-finalstep"
 		data-envelopes-url="{{ $envelopeUrl }}"
 		data-summary-url="{{ $summaryUrl }}"
@@ -55,16 +124,13 @@ $hasGiveaway = (bool) data_get($orderSummary, 'hasGiveaway', !empty(data_get($or
 		data-giveaway-store-url="{{ $giveawayStoreUrl }}"
 		data-summary-sync-url="{{ $summarySyncUrl }}"
 	>
-		<header class="ordersummary-header">
-			<div class="ordersummary-header__content">
-				<a href="{{ $envelopeUrl }}" class="ordersummary-header__back" aria-label="Back to envelope options">
-					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
-					Back to envelopes
-				</a>
-				<h1>Review your order</h1>
-				<p>Confirm your invitations, envelopes, and giveaways before heading to checkout.</p>
-			</div>
-		</header>
+		<div class="os-backbar">
+			<a href="{{ $giveawaysUrl }}" class="os-back-giveaways" aria-label="Back to giveaways">
+				<svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+				Back to giveaways
+			</a>
+		</div>
+
 
 		<div class="os-empty" data-empty-state hidden>
 			<div class="os-empty-card">

@@ -18,6 +18,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -410,7 +411,7 @@ class OrderFlowController extends Controller
                     'template',
                     'uploads',
                     'images',
-                    'paperStocks',
+                    'paperStocks.material',
                     'addons',
                     'bulkOrders',
                 ]);
@@ -469,7 +470,7 @@ class OrderFlowController extends Controller
                 'template',
                 'uploads',
                 'images',
-                'paperStocks',
+                'paperStocks.material',
                 'addons',
                 'bulkOrders',
             ]);
@@ -658,25 +659,31 @@ class OrderFlowController extends Controller
 
     public function envelopeOptions(): JsonResponse
     {
-        $fallbackImage = asset('images/no-image.png');
+        $cacheKey = 'envelope_options_api';
+        $cacheDuration = 300; // 5 minutes
 
-        $envelopes = ProductEnvelope::query()
-            ->with(['product'])
-            ->orderByDesc('updated_at')
-            ->get()
-            ->map(function (ProductEnvelope $envelope) use ($fallbackImage) {
-                return [
-                    'id' => $envelope->id,
-                    'product_id' => $envelope->product_id,
-                    'name' => $envelope->product?->name ?? $envelope->envelope_material_name ?? 'Envelope',
-                    'price' => $envelope->price_per_unit ?? 0,
-                    'image' => $this->orderFlow->resolveMediaPath($envelope->envelope_image, $fallbackImage),
-                    'material' => $envelope->envelope_material_name,
-                    'max_qty' => $envelope->max_qty ?? $envelope->max_quantity,
-                    'updated_at' => $envelope->updated_at?->toIso8601String(),
-                ];
-            })
-            ->values();
+        $envelopes = Cache::remember($cacheKey, $cacheDuration, function () {
+            $fallbackImage = asset('images/no-image.png');
+
+            return ProductEnvelope::query()
+                ->with(['product'])
+                ->orderByDesc('updated_at')
+                ->get()
+                ->map(function (ProductEnvelope $envelope) use ($fallbackImage) {
+                    return [
+                        'id' => $envelope->id,
+                        'product_id' => $envelope->product_id,
+                        'name' => $envelope->product?->name ?? $envelope->envelope_material_name ?? 'Envelope',
+                        'price' => $envelope->price_per_unit ?? 0,
+                        'image' => $this->orderFlow->resolveMediaPath($envelope->envelope_image, $fallbackImage),
+                        'material' => $envelope->envelope_material_name,
+                        'max_qty' => $envelope->max_qty ?? $envelope->max_quantity,
+                        'updated_at' => $envelope->updated_at?->toIso8601String(),
+                    ];
+                })
+                ->values()
+                ->toArray();
+        });
 
         return response()->json($envelopes);
     }
@@ -691,29 +698,43 @@ class OrderFlowController extends Controller
             ->whereHas('uploads')
             ->orderByDesc('updated_at')
             ->get()
-            ->map(function (Product $product) use ($fallbackImage) {
-                $images = $this->orderFlow->resolveProductImages($product);
-                $unitPrice = $this->orderFlow->unitPriceFor($product);
-                $bulkTier = $product->bulkOrders->sortBy('min_qty')->first();
-
-                return [
-                    'id' => $product->id,
-                    'product_id' => $product->id,
-                    'name' => $product->name ?? 'Giveaway',
-                    'price' => $unitPrice,
-                    'image' => $images['front'] ?? $fallbackImage,
-                    'images' => $images['all'] ?? [],
-                    'description' => Str::limit(strip_tags($product->description ?? ''), 220),
-                    'material' => null,
-                    'min_qty' => $bulkTier?->min_qty,
-                    'max_qty' => $bulkTier?->max_qty,
-                    'preview_url' => route('product.preview', $product->id),
-                    'updated_at' => $product->updated_at?->toIso8601String(),
-                ];
-            })
+            ->map(fn (Product $product) => $this->formatGiveawayProduct($product, $fallbackImage))
             ->values();
 
         return response()->json($giveaways);
+    }
+
+    private function formatGiveawayProduct(Product $product, ?string $fallbackImage = null): array
+    {
+        $images = $this->orderFlow->resolveProductImages($product);
+        $unitPrice = $this->orderFlow->unitPriceFor($product);
+        $bulkTier = $product->bulkOrders->sortBy('min_qty')->first();
+
+        $primaryImage = $images['front']
+            ?? ($images['all'][0] ?? null)
+            ?? $fallbackImage
+            ?? asset('images/no-image.png');
+
+        $defaultQty = max($bulkTier?->min_qty ?? $this->orderFlow->defaultQuantityFor($product), 1);
+
+        return [
+            'id' => $product->id,
+            'product_id' => $product->id,
+            'name' => $product->name ?? 'Giveaway',
+            'price' => $unitPrice,
+            'image' => $primaryImage,
+            'images' => $images['all'] ?? [],
+            'description' => Str::limit(strip_tags($product->description ?? ''), 220),
+            'material' => null,
+            'min_qty' => $bulkTier?->min_qty ?? $defaultQty,
+            'max_qty' => $bulkTier?->max_qty,
+            'step' => max(1, $bulkTier?->min_qty ?? 5),
+            'default_qty' => $defaultQty,
+            'preview_url' => route('product.preview', $product->id),
+            'event_type' => $product->event_type ?: null,
+            'theme_style' => $product->theme_style ?: null,
+            'updated_at' => $product->updated_at?->toIso8601String(),
+        ];
     }
 
     /**
@@ -1396,46 +1417,20 @@ class OrderFlowController extends Controller
             $orderSummary = session(static::SESSION_SUMMARY_KEY);
         }
 
-        $selectedEvent = $request->query('event');
-        $search = $request->query('q');
-
-        $productsQuery = Product::query()
-            ->with(['template', 'uploads', 'images', 'materials.material', 'bulkOrders'])
+        $initialCatalog = Product::query()
+            ->with(['template', 'uploads', 'images', 'bulkOrders'])
             ->where('product_type', 'Giveaway')
-            ->whereHas('uploads');
-
-        if ($selectedEvent && $selectedEvent !== 'all') {
-            $productsQuery->where(function ($query) use ($selectedEvent) {
-                $query->where('event_type', $selectedEvent);
-            });
-        }
-
-        if ($search) {
-            $productsQuery->where(function ($query) use ($search) {
-                $query->where('name', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%");
-            });
-        }
-
-        $products = $productsQuery
+            ->whereHas('uploads')
             ->orderByDesc('updated_at')
-            ->get();
-
-        $eventTypes = Product::query()
-            ->where('product_type', 'Giveaway')
-            ->whereNotNull('event_type')
-            ->where('event_type', '!=', '')
-            ->distinct()
-            ->orderBy('event_type')
-            ->pluck('event_type');
+            ->limit(60)
+            ->get()
+            ->map(fn (Product $product) => $this->formatGiveawayProduct($product))
+            ->values();
 
         return view('customer.orderflow.giveaways', [
-            'products' => $products,
-            'eventTypes' => $eventTypes,
-            'selectedEvent' => $selectedEvent,
-            'searchTerm' => $search,
             'order' => $order,
             'orderSummary' => $orderSummary,
+            'initialCatalog' => $initialCatalog,
         ]);
     }
 

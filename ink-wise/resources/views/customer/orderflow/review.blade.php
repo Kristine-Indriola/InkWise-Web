@@ -205,6 +205,7 @@
 	<script>
 		document.addEventListener('DOMContentLoaded', () => {
 			const summaryData = {!! \Illuminate\Support\Js::from($orderSummary) !!};
+			window.summaryData = summaryData;
 			window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(summaryData));
 		});
 	</script>

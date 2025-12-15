@@ -27,12 +27,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const state = {
     envelopes: [],
-    selectedId: null,
+    selectedIds: [], // Changed from selectedId to selectedIds array
     skeletonCount: Math.min(6, Math.max(3, Math.floor(((window.innerWidth || 1200) - 180) / 260))),
     isSaving: false
   };
 
-  let toastTimer;
+  // Debounce utility for performance
+  const debounce = (func, wait) => {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  };
 
   const formatMoney = (value) => new Intl.NumberFormat('en-PH', {
     style: 'currency',
@@ -56,6 +67,66 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const writeSummary = (summary) => {
     window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(summary));
+  };
+
+  const applyLocalEnvelopeSelection = (env, qty, total, isRemoval = false) => {
+    const summary = readSummary() ?? {};
+    const price = normalisePrice(env.price);
+    const resolvedTotal = Number.isFinite(total) ? total : price * qty;
+
+    const envelopeMeta = {
+      id: env.id ?? null,
+      product_id: env.product_id ?? null,
+      name: env.name ?? 'Envelope',
+      price,
+      qty,
+      total: resolvedTotal,
+      material: env.material ?? null,
+      image: env.image ?? null,
+      min_qty: env.min_qty ?? 10,
+      max_qty: env.max_qty ?? null,
+      updated_at: new Date().toISOString()
+    };
+
+    // Initialize envelopes array if it doesn't exist
+    if (!summary.envelopes) {
+      summary.envelopes = [];
+    }
+
+    if (isRemoval) {
+      // Remove the envelope from the array
+      summary.envelopes = summary.envelopes.filter(e => e.id !== env.id);
+    } else {
+      // Add or update the envelope in the array
+      const existingIndex = summary.envelopes.findIndex(e => e.id === env.id);
+      if (existingIndex >= 0) {
+        summary.envelopes[existingIndex] = envelopeMeta;
+      } else {
+        summary.envelopes.push(envelopeMeta);
+      }
+    }
+
+    // Update selected IDs
+    state.selectedIds = summary.envelopes.map(e => String(e.id));
+
+    // Calculate total for all envelopes
+    const totalEnvelopeCost = summary.envelopes.reduce((sum, e) => sum + e.total, 0);
+    summary.extras = summary.extras ?? { paper: 0, addons: 0, envelope: 0, giveaway: 0 };
+    summary.extras.envelope = totalEnvelopeCost;
+
+    writeSummary(summary);
+    syncSelectionState(summary);
+  };
+
+  const clearLocalEnvelopeSelection = () => {
+    const summary = readSummary() ?? {};
+    if (summary.extras) {
+      summary.extras.envelope = 0;
+    }
+    delete summary.envelopes; // Changed from envelope to envelopes
+    writeSummary(summary);
+    state.selectedIds = []; // Changed from selectedId to selectedIds
+    syncSelectionState(summary);
   };
 
   const setContinueState = (disabled) => {
@@ -219,7 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const buildSummaryMarkup = (envelope) => {
-    const total = envelope.total ?? (envelope.price * (envelope.qty || 0));
+    const total = envelope.total;
     return `
       <div class="summary-selection">
         <div class="summary-selection__media">
@@ -238,15 +309,51 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   };
 
+  const buildSummaryMarkupMultiple = (envelopes) => {
+    const totalCost = envelopes.reduce((sum, e) => sum + e.total, 0);
+    const totalQuantity = envelopes.reduce((sum, e) => sum + e.qty, 0);
+
+    let markup = `<h4 class="summary-title">Selected Envelopes (${envelopes.length})</h4>`;
+
+    envelopes.forEach((envelope, index) => {
+      markup += `
+        <div class="summary-selection summary-selection--multiple">
+          <div class="summary-selection__media">
+            <img src="${envelope.image ?? '/images/no-image.png'}" alt="${envelope.name}">
+          </div>
+          <div class="summary-selection__main">
+            <p class="summary-selection__name">${envelope.name}</p>
+            <p class="summary-selection__meta">${envelope.material ?? 'Custom envelope'}</p>
+          </div>
+        </div>
+      `;
+    });
+
+    markup += `
+      <div class="summary-totals">
+        <div class="summary-total-row">
+          <span class="summary-total-label">Total Quantity:</span>
+          <span class="summary-total-value">${totalQuantity} pcs</span>
+        </div>
+        <div class="summary-total-row summary-total-row--grand">
+          <span class="summary-total-label">Total Cost:</span>
+          <span class="summary-total-value">${formatMoney(totalCost)}</span>
+        </div>
+      </div>
+    `;
+
+    return markup;
+  };
+
   const syncSelectionState = (summaryOverride = null) => {
     const summary = summaryOverride ?? readSummary() ?? {};
-    const envelope = summary.envelope;
+    const envelopes = summary.envelopes || [];
 
-    state.selectedId = envelope?.id ? String(envelope.id) : null;
+    state.selectedIds = envelopes.map(e => String(e.id));
 
-    if (!envelope) {
+    if (!envelopes.length) {
       if (summaryBody) {
-        summaryBody.innerHTML = '<p class="summary-empty">Choose an envelope to see the details here.</p>';
+        summaryBody.innerHTML = '<p class="summary-empty">Choose envelopes to see the details here.</p>';
       }
       setBadgeState({ label: 'Pending' });
       setContinueState(true);
@@ -255,9 +362,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (summaryBody) {
-      summaryBody.innerHTML = buildSummaryMarkup(envelope);
+      summaryBody.innerHTML = buildSummaryMarkupMultiple(envelopes);
     }
-    setBadgeState({ label: 'Selected', tone: 'summary-badge--success' });
+    setBadgeState({ label: `${envelopes.length} Selected`, tone: 'summary-badge--success' });
     highlightSelectedCard();
     setContinueState(false);
   };
@@ -265,10 +372,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const highlightSelectedCard = () => {
     if (!envelopeGrid) return;
     envelopeGrid.querySelectorAll('.envelope-item').forEach((card) => {
-      const isSelected = card.dataset.envelopeId === state.selectedId;
+      const envelopeId = card.dataset.envelopeId;
+      const isSelected = state.selectedIds.includes(envelopeId);
       card.classList.toggle('is-selected', isSelected);
       const btn = card.querySelector('.envelope-item__select');
-      if (btn) btn.textContent = isSelected ? 'Selected envelope' : 'Select envelope';
+      if (btn) {
+        btn.textContent = isSelected ? 'Unselect envelope' : 'Select envelope';
+        // Apply primary-action styling to both select and unselect buttons
+        if (isSelected) {
+          btn.className = 'primary-action envelope-item__select';
+        } else {
+          btn.className = 'primary-action envelope-item__select';
+        }
+      }
     });
   };
 
@@ -316,11 +432,21 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     };
 
+    // Optimistically reflect the selection locally so the UI updates even if the API is slow or fails.
+    applyLocalEnvelopeSelection(env, qty, total);
+
     const result = await persistEnvelopeSelection(payload);
 
     if (triggerButton) {
       triggerButton.disabled = false;
-      triggerButton.textContent = originalButtonText ?? 'Select envelope';
+      const selectedText = state.selectedIds.includes(String(env.id)) ? 'Unselect envelope' : 'Select envelope';
+      triggerButton.textContent = selectedText;
+      // Apply primary-action styling to both select and unselect buttons
+      if (state.selectedIds.includes(String(env.id))) {
+        triggerButton.className = 'primary-action envelope-item__select';
+      } else {
+        triggerButton.className = 'primary-action envelope-item__select';
+      }
     }
     if (card) {
       card.classList.remove('is-saving');
@@ -363,54 +489,116 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const createCard = (env) => {
     const price = normalisePrice(env.price);
-    const initialQty = 10;
+    const minQty = Math.max(env.min_qty || 1, 20); // Ensure minimum is at least 20
+    const initialQty = Math.max(env.min_qty || 10, 20); // Ensure initial quantity is at least 20
     const placeholderImage = '/images/no-image.png';
 
     const card = document.createElement('div');
     card.className = 'envelope-item';
     card.dataset.envelopeId = env.id;
 
-    const quantitySteps = Array.from({ length: 12 }, (_, idx) => (idx + 1) * 10);
-    const options = quantitySteps.map((qty) => {
-      const total = price * qty;
-      return `<option value="${qty}" data-total="${total}">${qty} pcs — ${formatMoney(total)}</option>`;
-    }).join('');
-
     card.innerHTML = `
       <div class="envelope-item__media">
-        <img src="${env.image || placeholderImage}" alt="${env.name}">
+        <img src="${env.image || placeholderImage}" alt="${env.name}" loading="lazy">
       </div>
       <h3 class="envelope-item__title">${env.name}</h3>
       <p class="envelope-item__price">${formatMoney(price)} <span class="per-tag">per piece</span></p>
-      <p class="envelope-item__total" data-total-display>${initialQty} pcs — ${formatMoney(price * initialQty)}</p>
       ${env.material ? `<p class="envelope-item__meta">${env.material}</p>` : ''}
       <div class="envelope-item__controls">
-        <label>Quantity
-          <select data-id="${env.id}">${options}</select>
-        </label>
-        <button class="btn btn-primary envelope-item__select" type="button">Select envelope</button>
+        <div class="quantity-control">
+          <div class="quantity-input-group">
+            <label for="qty-${env.id}">Quantity</label>
+            <div class="quantity-input-wrapper">
+                <div class="quantity-input-controls">
+                  <input type="number" id="qty-${env.id}" data-id="${env.id}" value="${initialQty}" min="${minQty}" max="${env.max_qty || ''}" step="1">
+                </div>
+              <span class="quantity-total" data-total-display>${formatMoney(price * initialQty)}</span>
+            </div>
+          </div>
+          <div class="quantity-error" style="display: none;"></div>
+          <p class="quantity-helper summary-note">Select a quantity. Minimum order is ${minQty}</p>
+        </div>
+        <div class="control-buttons">
+          <button class="btn btn-secondary envelope-item__design" type="button" title="Add/Edit My Design">
+            <i class="fas fa-edit"></i> Design
+          </button>
+          <button class="primary-action envelope-item__select" type="button">Select envelope</button>
+        </div>
       </div>
     `;
 
-    const select = card.querySelector('select');
+    const qtyInput = card.querySelector('input[type="number"]');
+    const designBtn = card.querySelector('.envelope-item__design');
     const addBtn = card.querySelector('.envelope-item__select');
     const totalDisplay = card.querySelector('[data-total-display]');
+    const errorDisplay = card.querySelector('.quantity-error');
 
-    if (select) {
-      select.value = String(initialQty);
-      select.addEventListener('change', async () => {
-        const qty = Number(select.value || initialQty);
-        const total = price * qty;
-        if (totalDisplay) totalDisplay.textContent = `${qty} pcs — ${formatMoney(total)}`;
-        if (state.selectedId === env.id) {
-          await selectEnvelope(env, qty, total, { silent: true, cardElement: card, triggerButton: addBtn });
+    const updateTotal = () => {
+      const qty = Number(qtyInput.value) || initialQty;
+      if (qty < 0) return { qty: initialQty, total: price * initialQty }; // Prevent negative values
+      const total = price * qty;
+      if (totalDisplay) totalDisplay.textContent = formatMoney(total);
+      return { qty, total };
+    };
+
+    // Quantity input now uses direct numeric entry (no +/- buttons)
+
+    const validateQuantity = () => {
+      const qty = Number(qtyInput.value);
+      const min = minQty; // Use the enforced minimum of at least 20
+      const max = env.max_qty;
+
+      if (isNaN(qty) || qty < min) {
+        errorDisplay.textContent = `Quantity must be at least ${min}`;
+        errorDisplay.style.display = 'block';
+        qtyInput.classList.add('error');
+        return false;
+      }
+
+      if (max && qty > max) {
+        errorDisplay.textContent = `Maximum quantity is ${max}`;
+        errorDisplay.style.display = 'block';
+        qtyInput.classList.add('error');
+        return false;
+      }
+
+      errorDisplay.style.display = 'none';
+      qtyInput.classList.remove('error');
+      return true;
+    };
+
+    if (qtyInput) {
+      qtyInput.addEventListener('input', debounce(() => {
+        updateTotal();
+        validateQuantity();
+        if (state.selectedIds.includes(String(env.id))) {
+          const { qty, total } = updateTotal();
+          selectEnvelope(env, qty, total, { silent: true, cardElement: card, triggerButton: addBtn });
         }
-      });
+      }, 300));
     }
 
+    designBtn?.addEventListener('click', () => {
+      // TODO: Implement design functionality
+      showToast('Design feature coming soon!');
+    });
+
     addBtn?.addEventListener('click', async () => {
-      const qty = Number(select?.value || initialQty);
-      const total = price * qty;
+      const envelopeId = String(env.id);
+      const isCurrentlySelected = state.selectedIds.includes(envelopeId);
+
+      if (isCurrentlySelected) {
+        // Remove this envelope from selection
+        applyLocalEnvelopeSelection(env, 0, 0, true);
+        showToast(`${env.name} removed from selection`);
+        return;
+      }
+
+      if (!validateQuantity()) {
+        qtyInput.focus();
+        return;
+      }
+      const { qty, total } = updateTotal();
       await selectEnvelope(env, qty, total, { cardElement: card, triggerButton: addBtn });
     });
 
@@ -429,14 +617,51 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    items.forEach((env) => envelopeGrid.appendChild(createCard(env)));
+    // Use DocumentFragment for better performance
+    const fragment = document.createDocumentFragment();
+    items.forEach((env) => fragment.appendChild(createCard(env)));
+    envelopeGrid.appendChild(fragment);
 
-    const storedId = readSummary()?.envelope?.id;
-    state.selectedId = storedId ? String(storedId) : null;
+    // Load selected envelopes from summary
+    const summary = readSummary() || {};
+    const envelopes = summary.envelopes || [];
+    state.selectedIds = envelopes.map(e => String(e.id));
+
     highlightSelectedCard();
   };
 
   const loadEnvelopes = async () => {
+    // Check cache first (5 minute cache)
+    const cacheKey = 'envelope_data_cache';
+    const cacheTimestamp = 'envelope_cache_timestamp';
+    const now = Date.now();
+    const cacheExpiry = 5 * 60 * 1000; // 5 minutes
+
+    const cachedData = sessionStorage.getItem(cacheKey);
+    const cachedTime = sessionStorage.getItem(cacheTimestamp);
+
+    if (cachedData && cachedTime && (now - parseInt(cachedTime)) < cacheExpiry) {
+      try {
+        const data = JSON.parse(cachedData);
+        state.envelopes = data.map((item, index) => ({
+          id: item.id ?? `env_${index}`,
+          product_id: item.product_id,
+          name: item.name ?? 'Envelope',
+          price: normalisePrice(item.price),
+          image: item.image,
+          material: item.material,
+          min_qty: item.min_qty ?? 10,
+          max_qty: item.max_qty
+        }));
+        clearSkeleton();
+        renderCards(state.envelopes);
+        syncSelectionState();
+        return;
+      } catch (e) {
+        // Cache corrupted, continue with API call
+      }
+    }
+
     showSkeleton(state.skeletonCount);
     try {
       const response = await fetch(envelopesUrl, { headers: { Accept: 'application/json' } });
@@ -453,6 +678,10 @@ document.addEventListener('DOMContentLoaded', () => {
             min_qty: item.min_qty ?? 10,
             max_qty: item.max_qty
           }));
+
+          // Cache the raw API data
+          sessionStorage.setItem(cacheKey, JSON.stringify(data));
+          sessionStorage.setItem(cacheTimestamp, now.toString());
         } else {
           state.envelopes = [];
         }
@@ -478,11 +707,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   skipBtn?.addEventListener('click', async () => {
-    console.log('Skip envelopes button clicked');
     if (state.isSaving) return;
-
-    // Allow skipping even when no envelopes loaded or selected
-    // by proceeding without checking selection state.
 
     state.isSaving = true;
     setContinueState(true);
@@ -490,43 +715,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const target = skipBtn.dataset.summaryUrl || giveawaysUrl;
     skipBtn.disabled = true;
 
-    const result = await clearEnvelopeSelection();
+    // Try to clear any saved envelope, but never block navigation.
+    try {
+      const result = await clearEnvelopeSelection();
+
+      if (result?.ok) {
+        if (result.data?.summary) {
+          applyServerSummary(result.data.summary);
+        } else {
+          await fetchSummaryFromServer();
+        }
+      }
+    } catch (error) {
+      console.warn('Skipping envelope failed, continuing anyway', error);
+    }
 
     skipBtn.disabled = false;
     state.isSaving = false;
 
-    if (result?.ok) {
-      if (result.data?.summary) {
-        applyServerSummary(result.data.summary);
-      } else {
-        const refreshed = await fetchSummaryFromServer();
-        if (!refreshed) {
-          syncSelectionState();
-          showToast('Unable to refresh order summary. Please try again.');
-          return;
-        }
-      }
-
-      showToast('Continuing without an envelope…');
-      window.setTimeout(() => {
-        window.location.href = target;
-      }, 500);
-      return;
-    }
-
-    const status = result?.status ?? 0;
-    if (status === 409 || status === 422) {
-      showToast('That envelope is no longer available. Refreshing options…');
-      await loadEnvelopes();
-      const refreshed = await fetchSummaryFromServer();
-      if (!refreshed) {
-        syncSelectionState();
-      }
-      return;
-    }
-
-    showToast('Unable to clear envelope. Please try again.');
-    syncSelectionState();
+    showToast('Continuing without an envelope…');
+    window.setTimeout(() => {
+      window.location.href = target;
+    }, 250);
   });
 
   const initialise = async () => {

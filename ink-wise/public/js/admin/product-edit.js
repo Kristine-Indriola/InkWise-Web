@@ -113,25 +113,6 @@ document.addEventListener('DOMContentLoaded', function(){
         `;
     }
 
-    function colorTemplate(index){
-        return `
-            <div class="dynamic-row color-row" data-index="${index}">
-                <div class="form-grid">
-                    <div class="field">
-                        <label>Name *</label>
-                        <input type="text" name="colors[${index}][name]" required>
-                    </div>
-                    <div class="field">
-                        <label>Color Code *</label>
-                        <input type="color" name="colors[${index}][color_code]" required value="#000000">
-                    </div>
-                    <div class="field actions">
-                        <button type="button" class="btn-remove remove-color">Remove</button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
 
     function bulkOrderTemplate(index){
         return `
@@ -160,8 +141,51 @@ document.addEventListener('DOMContentLoaded', function(){
     // Initialize dynamic sections
     addDynamicRow('paper-stocks-container', 'paper-stock-row', paperStockTemplate, 'add-paper-stock', 'remove-paper-stock');
     addDynamicRow('addons-container', 'addon-row', addonTemplate, 'add-addon', 'remove-addon');
-    addDynamicRow('colors-container', 'color-row', colorTemplate, 'add-color', 'remove-color');
     addDynamicRow('bulk-orders-container', 'bulk-order-row', bulkOrderTemplate, 'add-bulk-order', 'remove-bulk-order');
+
+        // Show/hide envelope fields when product type changes
+        const productTypeSelect = document.getElementById('productType');
+        const envelopeFields = document.getElementById('envelope-fields');
+        if (productTypeSelect && envelopeFields) {
+            productTypeSelect.addEventListener('change', function () {
+                if (this.value === 'Envelope') {
+                    envelopeFields.style.display = 'block';
+                    // Make required
+                    document.getElementById('materialType').required = true;
+                    document.getElementById('envelopeMaterial').required = true;
+                } else {
+                    envelopeFields.style.display = 'none';
+                    document.getElementById('materialType').required = false;
+                    document.getElementById('envelopeMaterial').required = false;
+                }
+            });
+        }
+
+        // Auto-calc Date Available from Lead Time (days)
+        const leadTimeInput = document.getElementById('leadTime');
+        const dateAvailableInput = document.getElementById('dateAvailable');
+        function updateDateAvailableFromLeadTime() {
+            if (!leadTimeInput || !dateAvailableInput) return;
+            const val = leadTimeInput.value;
+            const days = parseInt(val, 10);
+            if (isNaN(days) || days < 0) {
+                // Clear if invalid
+                dateAvailableInput.value = '';
+                return;
+            }
+            const today = new Date();
+            // Add days (consider only whole days)
+            today.setDate(today.getDate() + days);
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            dateAvailableInput.value = `${yyyy}-${mm}-${dd}`;
+        }
+        if (leadTimeInput) {
+            leadTimeInput.addEventListener('input', updateDateAvailableFromLeadTime);
+            // also update on blur to finalize
+            leadTimeInput.addEventListener('blur', updateDateAvailableFromLeadTime);
+        }
 
     // Remove button event delegation
     document.addEventListener('click', function(e){

@@ -129,13 +129,13 @@
 
                 <div class="responsive-grid grid-2-cols">
                     <div class="field">
-                        <label for="material_type">Material *</label>
+                        <label for="material_type">Souvenirs *</label>
                         <select id="material_type"
                                 name="material_type"
                                 required
                                 aria-required="true"
                                 aria-describedby="material_type-error">
-                            <option value="" disabled {{ $materialDefaults['material_type'] ? '' : 'selected' }}>Select Material Type *</option>
+                            <option value="" disabled {{ $materialDefaults['material_type'] ? '' : 'selected' }}>Select Souvenirs *</option>
                             @foreach($materialTypes as $materialType)
                                 <option value="{{ $materialType }}" {{ $materialDefaults['material_type'] === $materialType ? 'selected' : '' }}>
                                     {{ $materialType }}
@@ -146,13 +146,13 @@
                         @error('material_type') <span class="error-message">{{ $message }}</span> @enderror
                     </div>
                     <div class="field">
-                        <label for="envelope_material_id">Giveaway Material Name *</label>
+                        <label for="envelope_material_id">Souvenirs Material Name *</label>
                         <select id="envelope_material_id"
                                 name="envelope_material_id"
                                 required
                                 aria-required="true"
                                 aria-describedby="envelope_material_id-error">
-                            <option value="" disabled {{ $materialDefaults['material_id'] ? '' : 'selected' }}>Select Giveaway Material *</option>
+                            <option value="" disabled {{ $materialDefaults['material_id'] ? '' : 'selected' }}>Select Souvenirs Material *</option>
                             @foreach($materialOptions as $material)
                                 <option value="{{ $material->material_id }}"
                                         data-material-type="{{ $material->material_type }}"

@@ -30,7 +30,7 @@ body {
     border-bottom: 1px solid var(--panel-border);
     position: sticky;
     top: 0;
-    z-index: 40;
+    z-index: 1300;
 }
 
 .topbar-left {
