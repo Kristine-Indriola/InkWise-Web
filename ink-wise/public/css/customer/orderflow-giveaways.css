@@ -1,7 +1,7 @@
 :root {
     --page-gradient: radial-gradient(circle at top, #e0f2fe 0%, #f5f8ff 38%, #ffffff 100%);
     --surface: #ffffff;
-    --surface-elev: rgba(255, 255, 255, 0.82);
+    --surface-elev: rgba(255, 255, 255, 0.92);
     --surface-muted: rgba(241, 245, 255, 0.55);
     --border: rgba(148, 163, 184, 0.22);
     --border-strong: rgba(79, 70, 229, 0.28);
@@ -30,7 +30,7 @@ body {
     min-height: 100vh;
     background: var(--page-gradient);
     color: var(--text-default);
-    padding: clamp(28px, 5vw, 48px) 0;
+    padding: clamp(20px, 3vw, 32px) 0;
 }
 
 a {
@@ -43,50 +43,60 @@ a:hover {
 }
 
 .giveaways-shell {
-    width: min(1200px, calc(100% - clamp(24px, 7vw, 120px)));
-    margin: 0 auto;
+    width: 100%;
+    max-width: 100vw;
+    margin: 0;
+    padding: 0 clamp(16px, 2vw, 24px);
     display: grid;
-    gap: clamp(28px, 4vw, 44px);
+    gap: clamp(24px, 3vw, 32px);
 }
 
 .giveaways-header {
     display: grid;
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
     gap: clamp(18px, 2.4vw, 28px);
 }
 
 .giveaways-header__content {
     background: var(--surface);
     border-radius: var(--radius-lg);
-    padding: clamp(26px, 3vw, 38px);
+    padding: clamp(20px, 2.5vw, 28px);
     box-shadow: var(--shadow-md);
     border: 1px solid var(--border);
+    display: grid;
+    gap: clamp(8px, 1.2vw, 12px);
+    margin: 0 clamp(16px, 2vw, 24px);
 }
 
 .giveaways-header__content h1 {
-    margin: 12px 0 10px;
-    font-size: clamp(25px, 3.2vw, 32px);
+    margin: 0;
+    font-size: clamp(24px, 2.8vw, 32px);
     color: var(--text-strong);
+    font-weight: 700;
 }
 
 .giveaways-header__content p {
     margin: 0;
     color: var(--text-muted);
-    font-size: clamp(14px, 1.8vw, 16px);
-    line-height: 1.6;
+    font-size: clamp(14px, 1.6vw, 16px);
+    line-height: 1.5;
 }
 
 .giveaways-header__back {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     font-weight: 600;
     font-size: 14px;
     color: var(--accent-strong);
+    margin: 0 clamp(16px, 2vw, 24px);
 }
 
 .giveaways-header__back svg {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
 }
 
 
@@ -178,72 +188,110 @@ a:hover {
 
 .giveaways-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 320px;
-    gap: clamp(24px, 3vw, 36px);
+    grid-template-columns: 1fr minmax(340px, 400px);
+    gap: clamp(20px, 2.5vw, 28px);
     align-items: start;
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 clamp(16px, 2vw, 24px);
 }
 
-.giveaways-main {
+.giveaways-options {
     display: grid;
-    gap: clamp(24px, 3vw, 32px);
+    gap: clamp(16px, 2vw, 20px);
 }
 
-.catalog {
+.giveaways-summary {
+    display: grid;
+    justify-items: stretch;
+    align-content: start;
+    gap: clamp(16px, 1.8vw, 20px);
+    position: sticky;
+    top: 20px;
+}
+
+.giveaways-summary .summary-card {
+    width: 100%;
+    max-width: 380px;
+}
+
+.giveaways-card {
     background: var(--surface);
     border-radius: var(--radius-lg);
-    padding: clamp(24px, 3vw, 34px);
     border: 1px solid var(--border);
     box-shadow: var(--shadow-md);
+    padding: clamp(20px, 2.2vw, 24px);
+    display: grid;
+    gap: clamp(16px, 1.8vw, 18px);
+    position: relative;
+    width: 100%;
+}
+
+.giveaway-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+}
+
+.giveaway-card__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 999px;
+    background: rgba(143, 157, 255, 0.18);
+    color: var(--accent-strong);
 }
 
 .giveaways-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: clamp(18px, 2.4vw, 26px);
+    gap: clamp(16px, 2vw, 20px);
 }
 
 .giveaway-card {
-    display: flex;
-    flex-direction: column;
-    background: rgba(249, 250, 255, 0.92);
+    display: grid;
+    gap: 14px;
+    background: var(--surface-elev);
     border-radius: var(--radius-md);
-    border: 1px solid rgba(148, 163, 184, 0.22);
-    box-shadow: var(--shadow-sm);
-    transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
-    position: relative;
-    overflow: hidden;
+    border: 1px solid var(--border);
+    padding: clamp(16px, 1.8vw, 20px);
+    transition: transform 0.24s ease, box-shadow 0.24s ease, border-color 0.24s ease;
+    width: 100%;
 }
 
-.giveaway-card.is-hidden {
-    display: none !important;
+.giveaway-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 28px rgba(143, 157, 255, 0.15);
 }
 
 .giveaway-card.is-selected {
     border-color: var(--border-strong);
-    box-shadow: 0 26px 48px rgba(95, 106, 217, 0.28);
-    transform: translateY(-6px);
+    box-shadow: 0 20px 36px rgba(95, 106, 217, 0.22);
+    transform: translateY(-4px);
 }
 
 .giveaway-card__media {
     position: relative;
-    aspect-ratio: 4 / 3;
-    background: linear-gradient(135deg, rgba(143, 157, 255, 0.18), rgba(143, 157, 255, 0.06));
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    aspect-ratio: 1 / 1;
+    border-radius: calc(var(--radius-md) - 6px);
     overflow: hidden;
+    background: linear-gradient(135deg, rgba(143, 157, 255, 0.18), rgba(143, 157, 255, 0.06));
 }
 
 .giveaway-card__image {
     width: 100%;
     height: 100%;
-    object-fit: contain;
-    mix-blend-mode: multiply;
-    transition: transform 0.35s ease;
+    object-fit: cover;
+    transition: transform 0.3s ease;
 }
 
 .giveaway-card:hover .giveaway-card__image {
-    transform: scale(1.05);
+    transform: scale(1.04);
 }
 
 .favorite-toggle {
@@ -281,9 +329,8 @@ a:hover {
 }
 
 .giveaway-card__body {
-    padding: clamp(20px, 2.4vw, 26px);
     display: grid;
-    gap: 14px;
+    gap: 12px;
 }
 
 .giveaway-card__meta-top {
@@ -314,15 +361,17 @@ a:hover {
 
 .giveaway-card h2 {
     margin: 0;
-    font-size: 18px;
+    font-size: clamp(16px, 1.4vw, 18px);
+    font-weight: 600;
     color: var(--text-strong);
+    line-height: 1.3;
 }
 
 .giveaway-card p {
     margin: 0;
-    font-size: 14px;
+    font-size: clamp(13px, 1.1vw, 14px);
     color: var(--text-muted);
-    line-height: 1.6;
+    line-height: 1.4;
 }
 
 .meta-list {
@@ -339,25 +388,58 @@ a:hover {
     color: var(--text-strong);
 }
 
-.giveaway-card__pricing {
-    background: rgba(143, 157, 255, 0.1);
-    border-radius: var(--radius-sm);
+.summary-quantity {
+    display: none !important;
+}
+
+/* Emphasize the computed total price on card and in summary */
+.qty-total {
+    font-size: clamp(19px, 2.3vw, 23px);
+    font-weight: 700;
+    color: var(--accent-strong);
+}
+
+.summary-total-value {
+    /* Emphasized total value for visibility */
+    font-size: clamp(26px, 2.6vw, 30px);
+    font-weight: 800;
+    color: var(--text-strong);
+    line-height: 1;
+}
+
+/* Slightly reduce number input size to de-emphasize it */
+.giveaway-card__quantity,
+.quantity-input-wrapper input[type="number"],
+.quantity-input-wrapper .quantity-input {
+    font-size: 16px;
     padding: 14px 16px;
+    max-width: 180px;
+    text-align: center;
+}
+
+.quantity-input-wrapper .qty-total {
+    margin-top: 6px;
+}
+
+.giveaway-card__pricing {
     display: grid;
-    gap: 10px;
-    border: 1px solid rgba(143, 157, 255, 0.24);
+    gap: clamp(10px, 1vw, 12px);
+    font-weight: 600;
+    color: var(--accent-strong);
+    font-size: clamp(13px, 1.1vw, 14px);
 }
 
 .price-label {
-    font-weight: 700;
-    color: var(--success);
-    font-size: 16px;
+    font-weight: bold;
+    color: var(--accent-strong);
+    font-size: clamp(18px, 1.6vw, 19px);
 }
 
 .price-label span {
-    font-size: 12px;
-    color: var(--text-soft);
+    font-size: 14px;
+    color: var(--accent-strong);
     margin-left: 4px;
+    font-weight: bold;
 }
 
 .price-label.is-muted {
@@ -365,60 +447,85 @@ a:hover {
     font-weight: 600;
 }
 
-.quantity-control {
-    display: grid;
-    gap: 6px;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--text-muted);
+.quantity-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(4px, 0.6vw, 6px);
 }
 
-.quantity-control input {
-    appearance: textfield;
-    border-radius: 10px;
-    border: 1px solid rgba(148, 163, 184, 0.4);
-    padding: 10px 12px;
-    font-size: 14px;
+.quantity-input-group label {
+    font-size: clamp(11px, 0.9vw, 12px);
+    font-weight: 600;
+    color: var(--text-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.quantity-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: clamp(8px, 0.8vw, 10px);
+}
+
+.quantity-input-wrapper input {
+    padding: clamp(10px, 1vw, 12px) clamp(14px, 1.2vw, 16px);
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(148, 163, 184, 0.38);
     font-family: inherit;
-    color: var(--text-strong);
-    background: #ffffff;
+    font-size: clamp(13px, 1vw, 14px);
+    background: var(--surface);
+    color: var(--text-default);
+    transition: border 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    min-width: clamp(100px, 8vw, 120px);
+    flex: 1;
+    min-height: 44px;
 }
 
-.quantity-control input:focus {
+.quantity-input-wrapper input:focus {
     outline: none;
     border-color: rgba(143, 157, 255, 0.7);
-    box-shadow: 0 0 0 3px rgba(143, 157, 255, 0.16);
+    box-shadow: 0 0 0 3px rgba(143, 157, 255, 0.2);
+    background: var(--surface);
 }
 
 .qty-total {
+    font-size: clamp(13px, 1vw, 14px);
     font-weight: 600;
-    font-size: 13px;
-    color: var(--accent-strong);
+    color: var(--text-strong);
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .giveaway-card__actions {
     display: flex;
-    gap: 10px;
+    gap: clamp(8px, 1vw, 10px);
     flex-wrap: wrap;
+    align-items: center;
+    position: relative;
+    z-index: 5;
 }
 
 .giveaway-card__action {
-    flex: 1 1 auto;
-    border-radius: 999px;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    gap: clamp(6px, 0.6vw, 8px);
     border: none;
-    padding: 12px 16px;
+    border-radius: 999px;
+    padding: clamp(12px, 1.2vw, 14px) clamp(14px, 1.4vw, 16px);
     font-weight: 600;
-    font-size: 14px;
-    cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-    background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+    font-size: clamp(14px, 1.1vw, 15px);
     color: #ffffff;
-    box-shadow: 0 16px 28px rgba(143, 157, 255, 0.28);
+    background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+    cursor: pointer;
+    box-shadow: 0 24px 42px rgba(143, 157, 255, 0.32);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    min-height: 44px;
 }
 
 .giveaway-card__action:hover {
     transform: translateY(-2px);
-    box-shadow: 0 22px 36px rgba(143, 157, 255, 0.32);
+    box-shadow: 0 28px 46px rgba(143, 157, 255, 0.36);
 }
 
 .giveaway-card__action.secondary {
@@ -430,7 +537,6 @@ a:hover {
 
 .giveaway-card__action.secondary:hover {
     background: rgba(143, 157, 255, 0.24);
-    transform: translateY(-1px);
 }
 
 .giveaways-empty {
@@ -462,41 +568,58 @@ a:hover {
     border-radius: var(--radius-lg);
     border: 1px solid var(--border);
     box-shadow: var(--shadow-md);
-    padding: clamp(22px, 2.6vw, 28px);
+    padding: clamp(20px, 2.2vw, 24px);
     display: grid;
-    gap: 16px;
+    gap: clamp(16px, 1.8vw, 18px);
+    position: relative;
 }
 
 .summary-card__header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 14px;
+    gap: 16px;
 }
 
 .summary-card__header h2 {
     margin: 0;
-    font-size: 18px;
-    color: var(--text-strong);
-}
-
-.summary-badge {
-    padding: 6px 14px;
-    border-radius: 999px;
-    font-size: 12px;
+    font-size: clamp(18px, 1.5vw, 20px);
     font-weight: 600;
-    background: rgba(148, 163, 184, 0.2);
-    color: var(--text-muted);
+    color: var(--text-strong);
+    line-height: 1.3;
 }
 
+.summary-card__badge,
+.summary-badge {
+    padding: clamp(4px, 0.5vw, 6px) clamp(10px, 1vw, 12px);
+    border-radius: 999px;
+    font-size: clamp(11px, 0.9vw, 12px);
+    font-weight: 600;
+    background: rgba(148, 163, 184, 0.22);
+    color: var(--text-soft);
+}
+
+.summary-card__badge.summary-badge--success,
 .summary-badge.is-success {
     background: rgba(16, 185, 129, 0.18);
     color: var(--success);
 }
 
+.summary-card__badge.summary-badge--alert {
+    background: rgba(239, 68, 68, 0.18);
+    color: var(--danger);
+}
+
 .summary-card__body {
     display: grid;
     gap: 12px;
+}
+
+.summary-card__header p {
+    margin: clamp(4px, 0.4vw, 6px) 0 0;
+    font-size: clamp(12px, 1vw, 13px);
+    color: var(--text-muted);
+    line-height: 1.4;
 }
 
 .summary-placeholder {
@@ -575,17 +698,34 @@ a:hover {
 .summary-actions {
     display: grid;
     gap: 12px;
+    width: min(100%, 280px);
+    margin-top: clamp(12px, 2vw, 20px);
+    position: relative;
+    z-index: 60;
+    isolation: isolate;
+}
+
+.btn {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    gap: clamp(6px, 0.6vw, 8px);
+    border-radius: 999px;
+    padding: clamp(12px, 1.2vw, 14px) clamp(14px, 1.4vw, 16px);
+    font-weight: 600;
+    font-size: clamp(14px, 1.1vw, 15px);
+    border: none;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    pointer-events: auto;
+    min-height: 44px;
+    position: relative;
+    z-index: 10;
 }
 
 .btn-secondary,
 .btn-primary {
     padding: 14px 16px;
-    border-radius: 999px;
-    border: none;
-    font-weight: 600;
-    font-size: 15px;
-    cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
 }
 
 .btn-secondary {
@@ -616,11 +756,120 @@ a:hover {
     box-shadow: 0 28px 46px rgba(143, 157, 255, 0.36);
 }
 
+/* Primary action button styles matching envelope page */
+.primary-action {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    border: none;
+    border-radius: 999px;
+    padding: 14px 22px;
+    font-weight: 700;
+    font-size: 15px;
+    color: #ffffff;
+    background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+    cursor: pointer;
+    box-shadow: 0 24px 42px rgba(143, 157, 255, 0.32);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    position: relative;
+    z-index: 12;
+    pointer-events: auto;
+}
+
+.primary-action:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 28px 46px rgba(143, 157, 255, 0.36);
+}
+
+.primary-action:active {
+    transform: translateY(0);
+}
+
+.primary-action:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
 .summary-note {
     margin: 0;
     font-size: 12px;
     color: var(--text-soft);
     text-align: center;
+    width: min(100%, 280px);
+}
+
+/* Multiple Envelope Selection Styles */
+.summary-title {
+    margin: 0 0 16px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-strong);
+}
+
+.summary-selection--multiple {
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    background: rgba(249, 250, 255, 0.6);
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.summary-selection--multiple:hover {
+    border-color: rgba(143, 157, 255, 0.4);
+    background: rgba(249, 250, 255, 0.8);
+}
+
+.summary-selection__qty {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.summary-totals {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(148, 163, 184, 0.2);
+    display: grid;
+    gap: 8px;
+}
+
+.summary-total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+}
+
+.summary-total-row--grand {
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--text-strong);
+    padding-top: 8px;
+    border-top: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.summary-total-label {
+    color: var(--text-muted);
+}
+
+.summary-total-value {
+    /* Keep summary total consistent across page */
+    font-size: clamp(26px, 2.6vw, 30px);
+    color: var(--text-strong);
+    font-weight: 800;
+    line-height: 1;
+}
+
+.summary-empty {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 14px;
+    text-align: center;
+    padding: 20px;
 }
 
 .giveaway-toast {
@@ -672,4 +921,27 @@ a:hover {
     .summary-selection {
         grid-template-columns: 56px 1fr;
     }
+}
+
+.giveaway-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 40px;
+    transform: translateX(-50%) translateY(20px);
+    background: linear-gradient(135deg, rgba(95, 106, 217, 0.96), rgba(143, 157, 255, 0.96));
+    color: #ffffff;
+    padding: 14px 28px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 14px;
+    box-shadow: 0 22px 40px rgba(95, 106, 217, 0.36);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.24s ease, transform 0.24s ease;
+    z-index: 999;
+}
+
+.giveaway-toast.is-visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
 }

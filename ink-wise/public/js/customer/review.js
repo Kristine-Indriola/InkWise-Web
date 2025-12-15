@@ -85,6 +85,73 @@ document.addEventListener('DOMContentLoaded', () => {
     updateContinueState();
   }
 
+  // Detect unedited placeholders using the actual template snapshot (texts + images)
+  const summaryData = window.summaryData;
+  if (summaryData) {
+    const design = summaryData.design || summaryData;
+    const textEntries = Array.isArray(design.texts) ? design.texts : [];
+    const imageEntries = Array.isArray(design.images) ? design.images : [];
+
+    const uneditedLabels = new Set();
+    textEntries.forEach((entry) => {
+      const value = (entry.content || entry.value || '').trim();
+      const def = (entry.defaultValue || '').trim();
+      const label = (entry.label || entry.key || '').trim();
+      if (!label) return;
+      if (value === '' || (def && value === def)) {
+        uneditedLabels.add(label);
+      }
+    });
+
+    const uneditedBySide = { front: [], back: [] };
+    let warningCount = 0;
+
+    unresolvedPlaceholders.forEach((li) => {
+      const placeholderText = li.textContent.trim();
+      let side = 'front';
+      let body = placeholderText;
+      if (placeholderText.toLowerCase().startsWith('front:')) {
+        side = 'front';
+        body = placeholderText.slice(6).trim();
+      } else if (placeholderText.toLowerCase().startsWith('back:')) {
+        side = 'back';
+        body = placeholderText.slice(5).trim();
+      }
+
+      const isImagePlaceholder = /image placeholder/i.test(body);
+      const matchesUneditedText = Array.from(uneditedLabels).some((label) => label === body);
+      const imageUnedited = isImagePlaceholder && imageEntries.length === 0;
+
+      // Try to enrich message with the actual default text from the design snapshot.
+      let defaultText = body;
+      const entryMatch = textEntries.find((entry) => {
+        const label = (entry.label || entry.key || '').trim();
+        return label && label === body;
+      });
+      if (entryMatch) {
+        defaultText = (entryMatch.defaultValue || entryMatch.content || entryMatch.value || body).trim();
+      }
+
+      if (matchesUneditedText || imageUnedited) {
+        warningCount += 1;
+        uneditedBySide[side]?.push(defaultText);
+        li.textContent = `Warning: ${side === 'front' ? 'Front' : 'Back'} — ${defaultText} was not edited`;
+        li.classList.add('unedited-warning');
+      }
+    });
+
+    if (placeholderCounter) {
+      placeholderCounter.textContent = warningCount.toString();
+    }
+
+    if (uneditedBySide.front.length) {
+      showToast(`Front placeholders not edited: ${uneditedBySide.front.join(', ')}`, 6000);
+    }
+    if (uneditedBySide.back.length) {
+      showToast(`Back placeholders not edited: ${uneditedBySide.back.join(', ')}`, 6000);
+    }
+  }
+
   continueBtn?.addEventListener('click', (event) => {
     if (continueBtn.disabled) {
       event.preventDefault();

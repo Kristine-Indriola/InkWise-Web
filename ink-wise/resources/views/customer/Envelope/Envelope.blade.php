@@ -381,7 +381,7 @@
 
                 <div class="summary-actions">
                     <button type="button" class="btn btn-secondary" id="skipEnvelopeBtn" data-summary-url="{{ $giveawaysUrl }}">Skip envelopes</button>
-                    <button type="button" class="btn btn-primary" id="envContinueBtn" data-summary-url="{{ $giveawaysUrl }}" disabled>Continue to giveaways</button>
+                    <button type="button" class="primary-action" id="envContinueBtn" data-summary-url="{{ $giveawaysUrl }}" disabled>Continue to giveaways</button>
                 </div>
                 <p class="summary-note">You can revisit this step before finalizing your order. Your progress is saved automatically.</p>
             </aside>

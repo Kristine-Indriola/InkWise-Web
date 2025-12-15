@@ -30,11 +30,11 @@ body {
     min-height: 100vh;
     background: var(--page-gradient);
     color: var(--text-default);
-    padding: clamp(28px, 5vw, 48px) 0;
+    padding: clamp(20px, 3vw, 32px) 0;
 }
 
 .envelope-body {
-    padding-top: calc(clamp(28px, 5vw, 48px) + 96px);
+    padding-top: calc(clamp(20px, 3vw, 32px) + 96px);
 }
 
 a {
@@ -47,71 +47,84 @@ a:hover {
 }
 
 .envelope-shell {
-    width: min(1200px, calc(100% - clamp(24px, 7vw, 120px)));
-    margin: 0 auto;
+    width: 100%;
+    max-width: 100vw;
+    margin: 0;
+    padding: 0 clamp(16px, 2vw, 24px);
     display: grid;
-    gap: clamp(28px, 4vw, 44px);
+    gap: clamp(24px, 3vw, 32px);
 }
 
 .envelope-header {
     display: grid;
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
 }
 
 .envelope-header__content {
     background: var(--surface);
     border-radius: var(--radius-lg);
-    padding: clamp(26px, 3vw, 38px);
+    padding: clamp(20px, 2.5vw, 28px);
     box-shadow: var(--shadow-md);
     border: 1px solid var(--border);
     display: grid;
-    gap: clamp(12px, 1.8vw, 18px);
+    gap: clamp(8px, 1.2vw, 12px);
+    margin: 0 clamp(16px, 2vw, 24px);
 }
 
 .envelope-header__content h1 {
     margin: 0;
-    font-size: clamp(26px, 3.3vw, 34px);
+    font-size: clamp(24px, 2.8vw, 32px);
     color: var(--text-strong);
+    font-weight: 700;
 }
 
 .envelope-header__content p {
     margin: 0;
     color: var(--text-muted);
-    font-size: clamp(14px, 1.8vw, 16px);
-    line-height: 1.6;
+    font-size: clamp(14px, 1.6vw, 16px);
+    line-height: 1.5;
 }
 
 .envelope-header__back {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     font-weight: 600;
     font-size: 14px;
     color: var(--accent-strong);
+    margin: 0 clamp(16px, 2vw, 24px);
 }
 
 .envelope-header__back svg {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
 }
 
 .envelope-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1.1fr) minmax(360px, 420px);
-    gap: clamp(28px, 4vw, 38px);
+    grid-template-columns: 1fr minmax(340px, 400px);
+    gap: clamp(20px, 2.5vw, 28px);
     align-items: start;
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 clamp(16px, 2vw, 24px);
 }
 
-.envelope-options,
+.envelope-options {
+    display: grid;
+    gap: clamp(16px, 2vw, 20px);
+}
+
 .envelope-summary {
     display: grid;
-}
-
-.envelope-summary {
-    justify-items: center;
+    justify-items: stretch;
     align-content: start;
-    gap: clamp(18px, 2vw, 24px);
-    position: relative;
-    z-index: 20;
+    gap: clamp(16px, 1.8vw, 20px);
+    position: sticky;
+    top: 20px;
 }
 
 .envelope-card,
@@ -120,15 +133,16 @@ a:hover {
     border-radius: var(--radius-lg);
     border: 1px solid var(--border);
     box-shadow: var(--shadow-md);
-    padding: clamp(24px, 3vw, 34px);
+    padding: clamp(20px, 2.2vw, 24px);
     display: grid;
-    gap: clamp(20px, 2.6vw, 24px);
+    gap: clamp(16px, 1.8vw, 18px);
     position: relative;
-    z-index: 30;
+    width: 100%;
 }
 
 .envelope-summary .summary-card {
-    width: min(100%, 320px);
+    width: 100%;
+    max-width: 380px;
 }
 
 .envelope-card__header {
@@ -152,34 +166,36 @@ a:hover {
 
 .envelope-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: clamp(20px, 2.6vw, 26px);
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: clamp(16px, 2vw, 20px);
+    width: 100%;
 }
 
 .envelope-item {
     display: grid;
-    gap: 16px;
-    background: rgba(249, 250, 255, 0.92);
+    gap: 14px;
+    background: var(--surface-elev);
     border-radius: var(--radius-md);
-    border: 1px solid rgba(148, 163, 184, 0.26);
-    padding: clamp(18px, 2.2vw, 22px);
+    border: 1px solid var(--border);
+    padding: clamp(16px, 1.8vw, 20px);
     transition: transform 0.24s ease, box-shadow 0.24s ease, border-color 0.24s ease;
+    width: 100%;
 }
 
 .envelope-item:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 18px 32px rgba(143, 157, 255, 0.18);
+    transform: translateY(-3px);
+    box-shadow: 0 16px 28px rgba(143, 157, 255, 0.15);
 }
 
 .envelope-item.is-selected {
     border-color: var(--border-strong);
-    box-shadow: 0 26px 48px rgba(95, 106, 217, 0.28);
-    transform: translateY(-6px);
+    box-shadow: 0 20px 36px rgba(95, 106, 217, 0.22);
+    transform: translateY(-4px);
 }
 
 .envelope-item__media {
     position: relative;
-    aspect-ratio: 4 / 3;
+    aspect-ratio: 1 / 1;
     border-radius: calc(var(--radius-md) - 6px);
     overflow: hidden;
     background: linear-gradient(135deg, rgba(143, 157, 255, 0.18), rgba(143, 157, 255, 0.06));
@@ -198,16 +214,18 @@ a:hover {
 
 .envelope-item__title {
     margin: 0;
-    font-size: 18px;
+    font-size: clamp(16px, 1.4vw, 18px);
+    font-weight: 600;
     color: var(--text-strong);
+    line-height: 1.3;
 }
 
 .envelope-item__meta,
-.envelope-item__price,
-.envelope-item__total {
+.envelope-item__price {
     margin: 0;
-    font-size: 14px;
+    font-size: clamp(13px, 1.1vw, 14px);
     color: var(--text-muted);
+    line-height: 1.4;
 }
 
 .envelope-item__price {
@@ -215,60 +233,182 @@ a:hover {
     color: var(--accent-strong);
 }
 
-.envelope-item__total {
-    font-weight: 600;
-    color: var(--text-strong);
-}
-
 .envelope-item__controls {
     display: flex;
-    flex-wrap: wrap;
-    gap: 14px;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
+    gap: clamp(12px, 1.2vw, 14px);
 }
 
-.envelope-item__controls label {
-    display: grid;
-    gap: 6px;
-    font-size: 12px;
+.quantity-control {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(6px, 0.8vw, 8px);
+}
+
+.quantity-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(4px, 0.6vw, 6px);
+}
+
+.quantity-input-group label {
+    font-size: clamp(11px, 0.9vw, 12px);
     font-weight: 600;
     color: var(--text-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
 }
 
-.envelope-item__controls select {
-    appearance: none;
-    padding: 12px 16px;
+.quantity-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: clamp(8px, 0.8vw, 10px);
+}
+
+.quantity-input-wrapper input {
+    padding: clamp(10px, 1vw, 12px) clamp(14px, 1.2vw, 16px);
     border-radius: var(--radius-sm);
     border: 1px solid rgba(148, 163, 184, 0.38);
     font-family: inherit;
-    font-size: 14px;
-    background: rgba(241, 245, 255, 0.6);
+    font-size: clamp(13px, 1vw, 14px);
+    background: var(--surface);
     color: var(--text-default);
-    transition: border 0.2s ease, box-shadow 0.2s ease;
-    min-width: 180px;
+    transition: border 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    min-width: clamp(100px, 8vw, 120px);
+    flex: 1;
+    min-height: 44px;
 }
 
-.envelope-item__controls select:focus {
+.quantity-input-wrapper input:focus {
     outline: none;
     border-color: rgba(143, 157, 255, 0.7);
     box-shadow: 0 0 0 3px rgba(143, 157, 255, 0.2);
+    background: var(--surface);
+}
+
+.quantity-input-wrapper input.error {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
+.quantity-input-wrapper input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.quantity-total {
+    font-size: clamp(13px, 1vw, 14px);
+    font-weight: 600;
+    color: var(--text-strong);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Quantity controls (increment / decrement) to match final step styling */
+.quantity-input-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    border-radius: 999px;
+    padding: 4px;
+    border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.qty-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: transparent;
+    color: var(--text-default);
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.qty-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(143, 157, 255, 0.06);
+}
+
+.quantity-input-controls input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+    border: none;
+    outline: none;
+    padding: 8px 12px;
+    min-width: 80px;
+    text-align: center;
+    font-size: 14px;
+    background: transparent;
+}
+
+.quantity-error {
+    font-size: clamp(11px, 0.9vw, 12px);
+    color: var(--danger);
+    margin-top: clamp(4px, 0.4vw, 6px);
+}
+    margin: 0;
+}
+
+.quantity-helper {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin: 0;
+}
+    color: var(--danger);
+    margin-top: 4px;
+}
+
+.control-buttons {
+    display: flex;
+    gap: clamp(8px, 1vw, 10px);
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.envelope-item__design {
+    background: var(--surface-muted);
+    color: var(--text-default);
+    border: 1px solid var(--border);
+    box-shadow: none;
+    padding: clamp(8px, 0.9vw, 10px) clamp(12px, 1.2vw, 14px);
+    font-size: clamp(12px, 1vw, 13px);
+    font-weight: 500;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+}
+
+.envelope-item__design:hover {
+    background: var(--surface);
+    border-color: var(--border-strong);
+    transform: translateY(-1px);
+}
+
+.envelope-item__design i {
+    font-size: clamp(11px, 0.9vw, 12px);
 }
 
 .btn {
     display: inline-flex;
     justify-content: center;
     align-items: center;
-    gap: 8px;
+    gap: clamp(6px, 0.6vw, 8px);
     border-radius: 999px;
-    padding: 14px 16px;
+    padding: clamp(12px, 1.2vw, 14px) clamp(14px, 1.4vw, 16px);
     font-weight: 600;
-    font-size: 15px;
+    font-size: clamp(14px, 1.1vw, 15px);
     border: none;
     cursor: pointer;
     transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
     pointer-events: auto;
     z-index: 120;
+    min-height: 44px;
+}
     position: relative;
 }
 
@@ -300,6 +440,68 @@ a:hover {
     box-shadow: 0 18px 30px rgba(143, 157, 255, 0.22);
 }
 
+/* Final step button styles for envelope page */
+.primary-action {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    border: none;
+    border-radius: 999px;
+    padding: 14px 22px;
+    font-weight: 700;
+    font-size: 15px;
+    color: #ffffff;
+    background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+    cursor: pointer;
+    box-shadow: 0 24px 42px rgba(143, 157, 255, 0.32);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    min-height: 44px;
+}
+
+.primary-action:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 28px 48px rgba(143, 157, 255, 0.36);
+}
+
+.primary-action:active {
+    transform: translateY(1px);
+}
+
+.primary-action:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.secondary-action {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 12px 20px;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-default);
+    background: transparent;
+    cursor: pointer;
+    text-decoration: none;
+    transition: border-color 0.2s ease, background 0.2s ease;
+    min-height: 44px;
+}
+
+.secondary-action:hover {
+    border-color: var(--accent-strong);
+    background: rgba(143, 157, 255, 0.05);
+}
+
+.secondary-action[aria-disabled="true"] {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
 .summary-card__header {
     display: flex;
     justify-content: space-between;
@@ -309,22 +511,25 @@ a:hover {
 
 .summary-card__header h2 {
     margin: 0;
-    font-size: 20px;
+    font-size: clamp(18px, 1.5vw, 20px);
+    font-weight: 600;
     color: var(--text-strong);
+    line-height: 1.3;
 }
 
 .summary-card__header p {
-    margin: 6px 0 0;
-    font-size: 13px;
+    margin: clamp(4px, 0.4vw, 6px) 0 0;
+    font-size: clamp(12px, 1vw, 13px);
     color: var(--text-muted);
+    line-height: 1.4;
 }
 
 .summary-card__badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 6px 12px;
-    font-size: 12px;
+    padding: clamp(4px, 0.5vw, 6px) clamp(10px, 1vw, 12px);
+    font-size: clamp(11px, 0.9vw, 12px);
     font-weight: 600;
     border-radius: 999px;
     background: rgba(148, 163, 184, 0.22);
@@ -343,25 +548,36 @@ a:hover {
 
 .summary-card__body {
     display: grid;
-    gap: 18px;
+    gap: clamp(14px, 1.4vw, 16px);
 }
 
 .summary-empty {
     margin: 0;
-    font-size: 14px;
+    font-size: clamp(13px, 1.1vw, 14px);
     color: var(--text-muted);
+    text-align: center;
+    padding: clamp(16px, 2vw, 20px);
 }
 
 .summary-selection {
     display: grid;
-    grid-template-columns: 64px 1fr;
-    gap: 16px;
+    grid-template-columns: clamp(56px, 5vw, 64px) 1fr;
+    gap: clamp(12px, 1.2vw, 14px);
     align-items: center;
+    padding: clamp(12px, 1.2vw, 14px);
+    border-radius: var(--radius-sm);
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
 }
 
 .summary-selection__media {
-    width: 64px;
-    height: 64px;
+    width: 100%;
+    height: clamp(56px, 5vw, 64px);
+    border-radius: calc(var(--radius-sm) - 2px);
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--border);
+}
     border-radius: var(--radius-sm);
     overflow: hidden;
     background: rgba(143, 157, 255, 0.12);
@@ -434,6 +650,16 @@ a:hover {
     width: min(100%, 280px);
 }
 
+/* Apply the summary/help design inside envelope cards for quantity helper text */
+.quantity-helper.summary-note {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-soft);
+    text-align: left;
+    width: 100%;
+    display: block;
+}
+
 .envelope-toast {
     position: fixed;
     left: 50%;
@@ -500,37 +726,103 @@ a:hover {
 @media (max-width: 1024px) {
     .envelope-layout {
         grid-template-columns: 1fr;
+        gap: clamp(20px, 3vw, 24px);
     }
 
     .envelope-summary {
         order: -1;
+        position: static;
+    }
+
+    .envelope-header__content,
+    .envelope-header__back {
+        margin: 0;
     }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
     body {
-        padding: clamp(18px, 8vw, 28px) 0;
+        padding: clamp(16px, 4vw, 20px) 0;
     }
 
     .envelope-shell {
-        width: min(100%, calc(100% - 28px));
+        padding: 0 clamp(12px, 3vw, 16px);
+        gap: clamp(20px, 2.5vw, 24px);
+    }
+
+    .envelope-layout {
+        padding: 0;
+        gap: clamp(18px, 2vw, 20px);
+    }
+
+    .envelope-header__content {
+        padding: clamp(18px, 2vw, 22px);
+        margin: 0;
+    }
+
+    .envelope-header__content h1 {
+        font-size: clamp(22px, 3vw, 28px);
+    }
+
+    .envelope-grid {
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: clamp(14px, 1.8vw, 16px);
+    }
+
+    .envelope-item {
+        padding: clamp(14px, 1.6vw, 16px);
+        gap: 12px;
     }
 
     .envelope-card,
     .summary-card {
-        padding: clamp(20px, 6vw, 28px);
+        padding: clamp(18px, 2vw, 20px);
+        gap: clamp(14px, 1.4vw, 16px);
     }
 
-    .envelope-card__header {
-        flex-direction: column;
-        align-items: flex-start;
+    .envelope-summary .summary-card {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .envelope-shell {
+        padding: 0 clamp(8px, 2vw, 12px);
+    }
+
+    .envelope-layout {
+        gap: clamp(16px, 1.8vw, 18px);
     }
 
     .envelope-grid {
-        grid-template-columns: minmax(0, 1fr);
+        grid-template-columns: 1fr;
+        gap: clamp(12px, 1.4vw, 14px);
     }
 
-    .summary-card__footer .btn {
-        width: 100%;
+    .envelope-item {
+        padding: clamp(12px, 1.4vw, 14px);
+    }
+
+    .envelope-header__content {
+        padding: clamp(16px, 1.8vw, 18px);
+    }
+
+    .envelope-header__content h1 {
+        font-size: clamp(20px, 2.8vw, 24px);
+    }
+}
+    }
+
+    .envelope-summary {
+        order: 1;
+        margin-bottom: 32px;
+    }
+
+    .envelope-item__title {
+        font-size: 16px;
+    }
+
+    .envelope-item__controls {
+        gap: 10px;
     }
 }

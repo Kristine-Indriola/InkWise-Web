@@ -866,7 +866,31 @@ document.addEventListener('DOMContentLoaded', () => {
       const invitationTotal = Math.round((invitationBase + extrasForInvitation) * 100) / 100;
 
       // envelope and giveaway totals (may be stored in extras or on meta)
-      const envelopeTotal = parseMoney(current.extras?.envelope ?? current.envelope?.total ?? current.envelope?.price ?? 0);
+      // Compute envelope total defensively: prefer explicit extras.envelope (total),
+      // otherwise derive from envelope meta (unit price * qty) or fall back to stored total.
+      let envelopeTotal = parseMoney(current.extras?.envelope ?? null);
+      try {
+        const envelopeMeta = current.envelope || current.metadata?.envelope || {};
+        if (!Number.isFinite(envelopeTotal) || envelopeTotal <= 0) {
+          const qty = Number(envelopeMeta.qty ?? 0) || 0;
+          let unit = parseMoney(envelopeMeta.price ?? envelopeMeta.unit_price ?? envelopeMeta.unitPrice ?? null);
+          if ((!Number.isFinite(unit) || unit <= 0) && Number.isFinite(envelopeMeta.total) && qty > 0) {
+            unit = parseMoney(envelopeMeta.total) / qty;
+          }
+          if (Number.isFinite(unit) && unit > 0 && qty > 0) {
+            envelopeTotal = Math.round(unit * qty * 100) / 100;
+          } else {
+            envelopeTotal = parseMoney(envelopeMeta.total ?? 0);
+          }
+        }
+      } catch (e) {
+        envelopeTotal = parseMoney(current.extras?.envelope ?? current.envelope?.total ?? current.envelope?.price ?? 0);
+      }
+
+      // Ensure extras.envelope is kept as the numeric total
+      current.extras = current.extras || { paper: 0, addons: 0, envelope: 0, giveaway: 0 };
+      current.extras.envelope = Number(envelopeTotal || 0);
+
       const giveawayTotal = parseMoney(current.extras?.giveaway ?? current.giveaway?.total ?? current.giveaway?.price ?? 0);
 
       const grandTotal = Math.round((invitationTotal + envelopeTotal + giveawayTotal) * 100) / 100;

@@ -16,7 +16,7 @@ class SelectEnvelopeRequest extends FormRequest
         return [
             'product_id' => ['nullable', 'integer', 'exists:products,id'],
             'envelope_id' => ['nullable', 'integer', 'exists:product_envelopes,id'],
-            'quantity' => ['required', 'integer', 'min:1'],
+            'quantity' => ['required', 'integer', 'min:20'],
             'unit_price' => ['nullable', 'numeric', 'min:0'],
             'total_price' => ['nullable', 'numeric', 'min:0'],
             'metadata' => ['nullable', 'array'],

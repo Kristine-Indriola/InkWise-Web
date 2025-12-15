@@ -1155,12 +1155,14 @@ class OrderFlowService
             ->sortBy(fn ($stock) => $stock->name ?? '')
             ->map(function ($stock) use ($fallbackImage, $selectedKey) {
                 $stockId = (string) $stock->id;
+                $available = $stock->material?->stock_qty ?? 0;
                 return [
                     'id' => $stockId,
                     'name' => $stock->name ?? 'Paper Stock',
                     'price' => $stock->price !== null ? (float) $stock->price : null,
                     'image' => $this->resolveMediaPath($stock->image_path, $fallbackImage),
                     'selected' => $selectedKey !== null && $selectedKey === $stockId,
+                    'available' => (int) $available,
                 ];
             })
             ->values()
@@ -1739,9 +1741,7 @@ class OrderFlowService
         $envelopeMeta = $payload['metadata'] ?? [];
 
         $minQuantity = (int) ($envelopeMeta['min_qty'] ?? Arr::get($payload, 'metadata.min_qty') ?? 10);
-        if ($minQuantity < 1) {
-            $minQuantity = 10;
-        }
+        $minQuantity = max($minQuantity, 20); // Enforce minimum of 20
         if ($minQuantity % 10 !== 0) {
             $minQuantity = (int) (ceil($minQuantity / 10) * 10);
         }

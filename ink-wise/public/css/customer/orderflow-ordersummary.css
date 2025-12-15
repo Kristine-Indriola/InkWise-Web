@@ -59,6 +59,16 @@ a:hover {
     gap: clamp(14px, 2vw, 20px);
 }
 
+/* Extra spacing to prevent overlap with the fixed topbar; increased so card sits further below */
+.ordersummary-header__content {
+    margin-top: clamp(60px, 8vw, 160px);
+}
+
+.os-empty {
+    /* Increase spacing so empty-state card is well below the fixed header */
+    margin-top: clamp(160px, 14vw, 300px);
+}
+
 .ordersummary-header__content h1 {
     margin: 0;
     font-size: clamp(28px, 3.4vw, 36px);
@@ -84,6 +94,38 @@ a:hover {
 .ordersummary-header__back svg {
     width: 20px;
     height: 20px;
+}
+
+/* Back-to-Giveaways button */
+.os-backbar {
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: 18px;
+}
+
+.os-back-giveaways {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #eef2ff 0%, #f8f7ff 100%);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    color: #4f46e5;
+    font-weight: 600;
+    font-size: 14px;
+    text-decoration: none;
+    box-shadow: 0 8px 20px rgba(79,70,229,0.06);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.os-back-giveaways:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 32px rgba(79,70,229,0.09);
+}
+
+.os-back-giveaways svg {
+    stroke-width: 1.6;
 }
 
 .os-layout {

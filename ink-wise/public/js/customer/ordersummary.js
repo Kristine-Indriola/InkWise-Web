@@ -271,16 +271,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (envelopeOptionElements.size) envelopeOptionElements.size.textContent = summary?.envelope?.size || 'A6';
     if (envelopeOptionElements.printing) envelopeOptionElements.printing.textContent = summary?.envelope?.printing ? summary.envelope.printing : 'Included';
 
-    // Calculate envelope total
-    const price = parseMoney(summary?.envelope?.price || 0);
-    const originalPrice = parseMoney(summary?.envelope?.originalPrice || price);
-    const savings = originalPrice - price;
+    // Calculate envelope total (defensive: total may be provided or derive from unit price * qty)
+    const unitPrice = parseMoney(summary?.envelope?.price || 0);
+    const qty = Number(summary?.envelope?.qty || 0);
+    const total = parseMoney(summary?.envelope?.total ?? (unitPrice * qty));
+    const originalTotal = parseMoney(summary?.envelope?.originalPrice ?? summary?.envelope?.originalTotal ?? total);
+    const savings = originalTotal - total;
 
     if (envelopeOldTotalEl) {
-      envelopeOldTotalEl.textContent = formatMoney(originalPrice);
+      envelopeOldTotalEl.textContent = formatMoney(originalTotal);
     }
     if (envelopeNewTotalEl) {
-      envelopeNewTotalEl.textContent = formatMoney(price);
+      envelopeNewTotalEl.textContent = formatMoney(total);
     }
     if (envelopeSavingsEl) {
       if (savings > 0.009) {
@@ -389,7 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const updateSummaryCard = (summary) => {
     const invitationTotal = parseMoney(summary?.totalAmount ?? summary?.total);
-    const envelopeTotal = parseMoney(summary?.envelope?.total);
+    const envelopeTotal = parseMoney(summary?.envelope?.total ?? ((summary?.envelope?.price || 0) * (summary?.envelope?.qty || 0)));
     const discountedSubtotal = invitationTotal + envelopeTotal;
     const originalSubtotal = parseMoney(
       summary?.originalTotal ?? summary?.subtotalOriginal ?? summary?.totalBeforeDiscount ?? discountedSubtotal

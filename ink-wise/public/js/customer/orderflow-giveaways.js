@@ -2,6 +2,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const shell = document.querySelector('.giveaways-shell');
     if (!shell) return;
 
+    const inlineCatalog = (() => {
+        const script = document.getElementById('giveawayCatalogData');
+        if (!script) return [];
+        try {
+            const payload = script.textContent?.trim();
+            const parsed = payload ? JSON.parse(payload) : [];
+            script.remove();
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+            console.warn('Failed to parse inline giveaway catalog', error);
+            return [];
+        }
+    })();
+
     const giveawayGrid = shell.querySelector('#giveawaysGrid');
     const emptyState = shell.querySelector('#giveawaysEmptyState');
     const summaryBody = shell.querySelector('#giveawaySummaryBody');
@@ -54,30 +68,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const storageKey = shell.dataset.storageKey || 'inkwise-finalstep';
     const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
 
-    const initialCatalog = (() => {
-        if (!giveawayGrid) return [];
-        return Array.from(giveawayGrid.querySelectorAll('[data-product-id]')).map((card) => {
-            const quantityInput = card.querySelector('.giveaway-card__quantity');
-            const totalDisplay = card.querySelector('[data-total-display]');
-            const initialQty = Number(quantityInput?.value || card.dataset.defaultQty || 50);
-            const unitPrice = Number.parseFloat(card.dataset.productPrice || quantityInput?.dataset.price || 0) || 0;
-            const rawImage = card.dataset.productImage || card.querySelector('img')?.getAttribute('src');
-            return {
-                id: card.dataset.productId ?? card.dataset.giveawayId,
-                product_id: card.dataset.productId ?? card.dataset.giveawayId,
-                name: card.dataset.productName || card.getAttribute('data-product-name') || card.querySelector('h2')?.textContent || 'Giveaway',
-                price: unitPrice,
-                image: extractImageSource(rawImage) || placeholderImage,
-                description: card.dataset.description || card.querySelector('p')?.textContent || '',
-                min_qty: Number(card.dataset.minQty ?? card.dataset.defaultQty ?? initialQty) || 1,
-                max_qty: Number(card.dataset.maxQty || 0) || null,
-                step: Number(card.dataset.step || quantityInput?.step || 10) || 10,
-                default_qty: initialQty,
-                preview_url: card.dataset.previewUrl || card.querySelector('.preview-trigger')?.dataset.previewUrl || null,
-                total_label: totalDisplay?.textContent || null,
-            };
-        });
-    })();
+    const initialCatalog = inlineCatalog.length
+        ? inlineCatalog
+        : (() => {
+            if (!giveawayGrid) return [];
+            return Array.from(giveawayGrid.querySelectorAll('[data-product-id]')).map((card) => {
+                const quantityInput = card.querySelector('.giveaway-card__quantity');
+                const totalDisplay = card.querySelector('[data-total-display]');
+                const initialQty = Number(quantityInput?.value || card.dataset.defaultQty || 50);
+                const unitPrice = Number.parseFloat(card.dataset.productPrice || quantityInput?.dataset.price || 0) || 0;
+                const rawImage = card.dataset.productImage || card.querySelector('img')?.getAttribute('src');
+                return {
+                    id: card.dataset.productId ?? card.dataset.giveawayId,
+                    product_id: card.dataset.productId ?? card.dataset.giveawayId,
+                    name: card.dataset.productName || card.getAttribute('data-product-name') || card.querySelector('h2')?.textContent || 'Giveaway',
+                    price: unitPrice,
+                    image: extractImageSource(rawImage) || placeholderImage,
+                    description: card.dataset.description || card.querySelector('p')?.textContent || '',
+                    min_qty: Number(card.dataset.minQty ?? card.dataset.defaultQty ?? initialQty) || 1,
+                    max_qty: Number(card.dataset.maxQty || 0) || null,
+                    step: Number(card.dataset.step || quantityInput?.step || 10) || 10,
+                    default_qty: initialQty,
+                    preview_url: card.dataset.previewUrl || card.querySelector('.preview-trigger')?.dataset.previewUrl || null,
+                    total_label: totalDisplay?.textContent || null,
+                };
+            });
+        })();
 
     const sampleGiveaways = [
         {
@@ -333,9 +349,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             </div>
             <ul class="summary-list">
-                <li class="summary-list__item"><dt>Quantity</dt><dd>${giveaway.qty} pcs</dd></li>
+                <li class="summary-list__item"><dt>Quantity</dt><dd class="summary-quantity" aria-hidden="true">${giveaway.qty} pcs</dd></li>
                 <li class="summary-list__item"><dt>Unit price</dt><dd>${formatMoney(giveaway.price)}</dd></li>
-                <li class="summary-list__item"><dt>Total</dt><dd>${formatMoney(total)}</dd></li>
+                <li class="summary-list__item"><dt>Total</dt><dd class="summary-total-value">${formatMoney(total)}</dd></li>
             </ul>
         `;
     };
@@ -345,9 +361,9 @@ document.addEventListener('DOMContentLoaded', () => {
         giveawayGrid.querySelectorAll('.giveaway-card').forEach((card) => {
             const isSelected = card.dataset.giveawayId === state.selectedId;
             card.classList.toggle('is-selected', isSelected);
-            const button = card.querySelector('.giveaway-card__select');
+            const button = card.querySelector('.envelope-item__select');
             if (button) {
-                button.textContent = isSelected ? 'Selected giveaway' : 'Add to order';
+                button.textContent = isSelected ? 'Unselect giveaway' : 'Select giveaway';
                 button.disabled = state.isSaving && isSelected;
             }
         });
@@ -423,41 +439,45 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${item.theme_style ? `<span class="meta-chip">${item.theme_style}</span>` : ''}
                 </div>
                 <h2>${item.name ?? 'Giveaway'}</h2>
-                <p>${description || 'Curated giveaway to accompany your invitation suite.'}</p>
+                ${description ? `<p>${description}</p>` : ''}
                 <div class="giveaway-card__pricing">
-                    <div class="price-label">${price ? `${formatMoney(price)} <span>/ piece</span>` : '<span class="is-muted">Pricing on request</span>'}</div>
-                    <label class="quantity-control">
-                        <span>Quantity</span>
-                        <input
-                            type="number"
-                            class="giveaway-card__quantity"
-                            data-qty-input
-                            min="${minQty}"
-                            ${maxQty ? `max="${maxQty}"` : ''}
-                            step="${step}"
-                            value="${defaultQty}"
-                            inputmode="numeric"
-                            pattern="[0-9]*"
-                        />
-                    </label>
-                    <div class="qty-total" data-total-display>${defaultQty} pcs — ${formatMoney(total)}</div>
+                    <div class="price-label">${price ? `${formatMoney(price)} <span>per piece</span>` : '<span class="is-muted">Pricing on request</span>'}</div>
+                    <div class="quantity-input-group">
+                        <label>Quantity</label>
+                        <div class="quantity-input-wrapper">
+                            <input
+                                type="number"
+                                class="giveaway-card__quantity quantity-input"
+                                data-qty-input
+                                min="${minQty}"
+                                ${maxQty ? `max="${maxQty}"` : ''}
+                                step="${step}"
+                                value="${defaultQty}"
+                                inputmode="numeric"
+                                pattern="[0-9]*"
+                            />
+                            <div class="qty-total" data-total-display>${formatMoney(total)}</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="giveaway-card__actions">
-                    <button type="button" class="giveaway-card__action giveaway-card__select">Add to order</button>
-                    ${previewUrl ? `<button type="button" class="giveaway-card__action secondary preview-trigger" data-preview-url="${previewUrl}">Quick preview</button>` : ''}
+                    <button class="btn btn-secondary envelope-item__design" type="button" title="Add/Edit My Design">
+                        <i class="fas fa-edit"></i> Design
+                    </button>
+                    <button class="primary-action envelope-item__select" type="button">Select giveaway</button>
                 </div>
             </div>
         `;
 
         const qtyInput = card.querySelector('[data-qty-input]');
         const totalDisplay = card.querySelector('[data-total-display]');
-        const selectBtn = card.querySelector('.giveaway-card__select');
+        const selectBtn = card.querySelector('.envelope-item__select');
 
         const computeTotal = (qty) => {
             const quantity = Number(qty) || minQty;
             const computedTotal = price * quantity;
             if (totalDisplay) {
-                totalDisplay.textContent = `${quantity} pcs — ${formatMoney(computedTotal)}`;
+                totalDisplay.textContent = formatMoney(computedTotal);
             }
             return { quantity, total: computedTotal };
         };
@@ -482,12 +502,53 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         selectBtn?.addEventListener('click', async () => {
-            const quantity = Number(qtyInput?.value || minQty) || minQty;
-            const { total: computedTotal } = computeTotal(quantity);
-            await selectGiveaway(item, quantity, computedTotal, {
-                cardElement: card,
-                triggerButton: selectBtn,
-            });
+            const giveawayId = String(card.dataset.giveawayId);
+            const isCurrentlySelected = state.selectedId === giveawayId;
+
+            // Immediately toggle button text and disable to prevent double-clicks
+            selectBtn.textContent = isCurrentlySelected ? 'Select giveaway' : 'Unselect giveaway';
+            selectBtn.disabled = true;
+
+            try {
+                if (isCurrentlySelected) {
+                    // Remove this giveaway from selection
+                    const result = await clearGiveawaySelection();
+                    if (result?.ok) {
+                        if (result.data?.summary) {
+                            applyServerSummary(result.data.summary);
+                        } else {
+                            // Fallback: manually clear the state
+                            state.selectedId = null;
+                            highlightSelectedCard();
+                            setContinueState(false);
+                        }
+                        showToast(`${item.name} removed from selection`);
+                    } else {
+                        // Revert button text on failure
+                        selectBtn.textContent = 'Unselect giveaway';
+                        showToast('Unable to remove giveaway. Please try again.');
+                    }
+                } else {
+                    const quantity = Number(qtyInput?.value || minQty) || minQty;
+                    const { total: computedTotal } = computeTotal(quantity);
+                    const result = await selectGiveaway(item, quantity, computedTotal, {
+                        cardElement: card,
+                        triggerButton: selectBtn,
+                    });
+                    if (!result || !result.ok) {
+                        // Revert button text on failure
+                        selectBtn.textContent = 'Select giveaway';
+                    }
+                }
+            } finally {
+                selectBtn.disabled = false;
+            }
+        });
+
+        const designBtn = card.querySelector('.envelope-item__design');
+        designBtn?.addEventListener('click', () => {
+            // TODO: Implement design functionality
+            showToast('Design feature coming soon!');
         });
 
         document.dispatchEvent(new CustomEvent('preview:register-triggers'));
@@ -529,7 +590,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setContinueState(true);
 
         const card = options.cardElement ?? giveawayGrid?.querySelector(`[data-giveaway-id="${item.id}"]`);
-        const triggerButton = options.triggerButton ?? card?.querySelector('.giveaway-card__select');
+        const triggerButton = options.triggerButton ?? card?.querySelector('.envelope-item__select');
 
         let originalButtonText;
         if (card) {
@@ -565,7 +626,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (triggerButton) {
             triggerButton.disabled = false;
-            triggerButton.textContent = originalButtonText ?? 'Add to order';
+            triggerButton.textContent = originalButtonText ?? 'Select giveaway';
         }
         if (card) {
             card.classList.remove('is-saving');
@@ -677,44 +738,30 @@ document.addEventListener('DOMContentLoaded', () => {
         removeBtn?.setAttribute('disabled', 'true');
 
         const target = skipBtn.dataset.target || summaryUrl;
-        const result = await clearGiveawaySelection();
+
+        // Try to clear any saved giveaway, but never block navigation.
+        try {
+            const result = await clearGiveawaySelection();
+
+            if (result?.ok) {
+                if (result.data?.summary) {
+                    applyServerSummary(result.data.summary);
+                } else {
+                    await fetchSummaryFromServer();
+                }
+            }
+        } catch (error) {
+            console.warn('Skipping giveaway failed, continuing anyway', error);
+        }
 
         skipBtn.disabled = false;
         removeBtn?.removeAttribute('disabled');
         state.isSaving = false;
 
-        if (result?.ok) {
-            if (result.data?.summary) {
-                applyServerSummary(result.data.summary);
-            } else {
-                const refreshed = await fetchSummaryFromServer();
-                if (!refreshed) {
-                    syncSelectionState();
-                    showToast('Unable to refresh order summary. Please try again.');
-                    return;
-                }
-            }
-
-            showToast('Continuing without a giveaway…');
-            window.setTimeout(() => {
-                window.location.href = target;
-            }, 400);
-            return;
-        }
-
-        const status = result?.status ?? 0;
-        if (status === 409 || status === 422) {
-            showToast('That giveaway is no longer available. Refreshing options…');
-            await loadGiveaways();
-            const refreshed = await fetchSummaryFromServer();
-            if (!refreshed) {
-                syncSelectionState();
-            }
-            return;
-        }
-
-        showToast('Unable to clear giveaway. Please try again.');
-        syncSelectionState();
+        showToast('Continuing without a giveaway…');
+        window.setTimeout(() => {
+            window.location.href = target;
+        }, 250);
     });
 
     removeBtn?.addEventListener('click', async () => {
@@ -756,9 +803,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const initialise = async () => {
         setContinueState(true);
+        const hasBootstrapData = initialCatalog.length > 0;
+
+        if (hasBootstrapData) {
+            renderCards(initialCatalog);
+        }
+
         syncSelectionState();
         await fetchSummaryFromServer();
-        await loadGiveaways();
+
+        if (!hasBootstrapData) {
+            await loadGiveaways();
+        }
     };
 
     initialise();
