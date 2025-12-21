@@ -1007,10 +1007,7 @@ body.dark-mode .btn-warning {
                  padding: 8px 0;
                  border: 1px solid #eaeaea;
                  ">
-            <a href="{{ route('admin.profile.edit') }}"
-               style="display:block; color:#333; font-size:16px; padding:14px 22px; text-decoration:none;">
-              👤 My Profile
-            </a>
+            <!-- My Profile link removed per request -->
           <form id="logout-form" action="{{ route('logout') }}" method="POST" style="margin:0;">
             @csrf
             <button type="submit"

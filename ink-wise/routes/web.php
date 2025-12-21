@@ -35,6 +35,7 @@ use App\Http\Controllers\Auth\CustomerAuthController;
 
 use App\Http\Controllers\Customer\InvitationController;
 use App\Http\Controllers\Customer\OrderFlowController;
+use App\Http\Controllers\Customer\CartController;
 
 use App\Http\Controllers\Customer\CustomerController;
 
@@ -778,6 +779,9 @@ Route::post('/checkout/cancel', [OrderFlowController::class, 'cancelCheckout'])-
 Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/order/{order}/pay-remaining-balance', [OrderFlowController::class, 'payRemainingBalance'])->name('order.pay.remaining.balance');
 
 Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->group(function () {
+    Route::get('/customer/cart', [CartController::class, 'index'])->name('customer.cart');
+    Route::patch('/order/cart/items/{cartItem}', [CartController::class, 'updateItem'])->name('customer.cart.update');
+    Route::delete('/order/cart/items/{cartItem}', [CartController::class, 'removeItem'])->name('customer.cart.remove');
     Route::post('/payments/gcash', [PaymentController::class, 'createGCashPayment'])->name('payment.gcash.create');
     Route::get('/payments/gcash/return', [PaymentController::class, 'handleGCashReturn'])->name('payment.gcash.return');
 });

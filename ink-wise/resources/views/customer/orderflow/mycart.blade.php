@@ -434,11 +434,17 @@ $searchValue = request('query', '');
 		(function () {
 			try {
 				const summaryData = {!! \Illuminate\Support\Js::from($orderSummary) !!};
+				console.log('[Order Summary] Server data received:', summaryData);
 				window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(summaryData));
+				console.log('[Order Summary] Data stored in sessionStorage');
 			} catch (e) {
-				// ignore serialization/storage errors
+				console.error('[Order Summary] Failed to store data:', e);
 			}
 		})();
+	</script>
+@else
+	<script>
+		console.warn('[Order Summary] No orderSummary data from server');
 	</script>
 @endif
 

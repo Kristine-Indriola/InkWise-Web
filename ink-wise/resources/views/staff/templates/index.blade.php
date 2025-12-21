@@ -742,9 +742,34 @@
                 @foreach($templates as $template)
                     <article class="template-card" role="listitem">
                         @php
-                            $front = $template->front_image ?? $template->preview;
-                            $back = $template->back_image ?? null;
-                            
+                            $front = null;
+                            $back = null;
+
+                            $frontCandidates = [
+                                $template->front_image,
+                                $template->preview_front,
+                                data_get($template->metadata, 'previews.front'),
+                                $template->preview,
+                            ];
+                            foreach ($frontCandidates as $candidate) {
+                                if (!empty($candidate)) {
+                                    $front = $candidate;
+                                    break;
+                                }
+                            }
+
+                            $backCandidates = [
+                                $template->back_image,
+                                $template->preview_back,
+                                data_get($template->metadata, 'previews.back'),
+                            ];
+                            foreach ($backCandidates as $candidate) {
+                                if (!empty($candidate)) {
+                                    $back = $candidate;
+                                    break;
+                                }
+                            }
+
                             // Check if front image is an SVG file
                             $isSvgFront = $template->svg_path || ($front && str_ends_with(strtolower($front), '.svg'));
                             $isSvgBack = $template->back_svg_path || ($back && str_ends_with(strtolower($back), '.svg'));

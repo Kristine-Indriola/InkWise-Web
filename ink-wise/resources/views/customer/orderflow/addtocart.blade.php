@@ -56,7 +56,7 @@
 	<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 	<link rel="stylesheet" href="{{ asset('css/customer/orderflow-addtocart.css') }}">
 </head>
-<body class="addtocart-body bg-white" data-product-id="{{ $product->id ?? '' }}">
+<body class="addtocart-body bg-white" data-product-id="{{ $product->id ?? ($orderSummary['productId'] ?? '') }}">
 @php
 	$resolvedInvitationTypeNavbar = 'Wedding';
 	$eventRoutesNavbar = [
@@ -309,10 +309,29 @@
 	// Minimal view setup for addtocart
 	$product = $product ?? null;
 	$proof = $proof ?? null;
+	$cartItems = collect($cartItems ?? []);
+	$cartTotalAmount = $cartTotalAmount ?? $cartItems->sum('total_price');
+	$primaryItem = $cartItems->first();
 
-	$uploads = $product->uploads ?? collect();
-	$images = $product->product_images ?? $product->images ?? optional($proof)->images ?? null;
-	$templateRef = $product->template ?? ($templateRef ?? optional($proof)->template ?? null);
+	if (!$product && $primaryItem && $primaryItem->relationLoaded('product') && $primaryItem->product) {
+		$product = $primaryItem->product;
+	}
+
+	$orderSummary = is_array($orderSummary ?? null) ? $orderSummary : ($primaryItem?->metadata ?? []);
+	if (!is_array($orderSummary)) {
+		$orderSummary = [];
+	}
+
+	if ($primaryItem) {
+		$orderSummary['quantity'] = $orderSummary['quantity'] ?? $primaryItem->quantity;
+		$orderSummary['totalAmount'] = $orderSummary['totalAmount'] ?? $primaryItem->total_price;
+		$orderSummary['productId'] = $orderSummary['productId'] ?? $primaryItem->product_id;
+		$orderSummary['productName'] = $orderSummary['productName'] ?? optional($primaryItem->product)->name;
+	}
+
+	$uploads = optional($product)->uploads ?? collect();
+	$images = optional($product)->product_images ?? optional($product)->images ?? optional($proof)->images ?? null;
+	$templateRef = optional($product)->template ?? ($templateRef ?? optional($proof)->template ?? null);
 
 	$frontImage = $finalArtwork['front'] ?? ($finalArtworkFront ?? null);
 	$backImage = $finalArtwork['back'] ?? ($finalArtworkBack ?? null);
@@ -353,7 +372,7 @@
 	$frontImage = $frontImage ?? $fallbackImage;
 	$backImage = $backImage ?? $frontImage;
 
-	$resolvedProductName = $product->name ?? optional($templateRef)->name ?? 'Custom Invitation';
+	$resolvedProductName = $orderSummary['productName'] ?? optional($product)->name ?? optional($templateRef)->name ?? 'Custom Invitation';
 
 	try {
 		$envelopeUrl = route('order.envelope');
@@ -367,7 +386,7 @@
 		$finalStepUrl = url('/order/finalstep');
 	}
 @endphp
-<main class="addtocart-shell" data-storage-key="inkwise-addtocart" data-envelope-url="{{ $envelopeUrl }}" data-product-id="{{ $product->id ?? '' }}" data-product-name="{{ $resolvedProductName }}">
+<main class="addtocart-shell" data-storage-key="inkwise-addtocart" data-envelope-url="{{ $envelopeUrl }}" data-product-id="{{ $product->id ?? ($orderSummary['productId'] ?? '') }}" data-product-name="{{ $resolvedProductName }}">
 	<header class="addtocart-header">
 		<div class="addtocart-header__content">
 			<a href="{{ $finalStepUrl }}" class="addtocart-header__back" aria-label="Back to final step">
@@ -429,6 +448,29 @@
 				<div class="action-card__content">
 					<h2>Ready to checkout?</h2>
 					<p>Your custom design is ready. Click the button below to continue to checkout and proceed with envelope options.</p>
+
+					@if($cartItems->isNotEmpty())
+					<div class="mt-6 space-y-3">
+						@foreach($cartItems as $cartItem)
+							@php
+								$itemName = $cartItem->product->name ?? data_get($cartItem->metadata, 'productName', 'Custom Product');
+								$itemQuantity = $cartItem->quantity ?? data_get($cartItem->metadata, 'quantity', 0);
+								$itemTotal = $cartItem->total_price ?? data_get($cartItem->metadata, 'totalAmount', 0);
+							@endphp
+							<div class="flex items-center justify-between rounded-lg bg-white/70 px-4 py-3 shadow-sm ring-1 ring-slate-200/70">
+								<div>
+									<p class="font-medium text-slate-900">{{ $itemName }}</p>
+									<p class="text-sm text-slate-500">Qty {{ number_format($itemQuantity) }}</p>
+								</div>
+								<p class="text-base font-semibold text-slate-900">₱{{ number_format($itemTotal, 2) }}</p>
+							</div>
+						@endforeach
+						<div class="flex items-center justify-between border-t border-slate-200 pt-3 text-slate-700">
+							<span class="text-sm font-medium uppercase tracking-wide">Cart Total</span>
+							<span class="text-lg font-semibold text-slate-900">₱{{ number_format($cartTotalAmount ?? $cartItems->sum('total_price'), 2) }}</span>
+						</div>
+					</div>
+					@endif
 
 					<div class="action-buttons">
 						<a href="{{ $finalStepUrl }}" class="secondary-action">Back to options</a>
@@ -562,13 +604,33 @@
 						...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
 					},
 					credentials: 'same-origin',
-					body: JSON.stringify({ product_id: Number(productId), quantity }),
+					body: JSON.stringify({ summary }),
 				});
 				return response.ok;
 			} catch (_error) {
 				return false;
 			}
 		};
+
+		// Ensure the Continue button persists the summary to server before navigating
+		document.addEventListener('DOMContentLoaded', () => {
+			const addBtn = document.getElementById('addToCartBtn');
+			if (!addBtn) return;
+			addBtn.addEventListener('click', async (ev) => {
+				ev.preventDefault();
+				const summary = getStoredSummary();
+				if (!summary) {
+					window.location.href = addBtn.getAttribute('href');
+					return;
+				}
+				try {
+					await createOrderFromSummary(summary);
+				} catch (_e) {
+					// ignore
+				}
+				window.location.href = addBtn.getAttribute('href');
+			});
+		});
 
 		navIcons.forEach((icon) => {
 			if (icon.getAttribute('aria-disabled') === 'true') {

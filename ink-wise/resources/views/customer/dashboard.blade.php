@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inkwise Dashboard</title>
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 
 
    <style>
@@ -22,7 +23,115 @@
         .layout-container {
             width: min(1200px, 100%);
             margin-inline: auto;
-            padding-inline: clamp(16px, 5vw, 48px);
+            padding-inline: clamp(24px, 5vw, 32px);
+        }
+
+        /* Laptop-friendly hero layout */
+        .hero-section {
+            padding: clamp(56px, 8vw, 96px) 0;
+        }
+
+        .hero-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.0fr); /* ~60/40 */
+            gap: clamp(24px, 4vw, 36px);
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 clamp(24px, 5vw, 32px);
+        }
+
+        @media (max-width: 1024px) {
+            .hero-grid {
+                grid-template-columns: 1fr;
+            }
+            .hero-visual { order: 2; margin-top: 24px; }
+            .hero-copy {
+                order: 1;
+                text-align: left;
+                align-items: flex-start;
+                margin-top: 0;
+                transform: none;
+            }
+            .hero-actions { justify-content: flex-start; }
+        }
+
+        .hero-copy {
+            display: flex;
+            flex-direction: column;
+            gap: clamp(16px, 3vw, 24px);
+            align-items: flex-end;
+            text-align: right;
+            max-width: clamp(320px, 40vw, 520px);
+            margin-top: -120px;
+            transform: translateX(-48px);
+        }
+
+        .hero-title {
+            font-size: clamp(2.25rem, 3vw, 2.8rem);
+            line-height: 1.1;
+            font-weight: 800;
+        }
+
+        .hero-subtitle {
+            font-size: 1.125rem;
+            color: #4b5563;
+            max-width: 34rem;
+            font-weight: 500;
+        }
+
+        .hero-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .hero-card {
+            max-width: 520px;
+            margin-inline: auto;
+        }
+
+        .hero-media {
+            width: 100%;
+            height: clamp(280px, 38vw, 420px);
+            object-fit: cover;
+            border-radius: 18px;
+            display: block;
+        }
+
+        .hero-visual {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: -150px;
+        }
+
+        .hero-frame {
+            position: relative;
+            width: clamp(260px, 55vw, 460px);
+            aspect-ratio: 3 / 4;
+            min-height: 360px;
+            overflow: hidden;
+            border-radius: 32px;
+            background: transparent;
+        }
+
+        .hero-frame-video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 32px;
+            -webkit-mask-image: url("{{ asset('images/frame.png') }}");
+            -webkit-mask-repeat: no-repeat;
+            -webkit-mask-size: contain;
+            -webkit-mask-position: center;
+            mask-image: url("{{ asset('images/frame.png') }}");
+            mask-repeat: no-repeat;
+            mask-size: contain;
+            mask-position: center;
         }
 
         .layout-stack {
@@ -128,32 +237,10 @@
             outline-offset: 2px;
         }
 
-        .flip-card .flip-card-inner {
-            perspective: 1000px;
-        }
-
-        .flip-card-front,
-        .flip-card-back {
-            min-height: 14rem;
-        }
-
-        @media (min-width: 768px) {
-            .flip-card-front,
-            .flip-card-back {
-                min-height: 22rem;
-            }
-        }
-
-        .template-image,
-        .flip-card-front video,
-        .flip-card-back img {
+        .template-image {
             width: 100%;
             height: 100%;
             object-fit: cover;
-        }
-
-        .flip-card {
-            margin-top: 0;
         }
 
         .space-y-6 {
@@ -232,6 +319,43 @@
         }
 
         /* icon placement for header */
+        .nav-icon-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.75rem;
+            height: 1.75rem;
+            border-radius: 9999px;
+            border: 1px solid #dbeafe;
+            background-color: rgba(255, 255, 255, 0.92);
+            color: #f472b6;
+            transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 6px 12px rgba(166, 183, 255, 0.12);
+            position: relative;
+        }
+
+        .nav-icon-button:hover {
+            transform: translateY(-1px);
+            background-color: #fdf2ff;
+        }
+
+        .nav-icon-button i {
+            font-size: 0.75rem;
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -3px;
+            right: -3px;
+            background: #ef4444;
+            color: white;
+            border-radius: 9999px;
+            padding: 1px 4px;
+            font-size: 9px;
+            font-weight: 700;
+            min-width: 16px;
+            text-align: center;
+        }
 
         .chat-header {
             padding: 16px 18px;
@@ -294,27 +418,8 @@
         }
 
         .chat-input input[type="text"] {
-            flex: 1;
-            border-radius: 999px;
-            padding: 12px 18px;
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            outline: none;
-            background: #fbfeff;
-            font-size: 15px;
-        }
-
-        .chat-input button {
-            background: var(--color-primary);
-            color: #fff;
-            border-radius: 999px;
-            padding: 10px 16px;
-            border: 0;
-            cursor: pointer;
-            font-weight: 700;
-        }
-
-        .msg {
-            display: inline-flex;
+                    /* Ensure template images scale nicely */
+                .template-image { width: 100%; height: 100%; object-fit: cover; }
             position: relative;
             max-width: 86%;
             padding: 12px 14px;
@@ -462,27 +567,8 @@
             #mainNav {
                 display: none;
                 position: absolute;
-                left: 0;
-                right: 0;
-                top: 100%;
-                background: white;
-                padding: 1rem;
-                box-shadow: 0 8px 30px rgba(2, 6, 23, 0.08);
-                border-bottom-left-radius: 8px;
-                border-bottom-right-radius: 8px;
-            }
-
-            #mainNav a {
-                display: block;
-                padding: 0.5rem 0;
-            }
-        }
-
-        @media (max-width: 720px) {
-            .chat-panel {
-                width: 92vw;
-                right: 4%;
-                bottom: 88px;
+                        /* Ensure template images scale nicely */
+                    .template-image { width: 100%; height: 100%; object-fit: cover; }
             }
 
             .chat-btn {
@@ -543,20 +629,12 @@
     <style>
         /* Responsive tweaks for dashboard */
         .logo-i { line-height: 1; }
-    .page-title { font-size: 1.1rem; }
+        .page-title { font-size: 1.1rem; }
 
-        /* Flip card responsive sizing */
-        .flip-card .flip-card-inner { perspective: 1000px; }
-        .flip-card-front, .flip-card-back { min-height: 14rem; }
-        @media (min-width: 768px) {
-            .flip-card-front, .flip-card-back { min-height: 22rem; }
-        }
-
-    /* Ensure video & image scale nicely */
-    .template-image, .flip-card-front video, .flip-card-back img { width: 100%; height: 100%; object-fit: cover; }
+        /* Ensure template images scale nicely */
+        .template-image { width: 100%; height: 100%; object-fit: cover; }
 
     /* Hero spacing tweaks */
-    .flip-card { margin-top: 0; }
     .space-y-6 { gap: .75rem; }
     .text-5xl { font-size: 2.25rem; }
     .text-lg { font-size: 0.95rem; }
@@ -730,7 +808,7 @@
             box-shadow: 0 8px 32px rgba(15, 23, 42, 0.08);
         }
         header { position: fixed; top: 0; width: 100%; z-index: 50; }
-        body { padding-top: 64px; }
+        body { padding-top: 56px; }
 
     </style>
 </head>
@@ -739,27 +817,30 @@
     
    <!-- Top Navigation Bar -->
 <header class="shadow animate-fade-in-down glass-nav w-full">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between h-16">
+    <div class="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 flex items-center justify-between h-14 relative">
         <!-- Logo -->
-        <div class="flex items-center animate-bounce-slow flex-shrink-0">
-            <span class="text-5xl font-bold logo-i logo-script">I</span>
-            <span class="text-2xl font-bold logo-serif">nkwise</span>
+        <div class="flex items-center animate-bounce-slow flex-shrink-0 -ml-2">
+            <span class="text-3xl font-bold logo-i logo-script">I</span>
+            <span class="text-lg font-bold logo-serif">nkwise</span>
         </div>
 
-        <!-- Navigation Links -->
-        <button id="mobileNavBtn" class="md:hidden p-2 rounded-md focus-ring mr-2" aria-label="Toggle navigation" aria-controls="mainNav" aria-expanded="false">
-            <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-        </button>
-        <!-- Mobile search toggle -->
-        <button id="mobileSearchBtn" class="md:hidden p-2 rounded-md focus-ring mr-2" aria-label="Toggle search" title="Search">
-            <svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
-        </button>
-        <nav id="mainNav" class="hidden md:flex flex-wrap space-x-6" role="navigation">
-            <a href="#dashboard" class="text-gray-700 hover:text-[#06b6d4]">Home</a>
-            <a href="#categories" class="text-gray-700 hover:text-[#06b6d4]">Categories</a>
-            <a href="#templates" class="text-gray-700 hover:text-[#06b6d4]">Templates</a>
-            <a href="#about" class="text-gray-700 hover:text-[#06b6d4]">About</a>
-            <a href="#contact" class="text-gray-700 hover:text-[#06b6d4]">Contact</a>
+        <!-- Mobile controls -->
+        <div class="md:hidden flex items-center gap-1">
+            <button id="mobileSearchBtn" class="p-1.5 rounded-md focus-ring" aria-label="Toggle search" title="Search">
+                <svg class="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
+            </button>
+            <button id="mobileNavBtn" class="p-1.5 rounded-md focus-ring" aria-label="Toggle navigation" aria-controls="mainNav" aria-expanded="false">
+                <svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+        </div>
+
+        <!-- Desktop Navigation Links - Centered -->
+        <nav id="mainNav" class="hidden md:flex space-x-4 absolute left-[54%] transform -translate-x-1/2" role="navigation">
+            <a href="#dashboard" class="text-sm text-gray-700 hover:text-[#06b6d4] font-medium transition-colors">Home</a>
+            <a href="#categories" class="text-sm text-gray-700 hover:text-[#06b6d4] font-medium transition-colors">Categories</a>
+            <a href="#templates" class="text-sm text-gray-700 hover:text-[#06b6d4] font-medium transition-colors">Templates</a>
+            <a href="#about" class="text-sm text-gray-700 hover:text-[#06b6d4] font-medium transition-colors">About</a>
+            <a href="#contact" class="text-sm text-gray-700 hover:text-[#06b6d4] font-medium transition-colors">Contact</a>
         </nav>
 
         <!-- Mobile search input (hidden on desktop) -->
@@ -770,32 +851,30 @@
         </div>
 
       
-        <div class="flex items-center space-x-4 relative min-w-0">
+        <!-- Right Side: Search, Icons, Auth -->
+        <div class="hidden md:flex items-center gap-3">
             <!-- Search Form -->
-            <form action="{{ url('/search') }}" method="GET" class="hidden md:flex">
-                <div class="search-with-icons" style="position:relative; display:flex; align-items:center;">
-                    <input type="text" name="query" placeholder="Search..."
-                           class="border rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring focus:ring-[#06b6d4]"
-                           style="padding-right:3.5rem;" />
-                </div>
+            <form action="{{ url('/search') }}" method="GET" class="flex">
+                <input type="text" name="query" placeholder="Search..."
+                       class="w-44 border border-gray-300 rounded-full px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#06b6d4] focus:border-transparent transition-all" />
             </form>
   
-   {{-- If not logged in --}}
+    {{-- If not logged in --}}
 @guest
-     <a href="{{ route('customer.login.form') }}"
-         id="openLogin"
-         class="btn-pill btn-primary animate-ocean focus-ring">
-       Sign in
-    </a>
+      <a href="{{ route('customer.login.form') }}"
+            id="openLogin"
+            class="px-4 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-[#6366f1] to-[#a6b7ff] rounded-full hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[#a6b7ff]">
+         Sign in
+     </a>
 @endguest
 
 {{-- If logged in --}}
 @auth
-    <div class="relative min-w-0 group">
-        <button id="userDropdownBtn" class="flex items-center space-x-2 text-gray-700 hover:text-gray-900">
+    <div class="relative group">
+        <button id="userDropdownBtn" class="flex items-center gap-1.5 text-sm text-gray-700 hover:text-gray-900 font-medium">
             {{-- Display customer's name or fallback --}}
             <span>{{ Auth::user()->customer?->first_name ?? Auth::user()->email ?? 'Customer' }}</span>
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
         </button>
@@ -831,8 +910,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     // inject icons into header right-side (only on desktop)
     try {
-        const headerRight = document.querySelector('header .flex.items-center.space-x-4.relative.min-w-0');
-        const searchIcons = document.querySelector('.search-icons');
+        const headerRight = document.querySelector('header .hidden.md\\:flex.items-center.gap-3');
         // check if icons already present anywhere
         if (!document.querySelector('.nav-icon-button')) {
             const notifications = document.createElement('a');
@@ -870,19 +948,19 @@ document.addEventListener('DOMContentLoaded', function () {
             cart.innerHTML = '<i class="bi bi-bag-heart-fill" aria-hidden="true"></i>';
 
             if (headerRight) {
-                // prefer to place icons right after the search form (outside the input)
-                const searchForm = headerRight.querySelector('form[action="{{ url('/search') }}"]');
-                if (searchForm && searchForm.parentElement) {
+                // Find the search form
+                const searchForm = headerRight.querySelector('form');
+                if (searchForm) {
                     const iconsWrap = document.createElement('div');
-                    iconsWrap.className = 'hidden md:flex items-center gap-2 ml-3';
+                    iconsWrap.className = 'flex items-center gap-2';
                     iconsWrap.appendChild(notifications);
                     iconsWrap.appendChild(fav);
                     iconsWrap.appendChild(cart);
-                    // insert after the search form element
-                    searchForm.parentElement.insertBefore(iconsWrap, searchForm.nextSibling);
+                    // insert after the search form
+                    searchForm.insertAdjacentElement('afterend', iconsWrap);
                 } else {
                     const container = document.createElement('div');
-                    container.className = 'hidden md:flex items-center gap-2';
+                    container.className = 'flex items-center gap-2';
                     container.appendChild(notifications);
                     container.appendChild(fav);
                     container.appendChild(cart);
@@ -890,7 +968,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         }
-    } catch (e) { /* ignore */ }
+    } catch (e) { console.error('Icon injection error:', e); }
 
     // Attach behavior: check server order, create from sessionStorage if missing, then redirect to /order/addtocart
     const storageKey = 'inkwise-finalstep';
@@ -968,51 +1046,32 @@ document.addEventListener('DOMContentLoaded', function () {
 
     <!-- Main Content -->
 <main class="py-8 bg-white" style="min-height:60vh;">
-    <div class="hero-wrapper relative overflow-hidden">
-        <div class="layout-container grid md:grid-cols-2 gap-8 items-center relative z-10">
-        
-        <!-- Left Content -->
-        <div class="space-y-6 animate-fade-in-left">
-                <h1 class="hero-title">
-                    <span class="hero-title-highlight">Invitation</span>
-                    <span class="hero-title-accent">maker</span>
-            </h1>
-
-                <p class="hero-subtitle">
-                Custom Invitations & Giveaways Crafted with Care.
-            </p>
-
-            <div class="flex space-x-4">
-     <!-- Order Now -->
-     <a href="{{ route('templates.wedding.invitations') }}"
-         class="btn-pill btn-primary focus-ring">
-       Order Now
-    </a>
-
-    <a href="#categories"  
-    class="btn-pill btn-outline focus-ring">
-   View Design
-</a>
-</div>
-
-        </div>
-
-        <!-- Right Content: Flip Card -->
-        <div class="flip-card animate-fade-in-right">
-            <div class="flip-card-inner">
-                <!-- Front (Video) -->
-                <div class="flip-card-front bg-white shadow-lg rounded-4x3 overflow-hidden flex items-center justify-center">
-                    <video class="w-full h-64 md:h-96 object-cover rounded-2xl" autoplay loop muted>
-                        <source src="{{ asset('customerVideo/Video/invitation.mp4') }}" type="video/mp4">
+    <div class="hero-wrapper relative overflow-hidden hero-section">
+        <div class="hero-grid relative z-10">
+            <!-- Left Content -->
+            <div class="hero-visual animate-fade-in-left">
+                <div class="hero-frame">
+                    <video class="hero-frame-video" autoplay muted loop playsinline>
+                        <source src="{{ asset('customerVideo/Video/wedding.mp4') }}" type="video/mp4">
                         Your browser does not support the video tag.
                     </video>
                 </div>
-                <!-- Back (Image) -->
-                <div class="flip-card-back bg-white shadow-lg rounded-2xl overflow-hidden">
-                    <img src="{{ asset('Customerimages/image/invitation.png') }}" alt="Invitation Design" class="w-full h-64 md:h-96 object-cover">
+            </div>
+
+            <!-- Right Content -->
+            <div class="hero-copy animate-fade-in-right">
+                <h1 class="hero-title">
+                    <span class="hero-title-highlight">Invitation</span>
+                    <span class="hero-title-accent">Maker</span>
+                </h1>
+
+                <p class="hero-subtitle">Custom Invitations & Giveaways Crafted with Care.</p>
+
+                <div class="hero-actions">
+                    <a href="{{ route('templates.wedding.invitations') }}" class="btn-pill btn-primary focus-ring">Order Now</a>
+                    <a href="#categories" class="btn-pill btn-outline focus-ring">View Design</a>
                 </div>
             </div>
-        </div>
         </div>
     </div>
 </main>

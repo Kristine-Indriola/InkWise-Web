@@ -438,8 +438,8 @@
 	}
 
 	// Show a simple minimum-order note instead of the previous bulk-range wording
-	$effectiveMin = $minQuantity ?? 20;
-	$quantityNote = 'Select a quantities. Minimum order is ' . number_format($effectiveMin);
+	$effectiveMin = $minQuantity ?? $minQty ?? 10;
+	$quantityNote = 'Select a quantities. Minimum order is ' . number_format(10);
 
 	$paperStocks = collect($paperStocks ?? [])->map(function ($stock, $i) use ($fallbackImage) {
 		$stock = (object) $stock;
@@ -514,13 +514,6 @@
 	$estimatedDeliveryDateFormatted = \Carbon\Carbon::now()->addWeekdays(5)->format('Y-m-d');
 
 	// Define pricing variables
-	$bulkOrders = collect([
-		(object)['min_qty' => 1, 'max_qty' => 49, 'price_per_unit' => 6.00],
-		(object)['min_qty' => 50, 'max_qty' => 99, 'price_per_unit' => 5.50],
-		(object)['min_qty' => 100, 'max_qty' => 199, 'price_per_unit' => 5.00],
-		(object)['min_qty' => 200, 'max_qty' => null, 'price_per_unit' => 4.50],
-	]);
-	$basePrice = 6.00;
 	$minQty = 10;
 @endphp
 @php
@@ -596,7 +589,7 @@
 						<div class="form-group paper-stocks-group">
 							<label>Paper stock</label>
 							<p class="selection-hint">Choose your preferred stock.</p>
-							<p id="paperStockAvailable" class="stock-available" style="display:none;">Available: <span id="paperStockAvailableCount">0</span></p>
+							<!-- Paper availability hidden per UX request -->
 							<div id="stockError" class="error-message" style="display:none; margin-top:6px;"></div>
 							<div class="feature-grid small">
 								@forelse($paperStocks as $stock)
@@ -631,8 +624,10 @@
 						</div>
 
 						<div class="form-group addons-group">
-							<label>Size</label>
 							@forelse($addonGroups as $group)
+								@if(strtolower(trim($group->label ?? '')) === 'size')
+									@continue
+								@endif
 								<div class="addon-section" data-addon-type="{{ $group->type }}">
 									<h4 class="addon-title">{{ trim(str_ireplace('Additional', '', $group->label)) }}</h4>
 									<div class="feature-grid small addon-grid" data-addon-type="{{ $group->type }}">
@@ -877,39 +872,39 @@
 		const quantityInput = document.getElementById('quantityInput');
 		const priceDisplay = document.getElementById('priceDisplay');
 		const quantityError = document.getElementById('quantityError');
-		const bulkOrders = {!! $bulkOrders->toJson() !!};
-		const basePrice = {{ $basePrice }};
-		const minQty = {{ $minQty }};
+		const paperStockPriceInput = document.getElementById('paperStockPrice');
+		const addToCartBtn = document.getElementById('addToCartBtn');
 
-		function calculatePrice(quantity) {
-			if (!quantity || quantity < minQty) return 0;
+		const MIN_QTY = 10;
 
-			let unitPrice = basePrice;
-			for (const tier of bulkOrders) {
-				const min = tier.min_qty || 0;
-				const max = tier.max_qty || Infinity;
-				if (quantity >= min && quantity <= max && tier.price_per_unit) {
-					unitPrice = parseFloat(tier.price_per_unit);
-					break;
-				}
-			}
-			return Math.round(quantity * unitPrice * 100) / 100;
-		}
+		const updatePriceDisplay = () => {
+			const qty = Math.max(0, parseInt(quantityInput.value) || 0);
+			const perUnit = Number(paperStockPriceInput?.value ?? 0) || 0;
+			const total = Number((perUnit * qty).toFixed(2));
+			priceDisplay.textContent = '₱' + total.toFixed(2);
 
-		function updatePrice() {
-			const quantity = parseInt(quantityInput.value) || 0;
-			const price = calculatePrice(quantity);
-			priceDisplay.textContent = '₱' + price.toFixed(2);
-			if (quantity < minQty) {
+			if (qty < MIN_QTY) {
 				quantityError.style.display = 'block';
+				if (addToCartBtn) addToCartBtn.setAttribute('disabled', 'true');
 			} else {
 				quantityError.style.display = 'none';
+				if (addToCartBtn) addToCartBtn.removeAttribute('disabled');
 			}
-		}
+		};
 
-		quantityInput.addEventListener('input', updatePrice);
+		quantityInput.addEventListener('input', updatePriceDisplay);
+
+		// Update when paper selection changes
+		document.querySelectorAll('.paper-stock-card').forEach((card) => {
+			card.addEventListener('click', () => {
+				const price = Number(card.dataset.price ?? 0);
+				if (paperStockPriceInput) paperStockPriceInput.value = String(price);
+				updatePriceDisplay();
+			});
+		});
+
 		// Initial update
-		updatePrice();
+		updatePriceDisplay();
 	});
 </script>
 
@@ -918,7 +913,7 @@
 	<div class="modal-backdrop" tabindex="-1"></div>
 	<div class="modal-content">
 		<h2 id="preOrderTitle" class="modal-title">Pre-order Confirmation</h2>
-		<p id="preOrderMessage" class="modal-message">Pre-order: 15 days estimated delivery. Proceed with the order?</p>
+		<p id="preOrderMessage" class="modal-message">Pre-order: The selected material is currently unavailable. You may choose another paper type, or proceed with a pre-order with an estimated delivery of 15 days.</p>
 		<div class="modal-actions">
 			<button id="preOrderConfirm" class="primary-action" type="button">Confirm</button>
 			<button id="preOrderCancel" class="secondary-action" type="button">Cancel</button>

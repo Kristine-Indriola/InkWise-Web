@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Summary Debug</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 1200px; margin: 0 auto; }
+        h1 { color: #333; }
+        .section { background: #f5f5f5; padding: 15px; margin: 15px 0; border-radius: 5px; }
+        .section h2 { margin-top: 0; color: #555; }
+        pre { background: #fff; padding: 10px; overflow-x: auto; border: 1px solid #ddd; }
+        button { background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #45a049; }
+        .error { color: #d32f2f; }
+        .success { color: #388e3c; }
+    </style>
+</head>
+<body>
+    <h1>Order Summary Debug Tool</h1>
+    
+    <div class="section">
+        <h2>Quick Actions</h2>
+        <button onclick="checkSessionStorage()">Check sessionStorage</button>
+        <button onclick="fetchFromServer()">Fetch from Server</button>
+        <button onclick="addTestData()">Add Test Data</button>
+        <button onclick="clearData()">Clear Data</button>
+        <button onclick="goToSummary()">Go to Summary Page</button>
+    </div>
+
+    <div class="section">
+        <h2>sessionStorage Data</h2>
+        <pre id="storage-data">Checking...</pre>
+    </div>
+
+    <div class="section">
+        <h2>Server Data (from /order/summary.json)</h2>
+        <pre id="server-data">Click "Fetch from Server" to load...</pre>
+    </div>
+
+    <div class="section">
+        <h2>Test Actions</h2>
+        <button onclick="addTestInvitation()">Add Test Invitation</button>
+        <button onclick="addTestEnvelope()">Add Test Envelope</button>
+        <button onclick="addTestGiveaway()">Add Test Giveaway</button>
+        <button onclick="addCompleteOrder()">Add Complete Order (All 3)</button>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'inkwise-finalstep';
+
+        function checkSessionStorage() {
+            const data = sessionStorage.getItem(STORAGE_KEY);
+            const el = document.getElementById('storage-data');
+            if (data) {
+                try {
+                    const parsed = JSON.parse(data);
+                    el.textContent = JSON.stringify(parsed, null, 2);
+                    el.className = 'success';
+                } catch (e) {
+                    el.textContent = 'Error parsing data: ' + e.message + '\n\nRaw:\n' + data;
+                    el.className = 'error';
+                }
+            } else {
+                el.textContent = 'No data found in sessionStorage';
+                el.className = 'error';
+            }
+        }
+
+        async function fetchFromServer() {
+            const el = document.getElementById('server-data');
+            el.textContent = 'Loading...';
+            try {
+                const response = await fetch('/order/summary.json');
+                const data = await response.json();
+                el.textContent = JSON.stringify(data, null, 2);
+                el.className = response.ok ? 'success' : 'error';
+            } catch (e) {
+                el.textContent = 'Error: ' + e.message;
+                el.className = 'error';
+            }
+        }
+
+        function addTestInvitation() {
+            const data = {
+                productId: 1,
+                productName: "Beautiful Wedding Invitation",
+                quantity: 50,
+                unitPrice: 15.00,
+                subtotal: 750.00,
+                total: 750.00,
+                previewImages: ["/images/placeholder.png"],
+                hasEnvelope: false,
+                hasGiveaway: false
+            };
+            sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            alert('Test invitation added to sessionStorage');
+            checkSessionStorage();
+        }
+
+        function addTestEnvelope() {
+            const existing = sessionStorage.getItem(STORAGE_KEY);
+            const data = existing ? JSON.parse(existing) : { productId: 1, productName: "Test Invitation", quantity: 50, unitPrice: 15, subtotal: 750, total: 750 };
+            
+            data.hasEnvelope = true;
+            data.envelope = {
+                id: 1,
+                name: "Classic White Envelope",
+                qty: 50,
+                price: 5.00,
+                total: 250.00,
+                type: "Classic",
+                color: "White",
+                size: "A6",
+                printing: "Included",
+                image: "/images/placeholder.png",
+                images: ["/images/placeholder.png"]
+            };
+            data.total = (data.subtotal || 0) + 250.00;
+            
+            sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            alert('Test envelope added to sessionStorage');
+            checkSessionStorage();
+        }
+
+        function addTestGiveaway() {
+            const existing = sessionStorage.getItem(STORAGE_KEY);
+            const data = existing ? JSON.parse(existing) : { productId: 1, productName: "Test Invitation", quantity: 50, unitPrice: 15, subtotal: 750, total: 750 };
+            
+            data.hasGiveaway = true;
+            data.giveaway = {
+                id: 2,
+                name: "Personalized Keychain",
+                qty: 50,
+                price: 8.00,
+                total: 400.00,
+                type: "Keychain",
+                material: "Metal",
+                customization: "Engraved",
+                image: "/images/placeholder.png",
+                images: ["/images/placeholder.png"]
+            };
+            data.total = (data.subtotal || 0) + (data.envelope?.total || 0) + 400.00;
+            
+            sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            alert('Test giveaway added to sessionStorage');
+            checkSessionStorage();
+        }
+
+        function addCompleteOrder() {
+            const data = {
+                productId: 1,
+                productName: "Beautiful Wedding Invitation",
+                quantity: 100,
+                unitPrice: 12.00,
+                subtotal: 1200.00,
+                total: 2050.00,
+                previewImages: ["/images/placeholder.png"],
+                hasEnvelope: true,
+                hasGiveaway: true,
+                envelope: {
+                    id: 1,
+                    name: "Premium Gold Envelope",
+                    qty: 100,
+                    price: 4.50,
+                    total: 450.00,
+                    type: "Premium",
+                    color: "Gold",
+                    size: "A6",
+                    printing: "Included",
+                    image: "/images/placeholder.png",
+                    images: ["/images/placeholder.png"]
+                },
+                giveaway: {
+                    id: 2,
+                    name: "Custom Bottle Opener",
+                    qty: 100,
+                    price: 4.00,
+                    total: 400.00,
+                    type: "Bottle Opener",
+                    material: "Stainless Steel",
+                    customization: "Laser Engraved",
+                    image: "/images/placeholder.png",
+                    images: ["/images/placeholder.png"]
+                }
+            };
+            
+            sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            alert('Complete order with invitation, envelope, and giveaway added!');
+            checkSessionStorage();
+        }
+
+        function addTestData() {
+            addCompleteOrder();
+        }
+
+        function clearData() {
+            sessionStorage.removeItem(STORAGE_KEY);
+            alert('Data cleared from sessionStorage');
+            checkSessionStorage();
+        }
+
+        function goToSummary() {
+            window.location.href = '/order/summary';
+        }
+
+        // Auto-check on load
+        checkSessionStorage();
+    </script>
+</body>
+</html>

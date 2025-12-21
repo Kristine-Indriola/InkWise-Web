@@ -166,8 +166,9 @@ a:hover {
 
 .envelope-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: clamp(16px, 2vw, 20px);
+    /* reduced min card width to make preview smaller */
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: clamp(12px, 2vw, 18px);
     width: 100%;
 }
 
@@ -765,8 +766,9 @@ a:hover {
     }
 
     .envelope-grid {
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-        gap: clamp(14px, 1.8vw, 16px);
+        /* keep responsive min smaller for tighter layouts */
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: clamp(12px, 1.8vw, 14px);
     }
 
     .envelope-item {

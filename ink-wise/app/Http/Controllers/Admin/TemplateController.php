@@ -16,6 +16,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use App\Notifications\TemplateUploadedNotification;
 use App\Notifications\TemplateReturnedNotification;
+use App\Support\ImageResolver;
 
 class TemplateController extends Controller
 {
@@ -359,6 +360,11 @@ public function saveCanvas(Request $request, $id)
                 $template->preview,
                 'preview_image'
             );
+            // Also populate preview_front and front_image for consistency
+            $template->preview_front = $template->preview;
+            if (empty($template->front_image)) {
+                $template->front_image = $template->preview;
+            }
         }
 
         // Handle multiple preview_images
@@ -380,6 +386,20 @@ public function saveCanvas(Request $request, $id)
             }
             if (!empty($previews)) {
                 $metadata['previews'] = $previews;
+                // Also populate preview_front/front_image from the 'front' preview
+                if (isset($previews['front'])) {
+                    $template->preview_front = $previews['front'];
+                    if (empty($template->front_image)) {
+                        $template->front_image = $previews['front'];
+                    }
+                }
+                // Populate back fields if back preview exists
+                if (isset($previews['back'])) {
+                    $template->preview_back = $previews['back'];
+                    if (empty($template->back_image)) {
+                        $template->back_image = $previews['back'];
+                    }
+                }
             }
         } elseif (array_key_exists('preview_images', $validated)) {
             unset($metadata['previews']);
@@ -436,10 +456,20 @@ public function uploadPreview(Request $request, $id)
 
     // Update preview column (store path)
     $template->preview = $filename;
+    $template->preview_front = $filename;
+
+    if (empty($template->front_image)) {
+        $template->front_image = $filename;
+    }
+
     $this->synchronizeTemplateSideState($template);
     $template->save();
 
-    return response()->json(['success' => true, 'preview' => $filename]);
+    return response()->json([
+        'success' => true,
+        'preview' => $filename,
+        'preview_url' => ImageResolver::url($filename),
+    ]);
 }
 
     public function autosave(Request $request, $id)

@@ -1625,7 +1625,9 @@ class OrderFlowService
             $meta['ink'] = $inkMeta;
         }
 
-    $paperTotal = (float) ($invitationItem?->paperStockSelection?->price ?? 0);
+    // paperStockSelection->price is stored as a per-unit price; multiply by quantity
+    $paperPerUnit = (float) ($invitationItem?->paperStockSelection?->price ?? 0);
+    $paperTotal = round($paperPerUnit * ($invitationItem->quantity ?? 0), 2);
     $addonsTotal = (float) ($invitationItem?->addons?->sum(fn($addon) => $addon->addon_price * $invitationItem->quantity) ?? 0);
     $extrasTotal = round($paperTotal + $addonsTotal + $inkTotal, 2);
 

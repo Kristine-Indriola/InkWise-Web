@@ -47,16 +47,16 @@
             <span class="text-2xl font-bold text-gray-900" style="font-family: 'Playfair Display', serif;">nkwise</span>
         </a>
 
-        <div class="flex items-center gap-3 lg:gap-6">
+        <div class="flex items-center gap-3 lg:gap-6 ml-8 sm:ml-16 lg:ml-36">
             <button id="navToggle" aria-controls="mobileNavPanel" aria-expanded="false" type="button"
-                    class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#c7d2fe] text-[#4f46e5] transition hover:bg-[#eef2ff] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#a6b7ff] lg:hidden">
+                class="ml-1 inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#c7d2fe] text-[#4f46e5] transition hover:bg-[#eef2ff] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#a6b7ff] lg:hidden">
                 <span class="sr-only">Toggle navigation menu</span>
                 <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                     <path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
             </button>
 
-            <nav id="primaryNav" class="hidden lg:flex">
+            <nav id="primaryNav" class="hidden lg:flex lg:ml-24">
                 <ul class="flex items-center gap-4 text-sm font-semibold text-gray-700">
                     <li>
                         <a href="{{ route('dashboard') }}"
@@ -107,13 +107,13 @@
             </nav>
 
             <div class="flex items-center gap-3">
-                <form action="{{ url('/search') }}" method="GET" class="hidden lg:flex">
+                <form action="{{ url('/search') }}" method="GET" class="hidden lg:flex ml-10">
                     <label for="desktop-invitation-search" class="sr-only">Search templates</label>
                     <input id="desktop-invitation-search" type="text" name="query" value="{{ $searchValue }}" placeholder="Search templates..."
                            class="w-52 rounded-full border border-[#dbeafe] px-4 py-2 text-sm placeholder:text-gray-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#a6b7ff]">
                 </form>
 
-                <div class="hidden items-center gap-2 lg:flex">
+                <div class="hidden items-center gap-2 lg:flex ml-6">
                     <a href="{{ $favoritesEnabled ? route('customer.favorites') : '#' }}"
                        class="nav-icon-button"
                        aria-label="My favorites"
@@ -130,15 +130,15 @@
                 </div>
 
                 @guest
-                    <a href="{{ route('customer.login') }}"
-                       class="hidden items-center rounded-full bg-gradient-to-r from-[#6366f1] via-[#7c83ff] to-[#a6b7ff] px-5 py-2 font-semibold text-white shadow focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#a6b7ff] sm:inline-flex"
+                          <a href="{{ route('customer.login') }}"
+                               class="hidden items-center rounded-full bg-gradient-to-r from-[#6366f1] via-[#7c83ff] to-[#a6b7ff] px-5 py-2 font-semibold text-white shadow focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#a6b7ff] sm:inline-flex ml-6"
                        style="font-family: 'Seasons', serif;">
                         Sign in
                     </a>
                 @endguest
 
                 @auth
-                    <div class="relative">
+                    <div class="relative ml-6">
                         <button id="userDropdownBtn" type="button" aria-expanded="false"
                                 class="inline-flex items-center gap-2 rounded-full bg-[#4f46e5] px-3 py-2 text-sm text-white transition hover:bg-[#4338ca] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#a6b7ff]">
                             <span>{{ Auth::user()->customer?->first_name ?? Auth::user()->email }}</span>

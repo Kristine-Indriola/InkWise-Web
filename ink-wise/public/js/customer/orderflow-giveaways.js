@@ -349,9 +349,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             </div>
             <ul class="summary-list">
-                <li class="summary-list__item"><dt>Quantity</dt><dd class="summary-quantity" aria-hidden="true">${giveaway.qty} pcs</dd></li>
-                <li class="summary-list__item"><dt>Unit price</dt><dd>${formatMoney(giveaway.price)}</dd></li>
-                <li class="summary-list__item"><dt>Total</dt><dd class="summary-total-value">${formatMoney(total)}</dd></li>
+                <li class="summary-list__item"><dt>Total Quantity:</dt><dd>${giveaway.qty} pcs</dd></li>
+                <li class="summary-list__item"><dt>Total Cost:</dt><dd>${formatMoney(total)}</dd></li>
             </ul>
         `;
     };
@@ -372,6 +371,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const syncSelectionState = (summaryOverride = null) => {
         const summary = summaryOverride ?? readSummary() ?? {};
         const giveaway = summary.giveaway;
+
+        console.log('[giveaways] syncSelectionState called', { summary, giveaway });
 
         state.selectedId = giveaway?.product_id
             ? String(giveaway.product_id)
@@ -423,6 +424,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const previewUrl = item.preview_url || null;
         const description = item.description || '';
         const total = price * defaultQty;
+        const designUrl = toCleanUrl(item.design_url || item.studio_url || item.designUrl || '');
 
         card.innerHTML = `
             <div class="giveaway-card__media">
@@ -461,7 +463,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
                 <div class="giveaway-card__actions">
-                    <button class="btn btn-secondary envelope-item__design" type="button" title="Add/Edit My Design">
+                    <button class="btn btn-secondary envelope-item__design" type="button" title="Add/Edit My Design" ${designUrl ? `data-design-url="${designUrl}"` : ''}>
                         <i class="fas fa-edit"></i> Design
                     </button>
                     <button class="primary-action envelope-item__select" type="button">Select giveaway</button>
@@ -547,8 +549,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const designBtn = card.querySelector('.envelope-item__design');
         designBtn?.addEventListener('click', () => {
-            // TODO: Implement design functionality
-            showToast('Design feature coming soon!');
+            if (!designBtn) {
+                return;
+            }
+
+            const targetUrl = toCleanUrl(designBtn.dataset.designUrl || '');
+            if (targetUrl) {
+                window.location.href = targetUrl;
+                return;
+            }
+
+            showToast('Studio access is unavailable for this giveaway.');
         });
 
         document.dispatchEvent(new CustomEvent('preview:register-triggers'));
@@ -605,6 +616,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const normalizedImages = normalizeImageArray(item.images);
         const primaryImage = extractImageSource(item.image) || normalizedImages[0] || placeholderImage;
+        const applyLocalSelection = () => {
+            const existingSummary = readSummary() ?? {};
+            const giveawayMeta = {
+                id: item.product_id ?? item.id,
+                product_id: item.product_id ?? item.id,
+                name: item.name ?? 'Giveaway',
+                price: normalisePrice(item.price, 0),
+                qty: quantity,
+                total: Number(total) || 0,
+                image: primaryImage,
+                description: item.description ?? '',
+                max_qty: item.max_qty ?? null,
+                min_qty: item.min_qty ?? null,
+                updated_at: new Date().toISOString(),
+            };
+
+            console.log('[giveaways] Applying local selection', { giveawayMeta, existingSummary });
+
+            existingSummary.giveaway = giveawayMeta;
+            const extras = existingSummary.extras ?? {};
+            existingSummary.extras = {
+                paper: Number(extras.paper ?? 0),
+                addons: Number(extras.addons ?? 0),
+                envelope: Number(extras.envelope ?? 0),
+                giveaway: Number(giveawayMeta.total ?? 0),
+            };
+
+            writeSummary(existingSummary);
+            console.log('[giveaways] Summary written to storage', existingSummary);
+            syncSelectionState(existingSummary);
+        };
 
         const payload = {
             product_id: item.product_id ?? item.id,
@@ -612,6 +654,7 @@ document.addEventListener('DOMContentLoaded', () => {
             unit_price: item.price,
             total_price: total,
             metadata: {
+                id: item.product_id ?? item.id,
                 name: item.name,
                 image: primaryImage,
                 images: normalizedImages.length ? normalizedImages : undefined,
@@ -634,37 +677,34 @@ document.addEventListener('DOMContentLoaded', () => {
         removeBtn?.removeAttribute('disabled');
         state.isSaving = false;
 
+        // Always apply local selection first for immediate UI feedback
+        applyLocalSelection();
+        
         if (result?.ok) {
             if (result.data?.summary) {
                 applyServerSummary(result.data.summary);
-                if (!options.silent) {
-                    showToast(`${item.name} added — ${quantity} pcs for ${formatMoney(total)}`);
-                }
-                return;
+            } else {
+                await fetchSummaryFromServer();
             }
-
-            const refreshed = await fetchSummaryFromServer();
-            if (refreshed) {
-                if (!options.silent) {
-                    showToast(`${item.name} added — ${quantity} pcs for ${formatMoney(total)}`);
-                }
-                return;
+            
+            if (!options.silent) {
+                showToast(`${item.name} added — ${quantity} pcs for ${formatMoney(total)}`);
             }
+            return;
         }
 
         const status = result?.status ?? 0;
         if (status === 409 || status === 422) {
             showToast('That giveaway is no longer available. Refreshing options…');
             await loadGiveaways();
-            const refreshed = await fetchSummaryFromServer();
-            if (!refreshed) {
-                syncSelectionState();
-            }
+            await fetchSummaryFromServer();
             return;
         }
 
-        showToast('Unable to save giveaway. Please try again.');
-        syncSelectionState();
+        // Even if server fails, we already applied local selection for immediate feedback
+        if (!options.silent) {
+            showToast(`${item.name} selected — ${quantity} pcs for ${formatMoney(total)}`);
+        }
     };
 
     const loadGiveaways = async () => {
