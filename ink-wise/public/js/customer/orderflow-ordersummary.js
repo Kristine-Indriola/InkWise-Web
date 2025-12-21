@@ -1428,10 +1428,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const envelopeMeta = summary?.envelope ?? summary?.metadata?.envelope ?? null;
   const hasEnvelope = summary?.hasEnvelope ?? Boolean(envelopeMeta && typeof envelopeMeta === 'object' && Object.keys(envelopeMeta).length);
 
+    console.log('[Envelope Preview] Rendering envelope', { envelopeMeta, hasEnvelope, summary });
+    
     if (envelopeCard) setHidden(envelopeCard, !hasEnvelope);
     if (removeEnvelopeBtn) removeEnvelopeBtn.hidden = !hasEnvelope;
 
     if (!hasEnvelope) {
+      console.log('[Envelope Preview] No envelope data, hiding card');
+
       if (envelopeQuantitySelect) {
         envelopeQuantitySelect.innerHTML = '';
         envelopeQuantitySelect.disabled = true;
@@ -1583,11 +1587,15 @@ document.addEventListener('DOMContentLoaded', () => {
       ?? null;
     const hasGiveaway = summary?.hasGiveaway ?? Boolean(giveawayMeta && typeof giveawayMeta === 'object' && Object.keys(giveawayMeta).length);
 
+    console.log('[Giveaways Preview] Rendering giveaways', { giveawayMeta, hasGiveaway, summary });
+    
     if (giveawaysCard) setHidden(giveawaysCard, !hasGiveaway);
     if (removeGiveawaysBtn) removeGiveawaysBtn.hidden = !hasGiveaway;
     if (giveawaysEditLink) giveawaysEditLink.href = giveawaysUrl;
 
     if (!hasGiveaway) {
+      console.log('[Giveaways Preview] No giveaway data, hiding card');
+
       if (giveawaysQuantitySelect) {
         giveawaysQuantitySelect.innerHTML = '';
         giveawaysQuantitySelect.disabled = true;
@@ -2128,23 +2136,32 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const renderSummary = (summary) => {
+    console.log('[Order Summary] Rendering with data:', summary);
+    
     if (!summary || (!Number(summary.quantity) && !getQuantityOptions(summary).length)) {
+      console.warn('[Order Summary] No valid summary data, showing empty state');
       showEmptyState();
       return;
     }
 
+    console.log('[Order Summary] Valid data found, rendering UI...');
     setHidden(emptyState, true);
     setHidden(layout, false);
     setHidden(summaryGrid, false);
     setHidden(summaryCard, false);
 
     // Ensure totals are recomputed (invitation base + extras) before rendering
-    try { recomputeTotals(summary); } catch (e) { /* ignore */ }
+    try { recomputeTotals(summary); } catch (e) { console.error('[Order Summary] recomputeTotals error:', e); }
 
+    console.log('[Order Summary] Rendering preview...');
     renderPreview(summary);
+    console.log('[Order Summary] Rendering envelope...', { hasEnvelope: summary?.hasEnvelope, envelope: summary?.envelope });
     renderEnvelopePreview(summary);
+    console.log('[Order Summary] Rendering giveaways...', { hasGiveaway: summary?.hasGiveaway, giveaway: summary?.giveaway });
     renderGiveawaysPreview(summary);
+    console.log('[Order Summary] Updating summary card...');
     updateSummaryCard(summary);
+    console.log('[Order Summary] Render complete');
   };
 
   const redirectToCheckout = async () => {
@@ -2169,13 +2186,26 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const bootstrapSummary = async () => {
+    console.log('[Order Summary] Bootstrap: Starting data load...');
+    
     const remoteSummary = await fetchSummaryFromServer();
     if (remoteSummary) {
+      console.log('[Order Summary] Bootstrap: Using remote data', remoteSummary);
       renderSummary(remoteSummary);
       return;
     }
 
-    renderSummary(getSummary());
+    const localSummary = getSummary();
+    if (localSummary) {
+      console.log('[Order Summary] Bootstrap: Using local data', localSummary);
+      // Sync local data to server if not already synced
+      await syncSummaryWithServer();
+      renderSummary(localSummary);
+      return;
+    }
+
+    console.warn('[Order Summary] Bootstrap: No data found, showing empty state');
+    renderSummary(null);
   };
 
   bootstrapSummary();

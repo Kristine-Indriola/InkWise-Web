@@ -14,7 +14,7 @@ class FinalizeOrderRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'quantity' => ['required', 'integer', 'min:1'],
+            'quantity' => ['required', 'integer', 'min:10'],
             'paper_stock_id' => ['nullable', 'integer', 'exists:product_paper_stocks,id'],
             'paper_stock_price' => ['nullable', 'numeric', 'min:0'],
             'paper_stock_name' => ['nullable', 'string', 'max:255'],

@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const finalStepSaveUrl = shell?.dataset?.saveUrl ?? null;
   const DEFAULT_TAX_RATE = 0;
   const DEFAULT_SHIPPING_FEE = 0;
+  const MIN_QTY = Number(quantityInput?.getAttribute('min')) || 10;
   const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
   let toastTimeout = null;
   let isPreOrderConfirmed = false;
@@ -583,25 +584,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const updateTotals = () => {
     if (!quantityInput) return;
-    const base = Number(priceDisplay?.textContent?.replace('₱', '') ?? 0);
-    const paper = Number(paperStockPriceInput?.value ?? 0);
+    const quantity = Number.parseInt(String(quantityInput.value ?? ''), 10) || 0;
+    const paperPerUnit = Number(paperStockPriceInput?.value ?? 0);
 
-    const addonsFromInputs = addonCheckboxes
-      .filter((checkbox) => checkbox.checked)
-      .reduce((sum, checkbox) => sum + Number(checkbox.dataset.price ?? 0), 0);
-
-    const selectedAddonCards = Array.from(document.querySelectorAll('.addon-card[aria-pressed="true"]'));
-    const addonsFromCards = selectedAddonCards.reduce((sum, card) => sum + Number(card.dataset.price ?? 0), 0);
-
-    const addonsTotal = addonsFromInputs + addonsFromCards;
-    const subtotal = base + paper + addonsTotal;
-    const tax = subtotal * DEFAULT_TAX_RATE;
-    const total = subtotal + tax + DEFAULT_SHIPPING_FEE;
+    // Per rules: total = quantity * paper_price. Exclude addons/ink/shipping from calculation.
+    const baseTotal = roundCurrency(paperPerUnit * quantity);
+    const subtotal = baseTotal;
+    const tax = roundCurrency(subtotal * DEFAULT_TAX_RATE);
+    const total = roundCurrency(subtotal + tax + DEFAULT_SHIPPING_FEE);
 
     computedTotals = {
-      base,
-      paper,
-      addons: addonsTotal,
+      base: baseTotal,
+      paper: paperPerUnit, // per-unit paper price
+      addons: 0,
       subtotal,
       tax,
       shipping: DEFAULT_SHIPPING_FEE,
@@ -609,7 +604,38 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     if (orderTotalEl) orderTotalEl.textContent = formatMoney(total);
-    if (paperStockPriceInput) paperStockPriceInput.value = String(paper || 0);
+    if (paperStockPriceInput) paperStockPriceInput.value = String(paperPerUnit || 0);
+    updateActionButtonsState();
+  };
+
+  const preventIfDisabled = (e) => {
+    if (!continueToCheckoutEl) return;
+    if (continueToCheckoutEl.getAttribute('aria-disabled') === 'true') {
+      e.preventDefault();
+      e.stopPropagation();
+      showToast('Please select a paper and ensure quantity is at least ' + MIN_QTY + ' before continuing.');
+    }
+  };
+
+  const updateActionButtonsState = () => {
+    const qty = Number.parseInt(String(quantityInput?.value ?? ''), 10) || 0;
+    const qtyOk = qty >= MIN_QTY;
+
+    if (addToCartBtn) {
+      if (!qtyOk) addToCartBtn.setAttribute('disabled', 'true');
+      else addToCartBtn.removeAttribute('disabled');
+    }
+
+    if (continueToCheckoutEl) {
+      if (!qtyOk) {
+        continueToCheckoutEl.setAttribute('aria-disabled', 'true');
+        continueToCheckoutEl.style.pointerEvents = 'none';
+        continueToCheckoutEl.addEventListener('click', preventIfDisabled);
+      } else {
+        continueToCheckoutEl.setAttribute('aria-disabled', 'false');
+        continueToCheckoutEl.style.pointerEvents = '';
+      }
+    }
   };
 
   const togglePreview = (face) => {
@@ -902,6 +928,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   addToCartBtn?.addEventListener('click', async (event) => {
     event.preventDefault();
+    // Guard: require minimum quantity
+    const currentQty = Number.parseInt(String(quantityInput?.value ?? ''), 10) || 0;
+    if (currentQty < (Number(quantityInput?.getAttribute('min')) || 10)) {
+      showToast('Please choose a quantity of at least ' + (Number(quantityInput?.getAttribute('min')) || 10) + '.');
+      quantityInput?.focus();
+      return;
+    }
 
     // Validate estimated date before proceeding
     if (!validateEstimatedDate()) {
@@ -1085,6 +1118,29 @@ document.addEventListener('DOMContentLoaded', () => {
       summary.quantityOptions = quantityOptionsSnapshot;
     }
 
+    const resolvedProductId = (() => {
+      const candidates = [productId, summary.productId, summary.product_id];
+      for (const candidate of candidates) {
+        const numeric = Number.parseInt(String(candidate ?? ''), 10);
+        if (Number.isFinite(numeric) && numeric > 0) {
+          return numeric;
+        }
+      }
+      return null;
+    })();
+    if (resolvedProductId) {
+      summary.productId = resolvedProductId;
+    }
+    if (!summary.productName && (productNameMeta || productNameFromBody)) {
+      summary.productName = productNameMeta ?? productNameFromBody;
+    }
+    const numericUnitFromSummary = Number.parseFloat(String(summary.unitPrice ?? ''));
+    if (!Number.isFinite(numericUnitFromSummary) && orderQuantityValue) {
+      summary.unitPrice = roundCurrency(totalAmount / orderQuantityValue);
+    } else if (Number.isFinite(numericUnitFromSummary)) {
+      summary.unitPrice = roundCurrency(numericUnitFromSummary);
+    }
+
     if (window && window.console && typeof window.console.debug === 'function') {
       console.debug('FinalStep: summary before writeSummary', {
         addonIds: summary.addonIds,
@@ -1101,6 +1157,49 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('Unable to sync final selections with the server', error);
       }
     }
+
+    const csrfToken = getCsrfToken();
+    const payload = {
+      product_id: summary.productId ?? resolvedProductId,
+      quantity: summary.quantity ?? currentQty,
+      summary,
+    };
+
+    if (!payload.product_id) {
+      showToast('We could not determine which design to add. Please refresh and try again.');
+      return;
+    }
+
+    addToCartBtn?.setAttribute('disabled', 'true');
+    addToCartBtn?.setAttribute('aria-busy', 'true');
+
+    try {
+      const response = await fetch('/order/cart/items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null);
+        const errorMessage = errorBody?.message ?? 'Unable to add item to cart. Please try again.';
+        throw new Error(errorMessage);
+      }
+    } catch (error) {
+      console.error('FinalStep: unable to persist cart item', error);
+      showToast(error?.message ?? 'Unable to add item to cart. Please try again.');
+      addToCartBtn?.removeAttribute('aria-busy');
+      addToCartBtn?.removeAttribute('disabled');
+      return;
+    }
+
+    addToCartBtn?.removeAttribute('aria-busy');
+    addToCartBtn?.removeAttribute('disabled');
 
     showToast('Adding to cart — redirecting...');
 
