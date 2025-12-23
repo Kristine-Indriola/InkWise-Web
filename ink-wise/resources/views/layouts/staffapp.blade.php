@@ -592,6 +592,18 @@
       <li class="{{ request()->routeIs('staff.messages.*') ? 'active' : '' }}">
         <a href="{{ route('staff.messages.index') }}"><i class="fa-solid fa-envelope"></i> <span class="label">Messages</span></a>
       </li>
+      <li class="{{ request()->routeIs('staff.reviews.*') ? 'active' : '' }}">
+        <a href="{{ route('staff.reviews.index') }}">
+          <i class="fa-solid fa-star"></i> 
+          <span class="label">Reviews</span>
+          @php
+              $unrepliedReviewsCount = \App\Models\OrderRating::whereNull('staff_reply')->count();
+          @endphp
+          @if($unrepliedReviewsCount > 0)
+              <span class="notif-badge" style="position: relative; top: auto; right: auto; margin-left: 8px;">{{ $unrepliedReviewsCount }}</span>
+          @endif
+        </a>
+      </li>
       <li class="{{ request()->routeIs('staff.order_list.index') ? 'active' : '' }}">
         <a href="{{ route('staff.order_list.index') }}"><i class="fa-solid fa-list"></i> <span class="label">Order List</span></a>
       </li>

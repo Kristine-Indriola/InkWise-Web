@@ -19,12 +19,16 @@ class OrderRating extends Model
         'photos',
         'metadata',
         'submitted_at',
+        'staff_reply',
+        'staff_reply_at',
+        'staff_reply_by',
     ];
 
     protected $casts = [
         'photos' => 'array',
         'metadata' => 'array',
         'submitted_at' => 'datetime',
+        'staff_reply_at' => 'datetime',
     ];
 
     public function order(): BelongsTo
@@ -40,5 +44,10 @@ class OrderRating extends Model
     public function submittedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'submitted_by', 'user_id');
+    }
+
+    public function staffReplyBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'staff_reply_by', 'user_id');
     }
 }

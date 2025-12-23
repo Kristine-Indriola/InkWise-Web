@@ -853,6 +853,18 @@ body.dark-mode .btn-warning {
       <li class="{{ (request()->routeIs('admin.ordersummary.*') || request()->routeIs('admin.orders.index')) ? 'active' : '' }}">
         <a href="{{ route('admin.orders.index') }}"><i class="fi fi-rr-list-check"></i> <span class="label">Order Summaries</span></a>
       </li>
+      <li class="{{ request()->routeIs('admin.reviews.*') ? 'active' : '' }}">
+        <a href="{{ route('admin.reviews.index') }}">
+          <i class="fi fi-rr-star"></i>
+          <span class="label">Reviews</span>
+          @php
+              $unrepliedReviewsCount = \App\Models\OrderRating::whereNull('staff_reply')->count();
+          @endphp
+          @if($unrepliedReviewsCount > 0)
+              <span class="notif-badge">{{ $unrepliedReviewsCount }}</span>
+          @endif
+        </a>
+      </li>
       <li class="{{ request()->routeIs('admin.payments.*') ? 'active' : '' }}">
         <a href="{{ route('admin.payments.index') }}"><i class="fi fi-rr-credit-card"></i> <span class="label">Payment Transactions</span></a>
       </li>

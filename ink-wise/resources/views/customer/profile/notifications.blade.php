@@ -26,7 +26,6 @@
                                     'confirmed' => route('customer.my_purchase.toship'),
                                     'to_receive' => route('customer.my_purchase.toreceive'),
                                     'completed' => route('customer.my_purchase.completed'),
-                                    'cancelled' => route('customer.my_purchase.cancelled'),
                                 ];
                                 $redirectUrl = $statusRoutes[$data['new_status']] ?? route('customer.my_purchase');
                                 $readUrl = route('customer.notifications.read', $notification->id) . '?redirect=' . urlencode($redirectUrl);

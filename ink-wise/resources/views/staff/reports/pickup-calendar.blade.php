@@ -1,4 +1,4 @@
-@extends('layouts.admin')
+@extends('layouts.staffapp')
 
 @section('title', 'Pickup Calendar')
 
@@ -8,19 +8,11 @@
 @endpush
 
 @section('content')
-<main class="reports-shell admin-page-shell" id="adminPickupCalendarShell">
+<main class="reports-shell admin-page-shell" id="staffPickupCalendarShell">
 	<header class="page-header reports-page-header">
 		<div>
 			<h1 class="page-title">Pickup Calendar</h1>
 			<p class="page-subtitle">View scheduled pickups for the selected period.</p>
-		</div>
-		<div class="page-header__quick-actions">
-			<a href="{{ route('admin.reports.sales') }}" class="pill-link">
-				<i class="fi fi-rr-chart-line-up" aria-hidden="true"></i> Sales analytics
-			</a>
-			<a href="{{ route('admin.reports.inventory') }}" class="pill-link">
-				<i class="fi fi-rr-boxes" aria-hidden="true"></i> Inventory insights
-			</a>
 		</div>
 	</header>
 
@@ -145,7 +137,7 @@
 			card.addEventListener('click', function() {
 				const orderId = this.dataset.orderId;
 				if (orderId) {
-					window.location.href = '{{ route("admin.ordersummary.index", ":id") }}'.replace(':id', orderId);
+					window.location.href = '{{ route("staff.orders.summary", ":id") }}'.replace(':id', orderId);
 				}
 			});
 		});
@@ -155,7 +147,7 @@
 			card.addEventListener('click', function() {
 				const orderId = this.dataset.orderId;
 				if (orderId) {
-					window.location.href = '{{ route("admin.ordersummary.index", ":id") }}'.replace(':id', orderId);
+					window.location.href = '{{ route("staff.orders.summary", ":id") }}'.replace(':id', orderId);
 				}
 			});
 		});

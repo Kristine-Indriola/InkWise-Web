@@ -47,6 +47,88 @@
   .summary-card:active {
     transform: translateY(-2px);
   }
+  
+  /* Review styles */
+  .reviews-list {
+    display: grid;
+    gap: 12px;
+  }
+  
+  .review-item {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px;
+    position: relative;
+  }
+  
+  .review-item.needs-reply {
+    border-left: 4px solid #f59e0b;
+  }
+  
+  .review-item.replied {
+    border-left: 4px solid #10b981;
+  }
+  
+  .review-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  
+  .review-rating {
+    display: flex;
+    gap: 2px;
+  }
+  
+  .review-rating i {
+    color: #fbbf24;
+    font-size: 14px;
+  }
+  
+  .review-date {
+    font-size: 12px;
+    color: #6b7280;
+  }
+  
+  .review-status {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+  
+  .review-status.replied {
+    background: #d1fae5;
+    color: #065f46;
+  }
+  
+  .review-status.needs-reply {
+    background: #fef3c7;
+    color: #92400e;
+  }
+  
+  .review-comment {
+    font-size: 14px;
+    line-height: 1.4;
+    color: #374151;
+    margin-bottom: 8px;
+  }
+  
+  .review-author {
+    font-size: 12px;
+    color: #6b7280;
+    font-style: italic;
+  }
+  
+  .no-reviews {
+    text-align: center;
+    padding: 20px;
+    color: #6b7280;
+    font-size: 14px;
+  }
 </style>
 
 @section('content')
@@ -164,6 +246,41 @@
     </section>
 
    
+
+    <section class="staff-dashboard-section" aria-label="Customer Reviews">
+        <header class="section-header">
+            <div>
+                <h2 class="section-title">Customer Reviews</h2>
+                <p class="section-subtitle">Recent feedback from your customers.</p>
+            </div>
+            <div class="section-actions">
+                <a href="{{ route('staff.reviews.index') }}" class="pill-link"><i class="fi fi-rr-star"></i>&nbsp;View all reviews</a>
+            </div>
+        </header>
+        <div class="reviews-list">
+            @forelse($recentReviews ?? [] as $review)
+                <div class="review-item {{ $review->staff_reply ? 'replied' : 'needs-reply' }}">
+                    <div class="review-header">
+                        <span class="review-rating">
+                            @for($i = 1; $i <= 5; $i++)
+                                <i class="fi fi-{{ $i <= $review->rating ? 'rs' : 'rr' }}-star" aria-hidden="true"></i>
+                            @endfor
+                        </span>
+                        <span class="review-date">{{ $review->submitted_at ? $review->submitted_at->format('M d, Y') : $review->created_at->format('M d, Y') }}</span>
+                        @if($review->staff_reply)
+                            <span class="review-status replied">Replied</span>
+                        @else
+                            <span class="review-status needs-reply">Needs Reply</span>
+                        @endif
+                    </div>
+                    <p class="review-comment">{{ $review->review }}</p>
+                    <small class="review-author">By {{ $review->customer->name ?? 'Anonymous' }}</small>
+                </div>
+            @empty
+                <p class="no-reviews">No recent reviews available.</p>
+            @endforelse
+        </div>
+    </section>
 
     <section class="staff-dashboard-section staff-dashboard-updates" aria-label="Materials health">
         <header class="section-header">

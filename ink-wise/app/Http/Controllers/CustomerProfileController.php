@@ -168,10 +168,10 @@ class CustomerProfileController extends Controller
             abort(403);
         }
 
-        $cancellableStatuses = ['draft', 'pending', 'processing'];
+        $cancellableStatuses = []; // Customers cannot cancel orders
 
         if (!in_array($order->status, $cancellableStatuses, true)) {
-            $errorMessage = 'Order can no longer be cancelled at this stage. Please contact InkWise support for assistance.';
+            $errorMessage = 'Order cancellation is not allowed. Please contact InkWise support for assistance.';
             
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json([

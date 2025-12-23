@@ -98,7 +98,7 @@ class ReportsDashboardController extends Controller
 
                     return [
                         'id' => $order->id,
-                        'inv' => 'INV' . $order->id,
+                        'inv' => $order->order_number ?? ('#' . $order->id),
                         'customer_name' => $customerName,
                         'total_amount' => (float) $order->total_amount,
                         'items_count' => $order->items->sum('quantity'),
@@ -163,7 +163,9 @@ class ReportsDashboardController extends Controller
             }
         }
 
-        return view('admin.reports.pickup-calendar', compact('calendarData', 'period', 'start', 'end'));
+        $view = auth()->user()->role === 'staff' ? 'staff.reports.pickup-calendar' : 'admin.reports.pickup-calendar';
+
+        return view($view, compact('calendarData', 'period', 'start', 'end'));
     }
 
     private function buildReportContext(?Carbon $startDate = null, ?Carbon $endDate = null): array

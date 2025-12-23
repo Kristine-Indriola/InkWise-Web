@@ -1510,9 +1510,6 @@ class OrderFlowController extends Controller
             if ($order->status === 'completed') {
                 return redirect()->route('customer.my_purchase.completed');
             }
-            if ($order->status === 'cancelled') {
-                return redirect()->route('customer.my_purchase.cancelled');
-            }
             // For other statuses like 'draft' or 'pending', continue with checkout
         }
 

@@ -385,7 +385,6 @@ class StaffOrderController extends Controller
             'in_production' => 'In Progress',
             'confirmed' => 'Ready for Pickup',
             'completed' => 'Completed',
-            'cancelled' => 'Cancelled',
         ];
     }
 
