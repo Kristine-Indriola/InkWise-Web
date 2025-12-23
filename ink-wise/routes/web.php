@@ -47,8 +47,10 @@ use App\Http\Controllers\Staff\StaffCustomerController;
 use App\Http\Controllers\Staff\StaffOrderController;
 use App\Http\Controllers\Staff\StaffMaterialController;
 use App\Http\Controllers\Staff\StaffDashboardController;
+use App\Http\Controllers\Staff\StaffReviewController;
 use App\Http\Controllers\Owner\OwnerRatingsController;
 use App\Http\Controllers\Admin\UserManagementController;
+use App\Http\Controllers\Admin\AdminReviewController;
 use App\Http\Controllers\Owner\OwnerInventoryController;
 use App\Http\Controllers\Staff\StaffInventoryController;
 use App\Http\Controllers\Admin\ReportsDashboardController;
@@ -107,7 +109,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     ->middleware('auth');
     
 
-    Route::get('/ordersummary/{order:order_number?}', [OrderSummaryController::class, 'show'])
+    Route::get('/ordersummary/{order}', [OrderSummaryController::class, 'show'])
         ->name('ordersummary.index');
 
     // Admin orders list (table) - simple closure for listing orders in the admin UI
@@ -211,17 +213,10 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::post('{id}/canvas-settings', [AdminTemplateController::class, 'updateCanvasSettings'])->name('updateCanvasSettings');
         // Add SVG save route
         Route::post('{id}/save-svg', [AdminTemplateController::class, 'saveSvg'])->name('saveSvg');
-    }); 
-    // ✅ User Management 
+    });
 
-Route::prefix('users')->name('users.')->group(function () { 
-    Route::get('/', [UserManagementController::class, 'index'])->name('index'); 
-    Route::get('/create', [UserManagementController::class, 'create'])->name('create'); 
-    Route::post('/', [UserManagementController::class, 'store'])->name('store'); 
-    Route::get('/{user_id}/edit', [UserManagementController::class, 'edit'])->name('edit'); // Edit form 
-    Route::put('/{user_id}', [UserManagementController::class, 'update'])->name('update'); // Update user 
-    Route::delete('/{user_id}', [UserManagementController::class, 'destroy'])->name('destroy'); // Delete user 
-});
+    Route::get('/reviews', [AdminReviewController::class, 'index'])->name('reviews.index');
+    Route::post('/reviews/{review}/reply', [AdminReviewController::class, 'reply'])->name('reviews.reply');
 
     Route::prefix('users/passwords')->name('users.passwords.')->group(function () {
         Route::get('/', [UserPasswordResetController::class, 'index'])->name('index');
@@ -515,8 +510,6 @@ Route::get('/customer/my-orders/toreceive', fn () => view('customer.profile.purc
 Route::get('/customer/my-orders/topickup', fn () => view('customer.profile.purchase.topickup'))->name('customer.my_purchase.topickup');
 Route::get('/customer/my-orders/completed', fn () => view('customer.profile.purchase.completed'))->name('customer.my_purchase.completed');
 Route::get('/customer/my-orders/rate', [CustomerProfileController::class, 'rate'])->middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->name('customer.my_purchase.rate');
-Route::get('/customer/my-orders/cancelled', fn () => view('customer.profile.purchase.cancelled'))->name('customer.my_purchase.cancelled');
-Route::get('/customer/my-orders/return-refund', fn () => view('customer.profile.purchase.return_refund'))->name('customer.my_purchase.return_refund');
 Route::get('/customer/pay-remaining-balance/{order}', function (\App\Models\Order $order) {
     // Ensure the order belongs to the authenticated user
     $customer = Auth::user();
@@ -979,6 +972,13 @@ Route::prefix('staff')->name('staff.')->middleware(\App\Http\Middleware\RoleMidd
         Route::post('figma/preview', [\App\Http\Controllers\FigmaController::class, 'preview'])->name('figma.preview');
         Route::post('figma/import', [\App\Http\Controllers\FigmaController::class, 'import'])->name('figma.import');
     });
+
+    Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/pickup-calendar', [App\Http\Controllers\Admin\ReportsDashboardController::class, 'pickupCalendar'])->name('pickup-calendar');
+    });
+
+    Route::get('/reviews', [StaffReviewController::class, 'index'])->name('reviews.index');
+    Route::post('/reviews/{review}/reply', [StaffReviewController::class, 'reply'])->name('reviews.reply');
 });
 
 /*

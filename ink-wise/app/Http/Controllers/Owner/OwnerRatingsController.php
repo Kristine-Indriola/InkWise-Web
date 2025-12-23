@@ -11,7 +11,7 @@ class OwnerRatingsController extends Controller
     public function index()
     {
         $ratings = Order::query()
-            ->with(['rating', 'customer'])
+            ->with(['rating.staffReplyBy.staff', 'customer'])
             ->whereHas('rating')
             ->latest('updated_at')
             ->paginate(12)
@@ -25,6 +25,9 @@ class OwnerRatingsController extends Controller
                     'rating' => $rating?->rating,
                     'review' => $rating?->review,
                     'submitted_at' => $rating?->submitted_at,
+                    'staff_reply' => $rating?->staff_reply,
+                    'staff_reply_at' => $rating?->staff_reply_at,
+                    'staff_reply_by' => $rating?->staffReplyBy,
                 ];
             });
 

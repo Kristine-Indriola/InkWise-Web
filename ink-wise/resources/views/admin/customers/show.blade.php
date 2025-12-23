@@ -388,10 +388,6 @@
             <h3>Pending</h3>
             <div class="value">{{ $pendingOrders }}</div>
         </div>
-        <div class="stat-card danger">
-            <h3>Cancelled</h3>
-            <div class="value">{{ $cancelledOrders }}</div>
-        </div>
         <div class="stat-card info">
             <h3>Total Spent</h3>
             <div class="value">₱{{ number_format($totalSpent, 2) }}</div>

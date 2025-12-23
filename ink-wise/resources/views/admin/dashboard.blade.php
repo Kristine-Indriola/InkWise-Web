@@ -39,10 +39,49 @@
                         font-size: 1rem;
                 }
 
-        .analytics-grid {
+        /* Enhanced section spacing and visual hierarchy */
+        .dashboard-page > section {
+            margin-bottom: 2rem;
+        }
+
+        .dashboard-page > section:last-of-type {
+            margin-bottom: 0;
+        }
+
+        /* Improved summary cards styling */
+        .summary-grid {
             display: grid;
-            gap: 18px;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            margin: 1.5rem 0;
+        }
+
+        .summary-card {
+            background: var(--admin-surface);
+            border-radius: 16px;
+            border: 1px solid rgba(148, 185, 255, 0.15);
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .summary-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #6a2ebc, #3cd5c8);
+        }
+
+        .summary-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
         }
 
         .analytics-card {
@@ -55,6 +94,12 @@
             gap: 16px;
             position: relative;
             overflow: hidden;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .analytics-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
         }
 
         .analytics-card__header {
@@ -278,6 +323,216 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* Review styles for admin dashboard */
+        .reviews-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .review-item {
+            background: rgba(148, 185, 255, 0.06);
+            border: 1px solid rgba(148, 185, 255, 0.12);
+            border-radius: 12px;
+            padding: 18px;
+            position: relative;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .review-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .review-item.needs-reply {
+            border-left: 4px solid #f59e0b;
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.04), rgba(245, 158, 11, 0.08));
+        }
+
+        .review-item.replied {
+            border-left: 4px solid #10b981;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.04), rgba(16, 185, 129, 0.08));
+        }
+
+        .review-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .review-rating {
+            display: flex;
+            gap: 2px;
+        }
+
+        .review-rating i {
+            color: #fbbf24;
+            font-size: 14px;
+        }
+
+        .review-date {
+            font-size: 12px;
+            color: var(--admin-text-secondary);
+            font-weight: 500;
+        }
+
+        .review-status {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .review-status.replied {
+            background: rgba(16, 185, 129, 0.12);
+            color: #065f46;
+        }
+
+        .review-status.needs-reply {
+            background: rgba(245, 158, 11, 0.12);
+            color: #92400e;
+        }
+
+        .review-comment {
+            font-size: 14px;
+            line-height: 1.4;
+            color: var(--admin-text-primary);
+            margin-bottom: 8px;
+        }
+
+        .review-author {
+            font-size: 12px;
+            color: var(--admin-text-secondary);
+            font-style: italic;
+        }
+
+        /* Enhanced stock section styling */
+        .dashboard-stock {
+            background: var(--admin-surface);
+            border-radius: 18px;
+            border: 1px solid rgba(148, 185, 255, 0.18);
+            box-shadow: var(--admin-shadow-soft);
+            padding: 24px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .dashboard-stock:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .section-title {
+            margin: 0 0 0.25rem 0;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--admin-text-primary);
+        }
+
+        .section-subtitle {
+            margin: 0;
+            font-size: 0.88rem;
+            color: var(--admin-text-secondary);
+        }
+
+        .table-wrapper {
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(148, 185, 255, 0.15);
+            background: rgba(148, 185, 255, 0.02);
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table th {
+            background: rgba(148, 185, 255, 0.08);
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 700;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--admin-text-secondary);
+            border-bottom: 1px solid rgba(148, 185, 255, 0.15);
+        }
+
+        .table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(148, 185, 255, 0.08);
+            color: var(--admin-text-primary);
+        }
+
+        .table tbody tr:hover {
+            background: rgba(148, 185, 255, 0.04);
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stock-ok {
+            background: rgba(16, 185, 129, 0.12);
+            color: #065f46;
+        }
+
+        .stock-low {
+            background: rgba(245, 158, 11, 0.12);
+            color: #92400e;
+        }
+
+        .stock-critical {
+            background: rgba(239, 68, 68, 0.12);
+            color: #991b1b;
+        }
+
+        .status-label {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .status-label.ok {
+            background: rgba(16, 185, 129, 0.12);
+            color: #065f46;
+        }
+
+        .status-label.low {
+            background: rgba(245, 158, 11, 0.12);
+            color: #92400e;
+        }
+
+        .status-label.out {
+            background: rgba(239, 68, 68, 0.12);
+            color: #991b1b;
+        }
         </style>
 @endpush
 
@@ -485,6 +740,41 @@
             </div>
             <span class="summary-card-meta">Average basket value</span>
         </div>
+    </section>
+
+
+    <section class="analytics-grid" aria-label="Customer reviews">
+        <article class="analytics-card">
+            <header class="analytics-card__header">
+                <h2>Customer Reviews</h2>
+            </header>
+            <div class="reviews-list">
+                @forelse(\App\Models\OrderRating::with(['customer', 'order'])->latest('submitted_at')->take(5)->get() as $review)
+                    <div class="review-item {{ $review->staff_reply ? 'replied' : 'needs-reply' }}">
+                        <div class="review-header">
+                            <span class="review-rating">
+                                @for($i = 1; $i <= 5; $i++)
+                                    <i class="fi fi-{{ $i <= $review->rating ? 'rs' : 'rr' }}-star" aria-hidden="true"></i>
+                                @endfor
+                            </span>
+                            <span class="review-date">{{ $review->submitted_at ? $review->submitted_at->format('M d, Y') : $review->created_at->format('M d, Y') }}</span>
+                            @if($review->staff_reply)
+                                <span class="review-status replied">Replied</span>
+                            @else
+                                <span class="review-status needs-reply">Needs Reply</span>
+                            @endif
+                        </div>
+                        <p class="review-comment">{{ Str::limit($review->review, 100) }}</p>
+                        <small class="review-author">By {{ $review->customer ? $review->customer->name : 'Anonymous' }}</small>
+                    </div>
+                @empty
+                    <p class="analytics-card__empty">No reviews available yet.</p>
+                @endforelse
+            </div>
+            <div class="section-actions" style="margin-top: 16px;">
+                <a href="{{ route('admin.reviews.index') }}" class="pill-link"><i class="fi fi-rr-star"></i>&nbsp;View all reviews</a>
+            </div>
+        </article>
     </section>
 
 

@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
 <link rel="stylesheet" href="{{ asset('css/admin-css/ordersummary.css') }}">
 <link rel="stylesheet" href="{{ asset('css/admin-css/orders.css') }}">
-<link rel="stylesheet" href="{{ asset('css/admin-css/orders-table.css') }}">
+<link rel="stylesheet" href="{{ asset('css/admin-css/orders-table.css') }}"> 
 <style>
   .orders-controls {
     display: flex;
@@ -247,6 +247,9 @@
     <div class="page-header__quick-actions">
       <a href="{{ route('admin.orders.archived') }}" class="pill-link">Archived Orders</a>
       <a href="#" class="pill-link">Export</a>
+      <a href="{{ route('admin.reports.pickup-calendar') }}" class="pill-link">
+				<i class="fi fi-rr-calendar" aria-hidden="true"></i> Pickup calendar
+			</a>
     </div>
   </header>
 

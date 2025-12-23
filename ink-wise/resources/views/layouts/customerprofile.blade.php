@@ -397,7 +397,7 @@ function toggleChatSize() {
         chatBox.style.width = '500px';
         chatBox.style.height = '650px';
         chatBox.setAttribute('data-expanded', 'true');
-        expandIcon.style.transform = 'rotate(180deg)';
+        expandIcon.style.transform = 'rotate(180deg)';S
     }
 }
 </script>

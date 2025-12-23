@@ -225,6 +225,7 @@
         <a href="{{ route('staff.order_list.index') }}" class="pill-link">Active Orders</a>
       @else
         <a href="{{ route('staff.orders.archived') }}" class="pill-link">Archived Orders</a>
+        <a href="{{ route('staff.reports.pickup-calendar') }}" class="pill-link">Pickup Calendar</a>
         <a href="#" class="pill-link">Export</a>
       @endif
     </div>
@@ -243,7 +244,6 @@
         $toShipRawCount = $statusCounts->get('to_ship', 0);
         $confirmedCount = $statusCounts->get('confirmed', 0);
         $completedCount = $statusCounts->get('completed', 0);
-        $cancelledCount = $statusCounts->get('cancelled', 0);
         $inProgressCount = $processingCount + $inProductionCount;
         $toShipCount = $confirmedCount + $toShipRawCount;
       @endphp
@@ -281,12 +281,6 @@
         <div class="summary-card" data-summary-count="{{ $completedCount }}">
           <div class="summary-card__label">Completed</div>
           <div class="summary-card__value">{{ $completedCount }}</div>
-        </div>
-      </button>
-      <button type="button" class="summary-card-button" data-summary-filter="cancelled" data-summary-label="Cancelled" data-summary-description="Orders voided or cancelled by the team or customer.">
-        <div class="summary-card" data-summary-count="{{ $cancelledCount }}">
-          <div class="summary-card__label">Cancelled</div>
-          <div class="summary-card__value">{{ $cancelledCount }}</div>
         </div>
       </button>
     </div>
@@ -399,7 +393,7 @@
       @endif
     </div>
   </section>
-</main>
+
 @endsection
 
 @push('scripts')
@@ -442,8 +436,7 @@
       pending: ['pending'],
       in_progress: ['processing', 'in_production'],
       ready_pickup: ['confirmed'],
-      completed: ['completed'],
-      cancelled: ['cancelled']
+      completed: ['completed']
     };
 
     let activeButton = null;
@@ -460,8 +453,7 @@
         pending: 0,
         in_progress: 0,
         ready_pickup: 0,
-        completed: 0,
-        cancelled: 0
+        completed: 0
       };
 
       const inProgressStatuses = statusMap.in_progress;
@@ -478,7 +470,6 @@
         if (inProgressStatuses.includes(status)) counts.in_progress += 1;
         if (readyPickupStatuses.includes(status)) counts.ready_pickup += 1;
         if (status === 'completed') counts.completed += 1;
-        if (status === 'cancelled') counts.cancelled += 1;
       });
 
       return counts;
@@ -491,7 +482,6 @@
         case 'in_progress': return counts.in_progress;
         case 'ready_pickup': return counts.ready_pickup;
         case 'completed': return counts.completed;
-        case 'cancelled': return counts.cancelled;
         case 'all':
         default:
           return counts.total;
