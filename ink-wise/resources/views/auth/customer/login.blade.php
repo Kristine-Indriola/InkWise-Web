@@ -3,7 +3,7 @@
 @endphp
 
 <div id="loginModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 px-2 {{ $showLoginModal ? '' : 'hidden' }}">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 relative transform transition-all scale-95 hover:scale-100 duration-300">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative transform transition-all scale-95 hover:scale-100 duration-300">
 
         <!-- Close button -->
         <button id="closeLogin" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition text-base font-bold">
@@ -12,7 +12,7 @@
 
         <!-- Modal Header -->
         <div class="text-center mb-5">
-            <h2 class="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-blue-400 bg-clip-text text-transparent">
+            <h2 class="text-xl font-bold bg-gradient-to-r from-indigo-600 to-blue-400 bg-clip-text text-transparent">
                 Sign In
             </h2>
             <p class="text-gray-500 text-sm mt-1">Welcome back! Please enter your details.</p>

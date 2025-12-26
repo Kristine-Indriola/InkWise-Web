@@ -358,8 +358,10 @@
         <div class="envelope-layout">
             <section class="envelope-options">
                 <div class="envelope-card">
-                    <header class="envelope-card__header">
-                        <span class="envelope-card__badge">Envelope catalog</span>
+                    <header class="envelope-card__header" aria-label="Envelope filters">
+                        <div class="envelope-card__heading">
+                            <span class="envelope-card__badge">Envelope catalog</span>
+                        </div>
                     </header>
                     <div id="envelopeGrid" class="envelope-grid" aria-live="polite"></div>
                 </div>

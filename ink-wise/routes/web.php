@@ -767,7 +767,7 @@ Route::get('/order/giveaways', [OrderFlowController::class, 'giveaways'])->name(
 Route::post('/order/giveaways', [OrderFlowController::class, 'storeGiveaway'])->name('order.giveaways.store');
 Route::delete('/order/giveaways', [OrderFlowController::class, 'clearGiveaway'])->name('order.giveaways.clear');
 Route::get('/api/envelopes', [OrderFlowController::class, 'envelopeOptions'])->name('api.envelopes');
-Route::get('/api/envelopes', [ProductController::class, 'getEnvelopes'])->name('api.envelopes');
+// Route::get('/api/envelopes', [ProductController::class, 'getEnvelopes'])->name('api.envelopes');
 Route::get('/api/giveaways', [OrderFlowController::class, 'giveawayOptions'])->name('api.giveaways');
 // Temporary debug endpoint: lists resolved giveaway images (thumbnail + gallery)
 Route::get('/debug/giveaways-images', [OrderFlowController::class, 'debugGiveawayImages'])->name('debug.giveaways.images');

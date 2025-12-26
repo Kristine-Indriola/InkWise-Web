@@ -901,25 +901,86 @@ class OrderFlowController extends Controller
 
     public function envelopeOptions(): JsonResponse
     {
-        $cacheKey = 'envelope_options_api';
+        $cacheKey = 'envelope_options_api_v3'; // Updated cache key to force refresh
         $cacheDuration = 300; // 5 minutes
 
-        $envelopes = Cache::remember($cacheKey, $cacheDuration, function () {
+        $orderFlow = $this->orderFlow;
+
+        $envelopes = Cache::remember($cacheKey, $cacheDuration, function () use ($orderFlow) {
             $fallbackImage = asset('images/no-image.png');
 
             return ProductEnvelope::query()
-                ->with(['product'])
+                ->with(['product', 'product.images', 'product.template', 'material', 'material.inventory'])
                 ->orderByDesc('updated_at')
                 ->get()
-                ->map(function (ProductEnvelope $envelope) use ($fallbackImage) {
+                ->map(function (ProductEnvelope $envelope) use ($fallbackImage, $orderFlow) {
+                    $product = $envelope->product;
+                    
+                    // Try multiple image sources like ProductController
+                    $imageCandidates = [
+                        $envelope->envelope_image,
+                        optional($product?->images)->front,
+                        optional($product?->images)->preview,
+                        $product?->image,
+                        optional($product?->template)->preview_front,
+                        optional($product?->template)->image,
+                    ];
+
+                    $image = collect($imageCandidates)
+                        ->filter()
+                        ->map(function ($path) {
+                            if (!$path) {
+                                return null;
+                            }
+                            if (preg_match('/^(https?:)?\/\//i', $path)) {
+                                return $path;
+                            }
+
+                            // If path looks like an absolute filesystem path starting with '/', keep it
+                            if (str_starts_with($path, '/')) {
+                                return $path;
+                            }
+
+                            // Try resolving via Storage (e.g. 'public/...')
+                            try {
+                                return Storage::url($path);
+                            } catch (\Throwable $e) {
+                                return null;
+                            }
+                        })
+                        ->first() ?? $fallbackImage;
+
+                    // Ensure the returned image is an absolute URL that the browser can load
+                    if ($image && !preg_match('/^(https?:)?\/\//i', $image)) {
+                        // Trim leading slash and make an absolute asset URL
+                        $image = asset(ltrim($image, '/'));
+                    }
+
+                    $availability = $orderFlow->resolveEnvelopeAvailability($envelope);
+                    $maxQuantity = $availability['max_quantity'] ?? null;
+                    $availableStock = $availability['available_stock'] ?? null;
+
+                    $defaultMin = 10;
+                    $minQty = $defaultMin;
+                    if ($maxQuantity !== null) {
+                        if ($maxQuantity <= 0) {
+                            $minQty = 0;
+                        } else {
+                            $minQty = max(1, min($defaultMin, $maxQuantity));
+                        }
+                    }
+
                     return [
                         'id' => $envelope->id,
                         'product_id' => $envelope->product_id,
-                        'name' => $envelope->product?->name ?? $envelope->envelope_material_name ?? 'Envelope',
+                        'name' => $product?->name ?? $envelope->envelope_material_name ?? 'Envelope',
                         'price' => $envelope->price_per_unit ?? 0,
-                        'image' => $this->orderFlow->resolveMediaPath($envelope->envelope_image, $fallbackImage),
-                        'material' => $envelope->envelope_material_name,
-                        'max_qty' => $envelope->max_qty ?? $envelope->max_quantity,
+                        'image' => $image,
+                        'material' => $envelope->envelope_material_name ?? optional(Arr::get($availability, 'material'))->material_name,
+                        'material_id' => $envelope->material_id,
+                        'min_qty' => $minQty,
+                        'max_qty' => $maxQuantity,
+                        'available_stock' => $availableStock,
                         'updated_at' => $envelope->updated_at?->toIso8601String(),
                     ];
                 })
@@ -983,11 +1044,18 @@ class OrderFlowController extends Controller
 
         $defaultQty = max($bulkTier?->min_qty ?? $this->orderFlow->defaultQuantityFor($product), 1);
 
+        $tiers = $product->bulkOrders->map(fn ($tier) => [
+            'min_qty' => $tier->min_qty,
+            'max_qty' => $tier->max_qty,
+            'price' => $tier->price_per_unit,
+        ])->values()->toArray();
+
         return [
             'id' => $product->id,
             'product_id' => $product->id,
             'name' => $product->name ?? 'Giveaway',
             'price' => $unitPrice,
+            'tiers' => $tiers,
             'image' => $primaryImage,
             'images' => $images['all'] ?? [],
             'description' => Str::limit(strip_tags($product->description ?? ''), 220),
@@ -1049,18 +1117,36 @@ class OrderFlowController extends Controller
             }
 
             $envelopeMeta = $payload['metadata'] ?? [];
+            $resolvedEnvelope = $request->resolvedEnvelope();
+            $availability = $request->resolvedEnvelopeAvailability();
+
+            $maxQuantity = Arr::get($availability, 'max_quantity', $envelopeMeta['max_qty'] ?? null);
+            if ($maxQuantity !== null) {
+                $maxQuantity = (int) $maxQuantity;
+                if ($maxQuantity >= 1 && $quantity > $maxQuantity) {
+                    $quantity = $maxQuantity;
+                    $total = $quantity * $unitPrice;
+                }
+            }
+
+            $availableStock = Arr::get($availability, 'available_stock');
+            $materialName = $envelopeMeta['material']
+                ?? $resolvedEnvelope?->envelope_material_name
+                ?? Arr::get($availability, 'material.material_name');
 
             $meta = array_filter([
                 'id' => $payload['envelope_id'] ?? $envelopeMeta['id'] ?? null,
-                'product_id' => $payload['product_id'] ?? null,
+                'product_id' => $payload['product_id'] ?? $resolvedEnvelope?->product_id,
                 'name' => $envelopeMeta['name'] ?? null,
                 'price' => $unitPrice,
                 'qty' => $quantity,
                 'total' => (float) $total,
-                'material' => $envelopeMeta['material'] ?? null,
+                'material' => $materialName,
                 'image' => $envelopeMeta['image'] ?? null,
                 'min_qty' => $envelopeMeta['min_qty'] ?? null,
-                'max_qty' => $envelopeMeta['max_qty'] ?? null,
+                'max_qty' => $maxQuantity,
+                'available_stock' => $availableStock,
+                'material_id' => $resolvedEnvelope?->material_id,
                 'updated_at' => now()->toIso8601String(),
             ], fn ($v) => $v !== null && $v !== '');
 
@@ -1190,9 +1276,20 @@ class OrderFlowController extends Controller
                 return $value !== null && $value !== '';
             }, ARRAY_FILTER_USE_BOTH);
 
-            $summary['giveaway'] = $meta;
+            $giveaways = $summary['giveaways'] ?? [];
+            if (empty($giveaways) && !empty($summary['giveaway'])) {
+                $oldId = $summary['giveaway']['product_id'] ?? $summary['giveaway']['id'] ?? null;
+                if ($oldId) {
+                    $giveaways[$oldId] = $summary['giveaway'];
+                }
+            }
+            
+            $giveaways[$product->id] = $meta;
+            $summary['giveaways'] = $giveaways;
+            unset($summary['giveaway']);
+
             $summary['extras'] = $summary['extras'] ?? ['paper' => 0, 'addons' => 0, 'envelope' => 0, 'giveaway' => 0];
-            $summary['extras']['giveaway'] = (float) $meta['total'];
+            $summary['extras']['giveaway'] = (float) collect($giveaways)->sum('total');
 
             // update totals
             $summary['subtotalAmount'] = ($summary['subtotalAmount'] ?? 0);
@@ -1202,7 +1299,7 @@ class OrderFlowController extends Controller
             session()->put(static::SESSION_SUMMARY_KEY, $summary);
 
             return response()->json([
-                'message' => 'Giveaway selection saved to session.',
+                'message' => 'Giveaway added to session.',
                 'order_id' => null,
                 'order_number' => null,
                 'summary' => $summary,
@@ -1233,14 +1330,40 @@ class OrderFlowController extends Controller
         ]);
     }
 
-    public function clearGiveaway(): JsonResponse
+    public function clearGiveaway(Request $request): JsonResponse
     {
+        $productId = $request->input('product_id');
         $order = $this->currentOrder();
+        
         if (!$order) {
             $summary = session(static::SESSION_SUMMARY_KEY) ?? [];
-            unset($summary['giveaway']);
+            
+            if ($productId) {
+                $giveaways = $summary['giveaways'] ?? [];
+                // Migrate old single giveaway if exists
+                if (empty($giveaways) && !empty($summary['giveaway'])) {
+                    $oldId = $summary['giveaway']['product_id'] ?? $summary['giveaway']['id'] ?? null;
+                    if ($oldId) {
+                        $giveaways[$oldId] = $summary['giveaway'];
+                    }
+                }
+                
+                unset($giveaways[$productId]);
+                $summary['giveaways'] = $giveaways;
+                unset($summary['giveaway']);
+            } else {
+                unset($summary['giveaway']);
+                unset($summary['giveaways']);
+            }
+
             $summary['extras'] = $summary['extras'] ?? ['paper' => 0, 'addons' => 0, 'envelope' => 0, 'giveaway' => 0];
-            $summary['extras']['giveaway'] = 0;
+            $summary['extras']['giveaway'] = (float) collect($summary['giveaways'] ?? [])->sum('total');
+            
+            // update totals
+            $summary['subtotalAmount'] = ($summary['subtotalAmount'] ?? 0);
+            $summary['taxAmount'] = round(($summary['subtotalAmount']) * static::DEFAULT_TAX_RATE, 2);
+            $summary['totalAmount'] = round(($summary['subtotalAmount'] + $summary['taxAmount'] + ($summary['shippingFee'] ?? static::DEFAULT_SHIPPING_FEE) + ($summary['extras']['envelope'] ?? 0) + ($summary['extras']['giveaway'] ?? 0)), 2);
+
             session()->put(static::SESSION_SUMMARY_KEY, $summary);
 
             return response()->json([
@@ -1253,8 +1376,8 @@ class OrderFlowController extends Controller
 
         $updatedOrder = $order;
 
-        DB::transaction(function () use ($order, &$updatedOrder) {
-            $updatedOrder = $this->orderFlow->clearGiveawaySelection($order);
+        DB::transaction(function () use ($order, $productId, &$updatedOrder) {
+            $updatedOrder = $this->orderFlow->clearGiveawaySelection($order, $productId);
         });
 
         $order = $updatedOrder ?? $this->currentOrder();

@@ -76,16 +76,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const envelopeMeta = {
       id: env.id ?? null,
-      product_id: env.product_id ?? null,
       name: env.name ?? 'Envelope',
       price,
       qty,
-      total: resolvedTotal,
-      material: env.material ?? null,
-      image: env.image ?? null,
-      min_qty: env.min_qty ?? 10,
-      max_qty: env.max_qty ?? null,
-      updated_at: new Date().toISOString()
+      total: resolvedTotal
     };
 
     // Initialize envelopes array if it doesn't exist
@@ -115,17 +109,6 @@ document.addEventListener('DOMContentLoaded', () => {
     summary.extras.envelope = totalEnvelopeCost;
 
     writeSummary(summary);
-    syncSelectionState(summary);
-  };
-
-  const clearLocalEnvelopeSelection = () => {
-    const summary = readSummary() ?? {};
-    if (summary.extras) {
-      summary.extras.envelope = 0;
-    }
-    delete summary.envelopes; // Changed from envelope to envelopes
-    writeSummary(summary);
-    state.selectedIds = []; // Changed from selectedId to selectedIds
     syncSelectionState(summary);
   };
 
@@ -177,40 +160,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return { ok: true, data };
     } catch (error) {
       console.error('Error persisting envelope selection', error);
-      return { ok: false, status: 0, error };
-    }
-  };
-
-  const clearEnvelopeSelection = async () => {
-    if (!syncUrl) return { ok: false };
-
-    const csrfToken = getCsrfToken();
-
-    try {
-      const response = await fetch(syncUrl, {
-        method: 'DELETE',
-        headers: {
-          Accept: 'application/json',
-          ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {})
-        },
-        credentials: 'same-origin'
-      });
-
-      if (!response.ok) {
-        console.warn('Failed to clear envelope selection', response.status);
-        return { ok: false, status: response.status };
-      }
-
-      let data = null;
-      try {
-        data = await response.json();
-      } catch (error) {
-        console.warn('Envelope clear response could not be parsed', error);
-      }
-
-      return { ok: true, data };
-    } catch (error) {
-      console.error('Error clearing envelope selection', error);
       return { ok: false, status: 0, error };
     }
   };
@@ -291,14 +240,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const buildSummaryMarkup = (envelope) => {
     const total = envelope.total;
+    const hasValidImage = envelope.image && !envelope.image.includes('no-image.png');
+    const imgSrc = hasValidImage ? envelope.image : '/images/no-image.png';
+    const detailParts = [];
+    if (envelope.material) detailParts.push(envelope.material);
+    if (Number.isFinite(envelope.qty)) detailParts.push(`${envelope.qty} pcs`);
+    if (Number.isFinite(total)) detailParts.push(formatMoney(total));
+    const meta = detailParts.length ? detailParts.join(' • ') : 'Custom envelope';
     return `
       <div class="summary-selection">
         <div class="summary-selection__media">
-          <img src="${envelope.image ?? '/images/no-image.png'}" alt="${envelope.name}">
+          <img src="${imgSrc}" alt="${envelope.name}" onerror="this.style.opacity='0.3';this.src='/images/no-image.png'">
         </div>
         <div class="summary-selection__main">
           <p class="summary-selection__name">${envelope.name}</p>
-          <p class="summary-selection__meta">${envelope.material ?? 'Custom envelope'}</p>
+          <p class="summary-selection__meta">${meta}</p>
         </div>
       </div>
       <ul class="summary-list">
@@ -316,14 +272,20 @@ document.addEventListener('DOMContentLoaded', () => {
     let markup = `<h4 class="summary-title">Selected Envelopes (${envelopes.length})</h4>`;
 
     envelopes.forEach((envelope, index) => {
+        const detailParts = [];
+        if (envelope.material) detailParts.push(envelope.material);
+        if (Number.isFinite(envelope.qty)) detailParts.push(`${envelope.qty} pcs`);
+        if (Number.isFinite(envelope.total)) detailParts.push(formatMoney(envelope.total));
+        const meta = detailParts.length ? detailParts.join(' • ') : 'Custom envelope';
+
       markup += `
         <div class="summary-selection summary-selection--multiple">
           <div class="summary-selection__media">
-            <img src="${envelope.image ?? '/images/no-image.png'}" alt="${envelope.name}">
+            <img src="${envelope.image ?? '/images/no-image.png'}" alt="${envelope.name}" onerror="this.style.opacity='0.3';this.src='/images/no-image.png'">
           </div>
           <div class="summary-selection__main">
             <p class="summary-selection__name">${envelope.name}</p>
-            <p class="summary-selection__meta">${envelope.material ?? 'Custom envelope'}</p>
+              <p class="summary-selection__meta">${meta}</p>
           </div>
         </div>
       `;
@@ -489,17 +451,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const createCard = (env) => {
     const price = normalisePrice(env.price);
-    const minQty = Math.max(env.min_qty || 1, 20); // Ensure minimum is at least 20
-    const initialQty = Math.max(env.min_qty || 10, 20); // Ensure initial quantity is at least 20
+    const defaultMinQty = 10;
+    const apiMinQty = env.min_qty || defaultMinQty;
+    const apiMaxQty = env.max_qty || null;
+    
+    // Ensure min_qty doesn't exceed max_qty if max_qty is set
+    let minQty = apiMinQty;
+    if (apiMaxQty !== null && apiMaxQty !== undefined && minQty > apiMaxQty) {
+      minQty = Math.max(1, apiMaxQty); // Set min to max if they're inverted, or 1 if max is 0
+    }
+    
+    const initialQty = Math.max(minQty, apiMinQty); // Start with at least the minimum
     const placeholderImage = '/images/no-image.png';
 
     const card = document.createElement('div');
     card.className = 'envelope-item';
     card.dataset.envelopeId = env.id;
 
+    const hasValidImage = env.image;
+    const imgSrc = hasValidImage ? env.image : '/images/no-image.png';
+    
     card.innerHTML = `
       <div class="envelope-item__media">
-        <img src="${env.image || placeholderImage}" alt="${env.name}" loading="lazy">
+        <img src="${imgSrc}" alt="${env.name}" loading="lazy">
       </div>
       <h3 class="envelope-item__title">${env.name}</h3>
       <p class="envelope-item__price">${formatMoney(price)} <span class="per-tag">per piece</span></p>
@@ -545,7 +519,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const validateQuantity = () => {
       const qty = Number(qtyInput.value);
-      const min = minQty; // Use the enforced minimum of at least 20
+      const min = minQty;
       const max = env.max_qty;
 
       if (isNaN(qty) || qty < min) {
@@ -605,14 +579,15 @@ document.addEventListener('DOMContentLoaded', () => {
     return card;
   };
 
-  const renderCards = (items) => {
+  const renderCards = (items = state.envelopes, options = {}) => {
     if (!envelopeGrid) return;
     envelopeGrid.innerHTML = '';
 
     if (!items.length) {
       const empty = document.createElement('div');
       empty.className = 'envelope-item envelope-item--empty';
-      empty.innerHTML = '<p>No stocks available.</p>';
+      const message = options.emptyMessage ?? 'No stocks available.';
+      empty.innerHTML = `<p>${message}</p>`;
       envelopeGrid.appendChild(empty);
       return;
     }
@@ -696,6 +671,9 @@ document.addEventListener('DOMContentLoaded', () => {
       setBadgeState({ label: 'Offline', tone: 'summary-badge--alert' });
     } finally {
       clearSkeleton();
+      if (!state.envelopes.length) {
+        // No envelopes available
+      }
       renderCards(state.envelopes);
       syncSelectionState();
     }

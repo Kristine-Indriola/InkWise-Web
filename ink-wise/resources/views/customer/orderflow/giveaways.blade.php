@@ -56,13 +56,14 @@
         }
     </style>
 
+    <link rel="stylesheet" href="{{ asset('css/customer/orderflow-envelope.css') }}">
     <link rel="stylesheet" href="{{ asset('css/customer/orderflow-giveaways.css') }}">
     <link rel="stylesheet" href="{{ asset('css/customer/preview-modal.css') }}">
     <link rel="icon" type="image/png" href="{{ asset('adminimage/ink.png') }}">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.10.2/cdn.min.js" defer></script>
 </head>
-<body class="antialiased bg-white min-h-screen">
+<body class="antialiased bg-white min-h-screen envelope-body">
     @php
         $favoritesEnabled = \Illuminate\Support\Facades\Route::has('customer.favorites');
         $cartRoute = \Illuminate\Support\Facades\Route::has('customer.cart')
@@ -250,7 +251,7 @@
             </div>
         </div>
     </header>
-	<main class="giveaways-shell pt-24 sm:pt-28"
+    <main class="giveaways-shell envelope-shell pt-24 sm:pt-28"
 		  data-summary-url="{{ route('order.summary') }}"
 		  data-summary-api="{{ route('order.summary.json') }}"
 		  data-options-url="{{ route('api.giveaways') }}"
@@ -258,9 +259,9 @@
 		  data-clear-url="{{ route('order.giveaways.clear') }}"
 		  data-storage-key="inkwise-finalstep"
 		  data-placeholder="{{ asset('images/no-image.png') }}">
-		<header class="giveaways-header">
-			<div class="giveaways-header__content">
-				<a href="{{ route('order.envelope') }}" class="giveaways-header__back" aria-label="Back to envelope options">
+        <header class="giveaways-header envelope-header">
+            <div class="giveaways-header__content envelope-header__content">
+                <a href="{{ route('order.envelope') }}" class="giveaways-header__back envelope-header__back" aria-label="Back to envelope options">
 					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
 					Back to envelopes
 				</a>
@@ -269,13 +270,13 @@
 			</div>
 		</header>
 
-        <div class="giveaways-layout">
-            <section class="giveaways-options">
-                <div class="giveaways-card">
+        <div class="giveaways-layout envelope-layout">
+            <section class="giveaways-options envelope-options">
+                <div class="giveaways-card envelope-card">
                     <header class="giveaway-card__header">
                         <span class="giveaway-card__badge">Giveaway catalog</span>
                     </header>
-                    <div id="giveawaysGrid" class="giveaways-grid" role="list" aria-live="polite"></div>
+                    <div id="giveawaysGrid" class="giveaways-grid envelope-grid" role="list" aria-live="polite"></div>
                     <div class="giveaways-empty is-dynamic" id="giveawaysEmptyState" hidden>
                         <h2>No giveaways match your filters</h2>
                         <p>Adjust your search or upload inspiration below so we can craft something custom for you.</p>
@@ -283,14 +284,16 @@
                 </div>
             </section>
 
-			<aside class="giveaways-summary">
+            <aside class="giveaways-summary envelope-summary">
 				<div class="summary-card">
 					<header class="summary-card__header">
 						<div>
-							<h2>Your giveaway</h2>
-							<p>We’ll keep your choice in sync with the rest of your order.</p>
+							<h2>Your giveaways</h2>
+							<p>We’ll keep your choices in sync with the rest of your order.</p>
 						</div>
-						<span id="giveawaysStatusBadge" class="summary-card__badge">Pending</span>
+						<div class="flex flex-col items-end gap-2">
+							<span id="giveawaysStatusBadge" class="summary-card__badge">Pending</span>
+						</div>
 					</header>
 					<div id="giveawaySummaryBody" class="summary-card__body">
 						<p class="summary-empty">Choose a giveaway to see the details here.</p>

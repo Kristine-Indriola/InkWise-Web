@@ -216,188 +216,10 @@ a:hover {
     max-width: 380px;
 }
 
-.giveaways-card {
-    background: var(--surface);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow-md);
-    padding: clamp(20px, 2.2vw, 24px);
-    display: grid;
-    gap: clamp(16px, 1.8vw, 18px);
-    position: relative;
-    width: 100%;
-}
-
-.giveaway-card__header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 16px;
-}
-
-.giveaway-card__badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 6px 14px;
-    font-size: 12px;
-    font-weight: 600;
-    border-radius: 999px;
-    background: rgba(143, 157, 255, 0.18);
-    color: var(--accent-strong);
-}
-
+.giveaways-card,
+.giveaway-card,
 .giveaways-grid {
-    display: grid;
-    /* reduced min card width to make preview smaller */
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: clamp(12px, 2vw, 18px);
-}
-
-.giveaway-card {
-    display: grid;
-    gap: 14px;
-    background: var(--surface-elev);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border);
-    padding: clamp(16px, 1.8vw, 20px);
-    transition: transform 0.24s ease, box-shadow 0.24s ease, border-color 0.24s ease;
-    width: 100%;
-}
-
-.giveaway-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 16px 28px rgba(143, 157, 255, 0.15);
-}
-
-.giveaway-card.is-selected {
-    border-color: var(--border-strong);
-    box-shadow: 0 20px 36px rgba(95, 106, 217, 0.22);
-    transform: translateY(-4px);
-}
-
-.giveaway-card__media {
-    position: relative;
-    aspect-ratio: 1 / 1;
-    border-radius: calc(var(--radius-md) - 6px);
-    overflow: hidden;
-    background: linear-gradient(135deg, rgba(143, 157, 255, 0.18), rgba(143, 157, 255, 0.06));
-}
-
-.giveaway-card__image {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 0.3s ease;
-}
-
-.giveaway-card:hover .giveaway-card__image {
-    transform: scale(1.04);
-}
-
-.favorite-toggle {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 42px;
-    height: 42px;
-    border-radius: 999px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: #ffffff;
-    border: none;
-    box-shadow: 0 20px 38px rgba(143, 157, 255, 0.32);
-    color: var(--accent-strong);
-    cursor: pointer;
-    transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
-}
-
-.favorite-toggle:hover {
-    transform: translateY(-2px) scale(1.04);
-    background: var(--accent-strong);
-    color: #ffffff;
-}
-
-.favorite-toggle.is-active {
-    background: var(--accent-strong);
-    color: #ffffff;
-}
-
-.favorite-toggle svg {
-    width: 20px;
-    height: 20px;
-}
-
-.giveaway-card__body {
-    display: grid;
-    gap: 12px;
-}
-
-.giveaway-card__meta-top {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.meta-badge {
-    padding: 6px 12px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    background: rgba(143, 157, 255, 0.22);
-    color: var(--accent-strong);
-}
-
-.meta-chip {
-    padding: 6px 10px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 600;
-    background: rgba(95, 106, 217, 0.14);
-    color: var(--accent-strong);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.giveaway-card h2 {
-    margin: 0;
-    font-size: clamp(16px, 1.4vw, 18px);
-    font-weight: 600;
-    color: var(--text-strong);
-    line-height: 1.3;
-}
-
-.giveaway-card p {
-    margin: 0;
-    font-size: clamp(13px, 1.1vw, 14px);
-    color: var(--text-muted);
-    line-height: 1.4;
-}
-
-.meta-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    gap: 6px;
-    font-size: 13px;
-    color: var(--text-muted);
-}
-
-.meta-list strong {
-    color: var(--text-strong);
-}
-
-.summary-quantity {
-    display: none !important;
-}
-
-/* Emphasize the computed total price on card and in summary */
-.qty-total {
-    font-size: clamp(19px, 2.3vw, 23px);
-    font-weight: 700;
-    color: var(--accent-strong);
+    /* Reuse envelope styling; giveaway-specific overrides removed to stay consistent */
 }
 
 .summary-total-value {
@@ -944,6 +766,43 @@ a:hover {
     .summary-selection {
         grid-template-columns: 56px 1fr;
     }
+}
+
+.summary-selection-item {
+    position: relative;
+    padding-bottom: 16px;
+}
+
+.summary-selection-item:not(:last-child) {
+    margin-bottom: 16px;
+}
+
+.summary-divider {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin: 16px 0;
+}
+
+.summary-remove-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.summary-remove-btn:hover {
+    background: var(--danger);
+    color: white;
 }
 
 .giveaway-toast {

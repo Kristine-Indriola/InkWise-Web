@@ -1,7 +1,7 @@
-<section id="contact" class="py-16 bg-white shadow-inner">
-  <hr class="section-divider">
+<section id="contact" class="py-16 section-base">
+  
 
-  <div class="layout-container">
+  <div class="layout-container section-content">
     @php($settings = $siteSettings ?? \App\Models\SiteSetting::current())
 
     <h2 class="text-3xl font-bold text-center mb-6 text-gray-800">{{ $settings->contact_heading }}</h2>
