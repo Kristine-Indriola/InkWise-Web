@@ -343,6 +343,9 @@
 	$outOfStockItems = $materialSnapshots->where('status_key', 'out-of-stock');
 	$lowStockItems = $materialSnapshots->where('status_key', 'low');
 
+	$recentlyRestocked = $materialSnapshots->filter(fn ($snapshot) => $snapshot['stock_in'] > 0)->sortByDesc('stock_in')->take(5);
+	$recentlyUsed = $materialSnapshots->filter(fn ($snapshot) => $snapshot['stock_out'] > 0)->sortByDesc('stock_out')->take(5);
+
 	$reportPayload = [
 		'inventory' => [
 			'labels' => $materialLabels->values(),
@@ -561,6 +564,30 @@
 							<li class="{{ $item['status_key'] === 'out-of-stock' ? 'critical' : 'warning' }}">
 								{{ $item['model']->material_name }} - {{ $item['status'] }}
 							</li>
+						@endforeach
+					</ul>
+				@endif
+			</div>
+			<div class="analysis-card">
+				<h3>📥 Recently Restocked</h3>
+				<p class="analysis-count">{{ $recentlyRestocked->count() }} items</p>
+				<p class="analysis-description">Items recently added to inventory</p>
+				@if($recentlyRestocked->isNotEmpty())
+					<ul class="analysis-list">
+						@foreach($recentlyRestocked as $item)
+							<li>{{ $item['model']->material_name }} (+{{ number_format($item['stock_in']) }} units)</li>
+						@endforeach
+					</ul>
+				@endif
+			</div>
+			<div class="analysis-card">
+				<h3>📤 Recently Used</h3>
+				<p class="analysis-count">{{ $recentlyUsed->count() }} items</p>
+				<p class="analysis-description">Items recently consumed or sold</p>
+				@if($recentlyUsed->isNotEmpty())
+					<ul class="analysis-list">
+						@foreach($recentlyUsed as $item)
+							<li>{{ $item['model']->material_name }} (-{{ number_format($item['stock_out']) }} units)</li>
 						@endforeach
 					</ul>
 				@endif

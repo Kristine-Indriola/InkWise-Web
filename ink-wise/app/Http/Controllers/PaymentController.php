@@ -252,7 +252,7 @@ class PaymentController extends Controller
         $latestPayment = $payments->sortByDesc(fn ($payment) => Arr::get($payment, 'attributes.created_at'))->first();
 
         if ($status === 'succeeded' && $latestPayment) {
-            $amount = (int) Arr::get($latestPayment, 'attributes.amount', 0) / 100;
+            $amount = round(Arr::get($latestPayment, 'attributes.amount', 0) / 100, 2);
             $paymentId = Arr::get($latestPayment, 'id') ?? ('pi:' . $intentId);
 
             $this->applyPaymentToOrder($order, [
@@ -298,7 +298,7 @@ class PaymentController extends Controller
             $order = $this->findOrderByIntentId($intentId);
 
             if ($order) {
-                $amount = (int) Arr::get($paymentData, 'attributes.amount', 0) / 100;
+                $amount = round(Arr::get($paymentData, 'attributes.amount', 0) / 100, 2);
 
                 $this->applyPaymentToOrder($order, [
                     'payment_id' => Arr::get($paymentData, 'id'),

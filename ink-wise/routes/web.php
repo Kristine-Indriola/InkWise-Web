@@ -110,8 +110,10 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     ->middleware('auth');
     
 
-    Route::get('/ordersummary/{order}', [OrderSummaryController::class, 'show'])
+    Route::get('/ordersummary', [OrderSummaryController::class, 'show'])
         ->name('ordersummary.index');
+    Route::get('/ordersummary/{order}', [OrderSummaryController::class, 'show'])
+        ->name('ordersummary.show');
 
     // Admin orders list (table) - simple closure for listing orders in the admin UI
     Route::get('/orders', function () {
