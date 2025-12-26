@@ -368,7 +368,7 @@
                   <small>Replied by: {{ $rating['staff_reply_by']->name }} @if($rating['staff_reply_by']->staff)<span class="staff-id">(ID: {{ $rating['staff_reply_by']->staff->staff_id }})</span>@endif <span class="user-role {{ $rating['staff_reply_by']->role }}">({{ ucfirst($rating['staff_reply_by']->role) }})</span></small>
                 @endif
               </div>
-            @endif
+             @endif
           </article>
         @empty
           <div class="ratings-empty">
