@@ -28,11 +28,23 @@ class OrderSummaryPresenter
             'items.colors',
             'rating',
             'activities',
+            'payments',
         ]);
 
         $customerOrder = $order->customerOrder;
         $customer = $order->customer ?? $customerOrder?->customer;
         $summary = $order->summary_snapshot ?? [];
+
+        // Compute payment status based on payments
+        $totalPaid = $order->payments->where('status', 'paid')->sum('amount');
+        $grandTotal = static::toFloat($order->total_amount);
+        if ($totalPaid >= $grandTotal && $grandTotal > 0) {
+            $computedPaymentStatus = 'paid';
+        } elseif ($totalPaid > 0) {
+            $computedPaymentStatus = 'partial';
+        } else {
+            $computedPaymentStatus = 'pending';
+        }
 
         $customerName = static::resolveCustomerName($customerOrder, $customer);
         $customerEmail = static::resolveCustomerEmail($customerOrder, $customer);
@@ -44,7 +56,7 @@ class OrderSummaryPresenter
             'created_at' => $order->order_date ?? $order->created_at,
             'updated_at' => $order->updated_at,
             'status' => Str::lower((string) $order->status ?: 'pending'),
-            'payment_status' => Str::lower((string) $order->payment_status ?: 'pending'),
+            'payment_status' => Str::lower((string) $computedPaymentStatus),
             'fulfillment_status' => Str::lower((string) $order->status ?: 'processing'),
             'subtotal' => static::toFloat($order->subtotal_amount),
             'discount_total' => static::toFloat(Arr::get($summary, 'totals.discount', 0)),

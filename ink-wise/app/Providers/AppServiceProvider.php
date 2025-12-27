@@ -9,6 +9,8 @@ use Illuminate\Support\ServiceProvider;
 use App\Models\SiteSetting;
 use App\Support\ImageResolver;
 use App\Support\MessageMetrics;
+use App\Models\Payment;
+use App\Observers\PaymentObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -56,5 +58,7 @@ class AppServiceProvider extends ServiceProvider
         ], function ($view) {
             $view->with('siteSettings', SiteSetting::current());
         });
+
+        Payment::observe(PaymentObserver::class);
     }
 }

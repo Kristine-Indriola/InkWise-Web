@@ -425,6 +425,7 @@
     $paymentStatusOptions = [
         'pending' => 'Pending',
         'paid' => 'Paid',
+        'partial' => 'Partial',
         'failed' => 'Failed',
         'refunded' => 'Refunded',
     ];

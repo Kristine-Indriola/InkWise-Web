@@ -202,6 +202,11 @@
         color: #92400e;
     }
 
+    .payment-status--partial {
+        background: #ede9fe;
+        color: #7c3aed;
+    }
+
     .payment-status--failed {
         background: #fee2e2;
         color: #991b1b;
@@ -431,7 +436,18 @@
                         @php
                             $paidAmount = $order->totalPaid();
                             $balanceDue = $order->balanceDue();
-                            $paymentStatusClass = 'payment-status--' . strtolower($order->payment_status ?? 'pending');
+                            
+                            // Compute payment status based on actual payments
+                            if ($paidAmount == 0) {
+                                $computedPaymentStatus = 'pending';
+                            } elseif ($balanceDue <= 0.01) {
+                                $computedPaymentStatus = 'paid';
+                            } else {
+                                $computedPaymentStatus = 'partial';
+                            }
+                            
+                            $paymentStatusClass = 'payment-status--' . $computedPaymentStatus;
+                            $displayPaymentStatus = ucfirst($computedPaymentStatus);
                         @endphp
                         <tr>
                             <td>
@@ -452,7 +468,7 @@
                             </td>
                             <td>
                                 <span class="payment-status {{ $paymentStatusClass }}">
-                                    {{ ucfirst($order->payment_status ?? 'pending') }}
+                                    {{ $displayPaymentStatus }}
                                 </span>
                             </td>
                             <td class="actions-cell">

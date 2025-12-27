@@ -21,29 +21,21 @@ class PaymentController extends Controller
         $filter = $request->query('filter');
         $validFilters = ['paid', 'pending', 'failed', 'partial'];
 
-        // Calculate statistics from all orders
-        $statistics = Order::query()
-            ->selectRaw('
-                COUNT(*) as total_orders,
-                SUM(CASE WHEN payment_status = "paid" THEN 1 ELSE 0 END) as paid_orders,
-                SUM(CASE WHEN payment_status = "pending" THEN 1 ELSE 0 END) as pending_orders,
-                SUM(CASE WHEN payment_status = "failed" THEN 1 ELSE 0 END) as failed_orders,
-                SUM(total_amount) as total_amount,
-                SUM(CASE WHEN payment_status = "paid" THEN total_amount ELSE 0 END) as paid_amount,
-                SUM(CASE WHEN payment_status = "pending" THEN total_amount ELSE 0 END) as pending_amount
-            ')
-            ->first();
+        // Calculate statistics from all orders with payments
+        $allOrders = Order::with('payments')->get();
+        
+        $statistics = (object) [
+            'total_orders' => $allOrders->count(),
+            'paid_orders' => $allOrders->filter(fn($o) => $o->balanceDue() <= 0.01 && $o->totalPaid() > 0)->count(),
+            'pending_orders' => $allOrders->filter(fn($o) => $o->totalPaid() == 0)->count(),
+            'failed_orders' => $allOrders->where('payment_status', 'failed')->count(),
+            'total_amount' => $allOrders->sum('total_amount'),
+            'paid_amount' => $allOrders->filter(fn($o) => $o->balanceDue() <= 0.01)->sum('total_amount'),
+            'pending_amount' => $allOrders->filter(fn($o) => $o->totalPaid() == 0)->sum('total_amount'),
+        ];
 
         // Count partial payments (orders with payments but balance > 0)
-        $partialPayments = Order::query()
-            ->whereHas('payments', function($query) {
-                $query->where('status', 'paid');
-            })
-            ->get()
-            ->filter(function($order) {
-                return $order->balanceDue() > 0;
-            })
-            ->count();
+        $partialPayments = $allOrders->filter(fn($o) => $o->totalPaid() > 0 && $o->balanceDue() > 0.01)->count();
 
         // Build query with optional filter
         $query = Order::query()

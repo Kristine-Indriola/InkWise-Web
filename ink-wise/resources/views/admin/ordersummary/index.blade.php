@@ -95,6 +95,11 @@
 			color: #15803d;
 		}
 
+		.order-stage-chip--pending-awaiting-materials {
+			background: #fef3c7;
+			color: #92400e;
+		}
+
 		.order-stage-chip--to-receive {
 			background: #f1f5f9;
 			color: #0f172a;
@@ -550,7 +555,7 @@
 		'completed' => 'Completed',
 		'cancelled' => 'Cancelled',
 	];
-	$statusFlow = ['draft', 'pending', 'processing', 'in_production', 'confirmed', 'completed'];
+	$statusFlow = ['draft', 'pending', 'pending_awaiting_materials', 'processing', 'in_production', 'confirmed', 'completed'];
 	$currentStatus = strtolower((string) data_get($order, 'status', 'draft'));
 	$flowIndex = array_search($currentStatus, $statusFlow, true);
 	$currentChipModifier = str_replace('_', '-', $currentStatus);

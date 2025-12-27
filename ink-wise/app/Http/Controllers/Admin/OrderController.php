@@ -23,7 +23,7 @@ class OrderController extends Controller
         $order->loadMissing('rating');
 
         $statusOptions = $this->statusOptions();
-        $statusFlow = ['draft', 'pending', 'processing', 'in_production', 'confirmed', 'completed'];
+        $statusFlow = ['draft', 'pending', 'pending_awaiting_materials', 'processing', 'in_production', 'confirmed', 'completed'];
         $metadata = $this->normalizeMetadata($order->metadata);
 
         return view('admin.orders.manage-status', [
@@ -55,7 +55,28 @@ class OrderController extends Controller
         ]);
 
         $oldStatus = $order->status;
-        $order->status = $validated['status'];
+        $newStatus = $validated['status'];
+
+        // Check inventory availability before allowing completion
+        if (in_array($newStatus, ['confirmed', 'completed'])) {
+            $inventoryCheck = $this->checkInventoryAvailability($order);
+
+            if (!$inventoryCheck['available']) {
+                // Automatically set status to pending awaiting materials
+                $newStatus = 'pending_awaiting_materials';
+                $validated['status'] = $newStatus;
+
+                // Send notification to admin/owner
+                $this->notifyAdminAboutMaterialShortage($order, $inventoryCheck['shortages']);
+
+                // Add internal note about material shortage
+                $validated['internal_note'] = ($validated['internal_note'] ?? '') .
+                    "\n\n[SYSTEM] Order automatically marked as 'Pending – Awaiting Materials' due to insufficient inventory: " .
+                    implode(', ', array_map(fn($s) => "{$s['material']} ({$s['required']} needed, {$s['available']} available)", $inventoryCheck['shortages']));
+            }
+        }
+
+        $order->status = $newStatus;
 
         $metadata = $this->normalizeMetadata($order->metadata);
 
@@ -222,6 +243,7 @@ class OrderController extends Controller
         return [
             'draft' => 'New Order',
             'pending' => 'Order Received',
+            'pending_awaiting_materials' => 'Pending – Awaiting Materials',
             'processing' => 'Processing',
             'in_production' => 'In Progress',
             'confirmed' => 'Ready for Pickup',
@@ -234,11 +256,131 @@ class OrderController extends Controller
         return [
             'pending' => 'Pending',
             'paid' => 'Paid',
+            'partial' => 'Partial',
             'failed' => 'Failed',
             'refunded' => 'Refunded',
         ];
     }
+    /**
+     * Check if all materials required for the order are available in inventory
+     */
+    protected function checkInventoryAvailability(Order $order): array
+    {
+        $order->loadMissing([
+            'items.product.materials.material.inventory',
+            'items.paperStockSelection.paperStock.material.inventory',
+            'items.addons.productAddon.material.inventory'
+        ]);
 
+        $shortages = [];
+        $allAvailable = true;
+
+        foreach ($order->items as $item) {
+            $quantity = $item->quantity ?? 1;
+
+            // Check product materials
+            if ($item->product && $item->product->materials) {
+                foreach ($item->product->materials as $productMaterial) {
+                    $material = $productMaterial->material;
+                    if ($material) {
+                        $required = ($productMaterial->qty ?? 0) * $quantity;
+                        $available = $material->inventory?->stock_level ?? 0;
+
+                        if ($required > $available) {
+                            $shortages[] = [
+                                'material' => $material->material_name,
+                                'required' => $required,
+                                'available' => $available,
+                                'shortage' => $required - $available
+                            ];
+                            $allAvailable = false;
+                        }
+                    }
+                }
+            }
+
+            // Check paper stock material
+            if ($item->paperStockSelection && $item->paperStockSelection->paperStock) {
+                $paperStock = $item->paperStockSelection->paperStock;
+                if ($paperStock->material) {
+                    $material = $paperStock->material;
+                    $required = $quantity; // Assuming 1:1 ratio for paper stock
+                    $available = $material->inventory?->stock_level ?? 0;
+
+                    if ($required > $available) {
+                        $shortages[] = [
+                            'material' => $material->material_name,
+                            'required' => $required,
+                            'available' => $available,
+                            'shortage' => $required - $available
+                        ];
+                        $allAvailable = false;
+                    }
+                }
+            }
+
+            // Check addon materials
+            if ($item->addons) {
+                foreach ($item->addons as $addon) {
+                    if ($addon->productAddon && $addon->productAddon->material) {
+                        $material = $addon->productAddon->material;
+                        $addonQuantity = $addon->quantity ?? 1;
+                        $required = $addonQuantity * $quantity;
+                        $available = $material->inventory?->stock_level ?? 0;
+
+                        if ($required > $available) {
+                            $shortages[] = [
+                                'material' => $material->material_name,
+                                'required' => $required,
+                                'available' => $available,
+                                'shortage' => $required - $available
+                            ];
+                            $allAvailable = false;
+                        }
+                    }
+                }
+            }
+        }
+
+        return [
+            'available' => $allAvailable,
+            'shortages' => $shortages
+        ];
+    }
+
+    /**
+     * Send notification to admin/owner about material shortage
+     */
+    protected function notifyAdminAboutMaterialShortage(Order $order, array $shortages): void
+    {
+        $shortageDetails = collect($shortages)->map(function ($shortage) {
+            return "{$shortage['material']}: {$shortage['shortage']} units short (need {$shortage['required']}, have {$shortage['available']})";
+        })->implode("\n");
+
+        $message = "Order #{$order->order_number} has been automatically marked as 'Pending – Awaiting Materials' due to insufficient inventory:\n\n{$shortageDetails}\n\nPlease restock materials before proceeding with this order.";
+
+        // Send notification to all admin and owner users
+        $adminUsers = \App\Models\User::whereIn('role', ['admin', 'owner'])->get();
+
+        foreach ($adminUsers as $user) {
+            $user->notify(new \App\Notifications\MaterialShortageAlert(
+                $order->id,
+                $order->order_number,
+                $shortages,
+                $message
+            ));
+        }
+
+        // Also log this as an order activity
+        \App\Models\OrderActivity::create([
+            'order_id' => $order->id,
+            'activity_type' => 'material_shortage',
+            'description' => 'Order automatically marked as pending due to material shortage: ' . $shortageDetails,
+            'user_id' => auth()->id(),
+            'user_name' => auth()->user()?->name ?? 'System',
+            'user_role' => 'Admin',
+        ]);
+    }
     protected function normalizeMetadata($metadata): array
     {
         if (is_array($metadata)) {
