@@ -210,11 +210,7 @@ header {
 /* Dividers Between Sections */
 /* ----------------------------- */
 .section-divider {
-  height: 2px;
-  width: 90%;
-  margin: 2rem auto;
-  background: #e0f7fa;
-  border-radius: 999px;
+  display: none !important;
 }
 
 /* Templates */
@@ -232,11 +228,11 @@ header {
   font-weight: 700;
 }
 
-/* About */
+/* About: static background (removed animated gradient) */
 #about {
-  background: linear-gradient(270deg, #e0f7fa, #06b6d4, #0891b2);
-  background-size: 800% 800%;
-  animation: waveGradient 15s ease infinite;
+  /* Remove the animated multi-stop gradient and use the page's section background instead */
+  background: none !important;
+  animation: none !important;
 }
 #about h2 {
   font-family: 'Playfair Display', serif;

@@ -136,17 +136,23 @@ class ProductController extends Controller
                 })
                 ->first() ?? asset('images/no-image.png');
 
-            return [
-                'id' => 'env_' . $product->id,
-                'product_id' => $product->id,
-                'name' => $product->name,
-                'price' => (float) $price,
-                'image' => $image,
-                'material' => optional($envelope->material)->material_name
-                    ?? optional($envelope)->envelope_material_name
-                    ?? null,
-                'max_qty' => optional($envelope)->max_qty ?? optional($envelope)->max_quantity,
-            ];
+                // Ensure returned image is an absolute URL
+                if ($image && !preg_match('/^(https?:)?\/\//i', $image)) {
+                    $image = asset(ltrim($image, '/'));
+                }
+
+                return [
+                    'id' => 'env_' . $product->id,
+                    'product_id' => $product->id,
+                    'name' => $product->name,
+                    'price' => (float) $price,
+                    'image' => $image,
+                    'material' => optional($envelope->material)->material_name
+                        ?? optional($envelope)->envelope_material_name
+                        ?? null,
+                    'min_qty' => 10, // Default minimum quantity
+                    'max_qty' => optional($envelope)->max_quantity ?? optional($envelope)->max_qty,
+                ];
         })->values();
 
         return response()->json($envelopes);

@@ -6,18 +6,10 @@
     <title>Inkwise Dashboard</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
-    <!-- FontAwesome CDN -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Seasons&family=Montserrat:wght@400;500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Seasons&display=swap');
         @import url('https://fonts.cdnfonts.com/css/edwardian-script-itc');
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;700&display=swap');
-        @import url('https://fonts.cdnfonts.com/css/bugaki');
-        @import url('https://fonts.cdnfonts.com/css/garet');
-        @import url('https://fonts.googleapis.com/css2?family=Forum&display=swap');
-        <!-- Ensure Cormorant loads early -->
-        <link rel="preload" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;700&display=swap" as="style">
 
         :root {
             --color-primary: #06b6d4;
@@ -26,11 +18,6 @@
             --font-display: 'Playfair Display', serif;
             --font-accent: 'Seasons', serif;
             --font-script: 'Edwardian Script ITC', cursive;
-            --font-body: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
-            --font-montserrat: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
-            --font-garet: 'Garet', 'Garet Display', sans-serif;
-            --font-bugaki: 'Bugaki', cursive;
-            --font-cormorant: 'Cormorant Garamond', 'Cormorant', serif;
         }
 
         .layout-container {
@@ -39,330 +26,112 @@
             padding-inline: clamp(24px, 5vw, 32px);
         }
 
-        /* Topbar and hero base */
-        .topbar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 60;
-            background: rgba(248, 246, 235, 0.92);
-            backdrop-filter: blur(18px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.65);
-        }
-
-        .topbar-inner {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            width: min(1200px, 100%);
-            margin: 0 auto;
-            padding-inline: clamp(20px, 4vw, 32px);
-            padding-block: 0.7rem;
-            gap: 1.5rem;
-        }
-
-        .topbar-brand {
-            display: flex;
-            align-items: baseline;
-            gap: 0.25rem;
-            font-family: var(--font-bugaki);
-            text-transform: uppercase;
-            font-size: 1.25rem;
-            /* entire wordmark: no extra letter spacing */
-            letter-spacing: 0;
-            /* balanced vertical alignment for the wordmark */
-            line-height: 1.2;
-            color: #0b0b0b;
-            margin-left: -15rem; /* move logo further to the left */
-        }
-
-        /* Logo: the initial 'I' */
-        .logo-i {
-            /* Use Bugaki for the capital I as requested */
-            font-family: var(--font-bugaki) !important;
-            color: #000000 !important;
-            /* very bold Roman-numeral appearance */
-            font-weight: 1000 !important; /* may fallback to heaviest available */
-            font-size: 2.6rem !important; /* slightly reduced size */
-            display: inline-block;
-            /* ensure it's fully static */
-            animation: none !important;
-            -webkit-animation: none !important;
-            transition: none !important;
-            line-height: 1.2; /* match the wordmark */
-            letter-spacing: 0;
-            /* Stronger stroke and layered shadows for thickness */
-            -webkit-text-stroke: 3px #000; /* thicker WebKit stroke */
-            text-stroke: 3px #000; /* fallback */
-            text-shadow:
-                0 1px 0 rgba(0,0,0,0.18),
-                1px 0 0 rgba(0,0,0,0.16),
-               -1px 0 0 rgba(0,0,0,0.16),
-                0 2px 0 rgba(0,0,0,0.08),
-                0 3px 0 rgba(0,0,0,0.04);
-        }
-
-        /* Ensure any script-specific rules don't override the Times styling */
-        .logo-i.logo-script {
-            font-family: 'Times New Roman', Times, serif !important;
-            font-style: normal !important;
-            font-weight: 700 !important;
-        }
-
-        .topbar-brand .logo-serif {
-            font-family: var(--font-garet);
-            font-size: 1rem;
-            letter-spacing: 0; /* characters sit tightly together */
-            line-height: 1.2; /* balanced vertical alignment */
-            text-transform: uppercase; /* caps lock */
-            color: inherit;
-            font-weight: 400; /* not bold */
-        }
-
-        .topbar-nav {
-            display: flex;
-            gap: clamp(0.75rem, 2vw, 1.5rem);
-            align-items: center;
-            justify-content: center;
-            flex: 1;
-            /* push nav links further toward the right side of the topbar (overlap slightly) */
-            margin-left: auto;
-            margin-right: -8rem;
-            font-family: var(--font-garet);
-            font-size: clamp(0.9rem, 1vw, 1.05rem);
-            text-transform: uppercase;
-        }
-
-        #mainNav a {
-            color: #1f2937;
-            padding: 0.4rem 0.85rem;
-            border-radius: 999px;
-            transition: color 0.2s ease, background 0.2s ease, transform 0.2s ease;
-        }
-
-        #mainNav a:hover {
-            color: #0f172a;
-            background: rgba(255, 255, 255, 0.6);
-            transform: translateY(-1px);
-        }
-
-        #mainNav .topbar-signup {
-            background: #0f172a;
-            color: #fff;
-            padding: 0.55rem 1.35rem;
-            font-weight: 600;
-            border-radius: 999px;
-        }
-
-        #mainNav .topbar-signup:hover {
-            background: #1f2937;
-        }
-
-        #mainNav.mobile-open {
-            display: flex !important;
-            flex-direction: column;
-            gap: 0.35rem;
-            margin-top: 0.75rem;
-            padding: 0.75rem 1rem;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 16px;
-            box-shadow: 0 18px 36px rgba(15, 23, 42, 0.14);
-        }
-
-        /* Hero section styling */
+        /* Laptop-friendly hero layout */
         .hero-section {
-            position: relative;
-            /* reduce top gap so the hero content sits higher on the page */
-            padding-top: clamp(60px, 8vw, 90px);
-            padding-bottom: clamp(120px, 12vw, 160px);
-            /* keep a tall hero but allow the visual to start nearer the top */
-            min-height: calc(110vh - 80px);
-            background-color: #f8f6eb;
-            background-image: url({{ asset('customerVideo/Video/wed.jpg') }});
-            background-size: cover;
-            /* anchor the background higher so image content moves up */
-            background-position: center top;
-            background-repeat: no-repeat;
-            overflow: hidden;
+            padding: clamp(56px, 8vw, 96px) 0;
         }
 
-        .hero-section::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(180deg, rgba(248, 246, 235, 0.7), rgba(248, 246, 235, 0));
-            z-index: 1;
-        }
-
-        .hero-content {
-            position: relative;
-            z-index: 2;
-            max-width: min(780px, 100%);
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            text-align: left;
-            /* shift the text content to the right */
-            margin-left: 7rem;
-        }
-
-        /* Two-column hero layout: visual (left) + content (right) */
-        .hero-inner {
-            display: flex;
+        .hero-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.0fr); /* ~60/40 */
+            gap: clamp(24px, 4vw, 36px);
             align-items: center;
-            gap: clamp(1rem, 4vw, 3rem);
             max-width: 1200px;
             margin: 0 auto;
-            padding-inline: clamp(20px, 4vw, 32px);
-            position: relative;
-            z-index: 2;
+            padding: 0 clamp(24px, 5vw, 32px);
         }
 
-        .hero-visual {
-            flex: 0 0 clamp(320px, 45%, 520px);
+        @media (max-width: 1024px) {
+            .hero-grid {
+                grid-template-columns: 1fr;
+            }
+            .hero-visual { order: 2; margin-top: 24px; }
+            .hero-copy {
+                order: 1;
+                text-align: left;
+                align-items: flex-start;
+                margin-top: 0;
+                transform: none;
+            }
+            .hero-actions { justify-content: flex-start; }
+        }
+
+        .hero-copy {
             display: flex;
-            align-items: center;
-            justify-content: center;
-            /* move the visual down */
-            margin-top: 2rem;
-            /* move a little to the left */
-            margin-left: -9rem;
-        }
-
-        .hero-frame {
-            width: 100%;
-            aspect-ratio: 3/4;
-            overflow: hidden;
-            display: block;
-            position: relative;
-        }
-
-        .hero-frame-img,
-        .hero-frame-video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-            -webkit-mask-image: url('{{ asset('customerVideo/Video/shape.gif') }}');
-            -webkit-mask-repeat: no-repeat;
-            -webkit-mask-position: center;
-            -webkit-mask-size: cover;
-            mask-image: url('{{ asset('customerVideo/Video/shape.gif') }}');
-            mask-repeat: no-repeat;
-            mask-position: center;
-            mask-size: cover;
-        }
-
-        @media (max-width: 900px) {
-            .hero-inner { flex-direction: column-reverse; text-align: center; }
-            .hero-visual { margin-bottom: 1rem; }
-            .hero-content { max-width: 100%; }
+            flex-direction: column;
+            gap: clamp(16px, 3vw, 24px);
+            align-items: flex-end;
+            text-align: right;
+            max-width: clamp(320px, 40vw, 520px);
+            margin-top: -120px;
+            transform: translateX(-72px);
         }
 
         .hero-title {
-            display: flex;
-            flex-direction: row; /* place the two words side-by-side */
-            gap: 0.75rem;
-            align-items: flex-end;
-            font-size: clamp(2.7rem, 6vw, 4.5rem);
-            line-height: 1.05;
-            text-transform: uppercase;
+            font-size: clamp(2.25rem, 3vw, 2.8rem);
+            line-height: 1.1;
             font-weight: 800;
         }
 
-        /* Render the two words vertically (letters stacked top->bottom).
-           Use vertical writing mode with upright text orientation so letters remain readable.
-           Also enforce non-bold weight and 15px size as requested. */
-        .hero-title-invitation,
-        .hero-title-maker {
-            display: inline-block;
-            writing-mode: horizontal-tb;
-            text-orientation: mixed;
-            font-weight: 400; /* not bold */
-            line-height: 1;
-            -webkit-font-smoothing: antialiased;
-            text-transform: uppercase;
-            margin: 0;
-        }
-
-        .hero-title-invitation { font-family: var(--font-montserrat); font-size: 80px; letter-spacing: 10px; line-height: 1.2; }
-        .hero-title-maker {
-            font-family: 'Times New Roman MT Condensed', 'Times New Roman', serif;
-            color: #545454;
-            letter-spacing: 0.12em;
-            font-size: 60px;
-            font-style: italic;
-            line-height: 1.2;
-        }
-
-        .hero-tagline {
-            font-family: var(--font-cormorant);
-            font-size: clamp(1.15rem, 2vw, 1.5rem);
-            color: #1f2937;
-            max-width: 600px;
-            line-height: 1.4;
-            text-align: center;
+        .hero-subtitle {
+            font-size: 1.125rem;
+            color: #4b5563;
+            max-width: 34rem;
+            font-weight: 500;
         }
 
         .hero-actions {
             display: flex;
             flex-wrap: wrap;
-            gap: 1rem;
+            gap: 12px;
             justify-content: flex-end;
         }
 
-        .hero-btn {
-            font-family: var(--font-cormorant);
-            padding: 0.95rem 1.9rem;
-            border-radius: 999px;
-            font-size: 1rem;
-            transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
-            display: inline-flex;
-            align-items: center;
+        .hero-card {
+            max-width: 520px;
+            margin-inline: auto;
+        }
+
+        .hero-media {
+            width: 100%;
+            height: clamp(280px, 38vw, 420px);
+            object-fit: cover;
+            border-radius: 18px;
+            display: block;
+        }
+
+        .hero-visual {
+            display: flex;
             justify-content: center;
-            min-width: 160px;
-            text-align: center;
+            align-items: center;
+            margin-top: -170px;
         }
 
-        .hero-btn--primary {
-            background: #111111;
-            color: #ffffff;
-            border: 2px solid #111111;
+        .hero-frame {
+            position: relative;
+            width: clamp(260px, 55vw, 460px);
+            aspect-ratio: 3 / 4;
+            min-height: 360px;
+            overflow: hidden;
+            border-radius: 32px;
+            background: transparent;
         }
 
-        .hero-btn--ghost {
-            background: rgba(255, 255, 255, 0.85);
-            color: #111111;
-            border: 2px solid rgba(0, 0, 0, 0.1);
-            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
-        }
-
-        .hero-btn:hover {
-            transform: translateY(-2px) scale(1.01);
-        }
-
-        .hero-btn--ghost:hover {
-            background: #ffffff;
-            border-color: #111111;
-        }
-
-        @media (max-width: 768px) {
-            .topbar-inner {
-                flex-wrap: wrap;
-            }
-
-            .hero-title {
-                letter-spacing: 0.15em;
-            }
-
-            #mainNav {
-                display: none;
-            }
-
-            #mainNav.mobile-open {
-                margin-top: 0.6rem;
-            }
+        .hero-frame-video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 32px;
+            -webkit-mask-image: url("{{ asset('images/frame.png') }}");
+            -webkit-mask-repeat: no-repeat;
+            -webkit-mask-size: contain;
+            -webkit-mask-position: center;
+            mask-image: url("{{ asset('images/frame.png') }}");
+            mask-repeat: no-repeat;
+            mask-size: contain;
+            mask-position: center;
         }
 
         /* Full-page background video (behind main content) */
@@ -380,16 +149,7 @@
 
         /* Categories section background video */
         .categories-section { position: relative; overflow: hidden; }
-        .section-with-media {
-            position: relative;
-            overflow: hidden;
-            background-color: #f8f6eb;
-        }
-        .section-base {
-            position: relative;
-            background-color: #f8f6eb;
-        }
-        .section-bg-media {
+        .categories-bg-video {
             position: absolute;
             inset: 0;
             width: 100%;
@@ -397,7 +157,9 @@
             object-fit: cover;
             z-index: 0;
             pointer-events: none;
-            filter: brightness(0.86);
+            opacity: 0.45;
+            transform: scale(1.06);
+            filter: brightness(0.9) saturate(0.95);
         }
         .categories-content { position: relative; z-index: 10; }
 
@@ -422,41 +184,6 @@
             .categories-bg-video, .section-bg-video { display: none; }
         }
 
-        /* Make card images appear transparent and sharp */
-        .transparent-card-img {
-            background: transparent !important;
-            padding: 0 !important;
-            object-fit: contain !important;
-            image-rendering: -webkit-optimize-contrast;
-            image-rendering: crisp-edges;
-            -webkit-backface-visibility: hidden;
-        }
-
-        /* Ensure dashboard hero sits above the dashboard background video */
-        body#dashboard main {
-            position: relative;
-            overflow: visible;
-        }
-        body#dashboard main > .section-bg-video {
-            z-index: 0;
-            opacity: 0.32; /* slightly dim for readability */
-        }
-        /* Coco Gothic labels for category headings */
-        .coco-gothic {
-            font-family: 'Coco Gothic', 'CocoGothic', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
-            letter-spacing: 0.02em;
-            font-weight: 700 !important;
-        }
-        /* Uppercase only the main Categories title */
-        .categories-title { text-transform: uppercase; }
-
-        /* Cormorant Garamond for descriptive text */
-        .cormorant {
-            font-family: 'Cormorant Garamond', serif !important;
-            font-weight: 400 !important;
-            color: #475569 !important; /* slightly muted slate for readability */
-        }
-
         .layout-stack {
             display: flex;
             flex-direction: column;
@@ -464,9 +191,9 @@
         }
 
         body {
-            font-family: var(--font-body);
+            font-family: var(--font-accent);
             color: #1f2937;
-            background-color: #f8f6eb;
+            background-color: #ffffff;
         }
 
         h1, h2, h3, h4 {
@@ -477,181 +204,8 @@
             transition: color .2s ease, transform .2s ease;
         }
 
-        /* About section redesign */
-        .about-section {
-            position: relative;
-        }
-
-        .about-elevated {
-            display: grid;
-            grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.2fr);
-            gap: clamp(2rem, 6vw, 4rem);
-            align-items: center;
-        }
-
-        .about-left {
-            position: relative;
-        }
-
-        .about-image-wrapper {
-            position: relative;
-            display: grid;
-            place-items: center;
-            padding: clamp(1.5rem, 5vw, 3rem);
-            background: radial-gradient(circle at top, rgba(255, 192, 203, 0.45), rgba(252, 157, 155, 0.25));
-            border-radius: 32px;
-        }
-
-        .about-invite-badge {
-            position: absolute;
-            top: clamp(-18px, -4vw, -24px);
-            left: 50%;
-            transform: translateX(-50%);
-            background: #fdf1f3;
-            border: 1px solid rgba(255, 182, 193, 0.6);
-            color: #cc527a;
-            font-family: var(--font-garet);
-            text-transform: uppercase;
-            letter-spacing: 0.2em;
-            font-size: 0.7rem;
-            padding: 0.55rem 1.4rem;
-            border-radius: 999px;
-            box-shadow: 0 12px 24px rgba(204, 82, 122, 0.12);
-        }
-
-        .about-image-arch {
-            width: clamp(220px, 80%, 320px);
-            aspect-ratio: 3 / 4;
-            border-radius: 160px 160px 60px 60px;
-            overflow: hidden;
-            position: relative;
-            box-shadow:
-                0 20px 45px rgba(204, 82, 122, 0.22),
-                0 20px 40px rgba(0, 0, 0, 0.08);
-        }
-
-        .about-image-arch img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .about-title-overlay {
-            position: absolute;
-            bottom: 1.5rem;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(255, 255, 255, 0.9);
-            padding: 0.6rem 1.5rem;
-            border-radius: 999px;
-            font-family: var(--font-cormorant);
-            font-size: clamp(1rem, 2vw, 1.25rem);
-            color: #8d3c65;
-            letter-spacing: 0.08em;
-            box-shadow: 0 14px 28px rgba(141, 60, 101, 0.18);
-        }
-
-        .about-line-accent {
-            position: absolute;
-            bottom: -30px;
-            right: clamp(12px, 4vw, 32px);
-            width: clamp(80px, 20vw, 130px);
-            height: 2px;
-            background: linear-gradient(90deg, rgba(255, 192, 203, 0), rgba(204, 82, 122, 0.65));
-        }
-
-        .about-circle-accent {
-            position: absolute;
-            bottom: -50px;
-            left: clamp(15px, 3vw, 42px);
-            width: clamp(50px, 15vw, 70px);
-            height: clamp(50px, 15vw, 70px);
-            border-radius: 50%;
-            background: radial-gradient(circle at center, rgba(255, 192, 203, 0.6), rgba(252, 157, 155, 0.35));
-            opacity: 0.85;
-        }
-
-        .about-right {
-            position: relative;
-            background: #fefcf5;
-            border-radius: 36px;
-            padding: clamp(2rem, 5vw, 3.5rem);
-            box-shadow: 0 25px 60px rgba(69, 56, 32, 0.12);
-        }
-
-        .about-content {
-            display: flex;
-            flex-direction: column;
-            gap: 1.25rem;
-            text-align: left;
-        }
-
-        .about-heading {
-            font-family: 'Forum', serif;
-            font-size: clamp(2.2rem, 4vw, 3rem);
-            text-transform: uppercase;
-            letter-spacing: 0.2em;
-            color: #000000; /* changed to black */
-            display: flex;
-            flex-direction: row; /* show "About" and "Us" side-by-side */
-            gap: 0.75rem;
-            align-items: center;
-        }
-
-        .about-heading span {
-            font-size: clamp(1.5rem, 3vw, 2rem);
-            letter-spacing: 0.35em;
-            color: #000000; /* changed to black */
-            margin-right: 0.25rem;
-        }
-
-        .about-subheading {
-            font-family: var(--font-garet);
-            text-transform: uppercase;
-            letter-spacing: 0.45em;
-            font-size: 0.85rem;
-            color: rgba(47, 42, 38, 0.7);
-        }
-
-        .about-body {
-            font-family: var(--font-montserrat);
-            font-size: clamp(1rem, 2vw, 1.05rem);
-            line-height: 1.8;
-            color: rgba(47, 42, 38, 0.78);
-        }
-
-        @media (max-width: 900px) {
-            .about-elevated {
-                grid-template-columns: 1fr;
-                text-align: center;
-            }
-
-            .about-left {
-                order: -1;
-                display: grid;
-                place-items: center;
-            }
-
-            .about-right {
-                margin-top: clamp(1rem, 4vw, 2rem);
-            }
-
-            .about-content {
-                text-align: center;
-                align-items: center;
-            }
-
-            .about-heading {
-                align-items: center;
-            }
-        }
-
         .logo-i {
             line-height: 1;
-            font-family: var(--font-bugaki) !important;
-            color: #000000 !important;
-            animation: none !important;
-            transform: none !important;
         }
 
         .logo-script {
@@ -660,15 +214,53 @@
         }
 
         .logo-serif {
-            font-family: var(--font-garet);
+            font-family: var(--font-display);
             color: var(--color-primary-dark);
-            letter-spacing: 0;
-            text-transform: uppercase;
-            line-height: 0.9;
         }
 
         .page-title {
             font-size: 1.1rem;
+        }
+
+        .hero-wrapper {
+            min-height: 420px;
+        }
+
+        .hero-title {
+            font-size: clamp(2.25rem, 4vw, 3rem);
+            font-weight: 700;
+            display: inline-flex;
+            flex-wrap: wrap;
+            gap: .35rem;
+        }
+
+        .hero-title-highlight {
+            color: var(--color-primary);
+        }
+
+        .hero-title-accent {
+            color: var(--color-primary-dark);
+        }
+
+        .hero-subtitle {
+            font-size: 1.05rem;
+            color: #4b5563;
+        }
+
+        .btn-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            padding: .75rem 1.5rem;
+            font-weight: 600;
+            line-height: 1;
+            transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .btn-pill:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(6, 182, 212, 0.18);
         }
 
         .btn-primary {
@@ -781,8 +373,8 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 1.35rem;
-            height: 1.35rem;
+            width: 1rem;
+            height: 1rem;
             border-radius: 9999px;
             border: none;
             background: transparent;
@@ -798,7 +390,7 @@
         }
 
         .nav-icon-button i {
-            font-size: 0.75rem;
+            font-size: 0.6rem;
         }
 
         .notification-badge {
@@ -1004,20 +596,29 @@
             background: linear-gradient(180deg, #ffffff, #fbfdff);
         }
 
+        .hero-wrapper::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.4));
+            pointer-events: none;
+            z-index: 5;
+        }
+
         #mainNav.mobile-open {
-            display: flex !important;
+            display: block !important;
         }
 
         #mainNav {
             z-index: 40;
-            position: relative;
         }
 
         @media (max-width: 767px) {
             #mainNav {
                 display: none;
-                position: relative;
-                width: 100%;
+                position: absolute;
+                        /* Ensure template images scale nicely */
+                    .template-image { width: 100%; height: 100%; object-fit: cover; }
             }
 
             .chat-btn {
@@ -1235,91 +836,52 @@
             .chat-btn { width: 80px; height: 80px; }
         }
 
-        /* Floating centered topbar with rounded corners */
-        .topbar {
-            position: fixed;
-            top: 18px;
-            left: 50%;
-            transform: translateX(-50%);
-            /* slightly wider floating bar (tiny bump) */
-            width: calc(100% - 8px);
-            max-width: 1800px;
-            z-index: 80;
-            border-radius: 30px;
-            background: rgba(218, 218, 218, 0.6);
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
-            box-shadow: 0 12px 40px rgba(2,6,23,0.12);
-            border: 1px solid rgba(255,255,255,0.6);
+        /* Mobile navigation panel */
+        #mainNav.mobile-open { display: block !important; }
+        #mainNav { z-index: 40; }
+        @media (max-width: 767px) {
+            #mainNav { display: none; position: absolute; left: 0; right: 0; top: 100%; background: white; padding: 1rem; box-shadow: 0 8px 30px rgba(2,6,23,0.08); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
+            #mainNav a { display: block; padding: .5rem 0; }
         }
 
-        @media (max-width: 768px) {
-            .topbar { width: calc(100% - 24px); top: 12px; }
-        }
+        /* Hero background canvas */
+        .hero-wrapper { min-height: 420px; }
+        #bgCanvas { display:block; background: linear-gradient(180deg, #ffffff, #fbfdff); }
+        /* gentle overlay to make text pop */
+        .hero-wrapper::after { content: ''; position: absolute; inset:0; background: linear-gradient(180deg, rgba(255,255,255,0.0), rgba(255,255,255,0.4)); pointer-events: none; z-index:5; }
 
-        /* Reduce top padding since topbar is now floating */
-        body { padding-top: 32px; }
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.08);
+        }
+        header { position: fixed; top: 0; width: 100%; z-index: 50; }
+        body { padding-top: 56px; }
 
     </style>
 </head>
-<body id="dashboard" class="antialiased">
+<body id="dashboard" class="antialiased bg-white">
+
+    <!-- Background video covering main sections -->
+    <video id="page-bg-video" class="page-bg-video" autoplay muted loop playsinline>
+        <source src="{{ asset('customerVideo/Video/wed.mp4') }}" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
 
     
    <!-- Top Navigation Bar -->
-<header class="shadow animate-fade-in-down topbar">
-    <div class="topbar-inner">
-        <div class="topbar-brand">
+<header class="shadow animate-fade-in-down glass-nav w-full">
+    <div class="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 flex items-center justify-between h-14 relative">
+        <!-- Logo -->
+        <div class="flex items-center animate-bounce-slow flex-shrink-0 -ml-2">
             <span class="text-3xl font-bold logo-i logo-script">I</span>
             <span class="text-lg font-bold logo-serif">nkwise</span>
         </div>
 
-        <nav id="mainNav" class="hidden md:flex topbar-nav" role="navigation">
-            <a href="#dashboard" class="topbar-link">Home</a>
-            <a href="#categories" class="topbar-link">Categories</a>
-            <a href="#templates" class="topbar-link">Template</a>
-            <a href="#about" class="topbar-link">About</a>
-            <a href="#contact" class="topbar-link">Contact</a>
-        </nav>
-
-        <div class="hidden md:flex items-center gap-3 ml-auto" style="margin-right: -16rem;">
-            <form action="{{ url('/search') }}" method="GET" class="flex" style="margin-left: -2rem; transform: translateX(-2rem) !important;">
-                <input type="text" name="query" placeholder="Search..."
-                       class="w-44 border border-gray-300 rounded-full px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#06b6d4] focus:border-transparent transition-all" />
-            </form>
-
-            @guest
-                <a href="{{ route('customer.login.form') }}" id="openLogin"
-                   class="px-4 py-1.5 text-xs font-semibold text-white rounded-full hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[#a6b7ff]"
-                   style="background: linear-gradient(90deg, #000000, #737373);">
-                    Sign in
-                </a>
-            @endguest
-
-            @auth
-                <div class="relative group">
-                    <button id="userDropdownBtn" class="flex items-center gap-1.5 text-sm text-gray-700 hover:text-gray-900 font-medium">
-                        <span>{{ Auth::user()->customer?->first_name ?? Auth::user()->email ?? 'Customer' }}</span>
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                    </button>
-
-                    <div id="userDropdownMenu"
-                         class="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-200 z-50 hidden group-hover:block">
-                        <a href="{{ route('customerprofile.index') }}"
-                           class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] transition-colors">My Account</a>
-                        <a href="{{ route('customer.my_purchase.completed') }}" class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] transition-colors">My Purchase</a>
-                        <a href="{{ route('customer.favorites') }}" class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] transition-colors">My Favorites</a>
-                        <form method="POST" action="{{ route('customer.logout') }}">
-                            @csrf
-                            <button type="submit" class="block w-full text-left px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] transition-colors">Logout</button>
-                        </form>
-                    </div>
-                </div>
-            @endauth
-        </div>
-
-        <div class="flex items-center gap-2 md:hidden">
+        <!-- Mobile controls -->
+        <div class="md:hidden flex items-center gap-1">
             <button id="mobileSearchBtn" class="p-1.5 rounded-md focus-ring" aria-label="Toggle search" title="Search">
                 <svg class="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
             </button>
@@ -1327,13 +889,77 @@
                 <svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
             </button>
         </div>
-    </div>
 
-    <div id="mobileSearch" class="hidden md:hidden w-full px-4 mt-2">
-        <form action="{{ url('/search') }}" method="GET">
-            <input type="text" name="query" placeholder="Search..." class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-[#06b6d4]" />
-        </form>
-    </div>
+        <!-- Desktop Navigation Links - Centered -->
+        <nav id="mainNav" class="hidden md:flex space-x-4 absolute left-[54%] transform -translate-x-1/2" role="navigation">
+            <a href="#dashboard" class="text-sm text-gray-700 hover:text-[#06b6d4] font-medium transition-colors">Home</a>
+            <a href="#categories" class="text-sm text-gray-700 hover:text-[#06b6d4] font-medium transition-colors">Categories</a>
+            <a href="#templates" class="text-sm text-gray-700 hover:text-[#06b6d4] font-medium transition-colors">Templates</a>
+            <a href="#about" class="text-sm text-gray-700 hover:text-[#06b6d4] font-medium transition-colors">About</a>
+            <a href="#contact" class="text-sm text-gray-700 hover:text-[#06b6d4] font-medium transition-colors">Contact</a>
+        </nav>
+
+        <!-- Mobile search input (hidden on desktop) -->
+        <div id="mobileSearch" class="hidden md:hidden w-full px-4 mt-2">
+            <form action="{{ url('/search') }}" method="GET">
+                <input type="text" name="query" placeholder="Search..." class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-[#06b6d4]" />
+            </form>
+        </div>
+
+      
+        <!-- Right Side: Search, Icons, Auth -->
+        <div class="hidden md:flex items-center gap-3">
+            <!-- Search Form -->
+            <form action="{{ url('/search') }}" method="GET" class="flex">
+                <input type="text" name="query" placeholder="Search..."
+                       class="w-44 border border-gray-300 rounded-full px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#06b6d4] focus:border-transparent transition-all" />
+            </form>
+  
+    {{-- If not logged in --}}
+@guest
+      <a href="{{ route('customer.login.form') }}"
+            id="openLogin"
+            class="px-4 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-[#6366f1] to-[#a6b7ff] rounded-full hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[#a6b7ff]">
+         Sign in
+     </a>
+@endguest
+
+{{-- If logged in --}}
+@auth
+    <div class="relative group">
+        <button id="userDropdownBtn" class="flex items-center gap-1.5 text-sm text-gray-700 hover:text-gray-900 font-medium">
+            {{-- Display customer's name or fallback --}}
+            <span>{{ Auth::user()->customer?->first_name ?? Auth::user()->email ?? 'Customer' }}</span>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+        </button>
+
+        <!-- Dropdown Menu -->
+        <div id="userDropdownMenu"
+             class="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-200 z-50 hidden group-hover:block">
+            <!-- Profile -->
+            <a href="{{ route('customerprofile.index') }}"
+               class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] transition-colors">
+                My Account
+            </a>
+            <!-- My Purchase (link to my_purchase) -->
+            <a href="{{ route('customer.my_purchase.completed') }}" class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] transition-colors">
+                My Purchase
+            </a>
+            <!-- My Favorites (link to favorites) -->
+            <a href="{{ route('customer.favorites') }}" class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] transition-colors">
+                My Favorites
+            </a>
+            <!-- Logout -->
+            <form method="POST" action="{{ route('customer.logout') }}">
+    @csrf
+    <button type="submit" class="block w-full text-left px-4 py-2 text-gray-700 hover:bg-[#e0f7fa] transition-colors">Logout</button>
+</form>
+
+        </div>
+    @endauth
+</div>
 </header>
         
 <script>
@@ -1348,7 +974,7 @@ document.addEventListener('DOMContentLoaded', function () {
             notifications.setAttribute('href', '{{ route('customer.notifications') }}');
             notifications.setAttribute('aria-label', 'Notifications');
             notifications.setAttribute('title', 'Notifications');
-            notifications.innerHTML = '<i class="fa-regular fa-bell" style="color: black;" aria-hidden="true"></i>';
+            notifications.innerHTML = '<i class="fi fi-br-bell" aria-hidden="true"></i>';
 
             // Add notification badge if there are unread notifications
             @auth
@@ -1368,14 +994,14 @@ document.addEventListener('DOMContentLoaded', function () {
             fav.setAttribute('href', '{{ route('customer.favorites') }}');
             fav.setAttribute('aria-label', 'My favorites');
             fav.setAttribute('title', 'My favorites');
-            fav.innerHTML = '<i class="fa-regular fa-heart" style="color: black;" aria-hidden="true"></i>';
+            fav.innerHTML = '<i class="fi fi-br-comment-heart" aria-hidden="true"></i>';
 
             const cart = document.createElement('a');
             cart.className = 'nav-icon-button';
             cart.setAttribute('href', '/order/addtocart');
             cart.setAttribute('aria-label', 'My cart');
             cart.setAttribute('title', 'My cart');
-            cart.innerHTML = '<i class="fa-solid fa-bag-shopping" style="color: black;" aria-hidden="true"></i>';
+            cart.innerHTML = '<i class="bi bi-bag-heart-fill" aria-hidden="true"></i>';
 
             if (headerRight) {
                 // Find the search form
@@ -1475,34 +1101,36 @@ document.addEventListener('DOMContentLoaded', function () {
     </div>
 
     <!-- Main Content -->
-    <main class="hero-section" style="padding-top: 36px !important; background-position: center top !important; min-height: calc(100vh - 40px) !important;">
-        <div class="hero-inner">
-            <div class="hero-visual">
+<main class="py-8 bg-white" style="min-height:60vh;">
+    <div class="hero-wrapper relative overflow-hidden hero-section">
+        <div class="hero-grid relative z-10">
+            <!-- Left Content -->
+            <div class="hero-visual animate-fade-in-left">
                 <div class="hero-frame">
-                    <!-- Masked video preview: wedding.mp4 (muted, autoplay, loop) with wed.jpg as poster -->
-                    <video class="hero-frame-video" autoplay muted loop playsinline poster="{{ asset('customerVideo/Video/wed.jpg') }}" aria-hidden="true">
+                    <video class="hero-frame-video" autoplay muted loop playsinline>
                         <source src="{{ asset('customerVideo/Video/wedding.mp4') }}" type="video/mp4">
-                        <!-- Fallback image for browsers without video support -->
-                        <img src="{{ asset('customerVideo/Video/wed.jpg') }}" alt="Wedding preview" class="hero-frame-img">
+                        Your browser does not support the video tag.
                     </video>
                 </div>
             </div>
 
-            <div class="hero-content layout-container">
+            <!-- Right Content -->
+            <div class="hero-copy animate-fade-in-right">
                 <h1 class="hero-title">
-                    <span class="hero-title-invitation">INVITATION</span>
-                    <span class="hero-title-maker">MAKER</span>
+                    <span class="hero-title-highlight">Invitation</span>
+                    <span class="hero-title-accent">Maker</span>
                 </h1>
 
-                <p class="hero-tagline">Custom Invitations &amp; Giveaways Crafted with Care.</p>
+                <p class="hero-subtitle">Custom Invitations & Giveaways Crafted with Care.</p>
 
                 <div class="hero-actions">
-                    <a href="{{ route('templates.wedding.invitations') }}" class="hero-btn hero-btn--primary focus-ring">Order Now</a>
-                    <a href="#categories" class="hero-btn hero-btn--ghost focus-ring">View Design</a>
+                    <a href="{{ route('templates.wedding.invitations') }}" class="btn-pill btn-primary focus-ring">Order Now</a>
+                    <a href="#categories" class="btn-pill btn-outline focus-ring">View Design</a>
                 </div>
             </div>
         </div>
-    </main>
+    </div>
+</main>
 
 {{-- Login modal --}}
 @include('auth.customer.login')

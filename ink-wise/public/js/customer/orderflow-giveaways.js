@@ -17,10 +17,11 @@ document.addEventListener('DOMContentLoaded', () => {
     })();
 
     const giveawayGrid = shell.querySelector('#giveawaysGrid');
+    giveawayGrid?.classList.add('envelope-grid');
+    giveawayGrid?.classList.add('envelope-item-container');
     const emptyState = shell.querySelector('#giveawaysEmptyState');
     const summaryBody = shell.querySelector('#giveawaySummaryBody');
     const statusBadge = shell.querySelector('#giveawaysStatusBadge');
-    const removeBtn = shell.querySelector('#giveawaysRemoveSelection');
     const skipBtn = shell.querySelector('#skipGiveawaysBtn');
     const continueBtn = shell.querySelector('#giveawaysContinueBtn');
     const toast = shell.querySelector('#giveawayToast');
@@ -39,13 +40,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const extractImageSource = (candidate) => {
         if (!candidate) return '';
-        if (typeof candidate === 'string') return candidate.trim();
+        
+        // If it's already a full URL or absolute path, return it
+        if (typeof candidate === 'string') {
+            const trimmed = candidate.trim();
+            if (trimmed.startsWith('http') || trimmed.startsWith('/') || trimmed.startsWith('data:')) {
+                return trimmed;
+            }
+            // If it looks like a path but doesn't start with /, it might be a storage path
+            // but we'll let the backend handle that or the error handler catch it.
+            return trimmed;
+        }
+
         if (typeof candidate === 'object') {
-            const keys = ['src', 'url', 'href', 'image', 'path', 'value'];
+            const keys = ['src', 'url', 'href', 'image', 'path', 'value', 'preview_front', 'preview'];
             for (const key of keys) {
                 const value = candidate[key];
                 if (typeof value === 'string' && value.trim().length) {
-                    return value.trim();
+                    return extractImageSource(value);
                 }
             }
         }
@@ -139,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const state = {
         items: initialCatalog,
-        selectedId: null,
+        selectedIds: new Set(),
         skeletonCount: Math.min(6, Math.max(3, Math.floor(((window.innerWidth || 1200) - 180) / 260))),
         isSaving: false,
     };
@@ -176,8 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const setRemoveState = (hidden) => {
-        if (!removeBtn) return;
-        removeBtn.hidden = Boolean(hidden);
+        // No-op as remove button is now per-item
     };
 
     const setBadgeState = ({ label, tone }) => {
@@ -301,13 +312,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const clearGiveawaySelection = async () => {
+    const clearGiveawaySelection = async (productId = null) => {
         if (!clearUrl) return { ok: false };
 
         const csrfToken = getCsrfToken();
 
         try {
-            const response = await fetch(clearUrl, {
+            const url = new URL(clearUrl, window.location.origin);
+            if (productId) {
+                url.searchParams.append('product_id', productId);
+            }
+
+            const response = await fetch(url.toString(), {
                 method: 'DELETE',
                 headers: {
                     Accept: 'application/json',
@@ -335,54 +351,69 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const buildSummaryMarkup = (giveaway) => {
-        const total = giveaway.total ?? (giveaway.price * (giveaway.qty || 0));
-        const description = giveaway.description ?? '';
-        return `
-            <div class="summary-selection">
-            <div class="summary-selection__media">
-                <img src="${extractImageSource(giveaway.image) || placeholderImage}" alt="${giveaway.name}">
+    const buildSummaryMarkup = (giveaways) => {
+        if (!Array.isArray(giveaways) || !giveaways.length) return '';
+        
+        return giveaways.map(giveaway => {
+            const total = giveaway.total ?? (giveaway.price * (giveaway.qty || 0));
+            const description = giveaway.description ?? '';
+            const id = giveaway.product_id ?? giveaway.id;
+            
+            return `
+                <div class="summary-selection-item" data-id="${id}">
+                    <div class="summary-selection">
+                        <div class="summary-selection__media">
+                            <img src="${extractImageSource(giveaway.image) || placeholderImage}" alt="${giveaway.name}">
+                        </div>
+                        <div class="summary-selection__main">
+                            <p class="summary-selection__name">${giveaway.name}</p>
+                            ${description ? `<p class="summary-selection__meta">${description}</p>` : ''}
+                        </div>
+                        <button type="button" class="summary-remove-btn" data-remove-id="${id}" aria-label="Remove ${giveaway.name}">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                    <ul class="summary-list">
+                        <li class="summary-list__item"><dt>Quantity:</dt><dd>${giveaway.qty} pcs</dd></li>
+                        <li class="summary-list__item"><dt>Cost:</dt><dd>${formatMoney(total)}</dd></li>
+                    </ul>
                 </div>
-                <div class="summary-selection__main">
-                    <p class="summary-selection__name">${giveaway.name}</p>
-                    ${description ? `<p class="summary-selection__meta">${description}</p>` : ''}
-                </div>
-            </div>
-            <ul class="summary-list">
-                <li class="summary-list__item"><dt>Total Quantity:</dt><dd>${giveaway.qty} pcs</dd></li>
-                <li class="summary-list__item"><dt>Total Cost:</dt><dd>${formatMoney(total)}</dd></li>
-            </ul>
-        `;
+            `;
+        }).join('<hr class="summary-divider">');
     };
 
     const highlightSelectedCard = () => {
         if (!giveawayGrid) return;
         giveawayGrid.querySelectorAll('.giveaway-card').forEach((card) => {
-            const isSelected = card.dataset.giveawayId === state.selectedId;
+            const id = String(card.dataset.giveawayId);
+            const isSelected = state.selectedIds.has(id);
             card.classList.toggle('is-selected', isSelected);
             const button = card.querySelector('.envelope-item__select');
             if (button) {
-                button.textContent = isSelected ? 'Unselect giveaway' : 'Select giveaway';
-                button.disabled = state.isSaving && isSelected;
+                button.textContent = isSelected ? 'Update selection' : 'Select giveaway';
+                button.disabled = state.isSaving;
             }
         });
     };
 
     const syncSelectionState = (summaryOverride = null) => {
         const summary = summaryOverride ?? readSummary() ?? {};
-        const giveaway = summary.giveaway;
+        
+        // Normalize giveaways to array
+        let giveaways = [];
+        if (summary.giveaways && typeof summary.giveaways === 'object') {
+            giveaways = Object.values(summary.giveaways);
+        } else if (summary.giveaway) {
+            giveaways = [summary.giveaway];
+        }
 
-        console.log('[giveaways] syncSelectionState called', { summary, giveaway });
+        console.log('[giveaways] syncSelectionState called', { summary, giveaways });
 
-        state.selectedId = giveaway?.product_id
-            ? String(giveaway.product_id)
-            : giveaway?.id
-                ? String(giveaway.id)
-                : null;
+        state.selectedIds = new Set(giveaways.map(g => String(g.product_id ?? g.id)));
 
-        if (!giveaway) {
+        if (!giveaways.length) {
             if (summaryBody) {
-                summaryBody.innerHTML = '<p class="summary-placeholder">Choose a giveaway to see its details here.</p>';
+                summaryBody.innerHTML = '<p class="summary-empty">Choose a giveaway to see its details here.</p>';
             }
             setBadgeState({ label: 'Pending' });
             setContinueState(true);
@@ -392,9 +423,35 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (summaryBody) {
-            summaryBody.innerHTML = buildSummaryMarkup(giveaway);
+            summaryBody.innerHTML = buildSummaryMarkup(giveaways);
+            
+            // Attach remove listeners
+            summaryBody.querySelectorAll('.summary-remove-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const id = btn.dataset.removeId;
+                    if (!id || state.isSaving) return;
+                    
+                    state.isSaving = true;
+                    btn.disabled = true;
+                    
+                    const result = await clearGiveawaySelection(id);
+                    
+                    if (result?.ok) {
+                        if (result.data?.summary) {
+                            applyServerSummary(result.data.summary);
+                        } else {
+                            await fetchSummaryFromServer();
+                        }
+                        showToast('Giveaway removed');
+                    }
+                    
+                    state.isSaving = false;
+                });
+            });
         }
-        setBadgeState({ label: 'Selected', tone: 'summary-badge--success' });
+        
+        setBadgeState({ label: `${giveaways.length} Selected`, tone: 'summary-badge--success' });
         setContinueState(false);
         setRemoveState(false);
         highlightSelectedCard();
@@ -402,7 +459,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const createCard = (item) => {
         const card = document.createElement('article');
-        card.className = 'giveaway-card';
+        card.className = 'giveaway-card envelope-item';
         card.dataset.giveawayId = String(item.id ?? item.product_id ?? '');
         card.dataset.productId = card.dataset.giveawayId;
 
@@ -412,44 +469,27 @@ document.addEventListener('DOMContentLoaded', () => {
         const defaultQty = Number(item.default_qty ?? item.qty ?? minQty) || minQty;
         const maxQty = item.max_qty ? Number(item.max_qty) : null;
         const imageSrc = extractImageSource(item.image) || placeholderImage;
-        if (imageSrc === placeholderImage) {
-            console.warn('[giveaways] card using placeholder image', {
-                id: item.id ?? item.product_id,
-                product_id: item.product_id,
-                provided_image: item.image,
-                normalized_images: normalizeImageArray(item.images),
-                preview_url: item.preview_url || null,
-            });
-        }
         const previewUrl = item.preview_url || null;
         const description = item.description || '';
         const total = price * defaultQty;
         const designUrl = toCleanUrl(item.design_url || item.studio_url || item.designUrl || '');
 
         card.innerHTML = `
-            <div class="giveaway-card__media">
-                <button type="button" class="favorite-toggle" aria-label="Save ${item.name ?? 'giveaway'}" data-product-id="${card.dataset.giveawayId}">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M12 21s-6.5-4.35-9-8.5C1.33 9.5 2.15 6 5 4.8 7.38 3.77 9.55 4.89 12 7.4c2.45-2.51 4.62-3.63 7-2.6 2.85 1.2 3.68 4.7 2 7.7-2.5 4.15-9 8.5-9 8.5Z" />
-                    </svg>
-                </button>
-                <img src="${imageSrc}" alt="${item.name ?? 'Giveaway'} preview" class="giveaway-card__image preview-trigger" ${previewUrl ? `data-preview-url="${previewUrl}"` : ''} loading="lazy">
+            <div class="envelope-item__media">
+                <img src="${imageSrc}" alt="${item.name ?? 'Giveaway'} preview" class="preview-trigger" ${previewUrl ? `data-preview-url="${previewUrl}"` : ''} loading="lazy" onerror="this.src='${placeholderImage}'; this.style.opacity='0.4';">
             </div>
-            <div class="giveaway-card__body">
-                <div class="giveaway-card__meta-top">
-                    ${item.event_type ? `<span class="meta-badge">${item.event_type}</span>` : ''}
-                    ${item.theme_style ? `<span class="meta-chip">${item.theme_style}</span>` : ''}
-                </div>
-                <h2>${item.name ?? 'Giveaway'}</h2>
-                ${description ? `<p>${description}</p>` : ''}
-                <div class="giveaway-card__pricing">
-                    <div class="price-label">${price ? `${formatMoney(price)} <span>per piece</span>` : '<span class="is-muted">Pricing on request</span>'}</div>
+            <h3 class="envelope-item__title">${item.name ?? 'Giveaway'}</h3>
+            ${description ? `<p class="envelope-item__meta">${description}</p>` : ''}
+            <p class="envelope-item__price">${price ? `${formatMoney(price)} <span class="per-tag">per piece</span>` : '<span class="is-muted">Pricing on request</span>'}</p>
+            <div class="envelope-item__controls">
+                <div class="quantity-control">
                     <div class="quantity-input-group">
-                        <label>Quantity</label>
+                        <label for="qty-${card.dataset.giveawayId}">Quantity</label>
                         <div class="quantity-input-wrapper">
                             <input
                                 type="number"
-                                class="giveaway-card__quantity quantity-input"
+                                id="qty-${card.dataset.giveawayId}"
+                                class="quantity-input"
                                 data-qty-input
                                 min="${minQty}"
                                 ${maxQty ? `max="${maxQty}"` : ''}
@@ -458,11 +498,12 @@ document.addEventListener('DOMContentLoaded', () => {
                                 inputmode="numeric"
                                 pattern="[0-9]*"
                             />
-                            <div class="qty-total" data-total-display>${formatMoney(total)}</div>
+                            <span class="quantity-total" data-total-display>${formatMoney(total)}</span>
                         </div>
                     </div>
+                    <p class="quantity-helper summary-note">Min ${minQty}${maxQty ? `, Max ${maxQty}` : ''}</p>
                 </div>
-                <div class="giveaway-card__actions">
+                <div class="control-buttons">
                     <button class="btn btn-secondary envelope-item__design" type="button" title="Add/Edit My Design" ${designUrl ? `data-design-url="${designUrl}"` : ''}>
                         <i class="fas fa-edit"></i> Design
                     </button>
@@ -477,25 +518,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const computeTotal = (qty) => {
             const quantity = Number(qty) || minQty;
-            const computedTotal = price * quantity;
+            
+            // Find matching tier if available
+            let currentPrice = price;
+            if (item.tiers && item.tiers.length > 0) {
+                const matchingTier = item.tiers.find(tier => {
+                    const min = tier.min_qty !== null ? Number(tier.min_qty) : null;
+                    const max = tier.max_qty !== null ? Number(tier.max_qty) : null;
+                    return (min === null || quantity >= min) && (max === null || quantity <= max);
+                });
+                if (matchingTier && matchingTier.price) {
+                    currentPrice = Number(matchingTier.price);
+                }
+            }
+
+            const computedTotal = currentPrice * quantity;
             if (totalDisplay) {
                 totalDisplay.textContent = formatMoney(computedTotal);
             }
-            return { quantity, total: computedTotal };
+            
+            // Update price label if it changed
+            const priceLabel = card.querySelector('.price-label');
+            if (priceLabel && item.tiers && item.tiers.length > 0) {
+                priceLabel.innerHTML = `${formatMoney(currentPrice)} <span>per piece</span>`;
+            }
+
+            return { quantity, total: computedTotal, unitPrice: currentPrice };
         };
 
         qtyInput?.addEventListener('input', () => {
-            const { quantity } = computeTotal(qtyInput.value);
-            if (maxQty && quantity > maxQty) {
-                qtyInput.value = String(maxQty);
-                computeTotal(maxQty);
+            let val = parseInt(qtyInput.value);
+            if (isNaN(val)) return;
+
+            if (maxQty && val > maxQty) {
+                val = maxQty;
+                qtyInput.value = val;
             }
+            computeTotal(val);
         });
 
         qtyInput?.addEventListener('change', () => {
-            const { quantity, total: computedTotal } = computeTotal(qtyInput.value);
-            if (state.selectedId === String(card.dataset.giveawayId)) {
-                selectGiveaway(item, quantity, computedTotal, {
+            let val = parseInt(qtyInput.value);
+            if (isNaN(val) || val < minQty) {
+                val = minQty;
+                qtyInput.value = val;
+            }
+            
+            const { total: computedTotal, unitPrice: currentPrice } = computeTotal(val);
+            if (state.selectedIds.has(String(card.dataset.giveawayId))) {
+                selectGiveaway({ ...item, price: currentPrice }, val, computedTotal, {
                     silent: true,
                     cardElement: card,
                     triggerButton: selectBtn,
@@ -505,7 +576,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         selectBtn?.addEventListener('click', async () => {
             const giveawayId = String(card.dataset.giveawayId);
-            const isCurrentlySelected = state.selectedId === giveawayId;
+            const isCurrentlySelected = state.selectedIds.has(giveawayId);
 
             // Immediately toggle button text and disable to prevent double-clicks
             selectBtn.textContent = isCurrentlySelected ? 'Select giveaway' : 'Unselect giveaway';
@@ -514,15 +585,12 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 if (isCurrentlySelected) {
                     // Remove this giveaway from selection
-                    const result = await clearGiveawaySelection();
+                    const result = await clearGiveawaySelection(giveawayId);
                     if (result?.ok) {
                         if (result.data?.summary) {
                             applyServerSummary(result.data.summary);
                         } else {
-                            // Fallback: manually clear the state
-                            state.selectedId = null;
-                            highlightSelectedCard();
-                            setContinueState(false);
+                            await fetchSummaryFromServer();
                         }
                         showToast(`${item.name} removed from selection`);
                     } else {
@@ -532,8 +600,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 } else {
                     const quantity = Number(qtyInput?.value || minQty) || minQty;
-                    const { total: computedTotal } = computeTotal(quantity);
-                    const result = await selectGiveaway(item, quantity, computedTotal, {
+                    const { total: computedTotal, unitPrice: currentPrice } = computeTotal(quantity);
+                    const result = await selectGiveaway({ ...item, price: currentPrice }, quantity, computedTotal, {
                         cardElement: card,
                         triggerButton: selectBtn,
                     });
@@ -612,7 +680,6 @@ document.addEventListener('DOMContentLoaded', () => {
             triggerButton.textContent = options.silent ? 'Updating…' : 'Saving…';
             triggerButton.disabled = true;
         }
-        removeBtn?.setAttribute('disabled', 'true');
 
         const normalizedImages = normalizeImageArray(item.images);
         const primaryImage = extractImageSource(item.image) || normalizedImages[0] || placeholderImage;
@@ -634,13 +701,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
             console.log('[giveaways] Applying local selection', { giveawayMeta, existingSummary });
 
-            existingSummary.giveaway = giveawayMeta;
+            // Handle multiple giveaways locally
+            let giveaways = existingSummary.giveaways || {};
+            // Migrate old single giveaway if exists
+            if (Object.keys(giveaways).length === 0 && existingSummary.giveaway) {
+                const oldId = existingSummary.giveaway.product_id || existingSummary.giveaway.id;
+                if (oldId) {
+                    giveaways[oldId] = existingSummary.giveaway;
+                }
+            }
+            
+            giveaways[giveawayMeta.product_id] = giveawayMeta;
+            existingSummary.giveaways = giveaways;
+            delete existingSummary.giveaway;
+
             const extras = existingSummary.extras ?? {};
+            const giveawaysTotal = Object.values(giveaways).reduce((sum, g) => sum + (Number(g.total) || 0), 0);
+            
             existingSummary.extras = {
                 paper: Number(extras.paper ?? 0),
                 addons: Number(extras.addons ?? 0),
                 envelope: Number(extras.envelope ?? 0),
-                giveaway: Number(giveawayMeta.total ?? 0),
+                giveaway: giveawaysTotal,
             };
 
             writeSummary(existingSummary);
@@ -674,7 +756,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (card) {
             card.classList.remove('is-saving');
         }
-        removeBtn?.removeAttribute('disabled');
         state.isSaving = false;
 
         // Always apply local selection first for immediate UI feedback
@@ -725,20 +806,22 @@ document.addEventListener('DOMContentLoaded', () => {
                             || placeholderImage;
 
                         return {
-                        id: item.id ?? item.product_id,
-                        product_id: item.product_id ?? item.id,
-                        name: item.name ?? 'Giveaway',
-                        price: normalisePrice(item.price, 0),
-                        image: primaryImage,
-                        images: normalizedImages,
-                        description: item.description,
-                        min_qty: item.min_qty,
-                        max_qty: item.max_qty,
-                        step: item.step ?? 5,
-                        default_qty: item.default_qty ?? item.min_qty ?? 10,
-                        preview_url: item.preview_url,
-                        event_type: item.event_type,
-                        theme_style: item.theme_style,
+                            id: item.id ?? item.product_id,
+                            product_id: item.product_id ?? item.id,
+                            name: item.name ?? 'Giveaway',
+                            price: normalisePrice(item.price, 0),
+                            tiers: item.tiers || [],
+                            image: primaryImage,
+                            images: normalizedImages,
+                            description: item.description,
+                            min_qty: item.min_qty,
+                            max_qty: item.max_qty,
+                            step: item.step ?? 5,
+                            default_qty: item.default_qty ?? item.min_qty ?? 10,
+                            preview_url: item.preview_url,
+                            event_type: item.event_type,
+                            theme_style: item.theme_style,
+                            design_url: item.design_url || item.studio_url || null,
                         };
                     });
                 } else if (initialCatalog.length) {
@@ -775,7 +858,6 @@ document.addEventListener('DOMContentLoaded', () => {
         state.isSaving = true;
         setContinueState(true);
         skipBtn.disabled = true;
-        removeBtn?.setAttribute('disabled', 'true');
 
         const target = skipBtn.dataset.target || summaryUrl;
 
@@ -795,7 +877,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         skipBtn.disabled = false;
-        removeBtn?.removeAttribute('disabled');
         state.isSaving = false;
 
         showToast('Continuing without a giveaway…');
@@ -804,42 +885,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 250);
     });
 
-    removeBtn?.addEventListener('click', async () => {
-        if (state.isSaving || removeBtn.hidden) return;
-
-        state.isSaving = true;
-        setContinueState(true);
-        removeBtn.disabled = true;
-
-        const result = await clearGiveawaySelection();
-
-        removeBtn.disabled = false;
-        state.isSaving = false;
-
-        if (result?.ok) {
-            if (result.data?.summary) {
-                applyServerSummary(result.data.summary);
-            } else {
-                await fetchSummaryFromServer();
-            }
-            showToast('Giveaway removed from your order.');
-            return;
-        }
-
-        const status = result?.status ?? 0;
-        if (status === 409 || status === 422) {
-            showToast('That giveaway is no longer available. Refreshing options…');
-            await loadGiveaways();
-            const refreshed = await fetchSummaryFromServer();
-            if (!refreshed) {
-                syncSelectionState();
-            }
-            return;
-        }
-
-        showToast('Unable to remove giveaway. Please try again.');
-        syncSelectionState();
-    });
+    // removeBtn listener removed as it is now handled per-item in syncSelectionState
 
     const initialise = async () => {
         setContinueState(true);
@@ -854,6 +900,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!hasBootstrapData) {
             await loadGiveaways();
+        }
+
+        // Add local search filtering
+        const searchInput = document.getElementById('desktop-giveaway-search') || document.getElementById('mobile-giveaway-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                const filtered = state.items.filter(item => 
+                    (item.name && item.name.toLowerCase().includes(query)) ||
+                    (item.description && item.description.toLowerCase().includes(query)) ||
+                    (item.event_type && item.event_type.toLowerCase().includes(query)) ||
+                    (item.theme_style && item.theme_style.toLowerCase().includes(query))
+                );
+                renderCards(filtered);
+            });
+
+            // Prevent form submission if we are filtering locally
+            const searchForm = searchInput.closest('form');
+            if (searchForm) {
+                searchForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                });
+            }
         }
     };
 

@@ -30,12 +30,11 @@
 
 </style>
 
-<section id="templates" class="py-12 relative overflow-hidden">
+<section id="templates" class="py-12 relative overflow-hidden section-base">
   <!-- animated themed background canvas (wedding, baptism, birthday) -->
   <canvas id="templatesCanvas" class="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true"></canvas>
 
   <div class="layout-container relative z-10">
-    <hr class="section-divider">
     <h2 class="text-center text-3xl font-bold text-indigo-700 mb-10" style="font-family: 'Seasons', serif;">
       Find your perfect match
     </h2>

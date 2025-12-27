@@ -284,11 +284,12 @@ class OrderFlowService
             ?? $order->items->first();
     }
 
-    protected function upsertLineItem(Order $order, string $lineType, array $attributes): OrderItem
+    protected function upsertLineItem(Order $order, string $lineType, array $attributes, array $matchAttributes = []): OrderItem
     {
+        $match = array_merge(['line_type' => $lineType], $matchAttributes);
         $payload = array_merge(['line_type' => $lineType], $attributes);
 
-        $item = $order->items()->firstOrNew(['line_type' => $lineType]);
+        $item = $order->items()->firstOrNew($match);
         $item->fill($payload);
 
         if (array_key_exists('design_metadata', $payload) && $payload['design_metadata'] === null) {
@@ -809,8 +810,10 @@ class OrderFlowService
 
         $designMeta = is_array($meta) ? $meta : [];
 
+        $productId = $meta['product_id'] ?? $meta['id'] ?? null;
+
         return $this->upsertLineItem($order, OrderItem::LINE_TYPE_GIVEAWAY, [
-            'product_id' => $meta['product_id'] ?? $meta['id'] ?? null,
+            'product_id' => $productId,
             'product_name' => $meta['name'] ?? 'Giveaway',
             'quantity' => $quantity,
             'unit_price' => $unitPrice,
@@ -822,6 +825,8 @@ class OrderFlowService
 
                 return $value !== null && $value !== '';
             }),
+        ], [
+            'product_id' => $productId,
         ]);
     }
 
@@ -855,8 +860,27 @@ class OrderFlowService
             $this->removeLineItem($order, OrderItem::LINE_TYPE_ENVELOPE);
         }
 
-        if (!empty($summary['giveaway']) && is_array($summary['giveaway'])) {
-            $this->upsertGiveawayOrderItem($order, $summary['giveaway']);
+        // Handle multiple giveaways
+        $giveaways = $summary['giveaways'] ?? [];
+        if (empty($giveaways) && !empty($summary['giveaway'])) {
+            $giveaways = [$summary['giveaway']];
+        }
+
+        if (!empty($giveaways) && is_array($giveaways)) {
+            $selectedProductIds = [];
+            foreach ($giveaways as $giveawayMeta) {
+                if (empty($giveawayMeta) || !is_array($giveawayMeta)) continue;
+                $item = $this->upsertGiveawayOrderItem($order, $giveawayMeta);
+                if ($item->product_id) {
+                    $selectedProductIds[] = $item->product_id;
+                }
+            }
+            
+            // Remove any giveaways that are no longer in the summary
+            $order->items()
+                ->where('line_type', OrderItem::LINE_TYPE_GIVEAWAY)
+                ->whereNotIn('product_id', $selectedProductIds)
+                ->delete();
         } else {
             $this->removeLineItem($order, OrderItem::LINE_TYPE_GIVEAWAY);
         }
@@ -1848,8 +1872,60 @@ class OrderFlowService
         ]);
     }
 
+    public function resolveEnvelopeAvailability(ProductEnvelope $envelope): array
+    {
+        $material = $envelope->material;
+
+        if (!$material && $envelope->material_id) {
+            $material = $envelope->material()->with('inventory')->first();
+        }
+
+        if (!$material && $envelope->envelope_material_name) {
+            $material = Material::query()
+                ->with('inventory')
+                ->where('material_name', $envelope->envelope_material_name)
+                ->orderByDesc('date_updated')
+                ->first();
+        } elseif ($material && !$material->relationLoaded('inventory')) {
+            $material->loadMissing('inventory');
+        }
+
+        $stock = null;
+        if ($material) {
+            $inventoryStock = $material->inventory?->stock_level;
+            $stock = $inventoryStock !== null ? (int) $inventoryStock : $material->stock_qty;
+        }
+
+        $stock = $stock !== null ? max(0, (int) $stock) : null;
+
+        $configuredMax = $envelope->max_quantity ?? $envelope->max_qty;
+        $configuredMax = $configuredMax !== null ? max(0, (int) $configuredMax) : null;
+
+        $maxQuantity = $stock !== null
+            ? ($configuredMax !== null ? min($stock, $configuredMax) : $stock)
+            : $configuredMax;
+
+        return [
+            'material' => $material,
+            'available_stock' => $stock,
+            'configured_max' => $configuredMax,
+            'max_quantity' => $maxQuantity,
+        ];
+    }
+
     public function applyEnvelopeSelection(Order $order, array $payload): Order
     {
+        $envelopeId = (int) ($payload['envelope_id'] ?? 0);
+        $resolvedEnvelope = null;
+        $availability = null;
+
+        if ($envelopeId > 0) {
+            $resolvedEnvelope = ProductEnvelope::with(['material', 'material.inventory'])->find($envelopeId);
+            if ($resolvedEnvelope) {
+                $availability = $this->resolveEnvelopeAvailability($resolvedEnvelope);
+            }
+        }
+
         $meta = $order->metadata ?? [];
 
         $quantity = max(1, (int) ($payload['quantity'] ?? 0));
@@ -1862,12 +1938,16 @@ class OrderFlowService
         $envelopeMeta = $payload['metadata'] ?? [];
 
         $minQuantity = (int) ($envelopeMeta['min_qty'] ?? Arr::get($payload, 'metadata.min_qty') ?? 10);
-        $minQuantity = max($minQuantity, 20); // Enforce minimum of 20
-        if ($minQuantity % 10 !== 0) {
-            $minQuantity = (int) (ceil($minQuantity / 10) * 10);
-        }
+        // Removed hardcoded minimum enforcement - let the API and frontend handle constraints
 
-        $maxQuantity = $envelopeMeta['max_qty'] ?? Arr::get($payload, 'metadata.max_qty');
+        $maxQuantity = Arr::get($availability, 'max_quantity');
+        $metaMaxCandidate = $envelopeMeta['max_qty'] ?? Arr::get($payload, 'metadata.max_qty');
+        if ($metaMaxCandidate !== null) {
+            $metaMaxCandidate = (int) $metaMaxCandidate;
+            $maxQuantity = $maxQuantity !== null
+                ? min($maxQuantity, $metaMaxCandidate)
+                : $metaMaxCandidate;
+        }
         if ($maxQuantity !== null) {
             $maxQuantity = (int) $maxQuantity;
             if ($maxQuantity < $minQuantity) {
@@ -1876,20 +1956,28 @@ class OrderFlowService
         }
 
         if ($maxQuantity !== null && $maxQuantity < $quantity) {
-            $maxQuantity = $quantity;
+            $quantity = $maxQuantity;
+            $total = $quantity * $unitPrice;
+        }
+
+        $materialName = $envelopeMeta['material'] ?? $resolvedEnvelope?->envelope_material_name;
+        if (!$materialName && $availability && Arr::get($availability, 'material')) {
+            $materialName = Arr::get($availability, 'material.material_name');
         }
 
         $envelopeMeta = array_filter([
             'id' => $payload['envelope_id'] ?? $envelopeMeta['id'] ?? null,
-            'product_id' => $payload['product_id'] ?? null,
+            'product_id' => $payload['product_id'] ?? $resolvedEnvelope?->product_id,
             'name' => $envelopeMeta['name'] ?? null,
             'price' => $unitPrice,
             'qty' => $quantity,
             'total' => (float) $total,
-            'material' => $envelopeMeta['material'] ?? null,
+            'material' => $materialName,
             'image' => $envelopeMeta['image'] ?? null,
             'min_qty' => $minQuantity,
             'max_qty' => $maxQuantity,
+            'available_stock' => Arr::get($availability, 'available_stock'),
+            'material_id' => $resolvedEnvelope?->material_id,
             'updated_at' => now()->toIso8601String(),
         ], fn ($value) => $value !== null && $value !== '');
 
@@ -1959,7 +2047,19 @@ class OrderFlowService
             return $value !== null && $value !== '';
         }, ARRAY_FILTER_USE_BOTH);
 
-        $meta['giveaway'] = $giveawayMeta;
+        $giveaways = $meta['giveaways'] ?? [];
+        // Migrate old single giveaway if exists
+        if (empty($giveaways) && !empty($meta['giveaway'])) {
+            $oldId = $meta['giveaway']['product_id'] ?? $meta['giveaway']['id'] ?? null;
+            if ($oldId) {
+                $giveaways[$oldId] = $meta['giveaway'];
+            }
+        }
+        
+        $giveaways[$product->id] = $giveawayMeta;
+        $meta['giveaways'] = $giveaways;
+        unset($meta['giveaway']);
+        
         $order->update(['metadata' => $meta]);
 
         $this->upsertGiveawayOrderItem($order, $giveawayMeta);
@@ -2000,14 +2100,34 @@ class OrderFlowService
         ]);
     }
 
-    public function clearGiveawaySelection(Order $order): Order
+    public function clearGiveawaySelection(Order $order, ?int $productId = null): Order
     {
         $meta = $order->metadata ?? [];
-        unset($meta['giveaway']);
+        
+        if ($productId) {
+            $giveaways = $meta['giveaways'] ?? [];
+            if (empty($giveaways) && !empty($meta['giveaway'])) {
+                $oldId = $meta['giveaway']['product_id'] ?? $meta['giveaway']['id'] ?? null;
+                if ($oldId) {
+                    $giveaways[$oldId] = $meta['giveaway'];
+                }
+            }
+            
+            unset($giveaways[$productId]);
+            $meta['giveaways'] = $giveaways;
+            unset($meta['giveaway']);
+            
+            $order->items()
+                ->where('line_type', OrderItem::LINE_TYPE_GIVEAWAY)
+                ->where('product_id', $productId)
+                ->delete();
+        } else {
+            unset($meta['giveaway']);
+            unset($meta['giveaways']);
+            $this->removeLineItem($order, OrderItem::LINE_TYPE_GIVEAWAY);
+        }
 
         $order->update(['metadata' => $meta]);
-
-        $this->removeLineItem($order, OrderItem::LINE_TYPE_GIVEAWAY);
 
         $order->refresh();
 
