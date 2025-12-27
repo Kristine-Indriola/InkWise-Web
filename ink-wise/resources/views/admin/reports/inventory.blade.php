@@ -525,33 +525,6 @@
 			color: var(--danger-color);
 		}
 
-		/* Purpose Badges */
-		.purpose-badge {
-			display: inline-block;
-			padding: 0.25rem 0.5rem;
-			border-radius: 4px;
-			font-size: 0.75rem;
-			font-weight: 600;
-			text-transform: uppercase;
-			letter-spacing: 0.05em;
-		}
-		.purpose-badge--used {
-			background: rgba(49, 130, 206, 0.1);
-			color: var(--accent-color);
-		}
-		.purpose-badge--issued {
-			background: rgba(102, 102, 255, 0.1);
-			color: #6666ff;
-		}
-		.purpose-badge--sold {
-			background: rgba(56, 161, 105, 0.1);
-			color: var(--success-color);
-		}
-		.purpose-badge--adjustment {
-			background: rgba(214, 158, 46, 0.1);
-			color: var(--warning-color);
-		}
-
 		/* Buttons and Links */
 		.btn {
 			display: inline-flex;
@@ -603,10 +576,60 @@
 			opacity: 0.8;
 		}
 
-		/* Chart Container */
-		.reports-panel canvas {
-			padding: 2rem;
-			max-height: 400px;
+		/* Usage Details Section */
+		.usage-details-section {
+			margin-bottom: 3rem;
+		}
+		.usage-count {
+			font-size: 0.875rem;
+			color: var(--text-secondary);
+			font-weight: 500;
+		}
+		.usage-table th {
+			background: var(--light-bg);
+			font-weight: 600;
+			font-size: 0.8rem;
+			padding: 1rem 0.75rem;
+			text-align: left;
+			color: var(--text-secondary);
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			border-bottom: 2px solid var(--border-color);
+		}
+		.usage-table td {
+			padding: 1rem 0.75rem;
+			font-size: 0.875rem;
+			border-bottom: 1px solid var(--border-color);
+			color: var(--text-primary);
+		}
+		.usage-table tbody tr {
+			transition: all 0.2s ease;
+		}
+		.usage-table tbody tr:hover {
+			background: var(--light-bg);
+		}
+
+		/* Purpose Badges */
+		.purpose-badge {
+			display: inline-block;
+			padding: 0.25rem 0.75rem;
+			border-radius: 20px;
+			font-size: 0.75rem;
+			font-weight: 600;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+		}
+		.purpose-badge--used {
+			background: rgba(56, 161, 105, 0.1);
+			color: var(--success-color);
+		}
+		.purpose-badge--issued {
+			background: rgba(49, 130, 206, 0.1);
+			color: var(--accent-color);
+		}
+		.purpose-badge--sold {
+			background: rgba(214, 158, 46, 0.1);
+			color: var(--warning-color);
 		}
 
 		/* Responsive Design */
@@ -641,6 +664,13 @@
 			.callout-meta {
 				flex-direction: column;
 				gap: 0.5rem;
+			}
+			.usage-table {
+				font-size: 0.8rem;
+			}
+			.usage-table th,
+			.usage-table td {
+				padding: 0.5rem 0.25rem;
 			}
 		}
 	</style>
@@ -776,37 +806,6 @@
 	$recentlyRestocked = $materialSnapshots->filter(fn ($snapshot) => $snapshot['stock_in'] > 0)->sortByDesc('stock_in')->take(5);
 	$recentlyUsed = $materialSnapshots->filter(fn ($snapshot) => $snapshot['stock_out'] > 0)->sortByDesc('stock_out')->take(5);
 
-	// Collect detailed usage/release details for moving out items
-	$usageDetails = collect();
-	foreach ($materialSnapshots as $snapshot) {
-		$material = $snapshot['model'];
-		$movements = $material->stockMovements ?? collect();
-		$outMovements = $movements->whereIn('movement_type', ['used', 'issued', 'sold', 'adjustment']);
-		
-		foreach ($outMovements as $movement) {
-			$purpose = match ($movement->movement_type) {
-				'used' => 'Used in production',
-				'issued' => 'Sample given',
-				'sold' => 'Sold',
-				'adjustment' => 'Damaged/Adjustment',
-				default => ucfirst($movement->movement_type)
-			};
-			
-			$usageDetails->push([
-				'material_name' => $material->material_name,
-				'material_sku' => $material->sku ?? 'N/A',
-				'order_id' => $movement->order_id ?? 'N/A',
-				'customer_name' => $movement->customer_name ?? 'N/A',
-				'purpose' => $purpose,
-				'quantity_deducted' => abs($movement->quantity),
-				'date' => $movement->created_at ?? $movement->movement_date ?? now(),
-				'movement_type' => $movement->movement_type
-			]);
-		}
-	}
-	
-	$usageDetails = $usageDetails->sortByDesc('date')->take(20); // Show last 20 movements
-
 	$reportPayload = [
 		'inventory' => [
 			'labels' => $materialLabels->values(),
@@ -860,6 +859,10 @@
 				</a>
 			</nav>
 			<div class="page-actions">
+				<a href="{{ route('admin.reports.usage-details') }}" class="btn btn-secondary" aria-label="View detailed usage and release transactions">
+					<i class="fi fi-rr-file-invoice" aria-hidden="true"></i>
+					<span>Usage Details</span>
+				</a>
 				<button type="button" class="pill-link" data-report-action="refresh" aria-label="Refresh data">
 					<i class="fi fi-rr-rotate-right" aria-hidden="true"></i>
 					<span>Refresh Data</span>
@@ -1087,54 +1090,6 @@
 		</header>
 		<canvas data-chart="inventory"></canvas>
 	</section>
-
-	@if($usageDetails->isNotEmpty())
-		<section class="reports-panel" aria-labelledby="usage-details-heading">
-			<header class="reports-panel__header">
-				<div class="panel-header-content">
-					<h2 id="usage-details-heading">Usage or Release Details (Moving Out)</h2>
-					<p>Detailed breakdown of inventory deductions and releases</p>
-				</div>
-				<div class="reports-toolbar">
-					<button type="button" class="pill-link" data-export="usage" data-format="csv">
-						<i class="fi fi-rr-download"></i> Export Usage Report
-					</button>
-				</div>
-			</header>
-			<div class="table-wrapper">
-				<table class="reports-table" id="usageDetailsTable">
-					<thead>
-						<tr>
-							<th scope="col">Item Code</th>
-							<th scope="col">Item Name</th>
-							<th scope="col">Order ID</th>
-							<th scope="col">Customer Name</th>
-							<th scope="col">Purpose</th>
-							<th scope="col" class="text-center">Quantity Deducted</th>
-							<th scope="col" class="text-center">Date</th>
-						</tr>
-					</thead>
-					<tbody>
-					@foreach($usageDetails as $detail)
-						<tr>
-							<td>{{ $detail['material_sku'] }}</td>
-							<td>{{ $detail['material_name'] }}</td>
-							<td>{{ $detail['order_id'] }}</td>
-							<td>{{ $detail['customer_name'] }}</td>
-							<td>
-								<span class="purpose-badge purpose-badge--{{ $detail['movement_type'] }}">
-									{{ $detail['purpose'] }}
-								</span>
-							</td>
-							<td class="text-center">{{ number_format($detail['quantity_deducted']) }}</td>
-							<td class="text-center">{{ \Carbon\Carbon::parse($detail['date'])->format('M j, Y') }}</td>
-						</tr>
-					@endforeach
-					</tbody>
-				</table>
-			</div>
-		</section>
-	@endif
 
 	@if($hotList->isNotEmpty())
 		<section class="reports-panel reports-panel--attention" aria-labelledby="attention-heading">

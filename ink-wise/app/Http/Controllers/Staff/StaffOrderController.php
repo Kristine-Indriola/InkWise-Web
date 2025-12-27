@@ -308,6 +308,7 @@ class StaffOrderController extends Controller
         return [
             'pending' => 'Pending',
             'paid' => 'Paid',
+            'partial' => 'Partial',
             'failed' => 'Failed',
             'refunded' => 'Refunded',
         ];

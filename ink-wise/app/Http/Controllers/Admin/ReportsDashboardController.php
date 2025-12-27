@@ -44,6 +44,19 @@ class ReportsDashboardController extends Controller
         return view('admin.reports.inventory', $context);
     }
 
+    public function usageDetails(Request $request)
+    {
+        [$startDate, $endDate] = $this->resolveDateRange($request);
+
+        $context = $this->buildReportContext($startDate, $endDate);
+        $context['filters'] = [
+            'startDate' => $startDate?->format('Y-m-d'),
+            'endDate' => $endDate?->format('Y-m-d'),
+        ];
+
+        return view('admin.reports.inventory-usage-details', $context);
+    }
+
     public function pickupCalendar(Request $request)
     {
         $period = $request->input('period', 'week'); // day, week, month, year

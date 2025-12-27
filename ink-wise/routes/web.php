@@ -315,6 +315,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::get('/', [ReportsDashboardController::class, 'index'])->name('index');
         Route::get('/sales', [ReportsDashboardController::class, 'sales'])->name('sales');
         Route::get('/inventory', [ReportsDashboardController::class, 'inventory'])->name('inventory');
+        Route::get('/usage-details', [ReportsDashboardController::class, 'usageDetails'])->name('usage-details');
         Route::get('/pickup-calendar', [ReportsDashboardController::class, 'pickupCalendar'])->name('pickup-calendar');
 
         Route::get('/sales/export/{type}', [ReportsDashboardController::class, 'exportSales'])
