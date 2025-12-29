@@ -80,32 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const storageKey = shell.dataset.storageKey || 'inkwise-finalstep';
     const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
 
-    const initialCatalog = inlineCatalog.length
-        ? inlineCatalog
-        : (() => {
-            if (!giveawayGrid) return [];
-            return Array.from(giveawayGrid.querySelectorAll('[data-product-id]')).map((card) => {
-                const quantityInput = card.querySelector('.giveaway-card__quantity');
-                const totalDisplay = card.querySelector('[data-total-display]');
-                const initialQty = Number(quantityInput?.value || card.dataset.defaultQty || 50);
-                const unitPrice = Number.parseFloat(card.dataset.productPrice || quantityInput?.dataset.price || 0) || 0;
-                const rawImage = card.dataset.productImage || card.querySelector('img')?.getAttribute('src');
-                return {
-                    id: card.dataset.productId ?? card.dataset.giveawayId,
-                    product_id: card.dataset.productId ?? card.dataset.giveawayId,
-                    name: card.dataset.productName || card.getAttribute('data-product-name') || card.querySelector('h2')?.textContent || 'Giveaway',
-                    price: unitPrice,
-                    image: extractImageSource(rawImage) || placeholderImage,
-                    description: card.dataset.description || card.querySelector('p')?.textContent || '',
-                    min_qty: Number(card.dataset.minQty ?? card.dataset.defaultQty ?? initialQty) || 1,
-                    max_qty: Number(card.dataset.maxQty || 0) || null,
-                    step: Number(card.dataset.step || quantityInput?.step || 10) || 10,
-                    default_qty: initialQty,
-                    preview_url: card.dataset.previewUrl || card.querySelector('.preview-trigger')?.dataset.previewUrl || null,
-                    total_label: totalDisplay?.textContent || null,
-                };
-            });
-        })();
+    const initialCatalog = inlineCatalog.length ? inlineCatalog : [];
 
     const sampleGiveaways = [
         {
@@ -353,33 +328,62 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const buildSummaryMarkup = (giveaways) => {
         if (!Array.isArray(giveaways) || !giveaways.length) return '';
-        
-        return giveaways.map(giveaway => {
-            const total = giveaway.total ?? (giveaway.price * (giveaway.qty || 0));
-            const description = giveaway.description ?? '';
-            const id = giveaway.product_id ?? giveaway.id;
-            
-            return `
-                <div class="summary-selection-item" data-id="${id}">
-                    <div class="summary-selection">
-                        <div class="summary-selection__media">
-                            <img src="${extractImageSource(giveaway.image) || placeholderImage}" alt="${giveaway.name}">
-                        </div>
-                        <div class="summary-selection__main">
-                            <p class="summary-selection__name">${giveaway.name}</p>
-                            ${description ? `<p class="summary-selection__meta">${description}</p>` : ''}
-                        </div>
-                        <button type="button" class="summary-remove-btn" data-remove-id="${id}" aria-label="Remove ${giveaway.name}">
-                            <i class="bi bi-x-lg"></i>
-                        </button>
+
+        const totalCost = giveaways.reduce((sum, item) => {
+            const qty = Number(item.qty) || 0;
+            const unitPrice = normalisePrice(item.price);
+            const lineTotal = Number.isFinite(item.total) ? Number(item.total) : unitPrice * qty;
+            return sum + (Number.isFinite(lineTotal) ? lineTotal : 0);
+        }, 0);
+
+        const totalQuantity = giveaways.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+
+        let markup = `<h4 class="summary-title">Selected Giveaways (${giveaways.length})</h4>`;
+
+        giveaways.forEach((giveaway) => {
+            const imageSrc = extractImageSource(giveaway.image) || placeholderImage;
+            const qty = Number(giveaway.qty) || 0;
+            const unitPrice = normalisePrice(giveaway.price);
+            const lineTotal = Number.isFinite(giveaway.total) ? Number(giveaway.total) : unitPrice * qty;
+            const materialParts = [];
+            if (giveaway.material) materialParts.push(giveaway.material);
+            if (giveaway.material_type) materialParts.push(giveaway.material_type);
+            const materialLabel = materialParts.length ? materialParts.join(' • ') : null;
+
+            const detailParts = [];
+            if (materialLabel) detailParts.push(materialLabel);
+            if (giveaway.description) detailParts.push(giveaway.description);
+            if (qty) detailParts.push(`${qty} pcs`);
+            if (Number.isFinite(lineTotal)) detailParts.push(formatMoney(lineTotal));
+            const meta = detailParts.length ? detailParts.join(' • ') : 'Custom giveaway';
+
+            markup += `
+                <div class="summary-selection summary-selection--multiple">
+                    <div class="summary-selection__media">
+                        <img src="${imageSrc}" alt="${giveaway.name}" onerror="this.style.opacity='0.3';this.src='${placeholderImage}'">
                     </div>
-                    <ul class="summary-list">
-                        <li class="summary-list__item"><dt>Quantity:</dt><dd>${giveaway.qty} pcs</dd></li>
-                        <li class="summary-list__item"><dt>Cost:</dt><dd>${formatMoney(total)}</dd></li>
-                    </ul>
+                    <div class="summary-selection__main">
+                        <p class="summary-selection__name">${giveaway.name}</p>
+                        <p class="summary-selection__meta">${meta}</p>
+                    </div>
                 </div>
             `;
-        }).join('<hr class="summary-divider">');
+        });
+
+        markup += `
+            <div class="summary-totals">
+                <div class="summary-total-row">
+                    <span class="summary-total-label">Total Quantity:</span>
+                    <span class="summary-total-value">${totalQuantity} pcs</span>
+                </div>
+                <div class="summary-total-row summary-total-row--grand">
+                    <span class="summary-total-label">Total Cost:</span>
+                    <span class="summary-total-value">${formatMoney(totalCost)}</span>
+                </div>
+            </div>
+        `;
+
+        return markup;
     };
 
     const highlightSelectedCard = () => {
@@ -390,7 +394,7 @@ document.addEventListener('DOMContentLoaded', () => {
             card.classList.toggle('is-selected', isSelected);
             const button = card.querySelector('.envelope-item__select');
             if (button) {
-                button.textContent = isSelected ? 'Update selection' : 'Select giveaway';
+                button.textContent = isSelected ? 'Unselect giveaways' : 'Select giveaway';
                 button.disabled = state.isSaving;
             }
         });
@@ -424,31 +428,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (summaryBody) {
             summaryBody.innerHTML = buildSummaryMarkup(giveaways);
-            
-            // Attach remove listeners
-            summaryBody.querySelectorAll('.summary-remove-btn').forEach(btn => {
-                btn.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    const id = btn.dataset.removeId;
-                    if (!id || state.isSaving) return;
-                    
-                    state.isSaving = true;
-                    btn.disabled = true;
-                    
-                    const result = await clearGiveawaySelection(id);
-                    
-                    if (result?.ok) {
-                        if (result.data?.summary) {
-                            applyServerSummary(result.data.summary);
-                        } else {
-                            await fetchSummaryFromServer();
-                        }
-                        showToast('Giveaway removed');
-                    }
-                    
-                    state.isSaving = false;
-                });
-            });
         }
         
         setBadgeState({ label: `${giveaways.length} Selected`, tone: 'summary-badge--success' });
@@ -467,18 +446,27 @@ document.addEventListener('DOMContentLoaded', () => {
         const minQty = Number(item.min_qty ?? 1) || 1;
         const step = Number(item.step ?? 5) || 5;
         const defaultQty = Number(item.default_qty ?? item.qty ?? minQty) || minQty;
-        const maxQty = item.max_qty ? Number(item.max_qty) : null;
+        const stockQty = item.stock_qty !== undefined && item.stock_qty !== null ? Number(item.stock_qty) : null;
+        const initialMax = item.max_qty !== undefined && item.max_qty !== null ? Number(item.max_qty) : null;
+        const maxQty = stockQty !== null
+            ? (initialMax !== null ? Math.min(initialMax, stockQty) : stockQty)
+            : initialMax;
         const imageSrc = extractImageSource(item.image) || placeholderImage;
         const previewUrl = item.preview_url || null;
         const description = item.description || '';
         const total = price * defaultQty;
         const designUrl = toCleanUrl(item.design_url || item.studio_url || item.designUrl || '');
+        const materialLabelParts = [];
+        if (item.material) materialLabelParts.push(item.material);
+        if (item.material_type) materialLabelParts.push(item.material_type);
+        const materialLabel = materialLabelParts.length ? materialLabelParts.join(' • ') : null;
 
         card.innerHTML = `
             <div class="envelope-item__media">
                 <img src="${imageSrc}" alt="${item.name ?? 'Giveaway'} preview" class="preview-trigger" ${previewUrl ? `data-preview-url="${previewUrl}"` : ''} loading="lazy" onerror="this.src='${placeholderImage}'; this.style.opacity='0.4';">
             </div>
             <h3 class="envelope-item__title">${item.name ?? 'Giveaway'}</h3>
+            ${materialLabel ? `<p class="envelope-item__material">${materialLabel}</p>` : ''}
             ${description ? `<p class="envelope-item__meta">${description}</p>` : ''}
             <p class="envelope-item__price">${price ? `${formatMoney(price)} <span class="per-tag">per piece</span>` : '<span class="is-muted">Pricing on request</span>'}</p>
             <div class="envelope-item__controls">
@@ -501,7 +489,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span class="quantity-total" data-total-display>${formatMoney(total)}</span>
                         </div>
                     </div>
-                    <p class="quantity-helper summary-note">Min ${minQty}${maxQty ? `, Max ${maxQty}` : ''}</p>
+                    <p class="quantity-helper summary-note" data-qty-helper>Min ${minQty}${maxQty ? `, Max ${maxQty}${stockQty !== null && maxQty === stockQty ? ' (stock)' : ''}` : ''}</p>
                 </div>
                 <div class="control-buttons">
                     <button class="btn btn-secondary envelope-item__design" type="button" title="Add/Edit My Design" ${designUrl ? `data-design-url="${designUrl}"` : ''}>
@@ -515,6 +503,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const qtyInput = card.querySelector('[data-qty-input]');
         const totalDisplay = card.querySelector('[data-total-display]');
         const selectBtn = card.querySelector('.envelope-item__select');
+        const helper = card.querySelector('[data-qty-helper]');
+
+        const setHelper = (message, isAlert = false) => {
+            if (!helper) return;
+            helper.textContent = message;
+            helper.classList.toggle('is-alert', Boolean(isAlert));
+        };
+
+        const baseHelperMessage = `Min ${minQty}${maxQty ? `, Max ${maxQty}${stockQty !== null && maxQty === stockQty ? ' (stock)' : ''}` : ''}`;
+        setHelper(baseHelperMessage, false);
+
+        const enforceQuantityBounds = (rawQty) => {
+            let quantity = Number(rawQty);
+            if (!Number.isFinite(quantity)) quantity = minQty;
+            if (quantity < minQty) quantity = minQty;
+            let message = null;
+            if (maxQty && quantity > maxQty) {
+                quantity = maxQty;
+                message = `Maximum allowed is ${maxQty} based on available stock.`;
+            }
+            return { quantity, message };
+        };
 
         const computeTotal = (qty) => {
             const quantity = Number(qty) || minQty;
@@ -547,26 +557,30 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         qtyInput?.addEventListener('input', () => {
-            let val = parseInt(qtyInput.value);
-            if (isNaN(val)) return;
-
-            if (maxQty && val > maxQty) {
-                val = maxQty;
-                qtyInput.value = val;
+            const { quantity, message } = enforceQuantityBounds(qtyInput.value);
+            qtyInput.value = quantity;
+            if (message) {
+                setHelper(message, true);
+                showToast(message);
+            } else {
+                setHelper(baseHelperMessage, false);
             }
-            computeTotal(val);
+            computeTotal(quantity);
         });
 
         qtyInput?.addEventListener('change', () => {
-            let val = parseInt(qtyInput.value);
-            if (isNaN(val) || val < minQty) {
-                val = minQty;
-                qtyInput.value = val;
+            const { quantity, message } = enforceQuantityBounds(qtyInput.value);
+            qtyInput.value = quantity;
+            if (message) {
+                setHelper(message, true);
+                showToast(message);
+            } else {
+                setHelper(baseHelperMessage, false);
             }
-            
-            const { total: computedTotal, unitPrice: currentPrice } = computeTotal(val);
+
+            const { total: computedTotal, unitPrice: currentPrice } = computeTotal(quantity);
             if (state.selectedIds.has(String(card.dataset.giveawayId))) {
-                selectGiveaway({ ...item, price: currentPrice }, val, computedTotal, {
+                selectGiveaway({ ...item, price: currentPrice }, quantity, computedTotal, {
                     silent: true,
                     cardElement: card,
                     triggerButton: selectBtn,
@@ -578,41 +592,59 @@ document.addEventListener('DOMContentLoaded', () => {
             const giveawayId = String(card.dataset.giveawayId);
             const isCurrentlySelected = state.selectedIds.has(giveawayId);
 
-            // Immediately toggle button text and disable to prevent double-clicks
-            selectBtn.textContent = isCurrentlySelected ? 'Select giveaway' : 'Unselect giveaway';
-            selectBtn.disabled = true;
+            const removeLocalSelection = () => {
+                const existingSummary = readSummary() ?? {};
+                const giveaways = existingSummary.giveaways ? { ...existingSummary.giveaways } : {};
+                delete giveaways[giveawayId];
 
-            try {
-                if (isCurrentlySelected) {
-                    // Remove this giveaway from selection
-                    const result = await clearGiveawaySelection(giveawayId);
-                    if (result?.ok) {
-                        if (result.data?.summary) {
-                            applyServerSummary(result.data.summary);
-                        } else {
-                            await fetchSummaryFromServer();
-                        }
-                        showToast(`${item.name} removed from selection`);
-                    } else {
-                        // Revert button text on failure
-                        selectBtn.textContent = 'Unselect giveaway';
-                        showToast('Unable to remove giveaway. Please try again.');
+                const extras = existingSummary.extras ?? {};
+                const giveawaysTotal = Object.values(giveaways).reduce((sum, g) => sum + (Number(g.total) || 0), 0);
+                existingSummary.giveaways = giveaways;
+                existingSummary.extras = {
+                    paper: Number(extras.paper ?? 0),
+                    addons: Number(extras.addons ?? 0),
+                    envelope: Number(extras.envelope ?? 0),
+                    giveaway: giveawaysTotal,
+                };
+
+                writeSummary(existingSummary);
+                syncSelectionState(existingSummary);
+            };
+
+            // Instant toggle
+            selectBtn.textContent = isCurrentlySelected ? 'Select giveaway' : 'Unselect giveaway';
+
+            if (isCurrentlySelected) {
+                removeLocalSelection();
+                // Fire and forget server clear
+                clearGiveawaySelection(giveawayId).then((result) => {
+                    if (result?.ok && result.data?.summary) {
+                        applyServerSummary(result.data.summary);
                     }
-                } else {
-                    const quantity = Number(qtyInput?.value || minQty) || minQty;
-                    const { total: computedTotal, unitPrice: currentPrice } = computeTotal(quantity);
-                    const result = await selectGiveaway({ ...item, price: currentPrice }, quantity, computedTotal, {
-                        cardElement: card,
-                        triggerButton: selectBtn,
-                    });
-                    if (!result || !result.ok) {
-                        // Revert button text on failure
-                        selectBtn.textContent = 'Select giveaway';
-                    }
-                }
-            } finally {
-                selectBtn.disabled = false;
+                }).catch(() => {
+                    /* ignore errors; UI already updated locally */
+                });
+                showToast(`${item.name} removed from selection`);
+                return;
             }
+
+            const { quantity, message } = enforceQuantityBounds(qtyInput?.value || minQty);
+            qtyInput.value = quantity;
+            if (message) {
+                setHelper(message, true);
+                showToast(message);
+            } else {
+                setHelper(baseHelperMessage, false);
+            }
+            const { total: computedTotal, unitPrice: currentPrice } = computeTotal(quantity);
+
+            // Immediate apply
+            selectGiveaway({ ...item, price: currentPrice }, quantity, computedTotal, {
+                cardElement: card,
+                triggerButton: selectBtn,
+            }).catch(() => {
+                /* ignore errors; local state already applied */
+            });
         });
 
         const designBtn = card.querySelector('.envelope-item__design');
@@ -664,25 +696,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const selectGiveaway = async (item, quantity, total, options = {}) => {
-        if (state.isSaving) return;
-        state.isSaving = true;
-        setContinueState(true);
-
-        const card = options.cardElement ?? giveawayGrid?.querySelector(`[data-giveaway-id="${item.id}"]`);
-        const triggerButton = options.triggerButton ?? card?.querySelector('.envelope-item__select');
-
-        let originalButtonText;
-        if (card) {
-            card.classList.add('is-saving');
-        }
-        if (triggerButton) {
-            originalButtonText = triggerButton.textContent;
-            triggerButton.textContent = options.silent ? 'Updating…' : 'Saving…';
-            triggerButton.disabled = true;
-        }
-
+        // Immediate UI update — no loading state
         const normalizedImages = normalizeImageArray(item.images);
         const primaryImage = extractImageSource(item.image) || normalizedImages[0] || placeholderImage;
+
         const applyLocalSelection = () => {
             const existingSummary = readSummary() ?? {};
             const giveawayMeta = {
@@ -696,6 +713,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 description: item.description ?? '',
                 max_qty: item.max_qty ?? null,
                 min_qty: item.min_qty ?? null,
+                material: item.material ?? null,
+                material_type: item.material_type ?? null,
+                stock_qty: item.stock_qty ?? null,
                 updated_at: new Date().toISOString(),
             };
 
@@ -730,6 +750,9 @@ document.addEventListener('DOMContentLoaded', () => {
             syncSelectionState(existingSummary);
         };
 
+        // Apply immediately for instant toggle
+        applyLocalSelection();
+
         const payload = {
             product_id: item.product_id ?? item.id,
             quantity,
@@ -743,23 +766,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 description: item.description,
                 min_qty: item.min_qty,
                 max_qty: item.max_qty,
+                material: item.material,
+                material_type: item.material_type,
+                stock_qty: item.stock_qty,
                 preview_url: item.preview_url,
             },
         };
 
         const result = await persistGiveawaySelection(payload);
-
-        if (triggerButton) {
-            triggerButton.disabled = false;
-            triggerButton.textContent = originalButtonText ?? 'Select giveaway';
-        }
-        if (card) {
-            card.classList.remove('is-saving');
-        }
-        state.isSaving = false;
-
-        // Always apply local selection first for immediate UI feedback
-        applyLocalSelection();
         
         if (result?.ok) {
             if (result.data?.summary) {
@@ -788,12 +802,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const loadGiveaways = async () => {
-        showSkeleton(state.skeletonCount);
+    const loadGiveaways = async ({ useSkeleton = true } = {}) => {
+        if (useSkeleton) {
+            showSkeleton(state.skeletonCount);
+        }
         try {
-            const response = await fetch(optionsUrl, {
+            const url = new URL(optionsUrl, window.location.origin);
+            url.searchParams.set('_', Date.now().toString());
+
+            const response = await fetch(url.toString(), {
                 headers: { Accept: 'application/json' },
                 credentials: 'same-origin',
+                cache: 'no-store',
             });
 
             if (response.ok) {
@@ -805,6 +825,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             || normalizedImages[0]
                             || placeholderImage;
 
+                        const stockQty = item.stock_qty !== undefined && item.stock_qty !== null ? Number(item.stock_qty) : null;
+                        const resolvedMax = stockQty !== null ? stockQty : null;
+
                         return {
                             id: item.id ?? item.product_id,
                             product_id: item.product_id ?? item.id,
@@ -815,7 +838,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             images: normalizedImages,
                             description: item.description,
                             min_qty: item.min_qty,
-                            max_qty: item.max_qty,
+                            max_qty: resolvedMax,
+                            stock_qty: stockQty,
+                            material: item.material,
+                            material_type: item.material_type,
                             step: item.step ?? 5,
                             default_qty: item.default_qty ?? item.min_qty ?? 10,
                             preview_url: item.preview_url,
@@ -823,6 +849,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             theme_style: item.theme_style,
                             design_url: item.design_url || item.studio_url || null,
                         };
+                    });
+                    // Hide any out-of-stock items defensively if not already filtered server-side
+                    state.items = state.items.filter((item) => {
+                        if (item.stock_qty === null || item.stock_qty === undefined) return true;
+                        return item.stock_qty > 0;
                     });
                 } else if (initialCatalog.length) {
                     state.items = initialCatalog;
@@ -839,7 +870,9 @@ document.addEventListener('DOMContentLoaded', () => {
             state.items = initialCatalog.length ? initialCatalog : sampleGiveaways;
             setBadgeState({ label: 'Offline', tone: 'summary-badge--alert' });
         } finally {
-            clearSkeleton();
+            if (useSkeleton) {
+                clearSkeleton();
+            }
             renderCards(state.items);
             syncSelectionState();
         }
@@ -852,37 +885,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    skipBtn?.addEventListener('click', async () => {
-        if (state.isSaving) return;
-
-        state.isSaving = true;
-        setContinueState(true);
-        skipBtn.disabled = true;
-
+    skipBtn?.addEventListener('click', () => {
         const target = skipBtn.dataset.target || summaryUrl;
 
-        // Try to clear any saved giveaway, but never block navigation.
-        try {
-            const result = await clearGiveawaySelection();
-
-            if (result?.ok) {
-                if (result.data?.summary) {
+        // Fire-and-forget clear so navigation is instant
+        clearGiveawaySelection()
+            .then((result) => {
+                if (result?.ok && result.data?.summary) {
                     applyServerSummary(result.data.summary);
-                } else {
-                    await fetchSummaryFromServer();
                 }
-            }
-        } catch (error) {
-            console.warn('Skipping giveaway failed, continuing anyway', error);
-        }
-
-        skipBtn.disabled = false;
-        state.isSaving = false;
+                return null;
+            })
+            .catch((error) => {
+                console.warn('Skipping giveaway failed, continuing anyway', error);
+            });
 
         showToast('Continuing without a giveaway…');
-        window.setTimeout(() => {
-            window.location.href = target;
-        }, 250);
+        window.location.href = target;
     });
 
     // removeBtn listener removed as it is now handled per-item in syncSelectionState
@@ -898,9 +917,8 @@ document.addEventListener('DOMContentLoaded', () => {
         syncSelectionState();
         await fetchSummaryFromServer();
 
-        if (!hasBootstrapData) {
-            await loadGiveaways();
-        }
+        // Always refresh from API so stock-aware maxima stay current (even if HTML had bootstrap data)
+        await loadGiveaways({ useSkeleton: !hasBootstrapData });
 
         // Add local search filtering
         const searchInput = document.getElementById('desktop-giveaway-search') || document.getElementById('mobile-giveaway-search');

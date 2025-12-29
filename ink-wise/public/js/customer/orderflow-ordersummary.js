@@ -2,14 +2,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const shell = document.querySelector('.os-shell');
   if (!shell) return;
 
-  // Debug: script loaded and initial elements
-  if (window && window.console && typeof window.console.debug === 'function') {
-    console.debug('OrderSummary script initialized', {
-      hasShell: !!shell,
-      envelopeSelect: !!shell.querySelector('[data-envelope-quantity]'),
-      giveawaysSelect: !!shell.querySelector('[data-giveaways-quantity]'),
-    });
-  }
+  const debugLog = (...args) => {
+    if (!(window && window.console && typeof window.console.debug === 'function')) return;
+    if (!window.INKWISE_DEBUG) return;
+    console.debug(...args);
+  };
+
+  debugLog('OrderSummary script initialized', {
+    hasShell: !!shell,
+    envelopeSelect: !!shell.querySelector('[data-envelope-quantity]'),
+    giveawaysSelect: !!shell.querySelector('[data-giveaways-quantity]'),
+  });
 
   // Delegated listener: catch change events for selects even if they're replaced
   document.addEventListener('change', (e) => {
@@ -156,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const toast = shell.querySelector('#osToast');
   const checkoutBtn = shell.querySelector('#osCheckoutBtn');
 
-  const previewPlaceholder = previewImageEl?.getAttribute('src') || shell.dataset.placeholder || '';
+  const previewPlaceholder = shell.dataset.placeholder || '/images/placeholder.png';
   let previewImages = [];
   let previewIndex = 0;
   let envelopeImages = [];
@@ -230,29 +233,32 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const fetchSummaryFromServer = async () => {
-    if (!summaryApiUrl) {
-      return null;
-    }
+    const candidates = [];
+    if (summaryApiUrl) candidates.push(summaryApiUrl);
+    if (summaryUrl && !candidates.includes(summaryUrl)) candidates.push(summaryUrl);
 
-    try {
-      const response = await fetch(summaryApiUrl, {
-        headers: { Accept: 'application/json' },
-        credentials: 'same-origin',
-      });
+    for (const url of candidates) {
+      try {
+        const response = await fetch(url, {
+          headers: { Accept: 'application/json' },
+          credentials: 'same-origin',
+        });
 
-      if (!response.ok) {
-        console.warn('Order summary API returned status', response.status);
-        return null;
+        if (!response.ok) {
+          console.warn('Order summary API returned status', response.status, 'for', url);
+          // If this was the stricter .json endpoint, fall back to next candidate
+          continue;
+        }
+
+        const payload = await response.json();
+        const summary = payload?.data ?? payload;
+        if (summary && typeof summary === 'object') {
+          setSummary(summary);
+          return summary;
+        }
+      } catch (error) {
+        console.error('Failed to fetch order summary from', url, error);
       }
-
-      const payload = await response.json();
-      const summary = payload?.data ?? payload;
-      if (summary && typeof summary === 'object') {
-        setSummary(summary);
-        return summary;
-      }
-    } catch (error) {
-      console.error('Failed to fetch order summary', error);
     }
 
     return null;
@@ -943,10 +949,15 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const applyPreviewImage = () => {
-    if (!previewImageEl || !previewImages.length) return;
-    const src = previewImages[previewIndex] ?? previewImages[0];
+    if (!previewImageEl) return;
+    const src = previewImages.length ? (previewImages[previewIndex] ?? previewImages[0]) : previewPlaceholder;
     if (src) {
       previewImageEl.src = src;
+      previewImageEl.onerror = () => {
+        if (previewImageEl.src !== previewPlaceholder) {
+          previewImageEl.src = previewPlaceholder;
+        }
+      };
       if (previewNameEl) {
         const name = previewNameEl.textContent?.trim() || 'Invitation preview';
         previewImageEl.alt = `Invitation preview — ${name}`;
@@ -1415,10 +1426,15 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const applyEnvelopeImage = () => {
-    if (!envelopePreviewImageEl || !envelopeImages.length) return;
-    const src = envelopeImages[envelopeIndex] ?? envelopeImages[0];
+    if (!envelopePreviewImageEl) return;
+    const src = envelopeImages.length ? (envelopeImages[envelopeIndex] ?? envelopeImages[0]) : previewPlaceholder;
     if (src) {
       envelopePreviewImageEl.src = src;
+      envelopePreviewImageEl.onerror = () => {
+        if (envelopePreviewImageEl.src !== previewPlaceholder) {
+          envelopePreviewImageEl.src = previewPlaceholder;
+        }
+      };
       const name = envelopeNameEl?.textContent?.trim() || 'Envelope';
       envelopePreviewImageEl.alt = `Envelope preview — ${name}`;
     }
@@ -1571,10 +1587,15 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const applyGiveawaysImage = () => {
-    if (!giveawaysPreviewImageEl || !giveawaysImages.length) return;
-    const src = giveawaysImages[giveawaysIndex] ?? giveawaysImages[0];
+    if (!giveawaysPreviewImageEl) return;
+    const src = giveawaysImages.length ? (giveawaysImages[giveawaysIndex] ?? giveawaysImages[0]) : previewPlaceholder;
     if (src) {
       giveawaysPreviewImageEl.src = src;
+      giveawaysPreviewImageEl.onerror = () => {
+        if (giveawaysPreviewImageEl.src !== previewPlaceholder) {
+          giveawaysPreviewImageEl.src = previewPlaceholder;
+        }
+      };
       const name = giveawaysNameEl?.textContent?.trim() || 'Giveaways';
       giveawaysPreviewImageEl.alt = `Giveaways preview — ${name}`;
     }
@@ -2138,7 +2159,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const renderSummary = (summary) => {
     console.log('[Order Summary] Rendering with data:', summary);
     
-    if (!summary || (!Number(summary.quantity) && !getQuantityOptions(summary).length)) {
+    const hasInvitation = Boolean(Number(summary?.quantity)) || getQuantityOptions(summary).length > 0;
+    const hasEnvelope = Boolean(summary?.envelope) || (Array.isArray(summary?.envelopes) && summary.envelopes.length > 0);
+    const hasGiveaway = Boolean(summary?.giveaway) || (Array.isArray(summary?.giveaways) && summary.giveaways.length > 0);
+
+    if (!summary || (!hasInvitation && !hasEnvelope && !hasGiveaway)) {
       console.warn('[Order Summary] No valid summary data, showing empty state');
       showEmptyState();
       return;
@@ -2153,15 +2178,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Ensure totals are recomputed (invitation base + extras) before rendering
     try { recomputeTotals(summary); } catch (e) { console.error('[Order Summary] recomputeTotals error:', e); }
 
-    console.log('[Order Summary] Rendering preview...');
     renderPreview(summary);
-    console.log('[Order Summary] Rendering envelope...', { hasEnvelope: summary?.hasEnvelope, envelope: summary?.envelope });
     renderEnvelopePreview(summary);
-    console.log('[Order Summary] Rendering giveaways...', { hasGiveaway: summary?.hasGiveaway, giveaway: summary?.giveaway });
     renderGiveawaysPreview(summary);
-    console.log('[Order Summary] Updating summary card...');
     updateSummaryCard(summary);
-    console.log('[Order Summary] Render complete');
   };
 
   const redirectToCheckout = async () => {
@@ -2186,25 +2206,23 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const bootstrapSummary = async () => {
-    console.log('[Order Summary] Bootstrap: Starting data load...');
-    
+    const localSummary = getSummary();
+    if (localSummary) {
+      renderSummary(localSummary);
+      // Background sync and refresh for freshness
+      syncSummaryWithServer().catch(() => {});
+      fetchSummaryFromServer().then((remote) => {
+        if (remote) renderSummary(remote);
+      }).catch(() => {});
+      return;
+    }
+
     const remoteSummary = await fetchSummaryFromServer();
     if (remoteSummary) {
-      console.log('[Order Summary] Bootstrap: Using remote data', remoteSummary);
       renderSummary(remoteSummary);
       return;
     }
 
-    const localSummary = getSummary();
-    if (localSummary) {
-      console.log('[Order Summary] Bootstrap: Using local data', localSummary);
-      // Sync local data to server if not already synced
-      await syncSummaryWithServer();
-      renderSummary(localSummary);
-      return;
-    }
-
-    console.warn('[Order Summary] Bootstrap: No data found, showing empty state');
     renderSummary(null);
   };
 

@@ -382,8 +382,8 @@
                 </div>
 
                 <div class="summary-actions">
-                    <button type="button" class="btn btn-secondary" id="skipEnvelopeBtn" data-summary-url="{{ $giveawaysUrl }}">Skip envelopes</button>
-                    <button type="button" class="primary-action" id="envContinueBtn" data-summary-url="{{ $giveawaysUrl }}" disabled>Continue to giveaways</button>
+                    <a href="{{ $giveawaysUrl }}" class="btn btn-secondary" id="skipEnvelopeBtn" data-summary-url="{{ $giveawaysUrl }}" role="button">Skip envelopes</a>
+                    <a href="{{ $giveawaysUrl }}" class="primary-action" id="envContinueBtn" data-summary-url="{{ $giveawaysUrl }}" aria-disabled="true">Continue to giveaways</a>
                 </div>
                 <p class="summary-note">You can revisit this step before finalizing your order. Your progress is saved automatically.</p>
             </aside>
@@ -397,6 +397,12 @@
                 const summaryData = {!! \Illuminate\Support\Js::from($orderSummary) !!};
                 window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(summaryData));
             });
+        </script>
+    @endif
+
+    @if(!empty($envelopeCatalog))
+        <script id="envelopeCatalogData" type="application/json">
+            {!! \Illuminate\Support\Js::from($envelopeCatalog) !!}
         </script>
     @endif
 

@@ -273,8 +273,10 @@
         <div class="giveaways-layout envelope-layout">
             <section class="giveaways-options envelope-options">
                 <div class="giveaways-card envelope-card">
-                    <header class="giveaway-card__header">
-                        <span class="giveaway-card__badge">Giveaway catalog</span>
+                    <header class="envelope-card__header" aria-label="Giveaway catalog">
+                        <div class="envelope-card__heading">
+                            <span class="envelope-card__badge">Giveaway catalog</span>
+                        </div>
                     </header>
                     <div id="giveawaysGrid" class="giveaways-grid envelope-grid" role="list" aria-live="polite"></div>
                     <div class="giveaways-empty is-dynamic" id="giveawaysEmptyState" hidden>
@@ -300,10 +302,10 @@
 					</div>
 				</div>
 
-				<div class="summary-actions">
-					<button type="button" class="btn btn-secondary" id="skipGiveawaysBtn" data-target="{{ route('order.summary') }}">Skip giveaways</button>
-					<button type="button" class="primary-action" id="giveawaysContinueBtn" data-target="{{ route('order.summary') }}" disabled>Continue to order summary</button>
-				</div>
+                <div class="summary-actions">
+                    <a href="{{ route('order.summary') }}" class="btn btn-secondary" id="skipGiveawaysBtn" data-target="{{ route('order.summary') }}" role="button">Skip giveaways</a>
+                    <button type="button" class="primary-action" id="giveawaysContinueBtn" data-target="{{ route('order.summary') }}" disabled>Continue to checkout</button>
+                </div>
 				<p class="summary-note">You can revisit this step before finalizing your order. Your progress is saved automatically.</p>
 			</aside>
 		</div>
@@ -509,7 +511,11 @@
         });
     </script>
 
-    <script id="giveawayCatalogData" type="application/json">{!! $inlineCatalogJson !!}</script>
+    @if(!empty($initialCatalog))
+        <script id="giveawayCatalogData" type="application/json">
+            {!! \Illuminate\Support\Js::from($initialCatalog) !!}
+        </script>
+    @endif
     <script src="{{ asset('js/customer/preview-modal.js') }}" defer></script>
     <script src="{{ asset('js/customer/orderflow-giveaways.js') }}" defer></script>
 	@if(!empty($orderSummary))

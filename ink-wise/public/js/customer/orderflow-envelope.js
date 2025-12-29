@@ -9,6 +9,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const skipBtn = shell.querySelector('#skipEnvelopeBtn');
   const toast = shell.querySelector('#envToast');
 
+  const inlineCatalog = (() => {
+    const script = document.getElementById('envelopeCatalogData');
+    if (!script) return [];
+    try {
+      const payload = script.textContent?.trim();
+      const parsed = payload ? JSON.parse(payload) : [];
+      script.remove();
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      console.warn('Failed to parse inline envelope catalog', error);
+      return [];
+    }
+  })();
+
   const summaryUrl = shell.dataset.summaryUrl || '/order/summary';
   const summaryApiUrl = shell.dataset.summaryApi || summaryUrl;
   const envelopesUrl = shell.dataset.envelopesUrl || '/api/envelopes';
@@ -18,7 +32,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
 
   if (continueBtn) {
-    continueBtn.disabled = true;
+    continueBtn.setAttribute('aria-disabled', 'true');
+    continueBtn.style.pointerEvents = 'none';
+    continueBtn.style.opacity = '0.6';
   }
 
   const sampleEnvelopes = [
@@ -26,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
   ];
 
   const state = {
-    envelopes: [],
+    envelopes: inlineCatalog.length ? inlineCatalog : [],
     selectedIds: [], // Changed from selectedId to selectedIds array
     skeletonCount: Math.min(6, Math.max(3, Math.floor(((window.innerWidth || 1200) - 180) / 260))),
     isSaving: false
@@ -55,6 +71,19 @@ document.addEventListener('DOMContentLoaded', () => {
     return Number.isFinite(numeric) ? numeric : 0;
   };
 
+  const resolveEnvelopeImage = (envelope) => {
+    const candidate = envelope?.image;
+    if (candidate && !String(candidate).includes('no-image')) return candidate;
+    const match = state.envelopes?.find((env) => String(env.id) === String(envelope?.id));
+    if (match?.image) return match.image;
+    return '/images/no-image.png';
+  };
+
+  const resolveMaterialLabel = (item) => {
+    const parts = [item?.material, item?.material_type].filter(Boolean);
+    return parts.join(' • ');
+  };
+
   const readSummary = () => {
     try {
       const raw = window.sessionStorage.getItem(STORAGE_KEY);
@@ -69,17 +98,38 @@ document.addEventListener('DOMContentLoaded', () => {
     window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(summary));
   };
 
+  const clearLocalEnvelopes = () => {
+    const summary = readSummary() ?? {};
+    summary.envelopes = [];
+    summary.extras = summary.extras ?? { paper: 0, addons: 0, envelope: 0, giveaway: 0 };
+    summary.extras.envelope = 0;
+    writeSummary(summary);
+    state.selectedIds = [];
+    if (summaryBody) {
+      summaryBody.innerHTML = '<p class="summary-empty">Choose an envelope to see the details here.</p>';
+    }
+    setBadgeState({ label: 'Pending' });
+    setContinueState(true);
+    highlightSelectedCard();
+  };
+
   const applyLocalEnvelopeSelection = (env, qty, total, isRemoval = false) => {
     const summary = readSummary() ?? {};
     const price = normalisePrice(env.price);
     const resolvedTotal = Number.isFinite(total) ? total : price * qty;
+    const imageSrc = env.image || '/images/no-image.png';
+    const materialLabel = resolveMaterialLabel(env);
 
     const envelopeMeta = {
       id: env.id ?? null,
       name: env.name ?? 'Envelope',
       price,
       qty,
-      total: resolvedTotal
+      total: resolvedTotal,
+      image: imageSrc,
+      material: env.material ?? null,
+      material_type: env.material_type ?? null,
+      material_label: materialLabel || null,
     };
 
     // Initialize envelopes array if it doesn't exist
@@ -114,11 +164,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const setContinueState = (disabled) => {
     if (!continueBtn) return;
-    continueBtn.disabled = Boolean(disabled);
+    const isDisabled = Boolean(disabled);
+    // Support both button and anchor variants
+    if (continueBtn.tagName.toLowerCase() === 'a') {
+      continueBtn.setAttribute('aria-disabled', isDisabled ? 'true' : 'false');
+      continueBtn.classList.toggle('is-disabled', isDisabled);
+      continueBtn.style.pointerEvents = isDisabled ? 'none' : '';
+      continueBtn.style.opacity = isDisabled ? '0.6' : '';
+    } else {
+      continueBtn.disabled = isDisabled;
+    }
   };
 
   const applyServerSummary = (summary) => {
     if (!summary || typeof summary !== 'object') {
+      clearLocalEnvelopes();
       return;
     }
 
@@ -164,6 +224,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  const clearEnvelopeSelection = async () => {
+    if (!syncUrl) return { ok: false };
+
+    const csrfToken = getCsrfToken();
+
+    try {
+      const response = await fetch(syncUrl, {
+        method: 'DELETE',
+        headers: {
+          Accept: 'application/json',
+          ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {})
+        },
+        credentials: 'same-origin',
+        keepalive: true
+      });
+
+      if (!response.ok) {
+        console.warn('Failed to clear envelope selection', response.status);
+        return { ok: false, status: response.status };
+      }
+
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (error) {
+        console.warn('Envelope clear response could not be parsed', error);
+      }
+
+      return { ok: true, data };
+    } catch (error) {
+      console.error('Error clearing envelope selection', error);
+      return { ok: false, status: 0, error };
+    }
+  };
+
   const fetchSummaryFromServer = async () => {
     if (!summaryApiUrl) {
       return null;
@@ -176,6 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (!response.ok) {
         console.warn('Envelope summary API returned status', response.status);
+        clearLocalEnvelopes();
         return null;
       }
 
@@ -192,6 +288,8 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error('Error fetching order summary for envelopes', error);
     }
 
+    // If no summary returned, clear any stale local data
+    clearLocalEnvelopes();
     return null;
   };
 
@@ -240,10 +338,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const buildSummaryMarkup = (envelope) => {
     const total = envelope.total;
-    const hasValidImage = envelope.image && !envelope.image.includes('no-image.png');
-    const imgSrc = hasValidImage ? envelope.image : '/images/no-image.png';
+    const imgSrc = resolveEnvelopeImage(envelope);
     const detailParts = [];
-    if (envelope.material) detailParts.push(envelope.material);
+    const materialLabel = resolveMaterialLabel(envelope) || envelope.material;
+    if (materialLabel) detailParts.push(materialLabel);
     if (Number.isFinite(envelope.qty)) detailParts.push(`${envelope.qty} pcs`);
     if (Number.isFinite(total)) detailParts.push(formatMoney(total));
     const meta = detailParts.length ? detailParts.join(' • ') : 'Custom envelope';
@@ -273,7 +371,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     envelopes.forEach((envelope, index) => {
         const detailParts = [];
-        if (envelope.material) detailParts.push(envelope.material);
+        const materialLabel = resolveMaterialLabel(envelope) || envelope.material;
+        if (materialLabel) detailParts.push(materialLabel);
         if (Number.isFinite(envelope.qty)) detailParts.push(`${envelope.qty} pcs`);
         if (Number.isFinite(envelope.total)) detailParts.push(formatMoney(envelope.total));
         const meta = detailParts.length ? detailParts.join(' • ') : 'Custom envelope';
@@ -281,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
       markup += `
         <div class="summary-selection summary-selection--multiple">
           <div class="summary-selection__media">
-            <img src="${envelope.image ?? '/images/no-image.png'}" alt="${envelope.name}" onerror="this.style.opacity='0.3';this.src='/images/no-image.png'">
+            <img src="${resolveEnvelopeImage(envelope)}" alt="${envelope.name}" onerror="this.style.opacity='0.3';this.src='/images/no-image.png'">
           </div>
           <div class="summary-selection__main">
             <p class="summary-selection__name">${envelope.name}</p>
@@ -311,6 +410,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const summary = summaryOverride ?? readSummary() ?? {};
     const envelopes = summary.envelopes || [];
 
+      // If summary claims selections that don't exist in the current catalog, treat as stale and clear
+      if (envelopes.length && state.envelopes.length) {
+        const catalogIds = new Set(state.envelopes.map((e) => String(e.id)));
+        const hasValid = envelopes.some((e) => catalogIds.has(String(e.id)));
+        if (!hasValid) {
+          clearLocalEnvelopes();
+          return;
+        }
+      }
     state.selectedIds = envelopes.map(e => String(e.id));
 
     if (!envelopes.length) {
@@ -351,23 +459,9 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const selectEnvelope = async (env, qty, total, options = {}) => {
-    if (state.isSaving) return;
-
-    state.isSaving = true;
-    setContinueState(true);
-
+    // Immediate apply; no loading state
     const card = options.cardElement ?? envelopeGrid?.querySelector(`[data-envelope-id="${env.id}"]`);
     const triggerButton = options.triggerButton ?? card?.querySelector('.envelope-item__select');
-
-    let originalButtonText;
-    if (card) {
-      card.classList.add('is-saving');
-    }
-    if (triggerButton) {
-      originalButtonText = triggerButton.textContent;
-      triggerButton.textContent = options.silent ? 'Updating…' : 'Saving…';
-      triggerButton.disabled = true;
-    }
 
     const numericEnvelopeId = Number(env.id);
     const envelopeId = Number.isFinite(numericEnvelopeId) && numericEnvelopeId > 0
@@ -384,10 +478,11 @@ document.addEventListener('DOMContentLoaded', () => {
       quantity: qty,
       unit_price: env.price,
       total_price: total,
-          metadata: {
-            id: envelopeId ?? env.id ?? null,
+      metadata: {
+        id: envelopeId ?? env.id ?? null,
         name: env.name,
         material: env.material ?? null,
+        material_type: env.material_type ?? null,
         image: env.image ?? null,
         min_qty: env.min_qty ?? 10,
         max_qty: env.max_qty ?? null
@@ -400,21 +495,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const result = await persistEnvelopeSelection(payload);
 
     if (triggerButton) {
-      triggerButton.disabled = false;
       const selectedText = state.selectedIds.includes(String(env.id)) ? 'Unselect envelope' : 'Select envelope';
       triggerButton.textContent = selectedText;
-      // Apply primary-action styling to both select and unselect buttons
-      if (state.selectedIds.includes(String(env.id))) {
-        triggerButton.className = 'primary-action envelope-item__select';
-      } else {
-        triggerButton.className = 'primary-action envelope-item__select';
-      }
+      triggerButton.className = 'primary-action envelope-item__select';
     }
-    if (card) {
-      card.classList.remove('is-saving');
-    }
-
-    state.isSaving = false;
 
     if (result?.ok) {
       if (result.data?.summary) {
@@ -453,7 +537,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const price = normalisePrice(env.price);
     const defaultMinQty = 10;
     const apiMinQty = env.min_qty || defaultMinQty;
-    const apiMaxQty = env.max_qty || null;
+    const apiMaxQty = env.stock_qty ?? env.max_qty ?? null;
     
     // Ensure min_qty doesn't exceed max_qty if max_qty is set
     let minQty = apiMinQty;
@@ -477,20 +561,20 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
       <h3 class="envelope-item__title">${env.name}</h3>
       <p class="envelope-item__price">${formatMoney(price)} <span class="per-tag">per piece</span></p>
-      ${env.material ? `<p class="envelope-item__meta">${env.material}</p>` : ''}
+      ${resolveMaterialLabel(env) ? `<p class="envelope-item__meta">${resolveMaterialLabel(env)}</p>` : ''}
       <div class="envelope-item__controls">
         <div class="quantity-control">
           <div class="quantity-input-group">
             <label for="qty-${env.id}">Quantity</label>
             <div class="quantity-input-wrapper">
                 <div class="quantity-input-controls">
-                  <input type="number" id="qty-${env.id}" data-id="${env.id}" value="${initialQty}" min="${minQty}" max="${env.max_qty || ''}" step="1">
+                  <input type="number" id="qty-${env.id}" data-id="${env.id}" value="${initialQty}" min="${minQty}" max="${apiMaxQty || ''}" step="1">
                 </div>
               <span class="quantity-total" data-total-display>${formatMoney(price * initialQty)}</span>
             </div>
           </div>
           <div class="quantity-error" style="display: none;"></div>
-          <p class="quantity-helper summary-note">Select a quantity. Minimum order is ${minQty}</p>
+          <p class="quantity-helper summary-note">Select a quantity. Minimum order is ${minQty}${apiMaxQty ? `, max ${apiMaxQty}` : ''}</p>
         </div>
         <div class="control-buttons">
           <button class="btn btn-secondary envelope-item__design" type="button" title="Add/Edit My Design">
@@ -520,7 +604,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const validateQuantity = () => {
       const qty = Number(qtyInput.value);
       const min = minQty;
-      const max = env.max_qty;
+      const max = apiMaxQty;
 
       if (isNaN(qty) || qty < min) {
         errorDisplay.textContent = `Quantity must be at least ${min}`;
@@ -530,7 +614,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (max && qty > max) {
-        errorDisplay.textContent = `Maximum quantity is ${max}`;
+        errorDisplay.textContent = `Maximum allowed is ${max} based on available stock.`;
         errorDisplay.style.display = 'block';
         qtyInput.classList.add('error');
         return false;
@@ -562,9 +646,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const isCurrentlySelected = state.selectedIds.includes(envelopeId);
 
       if (isCurrentlySelected) {
-        // Remove this envelope from selection
+        // Remove locally first
         applyLocalEnvelopeSelection(env, 0, 0, true);
         showToast(`${env.name} removed from selection`);
+        // Fire-and-forget server clear
+        clearEnvelopeSelection().catch(() => {});
         return;
       }
 
@@ -573,7 +659,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       const { qty, total } = updateTotal();
-      await selectEnvelope(env, qty, total, { cardElement: card, triggerButton: addBtn });
+      selectEnvelope(env, qty, total, { cardElement: card, triggerButton: addBtn }).catch(() => {});
     });
 
     return card;
@@ -606,38 +692,8 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const loadEnvelopes = async () => {
-    // Check cache first (5 minute cache)
-    const cacheKey = 'envelope_data_cache';
-    const cacheTimestamp = 'envelope_cache_timestamp';
-    const now = Date.now();
-    const cacheExpiry = 5 * 60 * 1000; // 5 minutes
-
-    const cachedData = sessionStorage.getItem(cacheKey);
-    const cachedTime = sessionStorage.getItem(cacheTimestamp);
-
-    if (cachedData && cachedTime && (now - parseInt(cachedTime)) < cacheExpiry) {
-      try {
-        const data = JSON.parse(cachedData);
-        state.envelopes = data.map((item, index) => ({
-          id: item.id ?? `env_${index}`,
-          product_id: item.product_id,
-          name: item.name ?? 'Envelope',
-          price: normalisePrice(item.price),
-          image: item.image,
-          material: item.material,
-          min_qty: item.min_qty ?? 10,
-          max_qty: item.max_qty
-        }));
-        clearSkeleton();
-        renderCards(state.envelopes);
-        syncSelectionState();
-        return;
-      } catch (e) {
-        // Cache corrupted, continue with API call
-      }
-    }
-
-    showSkeleton(state.skeletonCount);
+    const shouldShowSkeleton = !state.envelopes.length;
+    if (shouldShowSkeleton) showSkeleton(state.skeletonCount);
     try {
       const response = await fetch(envelopesUrl, { headers: { Accept: 'application/json' } });
       if (response.ok) {
@@ -650,13 +706,14 @@ document.addEventListener('DOMContentLoaded', () => {
             price: normalisePrice(item.price),
             image: item.image,
             material: item.material,
+            material_type: item.material_type,
             min_qty: item.min_qty ?? 10,
-            max_qty: item.max_qty
-          }));
-
-          // Cache the raw API data
-          sessionStorage.setItem(cacheKey, JSON.stringify(data));
-          sessionStorage.setItem(cacheTimestamp, now.toString());
+            max_qty: item.max_qty,
+            stock_qty: item.stock_qty
+          })).filter((item) => {
+            if (item.stock_qty === null || item.stock_qty === undefined) return true;
+            return item.stock_qty > 0;
+          });
         } else {
           state.envelopes = [];
         }
@@ -670,7 +727,7 @@ document.addEventListener('DOMContentLoaded', () => {
       state.envelopes = [];
       setBadgeState({ label: 'Offline', tone: 'summary-badge--alert' });
     } finally {
-      clearSkeleton();
+      if (shouldShowSkeleton) clearSkeleton();
       if (!state.envelopes.length) {
         // No envelopes available
       }
@@ -679,46 +736,44 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  continueBtn?.addEventListener('click', () => {
-    const target = continueBtn.dataset.summaryUrl || summaryUrl;
-    window.location.href = target;
+  continueBtn?.addEventListener('click', (event) => {
+    if (continueBtn.getAttribute('aria-disabled') === 'true') {
+      event.preventDefault();
+      return;
+    }
+    const target = continueBtn.dataset.summaryUrl || giveawaysUrl || summaryUrl;
+    // Direct navigation for snappier transition
+    window.location.assign(target);
   });
 
   skipBtn?.addEventListener('click', async () => {
     if (state.isSaving) return;
 
     state.isSaving = true;
-    setContinueState(true);
-
     const target = skipBtn.dataset.summaryUrl || giveawaysUrl;
-    skipBtn.disabled = true;
 
-    // Try to clear any saved envelope, but never block navigation.
-    try {
-      const result = await clearEnvelopeSelection();
-
-      if (result?.ok) {
-        if (result.data?.summary) {
+    // Fire-and-forget clear so navigation is instant
+    clearEnvelopeSelection()
+      .then((result) => {
+        if (result?.ok && result.data?.summary) {
           applyServerSummary(result.data.summary);
-        } else {
-          await fetchSummaryFromServer();
         }
-      }
-    } catch (error) {
-      console.warn('Skipping envelope failed, continuing anyway', error);
-    }
-
-    skipBtn.disabled = false;
-    state.isSaving = false;
+        return null;
+      })
+      .catch((error) => {
+        console.warn('Skipping envelope failed, continuing anyway', error);
+      });
 
     showToast('Continuing without an envelope…');
-    window.setTimeout(() => {
-      window.location.href = target;
-    }, 250);
+    window.location.href = target;
   });
 
   const initialise = async () => {
     await fetchSummaryFromServer();
+    if (inlineCatalog.length) {
+      renderCards(inlineCatalog);
+      syncSelectionState();
+    }
     await loadEnvelopes();
   };
 
