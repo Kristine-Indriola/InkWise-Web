@@ -206,8 +206,8 @@ class PaymentController extends Controller
 
         $order->forceFill([
             'payment_method' => 'gcash',
-            // When GCash payment is created, mark payment status as pending unless already paid
-            'payment_status' => $order->payment_status === 'paid' ? 'paid' : 'pending',
+            // When GCash payment is created, mark payment status as pending unless already paid or partial
+            'payment_status' => in_array($order->payment_status, ['paid', 'partial']) ? $order->payment_status : 'pending',
             'metadata' => $metadata,
         ])->save();
 
@@ -604,7 +604,6 @@ class PaymentController extends Controller
 
         $attributes = [
             'metadata' => $summary['metadata'],
-            'payment_status' => $summary['balance'] <= 0 ? 'paid' : ($summary['total_paid'] > 0 ? 'partial' : $order->payment_status),
         ];
 
         $mode = Arr::get($payload, 'mode', 'half');

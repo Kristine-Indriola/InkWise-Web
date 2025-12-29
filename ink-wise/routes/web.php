@@ -127,7 +127,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         $orders = \App\Models\Order::query()
             ->select(['id', 'order_number', 'customer_id', 'total_amount', 'order_date', 'status', 'payment_status'])
             ->where('archived', false)
-            ->with(['customer'])
+            ->with(['customer', 'payments'])
             ->latest('order_date')
             ->latest()
             ->paginate($perPage)
@@ -149,7 +149,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         $orders = \App\Models\Order::query()
             ->select(['id', 'order_number', 'customer_id', 'total_amount', 'order_date', 'status', 'payment_status'])
             ->where('archived', true)
-            ->with(['customer', 'activities' => function ($query) {
+            ->with(['customer', 'payments', 'activities' => function ($query) {
                 $query->latest()->limit(1); // Get the most recent activity
             }])
             ->latest('order_date')

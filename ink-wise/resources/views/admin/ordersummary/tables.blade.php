@@ -368,7 +368,15 @@
                   <td class="text-end">{{ number_format((float) data_get($order, 'total_amount', 0), 2) }}</td>
                   <td>
                     @php
-                      $paymentStatus = strtolower($order->payment_status ?? 'pending');
+                      $totalPaid = $order->totalPaid();
+                      $totalAmount = (float) $order->total_amount;
+                      if ($totalPaid >= $totalAmount && $totalAmount > 0) {
+                        $paymentStatus = 'paid';
+                      } elseif ($totalPaid > 0) {
+                        $paymentStatus = 'partial';
+                      } else {
+                        $paymentStatus = 'pending';
+                      }
                       $paymentClass = 'payment-' . $paymentStatus;
                     @endphp
                     <span class="payment-badge {{ $paymentClass }}">
