@@ -2164,11 +2164,6 @@ class OrderFlowService
      */
     public function syncMaterialUsage(Order $order): void
     {
-        // Do not deduct inventory for orders awaiting materials
-        if ($order->status === 'pending_awaiting_materials') {
-            return;
-        }
-
         $order->loadMissing([
             'items.product',
             'items.paperStockSelection',

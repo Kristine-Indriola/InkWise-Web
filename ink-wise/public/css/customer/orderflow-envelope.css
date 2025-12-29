@@ -673,6 +673,43 @@ a:hover {
     gap: clamp(14px, 1.4vw, 16px);
 }
 
+/* Totals alignment (match giveaways) */
+.summary-totals {
+    margin-top: 20px;
+    display: grid;
+    gap: 8px;
+}
+
+.summary-total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+}
+
+.summary-total-row--grand {
+    font-weight: 400;
+    font-size: 14px;
+    color: var(--text-strong);
+}
+
+.summary-total-label {
+    color: var(--text-muted);
+    text-align: left;
+}
+
+.summary-total-value {
+    font-size: 14px;
+    color: var(--text-strong);
+    font-weight: 400;
+    text-align: right;
+    line-height: 1.2;
+}
+
+.summary-total-row--grand .summary-total-value {
+    font-weight: 700;
+}
+
 .summary-clear {
     align-self: flex-start;
     margin-top: -4px;
@@ -710,6 +747,13 @@ a:hover {
     border-radius: var(--radius-sm);
     background: var(--surface-muted);
     border: 1px solid var(--border);
+}
+
+.summary-title {
+    margin: 0 0 12px 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-strong);
 }
 
 .summary-selection__media {
@@ -796,6 +840,10 @@ a:hover {
     position: relative;
     z-index: 60;
     isolation: isolate;
+}
+
+.summary-actions > * {
+    width: 100%;
 }
 
 .summary-note {
