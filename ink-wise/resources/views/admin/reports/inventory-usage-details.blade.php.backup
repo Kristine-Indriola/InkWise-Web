@@ -1,6 +1,6 @@
 @extends('layouts.admin')
 
-@section('title', 'Inventory Usage Details')
+@section('title', 'Inventory Usage & Requests')
 
 @push('styles')
 	<link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
@@ -382,20 +382,28 @@
 
 	$materialCollection = $materials instanceof \Illuminate\Support\Collection ? $materials : collect($materials);
 
-	// Collect detailed usage/release details for moving out items
-	$usageDetails = collect();
+	// Collect detailed usage/release details grouped by order
+	$usageByOrder = collect();
 	foreach ($materialCollection as $material) {
 		$movements = $material->stockMovements ?? collect();
 		$outMovements = $movements->whereIn('movement_type', ['used', 'issued', 'sold']);
 
 		foreach ($outMovements as $movement) {
-			$usageDetails->push([
+			$orderId = $movement->order_id ?? 'no_order';
+
+			if (!$usageByOrder->has($orderId)) {
+				$usageByOrder[$orderId] = [
+					'order_id' => $orderId === 'no_order' ? null : $orderId,
+					'customer_name' => $movement->customer_name ?? null,
+					'materials' => collect(),
+				];
+			}
+
+			$usageByOrder[$orderId]['materials']->push([
 				'material_name' => $material->material_name,
 				'material_sku' => $material->sku ?? 'N/A',
 				'movement_type' => $movement->movement_type,
 				'quantity' => abs($movement->quantity),
-				'order_id' => $movement->order_id ?? null,
-				'customer_name' => $movement->customer_name ?? null,
 				'purpose' => match($movement->movement_type) {
 					'used' => 'Used in production',
 					'issued' => 'Released/Dispatched',
@@ -407,7 +415,52 @@
 			]);
 		}
 	}
-	$usageDetails = $usageDetails->sortByDesc('date');
+
+	// Include all orders, even those without usage
+	$allOrders = \App\Models\Order::query()
+		->select('id', 'order_number')
+		->with(['customer:id,name', 'items.product:id,name'])
+		->orderBy('order_number', 'desc')
+		->get();
+
+	$completeUsageByOrder = collect();
+	foreach ($allOrders as $order) {
+		$orderId = $order->id;
+
+		// Get materials ordered in this order
+		$materialsOrdered = $order->items->map(function ($item) {
+			return [
+				'material_name' => $item->product->name ?? 'Unknown Material',
+
+				'quantity_ordered' => $item->quantity ?? 0,
+				'unit' => $item->unit ?? 'pcs',
+			];
+		});
+
+		$completeUsageByOrder[$orderId] = [
+			'order_id' => $orderId,
+			'customer_name' => $order->customer->name ?? null,
+			'materials_ordered' => $materialsOrdered,
+			'materials_used' => $usageByOrder->get($orderId, ['materials' => collect()])['materials'],
+		];
+	}
+
+	// Add unassigned transactions if any
+	if ($usageByOrder->has('no_order')) {
+		$completeUsageByOrder['no_order'] = $usageByOrder['no_order'];
+	}
+
+	// Sort orders by order_id desc, with no_order last
+	$completeUsageByOrder = $completeUsageByOrder->sortKeysUsing(function ($a, $b) {
+		if ($a === 'no_order') return 1;
+		if ($b === 'no_order') return -1;
+		return $b <=> $a;
+	});
+
+	$totalTransactions = $completeUsageByOrder->sum(function ($order) {
+		return $order['materials_used']->count();
+	});
+	$totalOrders = $completeUsageByOrder->count();
 @endphp
 
 <main class="reports-shell admin-page-shell" id="adminUsageDetailsShell">
@@ -416,7 +469,7 @@
 		<div class="report-header-content">
 			<div class="report-company-info">
 				<h1 class="company-name">InkWise</h1>
-				<h2 class="report-title">Inventory Usage Details Report</h2>
+				<h2 class="report-title">Products Used in Orders Report</h2>
 			</div>
 			<div class="report-meta-info">
 				<div class="meta-item">
@@ -429,7 +482,7 @@
 					<strong>Prepared by:</strong> System Administrator
 				</div>
 				<div class="meta-item">
-					<strong>Total Transactions:</strong> {{ number_format($usageDetails->count()) }}
+					<strong>Total Transactions:</strong> {{ number_format($totalTransactions) }}
 				</div>
 			</div>
 		</div>
@@ -437,8 +490,8 @@
 
 	<header class="page-header reports-page-header">
 		<div class="page-header__content">
-			<h1 class="page-title">Inventory Usage & Release Details</h1>
-			<p class="page-subtitle">Detailed transaction history for inventory deductions and releases</p>
+			<h1 class="page-title">Products Used in Orders</h1>
+			<p class="page-subtitle">List of products used in each order</p>
 		</div>
 		<div class="page-header__actions">
 			<nav class="page-nav" aria-label="Quick navigation">
@@ -501,50 +554,57 @@
 	<section class="reports-panel usage-details-section" aria-labelledby="usage-details-heading">
 		<header class="reports-panel__header">
 			<div class="panel-header-content">
-				<h2 id="usage-details-heading">Usage or Release Details (Moving Out)</h2>
-				<p>Complete transaction history showing how inventory is being consumed or released</p>
+				<h2 id="usage-details-heading">Products Used in Each Order</h2>
+				<p>Complete list of products used in each order</p>
 			</div>
 			<div class="reports-toolbar">
-				<span class="usage-count">Total: {{ number_format($usageDetails->count()) }} transactions</span>
+				<span class="usage-count">Total: {{ number_format($totalTransactions) }} products across {{ $totalOrders }} orders</span>
 			</div>
 		</header>
 		<div class="table-wrapper">
-			<table class="reports-table usage-table" id="usageDetailsTable" aria-label="Detailed usage and release transactions">
-				<thead>
-					<tr>
-						<th scope="col">Date & Time</th>
-						<th scope="col">Item Name</th>
-						<th scope="col">SKU</th>
-						<th scope="col">Purpose</th>
-						<th scope="col">Order ID</th>
-						<th scope="col">Customer</th>
-						<th scope="col" class="text-center">Quantity Deducted</th>
-						<th scope="col">Reference</th>
-					</tr>
-				</thead>
-				<tbody>
-				@forelse($usageDetails as $detail)
-					<tr>
-						<td>{{ \Carbon\Carbon::parse($detail['date'])->format('M j, Y g:i A') }}</td>
-						<td>{{ $detail['material_name'] }}</td>
-						<td>{{ $detail['material_sku'] }}</td>
-						<td>
-							<span class="purpose-badge purpose-badge--{{ $detail['movement_type'] }}">
-								{{ $detail['purpose'] }}
-							</span>
-						</td>
-						<td>{{ $detail['order_id'] ?? '-' }}</td>
-						<td>{{ $detail['customer_name'] ?? '-' }}</td>
-						<td class="text-center">{{ number_format($detail['quantity']) }}</td>
-						<td>{{ $detail['reference'] ?? '-' }}</td>
-					</tr>
-				@empty
-					<tr>
-						<td colspan="8" class="text-center">No usage or release transactions found for the selected period.</td>
-					</tr>
-				@endforelse
-				</tbody>
-			</table>
+			@forelse($completeUsageByOrder as $orderKey => $orderData)
+				<div class="order-usage-section" style="margin-bottom: 3rem;">
+					<h3 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">
+						@if($orderData['order_id'])
+							Order #{{ $orderData['order_id'] }}
+							@if($orderData['customer_name'])
+								- {{ $orderData['customer_name'] }}
+							@endif
+						@else
+							Unassigned Transactions
+						@endif
+						<span style="font-size: 0.875rem; font-weight: 400; color: var(--text-secondary);">
+							({{ $orderData['materials_used']->count() }} products)
+						</span>
+					</h3>
+					@if($orderData['materials_used']->isNotEmpty())
+					<table class="reports-table usage-table" aria-label="Materials for order {{ $orderData['order_id'] }}">
+						<thead>
+							<tr>
+								<th scope="col">Product Name</th>
+								<th scope="col" class="text-center">Quantity Used</th>
+								<th scope="col">Purpose</th>
+								<th scope="col">Date</th>
+							</tr>
+						</thead>
+						<tbody>
+						@foreach($orderData['materials_used'] as $material)
+							<tr>
+								<td>{{ $material['material_name'] }}</td>
+								<td class="text-center">{{ number_format($material['quantity']) }}</td>
+								<td>{{ $material['purpose'] }}</td>
+								<td>{{ $material['date']->format('M j, Y') }}</td>
+							</tr>
+						@endforeach
+						</tbody>
+					</table>
+					@else
+					<p style="color: var(--text-secondary); font-style: italic;">No products used for this order.</p>
+					@endif
+				</div>
+			@empty
+				<p>No orders found.</p>
+			@endforelse
 		</div>
 	</section>
 </main>
@@ -553,14 +613,15 @@
 @section('scripts')
 	<script>
 		window.__INKWISE_USAGE__ = {!! json_encode([
-			'transactions' => $usageDetails->count(),
+			'transactions' => $totalTransactions,
+			'orders' => $totalOrders,
 			'period' => $reportPeriod,
 			'filters' => $currentFilters
 		]) !!};
 
 		document.addEventListener('DOMContentLoaded', function () {
 			// Add any interactive functionality here if needed
-			console.log('Usage Details Report Loaded');
+			console.log('Products Used in Orders Report Loaded');
 		});
 	</script>
 @endsection

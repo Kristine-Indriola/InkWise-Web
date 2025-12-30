@@ -610,9 +610,7 @@
       <li class="{{ request()->routeIs('staff.customer_profile') ? 'active' : '' }}">
         <a href="{{ route('staff.customer_profile') }}"><i class="fa-solid fa-users"></i> <span class="label">Customer Profiles</span></a>
       </li>
-      <li class="{{ request()->routeIs('staff.notify.customers') ? 'active' : '' }}">
-        <a href="{{ route('staff.notify.customers') }}"><i class="fa-solid fa-bell"></i> <span class="label">Notify Customers</span></a>
-      </li>
+
 
       <li class="{{ request()->routeIs('staff.materials.*') ? 'active' : '' }}">
         <a href="{{ route('staff.materials.index') }}"><i class="fa-solid fa-boxes-stacked"></i> <span class="label">Inventory</span></a>

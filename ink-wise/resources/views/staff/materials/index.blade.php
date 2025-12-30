@@ -4,6 +4,94 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@flaticon/flaticon-uicons/css/all/all.css">
     <link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
     <link rel="stylesheet" href="{{ asset('css/staff-css/materials.css') }}">
+    <style>
+        .restock-modal {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(26, 32, 44, 0.55);
+            backdrop-filter: blur(2px);
+            z-index: 1050;
+        }
+
+        .restock-modal.is-open {
+            display: flex;
+        }
+
+        .restock-modal__dialog {
+            width: min(420px, 92%);
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25);
+            padding: 1.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .restock-modal__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .restock-modal__header h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #1a202c;
+        }
+
+        .restock-close-btn {
+            border: none;
+            background: transparent;
+            color: #718096;
+            font-size: 1.25rem;
+            cursor: pointer;
+        }
+
+        .restock-modal__body label {
+            display: block;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 0.35rem;
+        }
+
+        .restock-modal__body .form-control,
+        .restock-modal__body textarea {
+            width: 100%;
+            border: 1px solid #cbd5e0;
+            border-radius: 8px;
+            padding: 0.65rem 0.75rem;
+            font-size: 0.95rem;
+            color: #2d3748;
+        }
+
+        .restock-modal__body textarea {
+            min-height: 90px;
+            resize: vertical;
+        }
+
+        .restock-modal__hint {
+            font-size: 0.85rem;
+            color: #4a5568;
+        }
+
+        .restock-modal__actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            border: 1px solid #cbd5e0;
+            color: #4a5568;
+        }
+    </style>
 @endpush
 
 @section('title', 'Materials Management')
@@ -159,6 +247,16 @@
                             </td>
                             <td class="actions-col text-center">
                                 <div class="materials-actions">
+                                    <button type="button"
+                                            class="btn btn-sm btn-success btn-restock"
+                                            data-action="{{ route('staff.materials.restock', $material->material_id) }}"
+                                            data-name="{{ $material->material_name }}"
+                                            data-unit="{{ $material->unit ?? 'units' }}"
+                                            data-stock="{{ $stock }}"
+                                            title="Restock material"
+                                            aria-label="Restock {{ $material->material_name }}">
+                                        <i class="fi fi-rr-plus-small"></i>
+                                    </button>
                                     <a href="{{ route('staff.materials.edit', $material->material_id) }}" class="btn btn-sm btn-warning" title="Edit material">
                                         <i class="fi fi-rr-pencil"></i>
                                     </a>
@@ -181,6 +279,33 @@
             </table>
         </div>
     </section>
+
+    <div id="staffRestockModal" class="restock-modal" aria-hidden="true">
+        <div class="restock-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="staffRestockModalTitle">
+            <div class="restock-modal__header">
+                <h2 id="staffRestockModalTitle">Restock Material</h2>
+                <button type="button" class="restock-close-btn" data-close-restock aria-label="Close restock dialog">&times;</button>
+            </div>
+            <div class="restock-modal__body">
+                <p class="restock-modal__hint" data-restock-summary>Enter the quantity to add to inventory.</p>
+                <form id="staffRestockForm" method="POST" action="#">
+                    @csrf
+                    <div class="form-group">
+                        <label for="staffRestockQuantity">Quantity to add</label>
+                        <input type="number" name="quantity" id="staffRestockQuantity" class="form-control" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="staffRestockNotes">Notes (optional)</label>
+                        <textarea name="notes" id="staffRestockNotes" placeholder="e.g., Supplier delivery reference or PO number"></textarea>
+                    </div>
+                    <div class="restock-modal__actions">
+                        <button type="button" class="btn btn-sm btn-ghost" data-close-restock>Cancel</button>
+                        <button type="submit" class="btn btn-sm btn-primary">Update Stock</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </main>
 @endsection
 
@@ -195,5 +320,63 @@
                 }, 4000);
             }
         });
+    </script>
+    <script>
+        (function () {
+            const modal = document.getElementById('staffRestockModal');
+            if (!modal) return;
+
+            const form = document.getElementById('staffRestockForm');
+            const quantityInput = document.getElementById('staffRestockQuantity');
+            const summary = modal.querySelector('[data-restock-summary]');
+            const title = document.getElementById('staffRestockModalTitle');
+            const closeButtons = modal.querySelectorAll('[data-close-restock]');
+            const restockButtons = document.querySelectorAll('.btn-restock');
+
+            const closeModal = () => {
+                modal.classList.remove('is-open');
+                modal.setAttribute('aria-hidden', 'true');
+                if (form) {
+                    form.reset();
+                }
+            };
+
+            const openModal = (config) => {
+                if (!form) return;
+                form.action = config.action;
+                title.textContent = `Restock ${config.name}`;
+                summary.textContent = `Current stock: ${config.stock} ${config.unit}. Enter the quantity to add.`;
+                modal.classList.add('is-open');
+                modal.setAttribute('aria-hidden', 'false');
+                requestAnimationFrame(() => {
+                    quantityInput?.focus();
+                });
+            };
+
+            restockButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    openModal({
+                        action: button.dataset.action,
+                        name: button.dataset.name,
+                        unit: button.dataset.unit || 'units',
+                        stock: button.dataset.stock || '0',
+                    });
+                });
+            });
+
+            closeButtons.forEach((btn) => btn.addEventListener('click', closeModal));
+
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && modal.classList.contains('is-open')) {
+                    closeModal();
+                }
+            });
+        })();
     </script>
 @endpush

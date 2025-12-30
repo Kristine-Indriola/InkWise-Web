@@ -91,6 +91,8 @@
                                             $address->barangay ?? null,
                                             $address->city ?? null,
                                             $address->province ?? null,
+                                            $address->postal_code ?? null,
+                                            $address->country ?? null,
                                         ])->filter()->implode(', ');
                                     @endphp
                                     <span class="address-block">{{ $addressParts ?: '—' }}</span>
