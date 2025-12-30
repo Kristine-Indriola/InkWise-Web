@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use App\Support\Admin\OrderSummaryPresenter;
 
 class StaffOrderController extends Controller
 {
@@ -58,11 +59,18 @@ class StaffOrderController extends Controller
     {
         $order->loadMissing(['customer', 'items.product', 'payments', 'activities']);
 
+        $presented = OrderSummaryPresenter::make($order);
+        $metadata = $this->normalizeMetadata($order->metadata);
+
+        if ($presented) {
+            $presented['metadata'] = $metadata;
+        }
+
         return view('staff.order.show', [
-            'order' => $order,
+            'order' => $presented,
             'statusOptions' => $this->statusOptions(),
             'statusFlow' => $this->statusFlow(),
-            'metadata' => $this->normalizeMetadata($order->metadata),
+            'metadata' => $metadata,
         ]);
     }
 
@@ -77,11 +85,18 @@ class StaffOrderController extends Controller
         // Load relationships as needed (lazy loading like admin)
         $order->loadMissing(['customerOrder.customer', 'items.product', 'payments', 'rating', 'activities']);
 
+        $presented = OrderSummaryPresenter::make($order);
+        $metadata = $this->normalizeMetadata($order->metadata);
+
+        if ($presented) {
+            $presented['metadata'] = $metadata;
+        }
+
         return view('staff.order.show', [
-            'order' => $order,
+            'order' => $presented,
             'statusOptions' => $this->statusOptions(),
             'statusFlow' => $this->statusFlow(),
-            'metadata' => $this->normalizeMetadata($order->metadata),
+            'metadata' => $metadata,
         ]);
     }
 

@@ -686,25 +686,29 @@
 
 	$materialCollection = $materials instanceof \Illuminate\Support\Collection ? $materials : collect($materials);
 
-	$evaluateMaterial = function ($material) use ($currentFilters) {
+	$evaluateMaterial = function ($material) {
 		$stockLevel = optional($material->inventory)->stock_level
 			?? $material->stock_qty
 			?? 0;
 		$reorderLevel = optional($material->inventory)->reorder_level
 			?? $material->reorder_point
 			?? 0;
-		$unitCost = $material->unit_cost ?? 0;
+		$unitCost = $material->unit_cost ?? $material->cost_per_ml ?? 0;
 		$lastRestock = optional($material->inventory)->last_restock_date ?? null;
 		$stockValue = $stockLevel * $unitCost;
 
-		// Calculate stock movements for the period
-		$movements = $material->stockMovements ?? collect();
-		$stockIn = $movements->where('movement_type', 'restock')->sum('quantity');
-		$stockOut = abs($movements->whereIn('movement_type', ['used', 'issued', 'sold'])->sum('quantity'));
-		$adjustments = $movements->where('movement_type', 'adjustment')->sum('quantity');
+		$hasMovementData = $material instanceof \App\Models\Material;
+
+		// Calculate stock movements when tracking is available
+		$movements = $hasMovementData ? $material->stockMovements : collect();
+		$stockIn = $hasMovementData ? $movements->where('movement_type', 'restock')->sum('quantity') : 0;
+		$stockOut = $hasMovementData ? abs($movements->whereIn('movement_type', ['used', 'issued', 'sold'])->sum('quantity')) : 0;
+		$adjustments = $hasMovementData ? $movements->where('movement_type', 'adjustment')->sum('quantity') : 0;
 
 		// Calculate beginning stock (current stock - movements in period)
-		$beginningStock = $stockLevel - $stockIn + $stockOut - $adjustments;
+		$beginningStock = $hasMovementData
+			? $stockLevel - $stockIn + $stockOut - $adjustments
+			: null;
 
 		$status = 'In stock';
 		$statusKey = 'in-stock';
@@ -743,7 +747,7 @@
 		};
 
 		// Determine movement category for analysis
-		$totalMovement = $stockIn + $stockOut;
+		$totalMovement = ($stockIn ?? 0) + ($stockOut ?? 0);
 		$movementCategory = 'normal';
 		if ($totalMovement > 50) {
 			$movementCategory = 'fast-moving';
@@ -758,6 +762,7 @@
 			'model' => $material,
 			'stock' => $stockLevel,
 			'reorder' => $reorderLevel,
+			'unit_cost' => $unitCost,
 			'status' => $status,
 			'status_key' => $statusKey,
 			'action' => $action,
@@ -766,16 +771,23 @@
 			'priority_key' => $priorityKey,
 			'stock_value' => $stockValue,
 			'last_restock' => $lastRestock,
-			'beginning_stock' => max(0, $beginningStock),
-			'stock_in' => $stockIn,
-			'stock_out' => $stockOut,
-			'adjustments' => $adjustments,
+			'beginning_stock' => $hasMovementData ? max(0, $beginningStock) : null,
+			'stock_in' => $hasMovementData ? $stockIn : null,
+			'stock_out' => $hasMovementData ? $stockOut : null,
+			'adjustments' => $hasMovementData ? $adjustments : null,
 			'ending_stock' => $stockLevel,
 			'movement_category' => $movementCategory,
+			'movement_tracked' => $hasMovementData,
 		];
 	};
 
 	$materialSnapshots = $materialCollection->map($evaluateMaterial);
+	$movementSnapshots = $materialSnapshots->filter(fn ($snapshot) => $snapshot['movement_tracked']);
+	$movementStockOut = $movementSnapshots->sum('stock_out');
+	$averageBeginningStock = (float) ($movementSnapshots->avg('beginning_stock') ?? 0);
+	$inventoryTurnover = ($movementStockOut > 0 && $averageBeginningStock > 0)
+		? number_format(($movementStockOut / $averageBeginningStock) * 100, 1)
+		: '0.0';
 
 	$statusCounts = [
 		'in-stock' => 0,
@@ -859,10 +871,6 @@
 				</a>
 			</nav>
 			<div class="page-actions">
-				<a href="{{ route('admin.reports.usage-details') }}" class="btn btn-secondary" aria-label="View detailed usage and release transactions">
-					<i class="fi fi-rr-file-invoice" aria-hidden="true"></i>
-					<span>Usage Details</span>
-				</a>
 				<button type="button" class="pill-link" data-report-action="refresh" aria-label="Refresh data">
 					<i class="fi fi-rr-rotate-right" aria-hidden="true"></i>
 					<span>Refresh Data</span>
@@ -925,22 +933,6 @@
 			<strong data-metric="total-skus">{{ number_format($inventoryStats['totalSkus'] ?? $reportPayload['totalTracked'] ?? 0) }}</strong>
 			<p>Active inventory items currently being tracked in the system</p>
 		</article>
-		<article class="reports-summary-card" aria-labelledby="low-stock-heading">
-			<header>
-				<span class="summary-label" id="low-stock-heading">Low Stock Alerts</span>
-				<i class="fi fi-rr-triangle-warning" aria-hidden="true"></i>
-			</header>
-			<strong data-metric="low-stock">{{ number_format($inventoryStats['lowStock'] ?? ($reportPayload['statusBreakdown']['low'] ?? 0)) }}</strong>
-			<p>Items at or below their configured reorder threshold</p>
-		</article>
-		<article class="reports-summary-card" aria-labelledby="out-stock-heading">
-			<header>
-				<span class="summary-label" id="out-stock-heading">Out of Stock</span>
-				<i class="fi fi-rr-empty-set" aria-hidden="true"></i>
-			</header>
-			<strong data-metric="out-stock">{{ number_format($inventoryStats['outStock'] ?? ($reportPayload['statusBreakdown']['out-of-stock'] ?? 0)) }}</strong>
-			<p>Items with zero available quantity requiring immediate action</p>
-		</article>
 		<article class="reports-summary-card" aria-labelledby="total-units-heading">
 			<header>
 				<span class="summary-label" id="total-units-heading">Total Units</span>
@@ -956,6 +948,22 @@
 			</header>
 			<strong>₱{{ number_format($totalStockValue, 2) }}</strong>
 			<p>Total monetary value of current inventory holdings</p>
+		</article>
+		<article class="reports-summary-card" aria-labelledby="low-stock-heading">
+			<header>
+				<span class="summary-label" id="low-stock-heading">Low Stock Alerts</span>
+				<i class="fi fi-rr-triangle-warning" aria-hidden="true"></i>
+			</header>
+			<strong data-metric="low-stock">{{ number_format($inventoryStats['lowStock'] ?? ($reportPayload['statusBreakdown']['low'] ?? 0)) }}</strong>
+			<p>Items at or below their configured reorder threshold</p>
+		</article>
+		<article class="reports-summary-card" aria-labelledby="out-stock-heading">
+			<header>
+				<span class="summary-label" id="out-stock-heading">Out of Stock</span>
+				<i class="fi fi-rr-empty-set" aria-hidden="true"></i>
+			</header>
+			<strong data-metric="out-stock">{{ number_format($inventoryStats['outStock'] ?? ($reportPayload['statusBreakdown']['out-of-stock'] ?? 0)) }}</strong>
+			<p>Items with zero available quantity requiring immediate action</p>
 		</article>
 	</section>
 
@@ -982,7 +990,7 @@
 				<span class="summary-label">Stock Turnover</span>
 				<i class="fi fi-rr-refresh" aria-hidden="true"></i>
 			</header>
-			<strong>{{ $materialSnapshots->sum('stock_out') > 0 ? number_format(($materialSnapshots->sum('stock_out') / max(1, $materialSnapshots->avg('beginning_stock'))) * 100, 1) : 0 }}%</strong>
+			<strong>{{ $inventoryTurnover }}%</strong>
 			<p>Items moved during reporting period</p>
 		</article>
 	</section>
@@ -1153,7 +1161,6 @@
 				<table class="reports-table" id="inventoryTable">
 					<thead>
 						<tr>
-							<th scope="col">Item Code</th>
 							<th scope="col">Item Name</th>
 							<th scope="col">Category</th>
 							<th scope="col">UOM</th>
@@ -1161,7 +1168,6 @@
 							<th scope="col" class="text-center">Beginning Stock</th>
 							<th scope="col" class="text-center">Stock In</th>
 							<th scope="col" class="text-center">Stock Out</th>
-							<th scope="col" class="text-center">Adjustments</th>
 							<th scope="col" class="text-center">Ending Stock</th>
 							<th scope="col" class="text-end">Unit Cost</th>
 							<th scope="col" class="text-end">Total Value</th>
@@ -1178,25 +1184,33 @@
 								default => 'status-badge status-badge--success',
 							};
 							$rowClass = in_array($snapshot['status_key'], ['low', 'out-of-stock'], true) ? 'needs-attention' : '';
+							$movementTracked = $snapshot['movement_tracked'];
+							$beginningDisplay = $movementTracked && $snapshot['beginning_stock'] !== null
+								? number_format($snapshot['beginning_stock'])
+								: 'N/A';
+							$stockInDisplay = $movementTracked && $snapshot['stock_in'] !== null
+								? number_format($snapshot['stock_in'])
+								: 'N/A';
+							$stockOutDisplay = $movementTracked && $snapshot['stock_out'] !== null
+								? number_format($snapshot['stock_out'])
+								: 'N/A';
 						@endphp
 						<tr data-stock-status="{{ $snapshot['status_key'] }}" class="{{ $rowClass }}">
-							<td>{{ $material->sku ?? 'N/A' }}</td>
 							<td>{{ $material->material_name }}</td>
 							<td>{{ $material->material_type }}</td>
 							<td>{{ $material->unit ?? 'pcs' }}</td>
 							<td class="text-center">{{ number_format($snapshot['reorder']) }}</td>
-							<td class="text-center">{{ number_format($snapshot['beginning_stock']) }}</td>
-							<td class="text-center">{{ number_format($snapshot['stock_in']) }}</td>
-							<td class="text-center">{{ number_format($snapshot['stock_out']) }}</td>
-							<td class="text-center">{{ $snapshot['adjustments'] != 0 ? number_format($snapshot['adjustments']) : '-' }}</td>
+							<td class="text-center">{{ $beginningDisplay }}</td>
+							<td class="text-center">{{ $stockInDisplay }}</td>
+							<td class="text-center">{{ $stockOutDisplay }}</td>
 							<td class="text-center">{{ number_format($snapshot['ending_stock']) }}</td>
-							<td class="text-end">₱{{ number_format($material->unit_cost ?? 0, 2) }}</td>
+							<td class="text-end">₱{{ number_format($snapshot['unit_cost'], 2) }}</td>
 							<td class="text-end">₱{{ number_format($snapshot['stock_value'], 2) }}</td>
 							<td><span class="{{ $statusClass }}">{{ $snapshot['status'] }}</span></td>
 						</tr>
 					@empty
 						<tr>
-							<td colspan="14" class="text-center">No materials found.</td>
+							<td colspan="11" class="text-center">No materials found.</td>
 						</tr>
 					@endforelse
 					</tbody>

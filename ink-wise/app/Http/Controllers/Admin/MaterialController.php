@@ -7,12 +7,14 @@ use App\Models\User;
 use App\Models\Material;
 use App\Models\Inventory;
 use App\Models\Ink; // <-- Add this import
+use App\Models\StockMovement;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Notifications\StockNotification;
 use App\Notifications\MaterialRestockedNotification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class MaterialController extends Controller
@@ -193,7 +195,7 @@ class MaterialController extends Controller
         })->count();
 
         $inkLowCount = $inks->filter(function($ink) {
-            $stock = optional($ink->inventory)->stock_level ?? $ink->stock_qty ?? $ink->stock_qty_ml ?? 0;
+            $stock = optional($ink->inventory)->stock_level ?? $ink->stock_qty ?? 0;
             $reorder = optional($ink->inventory)->reorder_level ?? 10;
             return $stock > 0 && $stock <= $reorder;
         })->count();
@@ -204,7 +206,7 @@ class MaterialController extends Controller
         })->count();
 
         $inkOutCount = $inks->filter(function($ink) {
-            $stock = optional($ink->inventory)->stock_level ?? $ink->stock_qty ?? $ink->stock_qty_ml ?? 0;
+            $stock = optional($ink->inventory)->stock_level ?? $ink->stock_qty ?? 0;
             return $stock <= 0;
         })->count();
 
@@ -217,7 +219,7 @@ class MaterialController extends Controller
             if ($stock !== null) {
                 return $stock;
             }
-            return $ink->stock_qty ?? $ink->stock_qty_ml ?? 0;
+            return $ink->stock_qty ?? 0;
         });
 
         $summary = [
@@ -334,7 +336,7 @@ class MaterialController extends Controller
             $material->inventory()->create($inventoryData);
         }
 
-        $material->load('inventory');
+        $material->refresh()->load('inventory');
         $currentStock = optional($material->inventory)->stock_level;
         if ($currentStock === null) {
             $currentStock = $material->stock_qty ?? 0;
@@ -362,6 +364,70 @@ class MaterialController extends Controller
         return redirect()->route('admin.materials.index')
                          ->with('success', 'Material updated successfully with inventory.');
 
+    }
+
+    public function restock(Request $request, $id)
+    {
+        $material = Material::with('inventory')->findOrFail($id);
+
+        $validated = $request->validate([
+            'quantity' => 'required|integer|min:1',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $quantity = (int) $validated['quantity'];
+        $notes = $validated['notes'] ?? null;
+
+        DB::transaction(function () use ($material, $quantity, $notes) {
+            $currentStock = optional($material->inventory)->stock_level ?? $material->stock_qty ?? 0;
+            $newStock = $currentStock + $quantity;
+
+            $material->update([
+                'stock_qty' => $newStock,
+                'date_updated' => now(),
+            ]);
+
+            $reorderLevel = optional($material->inventory)->reorder_level ?? $material->reorder_point ?? 0;
+            $inventoryPayload = [
+                'stock_level' => $newStock,
+                'reorder_level' => $reorderLevel,
+            ];
+
+            if ($material->inventory) {
+                $material->inventory->update($inventoryPayload);
+            } else {
+                $material->inventory()->create($inventoryPayload);
+                $material->load('inventory');
+            }
+
+            StockMovement::create([
+                'material_id' => $material->getKey(),
+                'movement_type' => 'restock',
+                'quantity' => $quantity,
+                'user_id' => Auth::id(),
+                'notes' => $notes,
+            ]);
+        });
+
+        $material->refresh()->load('inventory');
+        $remarks = optional($material->inventory)->remarks ?? 'In Stock';
+
+        $owners = User::where('role', 'owner')->get();
+        if ($owners->isNotEmpty()) {
+            Notification::send($owners, new MaterialRestockedNotification($material, $quantity, Auth::user()));
+        }
+
+        if (in_array($remarks, ['Low Stock', 'Out of Stock'], true)) {
+            $admins = User::where('role', 'admin')->get();
+            if ($admins->isNotEmpty()) {
+                Notification::send($admins, new StockNotification($material, $remarks));
+            }
+        }
+
+        $currentStock = optional($material->inventory)->stock_level ?? $material->stock_qty ?? 0;
+
+        return redirect()->route('admin.materials.index')
+            ->with('success', "Restocked {$material->material_name} by {$quantity} units. Current stock: {$currentStock}.");
     }
 
     public function destroy($id)

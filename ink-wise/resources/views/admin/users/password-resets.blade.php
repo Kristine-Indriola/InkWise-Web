@@ -123,13 +123,58 @@
                                     <span class="badge badge-status badge-status--{{ $statusSlug }}">{{ $statusLabel }}</span>
                                 </td>
                                 <td class="text-right">
-                                    <form method="POST" action="{{ route('admin.users.passwords.send', $user) }}" class="table-action" data-reset-form>
-                                        @csrf
-                                        <button type="submit" class="console-btn console-btn--primary" data-confirm="Send a password reset link to {{ $user->email }}?">
-                                            <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
-                                            <span class="console-btn__label">Send reset link</span>
-                                        </button>
-                                    </form>
+                                    <div class="table-actions">
+                                        <form method="POST" action="{{ route('admin.users.passwords.send', $user) }}" class="table-action" data-reset-form>
+                                            @csrf
+                                            <button type="submit" class="console-btn console-btn--primary" data-confirm="Send a password reset link to {{ $user->email }}?">
+                                                <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
+                                                <span class="console-btn__label">Send reset link</span>
+                                            </button>
+                                        </form>
+
+                                        <details class="change-password" data-change-panel>
+                                            <summary class="console-btn console-btn--ghost">
+                                                <i class="fa-solid fa-key" aria-hidden="true"></i>
+                                                <span class="console-btn__label">Set new password</span>
+                                            </summary>
+                                            <div class="change-password__overlay" data-change-overlay></div>
+                                            <div class="change-password__body">
+                                                <form method="POST" action="{{ route('admin.users.passwords.update', $user) }}" class="change-password__form" data-change-form>
+                                                    @csrf
+                                                    @method('PUT')
+                                                    <div class="form-field form-field--password">
+                                                        <label for="password-{{ $user->user_id }}" class="form-label">New password</label>
+                                                        <div class="password-input">
+                                                            <input id="password-{{ $user->user_id }}" type="password" name="password" required class="form-input" autocomplete="new-password" data-password-input>
+                                                            <button type="button" class="console-btn console-btn--icon" aria-label="Show password" data-toggle-password>
+                                                                <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div class="form-field form-field--password">
+                                                        <label for="password-confirmation-{{ $user->user_id }}" class="form-label">Confirm password</label>
+                                                        <div class="password-input">
+                                                            <input id="password-confirmation-{{ $user->user_id }}" type="password" name="password_confirmation" required class="form-input" autocomplete="new-password" data-password-input>
+                                                            <button type="button" class="console-btn console-btn--icon" aria-label="Show password" data-toggle-password>
+                                                                <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div class="change-password__actions">
+                                                        <button type="button" class="console-btn console-btn--secondary" data-cancel-change>
+                                                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                                            <span class="console-btn__label">Cancel</span>
+                                                        </button>
+                                                        <button type="submit" class="console-btn console-btn--primary" data-confirm="Set a new password for {{ $user->email }}?">
+                                                            <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+                                                            <span class="console-btn__label">Update password</span>
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                                <p class="change-password__note">Share the new password securely and ask the user to update it after signing in.</p>
+                                            </div>
+                                        </details>
+                                    </div>
                                 </td>
                             </tr>
                         @empty

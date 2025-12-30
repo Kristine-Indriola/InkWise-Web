@@ -393,6 +393,269 @@
 			margin-right: 6px;
 		}
 	</style>
+	<style>
+		.materials-grid {
+			display: grid;
+			gap: 16px;
+			grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+		}
+
+		.material-card {
+			background: #ffffff;
+			border: 1px solid #e5e7eb;
+			border-radius: 12px;
+			padding: 18px;
+			box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+			transition: transform 0.2s ease, box-shadow 0.2s ease;
+			position: relative;
+		}
+
+		.material-card:hover {
+			transform: translateY(-2px);
+			box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+		}
+
+		.material-card__type {
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+			font-size: 12px;
+			font-weight: 600;
+			text-transform: uppercase;
+			letter-spacing: 0.04em;
+			padding: 6px 10px;
+			border-radius: 999px;
+			background: #eef2ff;
+			color: #4338ca;
+			margin-bottom: 12px;
+		}
+
+		.material-card--addon .material-card__type {
+			background: #fef3c7;
+			color: #b45309;
+		}
+
+		.material-card--paper .material-card__type {
+			background: #dcfce7;
+			color: #166534;
+		}
+
+		.material-card--other .material-card__type {
+			background: #f1f5f9;
+			color: #1f2937;
+		}
+
+		.material-card__title {
+			margin: 0 0 8px;
+			font-size: 18px;
+			font-weight: 600;
+			color: #111827;
+		}
+
+		.material-card__quantity,
+		.material-card__cost {
+			margin: 0;
+			font-size: 14px;
+			color: #475569;
+		}
+
+		.material-card__quantity strong {
+			font-size: 20px;
+			color: #1f2937;
+		}
+
+		.item-cell__thumb-button {
+			appearance: none;
+			border: none;
+			background: transparent;
+			padding: 0;
+			cursor: pointer;
+			border-radius: 8px;
+			box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+			overflow: hidden;
+			transition: transform 0.2s ease, box-shadow 0.2s ease;
+		}
+
+		.item-cell__thumb-button:focus-visible {
+			outline: 3px solid rgba(99, 102, 241, 0.5);
+			outline-offset: 2px;
+		}
+
+		.item-cell__thumb-button:hover {
+			transform: translateY(-2px);
+			box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+		}
+
+		.item-cell__thumb-button img {
+			display: block;
+		}
+
+		.ordersummary-preview-modal {
+			position: fixed;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			z-index: 105;
+		}
+
+		.ordersummary-preview-modal[hidden] {
+			display: none !important;
+		}
+
+		.ordersummary-preview-backdrop {
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			background: rgba(15, 23, 42, 0.6);
+		}
+
+		.ordersummary-preview-dialog {
+			position: relative;
+			background: #ffffff;
+			border-radius: 16px;
+			box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+			max-width: min(900px, 95vw);
+			width: 90vw;
+			max-height: 90vh;
+			display: flex;
+			flex-direction: column;
+			overflow: hidden;
+		}
+
+		.ordersummary-preview-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			padding: 16px 20px;
+			border-bottom: 1px solid #e2e8f0;
+		}
+
+		.ordersummary-preview-header h2 {
+			margin: 0;
+			font-size: 18px;
+			font-weight: 700;
+			color: #111827;
+		}
+
+		.ordersummary-preview-meta {
+			font-size: 14px;
+			color: #475569;
+			margin-top: 4px;
+		}
+
+		.ordersummary-preview-meta span[data-preview-label] {
+			color: #0f172a;
+			font-weight: 500;
+		}
+
+		.ordersummary-preview-meta span[data-preview-label]:empty {
+			display: none;
+		}
+
+		.ordersummary-preview-meta span[data-preview-label]::before {
+			content: '·';
+			display: inline-block;
+			margin: 0 6px 0 8px;
+			color: #94a3b8;
+		}
+
+		.ordersummary-preview-close {
+			appearance: none;
+			border: none;
+			background: transparent;
+			cursor: pointer;
+			color: #475569;
+			font-size: 18px;
+			padding: 6px;
+			border-radius: 6px;
+		}
+
+		.ordersummary-preview-close:hover,
+		.ordersummary-preview-close:focus-visible {
+			background: #f1f5f9;
+			outline: none;
+		}
+
+		.ordersummary-preview-body {
+			flex: 1;
+			padding: 20px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			background: #f8fafc;
+		}
+
+		.ordersummary-preview-body img {
+			max-width: 100%;
+			height: auto;
+			max-height: 65vh;
+			border-radius: 12px;
+			box-shadow: 0 12px 24px rgba(15, 23, 42, 0.15);
+		}
+
+		.ordersummary-preview-details {
+			padding: 4px 20px 18px;
+			background: #ffffff;
+			border-top: 1px solid #e2e8f0;
+		}
+
+		.ordersummary-preview-details[hidden] {
+			display: none !important;
+		}
+
+		.ordersummary-preview-details h3 {
+			margin: 0 0 8px;
+			font-size: 14px;
+			font-weight: 600;
+			color: #0f172a;
+		}
+
+		.ordersummary-preview-materials {
+			margin: 0;
+			padding: 0;
+			list-style: none;
+		}
+
+		.ordersummary-preview-materials li {
+			font-size: 13px;
+			color: #475569;
+			padding: 8px 0;
+			border-top: 1px solid #e2e8f0;
+		}
+
+		.ordersummary-preview-materials li:first-child {
+			border-top: none;
+		}
+
+		.ordersummary-preview-actions {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 12px;
+			padding: 16px 20px;
+			border-top: 1px solid #e2e8f0;
+		}
+
+		.ordersummary-preview-actions .btn {
+			white-space: nowrap;
+		}
+
+		.ordersummary-preview-actions .btn[disabled],
+		.ordersummary-preview-actions .btn:disabled {
+			opacity: 0.4;
+			cursor: not-allowed;
+		}
+
+		body.ordersummary-modal-open {
+			overflow: hidden;
+		}
+	</style>
 @endpush
 
 @section('content')
@@ -487,6 +750,42 @@
 		'others' => 0.0,
 	];
 
+	// Collect production materials for quick-reference cards.
+	$materialRequirements = [
+		'paper' => [],
+		'addon' => [],
+		'other' => [],
+	];
+
+	$registerMaterial = function (string $type, string $label, $quantity, $unitPrice, $total) use (&$materialRequirements) {
+		$typeKey = in_array($type, ['paper', 'addon'], true) ? $type : 'other';
+		$normalizedLabel = trim(mb_strtolower($label));
+		$key = $normalizedLabel !== '' ? $normalizedLabel : uniqid($typeKey . '_');
+
+		if (!isset($materialRequirements[$typeKey][$key])) {
+			$materialRequirements[$typeKey][$key] = [
+				'label' => $label !== '' ? $label : 'Material',
+				'quantity' => 0.0,
+				'unit_price' => null,
+				'total' => 0.0,
+			];
+		}
+
+		if (is_numeric($quantity)) {
+			$materialRequirements[$typeKey][$key]['quantity'] += (float) $quantity;
+		}
+
+		if (is_numeric($unitPrice) && $materialRequirements[$typeKey][$key]['unit_price'] === null) {
+			$materialRequirements[$typeKey][$key]['unit_price'] = (float) $unitPrice;
+		}
+
+		if (is_numeric($total)) {
+			$materialRequirements[$typeKey][$key]['total'] += (float) $total;
+		}
+	};
+
+	$materialsList = collect();
+
 	// Build timeline from order activities
 	$timeline = collect();
 	
@@ -556,10 +855,16 @@
 		'cancelled' => 'Cancelled',
 	];
 	$statusFlow = ['draft', 'pending', 'pending_awaiting_materials', 'processing', 'in_production', 'confirmed', 'completed'];
-	$currentStatus = strtolower((string) data_get($order, 'status', 'draft'));
+	$orderStatusRaw = data_get($order, 'status', 'draft');
+	$orderStatusRaw = $orderStatusRaw === 'draft' ? 'new_order' : $orderStatusRaw;
+	$currentStatus = strtolower((string) $orderStatusRaw);
+	if ($currentStatus === 'new_order') {
+		$currentStatus = 'draft';
+	}
 	$flowIndex = array_search($currentStatus, $statusFlow, true);
 	$currentChipModifier = str_replace('_', '-', $currentStatus);
-	$currentStatusLabel = $statusOptions[$currentStatus] ?? ucfirst(str_replace('_', ' ', $currentStatus));
+	$currentDisplayStatus = $currentStatus === 'draft' ? 'new_order' : $currentStatus;
+	$currentStatusLabel = $statusOptions[$currentDisplayStatus] ?? ucfirst(str_replace('_', ' ', $currentDisplayStatus));
 	$formatDateTime = function ($value) {
 		try {
 			if ($value instanceof \Illuminate\Support\Carbon) {
@@ -673,6 +978,7 @@
 								? 'status-tracker__item--done'
 								: 'status-tracker__item--current';
 						}
+						$displayKey = $statusKey === 'draft' ? 'new_order' : $statusKey;
 					}
 				@endphp
 				<li class="status-tracker__item {{ $stateClass }}" data-status-step="{{ $statusKey }}">
@@ -688,7 +994,7 @@
 					@endif
 					<div class="status-tracker__content">
 						<p class="status-tracker__title">
-							{{ $statusOptions[$statusKey] ?? ucfirst(str_replace('_', ' ', $statusKey)) }}
+							{{ $statusOptions[$displayKey] ?? ucfirst(str_replace('_', ' ', $displayKey)) }}
 						</p>
 						<p class="status-tracker__subtitle">
 							@switch($statusKey)
@@ -817,6 +1123,7 @@
 											}
 										}
 										$addonValues = array_filter($addonValues);
+										$addonLookup = collect($addonValues);
 
 										$breakdown = collect(data_get($item, 'breakdown', []))
 											->filter(function ($row) {
@@ -963,6 +1270,38 @@
 											->unique(fn ($option) => \Illuminate\Support\Str::lower($option))
 											->values();
 										$images = collect(data_get($item, 'preview_images', data_get($item, 'images', [])))->filter();
+										$itemMaterialBuckets = [
+											'paper' => [],
+											'addon' => [],
+											'other' => [],
+										];
+
+										$itemRegisterMaterial = function (string $type, string $label, $quantity, $unitPrice, $total) use (&$itemMaterialBuckets) {
+											$typeKey = in_array($type, ['paper', 'addon'], true) ? $type : 'other';
+											$normalizedLabel = trim(mb_strtolower($label));
+											$key = $normalizedLabel !== '' ? $normalizedLabel : uniqid($typeKey . '_');
+
+											if (!isset($itemMaterialBuckets[$typeKey][$key])) {
+												$itemMaterialBuckets[$typeKey][$key] = [
+													'label' => $label !== '' ? $label : 'Material',
+													'quantity' => 0.0,
+													'unit_price' => null,
+													'total' => 0.0,
+												];
+											}
+
+											if (is_numeric($quantity)) {
+												$itemMaterialBuckets[$typeKey][$key]['quantity'] += (float) $quantity;
+											}
+
+											if (is_numeric($unitPrice) && $itemMaterialBuckets[$typeKey][$key]['unit_price'] === null) {
+												$itemMaterialBuckets[$typeKey][$key]['unit_price'] = (float) $unitPrice;
+											}
+
+											if (is_numeric($total)) {
+												$itemMaterialBuckets[$typeKey][$key]['total'] += (float) $total;
+											}
+										};
 
 										// detect if item is envelope or giveaway by product_type or name
 										$ptype = strtolower((string) data_get($item, 'product_type', ''));
@@ -999,7 +1338,8 @@
 										// breakdown rows (paper stock and addons) add to group sums only for invitations
 										if (!$isEnvelope && !$isGiveaway) {
 											foreach ($breakdown as $brow) {
-												$lbl = strtolower((string) data_get($brow, 'label', ''));
+												$lblRaw = (string) data_get($brow, 'label', '');
+												$lbl = strtolower($lblRaw);
 												$btotal = data_get($brow, 'total');
 												if (!is_numeric($btotal)) {
 													$bunit = data_get($brow, 'unit_price');
@@ -1008,12 +1348,69 @@
 												}
 												$btotal = (float) $btotal;
 
-												if ($lbl !== '' && str_contains($lbl, strtolower((string) $paperStockValue))) {
+												$matchesPaper = $lbl !== '' && $paperStockValue && str_contains($lbl, strtolower((string) $paperStockValue));
+												$matchesAddon = $addonLookup->contains(function ($v) use ($lbl) {
+													return $v !== '' && str_contains($lbl, $v);
+												});
+
+												if ($matchesPaper) {
 													$groupSums['paper_stock'] += $btotal;
-												} elseif (collect($addonValues)->contains(function ($v) use ($lbl) { return $v !== '' && str_contains($lbl, $v); })) {
+												} elseif ($matchesAddon) {
 													$groupSums['addons'] += $btotal;
 												} else {
 													$groupSums['others'] += $btotal;
+												}
+
+												$rowQuantityValue = data_get($brow, 'quantity');
+												if (!is_numeric($rowQuantityValue) || (float) $rowQuantityValue <= 0) {
+													$rowQuantityValue = $quantity ?: null;
+												}
+
+												$rowUnitValue = data_get($brow, 'unit_price');
+												if ((!is_numeric($rowUnitValue) || (float) $rowUnitValue === 0.0) && is_numeric($rowQuantityValue) && (float) $rowQuantityValue > 0 && $btotal > 0) {
+													$rowUnitValue = $btotal / (float) $rowQuantityValue;
+												}
+
+												$materialType = $matchesPaper ? 'paper' : ($matchesAddon ? 'addon' : 'other');
+												$registerMaterial($materialType, $lblRaw, $rowQuantityValue, $rowUnitValue, $btotal);
+												$itemRegisterMaterial($materialType, $lblRaw, $rowQuantityValue, $rowUnitValue, $btotal);
+											}
+
+											if ($paperStockValue && empty($itemMaterialBuckets['paper'])) {
+												$paperLabel = is_string($paperStockValue) && trim($paperStockValue) !== ''
+													? trim((string) $paperStockValue)
+													: 'Paper Stock';
+												$paperUnitPrice = $extractMoney(data_get($rawOptions, 'paper_stock_price'));
+												$paperTotal = is_numeric($paperUnitPrice) ? (float) $paperUnitPrice * max(1, $quantity) : null;
+												$registerMaterial('paper', $paperLabel, $quantity, is_numeric($paperUnitPrice) ? (float) $paperUnitPrice : null, $paperTotal);
+												$itemRegisterMaterial('paper', $paperLabel, $quantity, is_numeric($paperUnitPrice) ? (float) $paperUnitPrice : null, $paperTotal);
+											}
+
+											if (empty($itemMaterialBuckets['addon']) && !empty($addonValues)) {
+												$addonFallbacks = [];
+												foreach ($rawOptions as $rawKey => $rawValue) {
+													if (!str_contains(strtolower((string) $rawKey), 'addon')) {
+														continue;
+													}
+
+													$normalizedAddons = $normalizeToArray($rawValue);
+													if (!$normalizedAddons) {
+														$normalizedAddons = $rawValue !== null ? [$rawValue] : [];
+													}
+
+													foreach ($normalizedAddons as $addonEntry) {
+														$label = trim($formatAddon($addonEntry));
+														if ($label === '' || strtolower($label) === 'none') {
+															continue;
+														}
+														$addonFallbacks[] = $label;
+													}
+												}
+
+												$addonFallbacks = array_values(array_unique($addonFallbacks));
+												foreach ($addonFallbacks as $addonLabel) {
+													$registerMaterial('addon', $addonLabel, $quantity, null, null);
+													$itemRegisterMaterial('addon', $addonLabel, $quantity, null, null);
 												}
 											}
 										}
@@ -1021,8 +1418,167 @@
 									<tr>
 										<td>
 											<div class="item-cell">
-												@if($images->isNotEmpty())
-													<img src="{{ $images->first() }}" alt="" class="item-cell__thumb">
+												@php
+													$detectOrientation = function ($value) {
+														$value = is_string($value) ? strtolower(trim($value)) : '';
+														if ($value === '') {
+															return null;
+														}
+
+														if (str_contains($value, 'back') || str_contains($value, 'reverse') || str_contains($value, 'rear')) {
+															return 'back';
+														}
+
+														if (str_contains($value, 'front') || str_contains($value, 'cover')) {
+															return 'front';
+														}
+
+														if (str_contains($value, 'inside')) {
+															return 'inside';
+														}
+
+														if (str_contains($value, 'outside')) {
+															return 'outside';
+														}
+
+														return null;
+													};
+
+													$labelForOrientation = function (?string $orientation) {
+														return match ($orientation) {
+															'front' => 'Front design',
+															'back' => 'Back design',
+															'inside' => 'Inside spread',
+															'outside' => 'Outside',
+															default => null,
+														};
+													};
+
+													$galleryEntries = collect();
+													$gallerySources = [];
+
+													$pushGalleryImage = function ($src, ?string $orientation = null, ?string $label = null) use (&$galleryEntries, &$gallerySources, $detectOrientation, $labelForOrientation) {
+														$src = is_string($src) ? trim($src) : '';
+														if ($src === '') {
+															return;
+														}
+
+														$orientation = $orientation ?: $detectOrientation($label);
+														$label = $label ?: $labelForOrientation($orientation);
+
+														if (in_array($src, $gallerySources, true)) {
+															return;
+														}
+
+														$entry = array_filter([
+															'src' => $src,
+															'orientation' => $orientation,
+															'label' => $label,
+														], function ($value) {
+															return $value !== null && $value !== '';
+														});
+
+														$galleryEntries->push($entry);
+														$gallerySources[] = $src;
+													};
+
+													$images->each(function ($img, $imageKey) use ($detectOrientation, $pushGalleryImage) {
+														$keyOrientation = $detectOrientation($imageKey);
+
+														if (is_string($img)) {
+															$pushGalleryImage($img, $keyOrientation);
+															return;
+														}
+
+														if (is_object($img)) {
+															if (method_exists($img, 'toArray')) {
+																$img = $img->toArray();
+															} elseif (method_exists($img, '__toString')) {
+																$pushGalleryImage((string) $img, $keyOrientation);
+																return;
+															} else {
+																$img = (array) $img;
+															}
+														}
+
+														if (!is_array($img)) {
+															return;
+														}
+
+														$primarySrc = $img['url'] ?? $img['src'] ?? $img['preview'] ?? null;
+														$primaryOrientation = $detectOrientation($img['orientation'] ?? $img['side'] ?? $img['page'] ?? $img['label'] ?? null) ?? $keyOrientation;
+														$primaryLabel = $img['label'] ?? $img['title'] ?? $img['description'] ?? null;
+														$pushGalleryImage($primarySrc, $primaryOrientation, $primaryLabel);
+
+														foreach ($img as $nestedKey => $nestedValue) {
+															if (in_array($nestedKey, ['url', 'src', 'preview', 'label', 'title', 'description', 'orientation', 'side', 'page'], true)) {
+																continue;
+															}
+
+															if (is_string($nestedValue)) {
+																$pushGalleryImage($nestedValue, $detectOrientation($nestedKey));
+																continue;
+															}
+
+															if (is_object($nestedValue)) {
+																if (method_exists($nestedValue, 'toArray')) {
+																	$nestedValue = $nestedValue->toArray();
+																} else {
+																	$nestedValue = (array) $nestedValue;
+																}
+															}
+
+															if (is_array($nestedValue)) {
+																$nestedSrc = $nestedValue['url'] ?? $nestedValue['src'] ?? $nestedValue['preview'] ?? null;
+																$nestedOrientation = $detectOrientation($nestedValue['orientation'] ?? $nestedKey) ?? $detectOrientation($nestedKey);
+																$nestedLabel = $nestedValue['label'] ?? $nestedValue['title'] ?? null;
+																$pushGalleryImage($nestedSrc, $nestedOrientation, $nestedLabel);
+															}
+														}
+													});
+
+													if ($galleryEntries->isEmpty()) {
+														$fallbackImage = data_get($item, 'image');
+														if (is_string($fallbackImage) && trim($fallbackImage) !== '') {
+															$pushGalleryImage($fallbackImage);
+														}
+													}
+
+													$gallery = $galleryEntries->values();
+													$itemMaterialsList = collect($itemMaterialBuckets)
+														->flatMap(function ($rows, $type) {
+															return collect($rows)->map(function ($row) use ($type) {
+																return [
+																	'type' => $type,
+																	'label' => $row['label'] ?? 'Material',
+																	'quantity' => isset($row['quantity']) ? (float) $row['quantity'] : null,
+																	'unit_price' => isset($row['unit_price']) ? (float) $row['unit_price'] : null,
+																	'total' => isset($row['total']) ? (float) $row['total'] : null,
+																];
+															});
+														})
+														->filter(function ($row) {
+															return (($row['quantity'] ?? 0) > 0) || (($row['total'] ?? 0) > 0) || (($row['unit_price'] ?? 0) > 0);
+														})
+														->values();
+
+													$primaryImageEntry = $gallery->first();
+													$primaryImage = is_array($primaryImageEntry) ? ($primaryImageEntry['src'] ?? null) : (is_string($primaryImageEntry) ? $primaryImageEntry : null);
+													$primaryImageLabel = is_array($primaryImageEntry) ? ($primaryImageEntry['label'] ?? null) : null;
+													$previewTitle = data_get($item, 'name', 'Custom product');
+												@endphp
+												@if($gallery->isNotEmpty())
+													<button
+														type="button"
+														class="item-cell__thumb-button"
+														data-preview-trigger
+														data-preview-title="{{ $previewTitle }}"
+														data-preview-gallery='@json($gallery)'
+														data-preview-materials='@json($itemMaterialsList)'
+														aria-label="View artwork preview for {{ $previewTitle }}"
+													>
+														<img src="{{ $primaryImage }}" alt="{{ $primaryImageLabel ? $previewTitle . ' ' . strtolower($primaryImageLabel) : $previewTitle . ' preview' }}" class="item-cell__thumb">
+													</button>
 												@endif
 												<div>
 													<strong>{{ data_get($item, 'name', 'Custom product') }}</strong>
@@ -1075,6 +1631,76 @@
 					</div>
 				@endif
 			</article>
+
+			@php
+				// Flatten grouped material requirements for presentation.
+				$materialsList = collect($materialRequirements ?? [])
+					->flatMap(function ($rows, $type) {
+						return collect($rows)->map(function ($row) use ($type) {
+							$quantityValue = isset($row['quantity']) ? (float) $row['quantity'] : 0.0;
+							$unitPriceValue = isset($row['unit_price']) ? (float) $row['unit_price'] : null;
+							$totalValue = isset($row['total']) ? (float) $row['total'] : null;
+
+							return [
+								'type' => $type,
+								'label' => $row['label'] ?? 'Material',
+								'quantity' => $quantityValue,
+								'unit_price' => $unitPriceValue,
+								'total' => $totalValue,
+							];
+						});
+					})
+					->filter(function ($row) {
+						return ($row['quantity'] ?? 0) > 0 || ($row['total'] ?? 0) > 0;
+					})
+					->sortByDesc(function ($row) {
+						return $row['quantity'] ?? 0;
+					})
+					->values();
+			@endphp
+
+			@if($materialsList->isNotEmpty())
+				<article class="ordersummary-card">
+					<header class="ordersummary-card__header">
+						<h2>Materials needed for production</h2>
+						<p class="ordersummary-card__meta">{{ $materialsList->count() }} {{ \Illuminate\Support\Str::plural('material', $materialsList->count()) }} tracked</p>
+					</header>
+					<div class="materials-grid">
+						@foreach($materialsList as $material)
+							@php
+								$typeLabel = 'Other';
+								if ($material['type'] === 'paper') {
+									$typeLabel = 'Paper Stock';
+								} elseif ($material['type'] === 'addon') {
+									$typeLabel = 'Add-on';
+								}
+
+								$quantityValue = $material['quantity'] ?? 0;
+								$isWholeNumber = $quantityValue > 0 && abs($quantityValue - round($quantityValue)) < 0.01;
+								$quantityText = $quantityValue > 0
+									? number_format($quantityValue, $isWholeNumber ? 0 : 2)
+									: '—';
+
+								$unitPriceValue = $material['unit_price'];
+								$totalValue = $material['total'];
+							@endphp
+							<div class="material-card material-card--{{ $material['type'] }}">
+								<span class="material-card__type">{{ $typeLabel }}</span>
+								<h3 class="material-card__title">{{ $material['label'] }}</h3>
+								<p class="material-card__quantity"><strong>{{ $quantityText }}</strong> units needed</p>
+								@if(is_numeric($totalValue) && $totalValue > 0)
+									<p class="material-card__cost">Total cost · ₱{{ number_format($totalValue, 2) }}</p>
+								@elseif(is_numeric($unitPriceValue) && $unitPriceValue > 0)
+									<p class="material-card__cost">Unit cost · ₱{{ number_format($unitPriceValue, 2) }}</p>
+								@else
+									<p class="material-card__cost">Cost pending</p>
+								@endif
+
+							</div>
+								@endforeach
+							</div>
+						</article>
+					@endif
 
 			<article class="ordersummary-card">
 				<header class="ordersummary-card__header">
@@ -1342,7 +1968,376 @@
 	</div>
 </main>
 
+<div class="ordersummary-preview-modal" data-preview-modal hidden aria-hidden="true" tabindex="-1">
+	<div class="ordersummary-preview-backdrop" data-preview-close></div>
+	<div class="ordersummary-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="ordersummaryPreviewTitle">
+		<header class="ordersummary-preview-header">
+			<div>
+				<h2 id="ordersummaryPreviewTitle">Artwork preview</h2>
+				<p class="ordersummary-preview-meta"><span data-preview-title></span><span data-preview-label></span><span data-preview-counter></span></p>
+			</div>
+			<button type="button" class="ordersummary-preview-close" data-preview-close aria-label="Close preview">
+				<span aria-hidden="true">&times;</span>
+			</button>
+		</header>
+		<div class="ordersummary-preview-body">
+			<img data-preview-image src="" alt="">
+		</div>
+		<div class="ordersummary-preview-details" data-preview-materials-wrapper hidden>
+			<h3>Materials used</h3>
+			<ul class="ordersummary-preview-materials" data-preview-materials></ul>
+		</div>
+		<div class="ordersummary-preview-actions">
+			<button type="button" class="btn btn-secondary" data-preview-prev disabled>
+				<i class="fi fi-rr-angle-small-left" aria-hidden="true"></i> Previous
+			</button>
+			<a href="#" class="btn btn-primary" data-preview-download rel="noopener" download>
+				<i class="fi fi-rr-download" aria-hidden="true"></i> Download
+			</a>
+			<button type="button" class="btn btn-secondary" data-preview-next disabled>
+				Next <i class="fi fi-rr-angle-small-right" aria-hidden="true"></i>
+			</button>
+		</div>
+	</div>
+</div>
+
 <div class="ordersummary-toast" data-toast role="status" aria-live="polite" hidden></div>
 
 <script src="{{ asset('js/admin/ordersummary.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+	const modal = document.querySelector('[data-preview-modal]');
+	if (!modal) {
+		return;
+	}
+
+	const imageEl = modal.querySelector('[data-preview-image]');
+	const titleEl = modal.querySelector('[data-preview-title]');
+	const labelEl = modal.querySelector('[data-preview-label]');
+	const counterEl = modal.querySelector('[data-preview-counter]');
+	const downloadEl = modal.querySelector('[data-preview-download]');
+	const prevBtn = modal.querySelector('[data-preview-prev]');
+	const nextBtn = modal.querySelector('[data-preview-next]');
+	const closeEls = modal.querySelectorAll('[data-preview-close]');
+	const materialsWrap = modal.querySelector('[data-preview-materials-wrapper]');
+	const materialsListEl = modal.querySelector('[data-preview-materials]');
+	const body = document.body;
+
+	const orientationLabels = {
+		front: 'Front design',
+		back: 'Back design',
+		inside: 'Inside spread',
+		outside: 'Outside',
+	};
+
+	const materialTypeLabels = {
+		paper: 'Paper Stock',
+		addon: 'Add-on',
+		other: 'Other',
+	};
+
+	const labelFromOrientation = function (value) {
+		if (!value) {
+			return '';
+		}
+		const key = value.toString().toLowerCase();
+		return orientationLabels[key] || value.toString();
+	};
+
+	const normalizeGallery = function (input) {
+		if (!Array.isArray(input)) {
+			return [];
+		}
+
+		const seen = new Set();
+		const normalized = [];
+
+		input.forEach(function (entry) {
+			let src = '';
+			let orientation = '';
+			let label = '';
+
+			if (typeof entry === 'string') {
+				src = entry;
+			} else if (entry && typeof entry === 'object') {
+				src = entry.src || entry.url || entry.preview || '';
+				orientation = entry.orientation || entry.side || entry.page || '';
+				label = entry.label || entry.title || entry.description || '';
+			}
+
+			src = (src || '').toString().trim();
+			if (!src || seen.has(src)) {
+				return;
+			}
+
+			const orientationKey = orientation ? orientation.toString().toLowerCase() : '';
+			const normalizedLabel = label ? label.toString().trim() : '';
+
+			seen.add(src);
+			normalized.push({
+				src: src,
+				orientation: orientationKey || null,
+				label: normalizedLabel || labelFromOrientation(orientationKey),
+			});
+		});
+
+		return normalized;
+	};
+
+	const normalizeMaterials = function (input) {
+		if (!Array.isArray(input)) {
+			return [];
+		}
+
+		return input.map(function (entry) {
+			if (!entry || typeof entry !== 'object') {
+				return null;
+			}
+
+			const typeRaw = entry.type;
+			const type = typeof typeRaw === 'string' ? typeRaw.toLowerCase() : 'other';
+			const label = typeof entry.label === 'string' && entry.label.trim() !== '' ? entry.label.trim() : 'Material';
+			const quantityValue = Number.isFinite(entry.quantity) ? entry.quantity : parseFloat(entry.quantity);
+			const unitPriceValue = Number.isFinite(entry.unit_price) ? entry.unit_price : parseFloat(entry.unit_price);
+			const totalValue = Number.isFinite(entry.total) ? entry.total : parseFloat(entry.total);
+
+			return {
+				type: materialTypeLabels[type] ? type : 'other',
+				label: label,
+				quantity: Number.isFinite(quantityValue) ? quantityValue : null,
+				unitPrice: Number.isFinite(unitPriceValue) ? unitPriceValue : null,
+				total: Number.isFinite(totalValue) ? totalValue : null,
+			};
+		}).filter(Boolean);
+	};
+
+	const formatQuantity = function (value) {
+		if (typeof value !== 'number' || !isFinite(value) || value <= 0) {
+			return '';
+		}
+		const rounded = Math.round(value);
+		if (Math.abs(rounded - value) < 0.01) {
+			return String(rounded);
+		}
+		return value.toFixed(2);
+	};
+
+	const formatCurrency = function (value) {
+		if (typeof value !== 'number' || !isFinite(value) || value <= 0) {
+			return '';
+		}
+		return '₱' + value.toLocaleString('en-PH', {
+			minimumFractionDigits: 2,
+			maximumFractionDigits: 2,
+		});
+	};
+
+	const renderMaterials = function () {
+		if (!materialsListEl || !materialsWrap) {
+			return;
+		}
+
+		materialsListEl.innerHTML = '';
+
+		if (!state.materials.length) {
+			materialsWrap.setAttribute('hidden', 'hidden');
+			return;
+		}
+
+		materialsWrap.removeAttribute('hidden');
+		const fragment = document.createDocumentFragment();
+
+		state.materials.forEach(function (material) {
+			const typeLabel = materialTypeLabels[material.type] || materialTypeLabels.other;
+			const quantityText = formatQuantity(material.quantity);
+			const totalText = formatCurrency(material.total);
+			const unitText = formatCurrency(material.unitPrice);
+
+			const segments = [typeLabel + ' · ' + material.label];
+			if (quantityText) {
+				segments.push(quantityText + ' units');
+			}
+			if (totalText) {
+				segments.push(totalText);
+			} else if (unitText) {
+				segments.push('Unit ' + unitText);
+			}
+
+			const item = document.createElement('li');
+			item.textContent = segments.join(' – ');
+			fragment.appendChild(item);
+		});
+
+		materialsListEl.appendChild(fragment);
+	};
+
+	const state = {
+		images: [],
+		index: 0,
+		title: 'Order preview',
+		materials: []
+	};
+
+	const sanitizeFileName = function (value) {
+		const safeBase = (value || 'preview')
+			.toString()
+			.trim()
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, '-');
+		return safeBase.replace(/^-+|-+$/g, '') || 'preview';
+	};
+
+	const updatePreview = function () {
+		if (!state.images.length) {
+			return;
+		}
+
+		const current = state.images[state.index];
+		const currentSrc = current.src;
+		const currentLabel = current.label || labelFromOrientation(current.orientation);
+		imageEl.src = currentSrc;
+		const baseAlt = state.title || 'Order preview image';
+		imageEl.alt = currentLabel ? baseAlt + ' – ' + currentLabel : baseAlt + ' ' + (state.index + 1);
+
+		if (titleEl) {
+			titleEl.textContent = state.title;
+		}
+
+		if (labelEl) {
+			labelEl.textContent = currentLabel || '';
+		}
+
+		if (counterEl) {
+			counterEl.textContent = state.images.length > 1
+				? ' (' + (state.index + 1) + ' of ' + state.images.length + ')'
+				: '';
+		}
+
+		if (downloadEl) {
+			downloadEl.href = currentSrc;
+			const baseName = sanitizeFileName(state.title);
+			const extensionMatch = (currentSrc || '').split('?')[0].split('.').pop();
+			const normalizedExt = extensionMatch ? extensionMatch.toLowerCase() : null;
+			const extension = normalizedExt && normalizedExt.length <= 5 ? normalizedExt : 'png';
+			const labelSlug = sanitizeFileName(currentLabel);
+			const nameParts = [baseName, state.index + 1];
+			if (labelSlug && labelSlug !== 'preview') {
+				nameParts.push(labelSlug);
+			}
+			downloadEl.setAttribute('download', nameParts.join('-') + '.' + extension);
+		}
+
+		if (prevBtn) {
+			prevBtn.disabled = state.index === 0;
+		}
+
+		if (nextBtn) {
+			nextBtn.disabled = state.index >= state.images.length - 1;
+		}
+
+		renderMaterials();
+	};
+
+	const openPreview = function (images, title, materials) {
+		const normalizedImages = normalizeGallery(images);
+		if (!normalizedImages.length) {
+			return;
+		}
+
+		state.images = normalizedImages;
+		state.index = 0;
+		state.title = title || 'Order preview';
+		state.materials = normalizeMaterials(materials);
+
+		modal.removeAttribute('hidden');
+		modal.setAttribute('aria-hidden', 'false');
+		body.classList.add('ordersummary-modal-open');
+		updatePreview();
+		try {
+			modal.focus({ preventScroll: true });
+		} catch (error) {
+			modal.focus();
+		}
+	};
+
+	const closePreview = function () {
+		modal.setAttribute('hidden', 'hidden');
+		modal.setAttribute('aria-hidden', 'true');
+		body.classList.remove('ordersummary-modal-open');
+		state.images = [];
+		state.index = 0;
+		state.materials = [];
+		if (labelEl) {
+			labelEl.textContent = '';
+		}
+		if (materialsListEl) {
+			materialsListEl.innerHTML = '';
+		}
+		if (materialsWrap) {
+			materialsWrap.setAttribute('hidden', 'hidden');
+		}
+	};
+
+	document.querySelectorAll('[data-preview-trigger]').forEach(function (trigger) {
+		trigger.addEventListener('click', function () {
+			try {
+				const galleryRaw = trigger.getAttribute('data-preview-gallery') || '[]';
+				const materialsRaw = trigger.getAttribute('data-preview-materials') || '[]';
+				const galleryParsed = JSON.parse(galleryRaw);
+				const materialsParsed = JSON.parse(materialsRaw);
+				openPreview(galleryParsed, trigger.getAttribute('data-preview-title'), materialsParsed);
+			} catch (error) {
+				console.error('Unable to open preview', error);
+			}
+		});
+	});
+
+	if (prevBtn) {
+		prevBtn.addEventListener('click', function () {
+			if (state.index > 0) {
+				state.index -= 1;
+				updatePreview();
+			}
+		});
+	}
+
+	if (nextBtn) {
+		nextBtn.addEventListener('click', function () {
+			if (state.index < state.images.length - 1) {
+				state.index += 1;
+				updatePreview();
+			}
+		});
+	}
+
+	closeEls.forEach(function (el) {
+		el.addEventListener('click', closePreview);
+	});
+
+	modal.addEventListener('click', function (event) {
+		if (event.target === modal || event.target.classList.contains('ordersummary-preview-backdrop')) {
+			closePreview();
+		}
+	});
+
+	document.addEventListener('keydown', function (event) {
+		if (modal.hasAttribute('hidden')) {
+			return;
+		}
+
+		if (event.key === 'Escape') {
+			closePreview();
+			return;
+		}
+
+		if (event.key === 'ArrowLeft' && state.index > 0) {
+			state.index -= 1;
+			updatePreview();
+		} else if (event.key === 'ArrowRight' && state.index < state.images.length - 1) {
+			state.index += 1;
+			updatePreview();
+		}
+	});
+});
+</script>
 @endsection

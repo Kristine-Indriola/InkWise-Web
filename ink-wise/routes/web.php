@@ -226,6 +226,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::post('/unlock', [UserPasswordResetController::class, 'unlock'])->name('unlock');
         Route::post('/lock', [UserPasswordResetController::class, 'lock'])->name('lock');
         Route::post('/{user}/send', [UserPasswordResetController::class, 'send'])->name('send');
+        Route::put('/{user}/update', [UserPasswordResetController::class, 'update'])->name('update');
     });
 
    
@@ -257,6 +258,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::post('/', [MaterialController::class, 'store'])->name('store');
         Route::get('/{id}/edit', [MaterialController::class, 'edit'])->name('edit');
         Route::put('/{id}', [MaterialController::class, 'update'])->name('update');
+        Route::post('/{id}/restock', [MaterialController::class, 'restock'])->name('restock');
         Route::delete('/{id}', [MaterialController::class, 'destroy'])->name('destroy');
     });
     // ✅ Inks resource route (move here, not nested)
@@ -315,7 +317,6 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::get('/', [ReportsDashboardController::class, 'index'])->name('index');
         Route::get('/sales', [ReportsDashboardController::class, 'sales'])->name('sales');
         Route::get('/inventory', [ReportsDashboardController::class, 'inventory'])->name('inventory');
-        Route::get('/usage-details', [ReportsDashboardController::class, 'usageDetails'])->name('usage-details');
         Route::get('/pickup-calendar', [ReportsDashboardController::class, 'pickupCalendar'])->name('pickup-calendar');
 
         Route::get('/sales/export/{type}', [ReportsDashboardController::class, 'exportSales'])
@@ -926,12 +927,13 @@ Route::prefix('staff')->name('staff.')->middleware(\App\Http\Middleware\RoleMidd
         Route::delete('/{id}', [StaffInventoryController::class, 'destroy'])->name('destroy');
     });
 
-     Route::prefix('materials')->name('materials.')->group(function () {
+    Route::prefix('materials')->name('materials.')->group(function () {
         Route::get('/', [StaffMaterialController::class, 'index'])->name('index');
         Route::get('/create', [StaffMaterialController::class, 'create'])->name('create');
         Route::post('/', [StaffMaterialController::class, 'store'])->name('store');
         Route::get('/{id}/edit', [StaffMaterialController::class, 'edit'])->name('edit');
         Route::put('/{id}', [StaffMaterialController::class, 'update'])->name('update');
+        Route::post('/{id}/restock', [StaffMaterialController::class, 'restock'])->name('restock');
         Route::delete('/{id}', [StaffMaterialController::class, 'destroy'])->name('destroy');
     });
 
