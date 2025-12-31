@@ -30,7 +30,7 @@
     <header class="page-header">
         <div>
             <h1 class="page-title">Customer Profiles</h1>
-            <p class="page-subtitle">View and manage customer information and registration details.</p>
+            <p class="page-subtitle">Manage customer information and registration details.</p>
         </div>
     </header>
 
