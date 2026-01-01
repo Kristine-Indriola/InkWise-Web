@@ -1281,10 +1281,17 @@
             <a href="#contact" class="topbar-link">Contact</a>
         </nav>
 
-        <div class="hidden md:flex items-center gap-3 ml-auto" style="margin-right: -16rem;">
-            <form action="{{ url('/search') }}" method="GET" class="flex" style="margin-left: -2rem; transform: translateX(-2rem) !important;">
-                <input type="text" name="query" placeholder="Search..."
-                       class="w-44 border border-gray-300 rounded-full px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#06b6d4] focus:border-transparent transition-all" />
+        <div class="hidden md:flex items-center gap-3 ml-auto">
+            <form action="{{ url('/search') }}" method="GET" class="flex items-center gap-2">
+                <div class="relative">
+                    <input type="text" name="query" placeholder="Search..."
+                           class="w-44 border border-gray-300 rounded-full px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#06b6d4] focus:border-transparent transition-all pr-8" />
+                    <button type="submit" class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/>
+                        </svg>
+                    </button>
+                </div>
             </form>
 
             @guest
@@ -1330,8 +1337,13 @@
     </div>
 
     <div id="mobileSearch" class="hidden md:hidden w-full px-4 mt-2">
-        <form action="{{ url('/search') }}" method="GET">
-            <input type="text" name="query" placeholder="Search..." class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-[#06b6d4]" />
+        <form action="{{ url('/search') }}" method="GET" class="relative">
+            <input type="text" name="query" placeholder="Search..." class="w-full border rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring focus:ring-[#06b6d4]" />
+            <button type="submit" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/>
+                </svg>
+            </button>
         </form>
     </div>
 </header>

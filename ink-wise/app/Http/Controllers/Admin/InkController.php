@@ -48,7 +48,6 @@ class InkController extends Controller
             'unit' => 'required|string|max:20', // e.g. can (required for inks)
             'size' => 'required|string|max:50', // store ml size (e.g. 500ml) (required for inks)
             'cost_per_ml' => 'required|numeric|min:0',
-            'avg_usage_per_invite_ml' => 'nullable|numeric|min:0',
             'cost_per_invite' => 'nullable|numeric|min:0',
             'description' => 'nullable|string|max:1000',
             'reorder_level' => 'required|integer|min:0',
@@ -67,7 +66,6 @@ class InkController extends Controller
             'unit' => $validated['unit'] ?? null,
             'size' => $validated['size'] ?? null,
             'cost_per_ml' => $validated['cost_per_ml'],
-            'avg_usage_per_invite_ml' => $validated['avg_usage_per_invite_ml'] ?? null,
             'cost_per_invite' => $validated['cost_per_invite'] ?? null,
             'description' => $validated['description'] ?? null,
         ];
@@ -142,7 +140,6 @@ class InkController extends Controller
             'unit' => 'required|string|max:20',
             'size' => 'required|string|max:50',
             'cost_per_ml' => 'required|numeric|min:0',
-            'avg_usage_per_invite_ml' => 'nullable|numeric|min:0',
             'cost_per_invite' => 'nullable|numeric|min:0',
             'description' => 'nullable|string|max:1000',
             'reorder_level' => 'required|integer|min:0',
@@ -161,7 +158,6 @@ class InkController extends Controller
             'unit' => $validated['unit'] ?? $ink->unit,
             'size' => $validated['size'] ?? $ink->size,
             'cost_per_ml' => $validated['cost_per_ml'],
-            'avg_usage_per_invite_ml' => $validated['avg_usage_per_invite_ml'] ?? $ink->avg_usage_per_invite_ml,
             'cost_per_invite' => $validated['cost_per_invite'] ?? $ink->cost_per_invite,
             'description' => $validated['description'] ?? $ink->description,
         ];

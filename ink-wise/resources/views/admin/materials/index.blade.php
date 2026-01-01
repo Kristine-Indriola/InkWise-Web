@@ -283,7 +283,6 @@
                     <th>Weight (GSM)</th>
                     <th>Unit</th>
                     <th>Unit Price (₱)</th>
-                    <th>Average Usage per Invite (ml)</th>
                     <th>Stock Qty</th>
                     <th>Reorder Point</th>
                     <th class="status-col text-center">Status</th>
@@ -343,9 +342,6 @@
                             @if($material->material_type === 'ink')
                                 /ml
                             @endif
-                        </td>
-                        <td>
-                            {{ $material->avg_usage_per_invite_ml ?? '-' }}
                         </td>
                         <td>
                             <span class="badge {{ $stock <= 0 ? 'stock-critical' : ($stock > 0 && $stock <= $reorder ? 'stock-low' : 'stock-ok') }}">
@@ -447,7 +443,6 @@
                         <td>-</td>
                         <td>{{ $ink->unit ?? 'can' }}</td>
                         <td>₱{{ number_format($ink->cost_per_ml, 2) }}/ml</td>
-                        <td>{{ $ink->avg_usage_per_invite_ml ?? '-' }}</td>
                         <td>
                             <span class="badge {{ $statusBadgeClass }}">
                                 {{ $stockLevel }} {{ $ink->unit ?? 'units' }}
