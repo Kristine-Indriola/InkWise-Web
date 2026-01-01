@@ -120,11 +120,6 @@
                     <input type="number" step="0.01" id="cost_per_ml" name="cost_per_ml" class="form-control" value="{{ old('cost_per_ml', $ink->cost_per_ml) }}" min="0" required>
                     <small style="color:#6b7280;">Required. Unit price per milliliter (e.g. 0.25).</small>
                 </div>
-                <div class="form-group">
-                    <label for="avg_usage_per_invite_ml">Average Usage per Invite (ml)</label>
-                    <input type="number" step="0.01" id="avg_usage_per_invite_ml" name="avg_usage_per_invite_ml" class="form-control" value="{{ old('avg_usage_per_invite_ml', $ink->avg_usage_per_invite_ml) }}" min="0">
-                    <small style="color:#6b7280;">Optional. Estimated ml used per invite (for inventory planning).</small>
-                </div>
             </div>
 
             <div class="btn-group">

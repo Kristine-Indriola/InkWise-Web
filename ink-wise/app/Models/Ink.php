@@ -20,7 +20,6 @@ class Ink extends Model
         'unit',
         'size',
         'cost_per_ml',
-        'avg_usage_per_invite_ml',
         'cost_per_invite',
         'description',
     ];
