@@ -103,6 +103,7 @@
                         <option value="envelopes" {{ old('material_type', $material->material_type) == 'envelopes' ? 'selected' : '' }}>ENVELOPES</option>
                         <option value="ribbon" {{ old('material_type', $material->material_type) == 'ribbon' ? 'selected' : '' }}>RIBBON</option>
                         <option value="powder" {{ old('material_type', $material->material_type) == 'powder' ? 'selected' : '' }}>POWDER</option>
+                        <option value="souvenirs" {{ old('material_type', $material->material_type) == 'souvenirs' ? 'selected' : '' }}>SOUVENIRS</option>
                     </select>
                     @error('material_type') <small style="color:red;">{{ $message }}</small> @enderror
                 </div>

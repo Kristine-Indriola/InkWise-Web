@@ -26,6 +26,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const continueBtn = shell.querySelector('#giveawaysContinueBtn');
     const toast = shell.querySelector('#giveawayToast');
 
+    // Modal elements
+    const preOrderModal = document.getElementById('preOrderModal');
+    const preOrderConfirm = document.getElementById('preOrderConfirm');
+    const preOrderCancel = document.getElementById('preOrderCancel');
+
     const toCleanUrl = (value) => {
         if (typeof value !== 'string') return '';
         const trimmed = value.trim();
@@ -37,6 +42,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const placeholderImage = toCleanUrl(shell.dataset.placeholder)
         || toCleanUrl(shell.dataset.placeholderImage)
         || '/images/no-image.png';
+
+    // Track quantity validity so we never read an undeclared variable
+    let isMinQuantityValid = true;
 
     const extractImageSource = (candidate) => {
         if (!candidate) return '';
@@ -157,9 +165,18 @@ document.addEventListener('DOMContentLoaded', () => {
         window.sessionStorage.setItem(storageKey, JSON.stringify(summary));
     };
 
-    const setContinueState = (disabled) => {
+    let isPreOrderConfirmed = false;
+    let pendingPreOrderSelection = null;
+
+    const applyContinueDisabled = (disabled = false) => {
         if (!continueBtn) return;
-        continueBtn.disabled = Boolean(disabled);
+        const shouldDisable = Boolean(disabled || !isMinQuantityValid);
+        continueBtn.disabled = shouldDisable;
+        continueBtn.classList.toggle('is-disabled', shouldDisable);
+    };
+
+    const setContinueState = (disabled) => {
+        applyContinueDisabled(disabled);
     };
 
     const setRemoveState = (hidden) => {
@@ -443,9 +460,10 @@ document.addEventListener('DOMContentLoaded', () => {
         card.dataset.productId = card.dataset.giveawayId;
 
         const price = normalisePrice(item.price, 0);
-        const minQty = Number(item.min_qty ?? 1) || 1;
-        const step = Number(item.step ?? 5) || 5;
-        const defaultQty = Number(item.default_qty ?? item.qty ?? minQty) || minQty;
+        const hardMinQty = 10;
+        const minQty = Math.max(hardMinQty, Number(item.min_qty ?? hardMinQty) || hardMinQty);
+        const step = 1; // allow any whole number increment
+        const defaultQty = Math.max(minQty, Math.floor(Number(item.default_qty ?? item.qty ?? minQty) || minQty));
         const stockQty = item.stock_qty !== undefined && item.stock_qty !== null ? Number(item.stock_qty) : null;
         const initialMax = item.max_qty !== undefined && item.max_qty !== null ? Number(item.max_qty) : null;
         const maxQty = stockQty !== null
@@ -461,11 +479,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (item.material_type) materialLabelParts.push(item.material_type);
         const materialLabel = materialLabelParts.length ? materialLabelParts.join(' • ') : null;
 
+        const isOutOfStock = stockQty !== null && stockQty === 0;
+        const preOrderBadge = isOutOfStock ? '<span class="pre-order-badge">Pre-Order</span>' : '';
+
         card.innerHTML = `
             <div class="envelope-item__media">
-                <img src="${imageSrc}" alt="${item.name ?? 'Giveaway'} preview" class="preview-trigger" ${previewUrl ? `data-preview-url="${previewUrl}"` : ''} loading="lazy" onerror="this.src='${placeholderImage}'; this.style.opacity='0.4';">
+                <img src="${imageSrc}" alt="${item.name ?? 'Giveaway'} preview" class="preview-trigger ${isOutOfStock ? 'out-of-stock' : ''}" ${previewUrl ? `data-preview-url="${previewUrl}"` : ''} loading="lazy" onerror="this.src='${placeholderImage}'; this.style.opacity='0.4';">
+                ${preOrderBadge}
             </div>
-            <h3 class="envelope-item__title">${item.name ?? 'Giveaway'}</h3>
+            <h3 class="envelope-item__title ${isOutOfStock ? 'pre-order-title' : ''}">${item.name ?? 'Giveaway'}</h3>
             ${materialLabel ? `<p class="envelope-item__material">${materialLabel}</p>` : ''}
             ${description ? `<p class="envelope-item__meta">${description}</p>` : ''}
             <p class="envelope-item__price">${price ? `${formatMoney(price)} <span class="per-tag">per piece</span>` : '<span class="is-muted">Pricing on request</span>'}</p>
@@ -495,7 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <button class="btn btn-secondary envelope-item__design" type="button" title="Add/Edit My Design" ${designUrl ? `data-design-url="${designUrl}"` : ''}>
                         <i class="fas fa-edit"></i> Design
                     </button>
-                    <button class="primary-action envelope-item__select" type="button">Select giveaway</button>
+                    <button class="primary-action envelope-item__select ${isOutOfStock ? 'pre-order-btn' : ''}" type="button">${isOutOfStock ? 'Pre-Order' : 'Select giveaway'}</button>
                 </div>
             </div>
         `;
@@ -511,11 +533,13 @@ document.addEventListener('DOMContentLoaded', () => {
             helper.classList.toggle('is-alert', Boolean(isAlert));
         };
 
-        const baseHelperMessage = `Min ${minQty}${maxQty ? `, Max ${maxQty}${stockQty !== null && maxQty === stockQty ? ' (stock)' : ''}` : ''}`;
+        const baseHelperMessage = isOutOfStock 
+            ? `Min ${minQty} • Pre-order available (15 days delivery)`
+            : `Min ${minQty}${maxQty ? `, Max ${maxQty}${stockQty !== null && maxQty === stockQty ? ' (stock)' : ''}` : ''}`;
         setHelper(baseHelperMessage, false);
 
         const enforceQuantityBounds = (rawQty) => {
-            let quantity = Number(rawQty);
+            let quantity = Math.floor(Number(rawQty));
             if (!Number.isFinite(quantity)) quantity = minQty;
             if (quantity < minQty) quantity = minQty;
             let message = null;
@@ -527,7 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const computeTotal = (qty) => {
-            const quantity = Number(qty) || minQty;
+            const quantity = Math.max(minQty, Math.floor(Number(qty) || minQty));
             
             // Find matching tier if available
             let currentPrice = price;
@@ -557,11 +581,26 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         qtyInput?.addEventListener('input', () => {
-            const { quantity, message } = enforceQuantityBounds(qtyInput.value);
+            const raw = qtyInput.value;
+            // Allow typing the first digit(s) without immediately snapping to the minimum
+            if (raw === '' || raw.length < String(minQty).length) {
+                isMinQuantityValid = false;
+                applyContinueDisabled();
+                setHelper('Minimum quantity is 10', true);
+                return;
+            }
+
+            const { quantity, message } = enforceQuantityBounds(raw);
+            const isValid = Number(quantity) >= minQty;
+            isMinQuantityValid = isValid;
+            applyContinueDisabled();
+
             qtyInput.value = quantity;
             if (message) {
                 setHelper(message, true);
                 showToast(message);
+            } else if (!isValid) {
+                setHelper('Minimum quantity is 10', true);
             } else {
                 setHelper(baseHelperMessage, false);
             }
@@ -570,6 +609,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         qtyInput?.addEventListener('change', () => {
             const { quantity, message } = enforceQuantityBounds(qtyInput.value);
+            isMinQuantityValid = Number(quantity) >= minQty;
+            applyContinueDisabled();
             qtyInput.value = quantity;
             if (message) {
                 setHelper(message, true);
@@ -696,6 +737,20 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const selectGiveaway = async (item, quantity, total, options = {}) => {
+        // Check stock availability
+        const stockQty = item.stock_qty ?? null;
+        if (stockQty !== null && stockQty === 0 && !isPreOrderConfirmed) {
+            // Out of stock - show pre-order modal and store selection for later
+            pendingPreOrderSelection = { item, quantity, total, options };
+            preOrderModal.removeAttribute('aria-hidden');
+            preOrderModal.style.display = 'flex';
+            preOrderConfirm.focus();
+            return; // Don't proceed with selection until confirmed
+        }
+
+        // Clear any pending pre-order selection
+        pendingPreOrderSelection = null;
+
         // Immediate UI update — no loading state
         const normalizedImages = normalizeImageArray(item.images);
         const primaryImage = extractImageSource(item.image) || normalizedImages[0] || placeholderImage;
@@ -716,6 +771,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 material: item.material ?? null,
                 material_type: item.material_type ?? null,
                 stock_qty: item.stock_qty ?? null,
+                is_preorder: (item.stock_qty !== null && item.stock_qty === 0) || Boolean(isPreOrderConfirmed),
                 updated_at: new Date().toISOString(),
             };
 
@@ -850,11 +906,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             design_url: item.design_url || item.studio_url || null,
                         };
                     });
-                    // Hide any out-of-stock items defensively if not already filtered server-side
-                    state.items = state.items.filter((item) => {
-                        if (item.stock_qty === null || item.stock_qty === undefined) return true;
-                        return item.stock_qty > 0;
-                    });
+                    // Keep out-of-stock items visible as pre-order options
+                    // state.items = state.items.filter((item) => {
+                    //     if (item.stock_qty === null || item.stock_qty === undefined) return true;
+                    //     return item.stock_qty > 0;
+                    // });
                 } else if (initialCatalog.length) {
                     state.items = initialCatalog;
                 } else {
@@ -878,11 +934,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    continueBtn?.addEventListener('click', () => {
-        const target = continueBtn.dataset.target || summaryUrl;
-        if (!continueBtn.disabled) {
-            window.location.href = target;
+    continueBtn?.addEventListener('click', async () => {
+        if (continueBtn.disabled) return;
+
+        // Normalize summary for downstream pages and sync to server before leaving
+        const summary = readSummary() ?? {};
+        try {
+            // Keep a canonical copy other pages already read
+            window.sessionStorage.setItem('order_summary_payload', JSON.stringify(summary));
+
+            const csrf = getCsrfToken();
+            await fetch('/order/summary/sync', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ summary }),
+            });
+        } catch (error) {
+            console.warn('Unable to sync giveaway summary before checkout', error);
         }
+
+        const target = continueBtn.dataset.target || summaryUrl;
+        window.location.href = target;
     });
 
     skipBtn?.addEventListener('click', () => {
@@ -943,6 +1020,47 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     };
+
+    // Modal event listeners
+    if (preOrderConfirm) {
+        preOrderConfirm.addEventListener('click', async () => {
+            isPreOrderConfirmed = true;
+            preOrderModal.setAttribute('aria-hidden', 'true');
+            preOrderModal.style.display = 'none';
+
+            // If there's a pending pre-order selection, proceed with it now
+            if (pendingPreOrderSelection) {
+                const { item, quantity, total, options } = pendingPreOrderSelection;
+                pendingPreOrderSelection = null;
+
+                // Proceed with the selection now that pre-order is confirmed
+                await selectGiveaway(item, quantity, total, options);
+            }
+
+            // Note: For giveaways, we don't adjust dates like in finalstep
+            // as giveaways don't have date selection
+        });
+    }
+
+    if (preOrderCancel) {
+        preOrderCancel.addEventListener('click', () => {
+            isPreOrderConfirmed = false;
+            pendingPreOrderSelection = null; // Clear pending selection
+            preOrderModal.setAttribute('aria-hidden', 'true');
+            preOrderModal.style.display = 'none';
+            // Show error message or handle cancellation
+            showToast('Pre-order cancelled. Please select an in-stock giveaway.');
+        });
+    }
+
+    // Close modal on backdrop click
+    if (preOrderModal) {
+        preOrderModal.addEventListener('click', (event) => {
+            if (event.target === preOrderModal) {
+                preOrderCancel.click();
+            }
+        });
+    }
 
     initialise();
 });

@@ -1,5 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('finalOrderForm');
+  // Quantity input now uses a number field (quantityInput); keep the old select as a fallback
+  const quantityInput = document.getElementById('quantityInput');
   const quantitySelect = document.getElementById('quantitySelect');
   const paperStockIdInput = document.getElementById('paperStockId');
   const paperStockPriceInput = document.getElementById('paperStockPrice');
@@ -91,9 +93,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 2600);
   };
 
+  const currentQuantity = () => {
+    const fromInput = Number(quantityInput?.value ?? 0);
+    if (Number.isFinite(fromInput) && fromInput > 0) return fromInput;
+    const fromSelect = Number(quantitySelect?.value ?? 0);
+    return Number.isFinite(fromSelect) && fromSelect > 0 ? fromSelect : 0;
+  };
+
   const updateTotals = () => {
-    if (!quantitySelect) return;
-    const base = Number(quantitySelect.selectedOptions[0]?.dataset.price ?? 0);
+    const base = Number(quantitySelect?.selectedOptions?.[0]?.dataset?.price ?? 0);
     const paper = Number(paperStockPriceInput?.value ?? 0);
 
     // addons may come from server-side checkboxes or client-side addon-cards
@@ -140,6 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   quantitySelect?.addEventListener('change', updateTotals);
+  quantityInput?.addEventListener('input', updateTotals);
 
   // Ensure sample UI exists for visual flow if server doesn't provide data
   ensureSamplePaperStocks();
@@ -270,7 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .filter((src) => typeof src === 'string' && src.length);
 
     const summary = {
-      quantity: Number(quantitySelect?.value ?? 0),
+      quantity: currentQuantity(),
       paperStockId: (paperStockIdInput?.value) || null,
       paperStockPrice: paperStockPriceValue,
       addons: addonIds,

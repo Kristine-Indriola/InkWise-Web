@@ -526,5 +526,19 @@
 			});
 		</script>
 	@endif
+
+<!-- Pre-order Confirmation Modal -->
+<div id="preOrderModal" class="modal" role="dialog" aria-labelledby="preOrderTitle" aria-describedby="preOrderMessage" aria-hidden="true">
+	<div class="modal-backdrop" tabindex="-1"></div>
+	<div class="modal-content">
+		<h2 id="preOrderTitle" class="modal-title">Pre-order Confirmation</h2>
+		<p id="preOrderMessage" class="modal-message">The selected material is currently unavailable. You may choose another giveaway or proceed with a pre-order with an estimated delivery of 15 days, similar to the invitation estimated date.</p>
+		<div class="modal-actions">
+			<button id="preOrderConfirm" class="primary-action" type="button">Confirm</button>
+			<button id="preOrderCancel" class="secondary-action" type="button">Cancel</button>
+		</div>
+	</div>
+</div>
+
 </body>
 </html>

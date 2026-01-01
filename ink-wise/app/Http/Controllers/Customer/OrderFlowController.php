@@ -366,6 +366,30 @@ class OrderFlowController extends Controller
         session()->put(static::SESSION_SUMMARY_KEY, $summary);
 
         $order = $this->currentOrder(false);
+
+        $product = $order?->items->first()?->product;
+        if (!$product) {
+            $productId = $summary['productId'] ?? null;
+            if ($productId) {
+                $product = $this->orderFlow->resolveProduct(null, (int) $productId);
+            }
+        }
+
+        if ($product) {
+            $this->orderFlow->persistDesignDraft($product, [
+                'design' => $designMeta,
+                'placeholders' => $placeholders,
+                'preview_image' => $primaryPreview,
+                'preview_images' => $previewImages,
+                'summary' => $summary,
+                'status' => $summary['orderStatus'] ?? 'draft',
+                'is_locked' => false,
+                'order_id' => $order?->id,
+                'order_item_id' => $order?->items->first()?->id,
+                'last_edited_at' => $designMeta['updated_at'] ?? Carbon::now()->toIso8601String(),
+            ], Auth::user());
+        }
+
         if ($order) {
             DB::transaction(function () use (&$order, $designMeta, $placeholders, $summary) {
                 $previewImages = $summary['previewImages'] ?? [];
@@ -397,13 +421,54 @@ class OrderFlowController extends Controller
         // session-only summary created in the editor flow.
         if (!$order) {
             $summary = session(static::SESSION_SUMMARY_KEY);
-            if (!$summary || empty($summary['productId'])) {
+            if (!$summary || !is_array($summary)) {
+                $summary = [];
+            }
+
+            $productId = $summary['productId'] ?? null;
+            $product = $productId ? $this->orderFlow->resolveProduct(null, $productId) : null;
+
+            $storedDraft = $product ? $this->orderFlow->loadDesignDraft($product, Auth::user()) : null;
+
+            if (!$product && $storedDraft && !empty($storedDraft['product_id'])) {
+                $product = $this->orderFlow->resolveProduct(null, (int) $storedDraft['product_id']);
+                $summary['productId'] = $summary['productId'] ?? $storedDraft['product_id'];
+            }
+
+            if ($storedDraft) {
+                if (!empty($storedDraft['design'])) {
+                    $summary['metadata']['design'] = $storedDraft['design'];
+                }
+
+                if (empty($summary['placeholders']) && !empty($storedDraft['placeholders'])) {
+                    $summary['placeholders'] = $storedDraft['placeholders'];
+                }
+
+                if (empty($summary['previewImages']) && !empty($storedDraft['preview_images'])) {
+                    $summary['previewImages'] = $storedDraft['preview_images'];
+                }
+
+                if (empty($summary['previewImage']) && !empty($storedDraft['preview_image'])) {
+                    $summary['previewImage'] = $storedDraft['preview_image'];
+                    $summary['invitationImage'] = $storedDraft['preview_image'];
+                }
+
+                if (empty($summary['orderStatus']) && !empty($storedDraft['status'])) {
+                    $summary['orderStatus'] = $storedDraft['status'];
+                }
+            }
+
+            $summary['metadata'] = is_array($summary['metadata'] ?? null) ? $summary['metadata'] : [];
+            $summary['metadata']['design'] = $summary['metadata']['design'] ?? ($storedDraft['design'] ?? []);
+
+            if (!$product) {
                 return $this->redirectToCatalog();
             }
 
-            $product = $this->orderFlow->resolveProduct(null, $summary['productId']);
             $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
             $placeholderItems = collect($summary['placeholders'] ?? []);
+
+            $customerReview = $this->orderFlow->loadCustomerReview($product->template_id, Auth::user());
 
             $summaryPreviewImages = array_values(array_filter($summary['previewImages'] ?? [], fn ($value) => is_string($value) && trim($value) !== ''));
             if (!empty($summaryPreviewImages)) {
@@ -440,6 +505,7 @@ class OrderFlowController extends Controller
                 'continueHref' => route('order.finalstep'),
                 'editHref' => $product && $product->template ? route('design.studio', ['template' => $product->template->id]) : route('design.edit'),
                 'orderSummary' => $summary,
+                'customerReview' => $customerReview,
             ]);
         }
 
@@ -468,6 +534,30 @@ class OrderFlowController extends Controller
         $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
         $designMeta = $item?->design_metadata ?? [];
         $placeholderItems = collect(Arr::get($designMeta, 'placeholders', []));
+
+        // If persisted order lacks design metadata, attempt to load the user's draft
+        if (empty($designMeta) && $product) {
+            $storedDraft = $this->orderFlow->loadDesignDraft($product, Auth::user());
+            if ($storedDraft) {
+                $designMeta = $storedDraft['design'] ?? [];
+                $placeholderItems = collect($storedDraft['placeholders'] ?? []);
+
+                if (!empty($storedDraft['preview_images'])) {
+                    $images['all'] = $storedDraft['preview_images'];
+                    $images['front'] = $storedDraft['preview_images'][0] ?? ($images['front'] ?? null);
+                    if (!empty($storedDraft['preview_images'][1])) {
+                        $images['back'] = $storedDraft['preview_images'][1];
+                    }
+                }
+
+                if (!empty($storedDraft['preview_image'])) {
+                    $images['front'] = $storedDraft['preview_image'];
+                    $images['all'][0] = $storedDraft['preview_image'];
+                }
+            }
+        }
+
+        $customerReview = $product ? $this->orderFlow->loadCustomerReview($product->template_id, Auth::user()) : null;
 
         $summaryPayload = session(static::SESSION_SUMMARY_KEY);
         if (is_array($summaryPayload)) {
@@ -505,6 +595,7 @@ class OrderFlowController extends Controller
             'continueHref' => route('order.finalstep'),
             'editHref' => $product && $product->template ? route('design.studio', ['template' => $product->template->id]) : route('design.edit'),
             'orderSummary' => session(static::SESSION_SUMMARY_KEY),
+            'customerReview' => $customerReview,
         ]);
     }
 
@@ -837,6 +928,14 @@ class OrderFlowController extends Controller
 
         $this->updateSessionSummary($order);
 
+        // Persist finalized snapshot for reporting/reference
+        $latestSummary = session(static::SESSION_SUMMARY_KEY) ?? [];
+        try {
+            $this->orderFlow->persistFinalizedSelection($order, is_array($latestSummary) ? $latestSummary : [], $product ?? null);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         // remove the one-time allowance to prevent other pages from reusing it
         session()->forget('order_checkout_allowed_for');
 
@@ -1020,8 +1119,7 @@ class OrderFlowController extends Controller
                 'bulkOrders',
                 'materials.material.inventory',
             ])
-            ->where('product_type', 'Giveaway')
-            ->whereHas('uploads')
+            ->whereRaw('LOWER(product_type) = ?', ['giveaway'])
             ->orderByDesc('updated_at')
             ->get()
             ->map(function (Product $product) use ($fallbackImage) {
@@ -1053,9 +1151,8 @@ class OrderFlowController extends Controller
                 return $payload;
             })
             ->filter(function (array $item) {
-                if (!array_key_exists('stock_qty', $item)) return true;
-                if ($item['stock_qty'] === null) return true;
-                return $item['stock_qty'] > 0;
+                // Keep all products visible, including out-of-stock ones for pre-order
+                return true;
             })
             ->values();
 
@@ -1492,7 +1589,7 @@ class OrderFlowController extends Controller
 
         // Always render the cart page. If there is a persisted order, refresh
         // the session summary from it. Otherwise, allow the client-side
-        // sessionStorage (inkwise-finalstep) to supply the draft payload.
+        // sessionStorage (order_summary_payload) to supply the draft payload.
 
         if ($order) {
             $this->updateSessionSummary($order);
@@ -1908,7 +2005,7 @@ class OrderFlowController extends Controller
 
     private function cachedGiveawayOptions(): array
     {
-        $cacheKey = 'giveaway_options_api_v1';
+        $cacheKey = 'giveaway_options_api_v3';
         $cacheDuration = 60; // keep stock fresh but avoid repeat queries per minute
 
         $fallbackImage = asset('images/placeholder.png');
@@ -1922,8 +2019,7 @@ class OrderFlowController extends Controller
                     'bulkOrders',
                     'materials.material.inventory',
                 ])
-                ->where('product_type', 'Giveaway')
-                ->whereHas('uploads')
+                ->whereRaw('LOWER(product_type) = ?', ['giveaway'])
                 ->orderByDesc('updated_at')
                 ->limit(120)
                 ->get()
@@ -1957,9 +2053,8 @@ class OrderFlowController extends Controller
                     return $payload;
                 })
                 ->filter(function (array $item) {
-                    if (!array_key_exists('stock_qty', $item)) return true;
-                    if ($item['stock_qty'] === null) return true;
-                    return $item['stock_qty'] > 0;
+                    // Keep all products visible, including out-of-stock ones for pre-order
+                    return true;
                 })
                 ->values()
                 ->toArray();
@@ -2112,6 +2207,7 @@ class OrderFlowController extends Controller
             'extras',
             'envelope',
             'giveaway',
+            'giveaways',
             'placeholders',
             'previewSelections',
         ]);

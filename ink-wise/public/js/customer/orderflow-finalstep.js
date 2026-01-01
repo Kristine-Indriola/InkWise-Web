@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const estimatedDateInput = document.getElementById('estimatedDate');
   const estimatedDateError = document.getElementById('estimatedDateError');
   const estimatedDateFinalLabel = document.getElementById('estimatedDateFinalLabel');
-  const continueToCheckoutEl = document.getElementById('continueToCheckout');
+  const continueToCheckoutEl = document.getElementById('continueToCheckoutBtn');
   const paperSelectErrorEl = document.getElementById('paperSelectError');
   const preOrderModal = document.getElementById('preOrderModal');
   const preOrderConfirm = document.getElementById('preOrderConfirm');
@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ?? null;
 
   const previewPlaceholder = '/images/placeholder.png';
-  const storageKey = shell?.dataset?.storageKey ?? 'inkwise-finalstep';
+  const storageKey = shell?.dataset?.storageKey ?? 'order_summary_payload';
   const envelopeUrl = shell?.dataset?.envelopeUrl ?? addToCartBtn?.dataset?.envelopeUrl ?? '/order/envelope';
   const addToCartUrl = addToCartBtn?.dataset?.cartUrl ?? shell?.dataset?.cartUrl ?? '/order/addtocart';
   const allowFallbackSamples = shell?.dataset?.fallbackSamples === 'true';
@@ -164,6 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
       metadataPayload.estimated_date = estimatedDateValue;
       if (summary.dateNeededLabel) {
         metadataPayload.estimated_date_label = summary.dateNeededLabel;
+        metadataPayload.estimatedDateLabel = summary.dateNeededLabel;
       }
     }
 
@@ -926,29 +927,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  addToCartBtn?.addEventListener('click', async (event) => {
-    event.preventDefault();
-    // Guard: require minimum quantity
+  const buildAndPersistSummary = async () => {
     const currentQty = Number.parseInt(String(quantityInput?.value ?? ''), 10) || 0;
-    if (currentQty < (Number(quantityInput?.getAttribute('min')) || 10)) {
-      showToast('Please choose a quantity of at least ' + (Number(quantityInput?.getAttribute('min')) || 10) + '.');
-      quantityInput?.focus();
-      return;
-    }
-
-    // Validate estimated date before proceeding
-    if (!validateEstimatedDate()) {
-      showToast('Please select a valid estimated date.');
-      estimatedDateInput?.focus();
-      return;
-    }
-
-    // Validate stock before proceeding
-    if (!validateStock()) {
-      showToast('Quantity exceeds available stock.');
-      quantityInput?.focus();
-      return;
-    }
 
     const selectedAddonCards = Array.from(document.querySelectorAll('.addon-card[aria-pressed="true"]'));
     const addonInputsChecked = addonCheckboxes.filter((checkbox) => checkbox.checked);
@@ -984,8 +964,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const totalAmount = roundCurrency(computedTotals.total);
 
     const orderTotalText = formatMoney(totalAmount);
-    const orderTotalValue = totalAmount;
-
     const previewSources = previewImages
       .map((img) => img?.getAttribute('src'))
       .filter((src) => typeof src === 'string' && src.length);
@@ -1041,6 +1019,8 @@ document.addEventListener('DOMContentLoaded', () => {
             day: 'numeric',
             year: 'numeric'
           });
+          summary.estimated_date_label = summary.dateNeededLabel;
+          summary.estimatedDateLabel = summary.dateNeededLabel;
         }
       } catch (error) {
         // ignore formatting errors
@@ -1141,13 +1121,25 @@ document.addEventListener('DOMContentLoaded', () => {
       summary.unitPrice = roundCurrency(numericUnitFromSummary);
     }
 
-    if (window && window.console && typeof window.console.debug === 'function') {
-      console.debug('FinalStep: summary before writeSummary', {
-        addonIds: summary.addonIds,
-        addons: summary.addons,
-        previewSelections: summary.previewSelections,
-      });
-    }
+    if (!summary.metadata) summary.metadata = {};
+    summary.metadata.final_step = {
+      estimated_date: summary.estimated_date,
+      estimated_date_label: summary.dateNeededLabel ?? summary.estimated_date_label,
+      estimatedDateLabel: summary.dateNeededLabel ?? summary.estimated_date_label,
+      is_preorder: isPreOrderConfirmed,
+      quantity: summary.quantity,
+      paper_stock_id: summary.paperStockId,
+      paper_stock_name: summary.paperStockName,
+      paper_stock_price: summary.paperStockPrice,
+      addon_ids: summary.addonIds,
+      totals: {
+        subtotal: summary.subtotalAmount,
+        tax: summary.taxAmount,
+        shipping: summary.shippingFee,
+        total: summary.totalAmount
+      }
+    };
+
     writeSummary(summary);
 
     if (finalStepSaveUrl) {
@@ -1165,7 +1157,37 @@ document.addEventListener('DOMContentLoaded', () => {
       summary,
     };
 
-    if (!payload.product_id) {
+    return { summary, resolvedProductId: payload.product_id, payload, csrfToken };
+  };
+
+  addToCartBtn?.addEventListener('click', async (event) => {
+    event.preventDefault();
+    const currentQty = Number.parseInt(String(quantityInput?.value ?? ''), 10) || 0;
+    if (currentQty < (Number(quantityInput?.getAttribute('min')) || 10)) {
+      showToast('Please choose a quantity of at least ' + (Number(quantityInput?.getAttribute('min')) || 10) + '.');
+      quantityInput?.focus();
+      return;
+    }
+
+    if (!validateEstimatedDate()) {
+      showToast('Please select a valid estimated date.');
+      estimatedDateInput?.focus();
+      return;
+    }
+
+    if (!validateStock()) {
+      showToast('Quantity exceeds available stock.');
+      quantityInput?.focus();
+      return;
+    }
+
+    if (!ensurePaperSelected()) {
+      showToast('Please select a paper type to continue.');
+      return;
+    }
+
+    const build = await buildAndPersistSummary();
+    if (!build?.resolvedProductId) {
       showToast('We could not determine which design to add. Please refresh and try again.');
       return;
     }
@@ -1179,10 +1201,10 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
-          ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+          ...(build.csrfToken ? { 'X-CSRF-TOKEN': build.csrfToken } : {}),
         },
         credentials: 'same-origin',
-        body: JSON.stringify(payload),
+        body: JSON.stringify(build.payload),
       });
 
       if (!response.ok) {
@@ -1206,6 +1228,49 @@ document.addEventListener('DOMContentLoaded', () => {
     window.setTimeout(() => {
       window.location.href = addToCartUrl;
     }, 600);
+  });
+
+  continueToCheckoutEl?.addEventListener('click', async (ev) => {
+    if (continueToCheckoutEl.getAttribute('aria-disabled') === 'true') {
+      ev.preventDefault();
+      showToast('Please select a paper type to continue.');
+      return;
+    }
+
+    ev.preventDefault();
+
+    const currentQty = Number.parseInt(String(quantityInput?.value ?? ''), 10) || 0;
+    if (currentQty < (Number(quantityInput?.getAttribute('min')) || 10)) {
+      showToast('Please choose a quantity of at least ' + (Number(quantityInput?.getAttribute('min')) || 10) + '.');
+      quantityInput?.focus();
+      return;
+    }
+
+    if (!validateEstimatedDate()) {
+      showToast('Please select a valid estimated date.');
+      estimatedDateInput?.focus();
+      return;
+    }
+
+    if (!validateStock()) {
+      showToast('Quantity exceeds available stock.');
+      quantityInput?.focus();
+      return;
+    }
+
+    if (!ensurePaperSelected()) {
+      showToast('Please select a paper type to continue.');
+      return;
+    }
+
+    const build = await buildAndPersistSummary();
+    if (!build?.resolvedProductId) {
+      showToast('We could not determine which design to continue. Please refresh and try again.');
+      return;
+    }
+
+    const target = continueToCheckoutEl.getAttribute('href') || envelopeUrl;
+    window.location.href = target;
   });
 
   window.addEventListener('keydown', (event) => {
