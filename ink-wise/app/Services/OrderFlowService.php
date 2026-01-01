@@ -2198,8 +2198,6 @@ class OrderFlowService
         $order->refresh();
         $this->syncMaterialUsage($order);
 
-        $this->persistEnvelopeRecord($order, $envelopeMeta);
-
         return $order->fresh([
             'items.product',
             'items.addons',

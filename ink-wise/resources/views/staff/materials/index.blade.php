@@ -260,11 +260,11 @@
                                     <a href="{{ route('staff.materials.edit', $material->material_id) }}" class="btn btn-sm btn-warning" title="Edit material">
                                         <i class="fi fi-rr-pencil"></i>
                                     </a>
-                                    <form action="{{ route('staff.materials.destroy', $material->material_id) }}" method="POST" class="inline-form" onsubmit="return confirm('Are you sure you want to delete this material?');">
+                                    <form action="{{ route('staff.materials.destroy', $material->material_id) }}" method="POST" class="inline-form" onsubmit="return confirm('Archive this material? It will be moved to the archive and removed from active inventory.');">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-danger" title="Delete material">
-                                            <i class="fi fi-rr-trash"></i>
+                                        <button type="submit" class="btn btn-sm btn-danger" title="Archive material">
+                                            <i class="fi fi-rr-box"></i>
                                         </button>
                                     </form>
                                 </div>
