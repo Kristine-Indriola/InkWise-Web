@@ -690,7 +690,7 @@
 
 						<div class="action-buttons">
 							<button type="button" id="addToCartBtn" class="primary-action" data-envelope-url="{{ $envelopeUrl }}" data-cart-url="{{ route('order.addtocart') }}">Add to cart</button>
-							<a id="continueToCheckout" href="{{ $envelopeUrl }}" class="btn btn-secondary">Continue to checkout</a>
+							<a id="continueToCheckoutBtn" data-continue-checkout href="{{ $envelopeUrl }}" class="btn btn-secondary">Continue to checkout</a>
 							<div id="paperSelectError" class="error-message" style="display:none; margin-left:8px;">Please select a paper type to continue.</div>
 						</div>
 					</div>
@@ -705,7 +705,7 @@
 	<script>
 		document.addEventListener('DOMContentLoaded', () => {
 			const summaryData = {!! \Illuminate\Support\Js::from($orderSummary) !!};
-			window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(summaryData));
+			window.sessionStorage.setItem('order_summary_payload', JSON.stringify(summaryData));
 		});
 	</script>
 @endif

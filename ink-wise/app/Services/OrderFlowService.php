@@ -3,6 +3,9 @@
 namespace App\Services;
 
 use App\Models\CustomerOrder;
+use App\Models\CustomerTemplateCustom;
+use App\Models\CustomerReview;
+use App\Models\CustomerFinalized;
 use App\Models\Material;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -276,6 +279,76 @@ class OrderFlowService
         ];
     }
 
+    public function loadDesignDraft(?Product $product, ?Authenticatable $user = null): ?array
+    {
+        if (!$product || !$product->template_id) {
+            return null;
+        }
+
+        $user = $user ?? Auth::user();
+        $userId = $user?->getAuthIdentifier();
+        $customerId = $user?->customer?->customer_id;
+
+        $query = CustomerTemplateCustom::query()
+            ->where('template_id', $product->template_id)
+            ->when($product->id, fn ($q) => $q->where('product_id', $product->id));
+
+        if ($userId) {
+            $query->where(function ($q) use ($userId, $customerId) {
+                $q->where('user_id', $userId);
+                if ($customerId) {
+                    $q->orWhere('customer_id', $customerId);
+                }
+            });
+        } elseif ($customerId) {
+            $query->where('customer_id', $customerId);
+        }
+
+        $draft = $query->latest('updated_at')->first();
+
+        if (!$draft) {
+            return null;
+        }
+
+        return [
+            'design' => $draft->design ?? [],
+            'placeholders' => $draft->placeholders ?? [],
+            'preview_image' => $draft->preview_image,
+            'preview_images' => $draft->preview_images ?? [],
+            'status' => $draft->status,
+            'is_locked' => (bool) ($draft->is_locked ?? false),
+            'summary' => $draft->summary ?? null,
+            'last_edited_at' => optional($draft->last_edited_at)->toIso8601String(),
+            'order_id' => $draft->order_id,
+            'order_item_id' => $draft->order_item_id,
+            'product_id' => $draft->product_id,
+            'template_id' => $draft->template_id,
+        ];
+    }
+
+    public function loadCustomerReview(?int $templateId, ?Authenticatable $user = null): ?CustomerReview
+    {
+        if (!$templateId) {
+            return null;
+        }
+
+        $user = $user ?? Auth::user();
+        $userId = $user?->getAuthIdentifier();
+        $customerId = $user?->customer?->customer_id;
+
+        $query = CustomerReview::query()
+            ->where('template_id', $templateId);
+
+        if ($customerId) {
+            $query->where('customer_id', $customerId);
+        } elseif ($userId) {
+            // fallback: user-based lookup if customer record absent
+            $query->whereNull('customer_id');
+        }
+
+        return $query->latest('updated_at')->first();
+    }
+
     public function primaryInvitationItem(Order $order): ?OrderItem
     {
         $order->loadMissing('items');
@@ -392,10 +465,15 @@ class OrderFlowService
         };
 
         $paperStockId = Arr::get($summary, 'paperStockId')
+            ?? Arr::get($summary, 'paper_stock_id')
             ?? Arr::get($summary, 'metadata.final_step.paper_stock_id');
         $paperStockName = Arr::get($summary, 'paperStockName')
+            ?? Arr::get($summary, 'paper_stock_name')
             ?? Arr::get($summary, 'metadata.final_step.paper_stock_name');
         $paperStockPrice = Arr::get($summary, 'paperStockPrice');
+        if ($paperStockPrice === null) {
+            $paperStockPrice = Arr::get($summary, 'paper_stock_price');
+        }
         if ($paperStockPrice === null) {
             $paperStockPrice = Arr::get($summary, 'metadata.final_step.paper_stock_price');
         }
@@ -856,8 +934,10 @@ class OrderFlowService
 
         if (!empty($summary['envelope']) && is_array($summary['envelope'])) {
             $this->upsertEnvelopeOrderItem($order, $summary['envelope']);
+            $this->persistEnvelopeRecord($order, $summary['envelope']);
         } else {
             $this->removeLineItem($order, OrderItem::LINE_TYPE_ENVELOPE);
+            $this->deleteCustomerOrderItems($order, 'envelope');
         }
 
         // Handle multiple giveaways
@@ -874,6 +954,7 @@ class OrderFlowService
                 if ($item->product_id) {
                     $selectedProductIds[] = $item->product_id;
                 }
+                $this->persistGiveawayRecord($order, $giveawayMeta);
             }
             
             // Remove any giveaways that are no longer in the summary
@@ -881,8 +962,18 @@ class OrderFlowService
                 ->where('line_type', OrderItem::LINE_TYPE_GIVEAWAY)
                 ->whereNotIn('product_id', $selectedProductIds)
                 ->delete();
+
+            // Remove stale giveaway snapshots from customer_order_items
+            if (!empty($selectedProductIds)) {
+                CustomerFinalized::query()
+                    ->where('order_id', $order->id)
+                    ->where('product_type', 'giveaway')
+                    ->whereNotIn('product_id', $selectedProductIds)
+                    ->delete();
+            }
         } else {
             $this->removeLineItem($order, OrderItem::LINE_TYPE_GIVEAWAY);
+            $this->deleteCustomerOrderItems($order, 'giveaway');
         }
 
         $initialized = $order->fresh([
@@ -969,6 +1060,248 @@ class OrderFlowService
         }
 
         return $order->fresh(['items']);
+    }
+
+    public function persistDesignDraft(Product $product, array $payload, ?Authenticatable $user = null): CustomerTemplateCustom
+    {
+        $user = $user ?? Auth::user();
+        $userId = $user?->getAuthIdentifier();
+        $customerId = $user?->customer?->customer_id;
+
+        $match = [
+            'template_id' => $product->template_id,
+            'product_id' => $product->id,
+        ];
+
+        if ($userId) {
+            $match['user_id'] = $userId;
+        } elseif ($customerId) {
+            $match['customer_id'] = $customerId;
+        }
+
+        $record = CustomerTemplateCustom::query()->firstOrNew($match);
+
+        $record->fill([
+            'customer_id' => $customerId,
+            'user_id' => $userId,
+            'template_id' => $product->template_id,
+            'product_id' => $product->id,
+            'order_id' => Arr::get($payload, 'order_id'),
+            'order_item_id' => Arr::get($payload, 'order_item_id'),
+            'status' => Arr::get($payload, 'status', 'draft'),
+            'is_locked' => (bool) Arr::get($payload, 'is_locked', false),
+            'design' => Arr::get($payload, 'design', []),
+            'summary' => Arr::get($payload, 'summary'),
+            'placeholders' => Arr::get($payload, 'placeholders', []),
+            'preview_image' => Arr::get($payload, 'preview_image'),
+            'preview_images' => Arr::get($payload, 'preview_images', []),
+            'last_edited_at' => Arr::get($payload, 'last_edited_at') ? Carbon::parse(Arr::get($payload, 'last_edited_at')) : now(),
+        ]);
+
+        $record->save();
+
+        return $record->refresh();
+    }
+
+    public function persistFinalizedSelection(?Order $order, array $summary, ?Product $product = null): CustomerFinalized
+    {
+        $user = Auth::user();
+        $customerId = $order?->customer_id ?? $user?->customer?->customer_id;
+
+        $productId = $product?->id ?? ($summary['productId'] ?? null);
+        if (!$product && $productId) {
+            $product = Product::find($productId);
+        }
+
+        $templateId = $product?->template_id ?? ($summary['template_id'] ?? null);
+
+        $designMeta = $summary['metadata']['design'] ?? $summary['design'] ?? [];
+        $previewImages = $summary['previewImages'] ?? [];
+
+        $size = $summary['size']
+            ?? $summary['invitation_size']
+            ?? ($product->size ?? null);
+
+        $paperStock = [
+            'id' => $summary['paperStockId'] ?? null,
+            'name' => $summary['paperStockName'] ?? null,
+            'price' => $summary['paperStockPrice'] ?? null,
+            'status' => $summary['paperStockStatus'] ?? null,
+            'preorder' => $summary['paperStockPreorder'] ?? null,
+        ];
+
+        $estimatedDate = $summary['estimated_date']
+            ?? data_get($summary, 'metadata.final_step.estimated_date')
+            ?? data_get($summary, 'metadata.final_step.pickup_date');
+        $preOrderStatus = $summary['paperStockPreorder'] ? 'pre_order' : ($summary['paperStockStatus'] ?? 'none');
+
+        return $this->persistCustomerOrderItem($order, [
+            'customer_id' => $customerId,
+            'template_id' => $templateId,
+            'product_id' => $productId,
+            'design' => $designMeta,
+            'preview_images' => $previewImages,
+            'quantity' => $summary['quantity'] ?? null,
+            'size' => $size,
+            'paper_stock' => $paperStock,
+            'estimated_date' => $estimatedDate,
+            'total_price' => $summary['totalAmount'] ?? null,
+            'status' => $summary['orderStatus'] ?? 'pending',
+            'product_type' => $summary['product_type'] ?? 'invitation',
+            'pre_order_status' => $preOrderStatus,
+            'pre_order_date' => $summary['paperStockAvailabilityDate'] ?? null,
+        ]);
+    }
+
+    protected function normalizePreOrderStatus($value): string
+    {
+        if ($value === true) {
+            return 'pre_order';
+        }
+
+        if ($value === false || $value === null) {
+            return 'none';
+        }
+
+        $normalized = is_string($value) ? Str::lower(trim($value)) : null;
+
+        if (!$normalized || $normalized === '') {
+            return 'none';
+        }
+
+        if (in_array($normalized, ['pre_order', 'preorder', 'pre-order'], true)) {
+            return 'pre_order';
+        }
+
+        if (in_array($normalized, ['available', 'in_stock', 'instock', 'in-stock'], true)) {
+            return 'available';
+        }
+
+        return 'none';
+    }
+
+    protected function persistCustomerOrderItem(?Order $order, array $attributes): CustomerFinalized
+    {
+        $user = Auth::user();
+        $customerId = $attributes['customer_id']
+            ?? $order?->customer_id
+            ?? $user?->customer?->customer_id;
+
+        $productType = $attributes['product_type'] ?? 'invitation';
+        $productId = $attributes['product_id'] ?? null;
+
+        $design = $attributes['design'] ?? [];
+        if (!is_array($design)) {
+            $design = (array) $design;
+        }
+
+        $previewImages = $attributes['preview_images'] ?? [];
+        if (!is_array($previewImages)) {
+            $previewImages = array_filter([$previewImages]);
+        }
+
+        $paperStock = $attributes['paper_stock'] ?? null;
+        if ($paperStock !== null && !is_array($paperStock)) {
+            $paperStock = ['value' => $paperStock];
+        }
+
+        $preOrderStatus = $this->normalizePreOrderStatus($attributes['pre_order_status'] ?? null);
+
+        $record = CustomerFinalized::query()->firstOrNew([
+            'order_id' => $order?->id,
+            'customer_id' => $customerId,
+            'product_id' => $productId,
+            'product_type' => $productType,
+        ]);
+
+        $record->fill([
+            'customer_id' => $customerId,
+            'order_id' => $order?->id,
+            'template_id' => $attributes['template_id'] ?? null,
+            'product_id' => $productId,
+            'design' => $design,
+            'preview_images' => $previewImages,
+            'quantity' => $attributes['quantity'] ?? null,
+            'size' => $attributes['size'] ?? null,
+            'paper_stock' => $paperStock,
+            'estimated_date' => $attributes['estimated_date'] ?? null,
+            'total_price' => $attributes['total_price'] ?? null,
+            'status' => $attributes['status'] ?? 'pending',
+            'product_type' => $productType,
+            'pre_order_status' => $preOrderStatus,
+            'pre_order_date' => $attributes['pre_order_date'] ?? null,
+        ]);
+
+        $record->save();
+
+        return $record->refresh();
+    }
+
+    protected function persistEnvelopeRecord(Order $order, array $meta): CustomerFinalized
+    {
+        $images = $meta['images'] ?? [];
+        if (!is_array($images)) {
+            $images = [];
+        }
+        if (empty($images) && !empty($meta['image'])) {
+            $images = [$meta['image']];
+        }
+
+        $paperStock = array_filter([
+            'material' => $meta['material'] ?? null,
+            'material_id' => $meta['material_id'] ?? null,
+        ], fn ($value) => $value !== null && $value !== '');
+
+        return $this->persistCustomerOrderItem($order, [
+            'product_id' => $meta['product_id'] ?? $meta['id'] ?? null,
+            'design' => ['metadata' => $meta],
+            'preview_images' => $images,
+            'quantity' => $meta['qty'] ?? $meta['quantity'] ?? null,
+            'size' => $meta['size'] ?? null,
+            'paper_stock' => !empty($paperStock) ? $paperStock : null,
+            'total_price' => $meta['total'] ?? $meta['total_price'] ?? null,
+            'status' => $meta['status'] ?? 'pending',
+            'product_type' => 'envelope',
+            'pre_order_status' => $meta['pre_order_status'] ?? $meta['status'] ?? null,
+            'pre_order_date' => $meta['pre_order_date'] ?? $meta['availability_date'] ?? null,
+        ]);
+    }
+
+    protected function persistGiveawayRecord(Order $order, array $meta): CustomerFinalized
+    {
+        $images = $meta['images'] ?? [];
+        if (!is_array($images)) {
+            $images = [];
+        }
+        if (empty($images) && !empty($meta['image'])) {
+            $images = [$meta['image']];
+        }
+
+        return $this->persistCustomerOrderItem($order, [
+            'product_id' => $meta['product_id'] ?? $meta['id'] ?? null,
+            'design' => ['metadata' => $meta],
+            'preview_images' => $images,
+            'quantity' => $meta['qty'] ?? $meta['quantity'] ?? null,
+            'size' => $meta['size'] ?? null,
+            'total_price' => $meta['total'] ?? $meta['total_price'] ?? null,
+            'status' => $meta['status'] ?? 'pending',
+            'product_type' => 'giveaway',
+            'pre_order_status' => $meta['pre_order_status'] ?? null,
+            'pre_order_date' => $meta['pre_order_date'] ?? null,
+        ]);
+    }
+
+    protected function deleteCustomerOrderItems(Order $order, string $productType, ?int $productId = null): void
+    {
+        $query = CustomerFinalized::query()
+            ->where('order_id', $order->id)
+            ->where('product_type', $productType);
+
+        if ($productId !== null) {
+            $query->where('product_id', $productId);
+        }
+
+        $query->delete();
     }
 
     protected function syncEnvelopeAssociations(OrderItem $orderItem, ?Product $product, array $meta): void
@@ -1865,6 +2198,8 @@ class OrderFlowService
         $order->refresh();
         $this->syncMaterialUsage($order);
 
+        $this->persistEnvelopeRecord($order, $envelopeMeta);
+
         return $order->fresh([
             'items.product',
             'items.addons',
@@ -1992,6 +2327,8 @@ class OrderFlowService
         $order->refresh();
         $this->syncMaterialUsage($order);
 
+        $this->persistEnvelopeRecord($order, $envelopeMeta);
+
         return $order->fresh([
             'items.product',
             'items.addons',
@@ -2070,6 +2407,8 @@ class OrderFlowService
         $order->refresh();
         $this->syncMaterialUsage($order);
 
+        $this->persistGiveawayRecord($order, $giveawayMeta);
+
         return $order->fresh([
             'items.product',
             'items.addons',
@@ -2092,6 +2431,8 @@ class OrderFlowService
 
         $order->refresh();
         $this->syncMaterialUsage($order);
+
+        $this->deleteCustomerOrderItems($order, 'envelope');
 
         return $order->fresh([
             'items.product',
@@ -2135,6 +2476,12 @@ class OrderFlowService
 
         $order->refresh();
         $this->syncMaterialUsage($order);
+
+        if ($productId) {
+            $this->deleteCustomerOrderItems($order, 'giveaway', $productId);
+        } else {
+            $this->deleteCustomerOrderItems($order, 'giveaway');
+        }
 
         return $order->fresh([
             'items.product',

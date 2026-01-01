@@ -154,11 +154,19 @@
             [
                 'name' => data_get($orderSummary, 'productName', 'Custom invitation'),
                 'quantity' => data_get($orderSummary, 'quantity', 0),
-                'paperStockName' => data_get($orderSummary, 'paperStockName'),
-                'paperStockPrice' => data_get($orderSummary, 'paperStockPrice'),
+                'unitPrice' => data_get($orderSummary, 'unitPrice') ?? data_get($orderSummary, 'unit_price') ?? data_get($orderSummary, 'paperStockPrice'),
+                'paperStockName' => data_get($orderSummary, 'paperStockName') ?? data_get($orderSummary, 'paperStock.name'),
+                'paperStockPrice' => data_get($orderSummary, 'paperStockPrice') ?? data_get($orderSummary, 'paperStock.price'),
+                'paperStockId' => data_get($orderSummary, 'paperStockId') ?? data_get($orderSummary, 'paperStock.id'),
                 'addons' => data_get($orderSummary, 'addons', []),
+                'addonItems' => data_get($orderSummary, 'addonItems', data_get($orderSummary, 'addons', [])),
                 'total' => $invitationSubtotal + $paperExtras + $addonsExtra,
                 'preview' => $extractPreview($orderSummary),
+                'previewImages' => data_get($orderSummary, 'previewImages', []),
+                'estimated_date' => data_get($orderSummary, 'estimated_date') ?? data_get($orderSummary, 'dateNeeded'),
+                'estimated_date_label' => data_get($orderSummary, 'dateNeededLabel') ?? data_get($orderSummary, 'estimated_date_label'),
+                'is_preorder' => data_get($orderSummary, 'metadata.final_step.is_preorder') ?? false,
+                'metadata' => data_get($orderSummary, 'metadata', []),
             ],
         ]);
     }
@@ -224,6 +232,57 @@
 
     @include('partials.topbar')
 
+    <script>
+        // Sync sessionStorage data (supports legacy and new keys) to server session on page load
+        (function() {
+            try {
+                const candidateKeys = ['inkwise-finalstep', 'order_summary_payload', 'inkwise-addtocart'];
+                let sessionData = null;
+                let activeKey = null;
+
+                for (const key of candidateKeys) {
+                    const value = sessionStorage.getItem(key);
+                    if (value) {
+                        sessionData = value;
+                        activeKey = key;
+                        break;
+                    }
+                }
+
+                if (sessionData) {
+                    const summary = JSON.parse(sessionData);
+                    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+                    // Keep a canonical copy for downstream pages
+                    if (activeKey !== 'order_summary_payload') {
+                        sessionStorage.setItem('order_summary_payload', sessionData);
+                    }
+                    
+                    // Sync to server
+                    fetch('{{ route("order.summary.sync") }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrf || ''
+                        },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ summary: summary })
+                    }).then(response => {
+                        if (response.ok) {
+                            // Reload page to show synced data
+                            if (!window.location.href.includes('synced=1')) {
+                                window.location.href = window.location.href + (window.location.href.includes('?') ? '&' : '?') + 'synced=1';
+                            }
+                        }
+                    }).catch(err => console.warn('Failed to sync session data:', err));
+                }
+            } catch (err) {
+                console.warn('Error syncing session data:', err);
+            }
+        })();
+    </script>
+
     <main class="max-w-6xl mx-auto px-4 lg:px-6 pt-28 pb-16">
         <header class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-10">
             <div>
@@ -262,6 +321,7 @@
                             $invName = data_get($invitation, 'name')
                                 ?? data_get($invitation, 'productName')
                                 ?? data_get($invitation, 'product_name')
+                                ?? data_get($orderSummary, 'productName')
                                 ?? 'Invitation selection';
                             $invQty = $extractQty($invitation);
                             $invPreview = $extractPreview($invitation);
@@ -285,6 +345,8 @@
                                 ?? data_get($invitation, 'price')
                                 ?? data_get($invitation, 'paperStockPrice')
                                 ?? data_get($invitation, 'paper_stock_price')
+                                ?? data_get($orderSummary, 'unitPrice')
+                                ?? data_get($orderSummary, 'paperStockPrice')
                                 ?? 0
                             );
                             $invMeta = (array) data_get($invitation, 'metadata', []);
@@ -301,23 +363,42 @@
                                 ?? data_get($orderSummary, 'is_pre_order')
                                 ?? data_get($orderSummary, 'preorder')
                             );
-                            $invPickupLabel = data_get($invMeta, 'estimated_date_label')
-                                ?? data_get($invMeta, 'estimatedDateLabel')
-                                ?? data_get($invMeta, 'estimated_date')
-                                ?? data_get($invMeta, 'estimatedDate')
-                                ?? data_get($invitation, 'estimated_date_label')
+                            // Enhanced estimated delivery date label extraction
+                            $invPickupLabel = data_get($invitation, 'estimated_date_label')
                                 ?? data_get($invitation, 'estimatedDateLabel')
-                                ?? data_get($invitation, 'estimated_date')
-                                ?? data_get($invitation, 'estimatedDate')
+                                ?? data_get($invitation, 'dateNeededLabel')
                                 ?? data_get($orderSummary, 'dateNeededLabel')
-                                ?? data_get($orderSummary, 'date_needed_label')
-                                ?? data_get($orderSummary, 'estimatedDateLabel')
                                 ?? data_get($orderSummary, 'estimated_date_label')
+                                ?? data_get($orderSummary, 'estimatedDateLabel')
                                 ?? data_get($orderSummary, 'metadata.final_step.estimated_date_label')
                                 ?? data_get($orderSummary, 'metadata.final_step.estimatedDateLabel')
-                                ?? data_get($orderSummary, 'metadata.final_step.estimated_date');
-                            $invPaper = data_get($invitation, 'paperStockName') ?? data_get($invitation, 'paper_stock_name');
-                            $invPaperPrice = data_get($invitation, 'paperStockPrice') ?? data_get($invitation, 'paper_stock_price');
+                                ?? data_get($invMeta, 'estimated_date_label')
+                                ?? data_get($invMeta, 'estimatedDateLabel');
+                            
+                            // If no formatted label, try to format the date value
+                            if (!$invPickupLabel) {
+                                $invPickupDate = data_get($invitation, 'estimated_date')
+                                    ?? data_get($invitation, 'dateNeeded')
+                                    ?? data_get($orderSummary, 'estimated_date')
+                                    ?? data_get($orderSummary, 'dateNeeded')
+                                    ?? data_get($orderSummary, 'metadata.final_step.estimated_date');
+                                if ($invPickupDate) {
+                                    try {
+                                        $invPickupLabel = \Carbon\Carbon::parse($invPickupDate)->format('F j, Y');
+                                    } catch (\Throwable $e) {
+                                        $invPickupLabel = $invPickupDate;
+                                    }
+                                }
+                            }
+                            
+                            $invPaper = data_get($invitation, 'paperStockName') 
+                                ?? data_get($invitation, 'paper_stock_name')
+                                ?? data_get($orderSummary, 'paperStockName')
+                                ?? data_get($orderSummary, 'paperStock.name');
+                            $invPaperPrice = data_get($invitation, 'paperStockPrice') 
+                                ?? data_get($invitation, 'paper_stock_price')
+                                ?? data_get($orderSummary, 'paperStockPrice')
+                                ?? data_get($orderSummary, 'paperStock.price');
                             $invPreorderPaper = data_get($invMeta, 'preorder_paper')
                                 ?? data_get($invMeta, 'preorderPaper')
                                 ?? data_get($invMeta, 'preorder_paper_name')
@@ -327,7 +408,22 @@
                                 ?? data_get($orderSummary, 'metadata.final_step.preorder_paper_name')
                                 ?? data_get($orderSummary, 'metadata.final_step.preorderPaper')
                                 ?? null;
-                            $invAddons = collect(data_get($invitation, 'addons', []))->pluck('name')->filter()->implode(', ');
+                            
+                            // Enhanced add-ons extraction
+                            $invAddonsList = data_get($invitation, 'addonItems', data_get($invitation, 'addons', []));
+                            if (empty($invAddonsList)) {
+                                $invAddonsList = data_get($orderSummary, 'addonItems', data_get($orderSummary, 'addons', []));
+                            }
+                            $invAddons = collect($invAddonsList)
+                                ->map(function ($addon) {
+                                    if (is_array($addon)) {
+                                        return data_get($addon, 'name') ?? data_get($addon, 'id');
+                                    }
+                                    return $addon;
+                                })
+                                ->filter()
+                                ->implode(', ');
+                            
                             $invTotal = $computeInvitationTotal($invitation) ?: ($invitationSubtotal + $paperExtras + $addonsExtra);
                         @endphp
                         <article class="glass-card fade-border rounded-3xl p-6">
@@ -415,6 +511,26 @@
                                                     ? $envTotal / $envQty
                                                     : (data_get($env, 'unit_price') ?? data_get($env, 'price') ?? 0);
                                                 $envId = data_get($env, 'product_id') ?? data_get($env, 'id');
+                                                $envPickupLabel = data_get($env, 'estimated_date_label')
+                                                    ?? data_get($env, 'estimatedDateLabel')
+                                                    ?? data_get($orderSummary, 'dateNeededLabel')
+                                                    ?? data_get($orderSummary, 'estimated_date_label')
+                                                    ?? data_get($orderSummary, 'estimatedDateLabel')
+                                                    ?? data_get($orderSummary, 'metadata.final_step.estimated_date_label');
+                                                if (!$envPickupLabel) {
+                                                    $envPickupDate = data_get($env, 'estimated_date')
+                                                        ?? data_get($env, 'dateNeeded')
+                                                        ?? data_get($orderSummary, 'estimated_date')
+                                                        ?? data_get($orderSummary, 'dateNeeded')
+                                                        ?? data_get($orderSummary, 'metadata.final_step.estimated_date');
+                                                    if ($envPickupDate) {
+                                                        try {
+                                                            $envPickupLabel = \Carbon\Carbon::parse($envPickupDate)->format('F j, Y');
+                                                        } catch (\Throwable $e) {
+                                                            $envPickupLabel = $envPickupDate;
+                                                        }
+                                                    }
+                                                }
                                             @endphp
                                             <div class="flex gap-4 rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-sm">
                                                 <div class="h-20 w-20 overflow-hidden rounded-xl bg-slate-100 shadow-inner flex-shrink-0">
@@ -425,6 +541,9 @@
                                                 </div>
                                                 <div class="flex-1">
                                                     <h3 class="text-base font-semibold text-slate-900">{{ $envName }}</h3>
+                                                    @if($envPickupLabel)
+                                                        <p class="mt-1 text-xs text-slate-600">Est. pickup {{ $envPickupLabel }}</p>
+                                                    @endif
                                                     <label class="text-slate-600 text-sm flex items-center gap-2">Quantity:
                                                         <input type="number"
                                                             value="{{ max(10, $envQty) }}"
@@ -489,6 +608,31 @@
                                                     ? $giveTotal / $giveQty
                                                     : (data_get($give, 'unit_price') ?? data_get($give, 'price') ?? 0);
                                                 $giveId = data_get($give, 'product_id') ?? data_get($give, 'id');
+                                                $giveIsPreorder = (bool) (
+                                                    data_get($give, 'is_preorder')
+                                                    ?? data_get($give, 'metadata.is_preorder')
+                                                    ?? (data_get($give, 'stock_qty') === 0)
+                                                );
+                                                $givePickupLabel = data_get($give, 'estimated_date_label')
+                                                    ?? data_get($give, 'estimatedDateLabel')
+                                                    ?? data_get($orderSummary, 'dateNeededLabel')
+                                                    ?? data_get($orderSummary, 'estimated_date_label')
+                                                    ?? data_get($orderSummary, 'estimatedDateLabel')
+                                                    ?? data_get($orderSummary, 'metadata.final_step.estimated_date_label');
+                                                if (!$givePickupLabel) {
+                                                    $givePickupDate = data_get($give, 'estimated_date')
+                                                        ?? data_get($give, 'dateNeeded')
+                                                        ?? data_get($orderSummary, 'estimated_date')
+                                                        ?? data_get($orderSummary, 'dateNeeded')
+                                                        ?? data_get($orderSummary, 'metadata.final_step.estimated_date');
+                                                    if ($givePickupDate) {
+                                                        try {
+                                                            $givePickupLabel = \Carbon\Carbon::parse($givePickupDate)->format('F j, Y');
+                                                        } catch (\Throwable $e) {
+                                                            $givePickupLabel = $givePickupDate;
+                                                        }
+                                                    }
+                                                }
                                             @endphp
                                             <div class="flex gap-4 rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-sm">
                                                 <div class="h-20 w-20 overflow-hidden rounded-xl bg-slate-100 shadow-inner flex-shrink-0">
@@ -498,7 +642,20 @@
                                                          data-preview-images='@json($giveGallery->values())'>
                                                 </div>
                                                 <div class="flex-1">
-                                                    <h3 class="text-base font-semibold text-slate-900">{{ $giveName }}</h3>
+                                                    <div class="flex items-center gap-2 flex-wrap">
+                                                        <h3 class="text-base font-semibold text-slate-900">{{ $giveName }}</h3>
+                                                        @if($giveIsPreorder)
+                                                            <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">Pre-order</span>
+                                                        @endif
+                                                    </div>
+                                                    @if($giveIsPreorder)
+                                                        <div class="mb-2 inline-flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-1.5 ring-1 ring-amber-200">
+                                                            <span class="text-amber-800 text-xs font-semibold uppercase tracking-wide">Pre-order</span>
+                                                            @if($givePickupLabel)
+                                                                <span class="text-amber-900 text-xs font-medium">· Est. pickup {{ $givePickupLabel }}</span>
+                                                            @endif
+                                                        </div>
+                                                    @endif
                                                     <label class="text-slate-600 text-sm flex items-center gap-2">Quantity:
                                                         <input type="number"
                                                             value="{{ max(10, $giveQty) }}"
@@ -511,7 +668,11 @@
                                                             data-unit="{{ (float) $giveUnitPrice }}">
                                                     </label>
                                                     @if($giveMaterial)
-                                                        <p class="text-slate-600 text-sm">Material: {{ $giveMaterial }}</p>
+                                                        @if($giveIsPreorder)
+                                                            <p class="text-amber-900 text-sm">Pre-order material: {{ $giveMaterial }}</p>
+                                                        @else
+                                                            <p class="text-slate-600 text-sm">Material: {{ $giveMaterial }}</p>
+                                                        @endif
                                                     @endif
                                                     <p class="text-sm font-semibold text-slate-900 mt-2 js-give-item-total" data-index="{{ $loop->index }}">{{ $formatMoney($giveTotal ?: $giveawayTotal) }}</p>
                                                     @if($giveId)

@@ -656,6 +656,40 @@ Route::get('/design/studio/{template}', function (Template $template, Request $r
         $images = $orderFlow->resolveProductImages($product);
         $designMetadata = $orderFlow->buildDesignMetadata($product);
 
+        $storedDraft = $orderFlow->loadDesignDraft($product, Auth::user());
+
+        if ($storedDraft) {
+            if (!empty($storedDraft['design'])) {
+                $designMetadata = $storedDraft['design'];
+                $summary['metadata']['design'] = $summary['metadata']['design'] ?? $storedDraft['design'];
+            }
+
+            if (empty($summary['placeholders']) && !empty($storedDraft['placeholders'])) {
+                $summary['placeholders'] = $storedDraft['placeholders'];
+            }
+
+            if (empty($summary['previewImages']) && !empty($storedDraft['preview_images'])) {
+                $summary['previewImages'] = $storedDraft['preview_images'];
+            }
+
+            if (empty($summary['previewImage']) && !empty($storedDraft['preview_image'])) {
+                $summary['previewImage'] = $storedDraft['preview_image'];
+                $summary['invitationImage'] = $storedDraft['preview_image'];
+            }
+
+            if (empty($summary['orderId']) && !empty($storedDraft['order_id'])) {
+                $summary['orderId'] = $storedDraft['order_id'];
+            }
+
+            if (empty($summary['order_item_id']) && !empty($storedDraft['order_item_id'])) {
+                $summary['order_item_id'] = $storedDraft['order_item_id'];
+            }
+
+            if (empty($summary['orderStatus']) && !empty($storedDraft['status'])) {
+                $summary['orderStatus'] = $storedDraft['status'];
+            }
+        }
+
         $shouldResetSummary = ($summary['productId'] ?? null) !== $product->id;
 
         if ($shouldResetSummary) {

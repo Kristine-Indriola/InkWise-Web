@@ -98,6 +98,7 @@
 
 	$continueHref = $continueHref ?? $continueUrl ?? route('order.finalstep');
 	$editHref = $editHref ?? route('design.edit');
+	$customerReview = $customerReview ?? null;
 @endphp
 
 	<div class="review-shell">
@@ -185,6 +186,21 @@
 				<input type="checkbox" id="approvalCheckbox">
 				<span>I have reviewed and approve my design.</span>
 			</label>
+
+			@if($customerReview)
+				<div class="customer-review">
+					<h2>Your saved review</h2>
+					@if(!is_null($customerReview->rating))
+						<p><strong>Rating:</strong> {{ $customerReview->rating }}/5</p>
+					@endif
+					@if(!empty($customerReview->review_text))
+						<p class="review-text">{{ $customerReview->review_text }}</p>
+					@else
+						<p class="review-text text-muted">No review text saved.</p>
+					@endif
+					<p class="review-date">Last updated: {{ optional($customerReview->updated_at ?? $customerReview->created_at)->format('M d, Y h:i A') }}</p>
+				</div>
+			@endif
 
 			<div class="confirm-actions">
 	    <button type="button"
