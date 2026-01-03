@@ -611,9 +611,9 @@ Route::get('/product/preview/{product}', function (Product $product) {
         'paperStocks',
         'addons',
         'colors',
-        'bulkOrders',
         'materials.material'
     ]);
+    $product->setRelation('bulkOrders', collect());
 
     return view('customer.Invitations.productpreview', compact('product'));
 })->name('product.preview');

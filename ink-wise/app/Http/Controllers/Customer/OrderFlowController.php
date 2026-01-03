@@ -90,8 +90,8 @@ class OrderFlowController extends Controller
             'paperStocks',
             'addons',
             'colors',
-            'bulkOrders',
         ])->findOrFail($data['product_id']);
+        $product->setRelation('bulkOrders', collect());
 
         $quantity = $data['quantity'] ?? $this->orderFlow->defaultQuantityFor($product);
         $unitPrice = $this->orderFlow->unitPriceFor($product);
@@ -599,7 +599,7 @@ class OrderFlowController extends Controller
         ]);
     }
 
-    public function addToCart(Request $request): ViewContract
+    public function addToCart(Request $request): mixed
     {
         $order = $this->currentOrder();
         $cart = $this->resolveActiveCart();
@@ -734,8 +734,8 @@ class OrderFlowController extends Controller
                     'images',
                     'paperStocks.material',
                     'addons',
-                    'bulkOrders',
                 ]);
+                $product->setRelation('bulkOrders', collect());
             }
 
             $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
@@ -747,10 +747,10 @@ class OrderFlowController extends Controller
             $paperStockOptions = $this->orderFlow->buildPaperStockOptions($product, $selectedPaperStockId);
             $addonGroups = $this->orderFlow->buildAddonGroups($product, $selectedAddonIds);
 
-            // Calculate quantity limits from bulk orders
-            $bulkOrders = $product->bulkOrders ?? collect();
-            $minQty = $bulkOrders->pluck('min_qty')->filter()->min() ?? 20;
-            $maxQty = $bulkOrders->pluck('max_qty')->filter()->max();
+            // Bulk orders removed; default quantity bounds
+            $bulkOrders = collect();
+            $minQty = 20;
+            $maxQty = null;
 
             $orderPlaceholder = (object) ['items' => collect()];
 
@@ -793,8 +793,8 @@ class OrderFlowController extends Controller
                 'images',
                 'paperStocks.material',
                 'addons',
-                'bulkOrders',
             ]);
+            $product->setRelation('bulkOrders', collect());
         }
 
         $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
@@ -806,10 +806,10 @@ class OrderFlowController extends Controller
         $paperStockOptions = $this->orderFlow->buildPaperStockOptions($product, $selectedPaperStockId);
         $addonGroups = $this->orderFlow->buildAddonGroups($product, $selectedAddonIds);
 
-        // Calculate quantity limits from bulk orders
-        $bulkOrders = $product->bulkOrders ?? collect();
-        $minQty = $bulkOrders->pluck('min_qty')->filter()->min() ?? 20;
-        $maxQty = $bulkOrders->pluck('max_qty')->filter()->max();
+        // Bulk orders removed; default quantity bounds
+        $bulkOrders = collect();
+        $minQty = 20;
+        $maxQty = null;
 
         $summaryPayload = session(static::SESSION_SUMMARY_KEY);
         $minPickupDate = Carbon::tomorrow();
@@ -1116,13 +1116,13 @@ class OrderFlowController extends Controller
                 'template',
                 'uploads',
                 'images',
-                'bulkOrders',
                 'materials.material.inventory',
             ])
             ->whereRaw('LOWER(product_type) = ?', ['giveaway'])
             ->orderByDesc('updated_at')
             ->get()
             ->map(function (Product $product) use ($fallbackImage) {
+                $product->setRelation('bulkOrders', collect());
                 $payload = $this->formatGiveawayProduct($product, $fallbackImage);
                 $material = $product->materials->first()?->material;
                 $stockQty = $material?->inventory?->quantity_available ?? $material?->stock_qty;
@@ -1163,7 +1163,7 @@ class OrderFlowController extends Controller
     {
         $images = $this->orderFlow->resolveProductImages($product);
         $unitPrice = $this->orderFlow->unitPriceFor($product);
-        $bulkTier = $product->bulkOrders->sortBy('min_qty')->first();
+        $bulkTier = null;
         $templateId = $product->template?->id ?? $product->template_id;
 
         $designUrl = null;
@@ -1181,13 +1181,9 @@ class OrderFlowController extends Controller
             ?? $fallbackImage
             ?? asset('images/no-image.png');
 
-        $defaultQty = max($bulkTier?->min_qty ?? $this->orderFlow->defaultQuantityFor($product), 1);
+        $defaultQty = max($this->orderFlow->defaultQuantityFor($product), 1);
 
-        $tiers = $product->bulkOrders->map(fn ($tier) => [
-            'min_qty' => $tier->min_qty,
-            'max_qty' => $tier->max_qty,
-            'price' => $tier->price_per_unit,
-        ])->values()->toArray();
+        $tiers = [];
 
         return [
             'id' => $product->id,
@@ -1199,9 +1195,9 @@ class OrderFlowController extends Controller
             'images' => $images['all'] ?? [],
             'description' => Str::limit(strip_tags($product->description ?? ''), 220),
             'material' => null,
-            'min_qty' => $bulkTier?->min_qty ?? $defaultQty,
-            'max_qty' => $bulkTier?->max_qty,
-            'step' => max(1, $bulkTier?->min_qty ?? 5),
+            'min_qty' => $defaultQty,
+            'max_qty' => null,
+            'step' => max(1, 5),
             'default_qty' => $defaultQty,
             'preview_url' => route('product.preview', $product->id),
             'event_type' => $product->event_type ?: null,
@@ -1429,7 +1425,10 @@ class OrderFlowController extends Controller
             $summary = session(static::SESSION_SUMMARY_KEY) ?? [];
 
             $productId = (int) ($payload['product_id'] ?? 0);
-            $product = $productId ? Product::with(['template', 'uploads', 'images', 'bulkOrders'])->find($productId) : null;
+            $product = $productId ? Product::with(['template', 'uploads', 'images'])->find($productId) : null;
+            if ($product) {
+                $product->setRelation('bulkOrders', collect());
+            }
 
             $quantity = max(1, (int) ($payload['quantity'] ?? 0));
             $payloadUnitPrice = $payload['unit_price'] ?? null;
@@ -1614,8 +1613,8 @@ class OrderFlowController extends Controller
                         'images',
                         'paperStocks',
                         'addons',
-                        'bulkOrders',
                     ]);
+                    $product->setRelation('bulkOrders', collect());
                 }
 
                 if ($needsQuantity) {
@@ -1857,9 +1856,17 @@ class OrderFlowController extends Controller
                     'metadata' => $metadata,
                 ]);
 
+                $this->orderFlow->logActivity($order, 'order_created', ['order_number' => $order->order_number]);
+
                 $orderJustCreated = true;
 
                 $order = $this->orderFlow->initializeOrderFromSummary($order, $summary);
+
+                if (!$this->orderFlow->checkInkStock($order)) {
+                    throw new \Exception('Insufficient ink stock for this order.');
+                }
+
+                $this->orderFlow->logActivity($order, 'order_initialized', ['items_count' => $order->items()->count()]);
 
                 $this->orderFlow->recalculateOrderTotals($order);
 
@@ -1940,6 +1947,9 @@ class OrderFlowController extends Controller
             'metadata' => $metadata,
         ]);
 
+        // Deduct ink stock when payment is completed
+        $this->orderFlow->deductInkStock($order);
+
         $this->updateSessionSummary($order);
 
         return redirect()
@@ -1968,6 +1978,11 @@ class OrderFlowController extends Controller
             'payment_status' => 'cancelled',
             'metadata' => $metadata,
         ]);
+
+        // Restore ink stock if order was previously paid
+        if ($order->getOriginal('payment_status') === 'paid') {
+            $this->orderFlow->restoreInkStock($order);
+        }
 
         $this->updateSessionSummary($order);
 
@@ -2016,7 +2031,6 @@ class OrderFlowController extends Controller
                     'template',
                     'uploads',
                     'images',
-                    'bulkOrders',
                     'materials.material.inventory',
                 ])
                 ->whereRaw('LOWER(product_type) = ?', ['giveaway'])
@@ -2024,6 +2038,7 @@ class OrderFlowController extends Controller
                 ->limit(120)
                 ->get()
                 ->map(function (Product $product) use ($fallbackImage) {
+                    $product->setRelation('bulkOrders', collect());
                     $payload = $this->formatGiveawayProduct($product, $fallbackImage);
 
                     $material = $product->materials->first()?->material;
@@ -2387,7 +2402,6 @@ class OrderFlowController extends Controller
                 'items.product.template',
                 'items.product.images',
                 'items.product.uploads',
-                'items.bulkSelections.productBulkOrder',
                 'items.paperStockSelection.paperStock',
                 'items.addons.productAddon',
                 'customerOrder',

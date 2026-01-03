@@ -531,7 +531,7 @@ label {
 }
 
 /* Defensive rules to prevent pages being hidden by other CSS */
-.page { display: none; }
+.page:not(.active-page) { display: none; }
 .page.active-page { display: block !important; visibility: visible !important; opacity: 1 !important; }
 
 /* Page 4 background container styling */

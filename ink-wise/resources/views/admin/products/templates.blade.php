@@ -19,6 +19,10 @@
         $filteredTemplates = $templatesCollection->filter(function($template) use ($showOnlyType) {
             return strtolower($template->product_type ?? '') === strtolower($showOnlyType);
         });
+
+        if ($filteredTemplates->isEmpty()) {
+            $filteredTemplates = $templatesCollection;
+        }
     } else {
         // Fallback to showing all templates if route detection fails
         $invitationTemplates = $templatesCollection->filter(function($template) {
@@ -34,7 +38,7 @@
     }
 @endphp
 
-<div class="page page1" data-page="0">
+<div class="page page1 active-page" data-page="0">
     <div class="templates-hero">
         <div>
             @if($showOnlyType === 'invitation')
@@ -49,6 +53,7 @@
             @else
                 <h2 class="templates-title">Choose a template to start your build</h2>
                 <p class="templates-subtitle">Browse curated invitations and giveaways. Pick one to pre-fill product details instantly.</p>
+                <button type="button" class="btn-secondary" onclick="Navigation.showPage(1)">Create Custom Product</button>
             @endif
         </div>
     </div>
@@ -124,6 +129,7 @@
                 @else
                     <div class="templates-empty">
                         <p>No {{ $showOnlyType }} templates available yet. Create a new template to get started.</p>
+                        <button type="button" class="btn-secondary" onclick="Navigation.showPage(1)">Create Custom {{ ucfirst($showOnlyType) }}</button>
                     </div>
                 @endif
             </section>

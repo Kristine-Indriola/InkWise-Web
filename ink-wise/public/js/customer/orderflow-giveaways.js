@@ -167,6 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let isPreOrderConfirmed = false;
     let pendingPreOrderSelection = null;
+    const confirmedPreOrderIds = new Set();
 
     const applyContinueDisabled = (disabled = false) => {
         if (!continueBtn) return;
@@ -461,14 +462,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const price = normalisePrice(item.price, 0);
         const hardMinQty = 10;
-        const minQty = Math.max(hardMinQty, Number(item.min_qty ?? hardMinQty) || hardMinQty);
+        const minQty = hardMinQty; // Force minimum quantity to 10 for giveaways
         const step = 1; // allow any whole number increment
         const defaultQty = Math.max(minQty, Math.floor(Number(item.default_qty ?? item.qty ?? minQty) || minQty));
         const stockQty = item.stock_qty !== undefined && item.stock_qty !== null ? Number(item.stock_qty) : null;
         const initialMax = item.max_qty !== undefined && item.max_qty !== null ? Number(item.max_qty) : null;
-        const maxQty = stockQty !== null
-            ? (initialMax !== null ? Math.min(initialMax, stockQty) : stockQty)
-            : initialMax;
+        const maxQty = null; // Allow unlimited quantity for giveaways (minimum enforced at 10)
         const imageSrc = extractImageSource(item.image) || placeholderImage;
         const previewUrl = item.preview_url || null;
         const description = item.description || '';
@@ -505,8 +504,6 @@ document.addEventListener('DOMContentLoaded', () => {
                                 ${maxQty ? `max="${maxQty}"` : ''}
                                 step="${step}"
                                 value="${defaultQty}"
-                                inputmode="numeric"
-                                pattern="[0-9]*"
                             />
                             <span class="quantity-total" data-total-display>${formatMoney(total)}</span>
                         </div>
@@ -638,6 +635,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const giveaways = existingSummary.giveaways ? { ...existingSummary.giveaways } : {};
                 delete giveaways[giveawayId];
 
+                // Remove from confirmed pre-orders if it was a pre-order
+                confirmedPreOrderIds.delete(giveawayId);
+
                 const extras = existingSummary.extras ?? {};
                 const giveawaysTotal = Object.values(giveaways).reduce((sum, g) => sum + (Number(g.total) || 0), 0);
                 existingSummary.giveaways = giveaways;
@@ -739,7 +739,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const selectGiveaway = async (item, quantity, total, options = {}) => {
         // Check stock availability
         const stockQty = item.stock_qty ?? null;
-        if (stockQty !== null && stockQty === 0 && !isPreOrderConfirmed) {
+        const itemId = String(item.product_id ?? item.id);
+        if (stockQty !== null && stockQty === 0 && !confirmedPreOrderIds.has(itemId)) {
             // Out of stock - show pre-order modal and store selection for later
             pendingPreOrderSelection = { item, quantity, total, options };
             preOrderModal.removeAttribute('aria-hidden');
@@ -771,7 +772,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 material: item.material ?? null,
                 material_type: item.material_type ?? null,
                 stock_qty: item.stock_qty ?? null,
-                is_preorder: (item.stock_qty !== null && item.stock_qty === 0) || Boolean(isPreOrderConfirmed),
+                is_preorder: (item.stock_qty !== null && item.stock_qty === 0) || confirmedPreOrderIds.has(String(item.product_id ?? item.id)),
                 updated_at: new Date().toISOString(),
             };
 
@@ -1025,6 +1026,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (preOrderConfirm) {
         preOrderConfirm.addEventListener('click', async () => {
             isPreOrderConfirmed = true;
+            if (pendingPreOrderSelection) {
+                const itemId = String(pendingPreOrderSelection.item.product_id ?? pendingPreOrderSelection.item.id);
+                confirmedPreOrderIds.add(itemId);
+            }
             preOrderModal.setAttribute('aria-hidden', 'true');
             preOrderModal.style.display = 'none';
 

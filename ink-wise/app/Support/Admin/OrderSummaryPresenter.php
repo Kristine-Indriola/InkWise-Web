@@ -22,7 +22,6 @@ class OrderSummaryPresenter
             'customerOrder.customer',
             'customer',
             'items.product',
-            'items.bulkSelections',
             'items.paperStockSelection',
             'items.addons',
             'items.colors',
@@ -245,16 +244,6 @@ class OrderSummaryPresenter
     {
         $options = [];
 
-        if ($item->bulkSelections->isNotEmpty()) {
-            $bulk = $item->bulkSelections->first();
-            if ($bulk) {
-                $options['quantity_set'] = $bulk->qty_selected;
-                if ($bulk->price_per_unit) {
-                    $options['price_per_unit'] = static::toFloat($bulk->price_per_unit);
-                }
-            }
-        }
-
         if ($item->paperStockSelection) {
             $paper = $item->paperStockSelection;
             $options['paper_stock'] = $paper->paperStock?->name ?? $paper->paper_stock_name;
@@ -274,12 +263,8 @@ class OrderSummaryPresenter
         }
 
         if ($item->colors->isNotEmpty()) {
-            $options['colors'] = $item->colors->map(function ($color) {
-                return [
-                    'name' => $color->productColor?->name ?? $color->color_name,
-                    'code' => $color->color_code,
-                ];
-            })->toArray();
+            $options['ink_usage_ml'] = $item->colors->pluck('average_usage_ml')->filter()->values()->toArray();
+            $options['ink_usage_total_ml'] = $item->colors->pluck('total_ink_ml')->filter()->sum();
         }
 
         return $options;

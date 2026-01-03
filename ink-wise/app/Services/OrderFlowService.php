@@ -51,7 +51,6 @@ class OrderFlowService
                 'paperStocks',
                 'addons',
                 'colors',
-                'bulkOrders',
                 'materials.material.inventory',
             ])->find($productId);
         } else {
@@ -62,9 +61,12 @@ class OrderFlowService
                 'paperStocks',
                 'addons',
                 'colors',
-                'bulkOrders',
                 'materials.material.inventory',
             ]);
+        }
+
+        if ($product) {
+            $product->setRelation('bulkOrders', collect());
         }
 
         return $product;
@@ -172,10 +174,6 @@ class OrderFlowService
 
     public function defaultQuantityFor(?Product $product): int
     {
-        if ($product && $product->bulkOrders->isNotEmpty()) {
-            return (int) $product->bulkOrders->sortBy('min_qty')->first()->min_qty;
-        }
-
         return 50;
     }
 
@@ -185,11 +183,6 @@ class OrderFlowService
             return (float) $product->base_price;
         }
 
-        $bulk = $product?->bulkOrders?->sortBy('min_qty')->first();
-        if ($bulk && $bulk->price_per_unit) {
-            return (float) $bulk->price_per_unit;
-        }
-
         return 120.0;
     }
 
@@ -197,23 +190,6 @@ class OrderFlowService
     {
         if (!$product) {
             return $fallback ?? 120.0;
-        }
-
-        $bulkOrders = $product->bulkOrders;
-        if ($bulkOrders && $bulkOrders->isNotEmpty()) {
-            $matchingTier = $bulkOrders->first(function ($tier) use ($quantity) {
-                $min = $tier->min_qty !== null ? (int) $tier->min_qty : null;
-                $max = $tier->max_qty !== null ? (int) $tier->max_qty : null;
-
-                $minMatches = $min === null || $quantity >= $min;
-                $maxMatches = $max === null || $quantity <= $max;
-
-                return $minMatches && $maxMatches;
-            });
-
-            if ($matchingTier && $matchingTier->price_per_unit) {
-                return (float) $matchingTier->price_per_unit;
-            }
         }
 
         if ($product->base_price !== null) {
@@ -374,69 +350,7 @@ class OrderFlowService
         return $item->fresh([
             'addons',
             'paperStockSelection',
-            'bulkSelections',
-            'colors',
         ]);
-    }
-
-    protected function removeLineItem(Order $order, string $lineType): void
-    {
-        $item = $order->items()->where('line_type', $lineType)->first();
-        if (!$item) {
-            return;
-        }
-
-        $item->addons()->delete();
-        $item->bulkSelections()->delete();
-        $item->paperStockSelection()->delete();
-        $item->colors()->delete();
-        $item->delete();
-    }
-
-    protected function calculateItemTotal(?OrderItem $item): float
-    {
-        if (!$item) {
-            return 0.0;
-        }
-
-        $baseSubtotal = $item->subtotal !== null
-            ? (float) $item->subtotal
-            : round(($item->unit_price ?? 0) * ($item->quantity ?? 0), 2);
-
-        $paperPrice = (float) ($item->paperStockSelection?->price ?? 0);
-        $addonTotal = (float) ($item->addons?->sum('addon_price') ?? 0);
-
-        return round($baseSubtotal + $paperPrice + $addonTotal, 2);
-    }
-
-    public function attachOptionalSelections(OrderItem $orderItem, Product $product): void
-    {
-        $bulkTier = $product->bulkOrders->sortBy('min_qty')->first();
-        if ($bulkTier) {
-            $orderItem->bulkSelections()->create([
-                'product_bulk_order_id' => $bulkTier->id,
-                'qty_selected' => $bulkTier->min_qty,
-                'price_per_unit' => $bulkTier->price_per_unit ?? $this->unitPriceFor($product),
-            ]);
-        }
-
-        $paperStock = $product->paperStocks->first();
-        if ($paperStock) {
-            $orderItem->paperStockSelection()->create([
-                'paper_stock_id' => $paperStock->id,
-                'paper_stock_name' => $paperStock->name,
-                'price' => $paperStock->price,
-            ]);
-        }
-
-        $product->addons->take(2)->each(function ($addon) use ($orderItem) {
-            $orderItem->addons()->create([
-                'addon_id' => $addon->id,
-                'addon_type' => $addon->addon_type,
-                'addon_name' => $addon->name,
-                'addon_price' => $addon->price,
-            ]);
-        });
     }
 
     protected function syncPaperAndAddonsFromSummary(OrderItem $orderItem, array $summary): void
@@ -722,47 +636,13 @@ class OrderFlowService
 
     protected function resolveBulkTierForQuantity(?Product $product, int $quantity): ?ProductBulkOrder
     {
-        if (!$product) {
-            return null;
-        }
-
-        $product->loadMissing(['bulkOrders']);
-
-        $bulkOrders = $product->bulkOrders;
-        if (!$bulkOrders || $bulkOrders->isEmpty()) {
-            return null;
-        }
-
-        $bulkOrders = $bulkOrders->sortBy('min_qty')->values();
-
-        $matchingTier = $bulkOrders->first(function (ProductBulkOrder $tier) use ($quantity) {
-            $min = $tier->min_qty !== null ? (int) $tier->min_qty : null;
-            $max = $tier->max_qty !== null ? (int) $tier->max_qty : null;
-
-            $minMatches = $min === null || $quantity >= $min;
-            $maxMatches = $max === null || $quantity <= $max;
-
-            return $minMatches && $maxMatches;
-        });
-
-        return $matchingTier ?? $bulkOrders->last();
+        // Bulk tiers removed
+        return null;
     }
 
     protected function syncBulkSelection(OrderItem $orderItem, ?Product $product, int $quantity, float $unitPrice): void
     {
-        $orderItem->bulkSelections()->delete();
-
-        if ($quantity <= 0) {
-            return;
-        }
-
-        $bulkTier = $this->resolveBulkTierForQuantity($product, $quantity);
-
-        $orderItem->bulkSelections()->create([
-            'product_bulk_order_id' => $bulkTier?->id,
-            'qty_selected' => $quantity,
-            'price_per_unit' => $bulkTier?->price_per_unit ?? $unitPrice,
-        ]);
+        // Bulk selections removed; no-op
     }
 
     protected function syncColorSelections(OrderItem $orderItem, array $previewSelections, ?Product $product = null): void
@@ -814,26 +694,32 @@ class OrderFlowService
                 $colorId = $color?->id;
             }
 
-            $colorName = $color?->name ?? ($payload['name'] ?? null);
-            $colorCode = $color?->color_code ?? ($payload['color_code'] ?? null);
-            $imagePath = $payload['image'] ?? null;
+            $averageUsage = $color?->average_usage_ml ?? ($payload['average_usage_ml'] ?? null);
 
-            if ($colorId === null && $colorName === null) {
+            if ($averageUsage === null) {
                 continue;
             }
 
-            $key = ($colorId !== null ? $colorId : 'null') . ':' . strtolower((string) $colorName);
-            $records[$key] = [
-                'color_id' => $colorId,
-                'color_name' => $colorName,
-                'color_code' => $colorCode,
-                'image_path' => $imagePath,
-            ];
+            $totalInk = $averageUsage * max(1, (int) $orderItem->quantity);
+
+            $orderItem->inkUsage()->create([
+                'color_id' => $color->id,
+                'average_usage_ml' => $averageUsage,
+                'total_ink_ml' => $totalInk,
+            ]);
         }
 
-        foreach ($records as $record) {
-            $orderItem->colors()->create($record);
-        }
+        // Remove the old code
+        // $key = 'usage:' . (string) $averageUsage;
+        // $records[$key] = [
+        //     'average_usage_ml' => $averageUsage,
+        //     'total_ink_ml' => $totalInk,
+        // ];
+        // }
+
+        // foreach ($records as $record) {
+        //     $orderItem->colors()->create($record);
+        // }
     }
 
     protected function upsertEnvelopeOrderItem(Order $order, array $meta): OrderItem
@@ -849,7 +735,10 @@ class OrderFlowService
         $designMeta = is_array($meta) ? $meta : [];
 
         $productId = $meta['product_id'] ?? $meta['id'] ?? null;
-        $product = $productId ? Product::with(['bulkOrders', 'paperStocks', 'addons', 'colors'])->find($productId) : null;
+        $product = $productId ? Product::with(['paperStocks', 'addons', 'colors'])->find($productId) : null;
+        if ($product) {
+            $product->setRelation('bulkOrders', collect());
+        }
 
         $orderItem = $this->upsertLineItem($order, OrderItem::LINE_TYPE_ENVELOPE, [
             'product_id' => $product?->id ?? $productId,
@@ -871,7 +760,6 @@ class OrderFlowService
         return $orderItem->fresh([
             'addons',
             'paperStockSelection',
-            'bulkSelections',
             'colors',
         ]);
     }
@@ -924,7 +812,6 @@ class OrderFlowService
         ]);
 
         $this->syncPaperAndAddonsFromSummary($invitationItem, $summary);
-        $this->syncBulkSelection($invitationItem, $product, $quantity, $unitPrice);
 
         $previewSelections = Arr::get($summary, 'previewSelections', Arr::get($summary, 'metadata.final_step.preview_selections', []));
         if (!is_array($previewSelections)) {
@@ -979,7 +866,6 @@ class OrderFlowService
         $initialized = $order->fresh([
             'items.addons',
             'items.paperStockSelection',
-            'items.bulkSelections',
             'items.colors',
         ]);
 
@@ -1208,7 +1094,7 @@ class OrderFlowService
         $preOrderStatus = $this->normalizePreOrderStatus($attributes['pre_order_status'] ?? null);
 
         $record = CustomerFinalized::query()->firstOrNew([
-            'order_id' => $order?->id,
+            'order_id' => $order?->customer_order_id,
             'customer_id' => $customerId,
             'product_id' => $productId,
             'product_type' => $productType,
@@ -1216,7 +1102,7 @@ class OrderFlowService
 
         $record->fill([
             'customer_id' => $customerId,
-            'order_id' => $order?->id,
+            'order_id' => $order?->customer_order_id,
             'template_id' => $attributes['template_id'] ?? null,
             'product_id' => $productId,
             'design' => $design,
@@ -1310,7 +1196,6 @@ class OrderFlowService
         $unitPrice = (float) ($meta['price'] ?? $meta['unit_price'] ?? $orderItem->unit_price ?? 0);
 
         // Envelope selections do not populate ancillary tables (addons, paper stock, colors, bulk)
-        $orderItem->bulkSelections()->delete();
         $orderItem->paperStockSelection()->delete();
         $orderItem->colors()->delete();
         $orderItem->addons()->delete();
@@ -1414,138 +1299,30 @@ class OrderFlowService
     {
         $basePrice = $this->unitPriceFor($product);
 
-        if (!$product || $product->bulkOrders->isEmpty()) {
-            return collect(range(1, 20))->map(function ($step) use ($basePrice) {
-                $qty = $step * 10;
-
-                return [
-                    'label' => number_format($qty),
-                    'value' => $qty,
-                    'price' => round($qty * $basePrice, 2),
-                ];
-            })->values()->all();
-        }
-
-        $bulkOrders = $product->bulkOrders->sortBy('min_qty')->values();
-
-        $startQty = $bulkOrders
-            ->pluck('min_qty')
-            ->filter(fn ($qty) => $qty !== null && $qty > 0)
-            ->min();
-
-        $startQty = $startQty ? (int) ceil($startQty / 10) * 10 : 10;
-        $startQty = max(10, $startQty);
-
-        $maxQty = $bulkOrders
-            ->map(function ($tier) {
-                if ($tier->max_qty !== null && $tier->max_qty > 0) {
-                    return (int) $tier->max_qty;
-                }
-
-                if ($tier->min_qty !== null && $tier->min_qty > 0) {
-                    return (int) $tier->min_qty;
-                }
-
-                return null;
-            })
-            ->filter()
-            ->max();
-
-        if (!$maxQty || $maxQty < $startQty) {
-            $maxQty = $startQty;
-        }
-
-        $maxQty = (int) ceil($maxQty / 10) * 10;
-
-        $quantities = collect(range($startQty, $maxQty, 10));
-
-        $options = $quantities->map(function ($qty) use ($bulkOrders, $basePrice) {
-            $matchingTier = $bulkOrders->first(function ($tier) use ($qty) {
-                $min = $tier->min_qty !== null ? (int) $tier->min_qty : null;
-                $max = $tier->max_qty !== null ? (int) $tier->max_qty : null;
-
-                $minMatches = $min === null || $qty >= $min;
-                $maxMatches = $max === null || $qty <= $max;
-
-                return $minMatches && $maxMatches;
-            });
-
-            $unitPrice = $matchingTier && $matchingTier->price_per_unit
-                ? (float) $matchingTier->price_per_unit
-                : $basePrice;
+        return collect(range(1, 20))->map(function ($step) use ($basePrice) {
+            $qty = $step * 10;
 
             return [
                 'label' => number_format($qty),
                 'value' => $qty,
-                'price' => round($qty * $unitPrice, 2),
+                'price' => round($qty * $basePrice, 2),
             ];
-        });
+        })->when($selectedQuantity, function ($options) use ($selectedQuantity, $basePrice) {
+            if (!$options->contains(fn ($option) => $option['value'] === $selectedQuantity)) {
+                $options->push([
+                    'label' => number_format($selectedQuantity),
+                    'value' => $selectedQuantity,
+                    'price' => round($selectedQuantity * $basePrice, 2),
+                ]);
+            }
 
-        if ($selectedQuantity && !$options->contains(fn ($option) => $option['value'] === $selectedQuantity)) {
-            $matchingTier = $bulkOrders->first(function ($tier) use ($selectedQuantity) {
-                $min = $tier->min_qty !== null ? (int) $tier->min_qty : null;
-                $max = $tier->max_qty !== null ? (int) $tier->max_qty : null;
-
-                $minMatches = $min === null || $selectedQuantity >= $min;
-                $maxMatches = $max === null || $selectedQuantity <= $max;
-
-                return $minMatches && $maxMatches;
-            });
-
-            $unitPrice = $matchingTier && $matchingTier->price_per_unit
-                ? (float) $matchingTier->price_per_unit
-                : $basePrice;
-
-            $options->push([
-                'label' => number_format($selectedQuantity),
-                'value' => $selectedQuantity,
-                'price' => round($selectedQuantity * $unitPrice, 2),
-            ]);
-
-            $options = $options->sortBy('value')->values();
-        }
-
-        return $options->values()->all();
+            return $options->sortBy('value')->values();
+        })->values()->all();
     }
 
     public function getQuantityLimits(?Product $product): array
     {
-        if (!$product || $product->bulkOrders->isEmpty()) {
-            return ['min' => 10, 'max' => 200];
-        }
-
-        $bulkOrders = $product->bulkOrders->sortBy('min_qty')->values();
-
-        $startQty = $bulkOrders
-            ->pluck('min_qty')
-            ->filter(fn ($qty) => $qty !== null && $qty > 0)
-            ->min();
-
-        $startQty = $startQty ? (int) ceil($startQty / 10) * 10 : 10;
-        $startQty = max(10, $startQty);
-
-        $maxQty = $bulkOrders
-            ->map(function ($tier) {
-                if ($tier->max_qty !== null && $tier->max_qty > 0) {
-                    return (int) $tier->max_qty;
-                }
-
-                if ($tier->min_qty !== null && $tier->min_qty > 0) {
-                    return (int) $tier->min_qty;
-                }
-
-                return null;
-            })
-            ->filter()
-            ->max();
-
-        if (!$maxQty || $maxQty < $startQty) {
-            $maxQty = $startQty;
-        }
-
-        $maxQty = (int) ceil($maxQty / 10) * 10;
-
-        return ['min' => $startQty, 'max' => $maxQty];
+        return ['min' => 10, 'max' => 200];
     }
 
     public function buildPaperStockOptions(?Product $product, $selectedId = null): array
@@ -1643,363 +1420,14 @@ class OrderFlowService
             return $path;
         }
 
-        try {
-            return Storage::url($path);
-        } catch (\Throwable $e) {
-            return $fallback;
-        }
-    }
+        $normalized = str_replace('\\', '/', $path);
+        $normalized = ltrim($normalized, '/');
 
-    public function buildSummary(Order $order): array
-    {
-        $order->loadMissing([
-            'items.product.template',
-            'items.product.images',
-            'items.product.uploads',
-            'items.paperStockSelection',
-            'items.addons',
-            'items.bulkSelections',
-            'items.colors',
-            'customerOrder',
-        ]);
-
-        $invitationItem = $this->primaryInvitationItem($order);
-        $product = optional($invitationItem)->product;
-        $images = $product ? $this->resolveProductImages($product) : $this->placeholderImages();
-
-        $orderMeta = $order->metadata;
-        if (is_string($orderMeta)) {
-            $decodedMeta = json_decode($orderMeta, true);
-            $orderMeta = is_array($decodedMeta) ? $decodedMeta : [];
-        } elseif (!is_array($orderMeta)) {
-            $orderMeta = [];
+        if (Storage::disk('public')->exists($normalized)) {
+            return Storage::url($normalized);
         }
 
-        $designPreviewMeta = Arr::get($orderMeta, 'design_preview');
-        if (is_array($designPreviewMeta)) {
-            $previewCandidates = [];
-
-            $primaryPreview = Arr::get($designPreviewMeta, 'image');
-            if (is_string($primaryPreview) && trim($primaryPreview) !== '') {
-                $previewCandidates[] = trim($primaryPreview);
-            }
-
-            foreach ((array) Arr::get($designPreviewMeta, 'images', []) as $candidate) {
-                if (is_string($candidate) && trim($candidate) !== '') {
-                    $previewCandidates[] = trim($candidate);
-                }
-            }
-
-            $previewCandidates = array_values(array_unique($previewCandidates));
-            if (!empty($previewCandidates)) {
-                $images['front'] = $previewCandidates[0];
-                if (!empty($previewCandidates[1])) {
-                    $images['back'] = $previewCandidates[1];
-                }
-                $images['all'] = $previewCandidates;
-            }
-        }
-
-        $envelopeItem = $order->items->firstWhere('line_type', OrderItem::LINE_TYPE_ENVELOPE);
-        $giveawayItem = $order->items->firstWhere('line_type', OrderItem::LINE_TYPE_GIVEAWAY);
-
-        $summary = [
-            'orderId' => $order->id,
-            'orderNumber' => $order->order_number,
-            'orderStatus' => $order->status,
-            'paymentStatus' => $order->payment_status,
-            'productId' => $product?->id,
-            'productName' => $invitationItem?->product_name ?? 'Custom invitation',
-            'quantity' => $invitationItem?->quantity ?? 0,
-            'quantityOptions' => $this->buildQuantityOptions($product, $invitationItem?->quantity),
-            'quantityLabel' => $invitationItem && $invitationItem->quantity ? number_format($invitationItem->quantity) : null,
-            'unitPrice' => $invitationItem?->unit_price ?? 0,
-            'subtotalAmount' => $order->subtotal_amount,
-            'taxAmount' => $order->tax_amount,
-            'shippingFee' => $order->shipping_fee,
-            'totalAmount' => $order->total_amount,
-            'previewImages' => $images['all'],
-            'previewImage' => $images['front'],
-            'invitationImage' => $images['front'],
-            'paperStockId' => $invitationItem?->paperStockSelection?->paper_stock_id,
-            'paperStockName' => $invitationItem?->paperStockSelection?->paper_stock_name,
-            'paperStockPrice' => $invitationItem?->paperStockSelection?->price,
-            'addons' => $invitationItem?->addons?->map(function ($addon) {
-                return [
-                    'id' => $addon->addon_id,
-                    'name' => $addon->addon_name,
-                    'price' => $addon->addon_price,
-                    'type' => $addon->addon_type,
-                ];
-            })->values()->all(),
-            'addonIds' => $invitationItem?->addons?->pluck('addon_id')->filter()->values()->all(),
-            'bulkSelection' => optional($invitationItem?->bulkSelections?->first(), function ($bulk) {
-                return array_filter([
-                    'product_bulk_order_id' => $bulk->product_bulk_order_id,
-                    'qty_selected' => $bulk->qty_selected,
-                    'price_per_unit' => $bulk->price_per_unit,
-                ], fn ($value) => $value !== null && $value !== '');
-            }),
-            'colorSelections' => $invitationItem?->colors?->map(function ($color) {
-                return array_filter([
-                    'color_id' => $color->color_id,
-                    'color_name' => $color->color_name,
-                    'color_code' => $color->color_code,
-                    'image_path' => $color->image_path,
-                ], fn ($value) => $value !== null && $value !== '');
-            })->values()->all(),
-            'colorIds' => $invitationItem?->colors?->pluck('color_id')->filter()->values()->all(),
-            'metadata' => $orderMeta,
-        ];
-
-        $pickupDate = $order->date_needed instanceof Carbon
-            ? $order->date_needed->copy()->startOfDay()
-            : null;
-
-        if (!$pickupDate) {
-            $pickupCandidate = Arr::get($orderMeta, 'final_step.estimated_date')
-                ?? Arr::get($orderMeta, 'final_step.metadata.estimated_date')
-                ?? Arr::get($orderMeta, 'delivery.estimated_pickup_date')
-                ?? Arr::get($orderMeta, 'delivery.estimated_ship_date');
-
-            if ($pickupCandidate) {
-                try {
-                    $pickupDate = Carbon::parse($pickupCandidate)->startOfDay();
-                } catch (\Throwable $e) {
-                    $pickupDate = null;
-                }
-            }
-        }
-
-        $summary['dateNeeded'] = $pickupDate ? $pickupDate->format('Y-m-d') : null;
-        $summary['dateNeededLabel'] = $pickupDate ? $pickupDate->format('F j, Y') : null;
-        $summary['dateNeededRelative'] = $pickupDate ? $pickupDate->diffForHumans(null, true) : null;
-        $summary['estimatedDate'] = $summary['dateNeeded'];
-        $summary['estimatedDateLabel'] = $summary['dateNeededLabel'];
-
-        if ($invitationItem?->design_metadata) {
-            $itemDesignMeta = $invitationItem->design_metadata;
-            if (is_string($itemDesignMeta)) {
-                $decodedDesignMeta = json_decode($itemDesignMeta, true);
-                $itemDesignMeta = is_array($decodedDesignMeta) ? $decodedDesignMeta : [];
-            }
-
-            if (is_array($itemDesignMeta)) {
-                $summary['placeholders'] = Arr::get($itemDesignMeta, 'placeholders', []);
-            }
-        }
-
-        $envelopeTotal = $this->calculateItemTotal($envelopeItem);
-        $giveawayTotal = $this->calculateItemTotal($giveawayItem);
-
-        $summary['extras'] = [
-            'paper' => $invitationItem?->paperStockSelection?->price ?? 0,
-            'addons' => $invitationItem?->addons?->sum('addon_price') ?? 0,
-            'envelope' => $envelopeItem ? $envelopeTotal : (float) Arr::get($orderMeta, 'envelope.total', Arr::get($orderMeta, 'envelope.price', 0)),
-            'giveaway' => $giveawayItem ? $giveawayTotal : (float) Arr::get($orderMeta, 'giveaway.total', Arr::get($orderMeta, 'giveaway.price', 0)),
-        ];
-
-        // Provide detailed ink breakdown if present in metadata
-        $inkMetaSummary = Arr::get($orderMeta, 'ink', []);
-        $inkUsageSummary = (float) Arr::get($inkMetaSummary, 'usage_per_invite_ml', Arr::get($inkMetaSummary, 'usage_ml', 0));
-        $inkUnitPriceSummary = (float) Arr::get($inkMetaSummary, 'unit_price', Arr::get($inkMetaSummary, 'price', 0));
-        $inkTotalSummary = 0.0;
-        if ($inkUnitPriceSummary > 0 && $inkUsageSummary > 0) {
-            $inkTotalSummary = round($inkUsageSummary * $inkUnitPriceSummary * ($invitationItem?->quantity ?? 0), 2);
-        } else {
-            $inkTotalSummary = (float) Arr::get($inkMetaSummary, 'total', 0);
-        }
-
-        $summary['extras']['ink'] = [
-            'usage_per_invite_ml' => $inkUsageSummary,
-            'unit_price_per_ml' => $inkUnitPriceSummary,
-            'total' => $inkTotalSummary,
-        ];
-
-        $envelopeMeta = Arr::get($orderMeta, 'envelope');
-        if (!$envelopeMeta && $envelopeItem) {
-            $envelopeMeta = array_merge(
-                is_array($envelopeItem->design_metadata) ? $envelopeItem->design_metadata : [],
-                [
-                    'qty' => $envelopeItem->quantity,
-                    'price' => (float) $envelopeItem->unit_price,
-                    'total' => $envelopeTotal,
-                ]
-            );
-        }
-
-        $hasEnvelope = !empty($envelopeMeta);
-        $summary['hasEnvelope'] = $hasEnvelope;
-        if ($hasEnvelope) {
-            $summary['envelope'] = $envelopeMeta;
-        }
-
-        $giveawayMeta = Arr::get($orderMeta, 'giveaway');
-        if (!$giveawayMeta && $giveawayItem) {
-            $giveawayMeta = array_merge(
-                is_array($giveawayItem->design_metadata) ? $giveawayItem->design_metadata : [],
-                [
-                    'qty' => $giveawayItem->quantity,
-                    'price' => (float) $giveawayItem->unit_price,
-                    'total' => $giveawayTotal,
-                ]
-            );
-        }
-
-        $hasGiveaway = !empty($giveawayMeta);
-        $summary['hasGiveaway'] = $hasGiveaway;
-        if ($hasGiveaway) {
-            $rawGallery = Arr::get($giveawayMeta, 'images', []);
-            $normalizedGallery = is_array($rawGallery)
-                ? array_values(array_filter($rawGallery, fn ($src) => is_string($src) && trim($src) !== ''))
-                : [];
-
-            $primaryImage = Arr::get($giveawayMeta, 'image');
-            $giveawayProductId = Arr::get($giveawayMeta, 'product_id') ?? Arr::get($giveawayMeta, 'id');
-            $resolvedImages = null;
-
-            if (!$normalizedGallery || !$primaryImage) {
-                $giveawayProduct = $giveawayProductId
-                    ? Product::with(['template', 'uploads', 'images'])->find($giveawayProductId)
-                    : null;
-
-                $resolvedImages = $giveawayProduct
-                    ? $this->resolveProductImages($giveawayProduct)
-                    : $this->placeholderImages();
-
-                if (!$normalizedGallery) {
-                    $normalizedGallery = array_values(array_filter(
-                        $resolvedImages['all'] ?? [],
-                        fn ($src) => is_string($src) && trim($src) !== ''
-                    ));
-                }
-
-                if (!$primaryImage) {
-                    $primaryImage = $normalizedGallery[0]
-                        ?? ($resolvedImages['front'] ?? null)
-                        ?? ($resolvedImages['all'][0] ?? null);
-                }
-            } else {
-                $resolvedImages = $normalizedGallery ? ['front' => $normalizedGallery[0], 'all' => $normalizedGallery] : null;
-            }
-
-            if (!$normalizedGallery) {
-                $placeholders = $resolvedImages ?? $this->placeholderImages();
-                $normalizedGallery = array_values(array_filter($placeholders['all'] ?? [], fn ($src) => is_string($src) && trim($src) !== ''));
-            }
-
-            if (!$primaryImage) {
-                $primaryImage = $normalizedGallery[0] ?? null;
-            }
-
-            $giveawayMeta['images'] = $normalizedGallery;
-            $giveawayMeta['image'] = $primaryImage;
-
-            $summary['giveaway'] = $giveawayMeta;
-        }
-
-        $payments = Arr::get($order->metadata, 'payments', []);
-        if ($payments) {
-            $summary['payments'] = $payments;
-        }
-
-        return $summary;
-    }
-
-    public function recalculateOrderTotals(Order $order): void
-    {
-        $order->loadMissing([
-            'items.addons',
-            'items.paperStockSelection',
-            'items.bulkSelections',
-        ]);
-
-        if ($order->items->isEmpty()) {
-            return;
-        }
-
-        $meta = $order->metadata ?? [];
-        $baseSubtotal = 0.0;
-
-        $invitationItem = $this->primaryInvitationItem($order);
-
-        foreach ($order->items as $lineItem) {
-            $storedSubtotal = $lineItem->subtotal !== null
-                ? (float) $lineItem->subtotal
-                : round(($lineItem->unit_price ?? 0) * ($lineItem->quantity ?? 0), 2);
-
-            if ($lineItem->subtotal === null || abs(((float) $lineItem->subtotal) - $storedSubtotal) > 0.009) {
-                $lineItem->forceFill([
-                    'subtotal' => $storedSubtotal,
-                ])->save();
-            }
-
-            $baseSubtotal += $storedSubtotal;
-
-            if ($lineItem->line_type === OrderItem::LINE_TYPE_ENVELOPE) {
-                $meta['envelope'] = array_merge(
-                    is_array($lineItem->design_metadata) ? $lineItem->design_metadata : [],
-                    [
-                        'qty' => $lineItem->quantity,
-                        'price' => (float) $lineItem->unit_price,
-                        'total' => $storedSubtotal,
-                    ]
-                );
-            }
-
-            if ($lineItem->line_type === OrderItem::LINE_TYPE_GIVEAWAY) {
-                $meta['giveaway'] = array_merge(
-                    is_array($lineItem->design_metadata) ? $lineItem->design_metadata : [],
-                    [
-                        'qty' => $lineItem->quantity,
-                        'price' => (float) $lineItem->unit_price,
-                        'total' => $storedSubtotal,
-                    ]
-                );
-            }
-        }
-
-        if (!$order->items->firstWhere('line_type', OrderItem::LINE_TYPE_ENVELOPE)) {
-            unset($meta['envelope']);
-        }
-
-        if (!$order->items->firstWhere('line_type', OrderItem::LINE_TYPE_GIVEAWAY)) {
-            unset($meta['giveaway']);
-        }
-
-        $inkMeta = Arr::get($meta, 'ink', Arr::get($order->metadata ?? [], 'ink', []));
-        $inkUsagePerInvite = (float) Arr::get($inkMeta, 'usage_per_invite_ml', Arr::get($inkMeta, 'usage_ml', 0));
-        $inkUnitPrice = Arr::get($inkMeta, 'unit_price', Arr::get($inkMeta, 'price', null));
-        $inkTotal = 0.0;
-        if ($inkUnitPrice !== null && $inkUsagePerInvite > 0) {
-            $inkTotal = round($inkUsagePerInvite * (float) $inkUnitPrice * ($invitationItem?->quantity ?? 0), 2);
-        } else {
-            $inkTotal = (float) Arr::get($inkMeta, 'total', (float) Arr::get($inkMeta, 'price', 0));
-        }
-
-        if (is_array($inkMeta)) {
-            $inkMeta['total'] = $inkTotal;
-            $meta['ink'] = $inkMeta;
-        }
-
-    // paperStockSelection->price is stored as a per-unit price; multiply by quantity
-    $paperPerUnit = (float) ($invitationItem?->paperStockSelection?->price ?? 0);
-    $paperTotal = round($paperPerUnit * ($invitationItem->quantity ?? 0), 2);
-    $addonsTotal = (float) ($invitationItem?->addons?->sum(fn($addon) => $addon->addon_price * $invitationItem->quantity) ?? 0);
-    $extrasTotal = round($paperTotal + $addonsTotal + $inkTotal, 2);
-
-    $subtotal = round($baseSubtotal + $extrasTotal, 2);
-        $tax = 0.0;
-        $shipping = $order->shipping_fee !== null ? (float) $order->shipping_fee : static::DEFAULT_SHIPPING_FEE;
-    $total = round($subtotal + $shipping, 2);
-
-        $order->update([
-            'subtotal_amount' => $subtotal,
-            'tax_amount' => $tax,
-            'shipping_fee' => $shipping,
-            'total_amount' => $total,
-            'metadata' => $meta,
-        ]);
+        return $fallback;
     }
 
     public function applyFinalSelections(Order $order, array $payload): Order
@@ -2128,10 +1556,9 @@ class OrderFlowService
         $this->syncBulkSelection($item, $product, $quantity, $unitPrice);
         $this->syncColorSelections($item, $previewSelections, $product);
 
-        $item->load(['addons', 'paperStockSelection', 'bulkSelections', 'colors']);
+        $item->load(['addons', 'paperStockSelection', 'colors']);
 
         $meta = $order->metadata ?? [];
-        $bulkSelection = $item->bulkSelections->first();
         $previousFinalStep = Arr::get($meta, 'final_step');
         if (!is_array($previousFinalStep)) {
             $previousFinalStep = [];
@@ -2149,22 +1576,11 @@ class OrderFlowService
                 ->all(),
             'estimated_date' => $pickupDate ? $pickupDate->toDateString() : Arr::get($previousFinalStep, 'estimated_date'),
             'estimated_date_label' => $pickupDateLabel ?? Arr::get($previousFinalStep, 'estimated_date_label'),
-            'bulk' => $bulkSelection ? [
-                'product_bulk_order_id' => $bulkSelection->product_bulk_order_id,
-                'qty_selected' => $bulkSelection->qty_selected,
-                'price_per_unit' => $bulkSelection->price_per_unit,
-            ] : [
-                'product_bulk_order_id' => null,
-                'qty_selected' => $item->quantity,
-                'price_per_unit' => $item->unit_price,
-            ],
-            'color_ids' => $item->colors->pluck('color_id')->filter()->values()->all(),
+            'color_ids' => [],
             'colors' => $item->colors->map(function ($color) {
                 return array_filter([
-                    'color_id' => $color->color_id,
-                    'color_name' => $color->color_name,
-                    'color_code' => $color->color_code,
-                    'image_path' => $color->image_path,
+                    'average_usage_ml' => $color->average_usage_ml,
+                    'total_ink_ml' => $color->total_ink_ml,
                 ], fn ($value) => $value !== null && $value !== '');
             })->values()->all(),
             'metadata' => $metadataPayload,
@@ -2337,7 +1753,10 @@ class OrderFlowService
     public function applyGiveawaySelection(Order $order, array $payload): Order
     {
         $productId = (int) ($payload['product_id'] ?? 0);
-        $product = Product::with(['template', 'uploads', 'images', 'bulkOrders'])->find($productId);
+        $product = Product::with(['template', 'uploads', 'images'])->find($productId);
+        if ($product) {
+            $product->setRelation('bulkOrders', collect());
+        }
 
         if (!$product) {
             throw new \RuntimeException('Giveaway product not found.');
@@ -2373,6 +1792,7 @@ class OrderFlowService
             'description' => $metadata['description'] ?? ($product->description ? Str::limit(strip_tags($product->description), 220) : null),
             'max_qty' => $metadata['max_qty'] ?? null,
             'min_qty' => $metadata['min_qty'] ?? null,
+            'is_preorder' => $payload['is_preorder'] ?? false,
             'updated_at' => now()->toIso8601String(),
         ], function ($value, $key) {
             if ($key === 'images') {
@@ -2511,6 +1931,7 @@ class OrderFlowService
     {
         $order->loadMissing([
             'items.product',
+            'items.product.inkUsage',
             'items.paperStockSelection',
             'items.addons',
         ]);
@@ -2812,6 +2233,38 @@ class OrderFlowService
                         'source' => 'addon',
                         'quantity_mode' => 'per_order',
                     ]);
+                }
+            }
+        }
+
+        // Process ink usage
+        foreach ($order->items as $item) {
+            $totalAverageInk = $item->product?->inkUsage?->sum('average_usage_ml') ?? 0;
+            $totalInk = $totalAverageInk * $item->quantity;
+            if ($totalInk > 0) {
+                $cyanMl = $totalInk * 0.3;
+                $magentaMl = $totalInk * 0.3;
+                $yellowMl = $totalInk * 0.3;
+                $blackMl = $totalInk * 0.1;
+
+                $inkMaterials = [
+                    'Cyan Ink' => $cyanMl,
+                    'Magenta Ink' => $magentaMl,
+                    'Yellow Ink' => $yellowMl,
+                    'Black Ink' => $blackMl,
+                ];
+
+                foreach ($inkMaterials as $name => $amount) {
+                    if ($amount > 0) {
+                        $material = $resolveMaterialByName($name);
+                        if ($material) {
+                            $accumulateMaterial($item, $material, $amount, [
+                                'source' => 'ink_cmyk',
+                                'ink_type' => strtolower(str_replace(' Ink', '', $name)),
+                                'quantity_mode' => 'total',
+                            ]);
+                        }
+                    }
                 }
             }
         }
@@ -3359,5 +2812,257 @@ class OrderFlowService
         }
 
         return $shortages;
+    }
+
+    public function checkInkStock(Order $order): bool
+    {
+        $order->loadMissing([
+            'items.product',
+            'items.product.inkUsage',
+        ]);
+
+        $required = [];
+
+        foreach ($order->items as $item) {
+            $totalAverageInk = $item->product?->inkUsage?->sum('average_usage_ml') ?? 0;
+            $totalInk = $totalAverageInk * $item->quantity;
+            if ($totalInk > 0) {
+                $cyanMl = $totalInk * 0.3;
+                $magentaMl = $totalInk * 0.3;
+                $yellowMl = $totalInk * 0.3;
+                $blackMl = $totalInk * 0.1;
+
+                $inkMaterials = [
+                    'Cyan' => $cyanMl,
+                    'Magenta' => $magentaMl,
+                    'Yellow' => $yellowMl,
+                    'Black' => $blackMl,
+                ];
+
+                foreach ($inkMaterials as $color => $amount) {
+                    if ($amount > 0) {
+                        $ink = \App\Models\Ink::query()
+                            ->with('inventory')
+                            ->whereRaw('LOWER(ink_color) = ?', [strtolower($color)])
+                            ->first();
+                        if ($ink && $ink->inventory) {
+                            $required[$ink->getKey()] = ($required[$ink->getKey()] ?? 0) + $amount;
+                        }
+                    }
+                }
+            }
+        }
+
+        foreach ($required as $inkId => $amount) {
+            $ink = \App\Models\Ink::query()->with('inventory')->find($inkId);
+            if (!$ink || !$ink->inventory || $ink->inventory->stock_qty < $amount) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    protected function removeLineItem(Order $order, string $lineType): void
+    {
+        $order->items()->where('line_type', $lineType)->delete();
+    }
+
+    public function recalculateOrderTotals(Order $order): void
+    {
+        $order->loadMissing(['items.addons', 'items.paperStockSelection']);
+
+        $invitationItem = $this->primaryInvitationItem($order);
+        if (!$invitationItem) {
+            return;
+        }
+
+        $baseSubtotal = (float) $invitationItem->unit_price * $invitationItem->quantity;
+
+        // paperStockSelection->price is stored as a per-unit price; multiply by quantity
+        $paperPerUnit = (float) ($invitationItem->paperStockSelection?->price ?? 0);
+        $paperTotal = round($paperPerUnit * $invitationItem->quantity, 2);
+
+        $addonsTotal = (float) ($invitationItem->addons?->sum(fn($addon) => $addon->addon_price * $invitationItem->quantity) ?? 0);
+
+        $inkTotal = 0.0; // TODO: calculate ink costs if applicable
+
+        $extrasTotal = round($paperTotal + $addonsTotal + $inkTotal, 2);
+
+        $subtotal = round($baseSubtotal + $extrasTotal, 2);
+        $tax = 0.0;
+        $shipping = $order->shipping_fee !== null ? (float) $order->shipping_fee : static::DEFAULT_SHIPPING_FEE;
+        $total = round($subtotal + $shipping, 2);
+
+        $order->update([
+            'subtotal_amount' => $subtotal,
+            'tax_amount' => $tax,
+            'shipping_fee' => $shipping,
+            'total_amount' => $total,
+        ]);
+    }
+
+    public function buildSummary(Order $order): array
+    {
+        $order->loadMissing(['items.addons', 'items.paperStockSelection']);
+
+        $invitationItem = $this->primaryInvitationItem($order);
+        if (!$invitationItem) {
+            return [];
+        }
+
+        $summary = [
+            'quantity' => $invitationItem->quantity,
+            'unitPrice' => $invitationItem->unit_price,
+            'paperStockId' => $invitationItem->paperStockSelection?->paper_stock_id,
+            'addonIds' => $invitationItem->addons?->pluck('addon_id')->toArray() ?? [],
+            'metadata' => $order->metadata ?? [],
+        ];
+
+        return $summary;
+    }
+
+    public function logActivity(Order $order, string $activity, array $data = []): void
+    {
+        $user = Auth::user();
+        $order->activities()->create([
+            'activity_type' => $activity,
+            'description' => json_encode($data),
+            'user_id' => $user?->user_id,
+            'user_name' => $user?->name ?? $user?->email,
+            'user_role' => $user?->role ?? 'customer',
+            'created_at' => now(),
+        ]);
+    }
+
+    public function deductInkStock(Order $order): void
+    {
+        $order->loadMissing([
+            'items.product',
+            'items.product.inkUsage',
+        ]);
+
+        foreach ($order->items as $item) {
+            $totalAverageInk = $item->product?->inkUsage?->sum('average_usage_ml') ?? 0;
+            $totalInk = $totalAverageInk * $item->quantity;
+            if ($totalInk > 0) {
+                $cyanMl = $totalInk * 0.3;
+                $magentaMl = $totalInk * 0.3;
+                $yellowMl = $totalInk * 0.3;
+                $blackMl = $totalInk * 0.1;
+
+                $inkMaterials = [
+                    'Cyan' => $cyanMl,
+                    'Magenta' => $magentaMl,
+                    'Yellow' => $yellowMl,
+                    'Black' => $blackMl,
+                ];
+
+                foreach ($inkMaterials as $color => $amount) {
+                    if ($amount > 0) {
+                        $ink = \App\Models\Ink::query()
+                            ->with('inventory')
+                            ->whereRaw('LOWER(ink_color) = ?', [strtolower($color)])
+                            ->first();
+                        if ($ink) {
+                            $this->adjustInkStock($ink, $amount);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    protected function adjustInkStock(\App\Models\Ink $ink, float $delta): array
+    {
+        $inkRecord = \App\Models\Ink::query()
+            ->whereKey($ink->getKey())
+            ->lockForUpdate()
+            ->with(['inventory' => function ($query) {
+                $query->lockForUpdate();
+            }])
+            ->first();
+
+        if ($inkRecord) {
+            $ink = $inkRecord;
+        } else {
+            $ink->loadMissing('inventory');
+        }
+
+        $inventory = $ink->inventory;
+        $currentInventory = $inventory?->stock_level ?? 0;
+        $currentInkStock = $ink->stock_qty ?? $currentInventory;
+
+        $newInventoryLevel = $inventory ? $currentInventory - $delta : null;
+        $newInkStock = $currentInkStock - $delta;
+
+        $shortage = 0.0;
+
+        if ($newInventoryLevel !== null && $newInventoryLevel < 0) {
+            $shortage = max($shortage, abs($newInventoryLevel));
+            $newInventoryLevel = 0;
+        }
+
+        if ($newInkStock < 0) {
+            $shortage = max($shortage, abs($newInkStock));
+            $newInkStock = 0;
+        }
+
+        if ($inventory && $newInventoryLevel !== null) {
+            $inventory->stock_level = (int) round($newInventoryLevel);
+            $inventory->save();
+        }
+
+        $ink->stock_qty = (int) round($newInkStock);
+        $ink->save();
+
+        $applied = $currentInkStock - $newInkStock;
+
+        return [
+            'applied' => $applied,
+            'shortage' => $shortage,
+            'remaining_stock' => [
+                'inventory' => $inventory?->stock_level,
+                'ink' => $ink->stock_qty,
+            ],
+        ];
+    }
+
+    public function restoreInkStock(Order $order): void
+    {
+        $order->loadMissing([
+            'items.product',
+            'items.product.inkUsage',
+        ]);
+
+        foreach ($order->items as $item) {
+            $totalAverageInk = $item->product?->inkUsage?->sum('average_usage_ml') ?? 0;
+            $totalInk = $totalAverageInk * $item->quantity;
+            if ($totalInk > 0) {
+                $cyanMl = $totalInk * 0.3;
+                $magentaMl = $totalInk * 0.3;
+                $yellowMl = $totalInk * 0.3;
+                $blackMl = $totalInk * 0.1;
+
+                $inkMaterials = [
+                    'Cyan' => $cyanMl,
+                    'Magenta' => $magentaMl,
+                    'Yellow' => $yellowMl,
+                    'Black' => $blackMl,
+                ];
+
+                foreach ($inkMaterials as $color => $amount) {
+                    if ($amount > 0) {
+                        $ink = \App\Models\Ink::query()
+                            ->with('inventory')
+                            ->whereRaw('LOWER(ink_color) = ?', [strtolower($color)])
+                            ->first();
+                        if ($ink) {
+                            $this->adjustInkStock($ink, -$amount); // Negative to restore
+                        }
+                    }
+                }
+            }
+        }
     }
 }

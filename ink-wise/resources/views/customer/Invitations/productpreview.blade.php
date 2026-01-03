@@ -65,7 +65,6 @@
   $defaultImage = $frontImage ?? $backImage ?? asset('images/placeholder.png');
   $priceValue = $product->base_price ?? $product->unit_price ?? optional($templateRef)->base_price ?? optional($templateRef)->unit_price;
   $paperStocksRaw = $product->paper_stocks ?? $product->paperStocks ?? collect();
-  $colors = $product->product_colors ?? $product->colors ?? collect();
   $stockAvailability = $product->stock_availability ?? optional($templateRef)->stock_availability;
   if ($product->materials && $product->materials->count()) {
     $allMaterialsAvailable = true;
@@ -196,24 +195,6 @@
       </div>
 
       <div class="options-scroll">
-        <section class="option-block">
-          <h3>Colors</h3>
-          @if($colors->count())
-            <div class="colors">
-              @foreach($colors as $color)
-                <button class="color-btn @if($loop->first) active @endif"
-                    style="background: {{ $color->color_code ?? '#d1d5db' }}"
-                    data-front="{{ $frontImage ?? $defaultImage }}"
-                    data-back="{{ $backImage ?? $frontImage ?? $defaultImage }}"
-                    title="{{ $color->name ?? 'Color option' }}">
-                </button>
-              @endforeach
-            </div>
-          @else
-            <p class="muted">Single colorway.</p>
-          @endif
-        </section>
-
         @if($paperStocks->count())
           <section class="option-block">
             <h3>Paper Stocks</h3>

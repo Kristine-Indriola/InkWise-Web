@@ -20,18 +20,46 @@
     $templates = $templates ?? [];
     $materials = $materials ?? collect();
 
+    // Normalize default values with explicit fallbacks to avoid nested ternaries in Blade.
+    $basePriceDefault = $product->base_price
+        ?? $product->unit_price
+        ?? optional($product->envelope)->price_per_unit
+        ?? '';
+
+    $inkUsageDefault = $product->estimated_ink_usage_ml
+        ?? optional($product->envelope)->average_usage_ml
+        ?? optional(optional($product)->inkUsage->first())->average_usage_ml
+        ?? '';
+
+    $leadTimeDefault = $product->lead_time
+        ?? $product->lead_time_days
+        ?? 7; // Default 7 days if not set
+
+    $dateAvailableValue = '';
+    if (isset($product)) {
+        $dateRaw = $product->date_available ?: $product->created_at;
+        if (!empty($dateRaw)) {
+            try {
+                $dateAvailableValue = optional(\Illuminate\Support\Carbon::parse($dateRaw))->format('Y-m-d');
+            } catch (\Throwable $e) {
+                $dateAvailableValue = '';
+            }
+        }
+    }
+
     $defaults = [
         'name' => old('invitationName', $product->name ?? $selectedTemplate->name ?? ''),
         'event_type' => old('eventType', $product->event_type ?? $selectedTemplate->event_type ?? ''),
         'product_type' => old('productType', $product->product_type ?? $selectedTemplate->product_type ?? 'Invitation'),
         'theme_style' => old('themeStyle', $product->theme_style ?? $selectedTemplate->theme_style ?? ''),
         'description' => old('description', $product->description ?? $selectedTemplate->description ?? ''),
-        'base_price' => old('base_price', $product->base_price ?? $product->unit_price ?? ''),
-        'lead_time' => old('lead_time', $product->lead_time ?? ''),
-        'date_available' => old('date_available', isset($product) && !empty($product->date_available)
-            ? optional(\Illuminate\Support\Carbon::parse($product->date_available))->format('Y-m-d')
-            : ''),
+        'base_price' => old('base_price', $basePriceDefault),
+        'estimated_ink_usage_ml' => old('estimated_ink_usage_ml', $inkUsageDefault),
+        'lead_time' => old('lead_time', $leadTimeDefault),
+        'date_available' => old('date_available', $dateAvailableValue),
     ];
+
+    $productTypeNormalized = strtolower($defaults['product_type'] ?? '');
 
     // Prepare existing data for editing
     $productPaperStocks = isset($product) ? $product->paperStocks->map(function ($stock) {
@@ -56,28 +84,9 @@
         ];
     })->toArray() : [];
 
-    $productColors = isset($product) ? $product->colors->map(function ($color) {
-        return [
-            'id' => $color->id,
-            'name' => $color->name,
-            'color_code' => $color->color_code,
-        ];
-    })->toArray() : [];
-
-    $productBulkOrders = isset($product) ? $product->bulkOrders->map(function ($bulk) {
-        return [
-            'id' => $bulk->id,
-            'min_qty' => $bulk->min_qty,
-            'max_qty' => $bulk->max_qty,
-            'price_per_unit' => $bulk->price_per_unit,
-        ];
-    })->toArray() : [];
-
     // Initialize with existing data or empty arrays
     $paperStockRows = old('paper_stocks', !empty($productPaperStocks) ? $productPaperStocks : [[]]);
     $addonRows = old('addons', !empty($productAddons) ? $productAddons : [[]]);
-    $colorRows = old('colors', !empty($productColors) ? $productColors : [[]]);
-    $bulkOrderRows = old('bulk_orders', !empty($productBulkOrders) ? $productBulkOrders : [[]]);
 
     // Envelope specific data
     $envelope = $product->envelope ?? null;
@@ -108,12 +117,12 @@
             <h2 id="basicInfoHeader">{{ $defaults['product_type'] }} Information</h2>
             <div class="form-grid grid-2-cols">
                 <div class="field">
-                    <label for="invitationName" id="productNameLabel">{{ $defaults['product_type'] }} Name *</label>
+                    <label for="invitationName" id="productNameLabel">{{ $defaults['product_type'] }} Name</label>
                     <input type="text" id="invitationName" name="invitationName" required value="{{ $defaults['name'] }}">
                 </div>
 
                 <div class="field">
-                    <label for="eventType">Event Type *</label>
+                    <label for="eventType">Event Type</label>
                     <select id="eventType" name="eventType" required>
                         <option value="">Select event type</option>
                         @foreach(['Wedding','Birthday','Baptism','Corporate'] as $type)
@@ -123,22 +132,30 @@
                 </div>
 
                 <div class="field">
-                    <label for="productType">Product Type *</label>
+                    <label for="productType">Product Type</label>
                     <select id="productType" name="productType" required>
-                        <option value="Invitation" {{ $defaults['product_type'] == 'Invitation' ? 'selected' : '' }}>Invitation</option>
-                        <option value="Giveaway" {{ $defaults['product_type'] == 'Giveaway' ? 'selected' : '' }}>Giveaway</option>
-                        <option value="Envelope" {{ $defaults['product_type'] == 'Envelope' ? 'selected' : '' }}>Envelope</option>
+                        <option value="Invitation" {{ $productTypeNormalized === 'invitation' ? 'selected' : '' }}>Invitation</option>
+                        <option value="Giveaway" {{ $productTypeNormalized === 'giveaway' ? 'selected' : '' }}>Giveaway</option>
+                        <option value="Envelope" {{ $productTypeNormalized === 'envelope' ? 'selected' : '' }}>Envelope</option>
                     </select>
                 </div>
 
+                @if($productTypeNormalized === 'invitation')
                 <div class="field">
-                    <label for="themeStyle">Theme / Style *</label>
-                    <input type="text" id="themeStyle" name="themeStyle" required value="{{ $defaults['theme_style'] }}">
+                    <label for="themeStyle">Theme / Style</label>
+                    <input type="text" id="themeStyle" name="themeStyle" value="{{ $defaults['theme_style'] }}">
                 </div>
+                @endif
 
                 <div class="field">
                     <label for="basePrice">Base Price</label>
                     <input type="number" step="0.01" id="basePrice" name="base_price" value="{{ $defaults['base_price'] }}">
+                </div>
+
+                <div class="field">
+                    <label for="estimatedInkUsage">Estimated Ink Usage (mL per invitation)</label>
+                    <input type="number" step="0.01" min="0" id="estimatedInkUsage" name="estimated_ink_usage_ml" value="{{ $defaults['estimated_ink_usage_ml'] }}" placeholder="e.g., 2.50">
+                    <small class="field-help">Used for printing and cost calculations.</small>
                 </div>
 
                 <div class="field">
@@ -159,27 +176,25 @@
         </div>
 
         {{-- Envelope Material Selection --}}
-        <div class="form-section" id="envelope-fields" style="display: {{ $defaults['product_type'] === 'Envelope' ? 'block' : 'none' }};">
+        <div class="form-section" id="envelope-fields" style="display: {{ $productTypeNormalized === 'envelope' ? 'block' : 'none' }};">
             <h2>Material</h2>
+            @php
+                $envelopeMaterialName = optional(optional($product->envelope)->material)->material_name
+                    ?? optional($product->envelope)->envelope_material_name
+                    ?? null;
+                $envelopeMaterialType = optional(optional($product->envelope)->material)->material_type
+                    ?? optional($product->envelope)->envelope_material_name
+                    ?? 'ENVELOPE';
+            @endphp
             <div class="form-grid grid-2-cols">
                 <div class="field">
-                    <label for="materialType">Material</label>
-                    <select id="materialType" name="material_type" required>
-                        <option value="">Select Material Type</option>
-                        @foreach($materialTypes ?? [] as $mt)
-                            <option value="{{ $mt }}" {{ (old('material_type', $envelopeDefaults['material_type'] ?? '') == $mt) ? 'selected' : '' }}>{{ strtoupper($mt) }}</option>
-                        @endforeach
-                    </select>
+                    <label>Material</label>
+                    <input type="text" class="styled-select" value="{{ strtoupper($envelopeMaterialType) }}" readonly>
                 </div>
 
                 <div class="field">
-                    <label for="envelopeMaterial">Envelope Material Name*</label>
-                    <select id="envelopeMaterial" name="envelope_material_id" required>
-                        <option value="">Select Envelope Material</option>
-                        @foreach($envelopeMaterials ?? collect() as $em)
-                            <option value="{{ $em->material_id }}" {{ (old('envelope_material_id', $envelopeDefaults['envelope_material_id'] ?? '') == $em->material_id) ? 'selected' : '' }}>{{ $em->material_name }}</option>
-                        @endforeach
-                    </select>
+                    <label>Envelope Material Name</label>
+                    <input type="text" class="styled-select" value="{{ $envelopeMaterialName ?? 'Not set' }}" readonly>
                 </div>
 
                 <div class="field">
@@ -187,10 +202,13 @@
                     <input type="number" step="0.01" id="pricePerUnit" name="price_per_unit" value="{{ $envelopeDefaults['price_per_unit'] }}">
                 </div>
             </div>
+            @if(!$envelopeMaterialName)
+                <p class="muted">Envelope material is already managed in the envelope record; no selection available here.</p>
+            @endif
         </div>
 
         {{-- Paper Stocks Section --}}
-        @if($defaults['product_type'] !== 'Envelope' && $defaults['product_type'] !== 'Giveaway')
+        @if($productTypeNormalized !== 'envelope' && $productTypeNormalized !== 'giveaway')
         <div class="form-section">
             <h2>Paper Stocks</h2>
             <div id="paper-stocks-container">
@@ -237,10 +255,10 @@
         </div>
         @endif
 
-        {{-- Addons Section --}}
-        @if($defaults['product_type'] !== 'Envelope' && $defaults['product_type'] !== 'Giveaway')
+        {{-- Size Section --}}
+        @if($productTypeNormalized !== 'envelope' && $productTypeNormalized !== 'giveaway')
         <div class="form-section">
-            <h2>Addons</h2>
+            <h2>Size</h2>
             <div id="addons-container">
                 @foreach($addonRows as $index => $addon)
                     <div class="dynamic-row addon-row" data-index="{{ $index }}">
@@ -279,43 +297,9 @@
                     </div>
                 @endforeach
             </div>
-            <button type="button" id="add-addon" class="btn-add">Add Addon</button>
+            <button type="button" id="add-addon" class="btn-add">Add Size</button>
         </div>
         @endif
-
-        {{-- Colors removed: not required for envelope products per request --}}
-
-        {{-- Bulk Orders Section --}}
-        <div class="form-section">
-            <h2>Bulk Orders</h2>
-            <div id="bulk-orders-container">
-                @foreach($bulkOrderRows as $index => $bulk)
-                    <div class="dynamic-row bulk-order-row" data-index="{{ $index }}">
-                        <div class="form-grid grid-4-cols">
-                            <div class="field">
-                                <label>Min Qty *</label>
-                                <input type="number" name="bulk_orders[{{ $index }}][min_qty]" required value="{{ $bulk['min_qty'] ?? '' }}">
-                            </div>
-                            <div class="field">
-                                <label>Max Qty *</label>
-                                <input type="number" name="bulk_orders[{{ $index }}][max_qty]" required value="{{ $bulk['max_qty'] ?? '' }}">
-                            </div>
-                            <div class="field">
-                                <label>Price per Unit *</label>
-                                <input type="number" step="0.01" name="bulk_orders[{{ $index }}][price_per_unit]" required value="{{ $bulk['price_per_unit'] ?? '' }}">
-                            </div>
-                            <div class="field actions">
-                                <button type="button" class="btn-remove remove-bulk-order" {{ $index === 0 ? 'disabled' : '' }}>Remove</button>
-                            </div>
-                        </div>
-                        @if(isset($bulk['id']))
-                            <input type="hidden" name="bulk_orders[{{ $index }}][id]" value="{{ $bulk['id'] }}">
-                        @endif
-                    </div>
-                @endforeach
-            </div>
-            <button type="button" id="add-bulk-order" class="btn-add">Add Bulk Order</button>
-        </div>
 
         {{-- Product Template Section --}}
         <div class="form-section">

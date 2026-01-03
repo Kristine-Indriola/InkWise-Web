@@ -110,28 +110,21 @@
                 <i class="fa-solid fa-pen-to-square"></i>
                 Edit Product
             </a>
-            @if($product->template_id)
-                <a href="{{ route('admin.products.create.invitation', ['template_id' => $product->template_id]) }}" class="btn-action btn-duplicate">
-                    <i class="fi fi-rr-copy-alt"></i>
-                    Duplicate from Template
-                </a>
-            @else
-                <span class="btn-action btn-duplicate is-disabled" role="button" aria-disabled="true">
-                    <i class="fi fi-rr-copy-alt"></i>
-                    Duplicate from Template
-                </span>
-            @endif
         </div>
     </header>
 
     @php
         $basePriceSummaryValue = '—';
-        $basePrice = $product->base_price ?? $product->unit_price;
+        $basePrice = $product->base_price
+            ?? $product->unit_price
+            ?? ($product->product_type === 'Envelope' ? optional($product->envelope)->price_per_unit : null);
         if (!is_null($basePrice)) {
             $basePriceSummaryValue = '₱' . number_format($basePrice, 2);
         }
 
-        $dateAvailableRaw = $product->getAttribute('date_available') ?? $product->getAttribute('date_Available');
+        $dateAvailableRaw = $product->getAttribute('date_available')
+            ?? $product->getAttribute('date_Available')
+            ?? $product->created_at;
         $dateAvailableDisplay = '—';
         if (!empty($dateAvailableRaw)) {
             try {
@@ -141,29 +134,9 @@
             }
         }
 
-        $bulkOrdersSummary = collect($product->product_bulk_orders ?? $product->bulk_orders ?? []);
-        $bulkOrdersSummaryValue = '—';
-        if ($bulkOrdersSummary->isNotEmpty()) {
-            $minQty = $bulkOrdersSummary->whereNotNull('min_qty')->min('min_qty');
-            $maxQty = $bulkOrdersSummary->whereNotNull('max_qty')->max('max_qty');
-            if (!is_null($minQty) && !is_null($maxQty)) {
-                $bulkOrdersSummaryValue = number_format($minQty) . ' – ' . number_format($maxQty) . ' pcs';
-            } elseif (!is_null($minQty)) {
-                $bulkOrdersSummaryValue = 'Min ' . number_format($minQty) . ' pcs';
-            } elseif (!is_null($maxQty)) {
-                $bulkOrdersSummaryValue = 'Up to ' . number_format($maxQty) . ' pcs';
-            } else {
-                $tierCount = $bulkOrdersSummary->count();
-                $bulkOrdersSummaryValue = $tierCount . ' tier' . ($tierCount === 1 ? '' : 's');
-            }
-        }
     @endphp
 
     <section class="product-summary" aria-label="Key product metrics">
-        <article class="summary-card">
-            <span class="summary-label">Event Type</span>
-            <span class="summary-value">{{ $product->event_type ?? '—' }}</span>
-        </article>
         <article class="summary-card">
             <span class="summary-label">Product Type</span>
             <span class="summary-value">{{ $product->product_type ?? '—' }}</span>
@@ -171,10 +144,6 @@
         <article class="summary-card">
             <span class="summary-label">Base Price</span>
             <span class="summary-value">{{ $basePriceSummaryValue }}</span>
-        </article>
-        <article class="summary-card">
-            <span class="summary-label">Bulk Orders</span>
-            <span class="summary-value">{{ $bulkOrdersSummaryValue }}</span>
         </article>
     </section>
 
@@ -276,7 +245,6 @@
                     <p class="template-name">{{ $product->template->name }}</p>
                     <ul class="meta-list">
                         <li><span>Event Type</span><strong>{{ $product->template->event_type ?? '—' }}</strong></li>
-                        <li><span>Theme</span><strong>{{ $product->template->theme_style ?? '—' }}</strong></li>
                         <li><span>Updated</span><strong>{{ optional($product->template->updated_at)->format('M d, Y') ?? '—' }}</strong></li>
                     </ul>
                 </div>
@@ -367,14 +335,28 @@
                     <div><dt>{{ $product->product_type ?? 'Product' }} Name</dt><dd>
                         @if($product->product_type === 'Giveaway' && $product->materials && $product->materials->first() && $product->materials->first()->material)
                             {{ $product->materials->first()->material->material_name }}
+                        @elseif($product->product_type === 'Envelope' && $product->envelope && $product->envelope->material)
+                            {{ $product->envelope->material->material_name }}
                         @else
                             {{ $product->name }}
                         @endif
                     </dd></div>
-                    <div><dt>Theme / Style</dt><dd>{{ $product->theme_style ?? '—' }}</dd></div>
                     <div><dt>Event Type</dt><dd>{{ $product->event_type ?? '—' }}</dd></div>
                     <div><dt>Product Type</dt><dd>{{ $product->product_type ?? '—' }}</dd></div>
-                    <div><dt>Base Price</dt><dd>{{ $product->base_price !== null ? '₱' . number_format($product->base_price, 2) : ($product->unit_price !== null ? '₱' . number_format($product->unit_price, 2) : '—') }}</dd></div>
+                    @if($product->product_type === 'Invitation')
+                    <div><dt>Theme / Style</dt><dd>{{ $product->theme_style ?? '—' }}</dd></div>
+                    @endif
+                    <div><dt>Base Price</dt><dd>
+                        @if($product->base_price !== null)
+                            ₱{{ number_format($product->base_price, 2) }}
+                        @elseif($product->unit_price !== null)
+                            ₱{{ number_format($product->unit_price, 2) }}
+                        @elseif($product->product_type === 'Envelope' && optional($product->envelope)->price_per_unit !== null)
+                            ₱{{ number_format($product->envelope->price_per_unit, 2) }}
+                        @else
+                            —
+                        @endif
+                    </dd></div>
                     <div><dt>Date Available</dt><dd>{{ $dateAvailableDisplay }}</dd></div>
                 </dl>
             </div>
@@ -386,6 +368,7 @@
                 </div>
             </div>
 
+            @if($product->product_type === 'Invitation')
             <div class="product-card">
                 <h2>Paper Stocks</h2>
                 @php $paperStocks = $product->paper_stocks ?? $product->paperStocks ?? collect(); @endphp
@@ -407,11 +390,56 @@
                     <p class="muted">No paper stocks defined.</p>
                 @endif
             </div>
+            @endif
 
-            {{-- Addons --}}
+            @if($product->product_type === 'Envelope')
+            <div class="product-card">
+                <h2>Envelope Material</h2>
+                @php $envelope = $product->envelope; @endphp
+                @if($envelope && ($envelope->material || $envelope->envelope_material_name))
+                    <ul class="meta-list">
+                        <li>
+                            <span>Material</span>
+                            <strong>{{ $envelope->material->material_name ?? $envelope->envelope_material_name ?? '—' }}</strong>
+                        </li>
+                        <li>
+                            <span>Type</span>
+                            <strong>{{ strtoupper($envelope->material->material_type ?? $envelope->envelope_material_name ?? 'ENVELOPE') }}</strong>
+                        </li>
+                    </ul>
+                @else
+                    <p class="muted">No envelope material defined.</p>
+                @endif
+            </div>
+            @endif
+
+            @if($product->product_type === 'Giveaway')
+            <div class="product-card">
+                <h2>Giveaway Material</h2>
+                @php $materials = $product->materials ?? collect(); @endphp
+                @if($materials && $materials->count())
+                    <ul class="meta-list">
+                        @foreach($materials as $mat)
+                            @php
+                                $matName = $mat->material->material_name ?? $mat->material_name ?? '—';
+                                $matType = strtoupper($mat->material->material_type ?? $mat->material_type ?? 'GIVEAWAY');
+                            @endphp
+                            <li>
+                                <span>{{ $matName }}</span>
+                                <strong>{{ $matType }}</strong>
+                            </li>
+                        @endforeach
+                    </ul>
+                @else
+                    <p class="muted">No giveaway material defined.</p>
+                @endif
+            </div>
+            @endif
+
+            {{-- Size --}}
             @if($product->product_type !== 'Envelope' && $product->product_type !== 'Giveaway')
             <div class="product-card">
-                <h2>Addons</h2>
+                <h2>Size</h2>
                 @php $addons = $product->addons ?? $product->product_addons ?? $product->addOns ?? collect(); @endphp
                 @if($addons && $addons->count())
                     <ul class="meta-list">
@@ -428,56 +456,27 @@
                         @endforeach
                     </ul>
                 @else
-                    <p class="muted">No addons defined.</p>
+                    <p class="muted">No size defined.</p>
                 @endif
             </div>
             @endif
 
-            {{-- Colors --}}
-            <div class="two-column-row">
+            {{-- Ink Usage --}}
             <div class="product-card">
-                <h2>Colors</h2>
-                @php $colors = $product->colors ?? $product->product_colors ?? collect(); @endphp
-                @if($colors && $colors->count())
+                <h2>Ink Usage</h2>
+                @php $inkUsage = $product->inkUsage ?? $product->colors ?? collect(); @endphp
+                @if($inkUsage && $inkUsage->count())
                     <ul class="meta-list">
-                        @foreach($colors as $c)
-                            <li style="display:flex; align-items:center; gap:8px;">
-                                <span>{{ $c->name ?? 'Color' }}</span>
-                                <strong style="display:flex; align-items:center; gap:8px;">
-                                    @if(!empty($c->color_code))
-                                        <span style="width:20px; height:20px; display:inline-block; background:{{ $c->color_code }}; border:1px solid #ccc;"></span>
-                                        <span>{{ $c->color_code }}</span>
-                                    @else
-                                        —
-                                    @endif
-                                </strong>
-                            </li>
-                        @endforeach
-                    </ul>
-                @else
-                    <p class="muted">No colors defined.</p>
-                @endif
-            </div>
-
-            {{-- Bulk Orders --}}
-            <div class="product-card">
-                <h2>Bulk Orders</h2>
-                @php $bulkOrders = $product->bulk_orders ?? $product->product_bulk_orders ?? collect(); @endphp
-                @if($bulkOrders && $bulkOrders->count())
-                    <ul class="meta-list">
-                        @foreach($bulkOrders as $b)
+                        @foreach($inkUsage as $usage)
                             <li>
-                                <div><strong>Min Qty:</strong> {{ $b->min_qty ?? '—' }}</div>
-                                <div><strong>Max Qty:</strong> {{ $b->max_qty ?? '—' }}</div>
-                                <div><strong>Price per Unit:</strong> {{ $b->price_per_unit ?? '—' }}</div>
+                                <div><strong>Average Usage:</strong> {{ $usage->average_usage_ml ?? '—' }} ml</div>
                             </li>
                         @endforeach
                     </ul>
                 @else
-                    <p class="muted">No bulk order tiers defined.</p>
+                    <p class="muted">No ink usage defined.</p>
                 @endif
             </div>
-        </div>
     </section>
     </div>
 </main>

@@ -337,12 +337,7 @@
                         <td>{{ $material->color ?? '-' }}</td>
                         <td>{{ $material->weight_gsm ?? '-' }}</td>
                         <td>{{ $material->unit ?? '-' }}</td>
-                        <td>
-                            ₱{{ number_format($material->unit_cost, 2) }}
-                            @if($material->material_type === 'ink')
-                                /ml
-                            @endif
-                        </td>
+                        <td>₱{{ number_format($material->unit_cost, 2) }}</td>
                         <td>
                             <span class="badge {{ $stock <= 0 ? 'stock-critical' : ($stock > 0 && $stock <= $reorder ? 'stock-low' : 'stock-ok') }}">
                                 {{ $stock }}
@@ -442,16 +437,16 @@
                         <td>{{ $ink->ink_color }}</td>
                         <td>-</td>
                         <td>{{ $ink->unit ?? 'can' }}</td>
-                        <td>₱{{ number_format($ink->cost_per_ml, 2) }}/ml</td>
+                        <td>₱{{ number_format($ink->cost_per_ml, 2) }}</td>
                         <td>
                             <span class="badge {{ $statusBadgeClass }}">
-                                {{ $stockLevel }} {{ $ink->unit ?? 'units' }}
+                                {{ number_format($stockLevel) }}
                             </span>
                             @if(!empty($ink->stock_qty_ml))
                                 <div class="approx-note">≈ {{ number_format($ink->stock_qty_ml, 0) }} ml</div>
                             @endif
                         </td>
-                        <td>{{ $reorder }} {{ $ink->unit ?? 'units' }}</td>
+                        <td>{{ number_format($reorder) }}</td>
                         @php
                             $inkStatusClass = $statusRemark === 'Out of Stock' ? 'out' : ($statusRemark === 'Low Stock' ? 'low' : 'ok');
                         @endphp

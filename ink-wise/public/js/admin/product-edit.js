@@ -114,34 +114,9 @@ document.addEventListener('DOMContentLoaded', function(){
     }
 
 
-    function bulkOrderTemplate(index){
-        return `
-            <div class="dynamic-row bulk-order-row" data-index="${index}">
-                <div class="form-grid">
-                    <div class="field">
-                        <label>Min Qty *</label>
-                        <input type="number" name="bulk_orders[${index}][min_qty]" required>
-                    </div>
-                    <div class="field">
-                        <label>Max Qty *</label>
-                        <input type="number" name="bulk_orders[${index}][max_qty]" required>
-                    </div>
-                    <div class="field">
-                        <label>Price per Unit *</label>
-                        <input type="number" step="0.01" name="bulk_orders[${index}][price_per_unit]" required>
-                    </div>
-                    <div class="field actions">
-                        <button type="button" class="btn-remove remove-bulk-order">Remove</button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
     // Initialize dynamic sections
     addDynamicRow('paper-stocks-container', 'paper-stock-row', paperStockTemplate, 'add-paper-stock', 'remove-paper-stock');
     addDynamicRow('addons-container', 'addon-row', addonTemplate, 'add-addon', 'remove-addon');
-    addDynamicRow('bulk-orders-container', 'bulk-order-row', bulkOrderTemplate, 'add-bulk-order', 'remove-bulk-order');
 
         // Show/hide envelope fields when product type changes
         const productTypeSelect = document.getElementById('productType');

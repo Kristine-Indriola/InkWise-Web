@@ -58,42 +58,25 @@ class ProductController extends Controller
             $this->hydrateLegacyAttributes($product);
         });
 
-        $recentGiveaways = Product::with(['template', 'images', 'envelope.material', 'materials.material', 'uploads'])
-            ->published()
-            ->where('product_type', 'Giveaway')
-            ->latest()
-            ->take(6)
-            ->get();
-        $recentGiveaways->each(function (Product $product) {
-            $this->hydrateLegacyAttributes($product);
-        });
-
-        $totalProducts = Product::published()->count();
-        $invitationCount = Product::published()->where('product_type', 'Invitation')->count();
-        $giveawayCount = Product::published()->where('product_type', 'Giveaway')->count();
-        $envelopeCount = Product::published()->where('product_type', 'Envelope')->count();
+        // Calculate summary counts
+        $invitationCount = Product::whereRaw('LOWER(product_type) = ?', ['invitation'])->count();
+        $giveawayCount = Product::whereRaw('LOWER(product_type) = ?', ['giveaway'])->count();
+        $envelopeCount = Product::whereRaw('LOWER(product_type) = ?', ['envelope'])->count();
         $totalUploads = Template::count();
-        $uploadedTemplatesCount = Template::where('status', 'uploaded')->count();
-        $totalQuantity = 0; // Column removed from table
-        $totalSales = 0; // Column removed from table
-        $activeProducts = 0; // Status column removed from table
-        $inactiveProducts = 0; // Status column removed from table
+        $uploadedTemplatesCount = Template::has('products')->count();
 
-        return view('admin.products.index', compact(
-            'products',
-            'totalProducts',
-            'invitationCount',
-            'giveawayCount',
-            'envelopeCount',
-            'totalUploads',
-            'uploadedTemplatesCount',
-            'totalQuantity',
-            'totalSales',
-            'activeProducts',
-            'inactiveProducts',
-            'recentGiveaways',
-            'currentFilter'
-        ));
+        return view('admin.products.index', [
+            'products' => $products,
+            'currentFilter' => $currentFilter,
+            'sort' => $sort,
+            'order' => $order,
+            'perPage' => $perPage,
+            'invitationCount' => $invitationCount,
+            'giveawayCount' => $giveawayCount,
+            'envelopeCount' => $envelopeCount,
+            'totalUploads' => $totalUploads,
+            'uploadedTemplatesCount' => $uploadedTemplatesCount,
+        ]);
     }
 
     public function getEnvelopes()
@@ -192,11 +175,19 @@ class ProductController extends Controller
             $selectedTemplate = Template::find($request->input('template_id'));
         }
 
-        $templatesQuery = Template::where('product_type', 'Invitation')
-            ->where('status', 'uploaded')
+        // Load invitation templates regardless of status so the admin can pick any available template
+        $templatesQuery = Template::query()
+            ->where(function ($query) {
+                $query->whereRaw('LOWER(product_type) = ?', ['invitation'])
+                    ->orWhereNull('product_type');
+            })
             ->orderByDesc('updated_at');
 
         $templates = $templatesQuery->get();
+
+        if ($templates->isEmpty()) {
+            $templates = Template::orderByDesc('updated_at')->get();
+        }
 
         if ($selectedTemplate && $templates->where('id', $selectedTemplate->id)->isEmpty()) {
             $templates->push($selectedTemplate);
@@ -312,7 +303,10 @@ class ProductController extends Controller
     {
         $product = null;
         if ($request->has('product_id')) {
-            $product = Product::with(['template', 'addons', 'colors', 'bulkOrders', 'envelope.material'])->find($request->input('product_id'));
+            $product = Product::with(['template', 'addons', 'colors', 'envelope.material'])->find($request->input('product_id'));
+            if ($product) {
+                $product->setRelation('bulkOrders', collect());
+            }
         }
 
         $templates = Template::where('product_type', 'Giveaway')->get();
@@ -392,14 +386,7 @@ class ProductController extends Controller
             'addons.*.price' => 'nullable|numeric',
             'addons.*.image_path' => 'nullable|file|image|mimes:jpeg,png,jpg,gif,svg|max:5120',
 
-            'colors' => 'nullable|array',
-            'colors.*.name' => 'nullable|string|max:255',
-            'colors.*.color_code' => 'nullable|string|max:15',
-
-            'bulk_orders' => 'nullable|array',
-            'bulk_orders.*.min_qty' => 'nullable|integer',
-            'bulk_orders.*.max_qty' => 'nullable|integer',
-            'bulk_orders.*.price_per_unit' => 'nullable|numeric',
+            'average_usage_ml' => 'nullable|numeric',
 
             'preview_images' => 'nullable|array',
             'preview_images.front' => 'nullable',
@@ -689,62 +676,15 @@ class ProductController extends Controller
                 }
             }
 
-            // Colors
-            $colors = $request->input('colors', []);
-
-            // If no colors provided but we have template data, use template data
-            if (empty($colors) && $templateData && isset($templateData['colors'])) {
-                $colors = $templateData['colors'];
-            }
+            // Average usage (stored via product_colors for backward compatibility)
+            $averageUsage = $request->input('average_usage_ml');
 
             if ($product) {
                 $product->colors()->delete();
-                foreach ($colors as $c) {
+
+                if ($averageUsage !== null && $averageUsage !== '') {
                     $product->colors()->create([
-                        'name' => $c['name'] ?? null,
-                        'color_code' => $c['color_code'] ?? null,
-                    ]);
-                }
-            }
-
-            // Bulk Orders
-            $bulkOrders = $request->input('bulk_orders', []);
-
-            // If no bulk orders provided but we have template data, use template data
-            if (empty($bulkOrders) && $templateData && isset($templateData['bulk_orders'])) {
-                $bulkOrders = $templateData['bulk_orders'];
-            }
-
-            if (empty($bulkOrders) && ($validated['productType'] ?? null) === 'Giveaway') {
-                $singleBulk = [
-                    'min_qty' => $request->filled('max_qty') ? intval($request->input('max_qty')) : null,
-                    'max_qty' => $request->filled('max_quantity') ? intval($request->input('max_quantity')) : null,
-                    'price_per_unit' => isset($validated['base_price']) && $request->filled('base_price')
-                        ? floatval($validated['base_price'])
-                        : null,
-                ];
-
-                // Only keep if at least one value is provided
-                if (!is_null($singleBulk['min_qty']) || !is_null($singleBulk['max_qty']) || !is_null($singleBulk['price_per_unit'])) {
-                    $bulkOrders[] = $singleBulk;
-                }
-            }
-
-            if ($product) {
-                $product->bulkOrders()->delete();
-                foreach ($bulkOrders as $b) {
-                    $minQty = isset($b['min_qty']) && $b['min_qty'] !== '' ? intval($b['min_qty']) : null;
-                    $maxQty = isset($b['max_qty']) && $b['max_qty'] !== '' ? intval($b['max_qty']) : null;
-                    $pricePerUnit = isset($b['price_per_unit']) && $b['price_per_unit'] !== '' ? floatval($b['price_per_unit']) : null;
-
-                    if (is_null($minQty) && is_null($maxQty) && is_null($pricePerUnit)) {
-                        continue;
-                    }
-
-                    $product->bulkOrders()->create([
-                        'min_qty' => $minQty,
-                        'max_qty' => $maxQty,
-                        'price_per_unit' => $pricePerUnit,
+                        'average_usage_ml' => (float) $averageUsage,
                     ]);
                 }
             }
@@ -873,7 +813,6 @@ class ProductController extends Controller
             'paperStocks',
             'addons',
             'colors',
-            'bulkOrders',
             'materials',
             'envelope.material'
         ])->findOrFail($id);
@@ -908,7 +847,6 @@ class ProductController extends Controller
             'paperStocks',
             'addons',
             'colors',
-            'bulkOrders',
             'materials',
             'envelope.material'
         ])->findOrFail($id);
@@ -936,8 +874,6 @@ class ProductController extends Controller
         $product->setAttribute('product_addons', $product->addons);
         $product->setAttribute('addOns', $product->addons);
         $product->setAttribute('product_colors', $product->colors);
-        $product->setAttribute('bulk_orders', $product->bulkOrders);
-        $product->setAttribute('product_bulk_orders', $product->bulkOrders);
         $product->setAttribute('product_uploads', $product->uploads);
         $product->setAttribute('envelope', $product->envelope);
     }
@@ -1074,7 +1010,6 @@ class ProductController extends Controller
             'paperStocks',
             'addons',
             'colors',
-            'bulkOrders',
             'materials',
             'envelope.material'
         ])->where('id', $id)->get();
@@ -1084,6 +1019,7 @@ class ProductController extends Controller
         }
 
         $products->each(function (Product $product) {
+            $product->setRelation('bulkOrders', collect());
             $this->hydrateLegacyAttributes($product);
         });
 

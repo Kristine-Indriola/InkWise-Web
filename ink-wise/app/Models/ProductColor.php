@@ -9,10 +9,11 @@ class ProductColor extends Model
 {
     use HasFactory;
 
+    protected $table = 'product_ink_usage';
+
     protected $fillable = [
         'product_id',
-        'name',
-        'color_code',
+        'average_usage_ml',
     ];
 
     public function product()
