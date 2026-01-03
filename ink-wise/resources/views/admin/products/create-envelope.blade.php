@@ -76,54 +76,43 @@
                 <h2><i class="fas fa-envelope"></i> Envelope Details</h2>
         <div class="responsive-grid grid-2-cols">
             <div class="field">
-                <label for="invitationName">Envelope Name *</label>
-                <input type="text" id="invitationName" name="invitationName" placeholder="Envelope Name * (e.g. Elegant Pearl Wedding Envelope)" required aria-required="true" aria-describedby="invitationName-error" value="{{ $defaults['name'] }}">
+                <label for="invitationName">Envelope Name</label>
+                <input type="text" id="invitationName" name="invitationName" placeholder="Envelope Name (e.g. Elegant Pearl Wedding Envelope)" required aria-required="true" aria-describedby="invitationName-error" value="{{ $defaults['name'] }}">
                 <span id="invitationName-error" class="error-message" role="alert" aria-live="polite"></span>
                 @error('invitationName') <span class="error-message">{{ $message }}</span> @enderror
             </div>
             <div class="field">
-                <label for="material_type">Material *</label>
-                <select name="material_type" id="material_type" class="material-select" required aria-required="true">
-                    <option value="">Select Material Type</option>
-                    @foreach($materialTypes as $type)
-                        <option value="{{ $type }}" {{ (old('material_type', $envelope ? \App\Models\Material::find($envelope->material_id)?->material_type : null) == $type) ? 'selected' : '' }}>
-                            {{ $type }}
-                        </option>
-                    @endforeach
-                </select>
-                @error('material_type') <span class="error-message">{{ $message }}</span> @enderror
+                <label for="material_type">Product Type</label>
+                <input type="hidden" name="material_type" value="envelope">
+                <input type="text" class="styled-select" value="ENVELOPE" readonly>
             </div>
         </div>
 
-        <div class="responsive-grid grid-3-cols">
+        <div class="responsive-grid grid-1-cols">
             <div class="field">
-                <label for="envelope_material_id">Envelope Material Name *</label>
+                <label for="envelope_material_id">Envelope Material Name</label>
                 <select name="envelope_material_id" id="envelope_material_id" required aria-required="true">
                     <option value="">Select Envelope Material</option>
                     @foreach($envelopeMaterials as $material)
                         <option value="{{ $material->material_id }}" {{ (old('envelope_material_id', $envelope->material_id ?? null) == $material->material_id) ? 'selected' : '' }}>
-                            {{ $material->material_name }}
+                            {{ strtoupper($material->material_type ?? 'ENVELOPE') }} • {{ $material->material_name }}
                         </option>
                     @endforeach
                 </select>
                 @error('envelope_material_id') <span class="error-message">{{ $message }}</span> @enderror
             </div>
-            <div class="field">
-                <label for="max_qty">Max Qty *</label>
-                <input type="number" id="max_qty" name="max_qty" placeholder="Maximum Quantity" min="1" value="{{ old('max_qty', $envelope->max_qty ?? '') }}" required aria-required="true">
-                @error('max_qty') <span class="error-message">{{ $message }}</span> @enderror
-            </div>
-            <div class="field">
-                <label for="max_quantity">Max Quantity *</label>
-                <input type="number" id="max_quantity" name="max_quantity" placeholder="Maximum Quantity" min="1" value="{{ old('max_quantity', $envelope->max_quantity ?? '') }}" required aria-required="true">
-                @error('max_quantity') <span class="error-message">{{ $message }}</span> @enderror
-            </div>
         </div>
 
                 <div class="field">
-                    <label for="price_per_unit">Price per Unit *</label>
+                    <label for="price_per_unit">Price per Unit</label>
                     <input type="number" id="price_per_unit" name="price_per_unit" placeholder="0.00" step="0.01" min="0" value="{{ old('price_per_unit', $envelope->price_per_unit ?? '') }}" required aria-required="true">
                     @error('price_per_unit') <span class="error-message">{{ $message }}</span> @enderror
+                </div>
+
+                <div class="field">
+                    <label for="average_usage_ml">Average usage (ml)</label>
+                    <input type="number" id="average_usage_ml" name="average_usage_ml" step="0.01" min="0" placeholder="0.00" value="{{ old('average_usage_ml', $envelope->average_usage_ml ?? '') }}">
+                    <small class="field-help">Used for printing and cost calculations.</small>
                 </div>
 
                 {{-- Template Preview Section --}}

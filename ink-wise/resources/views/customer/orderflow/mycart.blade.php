@@ -309,7 +309,7 @@
                 <p class="mt-2 text-slate-600">Start again from the final step to configure your invitation, envelopes, or giveaways.</p>
                 <div class="mt-6 flex flex-col sm:flex-row sm:justify-center gap-3">
                     <a href="{{ $finalStepUrl }}" class="rounded-full bg-slate-900 px-5 py-2.5 text-white font-medium shadow-lg shadow-slate-900/15 hover:bg-slate-800">Return to final step</a>
-                    <a href="{{ $giveawaysUrl }}" class="rounded-full border border-slate-200 px-5 py-2.5 text-slate-800 font-medium hover:border-slate-300">Browse giveaways</a>
+                    <a href="http://127.0.0.1:8000/templates/wedding/invitations" class="rounded-full border border-slate-200 px-5 py-2.5 text-slate-800 font-medium hover:border-slate-300">Browse invitation</a>
                 </div>
             </section>
         @else
@@ -466,7 +466,7 @@
                                             <p class="text-amber-700 text-sm">Pre-order paper: {{ $invPreorderPaper ?? $invPaper }}</p>
                                         @endif
                                         @if($invAddons)
-                                            <p class="text-slate-600 text-sm">Add-ons: {{ $invAddons }}</p>
+                                            <p class="text-slate-600 text-sm">{{ $invAddons === '5 x 7' ? 'size:' : 'Add-ons:' }} {{ $invAddons }}</p>
                                         @endif
                                     </div>
                                 </div>

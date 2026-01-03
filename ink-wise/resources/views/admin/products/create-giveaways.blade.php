@@ -102,11 +102,11 @@
 
                 <div class="responsive-grid grid-2-cols">
                     <div class="field">
-                        <label for="invitationName">Giveaway Name *</label>
+                        <label for="invitationName">Giveaway Name</label>
                         <input type="text"
                                id="invitationName"
                                name="invitationName"
-                               placeholder="Giveaway Name * (e.g. Scented Candle Favor)"
+                               placeholder="Giveaway Name (e.g. Scented Candle Favor)"
                                required
                                aria-required="true"
                                aria-describedby="invitationName-error"
@@ -115,9 +115,9 @@
                         @error('invitationName') <span class="error-message">{{ $message }}</span> @enderror
                     </div>
                     <div class="field">
-                        <label for="eventType">Event Type *</label>
+                        <label for="eventType">Event Type</label>
                         <select id="eventType" name="eventType" required aria-required="true" aria-describedby="eventType-error">
-                            <option value="" disabled {{ $defaults['event_type'] ? '' : 'selected' }}>Event Type *</option>
+                            <option value="" disabled {{ $defaults['event_type'] ? '' : 'selected' }}>Event Type</option>
                             @foreach(['Wedding', 'Birthday', 'Baptism', 'Corporate', 'Debut', 'Holiday'] as $type)
                                 <option value="{{ $type }}" {{ $defaults['event_type'] === $type ? 'selected' : '' }}>{{ $type }}</option>
                             @endforeach
@@ -129,30 +129,18 @@
 
                 <div class="responsive-grid grid-2-cols">
                     <div class="field">
-                        <label for="material_type">Souvenirs *</label>
-                        <select id="material_type"
-                                name="material_type"
-                                required
-                                aria-required="true"
-                                aria-describedby="material_type-error">
-                            <option value="" disabled {{ $materialDefaults['material_type'] ? '' : 'selected' }}>Select Souvenirs *</option>
-                            @foreach($materialTypes as $materialType)
-                                <option value="{{ $materialType }}" {{ $materialDefaults['material_type'] === $materialType ? 'selected' : '' }}>
-                                    {{ $materialType }}
-                                </option>
-                            @endforeach
-                        </select>
-                        <span id="material_type-error" class="error-message" role="alert"></span>
-                        @error('material_type') <span class="error-message">{{ $message }}</span> @enderror
+                        <label for="material_type">Souvenirs</label>
+                        <input type="hidden" name="material_type" value="souvenirs">
+                        <input type="text" class="styled-select" value="SOUVENIRS" readonly>
                     </div>
                     <div class="field">
-                        <label for="envelope_material_id">Souvenirs Material Name *</label>
+                        <label for="envelope_material_id">Souvenirs Material Name</label>
                         <select id="envelope_material_id"
                                 name="envelope_material_id"
                                 required
                                 aria-required="true"
                                 aria-describedby="envelope_material_id-error">
-                            <option value="" disabled {{ $materialDefaults['material_id'] ? '' : 'selected' }}>Select Souvenirs Material *</option>
+                            <option value="" disabled {{ $materialDefaults['material_id'] ? '' : 'selected' }}>Select Souvenirs Material</option>
                             @foreach($materialOptions as $material)
                                 <option value="{{ $material->material_id }}"
                                         data-material-type="{{ $material->material_type }}"
@@ -194,37 +182,6 @@
                     </div>
                 </div>
 
-                <div class="responsive-grid grid-2-cols">
-                    <div class="field">
-                        <label for="max_qty">Max Qty *</label>
-                        <input type="number"
-                               id="max_qty"
-                               name="max_qty"
-                               min="1"
-                               placeholder="Max Qty"
-                               required
-                               aria-required="true"
-                               aria-describedby="max_qty-error"
-                               value="{{ $materialDefaults['max_qty'] }}">
-                        <span id="max_qty-error" class="error-message"></span>
-                        @error('max_qty') <span class="error-message">{{ $message }}</span> @enderror
-                    </div>
-                    <div class="field">
-                        <label for="max_quantity">Maximum Quantity *</label>
-                        <input type="number"
-                               id="max_quantity"
-                               name="max_quantity"
-                               min="1"
-                               placeholder="Maximum Quantity"
-                               required
-                               aria-required="true"
-                               aria-describedby="max_quantity-error"
-                               value="{{ $materialDefaults['max_quantity'] }}">
-                        <span id="max_quantity-error" class="error-message"></span>
-                        @error('max_quantity') <span class="error-message">{{ $message }}</span> @enderror
-                    </div>
-                </div>
-
                 <div class="field">
                     <label for="dateAvailable">Date Available</label>
                     <input type="date"
@@ -234,6 +191,18 @@
                            value="{{ $defaults['date_available'] }}">
                     <span id="dateAvailable-error" class="error-message"></span>
                     @error('date_available') <span class="error-message">{{ $message }}</span> @enderror
+                </div>
+
+                <div class="field">
+                    <label for="average_usage_ml">Average usage (ml)</label>
+                    <input type="number"
+                           id="average_usage_ml"
+                           name="average_usage_ml"
+                           step="0.01"
+                           min="0"
+                           placeholder="0.00"
+                           value="{{ old('average_usage_ml', $materialDefaults['average_usage_ml'] ?? '') }}">
+                    <small class="field-help">Used for printing and cost calculations.</small>
                 </div>
 
                 {{-- Template Preview Section --}}

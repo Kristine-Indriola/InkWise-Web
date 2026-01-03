@@ -93,19 +93,19 @@ class Product extends Model
     }
 
     /**
-     * Relationship: colors
+     * Relationship: ink usage
      */
-    public function colors()
+    public function inkUsage()
     {
         return $this->hasMany(ProductColor::class);
     }
 
     /**
-     * Relationship: bulk order tiers
+     * Relationship: colors (alias for inkUsage)
      */
-    public function bulkOrders()
+    public function colors()
     {
-        return $this->hasMany(ProductBulkOrder::class);
+        return $this->inkUsage();
     }
 
     /**
@@ -114,6 +114,22 @@ class Product extends Model
     public function envelope()
     {
         return $this->hasOne(ProductEnvelope::class);
+    }
+
+    protected static function booted()
+    {
+        static::retrieved(function (Product $product) {
+            // Bulk orders deprecated; keep relation empty to avoid queries
+            $product->setRelation('bulkOrders', collect());
+        });
+    }
+
+    /**
+     * Relationship: bulk order tiers.
+     */
+    public function bulkOrders()
+    {
+        return $this->hasMany(ProductBulkOrder::class);
     }
 
     // Add any additional methods or relationships as needed

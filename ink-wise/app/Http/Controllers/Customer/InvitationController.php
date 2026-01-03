@@ -102,7 +102,7 @@ class InvitationController extends Controller
     protected function giveawayProductsForEvent(string $eventType)
     {
         return Product::query()
-            ->with(['template', 'uploads', 'images', 'materials', 'bulkOrders'])
+            ->with(['template', 'uploads', 'images', 'materials'])
             ->where('product_type', 'Giveaway')
             ->whereHas('uploads')
             ->where(function ($query) use ($eventType) {
@@ -111,6 +111,9 @@ class InvitationController extends Controller
                       ->orWhere('event_type', '');
             })
             ->orderByDesc('updated_at')
-            ->get();
+            ->get()
+            ->each(function (Product $product) {
+                $product->setRelation('bulkOrders', collect());
+            });
     }
 }

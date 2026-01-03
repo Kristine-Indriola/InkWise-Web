@@ -466,11 +466,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function toggleAddonInputs(row) {
         if (!row) return;
-        const typeSelect = row.querySelector('select[name$="[addon_type]"]');
+        // Since addon_type is now always "size", we always show the text input
         const select = row.querySelector('.addon-name-select');
         const input = row.querySelector('.addon-name-input');
-        const type = typeSelect ? typeSelect.value.toLowerCase() : '';
-        const shouldUseSelect = type === 'embossed';
+        const shouldUseSelect = false; // Always false since type is always "size"
 
         if (select) {
             select.style.display = shouldUseSelect ? '' : 'none';
@@ -539,12 +538,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        if (event.target.matches('select[name$="[addon_type]"]')) {
-            const select = event.target;
-            const row = select.closest('.addon-row');
-            toggleAddonInputs(row);
-            syncAddonRow(row);
-        }
+        // Removed: addon_type select change listener since we no longer have the select
     });
 
     document.addEventListener('input', event => {
@@ -685,10 +679,7 @@ window.addAddonEntry = function(data = null, index = null) {
 
     // Set data if provided
     if (data) {
-        if (data.addon_type) {
-            const typeSelect = newRow.querySelector('select[name$="[addon_type]"]');
-            if (typeSelect) typeSelect.value = data.addon_type;
-        }
+        // Removed: addon_type select setting since we no longer have the select
         if (data.name) {
             const nameInput = newRow.querySelector('.addon-name-input');
             if (nameInput) nameInput.value = data.name;
