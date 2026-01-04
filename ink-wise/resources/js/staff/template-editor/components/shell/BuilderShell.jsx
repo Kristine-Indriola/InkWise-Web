@@ -15,10 +15,12 @@ import { derivePageLabel, normalizePageTypeValue } from '../../utils/pageFactory
 import { BuilderErrorBoundary } from './BuilderErrorBoundary';
 
 const MAX_DEVICE_PIXEL_RATIO = 2.5; // allow higher density captures for crisper exports
-const PREVIEW_MAX_EDGE = 2400; // keep a larger edge for higher-resolution previews
-const PREVIEW_JPEG_QUALITY = 0.94; // favor quality over size for saved previews
-const PREVIEW_MIN_JPEG_QUALITY = 0.85;
-const PREVIEW_MAX_BYTES = 4_500_000; // permit larger payloads to avoid aggressive downscaling
+const PREVIEW_MAX_EDGE = 1800; // slightly smaller edge to keep payloads leaner
+const PREVIEW_JPEG_QUALITY = 0.9; // balance fidelity with payload size
+const PREVIEW_MIN_JPEG_QUALITY = 0.82;
+const PREVIEW_MAX_BYTES = 3_200_000; // individual preview budget
+const PREVIEW_TOTAL_BUDGET = 5_000_000; // combined preview payload budget
+const MANUAL_SAVE_PAYLOAD_BUDGET = 7_500_000; // safety budget for full save payloads
 
 const waitForNextFrame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)))));
 
@@ -103,6 +105,39 @@ function estimateBase64Bytes(dataUrl) {
   const commaIndex = dataUrl.indexOf(',');
   const base64 = commaIndex !== -1 ? dataUrl.slice(commaIndex + 1) : dataUrl;
   return Math.ceil((base64.length * 3) / 4);
+}
+
+function estimateJsonBytes(value) {
+  try {
+    const encoder = new TextEncoder();
+    return encoder.encode(JSON.stringify(value)).length;
+  } catch (err) {
+    console.warn('[InkWise Builder] Failed to estimate JSON payload size.', err);
+    try {
+      return JSON.stringify(value).length;
+    } catch (stringifyError) {
+      console.warn('[InkWise Builder] Stringify fallback also failed.', stringifyError);
+      return 0;
+    }
+  }
+}
+
+function getPreviewPriority(entry) {
+  if (!entry) {
+    return 0;
+  }
+
+  const key = entry.key ?? '';
+  if (key === 'front') {
+    return 400;
+  }
+  if (key === 'back') {
+    return 360;
+  }
+
+  const order = typeof entry.meta?.order === 'number' ? entry.meta.order : 0;
+  // Prefer earlier pages and smaller assets to keep payload compact.
+  return 300 - order * 2 - Math.round((entry.bytes || 0) / 200_000);
 }
 
 function loadImageElement(dataUrl) {
@@ -405,8 +440,11 @@ export function BuilderShell() {
 
       const totalPages = allPages.length > 0 ? allPages.length : pagesToCapture.length;
 
-      const previewImages = {};
-      const previewImagesMeta = {};
+      const pendingPreviewEntries = [];
+      const seenPreviewKeys = new Set();
+      let previewImages = {};
+      let previewImagesMeta = {};
+      let previewPayloadTrimmed = false;
       let primaryPreviewCandidate = null;
       let svgDataUrl = null;
 
@@ -455,18 +493,25 @@ export function BuilderShell() {
 
         let uniqueKey = safeKeyBase ?? fallbackKey;
         let suffix = 2;
-        while (previewImages[uniqueKey]) {
+        while (seenPreviewKeys.has(uniqueKey)) {
           uniqueKey = safeKeyBase ? `${safeKeyBase}-${suffix}` : `${fallbackKey}-${suffix}`;
           suffix += 1;
         }
+        seenPreviewKeys.add(uniqueKey);
 
-        previewImages[uniqueKey] = compressedImage;
-        previewImagesMeta[uniqueKey] = {
+        const entryMeta = {
           label: derivePreviewLabel(page, index, totalPages || pagesToCapture.length || 1),
           pageId: page.id,
           pageType: safeKeyBase ?? uniqueKey,
           order: index,
         };
+
+        pendingPreviewEntries.push({
+          key: uniqueKey,
+          data: compressedImage,
+          meta: entryMeta,
+          bytes: estimateBase64Bytes(compressedImage),
+        });
 
         if (!primaryPreviewCandidate) {
           primaryPreviewCandidate = compressedImage;
@@ -500,6 +545,46 @@ export function BuilderShell() {
         await waitForNextFrame();
       }
 
+      if (pendingPreviewEntries.length > 0) {
+        const sortedEntries = [...pendingPreviewEntries].sort((a, b) => {
+          const priorityDiff = getPreviewPriority(b) - getPreviewPriority(a);
+          if (priorityDiff !== 0) {
+            return priorityDiff;
+          }
+          return (a.bytes || 0) - (b.bytes || 0);
+        });
+
+        let remainingBudget = PREVIEW_TOTAL_BUDGET;
+        const selectedEntries = [];
+
+        for (const entry of sortedEntries) {
+          const entryBytes = entry.bytes || 0;
+          if (selectedEntries.length === 0 || entryBytes <= remainingBudget) {
+            selectedEntries.push(entry);
+            remainingBudget = Math.max(remainingBudget - entryBytes, 0);
+          }
+        }
+
+        if (selectedEntries.length < pendingPreviewEntries.length) {
+          previewPayloadTrimmed = true;
+          console.warn('[InkWise Builder] Trimmed preview payload to avoid oversize POST.', {
+            totalEntries: pendingPreviewEntries.length,
+            selectedEntries: selectedEntries.length,
+            remainingBudget,
+          });
+        }
+
+        previewImages = {};
+        previewImagesMeta = {};
+        for (const entry of selectedEntries) {
+          previewImages[entry.key] = entry.data;
+          previewImagesMeta[entry.key] = entry.meta;
+        }
+      } else {
+        previewImages = {};
+        previewImagesMeta = {};
+      }
+
       const previewImage = previewImages.front ?? primaryPreviewCandidate ?? null;
       const svgMarkup = extractSvgMarkup(svgDataUrl);
       const svgPayload = encodeSvgMarkup(svgMarkup);
@@ -525,11 +610,49 @@ export function BuilderShell() {
       if (Object.keys(previewImages).length > 0) {
         payload.preview_images = previewImages;
         payload.preview_images_meta = previewImagesMeta;
+        if (previewPayloadTrimmed) {
+          payload.preview_images_truncated = true;
+        }
+      } else if (previewPayloadTrimmed) {
+        payload.preview_images_truncated = true;
       }
 
       if (svgPayload) {
         payload.svg_markup = svgPayload;
       }
+
+      let estimatedPayloadBytes = estimateJsonBytes(payload);
+
+      if (estimatedPayloadBytes > MANUAL_SAVE_PAYLOAD_BUDGET && payload.preview_images) {
+        console.warn('[InkWise Builder] Dropping secondary previews to respect payload budget.', {
+          estimatedPayloadBytes,
+          budget: MANUAL_SAVE_PAYLOAD_BUDGET,
+        });
+        payload.preview_images_truncated = true;
+        delete payload.preview_images;
+        delete payload.preview_images_meta;
+        estimatedPayloadBytes = estimateJsonBytes(payload);
+      }
+
+      if (estimatedPayloadBytes > MANUAL_SAVE_PAYLOAD_BUDGET && payload.preview_image) {
+        console.warn('[InkWise Builder] Dropping primary preview image to reduce payload.', {
+          estimatedPayloadBytes,
+          budget: MANUAL_SAVE_PAYLOAD_BUDGET,
+        });
+        delete payload.preview_image;
+        estimatedPayloadBytes = estimateJsonBytes(payload);
+      }
+
+      if (estimatedPayloadBytes > MANUAL_SAVE_PAYLOAD_BUDGET && payload.svg_markup) {
+        console.warn('[InkWise Builder] Dropping SVG markup to keep payload within limits.', {
+          estimatedPayloadBytes,
+          budget: MANUAL_SAVE_PAYLOAD_BUDGET,
+        });
+        delete payload.svg_markup;
+        estimatedPayloadBytes = estimateJsonBytes(payload);
+      }
+
+      const requestBody = JSON.stringify(payload);
 
       const response = await fetch(saveTemplateRoute, {
         method: 'POST',
@@ -539,7 +662,7 @@ export function BuilderShell() {
           'X-CSRF-TOKEN': csrfToken,
         },
         credentials: 'same-origin',
-        body: JSON.stringify(payload),
+        body: requestBody,
       });
 
       if (!response.ok) {

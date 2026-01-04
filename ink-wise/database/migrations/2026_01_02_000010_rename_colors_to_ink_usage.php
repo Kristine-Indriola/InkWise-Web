@@ -7,23 +7,31 @@ use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
+    private function dropForeignIfExists(string $table, string $foreignKey): void
+    {
+        $connection = Schema::getConnection();
+        $database = $connection->getDatabaseName();
+
+        $constraintExists = $connection->select(
+            'SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE CONSTRAINT_SCHEMA = ? AND TABLE_NAME = ? AND CONSTRAINT_NAME = ? LIMIT 1',
+            [$database, $table, $foreignKey]
+        );
+
+        if (!empty($constraintExists)) {
+            DB::statement("ALTER TABLE `{$table}` DROP FOREIGN KEY `{$foreignKey}`");
+        }
+    }
+
     public function up(): void
     {
         // Drop foreign key on the old table name before renaming to avoid missing constraint errors
-        if (Schema::hasTable('order_item_colors')) {
-            Schema::table('order_item_colors', function (Blueprint $table) {
-                $fkNames = [
-                    'order_item_colors_color_id_foreign',
-                    'order_item_ink_usage_color_id_foreign',
-                ];
-                foreach ($fkNames as $fk) {
-                    try {
-                        $table->dropForeign($fk);
-                    } catch (\Throwable $e) {
-                        // ignore if not present
-                    }
-                }
-            });
+        foreach ([
+            ['order_item_colors', 'order_item_colors_color_id_foreign'],
+            ['order_item_colors', 'order_item_ink_usage_color_id_foreign'],
+        ] as [$table, $foreignKey]) {
+            if (Schema::hasTable($table)) {
+                $this->dropForeignIfExists($table, $foreignKey);
+            }
         }
 
         if (Schema::hasTable('product_colors')) {
@@ -48,10 +56,8 @@ return new class extends Migration
 
         // Best-effort drop FK by explicit names after rename
         foreach (['order_item_ink_usage_color_id_foreign', 'order_item_colors_color_id_foreign'] as $fkName) {
-            try {
-                DB::statement("ALTER TABLE `order_item_ink_usage` DROP FOREIGN KEY `$fkName`");
-            } catch (\Throwable $e) {
-                // ignore if not present
+            if (Schema::hasTable('order_item_ink_usage')) {
+                $this->dropForeignIfExists('order_item_ink_usage', $fkName);
             }
         }
 

@@ -187,7 +187,16 @@ class ReportsDashboardController extends Controller
             ->orderBy('material_name')
             ->get();
 
-        $inks = Ink::with('inventory')
+        $inks = Ink::with(['inventory', 'stockMovements' => function ($query) use ($startDate, $endDate) {
+                if ($startDate && $endDate) {
+                    $query->whereBetween('created_at', [$startDate, $endDate]);
+                } elseif ($startDate) {
+                    $query->where('created_at', '>=', $startDate);
+                } elseif ($endDate) {
+                    $query->where('created_at', '<=', $endDate);
+                }
+                $query->orderBy('created_at');
+            }])
             ->orderBy('material_name')
             ->get();
 

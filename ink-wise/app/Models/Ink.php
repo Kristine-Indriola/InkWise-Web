@@ -28,4 +28,9 @@ class Ink extends Model
     {
         return $this->hasOne(Inventory::class, 'ink_id');
     }
+
+    public function stockMovements()
+    {
+        return $this->hasMany(InkStockMovement::class, 'ink_id');
+    }
 }
