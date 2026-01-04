@@ -45,9 +45,14 @@ class OrderItem extends Model
 		return $this->hasMany(OrderItemAddon::class);
 	}
 
-	public function colors(): HasMany
+	public function inkUsage(): HasMany
 	{
 		return $this->hasMany(OrderItemColor::class);
+	}
+
+	public function colors(): HasMany
+	{
+		return $this->inkUsage();
 	}
 
 	public function scopeLineType($query, string $lineType)

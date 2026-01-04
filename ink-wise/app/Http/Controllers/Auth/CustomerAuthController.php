@@ -209,7 +209,8 @@ class CustomerAuthController extends Controller
         // ✅ Double-check that only customers can access this
         if (!Auth::check() || Auth::user()->role !== 'customer') {
             Auth::logout();
-            return redirect()->route('customer.login.form')
+            return redirect()->route('dashboard', ['modal' => 'login'])
+                ->with('show_login_modal', true)
                 ->withErrors(['error' => '❌ You must be logged in as a customer to access this page.']);
         }
 

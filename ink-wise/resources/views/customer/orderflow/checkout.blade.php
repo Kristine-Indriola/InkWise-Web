@@ -856,22 +856,88 @@
             <div class="steps-container" style="display: flex; align-items: center; justify-content: center; gap: 32px;">
                 <div class="step active" style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
                     <div class="step-circle">1</div>
-                    <span class="step-label">Shipping</span>
+                    <span class="step-label">Order Summary</span>
                 </div>
                 <div class="step-line"></div>
                 <div class="step" style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
                     <div class="step-circle">2</div>
-                    <span class="step-label">Payment</span>
+                    <span class="step-label">Shipping</span>
                 </div>
                 <div class="step-line"></div>
                 <div class="step" style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
                     <div class="step-circle">3</div>
-                    <span class="step-label">Review</span>
+                    <span class="step-label">Payment</span>
                 </div>
             </div>
         </div>
 
-        <section class="card checkout-form checkout-section active" id="shipping">
+        <section class="card checkout-form checkout-section active" id="summary-step">
+            <header class="shipping-header">
+                <h1 class="section-title">Order Summary</h1>
+                <p class="section-subtitle">Review your selected items and totals before proceeding.</p>
+            </header>
+
+            <div class="summary-card" style="position: static; top: auto;">
+                <div class="summary-items" id="summaryItems">
+                    @forelse(($order?->items ?? collect()) as $item)
+                        <div class="summary-item">
+                            <span>{{ $item->product_name }} × {{ $item->quantity }}</span>
+                            <strong>₱{{ number_format($item->subtotal, 2) }}</strong>
+                        </div>
+                        @foreach($item->addons as $addon)
+                            <div class="summary-item" style="padding-left:16px; font-size:0.9rem;">
+                                <span>{{ $addon->addon_name }}</span>
+                                <strong>₱{{ number_format(($addon->addon_price ?? 0) * $item->quantity, 2) }}</strong>
+                            </div>
+                        @endforeach
+                    @empty
+                        <div class="summary-item">
+                            <span>No items in this order yet.</span>
+                            <strong>—</strong>
+                        </div>
+                    @endforelse
+                </div>
+                <hr class="summary-divider">
+                <div class="summary-item">
+                    <span>Subtotal</span>
+                    <strong id="subtotalAmount">₱{{ number_format($subtotal, 2) }}</strong>
+                </div>
+                <div class="summary-item">
+                    <span>Shipping</span>
+                    <strong id="shippingAmount">{{ $shippingFee > 0 ? '₱' . number_format($shippingFee, 2) : 'Free' }}</strong>
+                </div>
+                <div class="summary-item">
+                    <span>Tax</span>
+                    <strong id="taxAmount">₱{{ number_format($taxAmount, 2) }}</strong>
+                </div>
+                <hr class="summary-divider">
+                <div class="summary-item">
+                    <span>Total paid via GCash</span>
+                    <strong id="paidAmount">₱{{ number_format($paidAmountDisplay, 2) }}</strong>
+                </div>
+                @if(!$isFullyPaid)
+                <div class="summary-item">
+                    <span>Balance remaining</span>
+                    <strong id="balanceAmount">₱{{ number_format($balanceDueDisplay, 2) }}</strong>
+                </div>
+                @endif
+                <div class="summary-total">
+                    <span>Total due</span>
+                    <span id="grandTotal">₱{{ number_format($totalAmount, 2) }}</span>
+                </div>
+                @if($isFullyPaid)
+                <p class="note">Order fully paid. Recorded payments total ₱{{ number_format($paidAmountDisplay, 2) }}.</p>
+                @else
+                <p class="note">Recorded payments total ₱{{ number_format($paidAmountDisplay, 2) }}. Outstanding balance: ₱{{ number_format($balanceDueDisplay, 2) }}.</p>
+                @endif
+            </div>
+
+            <button type="button" class="btn-continue" id="continueToShipping" style="margin-top: 24px;">
+                Continue to Shipping
+            </button>
+        </section>
+
+        <section class="card checkout-form checkout-section" id="shipping">
             <header class="shipping-header">
                 <h1 class="section-title">Fulfillment Information</h1>
                 <p class="section-subtitle">Please provide your contact details for order pickup</p>
@@ -938,9 +1004,12 @@
                 </p>
             </div>
 
-            <button type="button" class="btn-continue" id="continueToPayment">
-                Continue to Payment
-            </button>
+            <div style="display: flex; gap: 12px; margin-top: 24px;">
+                <button type="button" class="btn-back" id="backToSummary">← Back to Summary</button>
+                <button type="button" class="btn-continue" id="continueToPayment" style="flex: 1;">
+                    Continue to Payment
+                </button>
+            </div>
 
             {{-- No dynamic select behavior: fields are prefilled server-side from first saved address (if any) and remain editable --}}
             <input type="hidden" id="checkoutQuantity" name="quantity" value="{{ $checkoutQuantity }}">
@@ -951,6 +1020,8 @@
                 <h1 class="section-title">Payment Method</h1>
                 <p class="section-subtitle" id="paymentSubtitle">Choose how you want to pay for your order.</p>
             </header>
+
+            <div id="paymentAlert" class="payment-alert" style="display: none;"></div>
 
             <!-- Deposit Payment Options (50%) -->
             <div class="fieldset" id="depositPaymentOptions">
@@ -1000,22 +1071,6 @@
                 </div>
             </div>
 
-            <div style="display: flex; gap: 12px; margin-top: 24px;">
-                <button type="button" class="btn-back" id="backToShipping">
-                    ← Back to Shipping
-                </button>
-                <button type="button" class="btn-continue" id="continueToReview" style="flex: 1;">
-                    Continue to Review
-                </button>
-            </div>
-        </section>
-
-        <section class="card checkout-form checkout-section" id="review">
-            <header class="shipping-header">
-                <h1 class="section-title">Review Your Order</h1>
-                <p class="section-subtitle">Please review your order details before placing your order</p>
-            </header>
-
             <div class="fieldset">
                 <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--text-strong);">Fulfillment Details</h3>
                 <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
@@ -1035,71 +1090,14 @@
             </div>
 
             <div style="display: flex; gap: 12px; margin-top: 24px;">
-                <button type="button" class="btn-back" id="backToPayment">
-                    ← Back to Payment
+                <button type="button" class="btn-back" id="backToShipping">
+                    ← Back to Shipping
                 </button>
                 <button type="button" class="place-order" id="placeOrderBtn" style="flex: 1;">
                     Place Order
                 </button>
             </div>
         </section>
-
-        <aside class="card summary-card" id="summary">
-            <h2 class="summary-header">Order Summary</h2>
-            <div class="summary-items" id="summaryItems">
-                @forelse(($order?->items ?? collect()) as $item)
-                    <div class="summary-item">
-                        <span>{{ $item->product_name }} × {{ $item->quantity }}</span>
-                        <strong>₱{{ number_format($item->subtotal, 2) }}</strong>
-                    </div>
-                    @foreach($item->addons as $addon)
-                        <div class="summary-item" style="padding-left:16px; font-size:0.9rem;">
-                            <span>{{ $addon->addon_name }}</span>
-                            <strong>₱{{ number_format(($addon->addon_price ?? 0) * $item->quantity, 2) }}</strong>
-                        </div>
-                    @endforeach
-                @empty
-                    <div class="summary-item">
-                        <span>No items in this order yet.</span>
-                        <strong>—</strong>
-                    </div>
-                @endforelse
-            </div>
-            <hr class="summary-divider">
-            <div class="summary-item">
-                <span>Subtotal</span>
-                <strong id="subtotalAmount">₱{{ number_format($subtotal, 2) }}</strong>
-            </div>
-            <div class="summary-item">
-                <span>Shipping</span>
-                <strong id="shippingAmount">{{ $shippingFee > 0 ? '₱' . number_format($shippingFee, 2) : 'Free' }}</strong>
-            </div>
-            <div class="summary-item">
-                <span>Tax</span>
-                <strong id="taxAmount">₱{{ number_format($taxAmount, 2) }}</strong>
-            </div>
-            <hr class="summary-divider">
-            <div class="summary-item">
-                <span>Total paid via GCash</span>
-                <strong id="paidAmount">₱{{ number_format($paidAmountDisplay, 2) }}</strong>
-            </div>
-            @if(!$isFullyPaid)
-            <div class="summary-item">
-                <span>Balance remaining</span>
-                <strong id="balanceAmount">₱{{ number_format($balanceDueDisplay, 2) }}</strong>
-            </div>
-            @endif
-            <div class="summary-total">
-                <span>Total due</span>
-                <span id="grandTotal">₱{{ number_format($totalAmount, 2) }}</span>
-            </div>
-            <div id="paymentAlert" class="payment-alert"></div>
-            @if($isFullyPaid)
-            <p class="note">Order fully paid. Recorded payments total ₱{{ number_format($paidAmountDisplay, 2) }}.</p>
-            @else
-            <p class="note">Recorded payments total ₱{{ number_format($paidAmountDisplay, 2) }}. Outstanding balance: ₱{{ number_format($balanceDueDisplay, 2) }}.</p>
-            @endif
-        </aside>
     </div>
 
     <!-- payment section merged into shipping above -->
@@ -1109,6 +1107,7 @@
             // Step navigation logic
             let currentStep = 1;
             const totalSteps = 3;
+            const stepOrder = ['summary-step', 'shipping', 'payment'];
 
             const updateStepIndicator = () => {
                 // Update step circles and labels
@@ -1140,13 +1139,17 @@
                 });
 
                 // Show current step
-                const currentSection = document.getElementById(['shipping', 'payment', 'review'][stepNumber - 1]);
+                const currentSection = document.getElementById(stepOrder[stepNumber - 1]);
                 if (currentSection) {
                     currentSection.classList.add('active');
                 }
 
                 currentStep = stepNumber;
                 updateStepIndicator();
+
+                if (stepNumber === 3) {
+                    populateReviewInfo();
+                }
             };
 
             const validateShippingStep = () => {
@@ -1224,28 +1227,34 @@
             };
 
             // Step navigation event listeners
+            document.getElementById('continueToShipping')?.addEventListener('click', () => {
+                showStep(2);
+            });
+
+            document.getElementById('backToSummary')?.addEventListener('click', () => {
+                showStep(1);
+            });
+
             document.getElementById('continueToPayment')?.addEventListener('click', () => {
                 if (validateShippingStep()) {
-                    showStep(2);
+                    clearPaymentMessage();
+                    showStep(3);
                 }
             });
 
             document.getElementById('backToShipping')?.addEventListener('click', () => {
-                showStep(1);
-            });
-
-            document.getElementById('continueToReview')?.addEventListener('click', () => {
-                populateReviewInfo();
-                showStep(3);
-            });
-
-            document.getElementById('backToPayment')?.addEventListener('click', () => {
+                clearPaymentMessage();
                 showStep(2);
             });
 
             // Initialize step from hash (e.g., #payment or #review) or default to shipping
             const hash = (window.location.hash || '').replace('#', '').toLowerCase();
-            const initialStep = hash === 'payment' ? 2 : (hash === 'review' ? 3 : 1);
+            let initialStep = 1;
+            if (hash === 'shipping') {
+                initialStep = 2;
+            } else if (hash === 'payment' || hash === 'review') {
+                initialStep = 3;
+            }
             showStep(initialStep);
 
             const priceFormatter = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' });
@@ -1291,11 +1300,11 @@
             };
 
             const updatePayButton = () => {
-                // No longer needed - payment happens in review step
+                // No longer needed - handled within the payment step
             };
 
             const updateMarkAsPaidButton = () => {
-                // No longer needed - payment happens in review step
+                // No longer needed - handled within the payment step
             };
 
             // Update summary area when payment method changes
@@ -1388,7 +1397,12 @@
 
             paymentRadios.forEach((radio) => {
                 if (radio.checked) highlightSelection(radio);
-                radio.addEventListener('change', (event) => highlightSelection(event.target));
+                radio.addEventListener('change', (event) => {
+                    highlightSelection(event.target);
+                    if (currentStep === 3) {
+                        populateReviewInfo();
+                    }
+                });
             });
 
             // Listen for payment method changes to show payment summary
@@ -1396,10 +1410,16 @@
                 r.addEventListener('change', (e) => {
                     updatePaymentSummary(e.target.value);
                     highlightSelection(e.target);
+                    if (currentStep === 3) {
+                        populateReviewInfo();
+                    }
                 });
                 if (r.checked) {
                     updatePaymentSummary(r.value);
                     highlightSelection(r);
+                    if (currentStep === 3) {
+                        populateReviewInfo();
+                    }
                 }
             });
 

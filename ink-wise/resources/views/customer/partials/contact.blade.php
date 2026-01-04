@@ -37,60 +37,72 @@
         @endif
       </div>
 
-      <!-- Contact Form -->
-      <div>
-        {{-- Success Message --}}
-        @if(session('success'))
+        <!-- Contact Form -->
+        <div>
+        @auth
+          {{-- Success Message --}}
+          @if(session('success'))
             <div id="successMessage" 
-                 class="p-4 mb-4 text-green-800 bg-green-100 border border-green-300 rounded-lg transition-opacity duration-1000">
-                ✅ {{ session('success') }}
+               class="p-4 mb-4 text-green-800 bg-green-100 border border-green-300 rounded-lg transition-opacity duration-1000">
+              ✅ {{ session('success') }}
             </div>
 
             <script>
-                // Auto-hide after 5 seconds
-                setTimeout(() => {
-                    const msg = document.getElementById('successMessage');
-                    if (msg) {
-                        msg.style.opacity = '0';
-                        setTimeout(() => msg.remove(), 1000); // remove completely after fade
-                    }
-                }, 5000);
+              // Auto-hide after 5 seconds
+              setTimeout(() => {
+                const msg = document.getElementById('successMessage');
+                if (msg) {
+                  msg.style.opacity = '0';
+                  setTimeout(() => msg.remove(), 1000); // remove completely after fade
+                }
+              }, 5000);
             </script>
-        @endif
+          @endif
 
-        <form class="space-y-4 bg-white p-6 rounded-2xl shadow-lg" 
+          <form class="space-y-4 bg-white p-6 rounded-2xl shadow-lg" 
               method="POST" 
               action="{{ route('messages.store') }}">
             @csrf
 
             {{-- Name --}}
             <input type="text" name="name" placeholder="Your Name" 
-                   value="{{ old('name') }}"
-                   class="w-full p-3 border rounded-lg text-black @error('name') border-red-500 animate-shake @enderror" required>
+                 value="{{ old('name', Auth::user()->name ?? '') }}"
+                 class="w-full p-3 border rounded-lg text-black @error('name') border-red-500 animate-shake @enderror" required>
             @error('name')
-                <p class="text-red-500 text-sm mt-1">⚠️ {{ $message }}</p>
+              <p class="text-red-500 text-sm mt-1">⚠️ {{ $message }}</p>
             @enderror
 
             {{-- Email --}}
             <input type="email" name="email" placeholder="Your Email" 
-                   value="{{ old('email') }}"
-                   class="w-full p-3 border rounded-lg text-black @error('email') border-red-500 animate-shake @enderror" required>
+                 value="{{ old('email', Auth::user()->email ?? '') }}"
+                 class="w-full p-3 border rounded-lg text-black @error('email') border-red-500 animate-shake @enderror" required>
             @error('email')
-                <p class="text-red-500 text-sm mt-1">⚠️ {{ $message }}</p>
+              <p class="text-red-500 text-sm mt-1">⚠️ {{ $message }}</p>
             @enderror
 
             {{-- Message --}}
             <textarea name="message" placeholder="Your Message" rows="4" 
-                      class="w-full p-3 border rounded-lg text-black @error('message') border-red-500 animate-shake @enderror" required>{{ old('message') }}</textarea>
+                  class="w-full p-3 border rounded-lg text-black @error('message') border-red-500 animate-shake @enderror" required>{{ old('message') }}</textarea>
             @error('message')
-                <p class="text-red-500 text-sm mt-1">⚠️ {{ $message }}</p>
+              <p class="text-red-500 text-sm mt-1">⚠️ {{ $message }}</p>
             @enderror
 
             <button class="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">
-                Send Message
+              Send Message
             </button>
-        </form>
-      </div>
+          </form>
+        @else
+          <div class="space-y-4 bg-white p-6 rounded-2xl shadow-lg text-center">
+            <p class="text-gray-700">
+              Please create an Inkwise account or sign in to send us a message.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-3 justify-center">
+              <a href="{{ route('customer.register.form') }}" class="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">Register</a>
+              <a href="{{ route('dashboard', ['modal' => 'login']) }}" class="px-6 py-3 border border-blue-500 text-blue-500 rounded-lg hover:bg-blue-50 transition">Log In</a>
+            </div>
+          </div>
+        @endauth
+        </div>
     </div>
   </div>
 </section>

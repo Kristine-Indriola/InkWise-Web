@@ -261,7 +261,8 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::post('/{id}/restock', [MaterialController::class, 'restock'])->name('restock');
         Route::delete('/{id}', [MaterialController::class, 'destroy'])->name('destroy');
     });
-    // ✅ Inks resource route (move here, not nested)
+    // ✅ Inks routes
+    Route::post('inks/{ink}/restock', [\App\Http\Controllers\Admin\InkController::class, 'restock'])->name('inks.restock');
     Route::resource('inks', \App\Http\Controllers\Admin\InkController::class)->except(['show']);
 
     Route::prefix('products')->name('products.')->group(function () {
@@ -428,7 +429,9 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-Route::post('/messages', [MessageController::class, 'storeFromContact'])->name('messages.store');
+Route::post('/messages', [MessageController::class, 'storeFromContact'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('messages.store');
 
 Route::middleware('auth')->group(function () {
     Route::get('customer/chat/thread', [MessageController::class, 'customerChatThread'])->name('customer.chat.thread');
@@ -777,36 +780,83 @@ Route::get('/design/studio/{template}', function (Template $template, Request $r
         'defaultQuantity' => $defaultQuantity,
         'orderSummary' => $summary,
     ]);
-})->name('design.studio');
-Route::get('/design/edit/{product?}', [OrderFlowController::class, 'edit'])->name('design.edit');
-Route::post('/order/cart/items', [OrderFlowController::class, 'storeDesignSelection'])->name('order.cart.add');
-Route::post('/design/autosave', [OrderFlowController::class, 'autosaveDesign'])->name('order.design.autosave');
+})->name('design.studio')
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer');
+Route::get('/design/edit/{product?}', [OrderFlowController::class, 'edit'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('design.edit');
+Route::post('/order/cart/items', [OrderFlowController::class, 'storeDesignSelection'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.cart.add');
+Route::post('/design/autosave', [OrderFlowController::class, 'autosaveDesign'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.design.autosave');
 
 /**Order Forms & Pages*/
-Route::get('/order/review', [OrderFlowController::class, 'review'])->name('order.review');
-Route::get('/order/finalstep', [OrderFlowController::class, 'finalStep'])->name('order.finalstep');
-Route::get('/order/addtocart', [OrderFlowController::class, 'addToCart'])->name('order.addtocart');
-Route::post('/order/finalstep/save', [OrderFlowController::class, 'saveFinalStep'])->name('order.finalstep.save');
-Route::get('/order/envelope', [OrderFlowController::class, 'envelope'])->name('order.envelope');
-Route::post('/order/envelope', [OrderFlowController::class, 'storeEnvelope'])->name('order.envelope.store');
-Route::delete('/order/envelope', [OrderFlowController::class, 'clearEnvelope'])->name('order.envelope.clear');
-Route::get('/order/summary', [OrderFlowController::class, 'summary'])->name('order.summary');
-Route::get('/order/summary.json', [OrderFlowController::class, 'summaryJson'])->name('order.summary.json');
-Route::post('/order/summary/sync', [OrderFlowController::class, 'syncSummary'])->name('order.summary.sync');
-Route::delete('/order/summary', [OrderFlowController::class, 'clearSummary'])->name('order.summary.clear');
-Route::get('/order/giveaways', [OrderFlowController::class, 'giveaways'])->name('order.giveaways');
-Route::post('/order/giveaways', [OrderFlowController::class, 'storeGiveaway'])->name('order.giveaways.store');
-Route::delete('/order/giveaways', [OrderFlowController::class, 'clearGiveaway'])->name('order.giveaways.clear');
-Route::get('/api/envelopes', [OrderFlowController::class, 'envelopeOptions'])->name('api.envelopes');
+Route::get('/order/review', [OrderFlowController::class, 'review'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.review');
+Route::get('/order/finalstep', [OrderFlowController::class, 'finalStep'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.finalstep');
+Route::get('/order/addtocart', [OrderFlowController::class, 'addToCart'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.addtocart');
+Route::post('/order/finalstep/save', [OrderFlowController::class, 'saveFinalStep'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.finalstep.save');
+Route::get('/order/envelope', [OrderFlowController::class, 'envelope'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.envelope');
+Route::post('/order/envelope', [OrderFlowController::class, 'storeEnvelope'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.envelope.store');
+Route::delete('/order/envelope', [OrderFlowController::class, 'clearEnvelope'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.envelope.clear');
+Route::get('/order/summary', [OrderFlowController::class, 'summary'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.summary');
+Route::get('/order/summary.json', [OrderFlowController::class, 'summaryJson'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.summary.json');
+Route::post('/order/summary/sync', [OrderFlowController::class, 'syncSummary'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.summary.sync');
+Route::delete('/order/summary', [OrderFlowController::class, 'clearSummary'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.summary.clear');
+Route::get('/order/giveaways', [OrderFlowController::class, 'giveaways'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.giveaways');
+Route::post('/order/giveaways', [OrderFlowController::class, 'storeGiveaway'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.giveaways.store');
+Route::delete('/order/giveaways', [OrderFlowController::class, 'clearGiveaway'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.giveaways.clear');
+Route::get('/api/envelopes', [OrderFlowController::class, 'envelopeOptions'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('api.envelopes');
 // Route::get('/api/envelopes', [ProductController::class, 'getEnvelopes'])->name('api.envelopes');
-Route::get('/api/giveaways', [OrderFlowController::class, 'giveawayOptions'])->name('api.giveaways');
+Route::get('/api/giveaways', [OrderFlowController::class, 'giveawayOptions'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('api.giveaways');
 // Temporary debug endpoint: lists resolved giveaway images (thumbnail + gallery)
-Route::get('/debug/giveaways-images', [OrderFlowController::class, 'debugGiveawayImages'])->name('debug.giveaways.images');
+Route::get('/debug/giveaways-images', [OrderFlowController::class, 'debugGiveawayImages'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('debug.giveaways.images');
 Route::get('/order/birthday', fn () => view('customer.templates.birthday'))->name('order.birthday');
 
-Route::get('/checkout', [OrderFlowController::class, 'checkout'])->name('customer.checkout');
-Route::post('/checkout/complete', [OrderFlowController::class, 'completeCheckout'])->name('checkout.complete');
-Route::post('/checkout/cancel', [OrderFlowController::class, 'cancelCheckout'])->name('checkout.cancel');
+Route::get('/checkout', [OrderFlowController::class, 'checkout'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('customer.checkout');
+Route::post('/checkout/complete', [OrderFlowController::class, 'completeCheckout'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('checkout.complete');
+Route::post('/checkout/cancel', [OrderFlowController::class, 'cancelCheckout'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('checkout.cancel');
 Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/order/{order}/pay-remaining-balance', [OrderFlowController::class, 'payRemainingBalance'])->name('order.pay.remaining.balance');
 
 Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->group(function () {

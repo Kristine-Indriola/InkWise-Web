@@ -153,7 +153,8 @@ class CustomerProfileController extends Controller
         $user = Auth::user();
 
         if (!$user) {
-            return redirect()->route('customer.login.form');
+            return redirect()->route('dashboard', ['modal' => 'login'])
+                ->with('show_login_modal', true);
         }
 
         $customer = $user->customer;
@@ -304,7 +305,8 @@ class CustomerProfileController extends Controller
         $user = Auth::user();
 
         if (!$user) {
-            return redirect()->route('customer.login.form');
+            return redirect()->route('dashboard', ['modal' => 'login'])
+                ->with('show_login_modal', true);
         }
 
         $customer = $user->customer;
@@ -344,7 +346,8 @@ class CustomerProfileController extends Controller
         $user = Auth::user();
 
         if (!$user) {
-            return redirect()->route('customer.login.form');
+            return redirect()->route('dashboard', ['modal' => 'login'])
+                ->with('show_login_modal', true);
         }
 
         $customer = $user->customer;
@@ -390,7 +393,8 @@ class CustomerProfileController extends Controller
         $user = Auth::user();
 
         if (!$user) {
-            return redirect()->route('customer.login.form');
+            return redirect()->route('dashboard', ['modal' => 'login'])
+                ->with('show_login_modal', true);
         }
 
         $customer = $user->customer;

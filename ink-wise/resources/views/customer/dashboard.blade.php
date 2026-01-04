@@ -1295,7 +1295,7 @@
             </form>
 
             @guest
-                <a href="{{ route('customer.login.form') }}" id="openLogin"
+                <a href="{{ route('dashboard', ['modal' => 'login']) }}" id="openLogin"
                    class="px-4 py-1.5 text-xs font-semibold text-white rounded-full hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[#a6b7ff]"
                    style="background: linear-gradient(90deg, #000000, #737373);">
                     Sign in
@@ -1509,7 +1509,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 <p class="hero-tagline">Custom Invitations &amp; Giveaways Crafted with Care.</p>
 
                 <div class="hero-actions">
-                    <a href="{{ route('templates.wedding.invitations') }}" class="hero-btn hero-btn--primary focus-ring">Order Now</a>
+                    @auth
+                        <a href="{{ route('templates.wedding.invitations') }}" class="hero-btn hero-btn--primary focus-ring">Order Now</a>
+                    @else
+                        <a href="{{ route('dashboard', ['modal' => 'login']) }}" class="hero-btn hero-btn--primary focus-ring">Order Now</a>
+                    @endauth
                     <a href="#categories" class="hero-btn hero-btn--ghost focus-ring">View Design</a>
                 </div>
             </div>
