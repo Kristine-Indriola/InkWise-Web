@@ -85,6 +85,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     const hidden = newRow.querySelector('.paper-stock-material-id');
                     if (hidden) hidden.value = '';
+                    const nameHidden = newRow.querySelector('.paper-stock-name-hidden');
+                    if (nameHidden) nameHidden.value = '';
                     syncPaperStockRow(newRow);
                 }
 
@@ -384,6 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!row) return;
         const select = row.querySelector('.paper-stock-name-select');
         const hidden = row.querySelector('.paper-stock-material-id');
+        const nameHidden = row.querySelector('.paper-stock-name-hidden');
         const priceInput = row.querySelector('input[name$="[price]"]');
 
         if (!select || !hidden) return;
@@ -394,6 +397,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (material) {
             hidden.value = material.id || '';
+            if (nameHidden) nameHidden.value = material.name || '';
             if (!select.value) {
                 const match = Array.from(select.options).find(opt => normalize(opt.dataset.materialId) === normalize(material.id));
                 if (match) select.value = match.value;
@@ -406,6 +410,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else if (!selectedOption || !selectedOption.value) {
             hidden.value = '';
+            if (nameHidden) nameHidden.value = '';
         }
     }
 
@@ -439,7 +444,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const select = row.querySelector('.addon-name-select');
         const hidden = row.querySelector('.addon-material-id');
         const textInput = row.querySelector('.addon-name-input');
-        const priceInput = row.querySelector('input[name$="[price]"]');
 
         const material = resolveAddonMaterial(row);
         if (material) {
@@ -452,12 +456,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (textInput && !textInput.value) {
                 textInput.value = material.name || '';
-            }
-            if (priceInput && (!priceInput.value || priceInput.dataset.autofill === 'true')) {
-                if (material.unitCost != null) {
-                    priceInput.value = material.unitCost;
-                    priceInput.dataset.autofill = 'true';
-                }
             }
         } else {
             if (hidden) hidden.value = '';
@@ -497,12 +495,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!row) return;
 
             const hidden = row.querySelector('.paper-stock-material-id');
+            const nameHidden = row.querySelector('.paper-stock-name-hidden');
             const priceInput = row.querySelector('input[name$="[price]"]');
             const selectedOption = select.selectedOptions[0];
             const materialId = selectedOption ? (selectedOption.dataset.materialId || selectedOption.value) : '';
 
             if (hidden) hidden.value = materialId || '';
-
+            if (nameHidden) {
+                const material = findMaterialById(materialId);
+                if (material) {
+                    nameHidden.value = material.name || '';
+                }
+            }
             if (priceInput) {
                 const material = findMaterialById(materialId) || findMaterialByName(select.value);
                 if (material && material.unitCost != null && (!priceInput.value || priceInput.dataset.autofill === 'true')) {
@@ -521,21 +525,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const hidden = row.querySelector('.addon-material-id');
             const textInput = row.querySelector('.addon-name-input');
-            const priceInput = row.querySelector('input[name$="[price]"]');
             const selectedOption = select.selectedOptions[0];
             const materialId = selectedOption ? selectedOption.value : '';
             const materialName = selectedOption ? (selectedOption.dataset.name || selectedOption.textContent.trim()) : '';
 
             if (hidden) hidden.value = materialId || '';
             if (textInput && materialName) textInput.value = materialName;
-
-            if (priceInput) {
-                const material = findMaterialById(materialId);
-                if (material && material.unitCost != null && (!priceInput.value || priceInput.dataset.autofill === 'true')) {
-                    priceInput.value = material.unitCost;
-                    priceInput.dataset.autofill = 'true';
-                }
-            }
         }
 
         // Removed: addon_type select change listener since we no longer have the select
@@ -548,24 +543,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!row) return;
 
             const hidden = row.querySelector('.addon-material-id');
-            const priceInput = row.querySelector('input[name$="[price]"]');
             const material = findMaterialByName(input.value);
 
             if (material) {
                 if (hidden) hidden.value = material.id;
-                if (priceInput && (!priceInput.value || priceInput.dataset.autofill === 'true')) {
-                    if (material.unitCost != null) {
-                        priceInput.value = material.unitCost;
-                        priceInput.dataset.autofill = 'true';
-                    }
-                }
             } else {
                 if (hidden) hidden.value = '';
-                if (priceInput) priceInput.dataset.autofill = 'false';
             }
         }
 
-        if (event.target.matches('.paper-stock-row input[name$="[price]"]') || event.target.matches('.addon-row input[name$="[price]"]')) {
+        if (event.target.matches('.paper-stock-row input[name$="[price]"]')) {
             event.target.dataset.autofill = 'false';
         }
     });

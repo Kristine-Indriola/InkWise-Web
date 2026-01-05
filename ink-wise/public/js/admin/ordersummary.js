@@ -72,6 +72,13 @@
     node.textContent = currencyFormatter.format(amount);
   };
 
+  const setCurrencyText = (node, amount) => {
+    if (!node) return;
+    const value = Number.isFinite(amount) ? amount : parseMoney(amount);
+    const normalized = Number.isFinite(value) ? value : 0;
+    node.textContent = currencyFormatter.format(normalized);
+  };
+
   const copyToClipboard = async (text) => {
     if (!text) return false;
     try {
@@ -144,7 +151,7 @@
     }, 2600);
   };
 
-  const updateChipStatus = (chip, status) => {
+  const updateChipStatus = (chip, status, customLabel) => {
     if (!chip) return;
     statusClassSuffixes.forEach((suffix) => {
       chip.classList.remove(`status-chip--${suffix}`);
@@ -153,8 +160,18 @@
     if (normalized) {
       chip.classList.add(`status-chip--${normalized}`);
     }
+    const modeAttr = chip.dataset?.chipTextMode || '';
+    const suffix = chip.dataset?.chipSuffix ?? ' payment';
     const isOutline = chip.classList.contains('status-chip--outline');
-    chip.textContent = isOutline ? statusLabel(normalized) : `${statusLabel(normalized)} payment`;
+    const mode = modeAttr || (isOutline ? 'label-only' : 'label-with-suffix');
+    const labelText = customLabel || statusLabel(normalized);
+    let finalText = labelText;
+    if (mode === 'label-with-suffix') {
+      finalText = `${labelText}${suffix}`;
+    } else if (mode === 'label-only') {
+      finalText = labelText;
+    }
+    chip.textContent = finalText;
   };
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -165,6 +182,9 @@
     const STATUS_STORAGE_KEY = 'inkwiseOrderStatusUpdate';
     const STATUS_CONSUMER_ID = 'order-summary';
     const KNOWN_STATUS_CONSUMERS = ['orders-table', 'order-summary'];
+    const PAYMENT_STORAGE_KEY = 'inkwiseOrderPaymentUpdate';
+    const PAYMENT_CONSUMER_ID = 'order-summary';
+    const KNOWN_PAYMENT_CONSUMERS = ['orders-table', 'order-summary'];
     const hasLocalStorage = (() => {
       try {
         const testKey = '__inkwise_status_probe__';
@@ -196,6 +216,7 @@
     const statusLabels = safeJsonParse(page.dataset.statusLabels, {});
     const statusFlow = safeJsonParse(page.dataset.statusFlow, []);
     const orderId = (page.dataset.orderId || '').toString();
+    const paymentStatusLabelNode = page.querySelector('[data-payment-status-label]');
     const statusCard = page.querySelector('[data-status-card]');
     const statusChip = page.querySelector('[data-status-chip]');
     const trackerItems = Array.from(page.querySelectorAll('[data-status-step]'));
@@ -208,11 +229,13 @@
     ];
     const chipClassPrefix = 'order-stage-chip--';
     page.dataset.currentStatus = toKey(page.dataset.currentStatus || 'pending');
+    page.dataset.paymentStatus = toKey(page.dataset.paymentStatus || 'pending');
     const getStatusLabelFor = (status) => {
       const normalized = toKey(status);
       return statusLabels[normalized] || fallbackStatusLabel(normalized);
     };
     let setFulfillmentStatusFn = null;
+    let setPaymentStatusFn = null;
 
     page.querySelectorAll('[data-money]').forEach(formatMoneyNode);
 
@@ -242,31 +265,107 @@
       const paymentIndicator = page.querySelector('[data-payment-indicator]');
       const fulfillmentIndicator = page.querySelector('[data-fulfillment-indicator]');
       const fulfillmentPill = sidebar.querySelector('[data-fulfillment-pill]');
+      const paymentSummaryChip = sidebar.querySelector('[data-payment-summary-chip]');
+      const paymentTotalValueEl = sidebar.querySelector('[data-payment-total-invoiced]');
+      const paymentPaidValueEl = sidebar.querySelector('[data-payment-total-paid]');
+      const paymentBalanceValueEl = sidebar.querySelector('[data-payment-balance]');
+      const paymentAlertEl = sidebar.querySelector('[data-payment-alert]');
       const markPaidBtn = sidebar.querySelector('[data-sidebar-action="mark-paid"]');
       const markFulfilledBtn = sidebar.querySelector('[data-sidebar-action="mark-fulfilled"]');
 
-      const setPaymentStatus = (status) => {
-        sidebar.dataset.paymentStatus = status;
-        updateChipStatus(paymentIndicator, status);
+      const paymentAlertVariants = ['pending', 'balance', 'clear'];
+      const detectAlertVariant = (element) => {
+        if (!element) return null;
+        return paymentAlertVariants.find((variant) => element.classList.contains(`payment-alert--${variant}`)) || null;
+      };
+
+      const setPaymentAlertVariant = (variant, message) => {
+        if (!paymentAlertEl) return;
+        paymentAlertVariants.forEach((entry) => paymentAlertEl.classList.remove(`payment-alert--${entry}`));
+        if (variant) {
+          paymentAlertEl.classList.add(`payment-alert--${variant}`);
+        }
+        if (typeof message === 'string') {
+          paymentAlertEl.textContent = message;
+        }
+      };
+
+      let paymentSummaryForcedPaid = false;
+      let paymentSummarySnapshot = null;
+
+      const capturePaymentSummarySnapshot = () => {
+        paymentSummarySnapshot = {
+          paidText: paymentPaidValueEl ? paymentPaidValueEl.textContent : null,
+          balanceText: paymentBalanceValueEl ? paymentBalanceValueEl.textContent : null,
+          alertText: paymentAlertEl ? paymentAlertEl.textContent : null,
+          alertVariant: detectAlertVariant(paymentAlertEl)
+        };
+      };
+
+      const restorePaymentSummarySnapshot = () => {
+        if (!paymentSummarySnapshot) return;
+        if (paymentPaidValueEl && paymentSummarySnapshot.paidText !== null) {
+          paymentPaidValueEl.textContent = paymentSummarySnapshot.paidText;
+        }
+        if (paymentBalanceValueEl && paymentSummarySnapshot.balanceText !== null) {
+          paymentBalanceValueEl.textContent = paymentSummarySnapshot.balanceText;
+        }
+        if (paymentAlertEl) {
+          setPaymentAlertVariant(
+            paymentSummarySnapshot.alertVariant,
+            paymentSummarySnapshot.alertText !== null ? paymentSummarySnapshot.alertText : ''
+          );
+        }
+      };
+
+      const setPaymentStatus = (status, labelOverride) => {
+        const normalized = toKey(status || 'pending');
+        const labelText = labelOverride || statusLabel(normalized);
+        sidebar.dataset.paymentStatus = normalized;
+        page.dataset.paymentStatus = normalized;
+        updateChipStatus(paymentIndicator, normalized, labelText);
+        updateChipStatus(paymentSummaryChip, normalized, labelText);
+        if (paymentStatusLabelNode) {
+          paymentStatusLabelNode.textContent = labelText;
+        }
         if (markPaidBtn) {
-          const isPaid = status === 'paid';
+          const isPaid = normalized === 'paid';
           markPaidBtn.disabled = isPaid;
           markPaidBtn.textContent = isPaid ? 'Paid' : 'Mark as paid';
+        }
+
+        if (normalized === 'paid') {
+          if (!paymentSummaryForcedPaid) {
+            capturePaymentSummarySnapshot();
+          }
+          const totalAmount = paymentTotalValueEl ? parseMoney(paymentTotalValueEl.textContent) : null;
+          if (Number.isFinite(totalAmount)) {
+            setCurrencyText(paymentPaidValueEl, totalAmount);
+            setCurrencyText(paymentBalanceValueEl, 0);
+          }
+          setPaymentAlertVariant('clear', 'Invoice fully paid.');
+          paymentSummaryForcedPaid = true;
+        } else if (paymentSummaryForcedPaid) {
+          restorePaymentSummarySnapshot();
+          paymentSummaryForcedPaid = false;
+          paymentSummarySnapshot = null;
         }
       };
 
       const setFulfillmentStatus = (status) => {
-        sidebar.dataset.fulfillmentStatus = status;
-        updateChipStatus(fulfillmentIndicator, status);
-        updateChipStatus(fulfillmentPill, status);
+        const normalized = toKey(status || 'processing');
+        sidebar.dataset.fulfillmentStatus = normalized;
+        updateChipStatus(fulfillmentIndicator, normalized);
+        updateChipStatus(fulfillmentPill, normalized);
         if (markFulfilledBtn) {
-          const isComplete = ['fulfilled', 'shipped', 'completed', 'success'].includes(status);
+          const isComplete = ['fulfilled', 'shipped', 'completed', 'success'].includes(normalized);
           markFulfilledBtn.disabled = isComplete;
           markFulfilledBtn.textContent = isComplete ? 'Fulfilled' : 'Mark as fulfilled';
         }
       };
 
       setFulfillmentStatusFn = setFulfillmentStatus;
+      setPaymentStatusFn = setPaymentStatus;
 
       setPaymentStatus(sidebar.dataset.paymentStatus || 'pending');
       setFulfillmentStatus(sidebar.dataset.fulfillmentStatus || 'processing');
@@ -443,6 +542,74 @@
       }
     };
 
+    const markPaymentPayloadConsumed = (payload) => {
+      const consumed = Array.isArray(payload.consumedBy) ? payload.consumedBy.slice() : [];
+      if (!consumed.includes(PAYMENT_CONSUMER_ID)) {
+        consumed.push(PAYMENT_CONSUMER_ID);
+      }
+      payload.consumedBy = consumed;
+      const allConsumed = KNOWN_PAYMENT_CONSUMERS.every((id) => consumed.includes(id));
+      if (allConsumed) {
+        if (hasLocalStorage) {
+          localStorage.removeItem(PAYMENT_STORAGE_KEY);
+        }
+      } else if (hasLocalStorage) {
+        try {
+          localStorage.setItem(PAYMENT_STORAGE_KEY, JSON.stringify(payload));
+        } catch (error) {
+          console.warn('Unable to persist order payment sync payload for summary view.', error);
+        }
+      }
+    };
+
+    const applyPaymentUpdateFromStorage = () => {
+      if (!hasLocalStorage) return;
+      const raw = localStorage.getItem(PAYMENT_STORAGE_KEY);
+      if (!raw) return;
+
+      let payload;
+      try {
+        payload = JSON.parse(raw);
+      } catch (error) {
+        localStorage.removeItem(PAYMENT_STORAGE_KEY);
+        return;
+      }
+
+      if (!payload || !payload.orderId || !payload.paymentStatus) {
+        localStorage.removeItem(PAYMENT_STORAGE_KEY);
+        return;
+      }
+
+      const maxAgeMs = 10 * 60 * 1000;
+      if (payload.timestamp && Date.now() - payload.timestamp > maxAgeMs) {
+        localStorage.removeItem(PAYMENT_STORAGE_KEY);
+        return;
+      }
+
+      if (String(payload.orderId) !== orderId) {
+        return;
+      }
+
+      const consumedBy = Array.isArray(payload.consumedBy) ? payload.consumedBy : [];
+      if (consumedBy.includes(PAYMENT_CONSUMER_ID)) {
+        return;
+      }
+
+      const normalized = toKey(payload.paymentStatus);
+      const label = payload.paymentStatusLabel || statusLabel(normalized);
+
+      if (typeof setPaymentStatusFn === 'function') {
+        setPaymentStatusFn(normalized, label);
+      } else {
+        page.dataset.paymentStatus = normalized;
+        if (paymentStatusLabelNode) {
+          paymentStatusLabelNode.textContent = label;
+        }
+      }
+
+      markPaymentPayloadConsumed(payload);
+    };
+
     const updateProgressStatus = (status, providedLabel) => {
       const normalized = toKey(status || page.dataset.currentStatus || 'pending');
       const label = providedLabel || getStatusLabelFor(normalized);
@@ -547,14 +714,18 @@
 
     if (hasLocalStorage) {
       applyStatusUpdateFromStorage();
+      applyPaymentUpdateFromStorage();
 
       window.addEventListener('pageshow', () => {
         applyStatusUpdateFromStorage();
+        applyPaymentUpdateFromStorage();
       });
 
       window.addEventListener('storage', (event) => {
         if (event.key === STATUS_STORAGE_KEY) {
           applyStatusUpdateFromStorage();
+        } else if (event.key === PAYMENT_STORAGE_KEY) {
+          applyPaymentUpdateFromStorage();
         }
       });
     }

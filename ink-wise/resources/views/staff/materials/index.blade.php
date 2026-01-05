@@ -60,19 +60,13 @@
             margin-bottom: 0.35rem;
         }
 
-        .restock-modal__body .form-control,
-        .restock-modal__body textarea {
+        .restock-modal__body .form-control {
             width: 100%;
             border: 1px solid #cbd5e0;
             border-radius: 8px;
             padding: 0.65rem 0.75rem;
             font-size: 0.95rem;
             color: #2d3748;
-        }
-
-        .restock-modal__body textarea {
-            min-height: 90px;
-            resize: vertical;
         }
 
         .restock-modal__hint {
@@ -94,7 +88,7 @@
     </style>
 @endpush
 
-@section('title', 'Materials Management')
+@section('title', 'Materials Management') 
 
 @section('content')
 @php
@@ -293,10 +287,6 @@
                     <div class="form-group">
                         <label for="staffRestockQuantity">Quantity to add</label>
                         <input type="number" name="quantity" id="staffRestockQuantity" class="form-control" min="1" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="staffRestockNotes">Notes (optional)</label>
-                        <textarea name="notes" id="staffRestockNotes" placeholder="e.g., Supplier delivery reference or PO number"></textarea>
                     </div>
                     <div class="restock-modal__actions">
                         <button type="button" class="btn btn-sm btn-ghost" data-close-restock>Cancel</button>

@@ -63,6 +63,7 @@ class OrderStatusUpdated extends Notification
                 $this->statusLabel
             ))
             ->action('View Order Details', route('customer.my_purchase'))
-            ->line('Thank you for using our service!');
+            ->line('Thank you for using our service!')
+            ->salutation("Regards,\n\nInkWise Management");
     }
 }

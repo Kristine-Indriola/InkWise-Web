@@ -341,6 +341,197 @@
 			margin-right: 6px;
 		}
 	</style>
+		<style>
+			.payment-info-grid {
+				display: grid;
+				gap: 16px;
+			}
+
+			@media (min-width: 900px) {
+				.payment-info-grid {
+					grid-template-columns: 2fr 1fr;
+				}
+			}
+
+			.payment-info-card {
+				background: #ffffff;
+				border: 1px solid #e5e7eb;
+				border-radius: 10px;
+				padding: 20px;
+			}
+
+			.payment-info-card__title {
+				margin: 0 0 12px;
+				font-size: 16px;
+				font-weight: 600;
+				color: #111827;
+			}
+
+			.payment-info-card dl {
+				margin: 0;
+				display: grid;
+				gap: 12px;
+			}
+
+			.payment-info-card dt {
+				font-size: 12px;
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+				color: #6b7280;
+				font-weight: 600;
+				margin-bottom: 4px;
+			}
+
+			.payment-info-card dd {
+				margin: 0;
+				font-size: 14px;
+				font-weight: 600;
+				color: #111827;
+				word-break: break-word;
+			}
+
+			.payment-info-card__text {
+				margin: 0;
+				color: #374151;
+				font-size: 14px;
+				line-height: 1.6;
+			}
+
+			.payment-info-card__empty {
+				color: #9ca3af;
+				font-size: 14px;
+				line-height: 1.6;
+				margin: 0;
+			}
+
+			.payment-summary-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+				gap: 12px;
+				margin-bottom: 16px;
+			}
+
+			.payment-summary-grid__item {
+				background: #f9fafb;
+				border: 1px solid #e5e7eb;
+				border-radius: 8px;
+				padding: 12px;
+			}
+
+			.payment-summary-grid__label {
+				display: block;
+				font-size: 12px;
+				font-weight: 600;
+				color: #6b7280;
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+				margin-bottom: 4px;
+			}
+
+			.payment-summary-grid__value {
+				font-size: 18px;
+				font-weight: 600;
+				color: #0f172a;
+			}
+
+			.payment-alert {
+				border-radius: 8px;
+				padding: 12px;
+				margin-bottom: 16px;
+				font-size: 13px;
+				font-weight: 500;
+			}
+
+			.payment-alert--balance {
+				background: #fef3c7;
+				border: 1px solid #fbbf24;
+				color: #92400e;
+			}
+
+			.payment-alert--clear {
+				background: #dcfce7;
+				border: 1px solid #34d399;
+				color: #166534;
+			}
+
+			.payment-alert--pending {
+				background: #e0f2fe;
+				border: 1px solid #38bdf8;
+				color: #0c4a6e;
+			}
+
+			.payment-history {
+				border-top: 1px solid #e5e7eb;
+				padding-top: 16px;
+				margin-top: 12px;
+			}
+
+			.payment-history h3 {
+				font-size: 14px;
+				font-weight: 600;
+				color: #0f172a;
+				margin: 0 0 12px;
+			}
+
+			.payment-history__row {
+				display: flex;
+				justify-content: space-between;
+				align-items: flex-start;
+				gap: 12px;
+				padding: 12px 0;
+				border-top: 1px solid #f1f5f9;
+			}
+
+			.payment-history__row:first-of-type {
+				border-top: none;
+				padding-top: 0;
+			}
+
+			.payment-history__amount {
+				font-size: 16px;
+				font-weight: 600;
+				color: #0f172a;
+			}
+
+			.payment-history__meta {
+				font-size: 12px;
+				color: #6b7280;
+				margin-top: 4px;
+			}
+
+			.payment-history__status {
+				display: inline-flex;
+				align-items: center;
+				padding: 4px 10px;
+				border-radius: 9999px;
+				font-size: 11px;
+				font-weight: 600;
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+				white-space: nowrap;
+			}
+
+			.payment-history__status--paid {
+				background: #dcfce7;
+				color: #166534;
+			}
+
+			.payment-history__status--pending {
+				background: #fef3c7;
+				color: #92400e;
+			}
+
+			.payment-history__status--partial {
+				background: #ede9fe;
+				color: #5b21b6;
+			}
+
+			.payment-history__status--failed,
+			.payment-history__status--refunded {
+				background: #fee2e2;
+				color: #991b1b;
+			}
+		</style>
 	<style>
 		.materials-grid {
 			display: grid;
@@ -662,6 +853,7 @@
 
 	$paymentStatusRaw = data_get($order, 'payment_status', data_get($order, 'payment.status', 'pending'));
 	$paymentStatus = strtolower($paymentStatusRaw ?: 'pending');
+	$initialPaymentStatus = $paymentStatus;
 	$fulfillmentStatusRaw = data_get($order, 'fulfillment_status', data_get($order, 'status', 'processing'));
 	$fulfillmentStatus = strtolower($fulfillmentStatusRaw ?: 'processing');
 
@@ -834,7 +1026,7 @@
 	}
 
 	try {
-		$paymentManageUrl = $order ? route('staff.orders.payment.edit', ['id' => data_get($order, 'id')]) : null;
+		$paymentManageUrl = $order ? route('staff.orders.payment.edit', ['order' => data_get($order, 'id')]) : null;
 	} catch (\Throwable $e) {
 		$paymentManageUrl = null;
 	}
@@ -874,6 +1066,27 @@
 		return null;
 	};
 
+	$paymentStatusOptions = [
+		'pending' => 'Pending',
+		'paid' => 'Paid',
+		'partial' => 'Partial',
+		'failed' => 'Failed',
+		'refunded' => 'Refunded',
+	];
+	$currentPaymentStatusLabel = $paymentStatusOptions[$paymentStatus] ?? ucfirst(str_replace('_', ' ', $paymentStatus));
+
+	$payments = collect(data_get($order, 'payments', []));
+	$paymentsSummary = collect(data_get($order, 'payments_summary', []));
+	$currencyCode = data_get($order, 'currency', 'PHP');
+	$currencySymbol = $currencyCode === 'PHP' ? '₱' : ($currencyCode . ' ');
+	$formatCurrencyAmount = function ($value) use ($currencySymbol) {
+		$numeric = is_numeric($value) ? (float) $value : 0.0;
+		return $currencySymbol . number_format($numeric, 2);
+	};
+	$orderGrandTotal = (float) ($paymentsSummary->get('grand_total') ?? data_get($order, 'grand_total', $grandTotal));
+	if ($orderGrandTotal <= 0 && $grandTotal > 0) {
+		$orderGrandTotal = (float) $grandTotal;
+	}
 	$metadataRaw = data_get($order, 'metadata');
 	if (is_string($metadataRaw) && $metadataRaw !== '') {
 		$decodedMetadata = json_decode($metadataRaw, true);
@@ -883,6 +1096,38 @@
 	} else {
 		$metadata = [];
 	}
+	$financialMetadata = data_get($metadata, 'financial', []);
+	$paidOverrideRaw = data_get($financialMetadata, 'total_paid_override');
+	$balanceOverrideRaw = data_get($financialMetadata, 'balance_due_override');
+	$paidOverride = is_numeric($paidOverrideRaw) ? (float) $paidOverrideRaw : null;
+	$balanceOverride = is_numeric($balanceOverrideRaw) ? (float) $balanceOverrideRaw : null;
+	$totalPaid = $paidOverride ?? (float) ($paymentsSummary->get('total_paid') ?? $payments->reduce(function ($carry, $paymentRow) {
+		$status = strtolower((string) data_get($paymentRow, 'status', 'pending'));
+		if ($status === 'paid') {
+			return $carry + (float) data_get($paymentRow, 'amount', 0);
+		}
+		return $carry;
+	}, 0.0));
+	$balanceDue = $balanceOverride ?? (float) ($paymentsSummary->get('balance_due') ?? max($orderGrandTotal - $totalPaid, 0));
+	if ($paymentStatus !== 'paid') {
+		if ($orderGrandTotal > 0 && $balanceDue <= 0.01 && $totalPaid >= max($orderGrandTotal - 0.01, 0)) {
+			$paymentStatus = 'paid';
+		} elseif ($totalPaid > 0 && $balanceDue > 0.01) {
+			$paymentStatus = 'partial';
+		} elseif ($initialPaymentStatus === 'paid' && $balanceDue > 0.01) {
+			$paymentStatus = 'partial';
+		}
+	}
+	$latestPaymentAtRaw = $paymentsSummary->get('latest_payment_at');
+	$latestPaymentDisplay = $latestPaymentAtRaw ? $formatDateTime($latestPaymentAtRaw) : null;
+	$primaryPaymentMethod = data_get($order, 'payment_method');
+	if (!$primaryPaymentMethod && $payments->isNotEmpty()) {
+		$primaryPaymentMethod = data_get($payments->first(), 'method');
+	}
+	$primaryPaymentProvider = $payments->isNotEmpty() ? data_get($payments->first(), 'provider') : null;
+	$paymentCount = $payments->count();
+
+	$paymentNote = $metadata['payment_note'] ?? null;
 
 	$trackingNumber = $metadata['tracking_number'] ?? null;
 	$statusNote = $metadata['status_note'] ?? null;
@@ -1904,6 +2149,86 @@
 
 			<article class="ordersummary-card">
 				<header class="ordersummary-card__header">
+					<h2>Payment details</h2>
+				</header>
+				<div class="payment-info-grid">
+					<div class="payment-info-card">
+						<h3 class="payment-info-card__title">Transaction overview</h3>
+						<dl>
+							<dt>Order number</dt>
+							<dd>{{ $orderNumber }}</dd>
+							<dt>Customer</dt>
+							<dd>{{ $customerName }}</dd>
+							<dt>Order date</dt>
+							<dd>{{ $placedAt ?? 'Not available' }}</dd>
+							<dt>Total amount</dt>
+							<dd>{{ $formatCurrencyAmount($orderGrandTotal) }}</dd>
+							<dt>Amount paid</dt>
+							<dd>{{ $formatCurrencyAmount($totalPaid) }}</dd>
+							<dt>Balance due</dt>
+							<dd>{{ $formatCurrencyAmount($balanceDue) }}</dd>
+							<dt>Payment status</dt>
+							<dd>{{ $currentPaymentStatusLabel }}</dd>
+							<dt>Last updated</dt>
+							<dd>{{ $lastUpdatedDisplay ?? 'Not available' }}</dd>
+							@if($primaryPaymentMethod)
+								<dt>Payment method</dt>
+								<dd>{{ mb_strtoupper($primaryPaymentMethod) }}</dd>
+							@endif
+							@if($primaryPaymentProvider)
+								<dt>Payment provider</dt>
+								<dd>{{ ucfirst($primaryPaymentProvider) }}</dd>
+							@endif
+							@if($latestPaymentDisplay)
+								<dt>Latest payment</dt>
+								<dd>{{ $latestPaymentDisplay }}</dd>
+							@endif
+							@if($paymentNote)
+								<dt>Payment note</dt>
+								<dd>{{ $paymentNote }}</dd>
+							@endif
+						</dl>
+					</div>
+					<div class="payment-info-card">
+						<h3 class="payment-info-card__title">Summary</h3>
+						<div class="payment-info-card__text">
+							@if($balanceDue > 0)
+								<p>This order has an outstanding balance of <strong>{{ $formatCurrencyAmount($balanceDue) }}</strong>.</p>
+								@if($paymentStatus === 'pending')
+									<p>Payment is still pending. Update the status once payment is confirmed.</p>
+								@elseif($paymentStatus === 'partial')
+									<p>Partial payments have been recorded. Collect the remaining balance to mark this order as fully paid.</p>
+								@endif
+							@else
+								<p>This order is fully paid. All amounts have been received.</p>
+							@endif
+
+							@if($paymentCount > 0)
+								<p><strong>{{ $paymentCount }}</strong> payment transaction{{ $paymentCount > 1 ? 's' : '' }} recorded.</p>
+							@else
+								<p>No payment transactions have been recorded yet.</p>
+							@endif
+
+							@if($primaryPaymentMethod || $primaryPaymentProvider)
+								<p>
+									@if($primaryPaymentMethod)
+										Primary method: <strong>{{ mb_strtoupper($primaryPaymentMethod) }}</strong>
+									@endif
+									@if($primaryPaymentMethod && $primaryPaymentProvider)
+										 · 
+									@endif
+									@if($primaryPaymentProvider)
+										Provider: <strong>{{ ucfirst($primaryPaymentProvider) }}</strong>
+									@endif
+								</p>
+							@endif
+						</div>
+					</div>
+				</div>
+			</article>
+
+			<article class="ordersummary-card">
+				<header class="ordersummary-card__header">
 					<h2>Customer Rating</h2>
 				</header>
 				@php
@@ -1965,6 +2290,47 @@
 						{{ ucfirst($paymentStatus ?: 'pending') }}
 					</span>
 				</div>
+				<div class="payment-summary-grid">
+					<div class="payment-summary-grid__item">
+						<span class="payment-summary-grid__label">Total invoiced</span>
+						<span class="payment-summary-grid__value">{{ $formatCurrencyAmount($orderGrandTotal) }}</span>
+					</div>
+					<div class="payment-summary-grid__item">
+						<span class="payment-summary-grid__label">Total paid</span>
+						<span class="payment-summary-grid__value">{{ $formatCurrencyAmount($totalPaid) }}</span>
+					</div>
+					<div class="payment-summary-grid__item">
+						<span class="payment-summary-grid__label">Balance remaining</span>
+						<span class="payment-summary-grid__value">{{ $formatCurrencyAmount($balanceDue) }}</span>
+					</div>
+					@if($primaryPaymentMethod)
+						<div class="payment-summary-grid__item">
+							<span class="payment-summary-grid__label">Payment method</span>
+							<span class="payment-summary-grid__value">{{ mb_strtoupper($primaryPaymentMethod) }}</span>
+						</div>
+					@endif
+					@if($primaryPaymentProvider)
+						<div class="payment-summary-grid__item">
+							<span class="payment-summary-grid__label">Provider</span>
+							<span class="payment-summary-grid__value">{{ ucfirst($primaryPaymentProvider) }}</span>
+						</div>
+					@endif
+					@if($latestPaymentDisplay)
+						<div class="payment-summary-grid__item">
+							<span class="payment-summary-grid__label">Latest payment</span>
+							<span class="payment-summary-grid__value">{{ $latestPaymentDisplay }}</span>
+						</div>
+					@endif
+				</div>
+				@if($orderGrandTotal > 0)
+					@if($totalPaid <= 0)
+						<div class="payment-alert payment-alert--pending">No payments recorded yet.</div>
+					@elseif($balanceDue > 0.01)
+						<div class="payment-alert payment-alert--balance">Remaining balance of {{ $formatCurrencyAmount($balanceDue) }} is pending.</div>
+					@else
+						<div class="payment-alert payment-alert--clear">Invoice fully paid.</div>
+					@endif
+				@endif
 				<dl class="sidebar-totals" data-sidebar-section>
 					<div>
 						<dt>Invitations</dt>
@@ -1996,16 +2362,54 @@
 						<dt>Subtotal</dt>
 						@php
 							$computedSidebarSubtotal = array_sum($groupSums);
-							$subtotal = $computedSidebarSubtotal ?: $subtotal;
-							$grandTotal = $subtotal;
+							$sidebarSubtotal = $computedSidebarSubtotal ?: $subtotal;
+							$sidebarGrandTotal = $orderGrandTotal > 0 ? $orderGrandTotal : $sidebarSubtotal;
 						@endphp
-						<dd data-money>{{ number_format($subtotal, 2) }}</dd>
+						<dd data-money>{{ number_format($sidebarSubtotal, 2) }}</dd>
 					</div>
 					<div class="sidebar-totals__total">
 						<dt>Total due</dt>
-						<dd data-grand-total data-money>{{ number_format($grandTotal, 2) }}</dd>
+						<dd data-grand-total data-money>{{ number_format($sidebarGrandTotal, 2) }}</dd>
 					</div>
 				</dl>
+				@if($payments->isNotEmpty())
+					<div class="payment-history">
+						<h3>Payment history</h3>
+						@foreach($payments as $payment)
+							@php
+								$paymentAmount = (float) data_get($payment, 'amount', 0);
+								$paymentStatusRow = strtolower((string) data_get($payment, 'status', 'pending'));
+								$statusClass = in_array($paymentStatusRow, ['paid', 'pending', 'partial', 'failed', 'refunded'], true) ? $paymentStatusRow : 'pending';
+								$paymentDateRaw = data_get($payment, 'recorded_at') ?? data_get($payment, 'created_at');
+								$paymentDate = $paymentDateRaw ? $formatDateTime($paymentDateRaw) : null;
+								$recordedBy = data_get($payment, 'recorded_by.name');
+								$method = data_get($payment, 'method');
+								$provider = data_get($payment, 'provider');
+								$reference = data_get($payment, 'reference');
+								$origin = data_get($payment, 'origin');
+								$notes = data_get($payment, 'notes');
+								$metaPieces = collect([
+									$paymentDate ? 'Recorded ' . $paymentDate : null,
+									$recordedBy ? 'By ' . $recordedBy : null,
+									$method ? 'Method: ' . mb_strtoupper($method) : null,
+									$provider ? 'Provider: ' . ucfirst($provider) : null,
+									$reference ? 'Ref: ' . $reference : null,
+									$origin === 'metadata' ? 'Imported record' : null,
+									$notes ? 'Note: ' . $notes : null,
+								])->filter()->implode(' · ');
+							@endphp
+							<div class="payment-history__row">
+								<div>
+									<div class="payment-history__amount">{{ $formatCurrencyAmount($paymentAmount) }}</div>
+									@if($metaPieces !== '')
+										<div class="payment-history__meta">{{ $metaPieces }}</div>
+									@endif
+								</div>
+								<span class="payment-history__status payment-history__status--{{ $statusClass }}">{{ ucfirst($paymentStatusRow) }}</span>
+							</div>
+						@endforeach
+					</div>
+				@endif
 			</section>
 
 		</aside>

@@ -607,7 +607,9 @@ class PaymentController extends Controller
         ];
 
         $mode = Arr::get($payload, 'mode', 'half');
-        if (($summary['balance'] <= 0 || $summary['total_paid'] > 0) && $order->status !== 'completed' && $order->status !== 'confirmed' && $order->status !== 'draft' && $mode !== 'balance_payment') {
+        if (($summary['balance'] <= 0 || $summary['total_paid'] > 0)
+            && in_array($order->status, ['processing'], true)
+            && $mode !== 'balance_payment') {
             $attributes['status'] = 'in_production';
         }
 

@@ -54,7 +54,7 @@ class MaterialShortageAlert extends Notification implements ShouldQueue
             ->line('Material Shortages:')
             ->line($shortageDetails)
             ->line('')
-            ->action('View Order Details', route('admin.ordersummary.index', $this->orderId))
+            ->action('View Order Details', route('admin.ordersummary.show', ['order' => $this->orderId]))
             ->line('Please restock the required materials before proceeding with this order.')
             ->salutation('Best regards, InkWise System');
     }
@@ -73,7 +73,7 @@ class MaterialShortageAlert extends Notification implements ShouldQueue
             'title' => 'Material Shortage Alert',
             'message' => $this->message,
             'shortages' => $this->shortages,
-            'action_url' => route('admin.ordersummary.index', $this->orderId),
+            'action_url' => route('admin.ordersummary.show', ['order' => $this->orderId]),
             'action_text' => 'View Order',
         ];
     }

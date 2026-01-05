@@ -28,16 +28,35 @@ class OrderSummaryPresenter
             'rating',
             'activities',
             'payments',
+            'payments.recordedBy',
+            'payments.customer',
         ]);
 
         $customerOrder = $order->customerOrder;
         $customer = $order->customer ?? $customerOrder?->customer;
         $summary = $order->summary_snapshot ?? [];
+        $metadata = $order->metadata ?? [];
+        $financialMetadata = Arr::get($metadata, 'financial', []);
 
-        // Compute payment status based on payments
-        $totalPaid = $order->payments->where('status', 'paid')->sum('amount');
-        $grandTotal = static::toFloat($order->total_amount);
-        if ($totalPaid >= $grandTotal && $grandTotal > 0) {
+        // Compute payment aggregates with metadata overrides in mind
+        $payments = $order->paymentRecords();
+        $grandTotal = (float) $order->grandTotalAmount();
+        $totalPaid = (float) $order->totalPaid();
+
+        $paidOverride = Arr::get($financialMetadata, 'total_paid_override');
+        if (is_numeric($paidOverride)) {
+            $totalPaid = (float) $paidOverride;
+        }
+
+        $balanceOverride = Arr::get($financialMetadata, 'balance_due_override');
+        $balanceDue = is_numeric($balanceOverride)
+            ? (float) $balanceOverride
+            : max($grandTotal - $totalPaid, 0.0);
+
+        $explicitPaymentStatus = Str::lower((string) $order->payment_status ?: '');
+        if ($explicitPaymentStatus !== '') {
+            $computedPaymentStatus = $explicitPaymentStatus;
+        } elseif ($totalPaid >= $grandTotal && $grandTotal > 0) {
             $computedPaymentStatus = 'paid';
         } elseif ($totalPaid > 0) {
             $computedPaymentStatus = 'partial';
@@ -45,9 +64,20 @@ class OrderSummaryPresenter
             $computedPaymentStatus = 'pending';
         }
 
+        if ($computedPaymentStatus !== 'paid') {
+            if ($grandTotal > 0 && $balanceDue <= 0.01 && $totalPaid >= max($grandTotal - 0.01, 0)) {
+                $computedPaymentStatus = 'paid';
+            } elseif ($totalPaid > 0 && $balanceDue > 0.01 && $computedPaymentStatus !== 'partial') {
+                $computedPaymentStatus = 'partial';
+            }
+        }
+
         $customerName = static::resolveCustomerName($customerOrder, $customer);
         $customerEmail = static::resolveCustomerEmail($customerOrder, $customer);
         $customerPhone = static::resolveCustomerPhone($customerOrder, $customer);
+
+        $latestPayment = $payments->first();
+        $latestPaymentAt = $latestPayment['recorded_at'] ?? $latestPayment['created_at'] ?? null;
 
         return [
             'id' => $order->id,
@@ -61,13 +91,14 @@ class OrderSummaryPresenter
             'discount_total' => static::toFloat(Arr::get($summary, 'totals.discount', 0)),
             'shipping_fee' => static::toFloat($order->shipping_fee),
             'tax_total' => static::toFloat($order->tax_amount),
-            'grand_total' => static::toFloat($order->total_amount),
+            'grand_total' => $grandTotal,
             'production_status' => Arr::get($order->metadata, 'production.status', Str::lower((string) $order->status ?: 'queue')),
             'delivery_status' => Arr::get($order->metadata, 'delivery.status'),
             'estimated_ship_date' => Arr::get($order->metadata, 'delivery.estimated_ship_date', $order->date_needed),
             'shipping_option' => $order->shipping_option,
             'payment_method' => $order->payment_method,
             'currency' => Arr::get($summary, 'currency', 'PHP'),
+            'metadata' => $metadata,
             'customer' => [
                 'id' => $customer?->customer_id,
                 'name' => $customerName,
@@ -100,6 +131,16 @@ class OrderSummaryPresenter
                 'photos' => $order->rating->photos ?? [],
                 'submitted_at' => $order->rating->created_at,
             ] : null,
+            'payments_summary' => [
+                'grand_total' => $grandTotal,
+                'total_paid' => $totalPaid,
+                'balance_due' => $balanceDue,
+                'status' => $computedPaymentStatus,
+                'currency' => Arr::get($summary, 'currency', 'PHP'),
+                'latest_payment_at' => $latestPaymentAt,
+                'total_payments' => $payments->count(),
+            ],
+            'payments' => $payments->values()->all(),
         ];
     }
 
@@ -361,4 +402,5 @@ class OrderSummaryPresenter
     {
         return (float) ($value ?? 0);
     }
+
 }

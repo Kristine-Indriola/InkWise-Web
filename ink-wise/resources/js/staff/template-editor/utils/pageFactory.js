@@ -130,10 +130,18 @@ function normalizeNode(node, index, page) {
 
   const type = node?.type ?? node?.kind ?? 'shape';
   const frame = normalizeFrame(node?.frame || node?.metadata?.frame || null, page, type, index);
+  const resolvedName = node?.name ?? `Layer ${index + 1}`;
+  const baseMetadata = { ...(node?.metadata ?? {}) };
+  const labelFallback = baseMetadata.previewLabel ?? resolvedName;
+  const metadata = {
+    ...baseMetadata,
+    previewKey: baseMetadata.previewKey ?? id,
+    previewLabel: labelFallback,
+  };
 
   return {
     id,
-    name: node?.name ?? `Layer ${index + 1}`,
+    name: resolvedName,
     type,
     visible: node?.visible !== undefined ? Boolean(node.visible) : true,
     locked: node?.locked !== undefined ? Boolean(node.locked) : false,
@@ -143,12 +151,14 @@ function normalizeNode(node, index, page) {
     stroke: node?.stroke ?? node?.border ?? null,
     content: node?.content ?? node?.text ?? '',
     fontSize: typeof node?.fontSize === 'number' ? node.fontSize : 42,
-  fontFamily: node?.fontFamily ?? 'Inter, sans-serif',
-  // Ensure an explicit fontWeight is present for text layers (defaults to normal 400)
-  fontWeight: node?.fontWeight ?? '400',
+    fontFamily: node?.fontFamily ?? 'Inter, sans-serif',
+    // Ensure an explicit fontWeight is present for text layers (defaults to normal 400)
+    fontWeight: node?.fontWeight ?? '400',
     textAlign: node?.textAlign ?? 'center',
     borderRadius: typeof node?.borderRadius === 'number' ? node.borderRadius : defaultBorderRadius(type),
-    metadata: node?.metadata ?? {},
+    metadata,
+    editable: node?.editable !== undefined ? Boolean(node.editable) : true,
+    replaceable: node?.replaceable !== undefined ? Boolean(node.replaceable) : type === 'image',
   };
 }
 
@@ -243,10 +253,17 @@ export function createLayer(type = 'shape', page = null, overrides = {}) {
   const frameOverride = overrides.frame ? { ...overrides.frame } : null;
   const frame = frameOverride || (page ? normalizeFrame(null, page, type, page.nodes?.length ?? 0) : null);
   const baseFill = overrides.fill ?? defaultFill(type);
+  const resolvedName = overrides.name ?? defaultLayerName(type);
+  const baseMetadata = { ...(overrides.metadata ?? {}) };
+  const metadata = {
+    ...baseMetadata,
+    previewKey: baseMetadata.previewKey ?? id,
+    previewLabel: baseMetadata.previewLabel ?? resolvedName,
+  };
 
   return {
     id,
-    name: overrides.name ?? defaultLayerName(type),
+    name: resolvedName,
     type,
     visible: overrides.visible !== undefined ? overrides.visible : true,
     locked: overrides.locked ?? false,
@@ -257,12 +274,14 @@ export function createLayer(type = 'shape', page = null, overrides = {}) {
     content: overrides.content ?? (type === 'text' ? 'Double-click to edit text' : ''),
     fontSize: overrides.fontSize ?? (type === 'text' ? 48 : null),
     fontFamily: overrides.fontFamily ?? 'Inter, sans-serif',
-  // default font weight for newly created text layers
-  fontWeight: overrides.fontWeight ?? (type === 'text' ? '400' : undefined),
+    // default font weight for newly created text layers
+    fontWeight: overrides.fontWeight ?? (type === 'text' ? '400' : undefined),
     textAlign: overrides.textAlign ?? 'center',
     borderRadius: overrides.borderRadius ?? defaultBorderRadius(type, overrides.variant),
     variant: overrides.variant ?? (type === 'shape' ? 'rectangle' : null),
-    metadata: { ...(overrides.metadata ?? {}) },
+    metadata,
+    editable: overrides.editable ?? true,
+    replaceable: overrides.replaceable ?? (type === 'image'),
   };
 }
 

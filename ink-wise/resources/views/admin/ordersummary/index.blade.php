@@ -394,6 +394,135 @@
 		}
 	</style>
 	<style>
+		.payment-summary-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+			gap: 12px;
+			margin-bottom: 16px;
+		}
+
+		.payment-summary-grid__item {
+			background: #f9fafb;
+			border: 1px solid #e5e7eb;
+			border-radius: 8px;
+			padding: 12px;
+		}
+
+		.payment-summary-grid__label {
+			display: block;
+			font-size: 12px;
+			font-weight: 600;
+			color: #6b7280;
+			text-transform: uppercase;
+			letter-spacing: 0.04em;
+			margin-bottom: 4px;
+		}
+
+		.payment-summary-grid__value {
+			font-size: 18px;
+			font-weight: 600;
+			color: #0f172a;
+		}
+
+		.payment-alert {
+			border-radius: 8px;
+			padding: 12px;
+			margin-bottom: 16px;
+			font-size: 13px;
+			font-weight: 500;
+		}
+
+		.payment-alert--balance {
+			background: #fef3c7;
+			border: 1px solid #fbbf24;
+			color: #92400e;
+		}
+
+		.payment-alert--clear {
+			background: #dcfce7;
+			border: 1px solid #34d399;
+			color: #166534;
+		}
+
+		.payment-alert--pending {
+			background: #e0f2fe;
+			border: 1px solid #38bdf8;
+			color: #0c4a6e;
+		}
+
+		.payment-history {
+			border-top: 1px solid #e5e7eb;
+			padding-top: 16px;
+			margin-top: 12px;
+		}
+
+		.payment-history h3 {
+			font-size: 14px;
+			font-weight: 600;
+			color: #0f172a;
+			margin: 0 0 12px;
+		}
+
+		.payment-history__row {
+			display: flex;
+			justify-content: space-between;
+			align-items: flex-start;
+			gap: 12px;
+			padding: 12px 0;
+			border-top: 1px solid #f1f5f9;
+		}
+
+		.payment-history__row:first-of-type {
+			border-top: none;
+			padding-top: 0;
+		}
+
+		.payment-history__amount {
+			font-size: 16px;
+			font-weight: 600;
+			color: #0f172a;
+		}
+
+		.payment-history__meta {
+			font-size: 12px;
+			color: #6b7280;
+			margin-top: 4px;
+		}
+
+		.payment-history__status {
+			display: inline-flex;
+			align-items: center;
+			padding: 4px 10px;
+			border-radius: 9999px;
+			font-size: 11px;
+			font-weight: 600;
+			text-transform: uppercase;
+			letter-spacing: 0.04em;
+			white-space: nowrap;
+		}
+
+		.payment-history__status--paid {
+			background: #dcfce7;
+			color: #166534;
+		}
+
+		.payment-history__status--pending {
+			background: #fef3c7;
+			color: #92400e;
+		}
+
+		.payment-history__status--partial {
+			background: #ede9fe;
+			color: #5b21b6;
+		}
+
+		.payment-history__status--failed,
+		.payment-history__status--refunded {
+			background: #fee2e2;
+			color: #991b1b;
+		}
+	</style>
+	<style>
 		.materials-grid {
 			display: grid;
 			gap: 16px;
@@ -786,38 +915,207 @@
 
 	$materialsList = collect();
 
-	// Build timeline from order activities
-	$timeline = collect();
-	
-	// Add order creation event
-	$timeline->push([
-		'label' => 'Order Created',
-		'author' => $customerName,
-		'state' => 'created',
-		'note' => null,
-		'timestamp' => data_get($order, 'created_at'),
-	]);
-
-	// Add activity events from database
-	$activities = collect(data_get($order, 'activities', []));
-	foreach ($activities as $activity) {
-		$timeline->push([
-			'label' => data_get($activity, 'description', 'Order Updated'),
-			'author' => data_get($activity, 'user_name', 'System') . ' (' . data_get($activity, 'user_role', 'Unknown') . ')',
-			'state' => data_get($activity, 'activity_type', 'updated'),
-			'note' => null,
-			'timestamp' => data_get($activity, 'created_at'),
-		]);
-	}
-
-	$timeline = $timeline->sortBy(function ($event) {
-		$timestamp = data_get($event, 'timestamp');
-		try {
-			return $timestamp ? \Illuminate\Support\Carbon::parse($timestamp)->timestamp : 0;
-		} catch (\Throwable $e) {
-			return 0;
+	$normalizeTimelineState = static function ($value) {
+		if (!is_string($value)) {
+			return 'default';
 		}
+		$normalized = strtolower(trim($value));
+		$normalized = preg_replace('/[^a-z0-9]+/i', '-', $normalized);
+		$normalized = trim($normalized, '-');
+		return $normalized !== '' ? $normalized : 'default';
+	};
+
+	$decodeJsonValue = static function ($value) {
+		if (!is_string($value)) {
+			return null;
+		}
+		$trimmed = trim($value);
+		if ($trimmed === '') {
+			return null;
+		}
+		$firstChar = $trimmed[0] ?? '';
+		if (!in_array($firstChar, ['{', '[', '"'], true)) {
+			return null;
+		}
+		$decoded = json_decode($trimmed, true);
+		return json_last_error() === JSON_ERROR_NONE ? $decoded : null;
+	};
+
+	$formatKeyForDisplay = static function ($key) {
+		$key = is_string($key) ? $key : (string) $key;
+		$key = strtr($key, ['_' => ' ', '-' => ' ', '.' => ' ']);
+		return ucwords($key);
+	};
+
+	$formatTimelinePayload = null;
+	$formatTimelinePayload = static function ($value) use (&$formatTimelinePayload, $decodeJsonValue, $formatKeyForDisplay) {
+		$decoded = $decodeJsonValue($value);
+		if ($decoded !== null) {
+			$value = $decoded;
+		}
+
+		if ($value instanceof \DateTimeInterface) {
+			return $value->format('M j, Y g:i A');
+		}
+
+		if (is_bool($value)) {
+			return $value ? 'Yes' : 'No';
+		}
+
+		if (is_array($value)) {
+			if ($value === []) {
+				return null;
+			}
+			$isAssoc = array_keys($value) !== range(0, count($value) - 1);
+			$segments = [];
+			foreach ($value as $key => $item) {
+				$text = $formatTimelinePayload($item);
+				if ($text === null || $text === '') {
+					continue;
+				}
+				if ($isAssoc && is_string($key)) {
+					$segments[] = $formatKeyForDisplay($key) . ': ' . $text;
+				} else {
+					$segments[] = $text;
+				}
+			}
+			if ($segments === []) {
+				return null;
+			}
+			return implode($isAssoc ? ' · ' : ', ', $segments);
+		}
+
+		if (is_numeric($value)) {
+			return (string) $value;
+		}
+
+		if (is_string($value)) {
+			$trimmed = trim($value);
+			return $trimmed === '' ? null : $trimmed;
+		}
+
+		return null;
+	};
+
+	$activityTypeLabels = [
+		'order_created' => 'Order Created',
+		'order_updated' => 'Order Updated',
+		'order_number_updated' => 'Order Number Updated',
+		'status_updated' => 'Status Updated',
+		'status_update' => 'Status Updated',
+		'status_changed' => 'Status Updated',
+		'items_updated' => 'Items Updated',
+		'metadata_updated' => 'Details Updated',
+		'note_added' => 'Note Added',
+		'customer_updated' => 'Customer Updated',
+	];
+
+	$formatActivityLabel = static function ($activity) use ($activityTypeLabels, $formatKeyForDisplay, $formatTimelinePayload, $decodeJsonValue) {
+		$rawDescription = data_get($activity, 'description');
+		$decodedDescription = $decodeJsonValue($rawDescription);
+		if (!is_array($decodedDescription)) {
+			$descriptionText = $formatTimelinePayload($rawDescription);
+			if ($descriptionText) {
+				return $descriptionText;
+			}
+		}
+
+		$type = strtolower((string) data_get($activity, 'activity_type', ''));
+		if ($type !== '' && isset($activityTypeLabels[$type])) {
+			return $activityTypeLabels[$type];
+		}
+
+		return $type !== '' ? $formatKeyForDisplay($type) : 'Activity';
+	};
+
+	$formatActivityNote = static function ($activity) use ($formatTimelinePayload) {
+		$newValue = $formatTimelinePayload(data_get($activity, 'new_value'));
+		$oldValue = $formatTimelinePayload(data_get($activity, 'old_value'));
+		if ($newValue && $oldValue && $newValue !== $oldValue) {
+			return $oldValue . ' → ' . $newValue;
+		}
+		if ($newValue) {
+			return $newValue;
+		}
+		if ($oldValue) {
+			return 'Previous: ' . $oldValue;
+		}
+
+		$extraFields = ['details', 'note', 'changes', 'metadata', 'description'];
+		foreach ($extraFields as $field) {
+			$text = $formatTimelinePayload(data_get($activity, $field));
+			if ($text) {
+				return $text;
+			}
+		}
+
+		return null;
+	};
+
+	$formatActivityAuthor = static function ($activity) {
+		$name = trim((string) data_get($activity, 'user_name', ''));
+		$role = trim((string) data_get($activity, 'user_role', ''));
+		if ($name !== '' && $role !== '') {
+			return $name . ' (' . $role . ')';
+		}
+		if ($name !== '') {
+			return $name;
+		}
+		if ($role !== '') {
+			return $role;
+		}
+		return 'System';
+	};
+
+	$prebuiltTimeline = collect(data_get($order, 'timeline', []));
+	$activities = collect(data_get($order, 'activities', []));
+
+	$activityTimeline = $activities->map(function ($activity) use ($formatActivityAuthor, $formatActivityLabel, $formatActivityNote, $normalizeTimelineState) {
+		return [
+			'label' => $formatActivityLabel($activity),
+			'author' => $formatActivityAuthor($activity),
+			'state' => $normalizeTimelineState(data_get($activity, 'activity_type')),
+			'note' => $formatActivityNote($activity),
+			'timestamp' => data_get($activity, 'created_at'),
+		];
 	});
+
+	$timeline = $prebuiltTimeline
+		->merge($activityTimeline)
+		->map(function ($event) use ($normalizeTimelineState, $formatTimelinePayload) {
+			$event['state'] = $normalizeTimelineState(data_get($event, 'state', 'default'));
+			$label = $formatTimelinePayload(data_get($event, 'label'));
+			if ($label) {
+				$event['label'] = $label;
+			}
+			$note = $formatTimelinePayload(data_get($event, 'note'));
+			$event['note'] = $note;
+			if (is_string(data_get($event, 'author')) && trim((string) data_get($event, 'author')) === '') {
+				$event['author'] = null;
+			}
+			if (is_string($event['label'] ?? null) && is_string($event['note'] ?? null) && trim($event['label']) === trim($event['note'])) {
+				$event['note'] = null;
+			}
+			return $event;
+		})
+		->sortByDesc(function ($event) {
+			$timestamp = data_get($event, 'timestamp');
+			if ($timestamp instanceof \Illuminate\Support\Carbon) {
+				return $timestamp->timestamp;
+			}
+			if ($timestamp instanceof \DateTimeInterface) {
+				return $timestamp->getTimestamp();
+			}
+			if (is_string($timestamp)) {
+				try {
+					return \Illuminate\Support\Carbon::parse($timestamp)->timestamp;
+				} catch (\Throwable $e) {
+					return 0;
+				}
+			}
+			return 0;
+		})
+		->values();
 
 	$actionUrls = collect(data_get($order, 'admin_actions', []));
 	$markPaidUrl = $actionUrls->get('mark_paid', data_get($order, 'admin_mark_paid_url'));
@@ -889,6 +1187,81 @@
 		$metadata = [];
 	}
 
+	$paymentsSummary = collect(data_get($order, 'payments_summary', []));
+	$financialMetadata = data_get($metadata, 'financial', []);
+	$orderGrandTotalAmount = (float) ($paymentsSummary->get('grand_total') ?? data_get($order, 'total_amount', $grandTotal ?? 0));
+	$paidOverrideRaw = data_get($financialMetadata, 'total_paid_override');
+	$balanceOverrideRaw = data_get($financialMetadata, 'balance_due_override');
+	$paidOverrideAmount = is_numeric($paidOverrideRaw) ? (float) $paidOverrideRaw : null;
+	$balanceOverrideAmount = is_numeric($balanceOverrideRaw) ? (float) $balanceOverrideRaw : null;
+	$totalPaidAmount = $paidOverrideAmount ?? (float) ($paymentsSummary->get('total_paid') ?? data_get($order, 'total_paid', 0));
+	$balanceDueAmount = $balanceOverrideAmount ?? (float) ($paymentsSummary->get('balance_due') ?? max($orderGrandTotalAmount - $totalPaidAmount, 0));
+	if ($paymentStatus !== 'paid') {
+		if ($orderGrandTotalAmount > 0 && $balanceDueAmount <= 0.01 && $totalPaidAmount >= max($orderGrandTotalAmount - 0.01, 0)) {
+			$paymentStatus = 'paid';
+		} elseif ($totalPaidAmount > 0 && $balanceDueAmount > 0.01) {
+			$paymentStatus = 'partial';
+		}
+	}
+	$paymentStatusLabel = ucwords(str_replace('_', ' ', $paymentStatus ?: 'pending'));
+	$orderCurrencyCode = data_get($order, 'currency', 'PHP');
+	$orderCurrencySymbol = $orderCurrencyCode === 'PHP' ? '₱' : ($orderCurrencyCode . ' ');
+	$formattedBalanceDue = $orderCurrencySymbol . number_format(max($balanceDueAmount, 0), 2);
+	$formattedGrandTotal = $orderCurrencySymbol . number_format(max($orderGrandTotalAmount, 0), 2);
+	$paymentSummaryHighlight = [
+		'background' => '#f0f9ff',
+		'border' => '#0ea5e9',
+		'accent' => '#0c4a6e',
+		'title' => 'Payment status',
+		'message' => 'Review the latest payment activity below.'
+	];
+	switch ($paymentStatus) {
+		case 'paid':
+			$paymentSummaryHighlight = [
+				'background' => '#ecfdf5',
+				'border' => '#34d399',
+				'accent' => '#047857',
+				'title' => 'Invoice fully paid',
+				'message' => 'All balances are cleared. No further action required.'
+			];
+			break;
+		case 'partial':
+			$paymentSummaryHighlight = [
+				'background' => '#ede9fe',
+				'border' => '#a855f7',
+				'accent' => '#5b21b6',
+				'title' => 'Payment partially received',
+				'message' => 'Balance remaining: ' . $formattedBalanceDue . '.'
+			];
+			break;
+		case 'failed':
+			$paymentSummaryHighlight = [
+				'background' => '#fee2e2',
+				'border' => '#f87171',
+				'accent' => '#b91c1c',
+				'title' => 'Payment failed',
+				'message' => 'Payment attempt failed. Reach out to the customer to retry.'
+			];
+			break;
+		case 'refunded':
+			$paymentSummaryHighlight = [
+				'background' => '#fef3c7',
+				'border' => '#f59e0b',
+				'accent' => '#92400e',
+				'title' => 'Payment refunded',
+				'message' => 'Order payment was refunded. Verify remaining balance totals.'
+			];
+			break;
+		default:
+			$paymentSummaryHighlight = [
+				'background' => '#fef3c7',
+				'border' => '#f59e0b',
+				'accent' => '#92400e',
+				'title' => 'Payment pending',
+				'message' => 'Outstanding balance: ' . $formattedBalanceDue . ' of ' . $formattedGrandTotal . '.'
+			];
+	}
+
 	$trackingNumber = $metadata['tracking_number'] ?? null;
 	$statusNote = $metadata['status_note'] ?? null;
 	$nextStatusKey = $flowIndex !== false && $flowIndex < count($statusFlow) - 1 ? $statusFlow[$flowIndex + 1] : null;
@@ -910,7 +1283,7 @@
 		<div>
 			<h1 class="page-title">{{ $orderTitle }}</h1>
 			<p class="page-subtitle">
-				Placed {{ $placedAt }} · {{ ucfirst($paymentStatus ?: 'pending') }} payment · {{ ucfirst($fulfillmentStatus ?: 'processing') }} fulfillment
+				Placed {{ $placedAt }} · {{ $paymentStatusLabel }} payment · {{ ucfirst($fulfillmentStatus ?: 'processing') }} fulfillment
 			</p>
 		</div>
 		<div class="page-header__quick-actions">
@@ -927,7 +1300,7 @@
 	<section class="ordersummary-banner" aria-live="polite">
 		<div class="ordersummary-banner__status">
 			<span class="status-chip {{ 'status-chip--' . $paymentStatus }}" data-payment-indicator>
-				{{ ucfirst($paymentStatus ?: 'pending') }} payment
+				{{ $paymentStatusLabel }} payment
 			</span>
 			<span class="status-chip status-chip--outline {{ 'status-chip--' . $fulfillmentStatus }}" data-fulfillment-indicator>
 				{{ ucfirst($fulfillmentStatus ?: 'processing') }} fulfillment
@@ -1915,12 +2288,85 @@
 						Collapse
 					</button>
 				</header>
-				<div class="payment-status-highlight" style="background: #f0f9ff; border: 2px solid #0ea5e9; border-radius: 8px; padding: 16px; margin-bottom: 16px; text-align: center;">
-					<div style="font-size: 14px; font-weight: 600; color: #0c4a6e; margin-bottom: 8px;">Payment Status</div>
-					<span class="status-chip {{ 'status-chip--' . $paymentStatus }}" style="font-size: 16px; padding: 8px 16px;">
-						{{ ucfirst($paymentStatus ?: 'pending') }}
+				<div class="payment-status-highlight" data-payment-highlight style="background: {{ $paymentSummaryHighlight['background'] }}; border: 2px solid {{ $paymentSummaryHighlight['border'] }}; border-radius: 8px; padding: 16px; margin-bottom: 16px; text-align: center;">
+					<div data-payment-highlight-title style="font-size: 14px; font-weight: 600; color: {{ $paymentSummaryHighlight['accent'] }}; margin-bottom: 8px;">{{ $paymentSummaryHighlight['title'] }}</div>
+					<span class="status-chip {{ 'status-chip--' . $paymentStatus }}" data-payment-status-chip style="font-size: 16px; padding: 8px 16px;">
+						{{ $paymentStatusLabel }}
 					</span>
+					<p data-payment-highlight-message style="margin: 8px 0 0; font-size: 13px; color: {{ $paymentSummaryHighlight['accent'] }};">{{ $paymentSummaryHighlight['message'] }}</p>
 				</div>
+				@php
+					$payments = collect(data_get($order, 'payments', []));
+					$paymentsSummary = isset($paymentsSummary) ? $paymentsSummary : collect(data_get($order, 'payments_summary', []));
+					$currencyCode = data_get($order, 'currency', 'PHP');
+					$currencySymbol = $currencyCode === 'PHP' ? '₱' : ($currencyCode . ' ');
+					$formatCurrency = function ($value) use ($currencySymbol) {
+						$numeric = is_numeric($value) ? (float) $value : 0.0;
+						return $currencySymbol . number_format($numeric, 2);
+					};
+					$orderGrandTotal = isset($orderGrandTotalAmount) ? $orderGrandTotalAmount : (float) ($paymentsSummary->get('grand_total') ?? ($grandTotal ?? 0));
+					$totalPaid = isset($totalPaidAmount) ? $totalPaidAmount : (float) ($paymentsSummary->get('total_paid') ?? $payments->reduce(function ($carry, $paymentRow) {
+						$status = strtolower((string) data_get($paymentRow, 'status', 'pending'));
+						if ($status === 'paid') {
+							return $carry + (float) data_get($paymentRow, 'amount', 0);
+						}
+						return $carry;
+					}, 0.0));
+					$balanceDue = isset($balanceDueAmount) ? $balanceDueAmount : (float) ($paymentsSummary->get('balance_due') ?? max($orderGrandTotal - $totalPaid, 0));
+					$latestPaymentAtRaw = $paymentsSummary->get('latest_payment_at');
+					$latestPaymentAt = null;
+					if ($latestPaymentAtRaw) {
+						$latestPaymentAt = isset($formatDateTime) && is_callable($formatDateTime)
+							? $formatDateTime($latestPaymentAtRaw)
+							: (is_string($latestPaymentAtRaw) ? $latestPaymentAtRaw : null);
+					}
+					$paymentMethodDisplay = data_get($order, 'payment_method');
+					if (!$paymentMethodDisplay && $payments->isNotEmpty()) {
+						$paymentMethodDisplay = data_get($payments->first(), 'method');
+					}
+					$primaryProvider = $payments->isNotEmpty() ? data_get($payments->first(), 'provider') : null;
+				@endphp
+				<div class="payment-summary-grid">
+					<div class="payment-summary-grid__item">
+						<span class="payment-summary-grid__label">Total invoiced</span>
+						<span class="payment-summary-grid__value" data-payment-total="grand">{{ $formatCurrency($orderGrandTotal) }}</span>
+					</div>
+					<div class="payment-summary-grid__item">
+						<span class="payment-summary-grid__label">Total paid</span>
+						<span class="payment-summary-grid__value" data-payment-total="paid">{{ $formatCurrency($totalPaid) }}</span>
+					</div>
+					<div class="payment-summary-grid__item">
+						<span class="payment-summary-grid__label">Balance remaining</span>
+						<span class="payment-summary-grid__value" data-payment-total="balance">{{ $formatCurrency($balanceDue) }}</span>
+					</div>
+					@if($paymentMethodDisplay)
+						<div class="payment-summary-grid__item">
+							<span class="payment-summary-grid__label">Payment method</span>
+							<span class="payment-summary-grid__value">{{ mb_strtoupper($paymentMethodDisplay) }}</span>
+						</div>
+					@endif
+					@if($primaryProvider)
+						<div class="payment-summary-grid__item">
+							<span class="payment-summary-grid__label">Provider</span>
+							<span class="payment-summary-grid__value">{{ ucfirst($primaryProvider) }}</span>
+						</div>
+					@endif
+					@if($latestPaymentAt)
+						<div class="payment-summary-grid__item">
+							<span class="payment-summary-grid__label">Latest payment</span>
+							<span class="payment-summary-grid__value">{{ $latestPaymentAt }}</span>
+						</div>
+					@endif
+				</div>
+				@if($orderGrandTotal > 0)
+					@if($totalPaid <= 0)
+						<div class="payment-alert payment-alert--pending">No payments recorded yet.</div>
+					@elseif($balanceDue > 0.01)
+						<div class="payment-alert payment-alert--balance">Remaining balance of {{ $formatCurrency($balanceDue) }} is pending.</div>
+					@else
+						<div class="payment-alert payment-alert--clear">Invoice fully paid.</div>
+					@endif
+				@endif
 				<dl class="sidebar-totals" data-sidebar-section>
 					<div>
 						<dt>Invitations</dt>
@@ -1962,6 +2408,49 @@
 						<dd data-grand-total data-money>{{ number_format($grandTotal, 2) }}</dd>
 					</div>
 				</dl>
+				@if($payments->isNotEmpty())
+					<div class="payment-history">
+						<h3>Payment history</h3>
+						@foreach($payments as $payment)
+							@php
+								$paymentAmount = (float) data_get($payment, 'amount', 0);
+								$paymentStatus = strtolower((string) data_get($payment, 'status', 'pending'));
+								$statusClass = in_array($paymentStatus, ['paid', 'pending', 'partial', 'failed', 'refunded'], true) ? $paymentStatus : 'pending';
+								$paymentDateRaw = data_get($payment, 'recorded_at') ?? data_get($payment, 'created_at');
+								$paymentDate = null;
+								if ($paymentDateRaw) {
+									$paymentDate = isset($formatDateTime) && is_callable($formatDateTime)
+										? $formatDateTime($paymentDateRaw)
+										: (is_string($paymentDateRaw) ? $paymentDateRaw : null);
+								}
+								$recordedBy = data_get($payment, 'recorded_by.name');
+								$method = data_get($payment, 'method');
+								$provider = data_get($payment, 'provider');
+								$reference = data_get($payment, 'reference');
+								$origin = data_get($payment, 'origin');
+								$notes = data_get($payment, 'notes');
+								$metaPieces = collect([
+									$paymentDate ? 'Recorded ' . $paymentDate : null,
+									$recordedBy ? 'By ' . $recordedBy : null,
+									$method ? 'Method: ' . mb_strtoupper($method) : null,
+									$provider ? 'Provider: ' . ucfirst($provider) : null,
+									$reference ? 'Ref: ' . $reference : null,
+									$origin === 'metadata' ? 'Imported record' : null,
+									$notes ? 'Note: ' . $notes : null,
+								])->filter()->implode(' · ');
+							@endphp
+							<div class="payment-history__row">
+								<div>
+									<div class="payment-history__amount">{{ $formatCurrency($paymentAmount) }}</div>
+									@if($metaPieces !== '')
+										<div class="payment-history__meta">{{ $metaPieces }}</div>
+									@endif
+								</div>
+								<span class="payment-history__status payment-history__status--{{ $statusClass }}">{{ ucfirst($paymentStatus) }}</span>
+							</div>
+						@endforeach
+					</div>
+				@endif
 			</section>
 
 		</aside>
@@ -2005,6 +2494,92 @@
 
 <script src="{{ asset('js/admin/ordersummary.js') }}"></script>
 <script>
+(function () {
+	const STORAGE_KEY = 'inkwiseOrderPaymentUpdate';
+	const CONSUMER_ID = 'order-summary';
+	const KNOWN_CONSUMERS = ['orders-table', 'order-summary'];
+	let orderId = null;
+	try {
+		const root = document.querySelector('.ordersummary-admin-page');
+		if (root) {
+			orderId = root.getAttribute('data-order-id') || null;
+		}
+	} catch (error) {
+		orderId = null;
+	}
+
+	if (!orderId) {
+		return;
+	}
+
+	const parsePayload = function (raw) {
+		if (!raw || typeof raw !== 'string') {
+			return null;
+		}
+		try {
+			return JSON.parse(raw);
+		} catch (error) {
+			return null;
+		}
+	};
+
+	const persistPayload = function (payload) {
+		const consumed = Array.isArray(payload.consumedBy) ? payload.consumedBy.slice() : [];
+		if (!consumed.includes(CONSUMER_ID)) {
+			consumed.push(CONSUMER_ID);
+		}
+		payload.consumedBy = consumed;
+		const allConsumed = KNOWN_CONSUMERS.every(function (id) {
+			return consumed.includes(id);
+		});
+		try {
+			if (allConsumed) {
+				window.localStorage.removeItem(STORAGE_KEY);
+			} else {
+				window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+			}
+		} catch (error) {
+			console.warn('Unable to persist payment sync payload for order summary.', error);
+		}
+	};
+
+	const applyPayload = function (payload, shouldReload) {
+		if (!payload || String(payload.orderId) !== String(orderId)) {
+			return false;
+		}
+		persistPayload(payload);
+		if (shouldReload) {
+			window.location.reload();
+		}
+		return true;
+	};
+
+	let initialRaw = null;
+	try {
+		initialRaw = window.localStorage.getItem(STORAGE_KEY);
+	} catch (error) {
+		initialRaw = null;
+	}
+	const initialPayload = parsePayload(initialRaw);
+	if (initialPayload) {
+		applyPayload(initialPayload, false);
+	}
+
+	window.addEventListener('storage', function (event) {
+		if (event.storageArea !== window.localStorage) {
+			return;
+		}
+		if (event.key !== STORAGE_KEY) {
+			return;
+		}
+		const payload = parsePayload(event.newValue);
+		if (!payload) {
+			return;
+		}
+		applyPayload(payload, true);
+	});
+})();
+
 document.addEventListener('DOMContentLoaded', function () {
 	const modal = document.querySelector('[data-preview-modal]');
 	if (!modal) {

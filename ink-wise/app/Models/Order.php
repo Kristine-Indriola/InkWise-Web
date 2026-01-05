@@ -7,6 +7,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 class Order extends Model
 {
@@ -81,21 +85,177 @@ class Order extends Model
 
 	public function totalPaid(): float
 	{
-		$paidFromRecords = (float) $this->payments
-			->where('status', 'paid')
-			->sum(fn (Payment $payment) => (float) $payment->amount);
-
-		// Also sum from metadata payments
-		$metadataPayments = collect($this->metadata['payments'] ?? []);
-		$paidFromMetadata = $metadataPayments
-			->where('status', 'paid')
-			->sum(fn ($payment) => (float) ($payment['amount'] ?? 0));
-
-		return $paidFromRecords + $paidFromMetadata;
+		return $this->paymentRecords()
+			->filter(function ($payment) {
+				return Str::lower((string) ($payment['status'] ?? 'pending')) === 'paid';
+			})
+			->sum(function ($payment) {
+				return (float) ($payment['amount'] ?? 0);
+			});
 	}
 
 	public function balanceDue(): float
 	{
-		return max((float) ($this->total_amount ?? 0) - $this->totalPaid(), 0.0);
+		return max($this->grandTotalAmount() - $this->totalPaid(), 0.0);
+	}
+
+	public function grandTotalAmount(): float
+	{
+		$summary = $this->summary_snapshot ?? [];
+		$grandTotal = Arr::get($summary, 'totals.grand_total');
+
+		if (!is_numeric($grandTotal) || (float) $grandTotal <= 0.0) {
+			$grandTotal = Arr::get($summary, 'totals.total', Arr::get($summary, 'grand_total'));
+		}
+
+		if (!is_numeric($grandTotal) || (float) $grandTotal <= 0.0) {
+			$metadata = $this->metadata ?? [];
+			$grandTotal = Arr::get($metadata, 'financial.grand_total', Arr::get($metadata, 'grand_total'));
+		}
+
+		if (!is_numeric($grandTotal) || (float) $grandTotal <= 0.0) {
+			$grandTotal = $this->total_amount ?? $this->grand_total ?? 0;
+		}
+
+		return (float) ($grandTotal ?? 0);
+	}
+
+	public function paymentRecords(): Collection
+	{
+		$records = $this->payments
+			->map(function (Payment $payment) {
+				$payload = $payment->raw_payload ?? [];
+				$reference = $payment->provider_payment_id
+					?: ($payment->intent_id ?: Arr::get($payload, 'reference'));
+
+				return [
+					'id' => $payment->id,
+					'origin' => 'record',
+					'amount' => (float) $payment->amount,
+					'currency' => $payment->currency ?? 'PHP',
+					'provider' => $payment->provider,
+					'method' => $payment->method,
+					'mode' => $payment->mode,
+					'link' => $payment->receipt_url ?? null,
+					'notes' => Arr::get($payload, 'note'),
+					'created_at' => $this->normalizePaymentTimestamp($payment->created_at),
+					'recorded_at' => $this->normalizePaymentTimestamp($payment->recorded_at),
+					'status' => Str::lower((string) $payment->status ?: 'pending'),
+					'reference' => $reference,
+					'recorded_by' => $payment->recordedBy ? [
+						'id' => $payment->recordedBy->user_id ?? $payment->recordedBy->id,
+						'name' => $payment->recordedBy->name,
+					] : null,
+				];
+			})
+			->values();
+
+		$metadataPayments = collect(Arr::get($this->metadata ?? [], 'payments', []))
+			->map(function ($payment, $index) {
+				if (!is_array($payment)) {
+					$payment = is_object($payment) ? (array) $payment : [];
+				}
+
+				$recordedAt = Arr::get($payment, 'recorded_at')
+					?? Arr::get($payment, 'paid_at')
+					?? Arr::get($payment, 'created_at');
+
+				return [
+					'id' => Arr::get($payment, 'id', 'meta_' . $index),
+					'origin' => 'metadata',
+					'amount' => (float) Arr::get($payment, 'amount', 0),
+					'currency' => Arr::get($payment, 'currency', 'PHP'),
+					'provider' => Arr::get($payment, 'provider'),
+					'method' => Arr::get($payment, 'method'),
+					'mode' => Arr::get($payment, 'mode'),
+					'link' => Arr::get($payment, 'receipt_url'),
+					'notes' => Arr::get($payment, 'note'),
+					'created_at' => $this->normalizePaymentTimestamp(Arr::get($payment, 'created_at')),
+					'recorded_at' => $this->normalizePaymentTimestamp($recordedAt),
+					'status' => Str::lower((string) Arr::get($payment, 'status', 'paid')),
+					'reference' => Arr::get($payment, 'reference', Arr::get($payment, 'provider_payment_id')),
+					'recorded_by' => null,
+				];
+			})
+			->filter(function ($payment) use ($records) {
+				if ($payment['amount'] === 0.0 && empty($payment['reference']) && empty($payment['recorded_at']) && empty($payment['notes'])) {
+					return false;
+				}
+
+				return !$records->contains(function ($record) use ($payment) {
+					$recordReference = $record['reference'] ?? null;
+					$paymentReference = $payment['reference'] ?? null;
+					if ($recordReference && $paymentReference && Str::lower($recordReference) === Str::lower($paymentReference)) {
+						return true;
+					}
+
+					$recordTimestamp = $record['recorded_at'] ?? $record['created_at'];
+					$paymentTimestamp = $payment['recorded_at'] ?? $payment['created_at'];
+					if ($paymentTimestamp && $recordTimestamp) {
+						$recordAmount = (float) ($record['amount'] ?? 0);
+						return abs($recordAmount - (float) ($payment['amount'] ?? 0)) < 0.01
+							&& $recordTimestamp === $paymentTimestamp;
+					}
+
+					return false;
+				});
+			});
+
+		$merged = $records->concat($metadataPayments);
+		$deduped = collect();
+		$seen = [];
+
+		foreach ($merged as $payment) {
+			$referenceKey = $payment['reference'] ? 'ref:' . Str::lower((string) $payment['reference']) : null;
+			$amountKey = number_format((float) ($payment['amount'] ?? 0), 2, '.', '');
+			$timestampKey = $payment['recorded_at'] ?? $payment['created_at'] ?? 'none';
+			$key = $referenceKey ?: ('amt:' . $amountKey . '|ts:' . $timestampKey);
+
+			if (isset($seen[$key])) {
+				continue;
+			}
+
+			$seen[$key] = true;
+			$deduped->push($payment);
+		}
+
+		return $deduped
+			->sortByDesc(function ($payment) {
+				return $payment['recorded_at'] ?? $payment['created_at'] ?? '';
+			})
+			->values();
+	}
+
+	protected function normalizePaymentTimestamp($value): ?string
+	{
+		if (!$value) {
+			return null;
+		}
+
+		if ($value instanceof Carbon) {
+			return $value->toIso8601String();
+		}
+
+		if ($value instanceof \DateTimeInterface) {
+			return Carbon::instance($value)->toIso8601String();
+		}
+
+		if (is_numeric($value)) {
+			try {
+				return Carbon::createFromTimestamp((int) $value)->toIso8601String();
+			} catch (\Throwable $e) {
+				return null;
+			}
+		}
+
+		if (is_string($value)) {
+			try {
+				return Carbon::parse($value)->toIso8601String();
+			} catch (\Throwable $e) {
+				return null;
+			}
+		}
+
+		return null;
 	}
 }

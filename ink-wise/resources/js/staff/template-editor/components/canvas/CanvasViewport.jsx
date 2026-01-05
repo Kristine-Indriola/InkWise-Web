@@ -725,6 +725,13 @@ export function CanvasViewport({ page, canvasRef }) {
                 imageMetaParts.push(objectFitMode);
               }
 
+              const previewKey = layer.metadata?.previewKey ?? layer.id;
+              const previewLabel = (
+                (typeof layer.metadata?.previewLabel === 'string' && layer.metadata.previewLabel.trim()) ||
+                (typeof layer.name === 'string' && layer.name.trim()) ||
+                'Layer'
+              );
+
               const layerClasses = [
                 'canvas-layer',
                 isSelected ? 'is-selected' : '',
@@ -793,6 +800,8 @@ export function CanvasViewport({ page, canvasRef }) {
                   aria-pressed={isSelected}
                   data-layer-id={layer.id}
                   data-preview-node={layer.id}
+                  data-preview-key={previewKey}
+                  data-preview-label={previewLabel}
                   data-changeable={isImageLike ? 'image' : undefined}
                   data-safe-state={isOutsideSafe ? 'warning' : 'ok'}
                 >
@@ -800,12 +809,14 @@ export function CanvasViewport({ page, canvasRef }) {
                     <div
                       className="canvas-layer__text"
                       data-preview-node={layer.id}
+                      data-preview-key={previewKey}
+                      data-preview-label={previewLabel}
                       style={{
                         color: layer.fill || '#0f172a',
                         fontSize: layer.fontSize ? `${layer.fontSize}px` : undefined,
-                          fontFamily: layer.fontFamily,
-                          fontWeight: layer.fontWeight ?? undefined,
-                          textAlign: layer.textAlign ?? 'center',
+                        fontFamily: layer.fontFamily,
+                        fontWeight: layer.fontWeight ?? undefined,
+                        textAlign: layer.textAlign ?? 'center',
                       }}
                     >
                       {layer.content || 'Add your text'}
@@ -814,6 +825,8 @@ export function CanvasViewport({ page, canvasRef }) {
                   {isImageLike && (
                     <div
                       className={isShapeImageFrame ? `canvas-shape-frame${hasImageSource ? '' : ' is-empty'}` : undefined}
+                      data-preview-key={previewKey}
+                      data-preview-label={previewLabel}
                       style={{
                         width: '100%',
                         height: '100%',
@@ -832,6 +845,8 @@ export function CanvasViewport({ page, canvasRef }) {
                             alt={layer.name || 'Shape image'}
                             className="canvas-layer__image"
                             data-preview-node={layer.id}
+                            data-preview-key={previewKey}
+                            data-preview-label={previewLabel}
                             data-changeable="image"
                             style={{
                               width: '100%',

@@ -569,9 +569,109 @@
                 return;
             }
 
+            const readSession = (key) => {
+                try {
+                    return window.sessionStorage.getItem(key);
+                } catch (error) {
+                    return null;
+                }
+            };
+
+            const writeSession = (key, value) => {
+                try {
+                    window.sessionStorage.setItem(key, value);
+                } catch (error) {
+                    /* ignore session storage failures */
+                }
+            };
+
+            const removeSession = (key) => {
+                try {
+                    window.sessionStorage.removeItem(key);
+                } catch (error) {
+                    /* ignore session storage failures */
+                }
+            };
+
+            const STEP_STORAGE_KEY = 'inkwise.customer.register.step';
+            const FIELD_STORAGE_KEY = 'inkwise.customer.register.data';
+            const fieldsToPersist = ['first_name', 'middle_name', 'last_name', 'birthdate', 'contact_number', 'email'];
+
+            const serializedFields = readSession(FIELD_STORAGE_KEY);
+            const persistedValues = (() => {
+                if (!serializedFields) {
+                    return {};
+                }
+                try {
+                    const parsed = JSON.parse(serializedFields);
+                    return parsed && typeof parsed === 'object' ? parsed : {};
+                } catch (error) {
+                    return {};
+                }
+            })();
+
+            const savePersistedValues = () => {
+                if (Object.keys(persistedValues).length) {
+                    writeSession(FIELD_STORAGE_KEY, JSON.stringify(persistedValues));
+                } else {
+                    removeSession(FIELD_STORAGE_KEY);
+                }
+            };
+
+            const registerFieldForPersistence = (input, fieldName) => {
+                if (!input || typeof input.addEventListener !== 'function' || !('value' in input)) {
+                    return;
+                }
+
+                const persistedValue = persistedValues[fieldName];
+                if (typeof persistedValue === 'string' && !input.value) {
+                    input.value = persistedValue;
+                }
+
+                const persistHandler = (event) => {
+                    const value = event.target.value ?? '';
+                    if (value) {
+                        persistedValues[fieldName] = value;
+                    } else {
+                        delete persistedValues[fieldName];
+                    }
+                    savePersistedValues();
+                };
+
+                input.addEventListener('input', persistHandler);
+                input.addEventListener('change', persistHandler);
+
+                if (input.value) {
+                    persistedValues[fieldName] = input.value;
+                }
+            };
+
+            fieldsToPersist.forEach((name) => {
+                const field = registerForm.elements.namedItem(name);
+                if (!field) {
+                    return;
+                }
+
+                if (typeof field.length === 'number' && !field.tagName) {
+                    Array.from(field).forEach((input) => registerFieldForPersistence(input, name));
+                    return;
+                }
+
+                registerFieldForPersistence(field, name);
+            });
+
+            savePersistedValues();
+
+            const storedStepRaw = readSession(STEP_STORAGE_KEY);
+            const storedStep = storedStepRaw !== null ? Number.parseInt(storedStepRaw, 10) : NaN;
+
             let activeIndex = steps.findIndex((step) => !step.classList.contains('hidden'));
             if (activeIndex < 0) {
                 activeIndex = 0;
+            }
+
+            if (!Number.isNaN(storedStep) && storedStep >= 0 && storedStep < steps.length) {
+                activeIndex = storedStep;
             }
 
             let cooldownTime = 60;
@@ -584,17 +684,21 @@
             const statusElement = document.getElementById('verificationStatus');
             const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
             const csrfToken = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : '';
-            const sendCodeUrl = '/customer/register/send-code';
+            const sendCodeUrl = @json(route('customer.register.send-code'));
 
             if (verificationCodeInput && verificationCodeInput.value.trim().length === 6) {
                 verificationSent = true;
             }
 
             const goToStep = (index) => {
+                if (typeof index !== 'number' || Number.isNaN(index) || index < 0 || index >= steps.length) {
+                    return;
+                }
                 steps.forEach((step, idx) => {
                     step.classList.toggle('hidden', idx !== index);
                 });
                 activeIndex = index;
+                writeSession(STEP_STORAGE_KEY, String(index));
             };
 
             const validateRequiredFields = (step) => {
@@ -717,7 +821,10 @@
             };
 
             if (sendButton) {
-                sendButton.addEventListener('click', async () => {
+                sendButton.addEventListener('click', async (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+
                     const email = emailInput ? emailInput.value.trim() : '';
                     if (!email) {
                         setStatus('Please enter your email address.', 'error');
@@ -777,7 +884,11 @@
                 if (!registerForm.checkValidity()) {
                     event.preventDefault();
                     registerForm.reportValidity();
+                    return;
                 }
+
+                removeSession(STEP_STORAGE_KEY);
+                removeSession(FIELD_STORAGE_KEY);
             });
 
             const submitButton = document.getElementById('submitRegister');

@@ -291,7 +291,7 @@
                 @php
                   $rowStatus = strtolower($order->status ?? 'processing');
                 @endphp
-                <tr data-order-id="{{ $order->id }}" data-status="{{ $rowStatus }}" data-order-url="{{ route('admin.ordersummary.index', ['order' => $order->order_number]) }}" style="cursor: pointer;">
+                <tr data-order-id="{{ $order->id }}" data-status="{{ $rowStatus }}" data-order-url="{{ route('admin.ordersummary.show', ['order' => $order->id]) }}" style="cursor: pointer;">
                   <td>{{ $order->order_number ?? ('#' . $order->id) }}</td>
                   <td>{{ optional($order->customer)->name ?? 'Guest' }}</td>
                   <td class="text-center">{{ (int) data_get($order, 'items_count', 0) }}</td>
@@ -323,7 +323,7 @@
                     {{ $archivedBy }}
                   </td>
                   <td class="actions-cell">
-                    <a href="{{ route('admin.ordersummary.index', ['order' => $order->order_number]) }}" class="btn btn-outline btn-sm btn-icon" aria-label="View order {{ $order->order_number ?? $order->id }}">
+                    <a href="{{ route('admin.ordersummary.show', ['order' => $order->id]) }}" class="btn btn-outline btn-sm btn-icon" aria-label="View order {{ $order->order_number ?? $order->id }}">
                       <i class="fa-solid fa-eye" aria-hidden="true"></i>
                     </a>
                   </td>

@@ -10,5 +10,5 @@ Use the code below to verify your email address for your InkWise account. The co
 If you didn't request this, you can safely ignore this email.
 
 Thanks,<br>
-{{ config('app.name') }}
+InkWise Management
 @endcomponent
