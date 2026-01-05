@@ -13,29 +13,32 @@ class StaffCustomerController extends Controller
     public function index()
     {
         // get all customers (adjust if you have a different role system)
-        $customers = User::where('role', 'customer')->get(); 
+        $customers = User::where('role', 'customer')
+            ->with(['customer', 'address'])
+            ->get(); 
 
         return view('staff.customer_profile', compact('customers'));
     }
 
     public function show($id)
     {
-        // Get the user
+        // Load the user and eager-load related customer + address (like admin)
         $user = User::where('user_id', $id)
             ->where('role', 'customer')
+            ->with(['customer', 'address'])
             ->firstOrFail();
 
-        // Get customer details if exists
-        $customer = Customer::where('user_id', $id)->first();
+        // Get customer details from the related model
+        $customer = $user->customer;
 
-        // Get customer orders with related data
+        // Get customer orders with related data (include product details for items)
         $orders = Order::where('user_id', $id)
             ->orWhereHas('customer', function($query) use ($customer) {
                 if ($customer) {
                     $query->where('customer_id', $customer->customer_id);
                 }
             })
-            ->with(['items', 'payments', 'rating'])
+            ->with(['items.product', 'payments', 'rating'])
             ->orderBy('created_at', 'desc')
             ->get();
 

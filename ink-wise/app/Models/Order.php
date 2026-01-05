@@ -19,6 +19,7 @@ class Order extends Model
 		'date_needed' => 'date',
 		'summary_snapshot' => 'array',
 		'metadata' => 'array',
+		'archived' => 'boolean',
 		'created_at' => 'datetime',
 		'updated_at' => 'datetime',
 	];
@@ -80,9 +81,17 @@ class Order extends Model
 
 	public function totalPaid(): float
 	{
-		return (float) $this->payments
+		$paidFromRecords = (float) $this->payments
 			->where('status', 'paid')
 			->sum(fn (Payment $payment) => (float) $payment->amount);
+
+		// Also sum from metadata payments
+		$metadataPayments = collect($this->metadata['payments'] ?? []);
+		$paidFromMetadata = $metadataPayments
+			->where('status', 'paid')
+			->sum(fn ($payment) => (float) ($payment['amount'] ?? 0));
+
+		return $paidFromRecords + $paidFromMetadata;
 	}
 
 	public function balanceDue(): float

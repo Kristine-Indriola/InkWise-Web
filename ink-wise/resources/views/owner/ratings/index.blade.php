@@ -151,6 +151,67 @@
     line-height: 1.6;
   }
 
+  .staff-reply {
+    background: #f0f9ff;
+    border-left: 4px solid #3b82f6;
+    padding: 16px;
+    margin-top: 16px;
+    border-radius: 8px;
+  }
+
+  .staff-reply-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .staff-reply-label {
+    font-weight: 600;
+    color: #1e40af;
+  }
+
+  .staff-reply-date {
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  .staff-reply-text {
+    color: #1e40af;
+    font-style: italic;
+    margin: 0;
+  }
+
+  .user-role {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-left: 6px;
+  }
+
+  .user-role.admin {
+    background: linear-gradient(135deg, rgba(106, 46, 188, 0.15), rgba(106, 46, 188, 0.25));
+    color: #6a2ebc;
+    border: 1px solid rgba(106, 46, 188, 0.3);
+  }
+
+  .user-role.staff {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.25));
+    color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+  }
+
+  .staff-id {
+    font-size: 11px;
+    color: #6b7280;
+    font-weight: 500;
+    margin-left: 4px;
+    font-family: 'Courier New', monospace;
+  }
+
   .ratings-empty {
     text-align: center;
     padding: 48px 24px;
@@ -192,6 +253,23 @@
     background: rgba(59, 130, 246, 0.12);
     border-color: rgba(59, 130, 246, 0.32);
     color: #cbd5f5;
+  }
+
+  .dark-mode .staff-reply {
+    background: rgba(59, 130, 246, 0.1);
+    border-left-color: #60a5fa;
+  }
+
+  .dark-mode .staff-reply-label {
+    color: #60a5fa;
+  }
+
+  .dark-mode .staff-reply-text {
+    color: #93c5fd;
+  }
+
+  .dark-mode .staff-reply-date {
+    color: #9ca3af;
   }
 
   @media (max-width: 900px) {
@@ -278,6 +356,19 @@
             @else
               <p class="rating-entry__review" style="color:#94a3b8;">No written review provided.</p>
             @endif
+
+            @if(!empty($rating['staff_reply']))
+              <div class="staff-reply">
+                <div class="staff-reply-header">
+                  <span class="staff-reply-label">Staff Reply</span>
+                  <span class="staff-reply-date">{{ $rating['staff_reply_at'] ? \Carbon\Carbon::parse($rating['staff_reply_at'])->format('M d, Y \a\t g:i A') : '' }}</span>
+                </div>
+                <p class="staff-reply-text">"{{ $rating['staff_reply'] }}"</p>
+                @if($rating['staff_reply_by'])
+                  <small>Replied by: {{ $rating['staff_reply_by']->name }} @if($rating['staff_reply_by']->staff)<span class="staff-id">(ID: {{ $rating['staff_reply_by']->staff->staff_id }})</span>@endif <span class="user-role {{ $rating['staff_reply_by']->role }}">({{ ucfirst($rating['staff_reply_by']->role) }})</span></small>
+                @endif
+              </div>
+             @endif
           </article>
         @empty
           <div class="ratings-empty">

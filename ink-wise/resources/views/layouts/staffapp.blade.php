@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css">
   <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-solid-rounded/css/uicons-solid-rounded.css">
   <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-solid-straight/css/uicons-solid-straight.css">
+  <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-regular-straight/css/uicons-regular-straight.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="icon" type="image/png" href="{{ asset('adminimage/inkwise.png') }}">
   <style>
@@ -591,15 +592,25 @@
       <li class="{{ request()->routeIs('staff.messages.*') ? 'active' : '' }}">
         <a href="{{ route('staff.messages.index') }}"><i class="fa-solid fa-envelope"></i> <span class="label">Messages</span></a>
       </li>
+      <li class="{{ request()->routeIs('staff.reviews.*') ? 'active' : '' }}">
+        <a href="{{ route('staff.reviews.index') }}">
+          <i class="fa-solid fa-star"></i> 
+          <span class="label">Reviews</span>
+          @php
+              $unrepliedReviewsCount = \App\Models\OrderRating::whereNull('staff_reply')->count();
+          @endphp
+          @if($unrepliedReviewsCount > 0)
+              <span class="notif-badge" style="position: relative; top: auto; right: auto; margin-left: 8px;">{{ $unrepliedReviewsCount }}</span>
+          @endif
+        </a>
+      </li>
       <li class="{{ request()->routeIs('staff.order_list.index') ? 'active' : '' }}">
         <a href="{{ route('staff.order_list.index') }}"><i class="fa-solid fa-list"></i> <span class="label">Order List</span></a>
       </li>
       <li class="{{ request()->routeIs('staff.customer_profile') ? 'active' : '' }}">
         <a href="{{ route('staff.customer_profile') }}"><i class="fa-solid fa-users"></i> <span class="label">Customer Profiles</span></a>
       </li>
-      <li class="{{ request()->routeIs('staff.notify.customers') ? 'active' : '' }}">
-        <a href="{{ route('staff.notify.customers') }}"><i class="fa-solid fa-bell"></i> <span class="label">Notify Customers</span></a>
-      </li>
+
 
       <li class="{{ request()->routeIs('staff.materials.*') ? 'active' : '' }}">
         <a href="{{ route('staff.materials.index') }}"><i class="fa-solid fa-boxes-stacked"></i> <span class="label">Inventory</span></a>

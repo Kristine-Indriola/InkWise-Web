@@ -63,5 +63,12 @@ class Staff extends Model
                 $staff->staff_id = $randomId;
             }
         });
+
+        static::updating(function ($staff) {
+            // Once persisted, the staff->user_id linkage must be immutable.
+            if ($staff->isDirty('user_id')) {
+                $staff->user_id = $staff->getOriginal('user_id');
+            }
+        });
     }
 }

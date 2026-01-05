@@ -1,21 +1,29 @@
 <?php
-require 'vendor/autoload.php';
+require_once 'vendor/autoload.php';
 
-use Illuminate\Foundation\Application;
-use Illuminate\Contracts\Console\Kernel;
-
+// Bootstrap Laravel
 $app = require_once 'bootstrap/app.php';
-$app->make(Kernel::class)->bootstrap();
+$app->make('Illuminate\Contracts\Console\Kernel')->bootstrap();
 
-$templates = \App\Models\Template::where('status', 'uploaded')->take(5)->get();
+use App\Models\Template;
+
+echo "Checking templates...\n\n";
+
+$templates = Template::all();
+
+echo "Found " . $templates->count() . " templates:\n\n";
 
 foreach ($templates as $template) {
-    echo "ID: {$template->id}\n";
-    echo "Name: {$template->name}\n";
-    echo "Front Image: {$template->front_image}\n";
-    echo "Back Image: {$template->back_image}\n";
-    echo "Preview: {$template->preview}\n";
-    echo "Resolved Front: " . \App\Support\ImageResolver::url($template->front_image) . "\n";
-    echo "Resolved Preview: " . \App\Support\ImageResolver::url($template->preview) . "\n";
+    echo "ID: " . $template->id . "\n";
+    echo "Name: " . $template->name . "\n";
+    echo "Status: " . $template->status . "\n";
+    echo "Event Type: " . ($template->event_type ?? 'N/A') . "\n";
     echo "---\n";
+}
+
+// Activate one template for testing
+if ($templates->count() > 0) {
+    $firstTemplate = $templates->first();
+    $firstTemplate->update(['status' => 'active']);
+    echo "\nActivated template: " . $firstTemplate->name . "\n";
 }

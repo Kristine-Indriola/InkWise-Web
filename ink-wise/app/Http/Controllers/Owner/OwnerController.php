@@ -102,77 +102,121 @@ class OwnerController extends Controller
 
     public function show()
     {
-        $owner = Auth::user(); // current logged-in owner
+        /** @var \App\Models\User $owner */
+        $owner = Auth::user()->load(['staff', 'address']);
+
+        $this->attachOwnerStaffRecord($owner);
+
         return view('owner.profile.show', compact('owner'));
     }
 
     public function edit()
     {
-    /** @var \App\Models\User $owner */
-    $owner = Auth::user();
+        /** @var \App\Models\User $owner */
+        $owner = Auth::user()->load(['staff', 'address']);
+
+        $this->attachOwnerStaffRecord($owner);
+
         return view('owner.profile.edit', compact('owner'));
     }
 
     public function update(Request $request)
     {
-    /** @var \App\Models\User $owner */
-    $owner = Auth::user();
+        /** @var \App\Models\User $owner */
+        $owner = Auth::user()->load(['staff', 'address']);
 
-        // ✅ Validation
+        $this->attachOwnerStaffRecord($owner, $request);
+
+        // ✅ Validation (do not validate or update email from this form)
         $request->validate([
-            'email'          => 'required|email|unique:users,email,' . $owner->user_id . ',user_id',
             'first_name'     => 'required|string|max:100',
             'middle_name'    => 'nullable|string|max:100',
             'last_name'      => 'required|string|max:100',
             'contact_number' => 'required|string|max:20',
             'password'       => 'nullable|min:6|confirmed',
-            'street'         => 'nullable|string|max:255',
-            'barangay'       => 'nullable|string|max:255',
-            'city'           => 'nullable|string|max:100',
-            'province'       => 'nullable|string|max:100',
-            'postal_code'    => 'nullable|string|max:20',
-            'country'        => 'nullable|string|max:100',
+            'profile_pic'    => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
+            'address'        => 'nullable|string|max:255',
         ]);
 
-        // ✅ Update users table (email + optional password)
-        $updateData = ['email' => $request->email];
+        // ✅ Update users table (only optional password). Do NOT change email here.
+        $updateData = [];
         if (!empty($request->password)) {
-            $updateData['password'] = Hash::make($request->password); // ✅ Fix
+            $updateData['password'] = Hash::make($request->password);
         }
-        $owner->update($updateData);
+        if (!empty($updateData)) {
+            $owner->update($updateData);
+        }
 
-        // ✅ Update staff table
+        // ✅ Update staff table (only editable owner fields — do NOT change linkage or role)
         if ($owner->staff) {
-            $owner->staff->update([
+            $staffUpdate = [
                 'first_name'     => $request->first_name,
                 'middle_name'    => $request->middle_name,
                 'last_name'      => $request->last_name,
                 'contact_number' => $request->contact_number,
-            ]);
+                'address'        => $request->address,
+            ];
+
+            if ($request->hasFile('profile_pic')) {
+                $path = $request->file('profile_pic')->store('owner_profiles', 'public');
+                $staffUpdate['profile_pic'] = $path;
+            }
+
+            $owner->staff->update($staffUpdate);
         }
 
         // ✅ Update or create address table
         if ($owner->address) {
             $owner->address->update([
-                'street'      => $request->street,
-                'barangay'    => $request->barangay,
-                'city'        => $request->city,
-                'province'    => $request->province,
-                'postal_code' => $request->postal_code,
-                'country'     => $request->country,
+                'street'      => $request->address,
+                'barangay'    => null,
+                'city'        => null,
+                'province'    => null,
+                'postal_code' => null,
+                'country'     => 'Philippines',
             ]);
         } else {
             $owner->address()->create([
-                'street'      => $request->street,
-                'barangay'    => $request->barangay,
-                'city'        => $request->city,
-                'province'    => $request->province,
-                'postal_code' => $request->postal_code,
-                'country'     => $request->country,
+                'street'      => $request->address,
+                'barangay'    => null,
+                'city'        => null,
+                'province'    => null,
+                'postal_code' => null,
+                'country'     => 'Philippines',
             ]);
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true]);
         }
 
         return redirect()->route('owner.profile.show')
                          ->with('success', 'Profile updated successfully.');
+    }
+
+    /**
+     * Always bind the owner to the dedicated staff record (ID 8879) for profile data.
+     */
+    private function attachOwnerStaffRecord(User $owner, ?Request $request = null): void
+    {
+        $ownerStaffId = 8879;
+
+        $ownerStaff = Staff::find($ownerStaffId);
+        if ($ownerStaff) {
+            // Never change the user_id/role linkage for this dedicated staff row.
+            // Simply expose it to the owner profile views.
+            $owner->setRelation('staff', $ownerStaff);
+            return;
+        }
+
+        if (!$owner->staff) {
+            $ownerStaff = $owner->staff()->create([
+                'first_name'     => $request?->first_name ?: 'Owner',
+                'last_name'      => $request?->last_name ?: 'Account',
+                'role'           => 'owner',
+                'contact_number' => $request?->contact_number ?: '0917-000-0000',
+            ]);
+            $owner->setRelation('staff', $ownerStaff);
+        }
     }
 }

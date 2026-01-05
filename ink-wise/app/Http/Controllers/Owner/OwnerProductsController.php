@@ -19,8 +19,7 @@ class OwnerProductsController extends Controller
             'envelope.material',
             'paperStocks',
             'addons',
-            'colors',
-            'bulkOrders'
+            'colors'
         ]);
 
         if (($type = trim((string) $request->query('type'))) !== '') {
@@ -83,8 +82,7 @@ class OwnerProductsController extends Controller
                 });
 
                 $builder->orWhereHas('colors', function ($relation) use ($keyword) {
-                    $relation->whereRaw("LOWER(COALESCE(name, '')) LIKE ?", [$keyword])
-                        ->orWhereRaw("LOWER(COALESCE(color_code, '')) LIKE ?", [$keyword]);
+                    $relation->whereRaw("LOWER(COALESCE(average_usage_ml, '')) LIKE ?", [$keyword]);
                 });
             });
         }
@@ -146,9 +144,10 @@ class OwnerProductsController extends Controller
             'envelope.material',
             'paperStocks',
             'addons',
-            'colors',
-            'bulkOrders'
+            'colors'
         ]);
+
+        $product->setRelation('bulkOrders', collect());
 
         $this->hydrateLegacyAttributes($product);
 
@@ -163,8 +162,8 @@ class OwnerProductsController extends Controller
         $product->setAttribute('product_addons', $product->addons ?? collect());
         $product->setAttribute('addOns', $product->addons ?? collect());
         $product->setAttribute('product_colors', $product->colors ?? collect());
-        $product->setAttribute('bulk_orders', $product->bulkOrders ?? collect());
-        $product->setAttribute('product_bulk_orders', $product->bulkOrders ?? collect());
+        $product->setAttribute('bulk_orders', collect());
+        $product->setAttribute('product_bulk_orders', collect());
         $product->setAttribute('product_uploads', $product->uploads ?? collect());
     }
 }

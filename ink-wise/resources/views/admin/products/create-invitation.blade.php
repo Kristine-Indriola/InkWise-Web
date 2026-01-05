@@ -3,10 +3,15 @@
 
 @section('title', 'Create Invitation Product')
 
+@push('styles')
 <link rel="stylesheet" href="{{ asset('css/admin-css/create_invite.css') }}">
-<script src="{{ asset('js/admin/create_invite.js') }}"></script>
+<link rel="stylesheet" href="{{ asset('css/admin-css/template/template.css') }}">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+@endpush
+
+@push('scripts')
+<script src="{{ asset('js/admin/create_invite.js') }}" defer></script>
+@endpush
 
 @section('content')
 @php
@@ -58,19 +63,11 @@
         ];
     })->toArray() : [];
 
-    $productBulkOrders = isset($product) ? $product->bulkOrders->map(function ($bulk) {
-        return [
-            'id' => $bulk->id,
-            'min_qty' => $bulk->min_qty,
-            'max_qty' => $bulk->max_qty,
-            'price_per_unit' => $bulk->price_per_unit,
-        ];
-    })->toArray() : [];
+    $averageUsageMl = old('average_usage_ml', optional($product?->colors?->first())->average_usage_ml ?? '');
 
     $paperStockRows = old('paper_stocks', !empty($productPaperStocks) ? $productPaperStocks : [[]]);
     $addonRows = old('addons', !empty($productAddons) ? $productAddons : [[]]);
     $colorRows = old('colors', !empty($productColors) ? $productColors : [[]]);
-    $bulkOrderRows = old('bulk_orders', !empty($productBulkOrders) ? $productBulkOrders : [[]]);
 @endphp
 {{-- Breadcrumb Navigation --}}
 <nav aria-label="breadcrumb" class="breadcrumb-nav">
@@ -124,7 +121,7 @@
         @include('admin.products.templates')
 
     {{-- Page 2: Basic Info --}}
-    <div class="page page2" data-page="1" style="display: none;">
+    <div class="page page2" data-page="1">
             <div class="error-summary" style="display: none;" role="alert" aria-live="polite">
                 <h3>Please correct the following errors:</h3>
                 <ul id="error-list-page2"></ul>
@@ -133,15 +130,15 @@
                 <h2><i class="fas fa-info-circle"></i> Basic Information</h2>
                 <div class="responsive-grid grid-2-cols">
                     <div class="field">
-                        <label for="invitationName">Invitation Name *</label>
-                        <input type="text" id="invitationName" name="invitationName" placeholder="Invitation Name * (e.g. Elegant Pearl Wedding Invitation)" required aria-required="true" aria-describedby="invitationName-error" value="{{ $defaults['name'] }}">
+                        <label for="invitationName">Invitation Name</label>
+                        <input type="text" id="invitationName" name="invitationName" placeholder="Invitation Name (e.g. Elegant Pearl Wedding Invitation)" required aria-required="true" aria-describedby="invitationName-error" value="{{ $defaults['name'] }}">
                         <span id="invitationName-error" class="error-message" role="alert" aria-live="polite"></span>
                         @error('invitationName') <span class="error-message">{{ $message }}</span> @enderror
                     </div>
                     <div class="field">
-                        <label for="eventType">Event Type *</label>
+                        <label for="eventType">Event Type</label>
                         <select id="eventType" name="eventType" required aria-required="true" aria-describedby="eventType-error">
-                            <option value="" disabled {{ $defaults['event_type'] ? '' : 'selected' }}>Event Type *</option>
+                            <option value="" disabled {{ $defaults['event_type'] ? '' : 'selected' }}>Event Type</option>
                             @foreach(['Wedding', 'Birthday', 'Baptism', 'Corporate'] as $type)
                                 <option value="{{ $type }}" {{ ($defaults['event_type'] == $type) ? 'selected' : '' }}>{{ $type }}</option>
                             @endforeach
@@ -152,18 +149,13 @@
                 </div>
                 <div class="responsive-grid grid-2-cols">
                     <div class="field">
-                        <label for="productType">Product Type *</label>
-                        <select id="productType" name="productType" required aria-required="true" aria-describedby="productType-error">
-                            <option value="" disabled {{ $defaults['product_type'] ? '' : 'selected' }}>Product Type *</option>
-                            <option value="Invitation" {{ ($defaults['product_type'] == 'Invitation') ? 'selected' : '' }}>Invitation</option>
-                            <option value="Giveaway" {{ ($defaults['product_type'] == 'Giveaway') ? 'selected' : '' }}>Giveaway</option>
-                        </select>
-                        <span id="productType-error" class="error-message"></span>
-                        @error('productType') <span class="error-message">{{ $message }}</span> @enderror
+                        <label for="productType">Product Type</label>
+                        <input type="hidden" name="productType" value="Invitation">
+                        <input type="text" class="styled-select" value="INVITATION" readonly>
                     </div>
                     <div class="field">
-                        <label for="themeStyle">Theme / Style *</label>
-                        <input type="text" id="themeStyle" name="themeStyle" placeholder="Theme / Style * (e.g. Luxury, Minimalist, Floral)" required aria-required="true" aria-describedby="themeStyle-error" value="{{ $defaults['theme_style'] }}">
+                        <label for="themeStyle">Theme / Style</label>
+                        <input type="text" id="themeStyle" name="themeStyle" placeholder="Theme / Style (e.g. Luxury, Minimalist, Floral)" required aria-required="true" aria-describedby="themeStyle-error" value="{{ $defaults['theme_style'] }}">
                         <span id="themeStyle-error" class="error-message"></span>
                         @error('themeStyle') <span class="error-message">{{ $message }}</span> @enderror
                     </div>
@@ -226,21 +218,7 @@
                         <div class="input-row">
                             <div class="field">
                                 <label for="paper_stocks_{{ $i }}_name">Name</label>
-                                <select id="paper_stocks_{{ $i }}_name" name="paper_stocks[{{ $i }}][name]" class="paper-stock-name-select" data-selected-name="{{ $stock['name'] ?? '' }}">
-                                    <option value="">Select material...</option>
-                                    @foreach($materials as $materialOption)
-                                        @php
-                                            $isSelected = (($stock['name'] ?? '') === $materialOption->material_name) || (!empty($paperMaterialId) && $paperMaterialId == $materialOption->material_id);
-                                            $optionLabel = $materialOption->material_name . (!empty($materialOption->material_type) ? ' (' . $materialOption->material_type . ')' : '');
-                                        @endphp
-                                        <option value="{{ $materialOption->material_name }}"
-                                                data-material-id="{{ $materialOption->material_id }}"
-                                                data-unit-cost="{{ $materialOption->unit_cost ?? '' }}"
-                                                {{ $isSelected ? 'selected' : '' }}>
-                                            {{ $optionLabel }}
-                                        </option>
-                                    @endforeach
-                                </select>
+                                <input type="text" id="paper_stocks_{{ $i }}_name" name="paper_stocks[{{ $i }}][name]" value="{{ $stock['name'] ?? '' }}" placeholder="Enter paper stock name">
                             </div>
                             <div class="field">
                                 <label for="paper_stocks_{{ $i }}_price">Price</label>
@@ -261,24 +239,18 @@
                 </div>
             </div>
 
-            {{-- Addons --}}
+            {{-- Size --}}
             <div class="form-section">
-                <h2>Addons</h2>
+                <h2>Size</h2>
                 <div class="addon-rows">
                     @foreach($addonRows as $i => $addon)
                     <div class="addon-row" data-row-index="{{ $i }}">
                         <input type="hidden" name="addons[{{ $i }}][id]" value="{{ $addon['id'] ?? '' }}">
                         <div class="input-row">
                             <div class="field">
-                                <label for="addons_{{ $i }}_addon_type">Addon Type</label>
-                                <select id="addons_{{ $i }}_addon_type" name="addons[{{ $i }}][addon_type]">
-                                    <option value="">Select Type</option>
-                                    <option value="trim" {{ (($addon['addon_type'] ?? '') == 'trim') ? 'selected' : '' }}>Trim</option>
-                                    <option value="embossed" {{ (($addon['addon_type'] ?? '') == 'embossed') ? 'selected' : '' }}>Embossed</option>
-                                    <option value="size" {{ (($addon['addon_type'] ?? '') == 'size') ? 'selected' : '' }}>Size</option>
-                                    <option value="orientation" {{ (($addon['addon_type'] ?? '') == 'orientation') ? 'selected' : '' }}>Orientation</option>
-                                    <option value="other" {{ (($addon['addon_type'] ?? '') == 'other') ? 'selected' : '' }}>Other</option>
-                                </select>
+                                <label>Size Type</label>
+                                <input type="text" value="Size" readonly style="background: #f7f9ff; cursor: not-allowed; opacity: 0.8;">
+                                <input type="hidden" name="addons[{{ $i }}][addon_type]" value="size">
                             </div>
                             <div class="field addon-name-field">
                                 <label for="addons_{{ $i }}_name">Name</label>
@@ -326,7 +298,7 @@
                 @endonce
             </div>
 
-            {{-- Colors and Bulk Orders moved to Production page --}}
+            {{-- Colors moved to Production page --}}
 
             {{-- Images removed: uploads handled elsewhere; show front/back preview only --}}
 
@@ -336,61 +308,19 @@
         </div>
 
     {{-- Page 3: Production --}}
-    <div class="page page3" data-page="2" style="display: none;">
+    <div class="page page3" data-page="2">
 
             <div class="error-summary" style="display: none;" role="alert" aria-live="polite">
                 <h3>Please correct the following errors:</h3>
                 <ul id="error-list-page3"></ul>
             </div>
-            {{-- Colors (moved from Basic Info) --}}
             <div class="form-section">
-                <h2>Colors</h2>
-                <div class="color-rows">
-                    @foreach($colorRows as $i => $color)
-                    <div class="color-row" data-row-index="{{ $i }}">
-                        <input type="hidden" name="colors[{{ $i }}][id]" value="{{ $color['id'] ?? '' }}">
-                        <div class="input-row">
-                            <div class="field">
-                                <label for="colors_{{ $i }}_name">Name</label>
-                                <input type="text" id="colors_{{ $i }}_name" name="colors[{{ $i }}][name]" value="{{ $color['name'] ?? '' }}" placeholder="Color Name">
-                            </div>
-                            <div class="field">
-                                <label for="colors_{{ $i }}_color_code">Color Code</label>
-                                <input type="color" id="colors_{{ $i }}_color_code" name="colors[{{ $i }}][color_code]" value="{{ $color['color_code'] ?? '#000000' }}">
-                            </div>
-                            <button class="add-row" type="button" aria-label="Add another color row">+</button>
-                            <button class="remove-row" type="button" aria-label="Remove this color row">−</button>
-                        </div>
+                <h2>Average Usage</h2>
+                <div class="input-row">
+                    <div class="field">
+                        <label for="average_usage_ml">Average usage (ml)</label>
+                        <input type="number" step="0.01" id="average_usage_ml" name="average_usage_ml" value="{{ $averageUsageMl }}" placeholder="e.g. 12.5">
                     </div>
-                    @endforeach
-                </div>
-            </div>
-
-            {{-- Bulk Orders (moved from Basic Info) --}}
-            <div class="form-section">
-                <h2>Bulk Orders</h2>
-                <div class="bulk-order-rows">
-                    @foreach($bulkOrderRows as $i => $bulk)
-                    <div class="bulk-order-row" data-row-index="{{ $i }}">
-                        <input type="hidden" name="bulk_orders[{{ $i }}][id]" value="{{ $bulk['id'] ?? '' }}">
-                        <div class="input-row">
-                            <div class="field">
-                                <label for="bulk_orders_{{ $i }}_min_qty">Min Qty</label>
-                                <input type="number" id="bulk_orders_{{ $i }}_min_qty" name="bulk_orders[{{ $i }}][min_qty]" value="{{ $bulk['min_qty'] ?? '' }}" placeholder="Min Quantity">
-                            </div>
-                            <div class="field">
-                                <label for="bulk_orders_{{ $i }}_max_qty">Max Qty</label>
-                                <input type="number" id="bulk_orders_{{ $i }}_max_qty" name="bulk_orders[{{ $i }}][max_qty]" value="{{ $bulk['max_qty'] ?? '' }}" placeholder="Max Quantity">
-                            </div>
-                            <div class="field">
-                                <label for="bulk_orders_{{ $i }}_price_per_unit">Price per Unit</label>
-                                <input type="number" step="0.01" id="bulk_orders_{{ $i }}_price_per_unit" name="bulk_orders[{{ $i }}][price_per_unit]" value="{{ $bulk['price_per_unit'] ?? '' }}" placeholder="Price per Unit">
-                            </div>
-                            <button class="add-row" type="button" aria-label="Add another bulk order row">+</button>
-                            <button class="remove-row" type="button" aria-label="Remove this bulk order row">−</button>
-                        </div>
-                    </div>
-                    @endforeach
                 </div>
             </div>
 

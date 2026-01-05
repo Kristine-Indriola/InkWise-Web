@@ -4,11 +4,14 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\View\View;
 
 class UserPasswordResetController extends Controller
@@ -85,6 +88,35 @@ class UserPasswordResetController extends Controller
 
 		return redirect()->route('admin.users.passwords.index')
 			->withErrors(['email' => __($status)]);
+	}
+
+	public function update(Request $request, User $user): RedirectResponse
+	{
+		$this->ensureAdmin();
+
+		if (! $this->isUnlocked($request)) {
+			return redirect()->route('admin.users.passwords.index')
+				->withErrors(['unlock' => 'Unlock the reset console before setting passwords.']);
+		}
+
+		if ($user->role === 'customer') {
+			return redirect()->route('admin.users.passwords.index')
+				->withErrors(['user' => 'Customer accounts must use the self-service reset page.']);
+		}
+
+		$validated = $request->validate([
+			'password' => ['required', 'confirmed', PasswordRule::defaults()],
+		]);
+
+		$user->forceFill([
+			'password' => Hash::make($validated['password']),
+			'remember_token' => Str::random(60),
+		])->save();
+
+		event(new PasswordReset($user));
+
+		return redirect()->route('admin.users.passwords.index')
+			->with('status', 'Password updated for '.$user->email.'. Share the new password securely and remind them to change it after signing in.');
 	}
 
 	private function ensureAdmin(): void

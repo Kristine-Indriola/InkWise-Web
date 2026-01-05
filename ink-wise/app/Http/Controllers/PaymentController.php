@@ -206,8 +206,8 @@ class PaymentController extends Controller
 
         $order->forceFill([
             'payment_method' => 'gcash',
-            // When GCash payment is created, mark payment status as pending unless already paid
-            'payment_status' => $order->payment_status === 'paid' ? 'paid' : 'pending',
+            // When GCash payment is created, mark payment status as pending unless already paid or partial
+            'payment_status' => in_array($order->payment_status, ['paid', 'partial']) ? $order->payment_status : 'pending',
             'metadata' => $metadata,
         ])->save();
 
@@ -252,7 +252,7 @@ class PaymentController extends Controller
         $latestPayment = $payments->sortByDesc(fn ($payment) => Arr::get($payment, 'attributes.created_at'))->first();
 
         if ($status === 'succeeded' && $latestPayment) {
-            $amount = (int) Arr::get($latestPayment, 'attributes.amount', 0) / 100;
+            $amount = round(Arr::get($latestPayment, 'attributes.amount', 0) / 100, 2);
             $paymentId = Arr::get($latestPayment, 'id') ?? ('pi:' . $intentId);
 
             $this->applyPaymentToOrder($order, [
@@ -298,7 +298,7 @@ class PaymentController extends Controller
             $order = $this->findOrderByIntentId($intentId);
 
             if ($order) {
-                $amount = (int) Arr::get($paymentData, 'attributes.amount', 0) / 100;
+                $amount = round(Arr::get($paymentData, 'attributes.amount', 0) / 100, 2);
 
                 $this->applyPaymentToOrder($order, [
                     'payment_id' => Arr::get($paymentData, 'id'),
@@ -604,10 +604,10 @@ class PaymentController extends Controller
 
         $attributes = [
             'metadata' => $summary['metadata'],
-            'payment_status' => $summary['balance'] <= 0 ? 'paid' : ($summary['total_paid'] > 0 ? 'partial' : $order->payment_status),
         ];
 
-        if (($summary['balance'] <= 0 || $summary['total_paid'] > 0) && $order->status !== 'completed' && $order->status !== 'confirmed') {
+        $mode = Arr::get($payload, 'mode', 'half');
+        if (($summary['balance'] <= 0 || $summary['total_paid'] > 0) && $order->status !== 'completed' && $order->status !== 'confirmed' && $order->status !== 'draft' && $mode !== 'balance_payment') {
             $attributes['status'] = 'in_production';
         }
 

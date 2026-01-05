@@ -657,17 +657,36 @@ export function CanvasViewport({ page, canvasRef }) {
                 : null;
               const shapeVisualStyles = isShape ? getShapeVisualStyles(shapeDescriptor) : null;
 
+              if (shapeDescriptor && shapeDescriptor.id === 'arch-shape' && shapeVisualStyles) {
+                const width = Math.max(frame.width, 1);
+                const height = Math.max(frame.height, 1);
+                const rx = width / 2;
+                const ry = Math.max(1, Math.min(height, rx));
+                const arcY = ry;
+                const bottomY = height;
+                const archPath = `path("M0 ${bottomY} L0 ${arcY} A ${rx} ${ry} 0 0 1 ${width} ${arcY} L ${width} ${bottomY} Z")`;
+                shapeVisualStyles.clipPath = archPath;
+                shapeVisualStyles.WebkitClipPath = archPath;
+              }
+
               const stackHint = Number.isFinite(explicitStackIndex)
                 ? explicitStackIndex
                 : renderIndex;
               const computedZIndex = Math.max(2, Math.round(10 + stackHint));
 
+              const isBackgroundLayer = resolveLayerPriority(layer) === 0;
+
               const style = buildLayerStyle(layer, frame, {
                 hidden: isHidden,
                 opacity: layer.opacity,
                 isSelected,
-                zIndex: computedZIndex,
+                zIndex: isBackgroundLayer ? 0 : computedZIndex,
               });
+
+              const layerStyle = {
+                ...style,
+                pointerEvents: isBackgroundLayer ? 'none' : style.pointerEvents,
+              };
 
               const withinSafeZone =
                 frame.x >= safeBounds.left &&
@@ -724,15 +743,22 @@ export function CanvasViewport({ page, canvasRef }) {
               return (
                 <div
                   key={layer.id}
-                  className={layerClasses}
-                  style={style}
-                  role="button"
-                  tabIndex={0}
+                  className={`${layerClasses}${isBackgroundLayer ? ' is-background' : ''}`}
+                  style={layerStyle}
+                  role={isBackgroundLayer ? undefined : 'button'}
+                  tabIndex={isBackgroundLayer ? -1 : 0}
+                  aria-hidden={isBackgroundLayer || undefined}
                   onClick={(event) => {
+                    if (isBackgroundLayer) {
+                      return;
+                    }
                     event.stopPropagation();
                     handleSelectLayer(layer.id);
                   }}
                   onPointerDown={(event) => {
+                    if (isBackgroundLayer) {
+                      return;
+                    }
                     // Don't start dragging if clicking on a resize handle
                     if (event.target.classList.contains('canvas-layer__resize-handle') ||
                         event.target.closest('.canvas-layer__resize-handle')) {
@@ -755,6 +781,9 @@ export function CanvasViewport({ page, canvasRef }) {
                     setHoveredLayerId((current) => (current === layer.id ? null : current));
                   }}
                   onKeyDown={(event) => {
+                    if (isBackgroundLayer) {
+                      return;
+                    }
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
                       handleSelectLayer(layer.id);
@@ -880,8 +909,8 @@ export function CanvasViewport({ page, canvasRef }) {
                     />
                   )}
 
-                  {/* Resize handles for selected images and text */}
-                  {isSelected && ((isImageLike && hasImageSource) || isText) && (
+                  {/* Resize handles for selected images, text, and shapes */}
+                  {isSelected && ((isImageLike && hasImageSource) || isText || isShape) && (
                     <>
                       {/* Northwest corner */}
                       <div
@@ -1076,9 +1105,6 @@ export function CanvasViewport({ page, canvasRef }) {
                     </div>
                   )}
 
-                  {isShape && !isText && !isShapeImageFrame && (
-                    <span className="canvas-layer__label">{layer.name}</span>
-                  )}
                 </div>
               );
             })}

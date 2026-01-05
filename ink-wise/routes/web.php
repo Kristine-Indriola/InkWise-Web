@@ -35,6 +35,7 @@ use App\Http\Controllers\Auth\CustomerAuthController;
 
 use App\Http\Controllers\Customer\InvitationController;
 use App\Http\Controllers\Customer\OrderFlowController;
+use App\Http\Controllers\Customer\CartController;
 
 use App\Http\Controllers\Customer\CustomerController;
 
@@ -47,8 +48,10 @@ use App\Http\Controllers\Staff\StaffCustomerController;
 use App\Http\Controllers\Staff\StaffOrderController;
 use App\Http\Controllers\Staff\StaffMaterialController;
 use App\Http\Controllers\Staff\StaffDashboardController;
+use App\Http\Controllers\Staff\StaffReviewController;
 use App\Http\Controllers\Owner\OwnerRatingsController;
 use App\Http\Controllers\Admin\UserManagementController;
+use App\Http\Controllers\Admin\AdminReviewController;
 use App\Http\Controllers\Owner\OwnerInventoryController;
 use App\Http\Controllers\Staff\StaffInventoryController;
 use App\Http\Controllers\Admin\ReportsDashboardController;
@@ -107,8 +110,10 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     ->middleware('auth');
     
 
-    Route::get('/ordersummary/{order:order_number?}', [OrderSummaryController::class, 'show'])
+    Route::get('/ordersummary', [OrderSummaryController::class, 'show'])
         ->name('ordersummary.index');
+    Route::get('/ordersummary/{order}', [OrderSummaryController::class, 'show'])
+        ->name('ordersummary.show');
 
     // Admin orders list (table) - simple closure for listing orders in the admin UI
     Route::get('/orders', function () {
@@ -121,6 +126,8 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
 
         $orders = \App\Models\Order::query()
             ->select(['id', 'order_number', 'customer_id', 'total_amount', 'order_date', 'status', 'payment_status'])
+            ->where('archived', false)
+            ->with(['customer', 'payments'])
             ->latest('order_date')
             ->latest()
             ->paginate($perPage)
@@ -129,6 +136,30 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         // Render the table view inside the ordersummary folder
         return view('admin.ordersummary.tables', compact('orders'));
     })->name('orders.index');
+
+    // Archived orders
+    Route::get('/orders/archived', function () {
+        $allowed = [10, 20, 25, 50, 100];
+        $default = 20;
+        $perPage = (int) request()->query('per_page', $default);
+        if (!in_array($perPage, $allowed, true)) {
+            $perPage = $default;
+        }
+
+        $orders = \App\Models\Order::query()
+            ->select(['id', 'order_number', 'customer_id', 'total_amount', 'order_date', 'status', 'payment_status'])
+            ->where('archived', true)
+            ->with(['customer', 'payments', 'activities' => function ($query) {
+                $query->latest()->limit(1); // Get the most recent activity
+            }])
+            ->latest('order_date')
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        // Render the archived table view
+        return view('admin.ordersummary.archived', compact('orders'));
+    })->name('orders.archived');
 
     // Delete an order (AJAX / API-friendly)
     Route::get('/orders/{order}/status', [\App\Http\Controllers\Admin\OrderController::class, 'editStatus'])
@@ -139,8 +170,9 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         ->name('orders.payment.edit');
     Route::put('/orders/{order}/payment', [\App\Http\Controllers\Admin\OrderController::class, 'updatePayment'])
         ->name('orders.payment.update');
-    Route::delete('/orders/{order}', [\App\Http\Controllers\Admin\OrderController::class, 'destroy'])
-        ->name('orders.destroy');
+    // Archive an order (AJAX / API-friendly)
+    Route::patch('/orders/{order}/archive', [\App\Http\Controllers\Admin\OrderController::class, 'archive'])
+        ->name('orders.archive');
 
     // Payments
     Route::get('/payments', [\App\Http\Controllers\Admin\PaymentController::class, 'index'])
@@ -184,23 +216,17 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::post('{id}/canvas-settings', [AdminTemplateController::class, 'updateCanvasSettings'])->name('updateCanvasSettings');
         // Add SVG save route
         Route::post('{id}/save-svg', [AdminTemplateController::class, 'saveSvg'])->name('saveSvg');
-    }); 
-    // ✅ User Management 
+    });
 
-Route::prefix('users')->name('users.')->group(function () { 
-    Route::get('/', [UserManagementController::class, 'index'])->name('index'); 
-    Route::get('/create', [UserManagementController::class, 'create'])->name('create'); 
-    Route::post('/', [UserManagementController::class, 'store'])->name('store'); 
-    Route::get('/{user_id}/edit', [UserManagementController::class, 'edit'])->name('edit'); // Edit form 
-    Route::put('/{user_id}', [UserManagementController::class, 'update'])->name('update'); // Update user 
-    Route::delete('/{user_id}', [UserManagementController::class, 'destroy'])->name('destroy'); // Delete user 
-});
+    Route::get('/reviews', [AdminReviewController::class, 'index'])->name('reviews.index');
+    Route::post('/reviews/{review}/reply', [AdminReviewController::class, 'reply'])->name('reviews.reply');
 
     Route::prefix('users/passwords')->name('users.passwords.')->group(function () {
         Route::get('/', [UserPasswordResetController::class, 'index'])->name('index');
         Route::post('/unlock', [UserPasswordResetController::class, 'unlock'])->name('unlock');
         Route::post('/lock', [UserPasswordResetController::class, 'lock'])->name('lock');
         Route::post('/{user}/send', [UserPasswordResetController::class, 'send'])->name('send');
+        Route::put('/{user}/update', [UserPasswordResetController::class, 'update'])->name('update');
     });
 
    
@@ -232,9 +258,11 @@ Route::prefix('users')->name('users.')->group(function () {
         Route::post('/', [MaterialController::class, 'store'])->name('store');
         Route::get('/{id}/edit', [MaterialController::class, 'edit'])->name('edit');
         Route::put('/{id}', [MaterialController::class, 'update'])->name('update');
+        Route::post('/{id}/restock', [MaterialController::class, 'restock'])->name('restock');
         Route::delete('/{id}', [MaterialController::class, 'destroy'])->name('destroy');
     });
-    // ✅ Inks resource route (move here, not nested)
+    // ✅ Inks routes
+    Route::post('inks/{ink}/restock', [\App\Http\Controllers\Admin\InkController::class, 'restock'])->name('inks.restock');
     Route::resource('inks', \App\Http\Controllers\Admin\InkController::class)->except(['show']);
 
     Route::prefix('products')->name('products.')->group(function () {
@@ -290,6 +318,7 @@ Route::prefix('users')->name('users.')->group(function () {
         Route::get('/', [ReportsDashboardController::class, 'index'])->name('index');
         Route::get('/sales', [ReportsDashboardController::class, 'sales'])->name('sales');
         Route::get('/inventory', [ReportsDashboardController::class, 'inventory'])->name('inventory');
+        Route::get('/pickup-calendar', [ReportsDashboardController::class, 'pickupCalendar'])->name('pickup-calendar');
 
         Route::get('/sales/export/{type}', [ReportsDashboardController::class, 'exportSales'])
             ->name('sales.export');
@@ -370,8 +399,9 @@ Route::get('/auth/google/callback', function () {
 */
 
 /**Dashboard & Home*/
-Route::get('/', fn () => view('customer.dashboard'))->name('dashboard');
-Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');  // Protected
+Route::redirect('/', '/landingpage');
+Route::get('/landingpage', fn () => view('customer.dashboard'))->name('dashboard');
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/landingpage/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard');  // Protected
  Route::get('/search', function (\Illuminate\Http\Request $request) {
      return 'Search for: ' . e($request->query('query', ''));
  })->name('search');
@@ -389,7 +419,9 @@ Route::post('/customer/forgot-password', [App\Http\Controllers\Auth\CustomerPass
 Route::get('/customer/reset-password', [App\Http\Controllers\Auth\CustomerNewPasswordController::class, 'create'])->name('customer.password.reset');
 Route::post('/customer/reset-password', [App\Http\Controllers\Auth\CustomerNewPasswordController::class, 'store'])->name('customer.password.store');
 
-Route::get('/customer/dashboard', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard.guest');
+Route::redirect('/dashboard', '/landingpage/dashboard');
+Route::redirect('/customer/dashboard', '/landingpage');
+Route::get('/landingpage/guest', [CustomerAuthController::class, 'dashboard'])->name('customer.dashboard.guest');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -397,7 +429,9 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-Route::post('/messages', [MessageController::class, 'storeFromContact'])->name('messages.store');
+Route::post('/messages', [MessageController::class, 'storeFromContact'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('messages.store');
 
 Route::middleware('auth')->group(function () {
     Route::get('customer/chat/thread', [MessageController::class, 'customerChatThread'])->name('customer.chat.thread');
@@ -484,8 +518,6 @@ Route::get('/customer/my-orders/toreceive', fn () => view('customer.profile.purc
 Route::get('/customer/my-orders/topickup', fn () => view('customer.profile.purchase.topickup'))->name('customer.my_purchase.topickup');
 Route::get('/customer/my-orders/completed', fn () => view('customer.profile.purchase.completed'))->name('customer.my_purchase.completed');
 Route::get('/customer/my-orders/rate', [CustomerProfileController::class, 'rate'])->middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->name('customer.my_purchase.rate');
-Route::get('/customer/my-orders/cancelled', fn () => view('customer.profile.purchase.cancelled'))->name('customer.my_purchase.cancelled');
-Route::get('/customer/my-orders/return-refund', fn () => view('customer.profile.purchase.return_refund'))->name('customer.my_purchase.return_refund');
 Route::get('/customer/pay-remaining-balance/{order}', function (\App\Models\Order $order) {
     // Ensure the order belongs to the authenticated user
     $customer = Auth::user();
@@ -582,9 +614,9 @@ Route::get('/product/preview/{product}', function (Product $product) {
         'paperStocks',
         'addons',
         'colors',
-        'bulkOrders',
         'materials.material'
     ]);
+    $product->setRelation('bulkOrders', collect());
 
     return view('customer.Invitations.productpreview', compact('product'));
 })->name('product.preview');
@@ -627,6 +659,40 @@ Route::get('/design/studio/{template}', function (Template $template, Request $r
         $shippingFee = 0.0;
         $images = $orderFlow->resolveProductImages($product);
         $designMetadata = $orderFlow->buildDesignMetadata($product);
+
+        $storedDraft = $orderFlow->loadDesignDraft($product, Auth::user());
+
+        if ($storedDraft) {
+            if (!empty($storedDraft['design'])) {
+                $designMetadata = $storedDraft['design'];
+                $summary['metadata']['design'] = $summary['metadata']['design'] ?? $storedDraft['design'];
+            }
+
+            if (empty($summary['placeholders']) && !empty($storedDraft['placeholders'])) {
+                $summary['placeholders'] = $storedDraft['placeholders'];
+            }
+
+            if (empty($summary['previewImages']) && !empty($storedDraft['preview_images'])) {
+                $summary['previewImages'] = $storedDraft['preview_images'];
+            }
+
+            if (empty($summary['previewImage']) && !empty($storedDraft['preview_image'])) {
+                $summary['previewImage'] = $storedDraft['preview_image'];
+                $summary['invitationImage'] = $storedDraft['preview_image'];
+            }
+
+            if (empty($summary['orderId']) && !empty($storedDraft['order_id'])) {
+                $summary['orderId'] = $storedDraft['order_id'];
+            }
+
+            if (empty($summary['order_item_id']) && !empty($storedDraft['order_item_id'])) {
+                $summary['order_item_id'] = $storedDraft['order_item_id'];
+            }
+
+            if (empty($summary['orderStatus']) && !empty($storedDraft['status'])) {
+                $summary['orderStatus'] = $storedDraft['status'];
+            }
+        }
 
         $shouldResetSummary = ($summary['productId'] ?? null) !== $product->id;
 
@@ -714,39 +780,89 @@ Route::get('/design/studio/{template}', function (Template $template, Request $r
         'defaultQuantity' => $defaultQuantity,
         'orderSummary' => $summary,
     ]);
-})->name('design.studio');
-Route::get('/design/edit/{product?}', [OrderFlowController::class, 'edit'])->name('design.edit');
-Route::post('/order/cart/items', [OrderFlowController::class, 'storeDesignSelection'])->name('order.cart.add');
-Route::post('/design/autosave', [OrderFlowController::class, 'autosaveDesign'])->name('order.design.autosave');
+})->name('design.studio')
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer');
+Route::get('/design/edit/{product?}', [OrderFlowController::class, 'edit'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('design.edit');
+Route::post('/order/cart/items', [OrderFlowController::class, 'storeDesignSelection'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.cart.add');
+Route::post('/design/autosave', [OrderFlowController::class, 'autosaveDesign'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.design.autosave');
 
 /**Order Forms & Pages*/
-Route::get('/order/review', [OrderFlowController::class, 'review'])->name('order.review');
-Route::get('/order/finalstep', [OrderFlowController::class, 'finalStep'])->name('order.finalstep');
-Route::get('/order/addtocart', [OrderFlowController::class, 'addToCart'])->name('order.addtocart');
-Route::post('/order/finalstep/save', [OrderFlowController::class, 'saveFinalStep'])->name('order.finalstep.save');
-Route::get('/order/envelope', [OrderFlowController::class, 'envelope'])->name('order.envelope');
-Route::post('/order/envelope', [OrderFlowController::class, 'storeEnvelope'])->name('order.envelope.store');
-Route::delete('/order/envelope', [OrderFlowController::class, 'clearEnvelope'])->name('order.envelope.clear');
-Route::get('/order/summary', [OrderFlowController::class, 'summary'])->name('order.summary');
-Route::get('/order/summary.json', [OrderFlowController::class, 'summaryJson'])->name('order.summary.json');
-Route::post('/order/summary/sync', [OrderFlowController::class, 'syncSummary'])->name('order.summary.sync');
-Route::delete('/order/summary', [OrderFlowController::class, 'clearSummary'])->name('order.summary.clear');
-Route::get('/order/giveaways', [OrderFlowController::class, 'giveaways'])->name('order.giveaways');
-Route::post('/order/giveaways', [OrderFlowController::class, 'storeGiveaway'])->name('order.giveaways.store');
-Route::delete('/order/giveaways', [OrderFlowController::class, 'clearGiveaway'])->name('order.giveaways.clear');
-Route::get('/api/envelopes', [OrderFlowController::class, 'envelopeOptions'])->name('api.envelopes');
-Route::get('/api/envelopes', [ProductController::class, 'getEnvelopes'])->name('api.envelopes');
-Route::get('/api/giveaways', [OrderFlowController::class, 'giveawayOptions'])->name('api.giveaways');
+Route::get('/order/review', [OrderFlowController::class, 'review'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.review');
+Route::get('/order/finalstep', [OrderFlowController::class, 'finalStep'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.finalstep');
+Route::get('/order/addtocart', [OrderFlowController::class, 'addToCart'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.addtocart');
+Route::post('/order/finalstep/save', [OrderFlowController::class, 'saveFinalStep'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.finalstep.save');
+Route::get('/order/envelope', [OrderFlowController::class, 'envelope'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.envelope');
+Route::post('/order/envelope', [OrderFlowController::class, 'storeEnvelope'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.envelope.store');
+Route::delete('/order/envelope', [OrderFlowController::class, 'clearEnvelope'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.envelope.clear');
+Route::get('/order/summary', [OrderFlowController::class, 'summary'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.summary');
+Route::get('/order/summary.json', [OrderFlowController::class, 'summaryJson'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.summary.json');
+Route::post('/order/summary/sync', [OrderFlowController::class, 'syncSummary'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.summary.sync');
+Route::delete('/order/summary', [OrderFlowController::class, 'clearSummary'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.summary.clear');
+Route::get('/order/giveaways', [OrderFlowController::class, 'giveaways'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.giveaways');
+Route::post('/order/giveaways', [OrderFlowController::class, 'storeGiveaway'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.giveaways.store');
+Route::delete('/order/giveaways', [OrderFlowController::class, 'clearGiveaway'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.giveaways.clear');
+Route::get('/api/envelopes', [OrderFlowController::class, 'envelopeOptions'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('api.envelopes');
+// Route::get('/api/envelopes', [ProductController::class, 'getEnvelopes'])->name('api.envelopes');
+Route::get('/api/giveaways', [OrderFlowController::class, 'giveawayOptions'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('api.giveaways');
 // Temporary debug endpoint: lists resolved giveaway images (thumbnail + gallery)
-Route::get('/debug/giveaways-images', [OrderFlowController::class, 'debugGiveawayImages'])->name('debug.giveaways.images');
+Route::get('/debug/giveaways-images', [OrderFlowController::class, 'debugGiveawayImages'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('debug.giveaways.images');
 Route::get('/order/birthday', fn () => view('customer.templates.birthday'))->name('order.birthday');
 
-Route::get('/checkout', [OrderFlowController::class, 'checkout'])->name('customer.checkout');
-Route::post('/checkout/complete', [OrderFlowController::class, 'completeCheckout'])->name('checkout.complete');
-Route::post('/checkout/cancel', [OrderFlowController::class, 'cancelCheckout'])->name('checkout.cancel');
+Route::get('/checkout', [OrderFlowController::class, 'checkout'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('customer.checkout');
+Route::post('/checkout/complete', [OrderFlowController::class, 'completeCheckout'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('checkout.complete');
+Route::post('/checkout/cancel', [OrderFlowController::class, 'cancelCheckout'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('checkout.cancel');
 Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/order/{order}/pay-remaining-balance', [OrderFlowController::class, 'payRemainingBalance'])->name('order.pay.remaining.balance');
 
 Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->group(function () {
+    Route::get('/customer/cart', [CartController::class, 'index'])->name('customer.cart');
+    Route::patch('/order/cart/items/{cartItem}', [CartController::class, 'updateItem'])->name('customer.cart.update');
+    Route::delete('/order/cart/items/{cartItem}', [CartController::class, 'removeItem'])->name('customer.cart.remove');
     Route::post('/payments/gcash', [PaymentController::class, 'createGCashPayment'])->name('payment.gcash.create');
     Route::get('/payments/gcash/return', [PaymentController::class, 'handleGCashReturn'])->name('payment.gcash.return');
 });
@@ -859,6 +975,8 @@ Route::prefix('staff')->name('staff.')->middleware(\App\Http\Middleware\RoleMidd
     Route::put('/orders/{id}/status', [StaffOrderController::class, 'updateStatus'])->name('orders.status.update');
     Route::get('/orders/{id}/payment', [StaffOrderController::class, 'editPayment'])->name('orders.payment.edit');
     Route::put('/orders/{id}/payment', [StaffOrderController::class, 'updatePayment'])->name('orders.payment.update');
+    Route::patch('/orders/{order}/archive', [StaffOrderController::class, 'archive'])->name('orders.archive');
+    Route::get('/orders/archived', [StaffOrderController::class, 'archived'])->name('orders.archived');
     Route::get('/notify-customers', fn () => view('staff.notify_customers'))->name('notify.customers');
     Route::get('/profile/edit', [StaffProfileController::class, 'edit'])->name('profile.edit');
     Route::post('/profile/update', [StaffProfileController::class, 'update'])->name('profile.update');
@@ -893,12 +1011,13 @@ Route::prefix('staff')->name('staff.')->middleware(\App\Http\Middleware\RoleMidd
         Route::delete('/{id}', [StaffInventoryController::class, 'destroy'])->name('destroy');
     });
 
-     Route::prefix('materials')->name('materials.')->group(function () {
+    Route::prefix('materials')->name('materials.')->group(function () {
         Route::get('/', [StaffMaterialController::class, 'index'])->name('index');
         Route::get('/create', [StaffMaterialController::class, 'create'])->name('create');
         Route::post('/', [StaffMaterialController::class, 'store'])->name('store');
         Route::get('/{id}/edit', [StaffMaterialController::class, 'edit'])->name('edit');
         Route::put('/{id}', [StaffMaterialController::class, 'update'])->name('update');
+        Route::post('/{id}/restock', [StaffMaterialController::class, 'restock'])->name('restock');
         Route::delete('/{id}', [StaffMaterialController::class, 'destroy'])->name('destroy');
     });
 
@@ -946,6 +1065,13 @@ Route::prefix('staff')->name('staff.')->middleware(\App\Http\Middleware\RoleMidd
         Route::post('figma/preview', [\App\Http\Controllers\FigmaController::class, 'preview'])->name('figma.preview');
         Route::post('figma/import', [\App\Http\Controllers\FigmaController::class, 'import'])->name('figma.import');
     });
+
+    Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/pickup-calendar', [App\Http\Controllers\Admin\ReportsDashboardController::class, 'pickupCalendar'])->name('pickup-calendar');
+    });
+
+    Route::get('/reviews', [StaffReviewController::class, 'index'])->name('reviews.index');
+    Route::post('/reviews/{review}/reply', [StaffReviewController::class, 'reply'])->name('reviews.reply');
 });
 
 /*

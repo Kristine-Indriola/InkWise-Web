@@ -33,6 +33,10 @@ body {
     padding: clamp(28px, 5vw, 48px) 0;
 }
 
+.addtocart-body {
+    padding-top: calc(clamp(28px, 5vw, 48px) + 96px);
+}
+
 a {
     color: inherit;
     text-decoration: none;
@@ -307,6 +311,13 @@ a:hover {
     cursor: pointer;
     box-shadow: 0 24px 42px rgba(143, 157, 255, 0.32);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Ensure primary CTAs in the add-to-cart panel are clickable above overlays */
+.addtocart-panel .primary-action {
+    position: relative;
+    z-index: 1100;
+    pointer-events: auto;
 }
 
 .primary-action:hover {

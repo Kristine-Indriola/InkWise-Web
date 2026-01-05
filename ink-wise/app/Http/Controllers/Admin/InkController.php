@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Ink;
+use App\Models\InkStockMovement;
 use App\Models\User;
 use App\Notifications\InkRestockedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 
 class InkController extends Controller
@@ -48,7 +50,6 @@ class InkController extends Controller
             'unit' => 'required|string|max:20', // e.g. can (required for inks)
             'size' => 'required|string|max:50', // store ml size (e.g. 500ml) (required for inks)
             'cost_per_ml' => 'required|numeric|min:0',
-            'avg_usage_per_invite_ml' => 'nullable|numeric|min:0',
             'cost_per_invite' => 'nullable|numeric|min:0',
             'description' => 'nullable|string|max:1000',
             'reorder_level' => 'required|integer|min:0',
@@ -67,7 +68,6 @@ class InkController extends Controller
             'unit' => $validated['unit'] ?? null,
             'size' => $validated['size'] ?? null,
             'cost_per_ml' => $validated['cost_per_ml'],
-            'avg_usage_per_invite_ml' => $validated['avg_usage_per_invite_ml'] ?? null,
             'cost_per_invite' => $validated['cost_per_invite'] ?? null,
             'description' => $validated['description'] ?? null,
         ];
@@ -142,7 +142,6 @@ class InkController extends Controller
             'unit' => 'required|string|max:20',
             'size' => 'required|string|max:50',
             'cost_per_ml' => 'required|numeric|min:0',
-            'avg_usage_per_invite_ml' => 'nullable|numeric|min:0',
             'cost_per_invite' => 'nullable|numeric|min:0',
             'description' => 'nullable|string|max:1000',
             'reorder_level' => 'required|integer|min:0',
@@ -161,7 +160,6 @@ class InkController extends Controller
             'unit' => $validated['unit'] ?? $ink->unit,
             'size' => $validated['size'] ?? $ink->size,
             'cost_per_ml' => $validated['cost_per_ml'],
-            'avg_usage_per_invite_ml' => $validated['avg_usage_per_invite_ml'] ?? $ink->avg_usage_per_invite_ml,
             'cost_per_invite' => $validated['cost_per_invite'] ?? $ink->cost_per_invite,
             'description' => $validated['description'] ?? $ink->description,
         ];
@@ -204,6 +202,57 @@ class InkController extends Controller
         }
 
         return redirect()->route('admin.materials.index')->with('success', 'Ink updated successfully.');
+    }
+
+    public function restock(Request $request, Ink $ink)
+    {
+        $validated = $request->validate([
+            'quantity' => 'required|integer|min:1',
+        ]);
+
+        $quantity = (int) $validated['quantity'];
+        $ink->loadMissing('inventory');
+
+        $currentStock = (int) ($ink->inventory->stock_level ?? $ink->stock_qty ?? 0);
+        $newStock = $currentStock + $quantity;
+        $reorderLevel = (int) (optional($ink->inventory)->reorder_level ?? 0);
+
+        DB::transaction(function () use ($ink, $newStock, $reorderLevel, $quantity) {
+            $ink->update([
+                'stock_qty' => $newStock,
+            ]);
+
+            if ($ink->inventory) {
+                $ink->inventory->update([
+                    'stock_level' => $newStock,
+                    'reorder_level' => $reorderLevel,
+                ]);
+            } else {
+                $ink->inventory()->create([
+                    'stock_level' => $newStock,
+                    'reorder_level' => $reorderLevel,
+                ]);
+            }
+
+            InkStockMovement::create([
+                'ink_id' => $ink->getKey(),
+                'movement_type' => 'restock',
+                'quantity' => $quantity,
+                'user_id' => Auth::id(),
+            ]);
+        });
+
+        $ink->refresh()->load('inventory');
+
+        $owners = User::where('role', 'owner')->get();
+        if ($owners->isNotEmpty()) {
+            Notification::send($owners, new InkRestockedNotification($ink, $quantity, Auth::user()));
+        }
+
+        $currentStockDisplay = $ink->inventory->stock_level ?? $ink->stock_qty ?? 0;
+
+        return redirect()->route('admin.materials.index')
+            ->with('success', "Restocked {$ink->material_name} by {$quantity}. Current stock: {$currentStockDisplay}.");
     }
 
     public function destroy(Ink $ink)

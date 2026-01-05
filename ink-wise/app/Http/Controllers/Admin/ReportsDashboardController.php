@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Material;
+use App\Models\Ink;
 use App\Models\Order;
 use Carbon\Carbon;
 use Carbon\CarbonInterval;
@@ -21,11 +22,13 @@ class ReportsDashboardController extends Controller
     public function sales(Request $request)
     {
         [$startDate, $endDate] = $this->resolveDateRange($request);
+        $paymentStatusFilter = $request->input('payment_status', 'all'); // all, full, half, unpaid
 
-        $context = $this->buildReportContext($startDate, $endDate);
+        $context = $this->buildReportContext($startDate, $endDate, $paymentStatusFilter);
         $context['filters'] = [
             'startDate' => $startDate?->format('Y-m-d'),
             'endDate' => $endDate?->format('Y-m-d'),
+            'paymentStatus' => $paymentStatusFilter,
         ];
 
         return view('admin.reports.sales', $context);
@@ -44,7 +47,131 @@ class ReportsDashboardController extends Controller
         return view('admin.reports.inventory', $context);
     }
 
-    private function buildReportContext(?Carbon $startDate = null, ?Carbon $endDate = null): array
+    public function pickupCalendar(Request $request)
+    {
+        $period = $request->input('period', 'week'); // day, week, month, year
+
+        $now = Carbon::now();
+
+        switch ($period) {
+            case 'day':
+                $start = $now->copy()->startOfDay();
+                $end = $now->copy()->endOfDay();
+                break;
+            case 'week':
+                $start = $now->copy()->startOfWeek();
+                $end = $now->copy()->endOfWeek();
+                break;
+            case 'month':
+                $nextMonth = $now->copy()->addMonth();
+                $start = $nextMonth->copy()->startOfMonth();
+                $end = $nextMonth->copy()->endOfMonth();
+                break;
+            case 'year':
+                $start = $now->copy()->startOfYear();
+                $end = $now->copy()->endOfYear();
+                break;
+            default:
+                $start = $now->copy()->startOfWeek();
+                $end = $now->copy()->endOfWeek();
+                break;
+        }
+
+        $orders = Order::query()
+            ->with(['customer:customer_id,first_name,last_name', 'items:id,order_id,product_name,quantity'])
+            ->whereNotNull('date_needed')
+            ->where('date_needed', '>=', $start)
+            ->where('date_needed', '<=', $end)
+            ->orderBy('date_needed')
+            ->get()
+            ->groupBy(function (Order $order) {
+                return $order->date_needed->format('Y-m-d');
+            })
+            ->map(function (Collection $dayOrders) {
+                return $dayOrders->map(function (Order $order) {
+                    $customer = $order->customer;
+                    $customerName = collect([
+                        optional($customer)->first_name,
+                        optional($customer)->last_name,
+                    ])->filter()->implode(' ');
+
+                    if (trim($customerName) === '') {
+                        $customerName = optional($order->customerOrder)->name ?? '-';
+                    }
+
+                    return [
+                        'id' => $order->id,
+                        'inv' => $order->order_number ?? ('#' . $order->id),
+                        'customer_name' => $customerName,
+                        'total_amount' => (float) $order->total_amount,
+                        'items_count' => $order->items->sum('quantity'),
+                        'items_list' => $order->items->pluck('product_name')->filter()->implode(', '),
+                        'date_needed' => $order->date_needed->format('Y-m-d H:i:s'),
+                        'status' => $order->status,
+                    ];
+                });
+            });
+
+        if ($period === 'year') {
+            // For year view, group by month instead of individual days
+            $calendarData = [];
+            $current = $start->copy();
+
+            while ($current <= $end) {
+                $monthKey = $current->format('Y-m');
+                $monthStart = $current->copy()->startOfMonth();
+                $monthEnd = $current->copy()->endOfMonth();
+
+                $monthOrders = collect();
+                $monthTotalAmount = 0;
+                $monthTotalOrders = 0;
+
+                // Collect all orders for this month
+                while ($monthStart <= $monthEnd) {
+                    $dayKey = $monthStart->format('Y-m-d');
+                    if ($orders->has($dayKey)) {
+                        $dayOrders = $orders->get($dayKey);
+                        $monthOrders = $monthOrders->merge($dayOrders);
+                        $monthTotalOrders += $dayOrders->count();
+                        $monthTotalAmount += $dayOrders->sum('total_amount');
+                    }
+                    $monthStart->addDay();
+                }
+
+                $calendarData[$monthKey] = [
+                    'date' => $current->format('Y-m-01'), // First day of month
+                    'month_name' => $current->format('F Y'),
+                    'orders' => $monthOrders->values()->toArray(),
+                    'total_orders' => $monthTotalOrders,
+                    'total_amount' => $monthTotalAmount,
+                ];
+
+                $current->addMonth();
+            }
+        } else {
+            // For day/week/month views, show individual days
+            $calendarData = [];
+            $current = $start->copy();
+
+            while ($current <= $end) {
+                $dateKey = $current->format('Y-m-d');
+                $calendarData[$dateKey] = [
+                    'date' => $current->format('Y-m-d'),
+                    'day_name' => $current->format('l'),
+                    'orders' => $orders->get($dateKey, collect())->toArray(),
+                    'total_orders' => $orders->get($dateKey, collect())->count(),
+                    'total_amount' => $orders->get($dateKey, collect())->sum('total_amount'),
+                ];
+                $current->addDay();
+            }
+        }
+
+        $view = auth()->user()->role === 'staff' ? 'staff.reports.pickup-calendar' : 'admin.reports.pickup-calendar';
+
+        return view($view, compact('calendarData', 'period', 'start', 'end'));
+    }
+
+    private function buildReportContext(?Carbon $startDate = null, ?Carbon $endDate = null, string $paymentStatusFilter = 'all'): array
     {
         $materials = Material::with('inventory')
             ->with(['stockMovements' => function ($query) use ($startDate, $endDate) {
@@ -60,10 +187,24 @@ class ReportsDashboardController extends Controller
             ->orderBy('material_name')
             ->get();
 
-        $materialLabels = $materials->pluck('material_name');
-        $materialStockLevels = $materials->map(fn (Material $material) => $this->resolveStockLevel($material));
-        $materialReorderLevels = $materials->map(fn (Material $material) => $this->resolveReorderLevel($material));
-        $inventoryStats = $this->buildInventorySummary($materials);
+        $inks = Ink::with(['inventory', 'stockMovements' => function ($query) use ($startDate, $endDate) {
+                if ($startDate && $endDate) {
+                    $query->whereBetween('created_at', [$startDate, $endDate]);
+                } elseif ($startDate) {
+                    $query->where('created_at', '>=', $startDate);
+                } elseif ($endDate) {
+                    $query->where('created_at', '<=', $endDate);
+                }
+                $query->orderBy('created_at');
+            }])
+            ->orderBy('material_name')
+            ->get();
+
+        $allInventoryItems = $materials->concat($inks);
+        $materialLabels = $allInventoryItems->pluck('material_name');
+        $materialStockLevels = $allInventoryItems->map(fn ($item) => $this->resolveStockLevel($item));
+        $materialReorderLevels = $allInventoryItems->map(fn ($item) => $this->resolveReorderLevel($item));
+        $inventoryStats = $this->buildInventorySummary($allInventoryItems);
 
         $salesQuery = Order::query()
             ->with([
@@ -72,6 +213,7 @@ class ReportsDashboardController extends Controller
                 'items:id,order_id,product_name,quantity',
                 'items.paperStockSelection.paperStock.material:material_id,unit_cost',
                 'items.addons.productAddon.material:material_id,unit_cost',
+                'payments:order_id,amount,status',
             ])
             ->where('status', 'completed')
             ->latest('order_date');
@@ -81,7 +223,7 @@ class ReportsDashboardController extends Controller
         $sales = $salesQuery
             ->take(100)
             ->get()
-            ->map(function (Order $order) {
+            ->map(function (Order $order) use ($paymentStatusFilter) {
                 $customer = $order->customer;
                 $fallbackName = optional($order->customerOrder)->name;
 
@@ -125,11 +267,35 @@ class ReportsDashboardController extends Controller
                 $order->profit_value = $order->total_amount_value - $materialCost;
                 $order->order_date_value = $order->order_date ?? $order->created_at;
 
+                // Determine payment status
+                $totalPaid = $order->totalPaid();
+                $balanceDue = $order->balanceDue();
+                if ($balanceDue == 0) {
+                    $order->payment_status = 'Full Payment';
+                } elseif ($totalPaid > 0) {
+                    $order->payment_status = 'Half Payment';
+                } else {
+                    $order->payment_status = 'Unpaid';
+                }
+
                 return $order;
-            });
+            })
+            ->filter(function (Order $order) use ($paymentStatusFilter) {
+                if ($paymentStatusFilter === 'all') {
+                    return true;
+                }
+                return match ($paymentStatusFilter) {
+                    'full' => $order->payment_status === 'Full Payment',
+                    'half' => $order->payment_status === 'Half Payment',
+                    'unpaid' => $order->payment_status === 'Unpaid',
+                    default => true,
+                };
+            })
+            ->take(100); // Limit after filtering
 
         $analyticsQuery = Order::query()
             ->select(['id', 'total_amount', 'order_date', 'created_at'])
+            ->with(['payments:order_id,amount,status'])
             ->where('status', 'completed')
             ->whereRaw("COALESCE(order_date, created_at) >= ?", [
                 Carbon::now()->copy()->subYears(5)->startOfYear(),
@@ -159,8 +325,11 @@ class ReportsDashboardController extends Controller
         
         $salesSummaryTotals['estimatedSales'] = round($estimatedSales, 2);
 
+        $paymentSummary = $this->buildPaymentSummary($analyticsOrders);
+
         return compact(
             'materials',
+            'inks',
             'materialLabels',
             'materialStockLevels',
             'materialReorderLevels',
@@ -169,7 +338,8 @@ class ReportsDashboardController extends Controller
             'salesIntervals',
             'defaultSalesInterval',
             'salesSummaryTotals',
-            'salesSummaryLabel'
+            'salesSummaryLabel',
+            'paymentSummary'
         );
     }
 
@@ -216,26 +386,26 @@ class ReportsDashboardController extends Controller
         return $query;
     }
 
-    private function resolveStockLevel(Material $material): int
+    private function resolveStockLevel($item): int
     {
-        return (int) (optional($material->inventory)->stock_level ?? $material->stock_qty ?? 0);
+        return (int) (optional($item->inventory)->stock_level ?? $item->stock_qty ?? 0);
     }
 
-    private function resolveReorderLevel(Material $material): int
+    private function resolveReorderLevel($item): int
     {
-        return (int) (optional($material->inventory)->reorder_level ?? $material->reorder_point ?? 0);
+        return (int) (optional($item->inventory)->reorder_level ?? $item->reorder_point ?? 0);
     }
 
-    private function buildInventorySummary(Collection $materials): array
+    private function buildInventorySummary(Collection $items): array
     {
         $lowStock = 0;
         $outStock = 0;
         $totalValue = 0;
 
-        foreach ($materials as $material) {
-            $stock = $this->resolveStockLevel($material);
-            $reorder = $this->resolveReorderLevel($material);
-            $unitCost = $material->unit_cost ?? 0;
+        foreach ($items as $item) {
+            $stock = $this->resolveStockLevel($item);
+            $reorder = $this->resolveReorderLevel($item);
+            $unitCost = $item->unit_cost ?? $item->cost_per_ml ?? 0;
 
             if ($stock <= 0) {
                 $outStock++;
@@ -251,10 +421,10 @@ class ReportsDashboardController extends Controller
         }
 
         return [
-            'totalSkus' => $materials->count(),
+            'totalSkus' => $items->count(),
             'lowStock' => $lowStock,
             'outStock' => $outStock,
-            'totalStock' => $materials->sum(fn (Material $material) => $this->resolveStockLevel($material)),
+            'totalStock' => $items->sum(fn ($item) => $this->resolveStockLevel($item)),
             'totalValue' => $totalValue,
         ];
     }
@@ -413,14 +583,29 @@ class ReportsDashboardController extends Controller
             return $moment ? $moment->betweenIncluded($start, $end) : false;
         });
 
+        // Only count fully paid orders for revenue
+        $fullyPaidOrders = $filtered->filter(function (Order $order) {
+            return $order->balanceDue() == 0;
+        });
+
         $orderCount = $filtered->count();
-        $revenue = (float) $filtered->sum('total_amount');
-        $materialCost = (float) $filtered->sum('material_cost_value');
+        $revenue = (float) $fullyPaidOrders->sum('total_amount');
+        $materialCost = (float) $fullyPaidOrders->sum('material_cost_value');
         $profit = $revenue - $materialCost;
+
+        // Calculate pending revenue from partially paid orders
+        $partiallyPaidOrders = $filtered->filter(function (Order $order) {
+            $totalPaid = $order->totalPaid();
+            return $totalPaid > 0 && $order->balanceDue() > 0;
+        });
+        $pendingRevenue = (float) $partiallyPaidOrders->sum(function (Order $order) {
+            return $order->balanceDue();
+        });
 
         return [
             'orders' => $orderCount,
             'revenue' => round($revenue, 2),
+            'pendingRevenue' => round($pendingRevenue, 2),
             'materialCost' => round($materialCost, 2),
             'profit' => round($profit, 2),
             'averageOrder' => $orderCount > 0 ? round($revenue / $orderCount, 2) : 0.0,
@@ -463,5 +648,44 @@ class ReportsDashboardController extends Controller
         }
 
         return [$start, $end];
+    }
+
+    private function buildPaymentSummary(Collection $orders): array
+    {
+        $summary = [
+            'totalPaid' => 0.0,
+            'full' => ['count' => 0, 'amount' => 0.0],
+            'half' => ['count' => 0, 'amount' => 0.0, 'balance' => 0.0],
+        ];
+
+        foreach ($orders as $order) {
+            $paidAmount = (float) $order->totalPaid();
+            $balanceDue = (float) $order->balanceDue();
+
+            $summary['totalPaid'] += $paidAmount;
+
+            if ($paidAmount <= 0 && $balanceDue <= 0) {
+                continue;
+            }
+
+            if ($balanceDue <= 0 && $paidAmount > 0) {
+                $summary['full']['count']++;
+                $summary['full']['amount'] += $paidAmount;
+                continue;
+            }
+
+            if ($paidAmount > 0 && $balanceDue > 0) {
+                $summary['half']['count']++;
+                $summary['half']['amount'] += $paidAmount;
+                $summary['half']['balance'] += $balanceDue;
+            }
+        }
+
+        $summary['totalPaid'] = round($summary['totalPaid'], 2);
+        $summary['full']['amount'] = round($summary['full']['amount'], 2);
+        $summary['half']['amount'] = round($summary['half']['amount'], 2);
+        $summary['half']['balance'] = round($summary['half']['balance'], 2);
+
+        return $summary;
     }
 }

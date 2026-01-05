@@ -12,14 +12,18 @@ use App\Models\Product;
 use App\Models\ProductEnvelope;
 use App\Models\User;
 use App\Notifications\NewOrderPlaced;
+use App\Models\Cart;
+use App\Models\CartItem;
 use App\Services\OrderFlowService;
 use Illuminate\Contracts\View\View as ViewContract;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -76,6 +80,7 @@ class OrderFlowController extends Controller
         $data = $request->validate([
             'product_id' => ['required', 'integer', 'exists:products,id'],
             'quantity' => ['nullable', 'integer', 'min:1'],
+            'summary' => ['nullable', 'array'],
         ]);
 
         $product = Product::with([
@@ -85,8 +90,8 @@ class OrderFlowController extends Controller
             'paperStocks',
             'addons',
             'colors',
-            'bulkOrders',
         ])->findOrFail($data['product_id']);
+        $product->setRelation('bulkOrders', collect());
 
         $quantity = $data['quantity'] ?? $this->orderFlow->defaultQuantityFor($product);
         $unitPrice = $this->orderFlow->unitPriceFor($product);
@@ -104,45 +109,199 @@ class OrderFlowController extends Controller
 
         $images = $this->orderFlow->resolveProductImages($product);
 
-        $summary = [
-            'orderId' => null,
-            'orderNumber' => null,
-            'orderStatus' => 'draft',
-            'paymentStatus' => null,
-            'productId' => $product->id,
-            'productName' => $product->name ?? 'Custom Invitation',
-            'quantity' => $quantity,
-            'unitPrice' => $unitPrice,
-            'subtotalAmount' => $subtotal,
-            'taxAmount' => $taxAmount,
-            'shippingFee' => $shippingFee,
-            'totalAmount' => $total,
-            'previewImages' => $images['all'] ?? [],
-            'previewImage' => $images['front'] ?? null,
-            'invitationImage' => $images['front'] ?? null,
-            'paperStockId' => null,
-            'paperStockName' => null,
-            'paperStockPrice' => null,
-            'addons' => [],
-            'addonIds' => [],
-            'metadata' => [
-                'design' => $designMetadata,
-            ],
-            'placeholders' => $designMetadata['placeholders'] ?? [],
-            'extras' => [
-                'paper' => 0,
-                'addons' => 0,
-                'envelope' => 0,
-                'giveaway' => 0,
-            ],
-        ];
+        // If the client provided a full summary payload (from final step), prefer it
+        if (!empty($data['summary']) && is_array($data['summary'])) {
+            $summary = $data['summary'];
+            // ensure key productId exists
+            $summary['productId'] = $summary['productId'] ?? $summary['product_id'] ?? $product->id;
+            $summary['quantity'] = $summary['quantity'] ?? $quantity;
+            $summary['unitPrice'] = $summary['unitPrice'] ?? $summary['unit_price'] ?? $unitPrice;
+            $summary['subtotalAmount'] = $summary['subtotalAmount'] ?? $summary['subtotal_amount'] ?? round(($summary['unitPrice'] ?? $unitPrice) * ($summary['quantity'] ?? $quantity), 2);
+            $summary['taxAmount'] = $summary['taxAmount'] ?? $taxAmount;
+            $summary['shippingFee'] = $summary['shippingFee'] ?? $shippingFee;
+            $summary['totalAmount'] = $summary['totalAmount'] ?? $summary['total_amount'] ?? round(($summary['subtotalAmount'] ?? $subtotal) + $summary['taxAmount'] + $summary['shippingFee'], 2);
+        } else {
+            $summary = [
+                'orderId' => null,
+                'orderNumber' => null,
+                'orderStatus' => 'draft',
+                'paymentStatus' => null,
+                'productId' => $product->id,
+                'productName' => $product->name ?? 'Custom Invitation',
+                'quantity' => $quantity,
+                'unitPrice' => $unitPrice,
+                'subtotalAmount' => $subtotal,
+                'taxAmount' => $taxAmount,
+                'shippingFee' => $shippingFee,
+                'totalAmount' => $total,
+                'previewImages' => $images['all'] ?? [],
+                'previewImage' => $images['front'] ?? null,
+                'invitationImage' => $images['front'] ?? null,
+                'paperStockId' => null,
+                'paperStockName' => null,
+                'paperStockPrice' => null,
+                'addons' => [],
+                'addonIds' => [],
+                'metadata' => [
+                    'design' => $designMetadata,
+                ],
+                'placeholders' => $designMetadata['placeholders'] ?? [],
+                'extras' => [
+                    'paper' => 0,
+                    'addons' => 0,
+                    'envelope' => 0,
+                    'giveaway' => 0,
+                ],
+            ];
+        }
+
+        $summary['productId'] = $summary['productId'] ?? $product->id;
+        $summary['productName'] = $summary['productName'] ?? ($product->name ?? 'Custom Invitation');
 
         // Replace any existing session summary for a fresh edit flow
         session()->put(static::SESSION_SUMMARY_KEY, $summary);
+
+        $cart = null;
+        $cartItem = null;
+
+        try {
+            [$cart, $cartItem] = $this->persistCartSelection($product, $summary);
+        } catch (\Throwable $ex) {
+            report($ex);
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Unable to add the item to your cart at this time. Please try again.',
+                ], 500);
+            }
+        }
+
         // Ensure we are not pointing at an existing persisted order
         session()->forget(static::SESSION_ORDER_ID);
 
+        if ($request->expectsJson()) {
+            return response()->json([
+                'cart_id' => $cart?->id,
+                'cart_item_id' => $cartItem?->id,
+                'quantity' => $cartItem?->quantity,
+                'total_amount' => $cart?->total_amount,
+            ], $cartItem ? 201 : 200);
+        }
+
         return redirect()->route('order.review');
+    }
+
+    /**
+     * Persist the provided summary into the active cart for the current session/user.
+     *
+     * @return array{0: Cart, 1: CartItem}
+     */
+    private function persistCartSelection(Product $product, array $summary): array
+    {
+        $userId = Auth::id();
+        $sessionId = session()->getId();
+        // We are moving to a cart_items-only approach. Store session_id on cart_items
+        // and treat the collection of matching cart_items as the "active cart".
+
+        $summary['productId'] = $summary['productId'] ?? $product->id;
+        $summary['productName'] = $summary['productName'] ?? ($product->name ?? 'Custom Invitation');
+
+        $paperTypeId = data_get($summary, 'paperStockId') ?? data_get($summary, 'paper_stock_id');
+        $paperPrice = data_get($summary, 'paperStockPrice') ?? data_get($summary, 'paper_stock_price');
+
+        $unit = data_get($summary, 'unitPrice') ?? data_get($summary, 'unit_price');
+        if (!is_numeric($unit) || (float) $unit <= 0) {
+            $unit = $this->orderFlow->unitPriceFor($product);
+        }
+        $unit = round((float) $unit, 2);
+
+        $qty = data_get($summary, 'quantity');
+        if (!is_numeric($qty) || (int) $qty <= 0) {
+            $qty = $this->orderFlow->defaultQuantityFor($product);
+        }
+        $qty = max(1, (int) $qty);
+
+        $totalAmount = data_get($summary, 'totalAmount') ?? data_get($summary, 'total_amount');
+        if (!is_numeric($totalAmount) || (float) $totalAmount <= 0) {
+            $totalAmount = round($unit * $qty, 2);
+        } else {
+            $totalAmount = round((float) $totalAmount, 2);
+        }
+
+        $summary['unitPrice'] = $unit;
+        $summary['quantity'] = $qty;
+        $summary['totalAmount'] = $totalAmount;
+
+        $cartItemData = [
+            'session_id' => $sessionId,
+            'customer_id' => $userId,
+            'product_type' => $product->product_type ?? data_get($summary, 'product_type'),
+            'product_id' => $product->id,
+            'quantity' => $qty,
+            'paper_type_id' => $paperTypeId,
+            'paper_price' => $paperPrice,
+            'unit_price' => $unit,
+            'total_price' => $totalAmount,
+            'status' => data_get($summary, 'status', 'not_ordered'),
+            'metadata' => $summary,
+        ];
+
+        // Find an existing matching cart_item for this session/user
+        $existingQuery = CartItem::query()
+            ->where(function ($q) use ($userId, $sessionId) {
+                $q->where('customer_id', $userId)
+                  ->orWhere('session_id', $sessionId);
+            })
+            ->where('product_id', $cartItemData['product_id'])
+            ->where('status', $cartItemData['status'])
+            ->when($paperTypeId, fn ($query) => $query->where('paper_type_id', $paperTypeId))
+            ->when(!$paperTypeId, fn ($query) => $query->whereNull('paper_type_id'));
+
+        $cartItem = $existingQuery->latest('id')->first();
+
+        if ($cartItem) {
+            $cartItem->fill($cartItemData);
+            $cartItem->save();
+        } else {
+            $cartItem = CartItem::create($cartItemData);
+        }
+
+        // Build an in-memory representation of the active cart (collection + totals)
+        $items = CartItem::where(function ($q) use ($userId, $sessionId) {
+            $q->where('customer_id', $userId)
+              ->orWhere('session_id', $sessionId);
+        })->with(['product.template'])->orderByDesc('created_at')->get();
+
+        $cart = new Cart();
+        $cart->setRelation('items', $items);
+        $cart->total_amount = $items->sum('total_price');
+
+        $cartItem->refresh();
+
+        return [$cart, $cartItem];
+    }
+
+    private function resolveActiveCart(): ?Cart
+    {
+        $sessionId = session()->getId();
+        $userId = Auth::id();
+
+        $items = CartItem::where(function ($q) use ($sessionId, $userId) {
+            $q->where('session_id', $sessionId);
+            if ($userId) {
+                $q->orWhere('customer_id', $userId);
+            }
+        })->with(['product.template'])->orderByDesc('created_at')->get();
+
+        if ($items->isEmpty()) {
+            return null;
+        }
+
+        $cart = new Cart();
+        $cart->setRelation('items', $items);
+        $cart->total_amount = $items->sum('total_price');
+
+        return $cart;
     }
 
     public function autosaveDesign(Request $request): JsonResponse
@@ -207,6 +366,30 @@ class OrderFlowController extends Controller
         session()->put(static::SESSION_SUMMARY_KEY, $summary);
 
         $order = $this->currentOrder(false);
+
+        $product = $order?->items->first()?->product;
+        if (!$product) {
+            $productId = $summary['productId'] ?? null;
+            if ($productId) {
+                $product = $this->orderFlow->resolveProduct(null, (int) $productId);
+            }
+        }
+
+        if ($product) {
+            $this->orderFlow->persistDesignDraft($product, [
+                'design' => $designMeta,
+                'placeholders' => $placeholders,
+                'preview_image' => $primaryPreview,
+                'preview_images' => $previewImages,
+                'summary' => $summary,
+                'status' => $summary['orderStatus'] ?? 'draft',
+                'is_locked' => false,
+                'order_id' => $order?->id,
+                'order_item_id' => $order?->items->first()?->id,
+                'last_edited_at' => $designMeta['updated_at'] ?? Carbon::now()->toIso8601String(),
+            ], Auth::user());
+        }
+
         if ($order) {
             DB::transaction(function () use (&$order, $designMeta, $placeholders, $summary) {
                 $previewImages = $summary['previewImages'] ?? [];
@@ -238,13 +421,54 @@ class OrderFlowController extends Controller
         // session-only summary created in the editor flow.
         if (!$order) {
             $summary = session(static::SESSION_SUMMARY_KEY);
-            if (!$summary || empty($summary['productId'])) {
+            if (!$summary || !is_array($summary)) {
+                $summary = [];
+            }
+
+            $productId = $summary['productId'] ?? null;
+            $product = $productId ? $this->orderFlow->resolveProduct(null, $productId) : null;
+
+            $storedDraft = $product ? $this->orderFlow->loadDesignDraft($product, Auth::user()) : null;
+
+            if (!$product && $storedDraft && !empty($storedDraft['product_id'])) {
+                $product = $this->orderFlow->resolveProduct(null, (int) $storedDraft['product_id']);
+                $summary['productId'] = $summary['productId'] ?? $storedDraft['product_id'];
+            }
+
+            if ($storedDraft) {
+                if (!empty($storedDraft['design'])) {
+                    $summary['metadata']['design'] = $storedDraft['design'];
+                }
+
+                if (empty($summary['placeholders']) && !empty($storedDraft['placeholders'])) {
+                    $summary['placeholders'] = $storedDraft['placeholders'];
+                }
+
+                if (empty($summary['previewImages']) && !empty($storedDraft['preview_images'])) {
+                    $summary['previewImages'] = $storedDraft['preview_images'];
+                }
+
+                if (empty($summary['previewImage']) && !empty($storedDraft['preview_image'])) {
+                    $summary['previewImage'] = $storedDraft['preview_image'];
+                    $summary['invitationImage'] = $storedDraft['preview_image'];
+                }
+
+                if (empty($summary['orderStatus']) && !empty($storedDraft['status'])) {
+                    $summary['orderStatus'] = $storedDraft['status'];
+                }
+            }
+
+            $summary['metadata'] = is_array($summary['metadata'] ?? null) ? $summary['metadata'] : [];
+            $summary['metadata']['design'] = $summary['metadata']['design'] ?? ($storedDraft['design'] ?? []);
+
+            if (!$product) {
                 return $this->redirectToCatalog();
             }
 
-            $product = $this->orderFlow->resolveProduct(null, $summary['productId']);
             $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
             $placeholderItems = collect($summary['placeholders'] ?? []);
+
+            $customerReview = $this->orderFlow->loadCustomerReview($product->template_id, Auth::user());
 
             $summaryPreviewImages = array_values(array_filter($summary['previewImages'] ?? [], fn ($value) => is_string($value) && trim($value) !== ''));
             if (!empty($summaryPreviewImages)) {
@@ -281,16 +505,59 @@ class OrderFlowController extends Controller
                 'continueHref' => route('order.finalstep'),
                 'editHref' => $product && $product->template ? route('design.studio', ['template' => $product->template->id]) : route('design.edit'),
                 'orderSummary' => $summary,
+                'customerReview' => $customerReview,
             ]);
         }
 
         $this->updateSessionSummary($order);
+
+        // Mark any cart for this session as done (order persisted) but keep records
+        try {
+            $sessionId = session()->getId();
+            $cart = Cart::where('session_id', $sessionId)->latest()->first();
+            if ($cart) {
+                $metadata = is_array($cart->metadata) ? $cart->metadata : (array) ($cart->metadata ?? []);
+                $metadata['finalized_order_id'] = $order->id ?? null;
+                $metadata['finalized_order_number'] = $order->order_number ?? null;
+                $cart->update([
+                    'status' => 'done',
+                    'total_amount' => $order->total_amount ?? $cart->total_amount,
+                    'metadata' => $metadata,
+                ]);
+            }
+        } catch (\Throwable $_e) {
+            report($_e);
+        }
 
         $item = $order->items->first();
         $product = optional($item)->product;
         $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
         $designMeta = $item?->design_metadata ?? [];
         $placeholderItems = collect(Arr::get($designMeta, 'placeholders', []));
+
+        // If persisted order lacks design metadata, attempt to load the user's draft
+        if (empty($designMeta) && $product) {
+            $storedDraft = $this->orderFlow->loadDesignDraft($product, Auth::user());
+            if ($storedDraft) {
+                $designMeta = $storedDraft['design'] ?? [];
+                $placeholderItems = collect($storedDraft['placeholders'] ?? []);
+
+                if (!empty($storedDraft['preview_images'])) {
+                    $images['all'] = $storedDraft['preview_images'];
+                    $images['front'] = $storedDraft['preview_images'][0] ?? ($images['front'] ?? null);
+                    if (!empty($storedDraft['preview_images'][1])) {
+                        $images['back'] = $storedDraft['preview_images'][1];
+                    }
+                }
+
+                if (!empty($storedDraft['preview_image'])) {
+                    $images['front'] = $storedDraft['preview_image'];
+                    $images['all'][0] = $storedDraft['preview_image'];
+                }
+            }
+        }
+
+        $customerReview = $product ? $this->orderFlow->loadCustomerReview($product->template_id, Auth::user()) : null;
 
         $summaryPayload = session(static::SESSION_SUMMARY_KEY);
         if (is_array($summaryPayload)) {
@@ -328,25 +595,42 @@ class OrderFlowController extends Controller
             'continueHref' => route('order.finalstep'),
             'editHref' => $product && $product->template ? route('design.studio', ['template' => $product->template->id]) : route('design.edit'),
             'orderSummary' => session(static::SESSION_SUMMARY_KEY),
+            'customerReview' => $customerReview,
         ]);
     }
 
-    public function addToCart(Request $request): ViewContract
+    public function addToCart(Request $request): mixed
     {
         $order = $this->currentOrder();
+        $cart = $this->resolveActiveCart();
 
-        // Session-only or product-preview path
-        if (!$order) {
+        if (!$order && (!$cart || $cart->items->isEmpty())) {
             $summary = session(static::SESSION_SUMMARY_KEY);
             if (!$summary || empty($summary['productId'])) {
                 return $this->redirectToCatalog();
             }
 
             $product = $this->orderFlow->resolveProduct(null, $summary['productId']);
+
+            if ($product) {
+                try {
+                    [$cart] = $this->persistCartSelection($product, $summary);
+                    $cart = $this->resolveActiveCart();
+                } catch (\Throwable $_e) {
+                    report($_e);
+                }
+            }
+        }
+
+        if ($order) {
+            $this->updateSessionSummary($order);
+
+            $item = $order->items->first();
+            $product = optional($item)->product;
             $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
 
             return view('customer.orderflow.addtocart', [
-                'order' => null,
+                'order' => $order,
                 'product' => $product,
                 'finalArtworkFront' => $images['front'],
                 'finalArtworkBack' => $images['back'],
@@ -355,18 +639,53 @@ class OrderFlowController extends Controller
                     'back' => $images['back'],
                 ],
                 'envelopeUrl' => route('order.envelope'),
-                'orderSummary' => $summary,
+                'orderSummary' => session(static::SESSION_SUMMARY_KEY),
+                'cart' => $cart,
+                'cartItems' => collect($cart?->items ?? []),
+                'cartTotalAmount' => $cart?->total_amount ?? collect($cart?->items ?? [])->sum('total_price'),
             ]);
         }
 
-        $this->updateSessionSummary($order);
+        $cartItems = collect($cart?->items ?? []);
 
-        $item = $order->items->first();
-        $product = optional($item)->product;
+        if ($cartItems->isEmpty()) {
+            return $this->redirectToCatalog();
+        }
+
+        $primaryItem = $cartItems->first();
+        $product = $primaryItem?->product;
+
+        $orderSummary = session(static::SESSION_SUMMARY_KEY);
+        if (!is_array($orderSummary) || empty($orderSummary)) {
+            $orderSummary = $primaryItem?->metadata ?? [];
+        }
+
+        if (!$product && !empty($orderSummary['productId'])) {
+            $product = $this->orderFlow->resolveProduct(null, $orderSummary['productId']);
+        }
+
         $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
 
+        $previewImages = array_values(array_filter(data_get($orderSummary, 'previewImages', []), fn ($value) => is_string($value) && trim($value) !== ''));
+        if (!empty($previewImages)) {
+            $images['all'] = $previewImages;
+            $images['front'] = $previewImages[0];
+            if (!empty($previewImages[1])) {
+                $images['back'] = $previewImages[1];
+            }
+        }
+
+        if (!empty($orderSummary['previewImage']) && is_string($orderSummary['previewImage'])) {
+            $images['front'] = $orderSummary['previewImage'];
+            if (empty($images['all'])) {
+                $images['all'] = [$orderSummary['previewImage']];
+            } else {
+                $images['all'][0] = $orderSummary['previewImage'];
+            }
+        }
+
         return view('customer.orderflow.addtocart', [
-            'order' => $order,
+            'order' => null,
             'product' => $product,
             'finalArtworkFront' => $images['front'],
             'finalArtworkBack' => $images['back'],
@@ -375,7 +694,10 @@ class OrderFlowController extends Controller
                 'back' => $images['back'],
             ],
             'envelopeUrl' => route('order.envelope'),
-            'orderSummary' => session(static::SESSION_SUMMARY_KEY),
+            'orderSummary' => $orderSummary,
+            'cart' => $cart,
+            'cartItems' => $cartItems,
+            'cartTotalAmount' => $cart?->total_amount ?? $cartItems->sum('total_price'),
         ]);
     }
 
@@ -410,10 +732,10 @@ class OrderFlowController extends Controller
                     'template',
                     'uploads',
                     'images',
-                    'paperStocks',
+                    'paperStocks.material',
                     'addons',
-                    'bulkOrders',
                 ]);
+                $product->setRelation('bulkOrders', collect());
             }
 
             $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
@@ -425,12 +747,16 @@ class OrderFlowController extends Controller
             $paperStockOptions = $this->orderFlow->buildPaperStockOptions($product, $selectedPaperStockId);
             $addonGroups = $this->orderFlow->buildAddonGroups($product, $selectedAddonIds);
 
-            // Calculate quantity limits from bulk orders
-            $bulkOrders = $product->bulkOrders ?? collect();
-            $minQty = $bulkOrders->pluck('min_qty')->filter()->min() ?? 20;
-            $maxQty = $bulkOrders->pluck('max_qty')->filter()->max();
+            // Bulk orders removed; default quantity bounds
+            $bulkOrders = collect();
+            $minQty = 20;
+            $maxQty = null;
 
             $orderPlaceholder = (object) ['items' => collect()];
+
+            $minPickupDate = Carbon::tomorrow();
+            $maxPickupDate = Carbon::now()->addMonths(2);
+            $resolvedPickupDate = $this->resolvePickupDate(null, $summary, $minPickupDate, $maxPickupDate);
 
             return view('customer.orderflow.finalstep', [
                 'order' => $orderPlaceholder,
@@ -446,10 +772,10 @@ class OrderFlowController extends Controller
                 'basePrice' => $this->orderFlow->unitPriceFor($product),
                 'minQty' => $minQty,
                 'maxQty' => $maxQty,
-                'estimatedDeliveryDate' => Carbon::now()->addWeekdays(5)->format('F j, Y'),
-                'estimatedDeliveryDateFormatted' => Carbon::now()->addWeekdays(5)->format('Y-m-d'),
-                'estimatedDeliveryMinDate' => Carbon::now()->addWeekdays(5)->subDays(2)->format('Y-m-d'),
-                'estimatedDeliveryMaxDate' => Carbon::now()->addWeekdays(5)->format('Y-m-d'),
+                'estimatedDeliveryDate' => $resolvedPickupDate->format('F j, Y'),
+                'estimatedDeliveryDateFormatted' => $resolvedPickupDate->format('Y-m-d'),
+                'estimatedDeliveryMinDate' => $minPickupDate->format('Y-m-d'),
+                'estimatedDeliveryMaxDate' => $maxPickupDate->format('Y-m-d'),
                 'orderSummary' => $summary,
             ]);
         }
@@ -465,10 +791,10 @@ class OrderFlowController extends Controller
                 'template',
                 'uploads',
                 'images',
-                'paperStocks',
+                'paperStocks.material',
                 'addons',
-                'bulkOrders',
             ]);
+            $product->setRelation('bulkOrders', collect());
         }
 
         $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
@@ -480,10 +806,15 @@ class OrderFlowController extends Controller
         $paperStockOptions = $this->orderFlow->buildPaperStockOptions($product, $selectedPaperStockId);
         $addonGroups = $this->orderFlow->buildAddonGroups($product, $selectedAddonIds);
 
-        // Calculate quantity limits from bulk orders
-        $bulkOrders = $product->bulkOrders ?? collect();
-        $minQty = $bulkOrders->pluck('min_qty')->filter()->min() ?? 20;
-        $maxQty = $bulkOrders->pluck('max_qty')->filter()->max();
+        // Bulk orders removed; default quantity bounds
+        $bulkOrders = collect();
+        $minQty = 20;
+        $maxQty = null;
+
+        $summaryPayload = session(static::SESSION_SUMMARY_KEY);
+        $minPickupDate = Carbon::tomorrow();
+        $maxPickupDate = Carbon::now()->addMonths(2);
+        $resolvedPickupDate = $this->resolvePickupDate($order, $summaryPayload, $minPickupDate, $maxPickupDate);
 
         return view('customer.orderflow.finalstep', [
             'order' => $order,
@@ -499,11 +830,11 @@ class OrderFlowController extends Controller
             'basePrice' => $this->orderFlow->unitPriceFor($product),
             'minQty' => $minQty,
             'maxQty' => $maxQty,
-            'estimatedDeliveryDate' => Carbon::now()->addWeekdays(5)->format('F j, Y'),
-            'estimatedDeliveryDateFormatted' => Carbon::now()->addWeekdays(5)->format('Y-m-d'),
-            'estimatedDeliveryMinDate' => Carbon::now()->addWeekdays(5)->subDays(2)->format('Y-m-d'),
-            'estimatedDeliveryMaxDate' => Carbon::now()->addWeekdays(5)->format('Y-m-d'),
-            'orderSummary' => session(static::SESSION_SUMMARY_KEY),
+            'estimatedDeliveryDate' => $resolvedPickupDate->format('F j, Y'),
+            'estimatedDeliveryDateFormatted' => $resolvedPickupDate->format('Y-m-d'),
+            'estimatedDeliveryMinDate' => $minPickupDate->format('Y-m-d'),
+            'estimatedDeliveryMaxDate' => $maxPickupDate->format('Y-m-d'),
+            'orderSummary' => $summaryPayload,
         ]);
     }
 
@@ -597,11 +928,31 @@ class OrderFlowController extends Controller
 
         $this->updateSessionSummary($order);
 
+        // Persist finalized snapshot for reporting/reference
+        $latestSummary = session(static::SESSION_SUMMARY_KEY) ?? [];
+        try {
+            $this->orderFlow->persistFinalizedSelection($order, is_array($latestSummary) ? $latestSummary : [], $product ?? null);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         // remove the one-time allowance to prevent other pages from reusing it
         session()->forget('order_checkout_allowed_for');
 
         if ($orderJustCreated && $order) {
             $this->notifyTeamOfNewOrder($order);
+        }
+
+        $latestSummary = session(static::SESSION_SUMMARY_KEY);
+        if (is_array($latestSummary) && !empty($latestSummary['productId'])) {
+            try {
+                $productForCart = Product::find($latestSummary['productId']);
+                if ($productForCart) {
+                    $this->persistCartSelection($productForCart, $latestSummary);
+                }
+            } catch (\Throwable $cartError) {
+                report($cartError);
+            }
         }
 
         // Return admin redirect URL so the client (GCash button) can redirect to admin order summary
@@ -636,6 +987,7 @@ class OrderFlowController extends Controller
             return view('customer.Envelope.Envelope', [
                 'order' => null,
                 'orderSummary' => $summary,
+                'envelopeCatalog' => $this->cachedEnvelopeOptions(),
             ]);
         }
 
@@ -644,32 +996,115 @@ class OrderFlowController extends Controller
         return view('customer.Envelope.Envelope', [
             'order' => $order,
             'orderSummary' => session(static::SESSION_SUMMARY_KEY),
+            'envelopeCatalog' => $this->cachedEnvelopeOptions(),
         ]);
     }
 
     public function envelopeOptions(): JsonResponse
     {
-        $fallbackImage = asset('images/no-image.png');
+        return response()->json($this->cachedEnvelopeOptions());
+    }
 
-        $envelopes = ProductEnvelope::query()
-            ->with(['product'])
-            ->orderByDesc('updated_at')
-            ->get()
-            ->map(function (ProductEnvelope $envelope) use ($fallbackImage) {
-                return [
-                    'id' => $envelope->id,
-                    'product_id' => $envelope->product_id,
-                    'name' => $envelope->product?->name ?? $envelope->envelope_material_name ?? 'Envelope',
-                    'price' => $envelope->price_per_unit ?? 0,
-                    'image' => $this->orderFlow->resolveMediaPath($envelope->envelope_image, $fallbackImage),
-                    'material' => $envelope->envelope_material_name,
-                    'max_qty' => $envelope->max_qty ?? $envelope->max_quantity,
-                    'updated_at' => $envelope->updated_at?->toIso8601String(),
-                ];
-            })
-            ->values();
+    private function cachedEnvelopeOptions(): array
+    {
+        $cacheKey = 'envelope_options_api_v4'; // Updated cache key to force refresh
+        $cacheDuration = 60; // 60 seconds to keep stock changes fresh
 
-        return response()->json($envelopes);
+        $orderFlow = $this->orderFlow;
+
+        return Cache::remember($cacheKey, $cacheDuration, function () use ($orderFlow) {
+            $fallbackImage = asset('images/no-image.png');
+
+            return ProductEnvelope::query()
+                ->with(['product', 'product.images', 'product.template', 'material', 'material.inventory'])
+                ->orderByDesc('updated_at')
+                ->get()
+                ->map(function (ProductEnvelope $envelope) use ($fallbackImage, $orderFlow) {
+                    $product = $envelope->product;
+                    
+                    // Try multiple image sources like ProductController
+                    $imageCandidates = [
+                        $envelope->envelope_image,
+                        optional($product?->images)->front,
+                        optional($product?->images)->preview,
+                        $product?->image,
+                        optional($product?->template)->preview_front,
+                        optional($product?->template)->image,
+                    ];
+
+                    $image = collect($imageCandidates)
+                        ->filter()
+                        ->map(function ($path) {
+                            if (!$path) {
+                                return null;
+                            }
+                            if (preg_match('/^(https?:)?\/\//i', $path)) {
+                                return $path;
+                            }
+
+                            // If path looks like an absolute filesystem path starting with '/', keep it
+                            if (str_starts_with($path, '/')) {
+                                return $path;
+                            }
+
+                            // Try resolving via Storage (e.g. 'public/...')
+                            try {
+                                return Storage::url($path);
+                            } catch (\Throwable $e) {
+                                return null;
+                            }
+                        })
+                        ->first() ?? $fallbackImage;
+
+                    // Ensure the returned image is an absolute URL that the browser can load
+                    if ($image && !preg_match('/^(https?:)?\/\//i', $image)) {
+                        // Trim leading slash and make an absolute asset URL
+                        $image = asset(ltrim($image, '/'));
+                    }
+
+                    $availability = $orderFlow->resolveEnvelopeAvailability($envelope);
+                    $maxQuantity = $availability['max_quantity'] ?? null;
+                    $availableStock = $availability['available_stock'] ?? null;
+
+                    // If material inventory exists, surface it for front-end validation
+                    $materialInventory = $envelope->material?->inventory;
+                    $stockQty = $materialInventory?->quantity_available ?? $availableStock;
+
+                    $defaultMin = 10;
+                    $minQty = $defaultMin;
+                    if ($maxQuantity !== null) {
+                        if ($maxQuantity <= 0) {
+                            $minQty = 0;
+                        } else {
+                            $minQty = max(1, min($defaultMin, $maxQuantity));
+                        }
+                    }
+
+                    return [
+                        'id' => $envelope->id,
+                        'product_id' => $envelope->product_id,
+                        'name' => $product?->name ?? $envelope->envelope_material_name ?? 'Envelope',
+                        'price' => $envelope->price_per_unit ?? 0,
+                        'image' => $image,
+                        'material' => $envelope->envelope_material_name ?? optional(Arr::get($availability, 'material'))->material_name,
+                        'material_type' => $envelope->material?->material_type,
+                        'material_id' => $envelope->material_id,
+                        'min_qty' => $minQty,
+                        'max_qty' => $maxQuantity,
+                        'available_stock' => $availableStock,
+                        'stock_qty' => $stockQty,
+                        'updated_at' => $envelope->updated_at?->toIso8601String(),
+                    ];
+                })
+                // Hide out-of-stock materials
+                ->filter(function (array $item) {
+                    if (!array_key_exists('stock_qty', $item)) return true;
+                    if ($item['stock_qty'] === null) return true;
+                    return $item['stock_qty'] > 0;
+                })
+                ->values()
+                ->toArray();
+        });
     }
 
     public function giveawayOptions(): JsonResponse
@@ -677,34 +1112,100 @@ class OrderFlowController extends Controller
         $fallbackImage = asset('images/placeholder.png');
 
         $giveaways = Product::query()
-            ->with(['template', 'uploads', 'images', 'bulkOrders'])
-            ->where('product_type', 'Giveaway')
-            ->whereHas('uploads')
+            ->with([
+                'template',
+                'uploads',
+                'images',
+                'materials.material.inventory',
+            ])
+            ->whereRaw('LOWER(product_type) = ?', ['giveaway'])
             ->orderByDesc('updated_at')
             ->get()
             ->map(function (Product $product) use ($fallbackImage) {
-                $images = $this->orderFlow->resolveProductImages($product);
-                $unitPrice = $this->orderFlow->unitPriceFor($product);
-                $bulkTier = $product->bulkOrders->sortBy('min_qty')->first();
+                $product->setRelation('bulkOrders', collect());
+                $payload = $this->formatGiveawayProduct($product, $fallbackImage);
+                $material = $product->materials->first()?->material;
+                $stockQty = $material?->inventory?->quantity_available ?? $material?->stock_qty;
 
-                return [
-                    'id' => $product->id,
-                    'product_id' => $product->id,
-                    'name' => $product->name ?? 'Giveaway',
-                    'price' => $unitPrice,
-                    'image' => $images['front'] ?? $fallbackImage,
-                    'images' => $images['all'] ?? [],
-                    'description' => Str::limit(strip_tags($product->description ?? ''), 220),
-                    'material' => null,
-                    'min_qty' => $bulkTier?->min_qty,
-                    'max_qty' => $bulkTier?->max_qty,
-                    'preview_url' => route('product.preview', $product->id),
-                    'updated_at' => $product->updated_at?->toIso8601String(),
+                // Do not cap by bulk rules; use stock only if available
+                $resolvedMax = $stockQty !== null ? (int) $stockQty : null;
+
+                $payload['metadata'] = [
+                    'id' => $payload['product_id'],
+                    'name' => $payload['name'],
+                    'price' => $payload['price'],
+                    'image' => $payload['image'],
+                    'min_qty' => $payload['min_qty'],
+                    'max_qty' => $resolvedMax,
+                    'step' => $payload['step'],
+                    'material' => $material?->material_name,
+                    'material_type' => $material?->material_type,
+                    'stock_qty' => $stockQty,
                 ];
+
+                $payload['material'] = $material?->material_name;
+                $payload['material_type'] = $material?->material_type;
+                $payload['stock_qty'] = $stockQty;
+                $payload['max_qty'] = $resolvedMax;
+
+                return $payload;
+            })
+            ->filter(function (array $item) {
+                // Keep all products visible, including out-of-stock ones for pre-order
+                return true;
             })
             ->values();
 
         return response()->json($giveaways);
+    }
+
+    private function formatGiveawayProduct(Product $product, ?string $fallbackImage = null): array
+    {
+        $images = $this->orderFlow->resolveProductImages($product);
+        $unitPrice = $this->orderFlow->unitPriceFor($product);
+        $bulkTier = null;
+        $templateId = $product->template?->id ?? $product->template_id;
+
+        $designUrl = null;
+        if ($templateId) {
+            $designUrl = route('design.studio', [
+                'template' => $templateId,
+                'product' => $product->id,
+            ]);
+        } elseif (Route::has('design.edit')) {
+            $designUrl = route('design.edit', ['product' => $product->id]);
+        }
+
+        $primaryImage = $images['front']
+            ?? ($images['all'][0] ?? null)
+            ?? $fallbackImage
+            ?? asset('images/no-image.png');
+
+        $defaultQty = max($this->orderFlow->defaultQuantityFor($product), 1);
+
+        $tiers = [];
+
+        return [
+            'id' => $product->id,
+            'product_id' => $product->id,
+            'name' => $product->name ?? 'Giveaway',
+            'price' => $unitPrice,
+            'tiers' => $tiers,
+            'image' => $primaryImage,
+            'images' => $images['all'] ?? [],
+            'description' => Str::limit(strip_tags($product->description ?? ''), 220),
+            'material' => null,
+            'min_qty' => $defaultQty,
+            'max_qty' => null,
+            'step' => max(1, 5),
+            'default_qty' => $defaultQty,
+            'preview_url' => route('product.preview', $product->id),
+            'event_type' => $product->event_type ?: null,
+            'theme_style' => $product->theme_style ?: null,
+            'updated_at' => $product->updated_at?->toIso8601String(),
+            'template_id' => $templateId,
+            'design_url' => $designUrl,
+        ];
     }
 
     /**
@@ -751,25 +1252,67 @@ class OrderFlowController extends Controller
             }
 
             $envelopeMeta = $payload['metadata'] ?? [];
+            $resolvedEnvelope = $request->resolvedEnvelope();
+            $availability = $request->resolvedEnvelopeAvailability();
+
+            $maxQuantity = Arr::get($availability, 'max_quantity', $envelopeMeta['max_qty'] ?? null);
+            if ($maxQuantity !== null) {
+                $maxQuantity = (int) $maxQuantity;
+                if ($maxQuantity >= 1 && $quantity > $maxQuantity) {
+                    $quantity = $maxQuantity;
+                    $total = $quantity * $unitPrice;
+                }
+            }
+
+            $availableStock = Arr::get($availability, 'available_stock');
+            $materialName = $envelopeMeta['material']
+                ?? $resolvedEnvelope?->envelope_material_name
+                ?? Arr::get($availability, 'material.material_name');
 
             $meta = array_filter([
                 'id' => $payload['envelope_id'] ?? $envelopeMeta['id'] ?? null,
-                'product_id' => $payload['product_id'] ?? null,
+                'product_id' => $payload['product_id'] ?? $resolvedEnvelope?->product_id,
                 'name' => $envelopeMeta['name'] ?? null,
                 'price' => $unitPrice,
                 'qty' => $quantity,
                 'total' => (float) $total,
-                'material' => $envelopeMeta['material'] ?? null,
+                'material' => $materialName,
                 'image' => $envelopeMeta['image'] ?? null,
                 'min_qty' => $envelopeMeta['min_qty'] ?? null,
-                'max_qty' => $envelopeMeta['max_qty'] ?? null,
+                'max_qty' => $maxQuantity,
+                'available_stock' => $availableStock,
+                'material_id' => $resolvedEnvelope?->material_id,
                 'updated_at' => now()->toIso8601String(),
             ], fn ($v) => $v !== null && $v !== '');
 
             $summary['giveaway'] = $summary['giveaway'] ?? null; // keep any existing
-            $summary['envelope'] = $meta;
+
+            // Support multiple envelope selections; keep legacy single "envelope" for backward compatibility
+            $envelopes = $summary['envelopes'] ?? [];
+            if (empty($envelopes) && !empty($summary['envelope'])) {
+                $envelopes[] = $summary['envelope'];
+            }
+
+            // Replace existing entry by id or append
+            $existingIndex = null;
+            foreach ($envelopes as $idx => $envelopeRow) {
+                if (($envelopeRow['id'] ?? null) === ($meta['id'] ?? null)) {
+                    $existingIndex = $idx;
+                    break;
+                }
+            }
+            if ($existingIndex !== null) {
+                $envelopes[$existingIndex] = $meta;
+            } else {
+                $envelopes[] = $meta;
+            }
+
+            $summary['envelopes'] = array_values($envelopes);
+            $summary['envelope'] = $summary['envelopes'][0] ?? $meta; // legacy consumers
+            $summary['hasEnvelope'] = !empty($summary['envelopes']);
+
             $summary['extras'] = $summary['extras'] ?? ['paper' => 0, 'addons' => 0, 'envelope' => 0, 'giveaway' => 0];
-            $summary['extras']['envelope'] = (float) $meta['total'];
+            $summary['extras']['envelope'] = (float) collect($summary['envelopes'])->sum(fn ($row) => (float) ($row['total'] ?? 0));
 
             // update totals
             $summary['subtotalAmount'] = ($summary['subtotalAmount'] ?? 0);
@@ -810,14 +1353,37 @@ class OrderFlowController extends Controller
         ]);
     }
 
-    public function clearEnvelope(): JsonResponse
+    public function clearEnvelope(Request $request): JsonResponse
     {
+        $productId = $request->input('product_id');
         $order = $this->currentOrder();
         if (!$order) {
             $summary = session(static::SESSION_SUMMARY_KEY) ?? [];
-            unset($summary['envelope']);
+
+            if ($productId) {
+                $envelopes = $summary['envelopes'] ?? [];
+                // migrate legacy single envelope into array if needed
+                if (empty($envelopes) && !empty($summary['envelope'])) {
+                    $envelopes[] = $summary['envelope'];
+                }
+
+                $envelopes = collect($envelopes)
+                    ->filter(fn ($env) => ($env['id'] ?? null) != $productId && ($env['product_id'] ?? null) != $productId)
+                    ->values()
+                    ->all();
+
+                if (empty($envelopes)) {
+                    unset($summary['envelopes'], $summary['envelope']);
+                } else {
+                    $summary['envelopes'] = $envelopes;
+                    $summary['envelope'] = $envelopes[0];
+                }
+            } else {
+                unset($summary['envelope'], $summary['envelopes']);
+            }
+
             $summary['extras'] = $summary['extras'] ?? ['paper' => 0, 'addons' => 0, 'envelope' => 0, 'giveaway' => 0];
-            $summary['extras']['envelope'] = 0;
+            $summary['extras']['envelope'] = (float) collect($summary['envelopes'] ?? [])->sum(fn ($row) => (float) ($row['total'] ?? 0));
             session()->put(static::SESSION_SUMMARY_KEY, $summary);
 
             return response()->json([
@@ -859,7 +1425,10 @@ class OrderFlowController extends Controller
             $summary = session(static::SESSION_SUMMARY_KEY) ?? [];
 
             $productId = (int) ($payload['product_id'] ?? 0);
-            $product = $productId ? Product::with(['template', 'uploads', 'images', 'bulkOrders'])->find($productId) : null;
+            $product = $productId ? Product::with(['template', 'uploads', 'images'])->find($productId) : null;
+            if ($product) {
+                $product->setRelation('bulkOrders', collect());
+            }
 
             $quantity = max(1, (int) ($payload['quantity'] ?? 0));
             $payloadUnitPrice = $payload['unit_price'] ?? null;
@@ -892,9 +1461,20 @@ class OrderFlowController extends Controller
                 return $value !== null && $value !== '';
             }, ARRAY_FILTER_USE_BOTH);
 
-            $summary['giveaway'] = $meta;
+            $giveaways = $summary['giveaways'] ?? [];
+            if (empty($giveaways) && !empty($summary['giveaway'])) {
+                $oldId = $summary['giveaway']['product_id'] ?? $summary['giveaway']['id'] ?? null;
+                if ($oldId) {
+                    $giveaways[$oldId] = $summary['giveaway'];
+                }
+            }
+            
+            $giveaways[$product->id] = $meta;
+            $summary['giveaways'] = $giveaways;
+            unset($summary['giveaway']);
+
             $summary['extras'] = $summary['extras'] ?? ['paper' => 0, 'addons' => 0, 'envelope' => 0, 'giveaway' => 0];
-            $summary['extras']['giveaway'] = (float) $meta['total'];
+            $summary['extras']['giveaway'] = (float) collect($giveaways)->sum('total');
 
             // update totals
             $summary['subtotalAmount'] = ($summary['subtotalAmount'] ?? 0);
@@ -904,7 +1484,7 @@ class OrderFlowController extends Controller
             session()->put(static::SESSION_SUMMARY_KEY, $summary);
 
             return response()->json([
-                'message' => 'Giveaway selection saved to session.',
+                'message' => 'Giveaway added to session.',
                 'order_id' => null,
                 'order_number' => null,
                 'summary' => $summary,
@@ -935,14 +1515,40 @@ class OrderFlowController extends Controller
         ]);
     }
 
-    public function clearGiveaway(): JsonResponse
+    public function clearGiveaway(Request $request): JsonResponse
     {
+        $productId = $request->input('product_id');
         $order = $this->currentOrder();
+        
         if (!$order) {
             $summary = session(static::SESSION_SUMMARY_KEY) ?? [];
-            unset($summary['giveaway']);
+            
+            if ($productId) {
+                $giveaways = $summary['giveaways'] ?? [];
+                // Migrate old single giveaway if exists
+                if (empty($giveaways) && !empty($summary['giveaway'])) {
+                    $oldId = $summary['giveaway']['product_id'] ?? $summary['giveaway']['id'] ?? null;
+                    if ($oldId) {
+                        $giveaways[$oldId] = $summary['giveaway'];
+                    }
+                }
+                
+                unset($giveaways[$productId]);
+                $summary['giveaways'] = $giveaways;
+                unset($summary['giveaway']);
+            } else {
+                unset($summary['giveaway']);
+                unset($summary['giveaways']);
+            }
+
             $summary['extras'] = $summary['extras'] ?? ['paper' => 0, 'addons' => 0, 'envelope' => 0, 'giveaway' => 0];
-            $summary['extras']['giveaway'] = 0;
+            $summary['extras']['giveaway'] = (float) collect($summary['giveaways'] ?? [])->sum('total');
+            
+            // update totals
+            $summary['subtotalAmount'] = ($summary['subtotalAmount'] ?? 0);
+            $summary['taxAmount'] = round(($summary['subtotalAmount']) * static::DEFAULT_TAX_RATE, 2);
+            $summary['totalAmount'] = round(($summary['subtotalAmount'] + $summary['taxAmount'] + ($summary['shippingFee'] ?? static::DEFAULT_SHIPPING_FEE) + ($summary['extras']['envelope'] ?? 0) + ($summary['extras']['giveaway'] ?? 0)), 2);
+
             session()->put(static::SESSION_SUMMARY_KEY, $summary);
 
             return response()->json([
@@ -955,8 +1561,8 @@ class OrderFlowController extends Controller
 
         $updatedOrder = $order;
 
-        DB::transaction(function () use ($order, &$updatedOrder) {
-            $updatedOrder = $this->orderFlow->clearGiveawaySelection($order);
+        DB::transaction(function () use ($order, $productId, &$updatedOrder) {
+            $updatedOrder = $this->orderFlow->clearGiveawaySelection($order, $productId);
         });
 
         $order = $updatedOrder ?? $this->currentOrder();
@@ -982,7 +1588,7 @@ class OrderFlowController extends Controller
 
         // Always render the cart page. If there is a persisted order, refresh
         // the session summary from it. Otherwise, allow the client-side
-        // sessionStorage (inkwise-finalstep) to supply the draft payload.
+        // sessionStorage (order_summary_payload) to supply the draft payload.
 
         if ($order) {
             $this->updateSessionSummary($order);
@@ -1007,8 +1613,8 @@ class OrderFlowController extends Controller
                         'images',
                         'paperStocks',
                         'addons',
-                        'bulkOrders',
                     ]);
+                    $product->setRelation('bulkOrders', collect());
                 }
 
                 if ($needsQuantity) {
@@ -1215,7 +1821,7 @@ class OrderFlowController extends Controller
             if ($order->status === 'cancelled') {
                 return redirect()->route('customer.my_purchase.cancelled');
             }
-            // For other statuses like 'pending', continue with checkout
+            // For other statuses like 'draft' or 'pending', continue with checkout
         }
 
         // If there is no persisted Order yet, but we have a session summary,
@@ -1238,7 +1844,7 @@ class OrderFlowController extends Controller
                     'customer_id' => $customerOrder->customer_id,
                     'user_id' => optional(Auth::user())->user_id,
                     'order_number' => $this->orderFlow->generateOrderNumber(),
-                    'status' => 'pending',
+                    'status' => 'draft',
                     'subtotal_amount' => $summary['subtotalAmount'] ?? 0,
                     'tax_amount' => $summary['taxAmount'] ?? 0,
                     'shipping_fee' => $summary['shippingFee'] ?? static::DEFAULT_SHIPPING_FEE,
@@ -1250,9 +1856,17 @@ class OrderFlowController extends Controller
                     'metadata' => $metadata,
                 ]);
 
+                $this->orderFlow->logActivity($order, 'order_created', ['order_number' => $order->order_number]);
+
                 $orderJustCreated = true;
 
                 $order = $this->orderFlow->initializeOrderFromSummary($order, $summary);
+
+                if (!$this->orderFlow->checkInkStock($order)) {
+                    throw new \Exception('Insufficient ink stock for this order.');
+                }
+
+                $this->orderFlow->logActivity($order, 'order_initialized', ['items_count' => $order->items()->count()]);
 
                 $this->orderFlow->recalculateOrderTotals($order);
 
@@ -1329,10 +1943,12 @@ class OrderFlowController extends Controller
         ];
 
         $order->update([
-            'status' => 'in_production',
             'payment_status' => 'paid',
             'metadata' => $metadata,
         ]);
+
+        // Deduct ink stock when payment is completed
+        $this->orderFlow->deductInkStock($order);
 
         $this->updateSessionSummary($order);
 
@@ -1363,6 +1979,11 @@ class OrderFlowController extends Controller
             'metadata' => $metadata,
         ]);
 
+        // Restore ink stock if order was previously paid
+        if ($order->getOriginal('payment_status') === 'paid') {
+            $this->orderFlow->restoreInkStock($order);
+        }
+
         $this->updateSessionSummary($order);
 
         return redirect()->route('customer.checkout')->with('status', 'Order has been cancelled.');
@@ -1388,47 +2009,71 @@ class OrderFlowController extends Controller
             $orderSummary = session(static::SESSION_SUMMARY_KEY);
         }
 
-        $selectedEvent = $request->query('event');
-        $search = $request->query('q');
-
-        $productsQuery = Product::query()
-            ->with(['template', 'uploads', 'images', 'materials.material', 'bulkOrders'])
-            ->where('product_type', 'Giveaway')
-            ->whereHas('uploads');
-
-        if ($selectedEvent && $selectedEvent !== 'all') {
-            $productsQuery->where(function ($query) use ($selectedEvent) {
-                $query->where('event_type', $selectedEvent);
-            });
-        }
-
-        if ($search) {
-            $productsQuery->where(function ($query) use ($search) {
-                $query->where('name', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%");
-            });
-        }
-
-        $products = $productsQuery
-            ->orderByDesc('updated_at')
-            ->get();
-
-        $eventTypes = Product::query()
-            ->where('product_type', 'Giveaway')
-            ->whereNotNull('event_type')
-            ->where('event_type', '!=', '')
-            ->distinct()
-            ->orderBy('event_type')
-            ->pluck('event_type');
+        $initialCatalog = $this->cachedGiveawayOptions();
 
         return view('customer.orderflow.giveaways', [
-            'products' => $products,
-            'eventTypes' => $eventTypes,
-            'selectedEvent' => $selectedEvent,
-            'searchTerm' => $search,
             'order' => $order,
             'orderSummary' => $orderSummary,
+            'initialCatalog' => $initialCatalog,
         ]);
+    }
+
+    private function cachedGiveawayOptions(): array
+    {
+        $cacheKey = 'giveaway_options_api_v3';
+        $cacheDuration = 60; // keep stock fresh but avoid repeat queries per minute
+
+        $fallbackImage = asset('images/placeholder.png');
+
+        return Cache::remember($cacheKey, $cacheDuration, function () use ($fallbackImage) {
+            return Product::query()
+                ->with([
+                    'template',
+                    'uploads',
+                    'images',
+                    'materials.material.inventory',
+                ])
+                ->whereRaw('LOWER(product_type) = ?', ['giveaway'])
+                ->orderByDesc('updated_at')
+                ->limit(120)
+                ->get()
+                ->map(function (Product $product) use ($fallbackImage) {
+                    $product->setRelation('bulkOrders', collect());
+                    $payload = $this->formatGiveawayProduct($product, $fallbackImage);
+
+                    $material = $product->materials->first()?->material;
+                    $stockQty = $material?->inventory?->quantity_available ?? $material?->stock_qty;
+
+                    // Stock-only cap (bulk limits ignored)
+                    $resolvedMax = $stockQty !== null ? (int) $stockQty : null;
+
+                    $payload['metadata'] = [
+                        'id' => $payload['product_id'],
+                        'name' => $payload['name'],
+                        'price' => $payload['price'],
+                        'image' => $payload['image'],
+                        'min_qty' => $payload['min_qty'],
+                        'max_qty' => $resolvedMax,
+                        'step' => $payload['step'],
+                        'material' => $material?->material_name,
+                        'material_type' => $material?->material_type,
+                        'stock_qty' => $stockQty,
+                    ];
+
+                    $payload['material'] = $material?->material_name;
+                    $payload['material_type'] = $material?->material_type;
+                    $payload['stock_qty'] = $stockQty;
+                    $payload['max_qty'] = $resolvedMax;
+
+                    return $payload;
+                })
+                ->filter(function (array $item) {
+                    // Keep all products visible, including out-of-stock ones for pre-order
+                    return true;
+                })
+                ->values()
+                ->toArray();
+        });
     }
 
     private function normalizeDesignAutosavePayload(array $design, array $placeholders): array
@@ -1577,6 +2222,7 @@ class OrderFlowController extends Controller
             'extras',
             'envelope',
             'giveaway',
+            'giveaways',
             'placeholders',
             'previewSelections',
         ]);
@@ -1756,7 +2402,6 @@ class OrderFlowController extends Controller
                 'items.product.template',
                 'items.product.images',
                 'items.product.uploads',
-                'items.bulkSelections.productBulkOrder',
                 'items.paperStockSelection.paperStock',
                 'items.addons.productAddon',
                 'customerOrder',
@@ -1856,6 +2501,70 @@ class OrderFlowController extends Controller
             $recipients,
             new NewOrderPlaced($order->id, $order->order_number, $customerName, $totalAmount, $orderSummaryUrl)
         );
+    }
+
+    private function resolvePickupDate(?Order $order, ?array $summaryPayload, Carbon $minDate, Carbon $maxDate): Carbon
+    {
+        $candidate = null;
+
+        if ($order && $order->date_needed instanceof Carbon) {
+            $candidate = $order->date_needed->copy();
+        }
+
+        if (!$candidate && $order) {
+            $metadata = $order->metadata;
+            if (is_string($metadata)) {
+                $decoded = json_decode($metadata, true);
+                $metadata = is_array($decoded) ? $decoded : [];
+            } elseif (!is_array($metadata)) {
+                $metadata = [];
+            }
+
+            $metadataCandidate = Arr::get($metadata, 'final_step.estimated_date')
+                ?? Arr::get($metadata, 'final_step.metadata.estimated_date')
+                ?? Arr::get($metadata, 'delivery.estimated_pickup_date')
+                ?? Arr::get($metadata, 'delivery.estimated_ship_date');
+
+            if ($metadataCandidate) {
+                try {
+                    $candidate = Carbon::parse($metadataCandidate);
+                } catch (\Throwable $e) {
+                    $candidate = null;
+                }
+            }
+        }
+
+        if (!$candidate && $summaryPayload) {
+            $summaryCandidate = Arr::get($summaryPayload, 'dateNeeded')
+                ?? Arr::get($summaryPayload, 'estimatedDate')
+                ?? Arr::get($summaryPayload, 'estimated_date')
+                ?? Arr::get($summaryPayload, 'metadata.final_step.estimated_date')
+                ?? Arr::get($summaryPayload, 'metadata.final_step.metadata.estimated_date');
+
+            if ($summaryCandidate) {
+                try {
+                    $candidate = Carbon::parse($summaryCandidate);
+                } catch (\Throwable $e) {
+                    $candidate = null;
+                }
+            }
+        }
+
+        if (!$candidate) {
+            $candidate = Carbon::now()->addMonth();
+        }
+
+        $candidate = $candidate->copy()->startOfDay();
+
+        if ($candidate->lt($minDate)) {
+            $candidate = $minDate->copy();
+        }
+
+        if ($candidate->gt($maxDate)) {
+            $candidate = $maxDate->copy();
+        }
+
+        return $candidate;
     }
 
     private function readInlineSvg(?string $path): array

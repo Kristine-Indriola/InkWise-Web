@@ -20,7 +20,6 @@ class Ink extends Model
         'unit',
         'size',
         'cost_per_ml',
-        'avg_usage_per_invite_ml',
         'cost_per_invite',
         'description',
     ];
@@ -28,5 +27,10 @@ class Ink extends Model
     public function inventory()
     {
         return $this->hasOne(Inventory::class, 'ink_id');
+    }
+
+    public function stockMovements()
+    {
+        return $this->hasMany(InkStockMovement::class, 'ink_id');
     }
 }

@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use App\Notifications\TemplateUploadedNotification;
+use App\Notifications\TemplateReturnedNotification;
+use App\Support\ImageResolver;
 
 class TemplateController extends Controller
 {
@@ -358,6 +360,11 @@ public function saveCanvas(Request $request, $id)
                 $template->preview,
                 'preview_image'
             );
+            // Also populate preview_front and front_image for consistency
+            $template->preview_front = $template->preview;
+            if (empty($template->front_image)) {
+                $template->front_image = $template->preview;
+            }
         }
 
         // Handle multiple preview_images
@@ -379,6 +386,20 @@ public function saveCanvas(Request $request, $id)
             }
             if (!empty($previews)) {
                 $metadata['previews'] = $previews;
+                // Also populate preview_front/front_image from the 'front' preview
+                if (isset($previews['front'])) {
+                    $template->preview_front = $previews['front'];
+                    if (empty($template->front_image)) {
+                        $template->front_image = $previews['front'];
+                    }
+                }
+                // Populate back fields if back preview exists
+                if (isset($previews['back'])) {
+                    $template->preview_back = $previews['back'];
+                    if (empty($template->back_image)) {
+                        $template->back_image = $previews['back'];
+                    }
+                }
             }
         } elseif (array_key_exists('preview_images', $validated)) {
             unset($metadata['previews']);
@@ -435,10 +456,20 @@ public function uploadPreview(Request $request, $id)
 
     // Update preview column (store path)
     $template->preview = $filename;
+    $template->preview_front = $filename;
+
+    if (empty($template->front_image)) {
+        $template->front_image = $filename;
+    }
+
     $this->synchronizeTemplateSideState($template);
     $template->save();
 
-    return response()->json(['success' => true, 'preview' => $filename]);
+    return response()->json([
+        'success' => true,
+        'preview' => $filename,
+        'preview_url' => ImageResolver::url($filename),
+    ]);
 }
 
     public function autosave(Request $request, $id)
@@ -738,11 +769,18 @@ public function uploadToProduct(Request $request, $id)
             $productUploadData
         );
 
+        // Capture who uploaded and when for downstream notifications
+        $metadata = $template->metadata ?? [];
+        $metadata['last_uploaded_by_user_id'] = $staff->id ?? null;
+        $metadata['last_uploaded_by_name'] = $staff->name ?? null;
+        $metadata['last_uploaded_at'] = now()->toIso8601String();
+
         // Ensure the template returns to uploaded status with a fresh timestamp
         $template->forceFill([
             'status' => 'uploaded',
             'status_note' => null,
             'status_updated_at' => now(),
+            'metadata' => $metadata,
         ])->save();
 
         // Flip any related products back to published once the template is re-uploaded
@@ -793,6 +831,15 @@ public function uploadToProduct(Request $request, $id)
                 ])->save();
             }
         });
+
+        // Notify the last uploader (staff) that the template was returned
+        $metadata = $template->metadata ?? [];
+        $staffUserId = $metadata['last_uploaded_by_user_id'] ?? null;
+        $staffUser = $staffUserId ? User::find($staffUserId) : null;
+        if ($staffUser) {
+            $adminUser = Auth::user();
+            $staffUser->notify(new TemplateReturnedNotification($template, $adminUser, $data['note'] ?? null));
+        }
 
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([

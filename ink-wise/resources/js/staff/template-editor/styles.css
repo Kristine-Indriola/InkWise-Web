@@ -926,8 +926,7 @@
 .canvas-viewport__surface {
   position: relative;
   padding: 1rem 3rem 3rem 3rem;
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.04) 25%, transparent 25%) repeat;
-  background-size: 18px 18px;
+  background: #d1d5db;
   border-radius: calc(var(--builder-radius) - 8px);
   overflow: hidden;
   display: flex;
@@ -976,11 +975,7 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image: linear-gradient(to right, rgba(148, 163, 184, 0.12) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(148, 163, 184, 0.12) 1px, transparent 1px);
-  background-size: 32px 32px;
-  border-radius: 16px;
-  z-index: 0;
+  display: none;
 }
 
 .canvas-viewport__safe-zone,
@@ -991,6 +986,7 @@
   border-style: dashed;
   border-width: 1px;
   box-sizing: border-box;
+  display: none;
 }
 
 .canvas-viewport__safe-zone {
@@ -1034,6 +1030,12 @@
   z-index: 5;
   text-align: center;
   cursor: grab;
+}
+
+.canvas-layer.is-background {
+  border: none;
+  box-shadow: none;
+  pointer-events: none;
 }
 
 body.builder-exporting .canvas-layer {

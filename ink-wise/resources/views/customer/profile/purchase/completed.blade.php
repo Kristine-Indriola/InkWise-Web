@@ -9,8 +9,6 @@
     <a href="{{ route('customer.my_purchase.inproduction') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">In Production</a>
      <a href="{{ route('customer.my_purchase.topickup') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Ready for Pickup</a>
      <a href="{{ route('customer.my_purchase.completed') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Completed</a>
-     <a href="{{ route('customer.my_purchase.cancelled') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Cancelled</a>
-     <a href="{{ route('customer.my_purchase.return_refund') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Return/Refund</a>
      </div>
 
     @php
@@ -22,7 +20,7 @@
             'completed' => 'Completed',
             'cancelled' => 'Cancelled',
         ];
-        $statusFlow = ['pending', 'processing', 'in_production', 'confirmed', 'completed'];
+        $statusFlow = ['draft', 'pending', 'processing', 'in_production', 'confirmed', 'completed'];
         $normalizeMetadata = function ($metadata) {
             if (is_array($metadata)) {
                 return $metadata;

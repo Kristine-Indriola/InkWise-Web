@@ -177,7 +177,7 @@ body {
 
 .preview-layout {
   display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  grid-template-columns: minmax(400px, 500px) 3fr;
   gap: clamp(24px, 3vw, 40px);
   align-items: flex-start;
 }
@@ -395,6 +395,11 @@ body {
   .preview-layout {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.unedited-warning {
+  color: var(--danger);
+  font-weight: 600;
 }
 
 @media (max-width: 720px) {

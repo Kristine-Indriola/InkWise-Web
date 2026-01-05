@@ -13,19 +13,30 @@ document.addEventListener('DOMContentLoaded', () => {
   const flipContainer = document.querySelector('.card-flip');
   const toggleButtons = Array.from(document.querySelectorAll('.preview-toggle button'));
   const previewImages = Array.from(document.querySelectorAll('.card-face img'));
+  const estimatedDateInput = document.getElementById('estimatedDate');
+  const estimatedDateError = document.getElementById('estimatedDateError');
+  const estimatedDateFinalLabel = document.getElementById('estimatedDateFinalLabel');
+  const continueToCheckoutEl = document.getElementById('continueToCheckoutBtn');
+  const paperSelectErrorEl = document.getElementById('paperSelectError');
+  const preOrderModal = document.getElementById('preOrderModal');
+  const preOrderConfirm = document.getElementById('preOrderConfirm');
+  const preOrderCancel = document.getElementById('preOrderCancel');
   const productNameMeta = shell?.dataset?.productName
     ?? document.querySelector('.finalstep-preview')?.dataset?.productName
     ?? null;
 
   const previewPlaceholder = '/images/placeholder.png';
-  const storageKey = shell?.dataset?.storageKey ?? 'inkwise-finalstep';
-  const envelopeUrl = addToCartBtn?.dataset?.envelopeUrl ?? shell?.dataset?.envelopeUrl ?? '/order/envelope';
+  const storageKey = shell?.dataset?.storageKey ?? 'order_summary_payload';
+  const envelopeUrl = shell?.dataset?.envelopeUrl ?? addToCartBtn?.dataset?.envelopeUrl ?? '/order/envelope';
+  const addToCartUrl = addToCartBtn?.dataset?.cartUrl ?? shell?.dataset?.cartUrl ?? '/order/addtocart';
   const allowFallbackSamples = shell?.dataset?.fallbackSamples === 'true';
   const finalStepSaveUrl = shell?.dataset?.saveUrl ?? null;
   const DEFAULT_TAX_RATE = 0;
   const DEFAULT_SHIPPING_FEE = 0;
+  const MIN_QTY = Number(quantityInput?.getAttribute('min')) || 10;
   const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
   let toastTimeout = null;
+  let isPreOrderConfirmed = false;
   let computedTotals = {
     base: 0,
     paper: 0,
@@ -39,6 +50,46 @@ document.addEventListener('DOMContentLoaded', () => {
   const PREVIEW_STORAGE_KEY = 'inkwise-preview-selections';
   const productId = document.body?.dataset?.productId ?? shell?.dataset?.productId ?? null;
   const productNameFromBody = document.body?.dataset?.productName ?? null;
+  let processingDays = (() => {
+    const raw = shell?.dataset?.processingDays;
+    const parsed = Number.parseInt(String(raw ?? ''), 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 7;
+  })();
+  const estimatedArrivalEl = document.getElementById('estimatedArrival');
+
+  // Initialize Flatpickr for date picker
+  let fp = null;
+  if (estimatedDateInput) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const minDate = new Date(today);
+    minDate.setDate(minDate.getDate() + 10);
+    const maxDate = new Date(today);
+    maxDate.setDate(maxDate.getDate() + 30);
+
+    // Prepare a sensible defaultDate: prefer server-provided if within range, otherwise clamp to minDate
+    const serverDefaultRaw = shell?.dataset?.estimatedDeliveryDateFormatted ?? '';
+    let defaultDate = minDate;
+    if (serverDefaultRaw) {
+      const parsed = new Date(serverDefaultRaw + 'T00:00:00');
+      if (!Number.isNaN(parsed.getTime())) {
+        if (parsed >= minDate && parsed <= maxDate) {
+          defaultDate = parsed;
+        } else if (parsed < minDate) {
+          defaultDate = minDate;
+        } else if (parsed > maxDate) {
+          defaultDate = maxDate;
+        }
+      }
+    }
+
+    fp = flatpickr(estimatedDateInput, {
+      dateFormat: 'Y-m-d',
+      minDate: minDate,
+      maxDate: maxDate,
+      defaultDate: defaultDate
+    });
+  }
 
   const readSummary = () => {
     try {
@@ -108,8 +159,18 @@ document.addEventListener('DOMContentLoaded', () => {
       total: summary.totalAmount
     };
 
+    const estimatedDateValue = summary.estimated_date ?? summary.dateNeeded ?? null;
+    if (estimatedDateValue) {
+      metadataPayload.estimated_date = estimatedDateValue;
+      if (summary.dateNeededLabel) {
+        metadataPayload.estimated_date_label = summary.dateNeededLabel;
+        metadataPayload.estimatedDateLabel = summary.dateNeededLabel;
+      }
+    }
+
     const payload = {
       quantity: summary.quantity,
+      estimated_date: estimatedDateValue,
       paper_stock_id: toNumericOrNull(summary.paperStockId),
       paper_stock_price: summary.paperStockPrice,
       paper_stock_name: summary.paperStockName,
@@ -126,6 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (payload.paper_stock_price === null || Number.isNaN(payload.paper_stock_price)) delete payload.paper_stock_price;
     if (!payload.paper_stock_name) delete payload.paper_stock_name;
     if (!payload.addons.length) delete payload.addons;
+    if (!payload.estimated_date) delete payload.estimated_date;
     if (!Object.keys(metadataPayload).length) delete payload.metadata;
 
     const csrfToken = getCsrfToken();
@@ -166,6 +228,83 @@ document.addEventListener('DOMContentLoaded', () => {
       console.warn('Unable to parse stored preview selections', error);
       return {};
     }
+  };
+
+  // Stock availability elements
+  const paperStockAvailableEl = document.getElementById('paperStockAvailable');
+  const paperStockAvailableCount = document.getElementById('paperStockAvailableCount');
+  const stockErrorEl = document.getElementById('stockError');
+
+  const getSelectedPaperAvailable = () => {
+    const selected = document.querySelector('.paper-stock-card[aria-pressed="true"]');
+    if (!selected) return null;
+    const raw = selected.dataset?.available;
+    const parsed = Number.parseInt(String(raw ?? ''), 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const showPaperAvailable = (available) => {
+    if (!paperStockAvailableEl || !paperStockAvailableCount) return;
+    if (available === null || available === undefined) {
+      paperStockAvailableEl.style.display = 'none';
+      paperStockAvailableCount.textContent = '0';
+      return;
+    }
+    paperStockAvailableCount.textContent = String(available);
+    paperStockAvailableEl.style.display = 'block';
+  };
+
+  const ensurePaperSelected = () => {
+    if (!continueToCheckoutEl || !paperSelectErrorEl) return;
+    const qty = Number.parseInt(String(quantityInput?.value ?? ''), 10) || 0;
+    const selected = document.querySelector('.paper-stock-card[aria-pressed="true"]');
+    if (!selected) {
+      continueToCheckoutEl.setAttribute('aria-disabled', 'true');
+      paperSelectErrorEl.textContent = 'Please select a paper type to continue.';
+      paperSelectErrorEl.style.display = 'block';
+      return false;
+    }
+    const available = getSelectedPaperAvailable();
+    if (available === 0 && !isPreOrderConfirmed) {
+      continueToCheckoutEl.setAttribute('aria-disabled', 'true');
+      paperSelectErrorEl.textContent = 'Please confirm pre-order to continue.';
+      paperSelectErrorEl.style.display = 'block';
+      return false;
+    }
+    if (available > 0 && qty > available) {
+      continueToCheckoutEl.setAttribute('aria-disabled', 'true');
+      paperSelectErrorEl.textContent = 'Order quantity exceeds available stock. Please adjust your quantity.';
+      paperSelectErrorEl.style.display = 'block';
+      return false;
+    }
+    continueToCheckoutEl.setAttribute('aria-disabled', 'false');
+    paperSelectErrorEl.style.display = 'none';
+    return true;
+  };
+
+  const validateStock = () => {
+    if (!stockErrorEl || !quantityInput) return true;
+    const qty = Number.parseInt(String(quantityInput.value ?? ''), 10) || 0;
+    const available = getSelectedPaperAvailable();
+    if (available === null) {
+      stockErrorEl.style.display = 'none';
+      addToCartBtn?.removeAttribute('disabled');
+      return true;
+    }
+    if (qty <= 0) {
+      stockErrorEl.style.display = 'none';
+      addToCartBtn?.removeAttribute('disabled');
+      return true;
+    }
+    if (qty > available && available > 0) {
+      stockErrorEl.textContent = 'Order quantity exceeds available stock. Please adjust your quantity.';
+      stockErrorEl.style.display = 'block';
+      addToCartBtn?.setAttribute('disabled', 'true');
+      return false;
+    }
+    stockErrorEl.style.display = 'none';
+    addToCartBtn?.removeAttribute('disabled');
+    return true;
   };
 
   const writePreviewStore = (store) => {
@@ -249,6 +388,100 @@ document.addEventListener('DOMContentLoaded', () => {
         toast.hidden = true;
       }, 260);
     }, 2600);
+  };
+
+  // Estimated date validation: require a date between 5 and 10 days from today (inclusive)
+  const validateEstimatedDate = () => {
+    if (!estimatedDateInput) return true;
+    const val = estimatedDateInput.value;
+    if (!val) {
+      if (estimatedDateError) {
+        estimatedDateError.textContent = 'Please pick an estimated delivery date.';
+        estimatedDateError.style.display = 'block';
+      }
+      return false;
+    }
+
+    // parse yyyy-mm-dd safely
+    const selected = new Date(val + 'T00:00:00');
+    if (Number.isNaN(selected.getTime())) {
+      if (estimatedDateError) {
+        estimatedDateError.textContent = 'Invalid date format.';
+        estimatedDateError.style.display = 'block';
+      }
+      return false;
+    }
+
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const minDate = new Date(today);
+    minDate.setDate(minDate.getDate() + 10);
+    const maxDate = new Date(today);
+    maxDate.setDate(maxDate.getDate() + 30); // up to 1 month
+
+    if (selected < minDate || selected > maxDate) {
+      if (estimatedDateError) {
+        const fmt = (d) => d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        estimatedDateError.textContent = `Please choose a date between ${fmt(minDate)} and ${fmt(maxDate)}.`;
+        estimatedDateError.style.display = 'block';
+      }
+      return false;
+    }
+
+    if (estimatedDateError) {
+      estimatedDateError.textContent = '';
+      estimatedDateError.style.display = 'none';
+    }
+    return true;
+  };
+
+  const computeArrival = (selectedDate) => {
+    if (!selectedDate || !Number.isFinite(selectedDate.getTime())) return null;
+    const arrival = new Date(selectedDate);
+    arrival.setDate(arrival.getDate() + processingDays);
+    return arrival;
+  };
+
+  const updateEstimatedArrival = () => {
+    if (!estimatedArrivalEl || !estimatedDateInput) return;
+    const val = estimatedDateInput.value;
+    if (!val) {
+      estimatedArrivalEl.style.display = 'none';
+      estimatedArrivalEl.textContent = '';
+      return;
+    }
+    const selected = new Date(val + 'T00:00:00');
+    if (Number.isNaN(selected.getTime())) {
+      estimatedArrivalEl.style.display = 'none';
+      estimatedArrivalEl.textContent = '';
+      return;
+    }
+    const arrival = computeArrival(selected);
+    if (!arrival) {
+      estimatedArrivalEl.style.display = 'none';
+      estimatedArrivalEl.textContent = '';
+      return;
+    }
+    const formatted = arrival.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    estimatedArrivalEl.textContent = `Estimated pickup: ${formatted}`;
+    estimatedArrivalEl.style.display = 'block';
+  };
+
+  // Update the final, human-readable label shown to the right of the date input
+  const updateFinalDateLabel = () => {
+    if (!estimatedDateFinalLabel || !estimatedDateInput) return;
+    const val = estimatedDateInput.value;
+    if (!val) {
+      estimatedDateFinalLabel.textContent = '';
+      return;
+    }
+    const dt = new Date(val + 'T00:00:00');
+    if (Number.isNaN(dt.getTime())) {
+      estimatedDateFinalLabel.textContent = '';
+      return;
+    }
+    const formatted = dt.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    estimatedDateFinalLabel.textContent = String(formatted).toUpperCase();
   };
 
   const ensureSamplePaperStocks = () => {
@@ -352,25 +585,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const updateTotals = () => {
     if (!quantityInput) return;
-    const base = Number(priceDisplay?.textContent?.replace('₱', '') ?? 0);
-    const paper = Number(paperStockPriceInput?.value ?? 0);
+    const quantity = Number.parseInt(String(quantityInput.value ?? ''), 10) || 0;
+    const paperPerUnit = Number(paperStockPriceInput?.value ?? 0);
 
-    const addonsFromInputs = addonCheckboxes
-      .filter((checkbox) => checkbox.checked)
-      .reduce((sum, checkbox) => sum + Number(checkbox.dataset.price ?? 0), 0);
-
-    const selectedAddonCards = Array.from(document.querySelectorAll('.addon-card[aria-pressed="true"]'));
-    const addonsFromCards = selectedAddonCards.reduce((sum, card) => sum + Number(card.dataset.price ?? 0), 0);
-
-    const addonsTotal = addonsFromInputs + addonsFromCards;
-    const subtotal = base + paper + addonsTotal;
-    const tax = subtotal * DEFAULT_TAX_RATE;
-    const total = subtotal + tax + DEFAULT_SHIPPING_FEE;
+    // Per rules: total = quantity * paper_price. Exclude addons/ink/shipping from calculation.
+    const baseTotal = roundCurrency(paperPerUnit * quantity);
+    const subtotal = baseTotal;
+    const tax = roundCurrency(subtotal * DEFAULT_TAX_RATE);
+    const total = roundCurrency(subtotal + tax + DEFAULT_SHIPPING_FEE);
 
     computedTotals = {
-      base,
-      paper,
-      addons: addonsTotal,
+      base: baseTotal,
+      paper: paperPerUnit, // per-unit paper price
+      addons: 0,
       subtotal,
       tax,
       shipping: DEFAULT_SHIPPING_FEE,
@@ -378,7 +605,38 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     if (orderTotalEl) orderTotalEl.textContent = formatMoney(total);
-    if (paperStockPriceInput) paperStockPriceInput.value = String(paper || 0);
+    if (paperStockPriceInput) paperStockPriceInput.value = String(paperPerUnit || 0);
+    updateActionButtonsState();
+  };
+
+  const preventIfDisabled = (e) => {
+    if (!continueToCheckoutEl) return;
+    if (continueToCheckoutEl.getAttribute('aria-disabled') === 'true') {
+      e.preventDefault();
+      e.stopPropagation();
+      showToast('Please select a paper and ensure quantity is at least ' + MIN_QTY + ' before continuing.');
+    }
+  };
+
+  const updateActionButtonsState = () => {
+    const qty = Number.parseInt(String(quantityInput?.value ?? ''), 10) || 0;
+    const qtyOk = qty >= MIN_QTY;
+
+    if (addToCartBtn) {
+      if (!qtyOk) addToCartBtn.setAttribute('disabled', 'true');
+      else addToCartBtn.removeAttribute('disabled');
+    }
+
+    if (continueToCheckoutEl) {
+      if (!qtyOk) {
+        continueToCheckoutEl.setAttribute('aria-disabled', 'true');
+        continueToCheckoutEl.style.pointerEvents = 'none';
+        continueToCheckoutEl.addEventListener('click', preventIfDisabled);
+      } else {
+        continueToCheckoutEl.setAttribute('aria-disabled', 'false');
+        continueToCheckoutEl.style.pointerEvents = '';
+      }
+    }
   };
 
   const togglePreview = (face) => {
@@ -396,6 +654,12 @@ document.addEventListener('DOMContentLoaded', () => {
     ensureSamplePaperStocks();
     ensureSampleAddons();
   }
+
+  estimatedDateInput?.addEventListener('change', () => {
+    validateEstimatedDate();
+    updateFinalDateLabel();
+    updateEstimatedArrival();
+  });
 
   toggleButtons.forEach((button) => {
     button.addEventListener('click', () => togglePreview(button.dataset.face));
@@ -434,6 +698,45 @@ document.addEventListener('DOMContentLoaded', () => {
         setPreviewSelection('paper_stock', null);
       }
       updateTotals();
+      // Update available display and validate stock after selection
+      const available = getSelectedPaperAvailable();
+      showPaperAvailable(available);
+
+      // Handle pre-order logic
+      if (available === 0) {
+        // Out of stock - show modal if not confirmed
+        if (!isPreOrderConfirmed) {
+          preOrderModal.removeAttribute('aria-hidden');
+          preOrderModal.style.display = 'flex';
+          preOrderConfirm.focus();
+        }
+      } else {
+        // In stock - reset pre-order state
+        isPreOrderConfirmed = false;
+        processingDays = 7; // Reset to default
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const minDate = new Date(today);
+        minDate.setDate(minDate.getDate() + 10);
+        const maxDate = new Date(today);
+        maxDate.setDate(maxDate.getDate() + 30);
+        if (fp) {
+          fp.set('minDate', minDate);
+          fp.set('maxDate', maxDate);
+          // Keep current date if valid, else set to min
+          const currentDate = new Date(estimatedDateInput.value + 'T00:00:00');
+          if (currentDate >= minDate && currentDate <= maxDate) {
+            fp.set('defaultDate', currentDate);
+          } else {
+            fp.set('defaultDate', minDate);
+            estimatedDateInput.value = minDate.toISOString().split('T')[0];
+          }
+          updateEstimatedArrival();
+        }
+      }
+
+      validateStock();
+      ensurePaperSelected();
     });
   });
 
@@ -470,6 +773,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!summary || typeof summary !== 'object') {
       updateTotals();
+      // if a paper selection was applied from stored summary show availability
+      const available = getSelectedPaperAvailable();
+      showPaperAvailable(available);
+      validateStock();
+      ensurePaperSelected();
       return;
     }
 
@@ -603,8 +911,24 @@ document.addEventListener('DOMContentLoaded', () => {
     checkbox.addEventListener('change', updateTotals);
   });
 
-  addToCartBtn?.addEventListener('click', async (event) => {
-    event.preventDefault();
+  // Validate stock whenever quantity changes
+  quantityInput?.addEventListener('input', () => {
+    updateTotals();
+    validateStock();
+    ensurePaperSelected();
+  });
+
+  // Block continue to checkout when disabled
+  continueToCheckoutEl?.addEventListener('click', (ev) => {
+    if (continueToCheckoutEl.getAttribute('aria-disabled') === 'true') {
+      ev.preventDefault();
+      showToast('Please select a paper type to continue.');
+      return;
+    }
+  });
+
+  const buildAndPersistSummary = async () => {
+    const currentQty = Number.parseInt(String(quantityInput?.value ?? ''), 10) || 0;
 
     const selectedAddonCards = Array.from(document.querySelectorAll('.addon-card[aria-pressed="true"]'));
     const addonInputsChecked = addonCheckboxes.filter((checkbox) => checkbox.checked);
@@ -640,8 +964,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const totalAmount = roundCurrency(computedTotals.total);
 
     const orderTotalText = formatMoney(totalAmount);
-    const orderTotalValue = totalAmount;
-
     const previewSources = previewImages
       .map((img) => img?.getAttribute('src'))
       .filter((src) => typeof src === 'string' && src.length);
@@ -686,6 +1008,24 @@ document.addEventListener('DOMContentLoaded', () => {
         addons: roundCurrency(computedTotals.addons)
       }
     };
+
+    if (summary.estimated_date) {
+      summary.dateNeeded = summary.estimated_date;
+      try {
+        const parsedDate = new Date(summary.estimated_date);
+        if (!Number.isNaN(parsedDate.getTime())) {
+          summary.dateNeededLabel = parsedDate.toLocaleDateString('en-US', {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric'
+          });
+          summary.estimated_date_label = summary.dateNeededLabel;
+          summary.estimatedDateLabel = summary.dateNeededLabel;
+        }
+      } catch (error) {
+        // ignore formatting errors
+      }
+    }
 
     Object.entries(previewSelectionSnapshot).forEach(([group, payload]) => {
       if (!payload || typeof payload !== 'object') return;
@@ -758,13 +1098,48 @@ document.addEventListener('DOMContentLoaded', () => {
       summary.quantityOptions = quantityOptionsSnapshot;
     }
 
-    if (window && window.console && typeof window.console.debug === 'function') {
-      console.debug('FinalStep: summary before writeSummary', {
-        addonIds: summary.addonIds,
-        addons: summary.addons,
-        previewSelections: summary.previewSelections,
-      });
+    const resolvedProductId = (() => {
+      const candidates = [productId, summary.productId, summary.product_id];
+      for (const candidate of candidates) {
+        const numeric = Number.parseInt(String(candidate ?? ''), 10);
+        if (Number.isFinite(numeric) && numeric > 0) {
+          return numeric;
+        }
+      }
+      return null;
+    })();
+    if (resolvedProductId) {
+      summary.productId = resolvedProductId;
     }
+    if (!summary.productName && (productNameMeta || productNameFromBody)) {
+      summary.productName = productNameMeta ?? productNameFromBody;
+    }
+    const numericUnitFromSummary = Number.parseFloat(String(summary.unitPrice ?? ''));
+    if (!Number.isFinite(numericUnitFromSummary) && orderQuantityValue) {
+      summary.unitPrice = roundCurrency(totalAmount / orderQuantityValue);
+    } else if (Number.isFinite(numericUnitFromSummary)) {
+      summary.unitPrice = roundCurrency(numericUnitFromSummary);
+    }
+
+    if (!summary.metadata) summary.metadata = {};
+    summary.metadata.final_step = {
+      estimated_date: summary.estimated_date,
+      estimated_date_label: summary.dateNeededLabel ?? summary.estimated_date_label,
+      estimatedDateLabel: summary.dateNeededLabel ?? summary.estimated_date_label,
+      is_preorder: isPreOrderConfirmed,
+      quantity: summary.quantity,
+      paper_stock_id: summary.paperStockId,
+      paper_stock_name: summary.paperStockName,
+      paper_stock_price: summary.paperStockPrice,
+      addon_ids: summary.addonIds,
+      totals: {
+        subtotal: summary.subtotalAmount,
+        tax: summary.taxAmount,
+        shipping: summary.shippingFee,
+        total: summary.totalAmount
+      }
+    };
+
     writeSummary(summary);
 
     if (finalStepSaveUrl) {
@@ -775,11 +1150,127 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    showToast('Added to cart — redirecting...');
+    const csrfToken = getCsrfToken();
+    const payload = {
+      product_id: summary.productId ?? resolvedProductId,
+      quantity: summary.quantity ?? currentQty,
+      summary,
+    };
+
+    return { summary, resolvedProductId: payload.product_id, payload, csrfToken };
+  };
+
+  addToCartBtn?.addEventListener('click', async (event) => {
+    event.preventDefault();
+    const currentQty = Number.parseInt(String(quantityInput?.value ?? ''), 10) || 0;
+    if (currentQty < (Number(quantityInput?.getAttribute('min')) || 10)) {
+      showToast('Please choose a quantity of at least ' + (Number(quantityInput?.getAttribute('min')) || 10) + '.');
+      quantityInput?.focus();
+      return;
+    }
+
+    if (!validateEstimatedDate()) {
+      showToast('Please select a valid estimated date.');
+      estimatedDateInput?.focus();
+      return;
+    }
+
+    if (!validateStock()) {
+      showToast('Quantity exceeds available stock.');
+      quantityInput?.focus();
+      return;
+    }
+
+    if (!ensurePaperSelected()) {
+      showToast('Please select a paper type to continue.');
+      return;
+    }
+
+    const build = await buildAndPersistSummary();
+    if (!build?.resolvedProductId) {
+      showToast('We could not determine which design to add. Please refresh and try again.');
+      return;
+    }
+
+    addToCartBtn?.setAttribute('disabled', 'true');
+    addToCartBtn?.setAttribute('aria-busy', 'true');
+
+    try {
+      const response = await fetch('/order/cart/items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...(build.csrfToken ? { 'X-CSRF-TOKEN': build.csrfToken } : {}),
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(build.payload),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null);
+        const errorMessage = errorBody?.message ?? 'Unable to add item to cart. Please try again.';
+        throw new Error(errorMessage);
+      }
+    } catch (error) {
+      console.error('FinalStep: unable to persist cart item', error);
+      showToast(error?.message ?? 'Unable to add item to cart. Please try again.');
+      addToCartBtn?.removeAttribute('aria-busy');
+      addToCartBtn?.removeAttribute('disabled');
+      return;
+    }
+
+    addToCartBtn?.removeAttribute('aria-busy');
+    addToCartBtn?.removeAttribute('disabled');
+
+    showToast('Adding to cart — redirecting...');
 
     window.setTimeout(() => {
-      window.location.href = '/order/addtocart';
+      window.location.href = addToCartUrl;
     }, 600);
+  });
+
+  continueToCheckoutEl?.addEventListener('click', async (ev) => {
+    if (continueToCheckoutEl.getAttribute('aria-disabled') === 'true') {
+      ev.preventDefault();
+      showToast('Please select a paper type to continue.');
+      return;
+    }
+
+    ev.preventDefault();
+
+    const currentQty = Number.parseInt(String(quantityInput?.value ?? ''), 10) || 0;
+    if (currentQty < (Number(quantityInput?.getAttribute('min')) || 10)) {
+      showToast('Please choose a quantity of at least ' + (Number(quantityInput?.getAttribute('min')) || 10) + '.');
+      quantityInput?.focus();
+      return;
+    }
+
+    if (!validateEstimatedDate()) {
+      showToast('Please select a valid estimated date.');
+      estimatedDateInput?.focus();
+      return;
+    }
+
+    if (!validateStock()) {
+      showToast('Quantity exceeds available stock.');
+      quantityInput?.focus();
+      return;
+    }
+
+    if (!ensurePaperSelected()) {
+      showToast('Please select a paper type to continue.');
+      return;
+    }
+
+    const build = await buildAndPersistSummary();
+    if (!build?.resolvedProductId) {
+      showToast('We could not determine which design to continue. Please refresh and try again.');
+      return;
+    }
+
+    const target = continueToCheckoutEl.getAttribute('href') || envelopeUrl;
+    window.location.href = target;
   });
 
   window.addEventListener('keydown', (event) => {
@@ -793,4 +1284,82 @@ document.addEventListener('DOMContentLoaded', () => {
   suppressPreviewSync = false;
   applyPreviewSelections();
   updateTotals();
+  // Ensure the final, human-readable date label is in sync on load
+  updateFinalDateLabel();
+  // Ensure the estimated arrival is shown on load if a date exists
+  updateEstimatedArrival();
+  // Ensure paper selection requirement is enforced on load
+  ensurePaperSelected();
+
+  // Modal event listeners
+  if (preOrderConfirm) {
+    preOrderConfirm.addEventListener('click', () => {
+      isPreOrderConfirmed = true;
+      processingDays = 15;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const preOrderMinDate = new Date(today);
+      preOrderMinDate.setDate(preOrderMinDate.getDate() + 15);
+      const preOrderMaxDate = new Date(today);
+      preOrderMaxDate.setDate(preOrderMaxDate.getDate() + 30);
+
+      if (fp) {
+        fp.set('minDate', preOrderMinDate);
+        fp.set('maxDate', preOrderMaxDate);
+        fp.set('defaultDate', preOrderMinDate);
+        estimatedDateInput.value = preOrderMinDate.toISOString().split('T')[0];
+        updateEstimatedArrival();
+      }
+
+      preOrderModal.setAttribute('aria-hidden', 'true');
+      preOrderModal.style.display = 'none';
+      ensurePaperSelected();
+    });
+  }
+
+  if (preOrderCancel) {
+    preOrderCancel.addEventListener('click', () => {
+      isPreOrderConfirmed = false;
+      preOrderModal.setAttribute('aria-hidden', 'true');
+      preOrderModal.style.display = 'none';
+      stockErrorEl.textContent = 'Paper stock unavailable. Please choose another paper.';
+      stockErrorEl.style.display = 'block';
+      ensurePaperSelected();
+    });
+  }
+
+  // Close modal on backdrop click
+  if (preOrderModal) {
+    preOrderModal.addEventListener('click', (event) => {
+      if (event.target === preOrderModal) {
+        preOrderCancel.click();
+      }
+    });
+  }
+
+  // Modal keyboard navigation
+  document.addEventListener('keydown', (event) => {
+    if (preOrderModal && preOrderModal.style.display !== 'none') {
+      if (event.key === 'Escape') {
+        preOrderCancel.click();
+      } else if (event.key === 'Tab') {
+        // Trap focus within modal
+        const focusableElements = preOrderModal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+        if (event.shiftKey) {
+          if (document.activeElement === firstElement) {
+            event.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            event.preventDefault();
+            firstElement.focus();
+          }
+        }
+      }
+    }
+  });
+
 });

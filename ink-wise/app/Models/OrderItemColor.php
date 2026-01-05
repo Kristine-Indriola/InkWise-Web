@@ -10,7 +10,7 @@ class OrderItemColor extends Model
 {
     use HasFactory;
 
-    protected $table = 'order_item_colors';
+    protected $table = 'order_item_ink_usage';
 
     protected $guarded = [];
 
@@ -22,10 +22,5 @@ class OrderItemColor extends Model
     public function orderItem(): BelongsTo
     {
         return $this->belongsTo(OrderItem::class);
-    }
-
-    public function productColor(): BelongsTo
-    {
-        return $this->belongsTo(ProductColor::class, 'color_id');
     }
 }

@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
 <link rel="stylesheet" href="{{ asset('css/admin-css/ordersummary.css') }}">
 <link rel="stylesheet" href="{{ asset('css/admin-css/orders.css') }}">
-<link rel="stylesheet" href="{{ asset('css/admin-css/orders-table.css') }}">
+<link rel="stylesheet" href="{{ asset('css/admin-css/orders-table.css') }}"> 
 <style>
   .orders-controls {
     display: flex;
@@ -47,6 +47,20 @@
     border-color: #4f46e5;
     box-shadow: 0 6px 20px rgba(79, 70, 229, 0.15);
     transform: translateY(-2px);
+  }
+
+  .summary-card--highlight {
+    border-color: #10b981;
+    background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+  }
+
+  .summary-card--highlight .summary-card__label {
+    color: #065f46;
+  }
+
+  .summary-card--highlight .summary-card__value {
+    color: #047857;
   }
 
   .summary-card__label {
@@ -139,6 +153,12 @@
     letter-spacing: 0.5px;
   }
 
+  .status-badge.status-draft {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+  }
+
   .status-badge.status-pending {
     background: #fef3c7;
     color: #d97706;
@@ -207,6 +227,17 @@
 @endpush
 
 @section('content')
+@php
+  $statusOptions = [
+    'draft' => 'New Order',
+    'pending' => 'Order Received',
+    'processing' => 'Processing',
+    'in_production' => 'In Progress',
+    'confirmed' => 'Ready for Pickup',
+    'completed' => 'Completed',
+    'cancelled' => 'Cancelled',
+  ];
+@endphp
 <main class="admin-page-shell">
   <header class="page-header">
     <div>
@@ -214,7 +245,11 @@
       <p class="page-subtitle">All orders in the system. Use the table to inspect and navigate to individual order summaries.</p>
     </div>
     <div class="page-header__quick-actions">
+      <a href="{{ route('admin.orders.archived') }}" class="pill-link">Archived Orders</a>
       <a href="#" class="pill-link">Export</a>
+      <a href="{{ route('admin.reports.pickup-calendar') }}" class="pill-link">
+				<i class="fi fi-rr-calendar" aria-hidden="true"></i> Pickup calendar
+			</a>
     </div>
   </header>
 
@@ -226,6 +261,7 @@
         $statusCounts = collect($orders->items())->groupBy(fn($o) => strtolower(data_get($o,'status','processing')))
           ->map->count();
         $pendingCount = $statusCounts->get('pending', 0);
+        $draftCount = $statusCounts->get('draft', 0);
         $processingCount = $statusCounts->get('processing', 0);
         $inProductionCount = $statusCounts->get('in_production', 0);
         $confirmedCount = $statusCounts->get('confirmed', 0);
@@ -237,6 +273,12 @@
         <div class="summary-card" data-summary-count="{{ $totalOrders }}">
           <div class="summary-card__label">Total orders</div>
           <div class="summary-card__value">{{ $totalOrders }}</div>
+        </div>
+      </button>
+      <button type="button" class="summary-card-button" data-summary-filter="draft" data-summary-label="New Orders" data-summary-description="Fresh orders that need attention.">
+        <div class="summary-card summary-card--highlight" data-summary-count="{{ $draftCount }}">
+          <div class="summary-card__label">New Orders</div>
+          <div class="summary-card__value">{{ $draftCount }}</div>
         </div>
       </button>
       <button type="button" class="summary-card-button" data-summary-filter="pending" data-summary-label="Pending" data-summary-description="Orders awaiting confirmation or updates.">
@@ -326,7 +368,15 @@
                   <td class="text-end">{{ number_format((float) data_get($order, 'total_amount', 0), 2) }}</td>
                   <td>
                     @php
-                      $paymentStatus = strtolower($order->payment_status ?? 'pending');
+                      $totalPaid = $order->totalPaid();
+                      $totalAmount = (float) $order->total_amount;
+                      if ($totalPaid >= $totalAmount && $totalAmount > 0) {
+                        $paymentStatus = 'paid';
+                      } elseif ($totalPaid > 0) {
+                        $paymentStatus = 'partial';
+                      } else {
+                        $paymentStatus = 'pending';
+                      }
                       $paymentClass = 'payment-' . $paymentStatus;
                     @endphp
                     <span class="payment-badge {{ $paymentClass }}">
@@ -339,7 +389,7 @@
                       $statusClass = 'status-' . $orderStatus;
                     @endphp
                     <span class="status-badge {{ $statusClass }}">
-                      {{ ucfirst(str_replace('_', ' ', $orderStatus)) }}
+                      {{ $statusOptions[$orderStatus] ?? ucfirst(str_replace('_', ' ', $orderStatus)) }}
                     </span>
                   </td>
                   <td>{{ optional($order->order_date)->format('M j, Y') ?? optional($order->created_at)->format('M j, Y') }}</td>
@@ -347,15 +397,11 @@
                     <a href="{{ route('admin.ordersummary.index', ['order' => $order->order_number]) }}" class="btn btn-outline btn-sm btn-icon" aria-label="View order {{ $order->order_number ?? $order->id }}">
                       <i class="fa-solid fa-eye" aria-hidden="true"></i>
                     </a>
-                    <a href="{{ route('admin.orders.status.edit', ['order' => $order->id]) }}" class="btn btn-outline btn-sm btn-icon" aria-label="Manage status for order {{ $order->order_number ?? $order->id }}" title="Update status">
-                      <i class="fa-solid fa-bars-progress" aria-hidden="true"></i>
-                    </a>
-                    <a href="{{ route('admin.orders.payment.edit', ['order' => $order->id]) }}" class="btn btn-outline btn-sm btn-icon" aria-label="Manage payment for order {{ $order->order_number ?? $order->id }}" title="Update payment">
-                      <i class="fa-solid fa-credit-card" aria-hidden="true"></i>
-                    </a>
-                    <button type="button" class="btn btn-outline btn-sm btn-icon btn-delete" data-order-id="{{ $order->id }}" aria-label="Delete order {{ $order->order_number ?? $order->id }}" title="Delete order">
-                      <i class="fa-solid fa-trash" aria-hidden="true"></i>
-                    </button>
+                    @if(in_array(strtolower($order->status ?? ''), ['cancelled', 'completed']))
+                      <button type="button" class="btn btn-outline btn-sm btn-icon btn-archive" data-order-id="{{ $order->id }}" aria-label="Archive order {{ $order->order_number ?? $order->id }}" title="Archive order">
+                        <i class="fa-solid fa-archive" aria-hidden="true"></i>
+                      </button>
+                    @endif
                   </td>
                 </tr>
               @endforeach
@@ -408,6 +454,7 @@
 
     const statusMap = {
       all: null,
+      draft: ['draft'],
       pending: ['pending'],
       in_progress: ['processing', 'in_production'],
       ready_pickup: ['confirmed'],
@@ -425,6 +472,7 @@
     function computeCounts() {
       const counts = {
         total: 0,
+        draft: 0,
         pending: 0,
         in_progress: 0,
         ready_pickup: 0,
@@ -441,6 +489,7 @@
         }
         const status = row.dataset.status || 'processing';
         counts.total += 1;
+        if (status === 'draft') counts.draft += 1;
         if (status === 'pending') counts.pending += 1;
         if (inProgressStatuses.includes(status)) counts.in_progress += 1;
         if (readyPickupStatuses.includes(status)) counts.ready_pickup += 1;
@@ -453,6 +502,7 @@
 
     function getCountForFilter(filterKey, counts) {
       switch (filterKey) {
+        case 'draft': return counts.draft;
         case 'pending': return counts.pending;
         case 'in_progress': return counts.in_progress;
         case 'ready_pickup': return counts.ready_pickup;

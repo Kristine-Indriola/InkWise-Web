@@ -103,6 +103,7 @@
                         <option value="envelopes" {{ old('material_type', $material->material_type) == 'envelopes' ? 'selected' : '' }}>ENVELOPES</option>
                         <option value="ribbon" {{ old('material_type', $material->material_type) == 'ribbon' ? 'selected' : '' }}>RIBBON</option>
                         <option value="powder" {{ old('material_type', $material->material_type) == 'powder' ? 'selected' : '' }}>POWDER</option>
+                        <option value="souvenirs" {{ old('material_type', $material->material_type) == 'souvenirs' ? 'selected' : '' }}>SOUVENIRS</option>
                     </select>
                     @error('material_type') <small style="color:red;">{{ $message }}</small> @enderror
                 </div>
@@ -182,12 +183,6 @@
                         <input type="number" step="0.01" name="cost_per_ml" value="{{ old('cost_per_ml', $material->cost_per_ml ?? '') }}" required class="form-control styled-select">
                         <small style="color:#6b7280;">Required. Unit price per milliliter (e.g. 0.25).</small>
                         @error('cost_per_ml') <small style="color:red;">{{ $message }}</small> @enderror
-                    </div>
-                    <div class="form-group">
-                        <label>Average Usage per Invite (ml)</label>
-                        <input type="number" step="0.01" name="avg_usage_per_invite_ml" value="{{ old('avg_usage_per_invite_ml', $material->avg_usage_per_invite_ml ?? '') }}" class="form-control styled-select">
-                        <small style="color:#6b7280;">Optional. Estimated ml used per invite (for inventory planning).</small>
-                        @error('avg_usage_per_invite_ml') <small style="color:red;">{{ $message }}</small> @enderror
                     </div>
                 </div>
             </div>

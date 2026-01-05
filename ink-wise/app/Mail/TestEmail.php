@@ -37,7 +37,7 @@ class TestEmail extends Mailable
     public function content(): Content
     {
         return new Content(
-            view: 'view.name',
+            htmlString: '<h1>Test Email</h1><p>This is a test email to verify SMTP configuration.</p>',
         );
     }
 

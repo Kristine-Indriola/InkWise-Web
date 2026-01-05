@@ -11,8 +11,6 @@
     <a href="{{ route('customer.my_purchase.toship') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Ship</a>
     <a href="{{ route('customer.my_purchase.toreceive') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Receive</a>
     <a href="{{ route('customer.my_purchase.completed') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Completed</a>
-    <a href="{{ route('customer.my_purchase.cancelled') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Cancelled</a>
-    <a href="{{ route('customer.my_purchase.return_refund') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">Return/Refund</a>
     </div>
     @php
         $ordersList = collect($orders ?? []);
@@ -191,8 +189,8 @@
 
                             $trackingNumber = data_get($order, 'metadata.tracking_number', data_get($order, 'tracking_number'));
 
-                            $cancelableStatuses = ['pending', 'awaiting_payment'];
-                            $canCancel = $orderId && in_array($rawStatus, $cancelableStatuses, true);
+                            $cancelableStatuses = []; // Customers cannot cancel orders
+                            $canCancel = false; // Disable cancel functionality
                         @endphp
 
                         <div class="bg-white border rounded-xl shadow-sm" data-customer-order-card data-order-id="{{ $orderId }}">

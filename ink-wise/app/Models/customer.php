@@ -40,4 +40,11 @@ class Customer extends Model
         return $this->hasMany(Order::class, 'customer_id', 'customer_id')
             ->orderByDesc('updated_at');
     }
+
+    // Accessors
+    public function getNameAttribute()
+    {
+        $name = trim(($this->first_name ?? '') . ' ' . ($this->middle_name ?? '') . ' ' . ($this->last_name ?? ''));
+        return $name ?: 'Guest';
+    }
 }

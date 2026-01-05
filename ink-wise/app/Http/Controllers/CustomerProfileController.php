@@ -153,7 +153,8 @@ class CustomerProfileController extends Controller
         $user = Auth::user();
 
         if (!$user) {
-            return redirect()->route('customer.login.form');
+            return redirect()->route('dashboard', ['modal' => 'login'])
+                ->with('show_login_modal', true);
         }
 
         $customer = $user->customer;
@@ -168,10 +169,10 @@ class CustomerProfileController extends Controller
             abort(403);
         }
 
-        $cancellableStatuses = ['pending', 'awaiting_payment', 'in_production'];
+        $cancellableStatuses = []; // Customers cannot cancel orders
 
         if (!in_array($order->status, $cancellableStatuses, true)) {
-            $errorMessage = 'Order can no longer be cancelled at this stage. Please contact InkWise support for assistance.';
+            $errorMessage = 'Order cancellation is not allowed. Please contact InkWise support for assistance.';
             
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json([
@@ -304,7 +305,8 @@ class CustomerProfileController extends Controller
         $user = Auth::user();
 
         if (!$user) {
-            return redirect()->route('customer.login.form');
+            return redirect()->route('dashboard', ['modal' => 'login'])
+                ->with('show_login_modal', true);
         }
 
         $customer = $user->customer;
@@ -344,7 +346,8 @@ class CustomerProfileController extends Controller
         $user = Auth::user();
 
         if (!$user) {
-            return redirect()->route('customer.login.form');
+            return redirect()->route('dashboard', ['modal' => 'login'])
+                ->with('show_login_modal', true);
         }
 
         $customer = $user->customer;
@@ -371,6 +374,7 @@ class CustomerProfileController extends Controller
         ]);
 
         $statusOptions = [
+            'draft' => 'New Order',
             'pending' => 'Order Received',
             'processing' => 'Processing',
             'in_production' => 'In Production',
@@ -379,7 +383,7 @@ class CustomerProfileController extends Controller
             'cancelled' => 'Cancelled',
         ];
 
-        $statusFlow = ['pending', 'processing', 'in_production', 'confirmed', 'completed'];
+        $statusFlow = ['draft', 'pending', 'processing', 'in_production', 'confirmed', 'completed'];
 
         return view('customer.profile.purchase.order_details', compact('order', 'statusOptions', 'statusFlow'));
     }
@@ -389,7 +393,8 @@ class CustomerProfileController extends Controller
         $user = Auth::user();
 
         if (!$user) {
-            return redirect()->route('customer.login.form');
+            return redirect()->route('dashboard', ['modal' => 'login'])
+                ->with('show_login_modal', true);
         }
 
         $customer = $user->customer;
@@ -416,6 +421,7 @@ class CustomerProfileController extends Controller
         ]);
 
         $statusOptions = [
+            'draft' => 'New Order',
             'pending' => 'Order Received',
             'processing' => 'Processing',
             'in_production' => 'In Production',
@@ -424,7 +430,7 @@ class CustomerProfileController extends Controller
             'cancelled' => 'Cancelled',
         ];
 
-        $statusFlow = ['pending', 'processing', 'in_production', 'confirmed', 'completed'];
+        $statusFlow = ['draft', 'pending', 'processing', 'in_production', 'confirmed', 'completed'];
 
         $settings = SiteSetting::current();
 

@@ -22,15 +22,15 @@
 @section('title', 'Customer Profiles')
 
 @section('content')
-@php
-    $customersCollection = $customers instanceof \Illuminate\Support\Collection ? $customers : collect($customers);
-@endphp
+    @php
+        $customersCollection = $customers instanceof \Illuminate\Support\Collection ? $customers : collect($customers);
+    @endphp
 
 <main class="materials-page admin-page-shell staff-customer-profiles-page" role="main">
     <header class="page-header">
         <div>
             <h1 class="page-title">Customer Profiles</h1>
-            <p class="page-subtitle">View and manage customer information and registration details.</p>
+            <p class="page-subtitle">Manage customer information and registration details.</p>
         </div>
     </header>
 
@@ -56,15 +56,28 @@
                 </thead>
                 <tbody>
                     @forelse($customersCollection as $customer)
+                        @php
+                            $profile = $customer->customer;
+                            $address = $customer->address;
+                            $avatar = $profile && ($profile->photo ?? null)
+                                ? \App\Support\ImageResolver::url($profile->photo)
+                                : 'https://via.placeholder.com/64?text=User';
+                            $fullName = collect([
+                                $profile->first_name ?? null,
+                                $profile->middle_name ?? null,
+                                $profile->last_name ?? null,
+                            ])->filter()->implode(' ');
+                        @endphp
+
                         <tr class="clickable-row" data-href="{{ route('staff.customer_profile.show', $customer->user_id) }}" role="button" tabindex="0">
                             <td>{{ $customer->user_id }}</td>
                             <td class="profile-pic-cell">
-                                <img src="{{ $customer->profile_picture ?? 'https://via.placeholder.com/50' }}" alt="Profile" class="profile-pic">
+                                <img src="{{ $avatar }}" alt="Profile" class="profile-pic">
                             </td>
-                            <td class="customer-name">{{ $customer->name }}</td>
+                            <td class="customer-name">{{ $fullName ?: ($customer->name ?? 'N/A') }}</td>
                             <td>{{ $customer->email }}</td>
-                            <td>{{ $customer->contact_number ?? '—' }}</td>
-                            <td>{{ $customer->address ?? '—' }}</td>
+                            <td>{{ $profile->contact_number ?? '—' }}</td>
+                            <td>{{ $address ? ($address->street . ', ' . $address->city . ', ' . $address->province) : '—' }}</td>
                             <td>{{ $customer->created_at->format('M d, Y') }}</td>
                         </tr>
                     @empty

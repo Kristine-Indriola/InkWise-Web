@@ -5,7 +5,7 @@
 <link rel="stylesheet" href="{{ asset('css/admin-css/product.css') }}">
 <script src="{{ asset('js/admin/product.js') }}"></script>
 @section('content')
-<main class="dashboard-container admin-page-shell" role="main">
+<main class="dashboard-container admin-page-shell" role="main" style="padding-left:140px;">
     <h1 class="page-title">Products</h1>
     @if(session('error'))
         <div class="alert alert-error">{{ session('error') }}</div>
@@ -113,6 +113,11 @@
 
 {{-- Upload modal styles --}}
 <style>
+    /* Further increased right nudge for summary cards and products grid */
+    .dashboard-container { padding-left: 140px !important; }
+    .summary-cards { margin-left: 32px; }
+    .products-grid { margin-left: 32px; }
+
     .upload-modal {
         position: fixed;
         top: 0;

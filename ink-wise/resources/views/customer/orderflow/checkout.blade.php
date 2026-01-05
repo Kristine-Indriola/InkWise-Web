@@ -17,24 +17,26 @@
     <link rel="icon" type="image/png" href="{{ asset('adminimage/ink.png') }}">
     <style>
         :root {
-            --page-gradient: linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%);
+            --page-gradient: radial-gradient(circle at 20% 20%, rgba(148, 163, 184, 0.12), transparent 35%),
+                              radial-gradient(circle at 80% 0%, rgba(99, 102, 241, 0.08), transparent 32%),
+                              #f7f9fc;
             --surface: #ffffff;
-            --surface-muted: #f8f9fa;
-            --surface-strong: #1a1a1a;
-            --divider: rgba(0, 0, 0, 0.08);
-            --shadow-lg: 0 4px 20px rgba(0, 0, 0, 0.08);
-            --shadow-md: 0 2px 12px rgba(0, 0, 0, 0.06);
-            --text-strong: #1a1a1a;
-            --text-default: #333333;
-            --text-muted: #666666;
-            --text-soft: #999999;
-            --accent: #ee4d2d;
-            --accent-dark: #d73211;
-            --success: #00bfa5;
-            --warning: #ffbf00;
-            --danger: #ee4d2d;
-            --radius-lg: 8px;
-            --radius-md: 6px;
+            --surface-muted: #f8fafc;
+            --surface-strong: #0f172a;
+            --divider: rgba(15, 23, 42, 0.06);
+            --shadow-lg: 0 22px 70px rgba(15, 23, 42, 0.10);
+            --shadow-md: 0 12px 40px rgba(15, 23, 42, 0.08);
+            --text-strong: #0f172a;
+            --text-default: #1f2937;
+            --text-muted: #475569;
+            --text-soft: #94a3b8;
+            --accent: #0f172a;
+            --accent-dark: #0b1220;
+            --success: #16a34a;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --radius-lg: 18px;
+            --radius-md: 12px;
         }
 
         * {
@@ -47,12 +49,25 @@
             font-family: 'Poppins', sans-serif;
             background: var(--page-gradient);
             color: var(--text-default);
-            line-height: 1.5;
+            line-height: 1.6;
+        }
+
+        .glass-card {
+            backdrop-filter: blur(14px);
+            background: rgba(255, 255, 255, 0.94);
+            border: 1px solid rgba(15, 23, 42, 0.06);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .fade-border {
+            border: 1px solid rgba(15, 23, 42, 0.06);
+            box-shadow: var(--shadow-md);
         }
 
         a {
-            color: var(--accent);
+            color: var(--text-default);
             text-decoration: none;
+            transition: color 0.2s ease, opacity 0.2s ease;
         }
 
         a:hover {
@@ -60,19 +75,19 @@
         }
 
         .page-wrapper {
-            width: min(1200px, calc(100% - 40px));
-            margin: 20px auto;
+            width: min(1200px, calc(100% - 48px));
+            margin: 32px auto 40px;
             display: grid;
             grid-template-columns: 1fr 400px;
-            gap: 24px;
+            gap: 28px;
             align-items: start;
         }
 
         .card {
             background: var(--surface);
-            border-radius: var(--radius-lg);
+            border-radius: 26px;
             box-shadow: var(--shadow-lg);
-            border: 1px solid rgba(0, 0, 0, 0.04);
+            border: 1px solid rgba(15, 23, 42, 0.06);
             overflow: hidden;
         }
 
@@ -87,7 +102,7 @@
         .checkout-form {
             display: flex;
             flex-direction: column;
-            gap: 32px;
+            gap: 28px;
             padding: 32px;
         }
 
@@ -98,7 +113,7 @@
             font-size: 20px;
             font-weight: 600;
             color: var(--text-strong);
-            margin: 0 0 8px 0;
+            margin: 0 0 6px 0;
         }
 
         .section-title span {
@@ -115,7 +130,7 @@
         }
 
         .section-subtitle {
-            margin: 0 0 20px 0;
+            margin: 0 0 18px 0;
             color: var(--text-muted);
             font-size: 14px;
         }
@@ -132,7 +147,7 @@
         }
 
         label {
-            font-weight: 500;
+            font-weight: 600;
             font-size: 14px;
             color: var(--text-strong);
             display: flex;
@@ -148,18 +163,19 @@
         select {
             border-radius: 14px;
             border: 1px solid rgba(148, 163, 184, 0.35);
-            padding: 12px 16px;
+            padding: 12px 14px;
             font-family: inherit;
-            transition: border 0.2s ease, box-shadow 0.2s ease;
+            transition: border 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
             background: #ffffff;
         }
 
         input:focus,
         select:focus,
         textarea:focus {
-            border-color: rgba(166, 183, 255, 0.6);
+            border-color: rgba(79, 70, 229, 0.45);
             outline: none;
-            box-shadow: 0 0 0 3px rgba(166, 183, 255, 0.18);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+            background: #f8fafc;
         }
 
         textarea {
@@ -168,27 +184,30 @@
         }
 
         .option-card {
-            border-radius: var(--radius-md);
-            border: 1px solid #e0e0e0;
-            background: #ffffff;
+            border-radius: 18px;
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            background: rgba(255, 255, 255, 0.96);
             padding: 16px 20px;
             display: flex;
             gap: 16px;
             align-items: flex-start;
             cursor: pointer;
             transition: all 0.2s ease;
+            box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
         }
 
         .option-card:hover {
-            border-color: var(--accent);
-            box-shadow: 0 2px 8px rgba(238, 77, 45, 0.15);
+            border-color: rgba(15, 23, 42, 0.22);
+            box-shadow: 0 20px 52px rgba(15, 23, 42, 0.14);
         }
 
         .option-card.selected {
-            border-color: var(--accent);
-            background: rgba(238, 77, 45, 0.02);
-            box-shadow: 0 2px 8px rgba(238, 77, 45, 0.15);
-        }        .option-card input[type="radio"] {
+            border-color: #0f172a;
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.04), rgba(15, 23, 42, 0.01));
+            box-shadow: 0 22px 60px rgba(15, 23, 42, 0.16);
+        }
+
+        .option-card input[type="radio"] {
             margin-top: 4px;
             width: 18px;
             height: 18px;
@@ -228,7 +247,11 @@
             display: grid;
             gap: 20px;
             position: sticky;
-            top: 20px;
+            top: 24px;
+            border-radius: 24px;
+            border: 1px solid rgba(15, 23, 42, 0.06);
+            box-shadow: var(--shadow-lg);
+            background: rgba(255, 255, 255, 0.98);
         }
 
         .summary-header {
@@ -268,10 +291,10 @@
             justify-content: space-between;
             align-items: center;
             font-size: 20px;
-            font-weight: 600;
+            font-weight: 700;
             color: var(--text-strong);
             padding: 16px 0;
-            border-top: 2px solid #e0e0e0;
+            border-top: 2px solid rgba(15, 23, 42, 0.08);
         }
 
         .summary-total span:last-child {
@@ -281,20 +304,32 @@
         .place-order {
             width: 100%;
             padding: 14px 20px;
-            border-radius: var(--radius-md);
+            border-radius: 999px;
             border: none;
             background: var(--accent);
             color: #ffffff;
             font-size: 16px;
-            font-weight: 600;
+            font-weight: 700;
+            letter-spacing: 0.01em;
             cursor: pointer;
             transition: all 0.2s ease;
+            box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
         }
 
         .place-order:hover {
             background: var(--accent-dark);
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(238, 77, 45, 0.3);
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+        }
+
+        .place-order:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(238, 77, 45, 0.28), 0 12px 28px rgba(15, 23, 42, 0.18);
+        }
+
+        .place-order:active {
+            transform: translateY(0);
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
         }
 
         .shipping-header {
@@ -493,7 +528,8 @@
                 justify-content: flex-start;
             }
 
-            .place-order {
+            .place-order,
+            .btn-continue {
                 font-size: 15px;
             }
         }
@@ -561,21 +597,35 @@
         .btn-continue {
             width: 100%;
             padding: 14px 20px;
-            border-radius: var(--radius-md);
+            border-radius: 999px;
             border: none;
-            background: var(--accent);
+            background: linear-gradient(135deg, var(--accent), #ef4444);
+            background-size: 160% 160%;
             color: #ffffff;
             font-size: 16px;
-            font-weight: 600;
+            font-weight: 700;
+            letter-spacing: 0.01em;
             cursor: pointer;
             transition: all 0.2s ease;
             margin-top: 24px;
+            box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
         }
 
         .btn-continue:hover {
-            background: var(--accent-dark);
+            background-position: 100% 0;
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(238, 77, 45, 0.3);
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+        }
+
+        .btn-continue:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(238, 77, 45, 0.28), 0 12px 28px rgba(15, 23, 42, 0.18);
+        }
+
+        .btn-continue:active {
+            transform: translateY(0);
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+            background-position: 0 100%;
         }
 
         .btn-back {
@@ -590,11 +640,23 @@
             cursor: pointer;
             transition: all 0.2s ease;
             margin-top: 12px;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
         }
 
         .btn-back:hover {
             background: #f8f9fa;
             border-color: #d1d5db;
+        }
+
+        .btn-back:focus-visible {
+            outline: none;
+            border-color: rgba(15, 23, 42, 0.26);
+            box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.16), 0 10px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        .btn-back:active {
+            transform: translateY(0);
+            box-shadow: 0 6px 14px rgba(15, 23, 42, 0.06);
         }
 
         /* GCash payment options styling */
@@ -677,6 +739,58 @@
 </head>
 <body>
 @php
+    // Provide navigation context required by the shared topbar
+    $resolvedInvitationType = $invitationType
+        ?? (request()->routeIs('templates.corporate.*') ? 'Corporate'
+            : (request()->routeIs('templates.baptism.*') ? 'Baptism'
+                : (request()->routeIs('templates.birthday.*') ? 'Birthday'
+                    : 'Wedding')));
+
+    $eventRoutes = [
+        'wedding' => [
+            'label' => 'Wedding',
+            'invitations' => route('templates.wedding.invitations'),
+            'giveaways' => route('templates.wedding.giveaways'),
+        ],
+        'corporate' => [
+            'label' => 'Corporate',
+            'invitations' => route('templates.corporate.invitations'),
+            'giveaways' => route('templates.corporate.giveaways'),
+        ],
+        'baptism' => [
+            'label' => 'Baptism',
+            'invitations' => route('templates.baptism.invitations'),
+            'giveaways' => route('templates.baptism.giveaways'),
+        ],
+        'birthday' => [
+            'label' => 'Birthday',
+            'invitations' => route('templates.birthday.invitations'),
+            'giveaways' => route('templates.birthday.giveaways'),
+        ],
+    ];
+
+    $currentEventKey = strtolower($resolvedInvitationType);
+    if (! array_key_exists($currentEventKey, $eventRoutes)) {
+        $currentEventKey = 'wedding';
+    }
+    $currentEventRoutes = $eventRoutes[$currentEventKey];
+
+    $navLinks = [];
+    foreach ($eventRoutes as $key => $config) {
+        $navLinks[] = [
+            'key' => $key,
+            'label' => $config['label'],
+            'route' => $config['invitations'],
+            'isActive' => $key === $currentEventKey,
+        ];
+    }
+
+    $favoritesEnabled = \Illuminate\Support\Facades\Route::has('customer.favorites');
+    $cartRoute = \Illuminate\Support\Facades\Route::has('customer.cart')
+        ? route('customer.cart')
+        : '/order/addtocart';
+    $searchValue = request('query', '');
+
     $order = $order ?? null;
     $customerOrder = $order?->customerOrder;
     $orderItem = $order?->items->first();
@@ -705,6 +819,7 @@
     $pendingPaymentUrl = $paymongoMeta['next_action_url'] ?? null;
     $paymentMode = $paymongoMeta['mode'] ?? 'half';
     $isFullyPaid = $balanceDueDisplay <= 0.01;
+    $hasRemainingBalance = !$isFullyPaid;
     $formatPaymentDate = static function ($date) {
         try {
             return $date ? \Illuminate\Support\Carbon::parse($date)->format('M j, Y g:i A') : null;
@@ -733,52 +848,7 @@
         </a>
     </div>
 @endif
-    <header class="global-nav shadow animate-fade-in-down bg-white w-full">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between h-16">
-            <div class="flex items-center animate-bounce-slow flex-shrink-0">
-                <span class="text-5xl font-bold logo-i" style="font-family: Edwardian Script ITC; color:#06b6d4;">I</span>
-                <span class="text-2xl font-bold" style="font-family: 'Playfair Display', serif; color: #0891b2;">nkwise</span>
-            </div>
-
-            <nav id="mainNav" class="flex flex-wrap gap-4 md:gap-0 md:space-x-6" role="navigation">
-                <a href="{{ route('customer.dashboard') }}" class="text-gray-700 hover:text-[#a6b7ff]">Home</a>
-                <a href="#shipping" class="text-gray-700 hover:text-[#a6b7ff]">Shipping</a>
-                <a href="#payment" class="text-gray-700 hover:text-[#a6b7ff]">Payment</a>
-                <a href="#summary" class="text-gray-700 hover:text-[#a6b7ff]">Summary</a>
-            </nav>
-
-            <div class="flex items-center space-x-4 relative min-w-0">
-                <form action="{{ url('/search') }}" method="GET" class="hidden md:flex">
-                    <input type="text" name="query" placeholder="Search..." class="border rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring focus:ring-[#a6b7ff]">
-                </form>
-
-                @guest
-                    <a href="{{ route('customer.login') }}" id="openLogin" class="text-white px-5 py-2 font-semibold animate-ocean rounded-full" style="font-family: 'Seasons', serif;">
-                        Sign in
-                    </a>
-                @endguest
-
-                @auth
-                    <div class="relative min-w-0 group">
-                        <button id="userDropdownBtn" class="flex items-center space-x-2 text-gray-700 hover:text-gray-900">
-                            <span>{{ Auth::user()->customer?->first_name ?? Auth::user()->email ?? 'Customer' }}</span>
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                        </button>
-
-                        <div id="userDropdownMenu" class="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-200 z-50 hidden group-hover:block">
-                            <a href="{{ route('customerprofile.index') }}" class="block px-4 py-2 text-gray-700 hover:bg-[#e7ecff] transition-colors">My Account</a>
-                            <div class="block px-4 py-2 text-gray-700 hover:bg-[#e7ecff] cursor-pointer transition-colors">My Purchase</div>
-                            <div class="block px-4 py-2 text-gray-700 hover:bg-[#e7ecff] cursor-pointer transition-colors">My Favorites</div>
-                            <form method="POST" action="{{ route('customer.logout') }}">
-                                @csrf
-                                <button type="submit" class="block w-full text-left px-4 py-2 text-gray-700 hover:bg-[#e7ecff] transition-colors">Logout</button>
-                            </form>
-                        </div>
-                    </div>
-                @endauth
-            </div>
-        </div>
-    </header>
+    @include('partials.topbar')
 
     <div class="page-wrapper">
         <!-- Checkout Steps -->
@@ -786,22 +856,88 @@
             <div class="steps-container" style="display: flex; align-items: center; justify-content: center; gap: 32px;">
                 <div class="step active" style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
                     <div class="step-circle">1</div>
-                    <span class="step-label">Shipping</span>
+                    <span class="step-label">Order Summary</span>
                 </div>
                 <div class="step-line"></div>
                 <div class="step" style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
                     <div class="step-circle">2</div>
-                    <span class="step-label">Payment</span>
+                    <span class="step-label">Shipping</span>
                 </div>
                 <div class="step-line"></div>
                 <div class="step" style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
                     <div class="step-circle">3</div>
-                    <span class="step-label">Review</span>
+                    <span class="step-label">Payment</span>
                 </div>
             </div>
         </div>
 
-        <section class="card checkout-form checkout-section active" id="shipping">
+        <section class="card checkout-form checkout-section active" id="summary-step">
+            <header class="shipping-header">
+                <h1 class="section-title">Order Summary</h1>
+                <p class="section-subtitle">Review your selected items and totals before proceeding.</p>
+            </header>
+
+            <div class="summary-card" style="position: static; top: auto;">
+                <div class="summary-items" id="summaryItems">
+                    @forelse(($order?->items ?? collect()) as $item)
+                        <div class="summary-item">
+                            <span>{{ $item->product_name }} × {{ $item->quantity }}</span>
+                            <strong>₱{{ number_format($item->subtotal, 2) }}</strong>
+                        </div>
+                        @foreach($item->addons as $addon)
+                            <div class="summary-item" style="padding-left:16px; font-size:0.9rem;">
+                                <span>{{ $addon->addon_name }}</span>
+                                <strong>₱{{ number_format(($addon->addon_price ?? 0) * $item->quantity, 2) }}</strong>
+                            </div>
+                        @endforeach
+                    @empty
+                        <div class="summary-item">
+                            <span>No items in this order yet.</span>
+                            <strong>—</strong>
+                        </div>
+                    @endforelse
+                </div>
+                <hr class="summary-divider">
+                <div class="summary-item">
+                    <span>Subtotal</span>
+                    <strong id="subtotalAmount">₱{{ number_format($subtotal, 2) }}</strong>
+                </div>
+                <div class="summary-item">
+                    <span>Shipping</span>
+                    <strong id="shippingAmount">{{ $shippingFee > 0 ? '₱' . number_format($shippingFee, 2) : 'Free' }}</strong>
+                </div>
+                <div class="summary-item">
+                    <span>Tax</span>
+                    <strong id="taxAmount">₱{{ number_format($taxAmount, 2) }}</strong>
+                </div>
+                <hr class="summary-divider">
+                <div class="summary-item">
+                    <span>Total paid via GCash</span>
+                    <strong id="paidAmount">₱{{ number_format($paidAmountDisplay, 2) }}</strong>
+                </div>
+                @if(!$isFullyPaid)
+                <div class="summary-item">
+                    <span>Balance remaining</span>
+                    <strong id="balanceAmount">₱{{ number_format($balanceDueDisplay, 2) }}</strong>
+                </div>
+                @endif
+                <div class="summary-total">
+                    <span>Total due</span>
+                    <span id="grandTotal">₱{{ number_format($totalAmount, 2) }}</span>
+                </div>
+                @if($isFullyPaid)
+                <p class="note">Order fully paid. Recorded payments total ₱{{ number_format($paidAmountDisplay, 2) }}.</p>
+                @else
+                <p class="note">Recorded payments total ₱{{ number_format($paidAmountDisplay, 2) }}. Outstanding balance: ₱{{ number_format($balanceDueDisplay, 2) }}.</p>
+                @endif
+            </div>
+
+            <button type="button" class="btn-continue" id="continueToShipping" style="margin-top: 24px;">
+                Continue to Shipping
+            </button>
+        </section>
+
+        <section class="card checkout-form checkout-section" id="shipping">
             <header class="shipping-header">
                 <h1 class="section-title">Fulfillment Information</h1>
                 <p class="section-subtitle">Please provide your contact details for order pickup</p>
@@ -868,19 +1004,24 @@
                 </p>
             </div>
 
-            <button type="button" class="btn-continue" id="continueToPayment">
-                Continue to Payment
-            </button>
+            <div style="display: flex; gap: 12px; margin-top: 24px;">
+                <button type="button" class="btn-back" id="backToSummary">← Back to Summary</button>
+                <button type="button" class="btn-continue" id="continueToPayment" style="flex: 1;">
+                    Continue to Payment
+                </button>
+            </div>
 
             {{-- No dynamic select behavior: fields are prefilled server-side from first saved address (if any) and remain editable --}}
             <input type="hidden" id="checkoutQuantity" name="quantity" value="{{ $checkoutQuantity }}">
         </section>
 
-        <section class="card checkout-form checkout-section" id="payment">
+        <section class="card glass-card fade-border checkout-form checkout-section" id="payment">
             <header class="shipping-header">
                 <h1 class="section-title">Payment Method</h1>
                 <p class="section-subtitle" id="paymentSubtitle">Choose how you want to pay for your order.</p>
             </header>
+
+            <div id="paymentAlert" class="payment-alert" style="display: none;"></div>
 
             <!-- Deposit Payment Options (50%) -->
             <div class="fieldset" id="depositPaymentOptions">
@@ -930,22 +1071,6 @@
                 </div>
             </div>
 
-            <div style="display: flex; gap: 12px; margin-top: 24px;">
-                <button type="button" class="btn-back" id="backToShipping">
-                    ← Back to Shipping
-                </button>
-                <button type="button" class="btn-continue" id="continueToReview" style="flex: 1;">
-                    Continue to Review
-                </button>
-            </div>
-        </section>
-
-        <section class="card checkout-form checkout-section" id="review">
-            <header class="shipping-header">
-                <h1 class="section-title">Review Your Order</h1>
-                <p class="section-subtitle">Please review your order details before placing your order</p>
-            </header>
-
             <div class="fieldset">
                 <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--text-strong);">Fulfillment Details</h3>
                 <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
@@ -965,65 +1090,14 @@
             </div>
 
             <div style="display: flex; gap: 12px; margin-top: 24px;">
-                <button type="button" class="btn-back" id="backToPayment">
-                    ← Back to Payment
+                <button type="button" class="btn-back" id="backToShipping">
+                    ← Back to Shipping
                 </button>
                 <button type="button" class="place-order" id="placeOrderBtn" style="flex: 1;">
                     Place Order
                 </button>
             </div>
         </section>
-
-        <aside class="card summary-card" id="summary">
-            <h2 class="summary-header">Order Summary</h2>
-            <div class="summary-items" id="summaryItems">
-                @forelse(($order?->items ?? collect()) as $item)
-                    <div class="summary-item">
-                        <span>{{ $item->product_name }} × {{ $item->quantity }}</span>
-                        <strong>₱{{ number_format($item->subtotal, 2) }}</strong>
-                    </div>
-                    @foreach($item->addons as $addon)
-                        <div class="summary-item" style="padding-left:16px; font-size:0.9rem;">
-                            <span>{{ $addon->addon_name }}</span>
-                            <strong>₱{{ number_format(($addon->addon_price ?? 0) * $item->quantity, 2) }}</strong>
-                        </div>
-                    @endforeach
-                @empty
-                    <div class="summary-item">
-                        <span>No items in this order yet.</span>
-                        <strong>—</strong>
-                    </div>
-                @endforelse
-            </div>
-            <hr class="summary-divider">
-            <div class="summary-item">
-                <span>Subtotal</span>
-                <strong id="subtotalAmount">₱{{ number_format($subtotal, 2) }}</strong>
-            </div>
-            <div class="summary-item">
-                <span>Shipping</span>
-                <strong id="shippingAmount">{{ $shippingFee > 0 ? '₱' . number_format($shippingFee, 2) : 'Free' }}</strong>
-            </div>
-            <div class="summary-item">
-                <span>Tax</span>
-                <strong id="taxAmount">₱{{ number_format($taxAmount, 2) }}</strong>
-            </div>
-            <hr class="summary-divider">
-            <div class="summary-item">
-                <span>Total paid via GCash</span>
-                <strong id="paidAmount">₱{{ number_format($paidAmountDisplay, 2) }}</strong>
-            </div>
-            <div class="summary-item">
-                <span>Balance remaining</span>
-                <strong id="balanceAmount">₱{{ number_format($balanceDueDisplay, 2) }}</strong>
-            </div>
-            <div class="summary-total">
-                <span>Total due</span>
-                <span id="grandTotal">₱{{ number_format($totalAmount, 2) }}</span>
-            </div>
-            <div id="paymentAlert" class="payment-alert"></div>
-            <p class="note">Recorded payments total ₱{{ number_format($paidAmountDisplay, 2) }}. Outstanding balance: ₱{{ number_format($balanceDueDisplay, 2) }}.</p>
-        </aside>
     </div>
 
     <!-- payment section merged into shipping above -->
@@ -1033,6 +1107,7 @@
             // Step navigation logic
             let currentStep = 1;
             const totalSteps = 3;
+            const stepOrder = ['summary-step', 'shipping', 'payment'];
 
             const updateStepIndicator = () => {
                 // Update step circles and labels
@@ -1064,13 +1139,17 @@
                 });
 
                 // Show current step
-                const currentSection = document.getElementById(['shipping', 'payment', 'review'][stepNumber - 1]);
+                const currentSection = document.getElementById(stepOrder[stepNumber - 1]);
                 if (currentSection) {
                     currentSection.classList.add('active');
                 }
 
                 currentStep = stepNumber;
                 updateStepIndicator();
+
+                if (stepNumber === 3) {
+                    populateReviewInfo();
+                }
             };
 
             const validateShippingStep = () => {
@@ -1148,27 +1227,35 @@
             };
 
             // Step navigation event listeners
+            document.getElementById('continueToShipping')?.addEventListener('click', () => {
+                showStep(2);
+            });
+
+            document.getElementById('backToSummary')?.addEventListener('click', () => {
+                showStep(1);
+            });
+
             document.getElementById('continueToPayment')?.addEventListener('click', () => {
                 if (validateShippingStep()) {
-                    showStep(2);
+                    clearPaymentMessage();
+                    showStep(3);
                 }
             });
 
             document.getElementById('backToShipping')?.addEventListener('click', () => {
-                showStep(1);
-            });
-
-            document.getElementById('continueToReview')?.addEventListener('click', () => {
-                populateReviewInfo();
-                showStep(3);
-            });
-
-            document.getElementById('backToPayment')?.addEventListener('click', () => {
+                clearPaymentMessage();
                 showStep(2);
             });
 
-            // Initialize first step
-            showStep(1);
+            // Initialize step from hash (e.g., #payment or #review) or default to shipping
+            const hash = (window.location.hash || '').replace('#', '').toLowerCase();
+            let initialStep = 1;
+            if (hash === 'shipping') {
+                initialStep = 2;
+            } else if (hash === 'payment' || hash === 'review') {
+                initialStep = 3;
+            }
+            showStep(initialStep);
 
             const priceFormatter = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' });
             const subtotal = @json($subtotal ?? 0);
@@ -1213,11 +1300,11 @@
             };
 
             const updatePayButton = () => {
-                // No longer needed - payment happens in review step
+                // No longer needed - handled within the payment step
             };
 
             const updateMarkAsPaidButton = () => {
-                // No longer needed - payment happens in review step
+                // No longer needed - handled within the payment step
             };
 
             // Update summary area when payment method changes
@@ -1310,7 +1397,12 @@
 
             paymentRadios.forEach((radio) => {
                 if (radio.checked) highlightSelection(radio);
-                radio.addEventListener('change', (event) => highlightSelection(event.target));
+                radio.addEventListener('change', (event) => {
+                    highlightSelection(event.target);
+                    if (currentStep === 3) {
+                        populateReviewInfo();
+                    }
+                });
             });
 
             // Listen for payment method changes to show payment summary
@@ -1318,10 +1410,16 @@
                 r.addEventListener('change', (e) => {
                     updatePaymentSummary(e.target.value);
                     highlightSelection(e.target);
+                    if (currentStep === 3) {
+                        populateReviewInfo();
+                    }
                 });
                 if (r.checked) {
                     updatePaymentSummary(r.value);
                     highlightSelection(r);
+                    if (currentStep === 3) {
+                        populateReviewInfo();
+                    }
                 }
             });
 

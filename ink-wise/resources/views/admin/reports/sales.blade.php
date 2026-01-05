@@ -33,6 +33,11 @@
 	$salesRangeLabel = $salesSummaryLabel ?? ($activeIntervalData['range_label'] ?? null);
 
 	$currentFilters = $filters ?? ['startDate' => null, 'endDate' => null];
+	$paymentSummary = $paymentSummary ?? [
+		'totalPaid' => 0,
+		'full' => ['count' => 0, 'amount' => 0],
+		'half' => ['count' => 0, 'amount' => 0, 'balance' => 0],
+	];
 
 	$reportPayload = [
 		'sales' => [
@@ -44,6 +49,10 @@
 		'filters' => [
 			'startDate' => $currentFilters['startDate'] ?? null,
 			'endDate' => $currentFilters['endDate'] ?? null,
+			'paymentStatus' => $currentFilters['paymentStatus'] ?? 'all',
+		],
+		'payments' => [
+			'summary' => $paymentSummary,
 		],
 	];
 @endphp
@@ -57,6 +66,9 @@
 		<div class="page-header__quick-actions">
 			<a href="{{ route('admin.reports.inventory') }}" class="pill-link">
 				<i class="fi fi-rr-boxes" aria-hidden="true"></i> Inventory insights
+			</a>
+			<a href="{{ route('admin.reports.pickup-calendar') }}" class="pill-link">
+				<i class="fi fi-rr-calendar" aria-hidden="true"></i> Pickup calendar
 			</a>
 			<button type="button" class="pill-link" data-report-action="refresh">
 				<i class="fi fi-rr-rotate-right" aria-hidden="true"></i> Refresh data
@@ -89,11 +101,20 @@
 					max="{{ now()->format('Y-m-d') }}"
 				>
 			</div>
+			<div class="reports-filter-field">
+				<label for="filterPaymentStatus">Payment Status</label>
+				<select id="filterPaymentStatus" name="payment_status">
+					<option value="all" {{ ($currentFilters['paymentStatus'] ?? 'all') === 'all' ? 'selected' : '' }}>All Orders</option>
+					<option value="full" {{ ($currentFilters['paymentStatus'] ?? 'all') === 'full' ? 'selected' : '' }}>Full Payment</option>
+					<option value="half" {{ ($currentFilters['paymentStatus'] ?? 'all') === 'half' ? 'selected' : '' }}>Half Payment</option>
+					<option value="unpaid" {{ ($currentFilters['paymentStatus'] ?? 'all') === 'unpaid' ? 'selected' : '' }}>Unpaid</option>
+				</select>
+			</div>
 			<div class="reports-filter-actions">
 				<button type="submit" class="btn btn-primary">
 					<i class="fi fi-rr-filter" aria-hidden="true"></i> Apply
 				</button>
-				@if ($currentFilters['startDate'] || $currentFilters['endDate'])
+				@if ($currentFilters['startDate'] || $currentFilters['endDate'] || ($currentFilters['paymentStatus'] ?? 'all') !== 'all')
 					<a href="{{ route('admin.reports.sales') }}" class="pill-link">
 						<i class="fi fi-rr-refresh" aria-hidden="true"></i> Reset
 					</a>
@@ -117,15 +138,15 @@
 				<i class="fi fi-rr-chart-histogram" aria-hidden="true"></i>
 			</header>
 			<strong data-metric="revenue-total">₱{{ number_format($salesSummary['revenue'] ?? 0, 2) }}</strong>
-			<p>Gross sales across fulfilled orders.</p>
+			<p>Gross sales from fully paid orders.</p>
 		</article>
 		<article class="reports-summary-card">
 			<header>
-				<span class="summary-label">Estimated Sales</span>
+				<span class="summary-label">Pending Revenue</span>
 				<i class="fi fi-rr-chart-line-up" aria-hidden="true"></i>
 			</header>
-			<strong data-metric="estimated-sales">₱{{ number_format($salesSummary['estimatedSales'] ?? 0, 2) }}</strong>
-			<p>Pending revenue from incomplete orders.</p>
+			<strong data-metric="pending-revenue">₱{{ number_format($salesSummary['pendingRevenue'] ?? 0, 2) }}</strong>
+			<p>Outstanding payments from partial orders.</p>
 		</article>
 		<article class="reports-summary-card">
 			<header>
@@ -137,11 +158,27 @@
 		</article>
 		<article class="reports-summary-card">
 			<header>
-				<span class="summary-label">Inventory Alerts</span>
-				<i class="fi fi-rr-boxes" aria-hidden="true"></i>
+				<span class="summary-label">Total Payment</span>
+				<i class="fa-solid fa-wallet" aria-hidden="true"></i>
 			</header>
-			<strong data-metric="stock-status">{{ $inventoryStats['lowStock'] }} low / {{ $inventoryStats['outStock'] }} out</strong>
-			<p>Monitor items impacting order fulfilment.</p>
+			<strong data-metric="total-payment">₱{{ number_format($paymentSummary['totalPaid'] ?? 0, 2) }}</strong>
+			<p>Collected across completed orders.</p>
+		</article>
+		<article class="reports-summary-card">
+			<header>
+				<span class="summary-label">Half Payment</span>
+				<i class="fa-solid fa-coins" aria-hidden="true"></i>
+			</header>
+			<strong data-metric="half-payment">₱{{ number_format($paymentSummary['half']['amount'] ?? 0, 2) }}</strong>
+			<p>{{ number_format($paymentSummary['half']['count'] ?? 0) }} partial orders in progress.</p>
+		</article>
+		<article class="reports-summary-card">
+			<header>
+				<span class="summary-label">Full Payment</span>
+				<i class="fa-solid fa-badge-check" aria-hidden="true"></i>
+			</header>
+			<strong data-metric="full-payment">₱{{ number_format($paymentSummary['full']['amount'] ?? 0, 2) }}</strong>
+			<p>{{ number_format($paymentSummary['full']['count'] ?? 0) }} orders paid in full.</p>
 		</article>
 	</section>
 
@@ -199,6 +236,7 @@
 							<th scope="col">Customer</th>
 							<th scope="col">Items</th>
 							<th scope="col" class="text-center">Qty</th>
+							<th scope="col" class="text-center">Payment Status</th>
 							<th scope="col" class="text-end">Total (PHP)</th>
 							<th scope="col">Date</th>
 						</tr>
@@ -210,12 +248,13 @@
 							<td>{{ $sale->customer_name }}</td>
 							<td>{{ $sale->items_list }}</td>
 							<td class="text-center">{{ $sale->items_quantity }}</td>
+							<td class="text-center">{{ $sale->payment_status }}</td>
 							<td class="text-end">{{ number_format($sale->total_amount_value, 2) }}</td>
 							<td>{{ optional($sale->order_date_value)->format('M d, Y') }}</td>
 						</tr>
 					@empty
 						<tr>
-							<td colspan="6" class="text-center">No sales records available.</td>
+							<td colspan="7" class="text-center">No sales records available.</td>
 						</tr>
 					@endforelse
 					</tbody>

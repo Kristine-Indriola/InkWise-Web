@@ -5,8 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 
 class OrderItem extends Model
@@ -35,11 +35,6 @@ class OrderItem extends Model
 		return $this->belongsTo(Product::class);
 	}
 
-	public function bulkSelections(): HasMany
-	{
-		return $this->hasMany(OrderItemBulk::class);
-	}
-
 	public function paperStockSelection(): HasOne
 	{
 		return $this->hasOne(OrderItemPaperStock::class);
@@ -50,9 +45,14 @@ class OrderItem extends Model
 		return $this->hasMany(OrderItemAddon::class);
 	}
 
-	public function colors(): HasMany
+	public function inkUsage(): HasMany
 	{
 		return $this->hasMany(OrderItemColor::class);
+	}
+
+	public function colors(): HasMany
+	{
+		return $this->inkUsage();
 	}
 
 	public function scopeLineType($query, string $lineType)

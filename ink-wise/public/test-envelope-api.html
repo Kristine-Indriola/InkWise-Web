@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Envelope API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .envelope-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-top: 20px; }
+        .envelope-card { border: 1px solid #ddd; padding: 12px; border-radius: 8px; }
+        .envelope-image { width: 100%; aspect-ratio: 1; background: #eee; border-radius: 4px; margin-bottom: 8px; overflow: hidden; }
+        .envelope-image img { width: 100%; height: 100%; object-fit: cover; }
+        .envelope-name { font-weight: 600; margin: 4px 0; }
+        .envelope-price { color: #666; font-size: 14px; }
+        .api-url { background: #f0f0f0; padding: 8px; border-radius: 4px; margin-bottom: 16px; word-break: break-all; }
+        pre { background: #f8f8f8; padding: 12px; border-radius: 4px; overflow: auto; max-height: 400px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Envelope API Test</h1>
+        <div class="api-url"><strong>API Endpoint:</strong> <span id="apiUrl">/api/envelopes</span></div>
+        
+        <h2>Raw JSON Response:</h2>
+        <pre id="rawJson">Loading...</pre>
+        
+        <h2>Visual Preview:</h2>
+        <div id="envelopeGrid" class="envelope-grid">Loading...</div>
+    </div>
+
+    <script>
+        const apiUrl = '/api/envelopes';
+        document.getElementById('apiUrl').textContent = apiUrl;
+
+        fetch(apiUrl, { headers: { Accept: 'application/json' } })
+            .then(response => response.json())
+            .then(data => {
+                // Display raw JSON
+                document.getElementById('rawJson').textContent = JSON.stringify(data, null, 2);
+
+                // Display visual cards
+                const grid = document.getElementById('envelopeGrid');
+                grid.innerHTML = '';
+
+                if (Array.isArray(data) && data.length > 0) {
+                    data.forEach(envelope => {
+                        const card = document.createElement('div');
+                        card.className = 'envelope-card';
+                        
+                        const img = envelope.image || '/images/no-image.png';
+                        
+                        card.innerHTML = `
+                            <div class="envelope-image">
+                                <img src="${img}" alt="${envelope.name}" 
+                                     onerror="this.src='/images/no-image.png'; this.style.opacity='0.5';">
+                            </div>
+                            <div class="envelope-name">${envelope.name}</div>
+                            <div class="envelope-price">₱${envelope.price} (ID: ${envelope.id})</div>
+                            <div style="font-size: 11px; color: #999; margin-top: 4px; word-break: break-all;">
+                                ${img}
+                            </div>
+                        `;
+                        
+                        grid.appendChild(card);
+                    });
+                } else {
+                    grid.innerHTML = '<p>No envelopes returned from API</p>';
+                }
+            })
+            .catch(error => {
+                document.getElementById('rawJson').textContent = 'Error: ' + error.message;
+                document.getElementById('envelopeGrid').innerHTML = '<p style="color: red;">Failed to load envelopes</p>';
+                console.error('API Error:', error);
+            });
+    </script>
+</body>
+</html>

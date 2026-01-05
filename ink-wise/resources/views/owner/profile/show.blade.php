@@ -6,26 +6,49 @@
 @include('layouts.owner.sidebar')
 
 @php
-    $owner   = $owner ?? auth('owner')->user();
-    $staff   = optional($owner?->staff);
-    $address = optional($owner?->address);
-    $fullName = trim(($staff->first_name ?? '') . ' ' . ($staff->last_name ?? ''));
-    $avatarLabel = $fullName !== '' ? $fullName : ($owner->email ?? 'Owner');
-    $memberSince = optional($owner?->created_at)->format('F d, Y');
+  $owner   = $owner ?? auth('owner')->user();
+  $staff   = optional($owner?->staff);
+  $address = optional($owner?->address);
+  $fullName = trim(($staff->first_name ?? '') . ' ' . ($staff->last_name ?? ''));
+  $memberSince = optional($owner?->created_at)->format('F d, Y');
+  $initials = collect(explode(' ', $fullName !== '' ? $fullName : ($owner->name ?? 'Owner')))
+    ->filter(fn ($segment) => strlen($segment) > 0)
+    ->map(fn ($segment) => substr($segment, 0, 1))
+    ->join('');
+  if ($initials === '') {
+    $initials = substr($owner->email ?? 'OW', 0, 2);
+  }
+  $initials = strtoupper(substr($initials, 0, 2));
+  $avatarUrl = $staff->profile_pic ? asset('storage/' . ltrim($staff->profile_pic, '/')) : null;
 @endphp
 
 <section class="main-content">
   <link rel="stylesheet" href="{{ asset('css/owner/owner-profile.css') }}">
+  <style>
+    .profile-hero__avatar--fallback {
+      width: 84px;
+      height: 84px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #6a2ebc, #3cd5c8);
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 28px;
+    }
+  </style>
 
   <div class="profile-page">
     <!-- Hero -->
     <div class="profile-hero">
       <div class="profile-hero__main">
         <div class="profile-hero__avatar-wrap">
-          <img
-            src="https://ui-avatars.com/api/?name={{ urlencode($avatarLabel) }}&background=A5D8FF&color=0F172A&bold=true"
-            alt="Owner Avatar"
-            class="profile-hero__avatar">
+          @if($avatarUrl)
+            <img src="{{ $avatarUrl }}" alt="Owner Avatar" class="profile-hero__avatar" style="object-fit:cover;">
+          @else
+            <div class="profile-hero__avatar profile-hero__avatar--fallback">{{ $initials }}</div>
+          @endif
         </div>
         <div>
           <h1 class="profile-hero__title">{{ $fullName !== '' ? $fullName : 'Owner' }}</h1>
@@ -52,6 +75,9 @@
               </span>
             @endif
           </div>
+        </div>
+        <div style="margin-left:18px; display:flex; align-items:center; gap:12px;">
+          <a href="{{ route('owner.profile.edit') }}" class="pill-link" style="background:linear-gradient(135deg,#4f8bff,#6ec8ff); color:#fff; padding:8px 12px; border-radius:10px; font-weight:700; text-decoration:none;">Edit Profile</a>
         </div>
       </div>
     </div>

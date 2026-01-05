@@ -54,18 +54,23 @@ console.log('[inkwise] orders-table.js loaded');
 
   // per-page control removed: pagination is handled by Laravel links
 
-  // Delete order handler
+  // Archive order handler
   document.addEventListener('click', function (e) {
-    const del = e.target.closest && e.target.closest('.btn-delete');
-    if (!del) return;
-    const orderId = del.getAttribute('data-order-id');
+    const archiveBtn = e.target.closest && e.target.closest('.btn-archive');
+    if (!archiveBtn) return;
+    const orderId = archiveBtn.getAttribute('data-order-id');
     if (!orderId) return;
-    if (!confirm('Delete this order? This action cannot be undone.')) return;
+    if (!confirm('Archive this order? This will hide it from the active orders list.')) return;
 
     const tokenMeta = document.querySelector('meta[name="csrf-token"]');
     const token = tokenMeta ? tokenMeta.getAttribute('content') : null;
-    fetch('/admin/orders/' + orderId, {
-      method: 'DELETE',
+    
+    // Determine if we're on staff or admin page
+    const isStaffPage = window.location.pathname.startsWith('/staff');
+    const baseUrl = isStaffPage ? '/staff' : '/admin';
+    
+    fetch(baseUrl + '/orders/' + orderId + '/archive', {
+      method: 'PATCH',
       credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/json',
@@ -98,7 +103,7 @@ console.log('[inkwise] orders-table.js loaded');
         return;
       }
       if (resp.status === 403) {
-        alert((body && body.error) ? body.error : 'You are not authorized to delete this order.');
+        alert((body && body.error) ? body.error : 'You are not authorized to archive this order.');
         return;
       }
       if (resp.status >= 300 && resp.status < 400) {
@@ -109,8 +114,8 @@ console.log('[inkwise] orders-table.js loaded');
 
       // Generic failure
       const errMsg = (body && (body.error || body.message)) ? (body.error || body.message) : (typeof body === 'string' ? body : 'Unknown error');
-      alert('Failed to delete order: ' + errMsg);
-    }).catch(err => { alert('Network error while deleting order'); console.error(err); });
+      alert('Failed to archive order: ' + errMsg);
+    }).catch(err => { alert('Network error while archiving order'); console.error(err); });
   });
 
   // Utility: debounce

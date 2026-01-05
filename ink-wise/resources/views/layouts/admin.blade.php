@@ -115,6 +115,7 @@
       border-radius: 8px;
       padding: 10px;
       transition: background 0.2s, color 0.2s;
+      position: relative; /* allow badges to anchor correctly */
     }
 
     /* Hover and active effect for expanded sidebar */
@@ -371,6 +372,11 @@
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
+    }
+
+    .sidebar ul li .notif-badge {
+      top: 6px;
+      right: 12px;
     }
 
     .topbar .icons .logout-btn {
@@ -853,6 +859,18 @@ body.dark-mode .btn-warning {
       <li class="{{ (request()->routeIs('admin.ordersummary.*') || request()->routeIs('admin.orders.index')) ? 'active' : '' }}">
         <a href="{{ route('admin.orders.index') }}"><i class="fi fi-rr-list-check"></i> <span class="label">Order Summaries</span></a>
       </li>
+      <li class="{{ request()->routeIs('admin.reviews.*') ? 'active' : '' }}">
+        <a href="{{ route('admin.reviews.index') }}">
+          <i class="fi fi-rr-star"></i>
+          <span class="label">Reviews</span>
+          @php
+              $unrepliedReviewsCount = \App\Models\OrderRating::whereNull('staff_reply')->count();
+          @endphp
+          @if($unrepliedReviewsCount > 0)
+              <span class="notif-badge">{{ $unrepliedReviewsCount }}</span>
+          @endif
+        </a>
+      </li>
       <li class="{{ request()->routeIs('admin.payments.*') ? 'active' : '' }}">
         <a href="{{ route('admin.payments.index') }}"><i class="fi fi-rr-credit-card"></i> <span class="label">Payment Transactions</span></a>
       </li>
@@ -873,10 +891,10 @@ body.dark-mode .btn-warning {
         </button>
         <ul class="submenu" data-submenu="reports" aria-hidden="{{ $reportsActive ? 'false' : 'true' }}">
           <li class="{{ request()->routeIs('admin.reports.sales') ? 'active' : '' }}">
-            <a href="{{ route('admin.reports.sales') }}"><span class="label">Sales analytics</span></a>
+            <a href="{{ route('admin.reports.sales') }}"><span class="label">Sales</span></a>
           </li>
           <li class="{{ request()->routeIs('admin.reports.inventory') ? 'active' : '' }}">
-            <a href="{{ route('admin.reports.inventory') }}"><span class="label">Inventory analytics</span></a>
+            <a href="{{ route('admin.reports.inventory') }}"><span class="label">Inventory</span></a>
           </li>
         </ul>
       </li>
@@ -1007,10 +1025,7 @@ body.dark-mode .btn-warning {
                  padding: 8px 0;
                  border: 1px solid #eaeaea;
                  ">
-            <a href="{{ route('admin.profile.edit') }}"
-               style="display:block; color:#333; font-size:16px; padding:14px 22px; text-decoration:none;">
-              👤 My Profile
-            </a>
+            <!-- My Profile link removed per request -->
           <form id="logout-form" action="{{ route('logout') }}" method="POST" style="margin:0;">
             @csrf
             <button type="submit"

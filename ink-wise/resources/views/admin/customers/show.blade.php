@@ -364,6 +364,8 @@
                         $address->barangay ?? null,
                         $address->city ?? null,
                         $address->province ?? null,
+                        $address->postal_code ?? null,
+                        $address->country ?? null,
                     ])->filter()->implode(', ');
                 @endphp
                 @if($addressParts)
@@ -387,10 +389,6 @@
         <div class="stat-card warning">
             <h3>Pending</h3>
             <div class="value">{{ $pendingOrders }}</div>
-        </div>
-        <div class="stat-card danger">
-            <h3>Cancelled</h3>
-            <div class="value">{{ $cancelledOrders }}</div>
         </div>
         <div class="stat-card info">
             <h3>Total Spent</h3>

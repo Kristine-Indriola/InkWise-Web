@@ -2,14 +2,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const shell = document.querySelector('.os-shell');
   if (!shell) return;
 
-  // Debug: script loaded and initial elements
-  if (window && window.console && typeof window.console.debug === 'function') {
-    console.debug('OrderSummary script initialized', {
-      hasShell: !!shell,
-      envelopeSelect: !!shell.querySelector('[data-envelope-quantity]'),
-      giveawaysSelect: !!shell.querySelector('[data-giveaways-quantity]'),
-    });
-  }
+  const debugLog = (...args) => {
+    if (!(window && window.console && typeof window.console.debug === 'function')) return;
+    if (!window.INKWISE_DEBUG) return;
+    console.debug(...args);
+  };
+
+  debugLog('OrderSummary script initialized', {
+    hasShell: !!shell,
+    envelopeSelect: !!shell.querySelector('[data-envelope-quantity]'),
+    giveawaysSelect: !!shell.querySelector('[data-giveaways-quantity]'),
+  });
 
   // Delegated listener: catch change events for selects even if they're replaced
   document.addEventListener('change', (e) => {
@@ -156,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const toast = shell.querySelector('#osToast');
   const checkoutBtn = shell.querySelector('#osCheckoutBtn');
 
-  const previewPlaceholder = previewImageEl?.getAttribute('src') || shell.dataset.placeholder || '';
+  const previewPlaceholder = shell.dataset.placeholder || '/images/placeholder.png';
   let previewImages = [];
   let previewIndex = 0;
   let envelopeImages = [];
@@ -230,29 +233,32 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const fetchSummaryFromServer = async () => {
-    if (!summaryApiUrl) {
-      return null;
-    }
+    const candidates = [];
+    if (summaryApiUrl) candidates.push(summaryApiUrl);
+    if (summaryUrl && !candidates.includes(summaryUrl)) candidates.push(summaryUrl);
 
-    try {
-      const response = await fetch(summaryApiUrl, {
-        headers: { Accept: 'application/json' },
-        credentials: 'same-origin',
-      });
+    for (const url of candidates) {
+      try {
+        const response = await fetch(url, {
+          headers: { Accept: 'application/json' },
+          credentials: 'same-origin',
+        });
 
-      if (!response.ok) {
-        console.warn('Order summary API returned status', response.status);
-        return null;
+        if (!response.ok) {
+          console.warn('Order summary API returned status', response.status, 'for', url);
+          // If this was the stricter .json endpoint, fall back to next candidate
+          continue;
+        }
+
+        const payload = await response.json();
+        const summary = payload?.data ?? payload;
+        if (summary && typeof summary === 'object') {
+          setSummary(summary);
+          return summary;
+        }
+      } catch (error) {
+        console.error('Failed to fetch order summary from', url, error);
       }
-
-      const payload = await response.json();
-      const summary = payload?.data ?? payload;
-      if (summary && typeof summary === 'object') {
-        setSummary(summary);
-        return summary;
-      }
-    } catch (error) {
-      console.error('Failed to fetch order summary', error);
     }
 
     return null;
@@ -866,7 +872,31 @@ document.addEventListener('DOMContentLoaded', () => {
       const invitationTotal = Math.round((invitationBase + extrasForInvitation) * 100) / 100;
 
       // envelope and giveaway totals (may be stored in extras or on meta)
-      const envelopeTotal = parseMoney(current.extras?.envelope ?? current.envelope?.total ?? current.envelope?.price ?? 0);
+      // Compute envelope total defensively: prefer explicit extras.envelope (total),
+      // otherwise derive from envelope meta (unit price * qty) or fall back to stored total.
+      let envelopeTotal = parseMoney(current.extras?.envelope ?? null);
+      try {
+        const envelopeMeta = current.envelope || current.metadata?.envelope || {};
+        if (!Number.isFinite(envelopeTotal) || envelopeTotal <= 0) {
+          const qty = Number(envelopeMeta.qty ?? 0) || 0;
+          let unit = parseMoney(envelopeMeta.price ?? envelopeMeta.unit_price ?? envelopeMeta.unitPrice ?? null);
+          if ((!Number.isFinite(unit) || unit <= 0) && Number.isFinite(envelopeMeta.total) && qty > 0) {
+            unit = parseMoney(envelopeMeta.total) / qty;
+          }
+          if (Number.isFinite(unit) && unit > 0 && qty > 0) {
+            envelopeTotal = Math.round(unit * qty * 100) / 100;
+          } else {
+            envelopeTotal = parseMoney(envelopeMeta.total ?? 0);
+          }
+        }
+      } catch (e) {
+        envelopeTotal = parseMoney(current.extras?.envelope ?? current.envelope?.total ?? current.envelope?.price ?? 0);
+      }
+
+      // Ensure extras.envelope is kept as the numeric total
+      current.extras = current.extras || { paper: 0, addons: 0, envelope: 0, giveaway: 0 };
+      current.extras.envelope = Number(envelopeTotal || 0);
+
       const giveawayTotal = parseMoney(current.extras?.giveaway ?? current.giveaway?.total ?? current.giveaway?.price ?? 0);
 
       const grandTotal = Math.round((invitationTotal + envelopeTotal + giveawayTotal) * 100) / 100;
@@ -919,10 +949,15 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const applyPreviewImage = () => {
-    if (!previewImageEl || !previewImages.length) return;
-    const src = previewImages[previewIndex] ?? previewImages[0];
+    if (!previewImageEl) return;
+    const src = previewImages.length ? (previewImages[previewIndex] ?? previewImages[0]) : previewPlaceholder;
     if (src) {
       previewImageEl.src = src;
+      previewImageEl.onerror = () => {
+        if (previewImageEl.src !== previewPlaceholder) {
+          previewImageEl.src = previewPlaceholder;
+        }
+      };
       if (previewNameEl) {
         const name = previewNameEl.textContent?.trim() || 'Invitation preview';
         previewImageEl.alt = `Invitation preview — ${name}`;
@@ -1391,10 +1426,15 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const applyEnvelopeImage = () => {
-    if (!envelopePreviewImageEl || !envelopeImages.length) return;
-    const src = envelopeImages[envelopeIndex] ?? envelopeImages[0];
+    if (!envelopePreviewImageEl) return;
+    const src = envelopeImages.length ? (envelopeImages[envelopeIndex] ?? envelopeImages[0]) : previewPlaceholder;
     if (src) {
       envelopePreviewImageEl.src = src;
+      envelopePreviewImageEl.onerror = () => {
+        if (envelopePreviewImageEl.src !== previewPlaceholder) {
+          envelopePreviewImageEl.src = previewPlaceholder;
+        }
+      };
       const name = envelopeNameEl?.textContent?.trim() || 'Envelope';
       envelopePreviewImageEl.alt = `Envelope preview — ${name}`;
     }
@@ -1404,10 +1444,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const envelopeMeta = summary?.envelope ?? summary?.metadata?.envelope ?? null;
   const hasEnvelope = summary?.hasEnvelope ?? Boolean(envelopeMeta && typeof envelopeMeta === 'object' && Object.keys(envelopeMeta).length);
 
+    console.log('[Envelope Preview] Rendering envelope', { envelopeMeta, hasEnvelope, summary });
+    
     if (envelopeCard) setHidden(envelopeCard, !hasEnvelope);
     if (removeEnvelopeBtn) removeEnvelopeBtn.hidden = !hasEnvelope;
 
     if (!hasEnvelope) {
+      console.log('[Envelope Preview] No envelope data, hiding card');
+
       if (envelopeQuantitySelect) {
         envelopeQuantitySelect.innerHTML = '';
         envelopeQuantitySelect.disabled = true;
@@ -1543,10 +1587,15 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const applyGiveawaysImage = () => {
-    if (!giveawaysPreviewImageEl || !giveawaysImages.length) return;
-    const src = giveawaysImages[giveawaysIndex] ?? giveawaysImages[0];
+    if (!giveawaysPreviewImageEl) return;
+    const src = giveawaysImages.length ? (giveawaysImages[giveawaysIndex] ?? giveawaysImages[0]) : previewPlaceholder;
     if (src) {
       giveawaysPreviewImageEl.src = src;
+      giveawaysPreviewImageEl.onerror = () => {
+        if (giveawaysPreviewImageEl.src !== previewPlaceholder) {
+          giveawaysPreviewImageEl.src = previewPlaceholder;
+        }
+      };
       const name = giveawaysNameEl?.textContent?.trim() || 'Giveaways';
       giveawaysPreviewImageEl.alt = `Giveaways preview — ${name}`;
     }
@@ -1559,11 +1608,15 @@ document.addEventListener('DOMContentLoaded', () => {
       ?? null;
     const hasGiveaway = summary?.hasGiveaway ?? Boolean(giveawayMeta && typeof giveawayMeta === 'object' && Object.keys(giveawayMeta).length);
 
+    console.log('[Giveaways Preview] Rendering giveaways', { giveawayMeta, hasGiveaway, summary });
+    
     if (giveawaysCard) setHidden(giveawaysCard, !hasGiveaway);
     if (removeGiveawaysBtn) removeGiveawaysBtn.hidden = !hasGiveaway;
     if (giveawaysEditLink) giveawaysEditLink.href = giveawaysUrl;
 
     if (!hasGiveaway) {
+      console.log('[Giveaways Preview] No giveaway data, hiding card');
+
       if (giveawaysQuantitySelect) {
         giveawaysQuantitySelect.innerHTML = '';
         giveawaysQuantitySelect.disabled = true;
@@ -2104,18 +2157,26 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const renderSummary = (summary) => {
-    if (!summary || (!Number(summary.quantity) && !getQuantityOptions(summary).length)) {
+    console.log('[Order Summary] Rendering with data:', summary);
+    
+    const hasInvitation = Boolean(Number(summary?.quantity)) || getQuantityOptions(summary).length > 0;
+    const hasEnvelope = Boolean(summary?.envelope) || (Array.isArray(summary?.envelopes) && summary.envelopes.length > 0);
+    const hasGiveaway = Boolean(summary?.giveaway) || (Array.isArray(summary?.giveaways) && summary.giveaways.length > 0);
+
+    if (!summary || (!hasInvitation && !hasEnvelope && !hasGiveaway)) {
+      console.warn('[Order Summary] No valid summary data, showing empty state');
       showEmptyState();
       return;
     }
 
+    console.log('[Order Summary] Valid data found, rendering UI...');
     setHidden(emptyState, true);
     setHidden(layout, false);
     setHidden(summaryGrid, false);
     setHidden(summaryCard, false);
 
     // Ensure totals are recomputed (invitation base + extras) before rendering
-    try { recomputeTotals(summary); } catch (e) { /* ignore */ }
+    try { recomputeTotals(summary); } catch (e) { console.error('[Order Summary] recomputeTotals error:', e); }
 
     renderPreview(summary);
     renderEnvelopePreview(summary);
@@ -2145,13 +2206,24 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const bootstrapSummary = async () => {
+    const localSummary = getSummary();
+    if (localSummary) {
+      renderSummary(localSummary);
+      // Background sync and refresh for freshness
+      syncSummaryWithServer().catch(() => {});
+      fetchSummaryFromServer().then((remote) => {
+        if (remote) renderSummary(remote);
+      }).catch(() => {});
+      return;
+    }
+
     const remoteSummary = await fetchSummaryFromServer();
     if (remoteSummary) {
       renderSummary(remoteSummary);
       return;
     }
 
-    renderSummary(getSummary());
+    renderSummary(null);
   };
 
   bootstrapSummary();

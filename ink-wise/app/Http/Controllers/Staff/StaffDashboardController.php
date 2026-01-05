@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Customer;
 use App\Models\Message;
+use App\Models\OrderRating;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -39,11 +40,18 @@ class StaffDashboardController extends Controller
             ->whereNull('seen_at')
             ->count();
 
+        // Recent Reviews
+        $recentReviews = OrderRating::with(['customer', 'order', 'staffReplyBy'])
+            ->latest('submitted_at')
+            ->take(5)
+            ->get();
+
         return view('staff.dashboard', compact(
             'totalOrders',
             'assignedOrders',
             'customers',
-            'unreadMessages'
+            'unreadMessages',
+            'recentReviews'
         ));
     }
 }

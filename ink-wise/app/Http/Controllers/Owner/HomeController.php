@@ -40,7 +40,7 @@ class HomeController extends Controller
             })
             ->groupBy('order_items.product_id', 'order_items.product_name')
             ->orderByDesc('total_sold')
-            ->limit(5)
+            ->limit(4)
             ->get();
 
         $topSellingProducts = [
@@ -125,7 +125,8 @@ class HomeController extends Controller
             $outgoingSum = $bucket->sum(function (StockMovement $movement) {
                 $quantity = (int) $movement->quantity;
 
-                if ($movement->movement_type === 'usage') {
+                // Accept both legacy and current movement type keys for usage
+                if (in_array($movement->movement_type, ['usage', 'used', 'issued', 'sold'], true)) {
                     return max($quantity, 0);
                 }
 
