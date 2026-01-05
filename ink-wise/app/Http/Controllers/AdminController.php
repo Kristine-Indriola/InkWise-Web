@@ -307,28 +307,31 @@ class AdminController extends Controller
 
     private function buildCustomerInsightsSection(): array
     {
-        $topCustomers = Customer::query()
-            ->withCount(['orders as order_count' => function ($query) {
-                $query->where('status', '!=', 'cancelled');
-            }])
-            ->withSum(['orders as total_spent' => function ($query) {
-                $query->where('status', '!=', 'cancelled');
-            }], 'total_amount')
+        $topCustomers = Order::query()
+            ->selectRaw('customer_id, COUNT(*) as order_count, SUM(total_amount) as total_spent')
+            ->where('status', '!=', 'cancelled')
+            ->whereNotNull('customer_id')
+            ->groupBy('customer_id')
             ->orderByDesc('total_spent')
             ->limit(5)
+            ->with(['customer:customer_id,first_name,middle_name,last_name'])
             ->get()
-            ->map(function (Customer $customer) {
+            ->map(function (Order $order) {
+                $name = optional($order->customer)->name ?? 'Guest';
+
                 return [
-                    'name' => $customer->name,
-                    'orders' => (int) $customer->order_count,
-                    'total_spent' => round((float) $customer->total_spent, 2),
+                    'name' => $name,
+                    'orders' => (int) $order->order_count,
+                    'total_spent' => round((float) $order->total_spent, 2),
                 ];
             });
 
-        $repeatCustomersCount = Customer::query()
-            ->whereHas('orders', function ($query) {
-                $query->where('status', '!=', 'cancelled');
-            }, '>=', 2)
+        $repeatCustomersCount = Order::query()
+            ->selectRaw('customer_id, COUNT(*) as orders_count')
+            ->where('status', '!=', 'cancelled')
+            ->whereNotNull('customer_id')
+            ->groupBy('customer_id')
+            ->havingRaw('COUNT(*) >= 2')
             ->count();
 
         $popularDesigns = OrderItem::query()
