@@ -53,18 +53,20 @@
   .faq-title { font-size: .95rem; font-weight: 600; color: #374151; }
   .faq-btn { background:#f9fafb; border:1px solid #e5e7eb; font-size:.9rem; cursor:pointer; }
   .faq-btn:hover { background:#2563eb; color:#fff; border-color:#2563eb; }
+  .faq-list { max-height: 180px; overflow-y: auto; }
 
   .chat-subtitle { font-size: 0.85rem; color: #6b7280; font-weight: 400; }
 
   .chat-body {
     padding:16px;
-    max-height:400px;
     overflow-y:auto;
     display:flex;
     flex-direction:column;
     gap:14px;
     scroll-behavior:smooth;
     background: linear-gradient(180deg, rgba(6,182,212,0.02), transparent);
+    flex: 1;
+    min-height: 0;
   }
 
   .msg { display:inline-flex; position:relative; max-width:78%; padding:12px 14px; border-radius:16px; font-size:15px; line-height:1.4; word-break:break-word; box-shadow:0 4px 12px rgba(4,29,66,0.08); align-items:flex-start; gap:10px; }
