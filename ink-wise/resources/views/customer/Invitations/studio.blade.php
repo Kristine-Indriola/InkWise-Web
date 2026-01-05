@@ -405,36 +405,6 @@
     </div>
 </header>
 <main class="studio-layout">
-    <nav class="studio-sidenav" aria-label="Editor sections">
-        <button class="sidenav-btn active" type="button" data-nav="text">
-            <span class="sidenav-icon-text">T</span>
-            <span>Text</span>
-        </button>
-        <button class="sidenav-btn" type="button" data-nav="uploads">
-            <i class="fa-solid fa-cloud-arrow-up"></i>
-            <span>Uploads</span>
-        </button>
-        <button class="sidenav-btn" type="button" data-nav="graphics">
-            <i class="fa-solid fa-images"></i>
-            <span>Graphics</span>
-        </button>
-        <button class="sidenav-btn" type="button" data-nav="background">
-            <i class="fa-solid fa-brush"></i>
-            <span>Background</span>
-        </button>
-        <button class="sidenav-btn" type="button" data-nav="template">
-            <i class="fa-regular fa-square"></i>
-            <span>Template</span>
-        </button>
-        <button class="sidenav-btn" type="button" data-nav="color">
-            <i class="fa-solid fa-fill-drip"></i>
-            <span>Template color</span>
-        </button>
-        <button class="sidenav-btn" type="button" data-nav="tables">
-            <i class="fa-solid fa-table"></i>
-            <span>Tables</span>
-        </button>
-    </nav>
     <section class="studio-canvas-area">
         <div class="canvas-workspace">
             <div class="canvas-pill-group">
@@ -650,28 +620,6 @@
         </div>
     </div>
 </div>
-
-
-<div id="template-modal" class="modal" data-section="template" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="template-modal-title">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2 id="template-modal-title">Template</h2>
-            <div class="modal-header-actions">
-                <button type="button" aria-label="Dock panel" disabled aria-disabled="true">
-                    <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
-                </button>
-                <button type="button" class="modal-close" data-modal-close aria-label="Close panel">
-                    <i class="fa-solid fa-xmark modal-close-icon"></i>
-                </button>
-            </div>
-        </div>
-        <p class="modal-helper">Swap between coordinated template styles without starting over.</p>
-        <div class="modal-placeholder">
-            <p>Template variations will be available soon.</p>
-        </div>
-    </div>
-</div>
-
 <div id="background-modal" class="modal" data-section="background" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="background-modal-title">
     <div class="modal-content">
         <div class="modal-header">
@@ -691,27 +639,6 @@
         </div>
     </div>
 </div>
-
-<div id="color-modal" class="modal" data-section="color" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="color-modal-title">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2 id="color-modal-title">Template color</h2>
-            <div class="modal-header-actions">
-                <button type="button" aria-label="Dock panel" disabled aria-disabled="true">
-                    <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
-                </button>
-                <button type="button" class="modal-close" data-modal-close aria-label="Close panel">
-                    <i class="fa-solid fa-xmark modal-close-icon"></i>
-                </button>
-            </div>
-        </div>
-        <p class="modal-helper">Apply brand colors and foil finishes to your design.</p>
-        <div class="modal-placeholder">
-            <p>Color themes are on the way.</p>
-        </div>
-    </div>
-</div>
-
 
 <div id="tables-modal" class="modal" data-section="tables" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="tables-modal-title">
     <div class="modal-content">

@@ -41,6 +41,11 @@
   margin-top: 20px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--templates-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
 .filter-buttons {
@@ -1129,4 +1134,114 @@
 .svg-preview-container .svg-bounding-box__rect,
 .svg-preview-container .resize-handle {
   display: none !important;
+}
+
+/* Search functionality */
+.search-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.search-input {
+  padding: 8px 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 20px;
+  background: var(--admin-surface);
+  color: var(--admin-text-primary);
+  font-size: 0.9rem;
+  width: 250px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--admin-accent);
+  box-shadow: 0 0 0 3px var(--admin-accent-soft);
+}
+
+.search-btn {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 20px;
+  background: var(--admin-accent);
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.search-btn:hover {
+  background: var(--admin-accent-strong);
+}
+
+/* Template actions */
+.template-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.action-btn {
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--admin-text-secondary);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+}
+
+.action-btn:hover {
+  background: var(--admin-accent-soft);
+  color: var(--admin-accent-strong);
+  transform: scale(1.1);
+}
+
+.edit-btn:hover {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.duplicate-btn:hover {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.delete-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .search-container {
+    margin-left: 0;
+    margin-top: 10px;
+    width: 100%;
+  }
+
+  .search-input {
+    width: 100%;
+  }
+
+  .templates-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-buttons {
+    justify-content: center;
+  }
+
+  .template-actions {
+    gap: 4px;
+  }
+
+  .action-btn {
+    padding: 4px 6px;
+    font-size: 0.8rem;
+  }
 }

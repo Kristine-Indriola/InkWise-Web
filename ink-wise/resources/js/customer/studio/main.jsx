@@ -84,7 +84,7 @@ function StudioStatusBadge({ bootstrap, status }) {
 function CustomerStudioApp() {
   const bootstrap = useMemo(() => readBootstrapPayload(), []);
   const [status, setStatus] = useState('initializing');
-  const [activeElementType, setActiveElementType] = useState(null);
+  const [activeElementType, setActiveElementType] = useState('text');
 
   useEffect(() => {
     initializeCustomerStudioLegacy();
