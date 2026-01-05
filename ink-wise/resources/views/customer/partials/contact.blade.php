@@ -34,57 +34,16 @@
         <!-- Contact Form -->
         <div>
         @auth
-          {{-- Success Message --}}
-          @if(session('success'))
-            <div id="successMessage" 
-               class="p-4 mb-4 text-green-800 bg-green-100 border border-green-300 rounded-lg transition-opacity duration-1000">
-              ✅ {{ session('success') }}
-            </div>
-
-            <script>
-              // Auto-hide after 5 seconds
-              setTimeout(() => {
-                const msg = document.getElementById('successMessage');
-                if (msg) {
-                  msg.style.opacity = '0';
-                  setTimeout(() => msg.remove(), 1000); // remove completely after fade
-                }
-              }, 5000);
-            </script>
-          @endif
-
-          <form class="space-y-4 bg-white p-6 rounded-2xl shadow-lg" 
-              method="POST" 
-              action="{{ route('messages.store') }}">
-            @csrf
-
-            {{-- Name --}}
-            <input type="text" name="name" placeholder="Your Name" 
-                 value="{{ old('name', Auth::user()->name ?? '') }}"
-                 class="w-full p-3 border rounded-lg text-black @error('name') border-red-500 animate-shake @enderror" required>
-            @error('name')
-              <p class="text-red-500 text-sm mt-1">⚠️ {{ $message }}</p>
-            @enderror
-
-            {{-- Email --}}
-            <input type="email" name="email" placeholder="Your Email" 
-                 value="{{ old('email', Auth::user()->email ?? '') }}"
-                 class="w-full p-3 border rounded-lg text-black @error('email') border-red-500 animate-shake @enderror" required>
-            @error('email')
-              <p class="text-red-500 text-sm mt-1">⚠️ {{ $message }}</p>
-            @enderror
-
-            {{-- Message --}}
-            <textarea name="message" placeholder="Your Message" rows="4" 
-                  class="w-full p-3 border rounded-lg text-black @error('message') border-red-500 animate-shake @enderror" required>{{ old('message') }}</textarea>
-            @error('message')
-              <p class="text-red-500 text-sm mt-1">⚠️ {{ $message }}</p>
-            @enderror
-
-            <button class="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">
-              Send Message
-            </button>
-          </form>
+          <div class="space-y-4 bg-white p-6 rounded-2xl shadow-lg text-center">
+            <p class="text-gray-700">
+              You're signed in. Start a live chat with our support team for quicker help.
+            </p>
+            <a href="{{ route('customerprofile.index', ['chat' => 'open']) }}"
+               class="inline-flex justify-center px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+               onclick="openCustomerSupportChat(event)">
+              Message Chat
+            </a>
+          </div>
         @else
           <div class="space-y-4 bg-white p-6 rounded-2xl shadow-lg text-center">
             <p class="text-gray-700">
@@ -112,3 +71,43 @@
   animation: shake 0.4s;
 }
 </style>
+
+@push('scripts')
+<script>
+(function() {
+  if (window.openCustomerSupportChat) {
+    return;
+  }
+  const chatRedirectUrl = '{{ route('customerprofile.index', ['chat' => 'open']) }}';
+
+  window.openCustomerSupportChat = function(ev) {
+    const openBtn = document.getElementById('openChatBtn');
+    const modal = document.getElementById('chatModal');
+
+    if (openBtn) {
+      if (ev) ev.preventDefault();
+      openBtn.click();
+    } else if (modal) {
+      if (ev) ev.preventDefault();
+      modal.classList.remove('hidden');
+      const floating = document.getElementById('chatFloatingBtn');
+      if (floating) {
+        floating.classList.add('hidden');
+      }
+    } else {
+      if (!ev || !ev.defaultPrevented) {
+        window.location.href = chatRedirectUrl;
+      }
+      return;
+    }
+    if (typeof window.loadChatThread === 'function') {
+      window.loadChatThread();
+    }
+    const input = document.getElementById('customerChatInput');
+    if (input) {
+      input.focus();
+    }
+  };
+})();
+</script>
+@endpush
