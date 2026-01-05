@@ -10,10 +10,12 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductEnvelope;
+use App\Models\Template;
 use App\Models\User;
 use App\Notifications\NewOrderPlaced;
 use App\Models\Cart;
 use App\Models\CartItem;
+use App\Models\CustomerTemplateCustom;
 use App\Services\OrderFlowService;
 use Illuminate\Contracts\View\View as ViewContract;
 use Illuminate\Http\JsonResponse;
@@ -306,6 +308,8 @@ class OrderFlowController extends Controller
 
     public function autosaveDesign(Request $request): JsonResponse
     {
+        Log::info('Autosave design called', ['payload' => $request->all()]);
+
         $payload = $request->validate([
             'design' => ['required', 'array'],
             'design.updated_at' => ['nullable', 'string'],
@@ -322,6 +326,7 @@ class OrderFlowController extends Controller
             'preview.images.*' => ['nullable', 'string'],
             'placeholders' => ['nullable', 'array'],
             'placeholders.*' => ['nullable', 'string'],
+            'product_id' => ['nullable', 'integer', 'exists:products,id'],
         ]);
 
         $placeholders = collect(Arr::get($payload, 'placeholders', []))
@@ -369,7 +374,7 @@ class OrderFlowController extends Controller
 
         $product = $order?->items->first()?->product;
         if (!$product) {
-            $productId = $summary['productId'] ?? null;
+            $productId = Arr::get($payload, 'product_id') ?? $summary['productId'] ?? null;
             if ($productId) {
                 $product = $this->orderFlow->resolveProduct(null, (int) $productId);
             }
@@ -413,6 +418,97 @@ class OrderFlowController extends Controller
         ]);
     }
 
+    public function saveAsTemplate(Request $request): JsonResponse
+    {
+        \Illuminate\Support\Facades\Log::info('saveAsTemplate called', ['request_data' => $request->all()]);
+
+        $validated = $request->validate([
+            'template_name' => 'required|string|max:255',
+            'design' => 'required|array',
+            'preview_image' => 'nullable|string',
+            'preview_images' => 'nullable|array',
+        ]);
+
+        \Illuminate\Support\Facades\Log::info('saveAsTemplate validation passed', ['template_name' => $validated['template_name']]);
+
+        $user = Auth::user();
+        $summary = session(static::SESSION_SUMMARY_KEY) ?? [];
+        $product = null;
+
+        if (!empty($summary['productId'])) {
+            $product = $this->orderFlow->resolveProduct(null, (int) $summary['productId']);
+        }
+
+        \Illuminate\Support\Facades\Log::info('saveAsTemplate product resolved', ['product_id' => $product?->id]);
+
+        // Use CustomerTemplateCustom instead of Template for customer templates
+        $template = new CustomerTemplateCustom();
+        $template->name = $validated['template_name'];
+        $template->design = $validated['design'];
+        $template->status = 'draft'; // Customer templates are drafts
+        $template->user_id = $user->id; // Associate with the customer who created it
+        $template->customer_id = $user->customer?->customer_id; // Associate with customer record
+
+        if ($product) {
+            $template->product_id = $product->id;
+            $template->template_id = $product->template_id;
+        }
+
+        \Illuminate\Support\Facades\Log::info('saveAsTemplate template object created', ['template_name' => $template->name, 'user_id' => $template->user_id]);
+
+        // Handle preview images
+        if (!empty($validated['preview_image'])) {
+            $template->preview_image = $this->persistDataUrl(
+                $validated['preview_image'],
+                'customer/designs/preview',
+                'png',
+                null,
+                'preview_image'
+            );
+            \Illuminate\Support\Facades\Log::info('saveAsTemplate preview image saved', ['preview_image' => $template->preview_image]);
+        }
+
+        if (!empty($validated['preview_images']) && is_array($validated['preview_images'])) {
+            // Handle multiple previews if needed
+            $processedImages = [];
+            foreach ($validated['preview_images'] as $key => $imageData) {
+                if (!empty($imageData)) {
+                    $processedImages[$key] = $this->persistDataUrl(
+                        $imageData,
+                        'customer/designs/preview',
+                        'png',
+                        null,
+                        'preview_images.' . $key
+                    );
+                }
+            }
+            $template->preview_images = $processedImages;
+        }
+
+        // Set placeholders if available
+        $placeholders = [];
+        if (isset($validated['design']['placeholders']) && is_array($validated['design']['placeholders'])) {
+            $placeholders = $validated['design']['placeholders'];
+        }
+        $template->placeholders = $placeholders;
+
+        try {
+            $saved = $template->save();
+            \Illuminate\Support\Facades\Log::info('saveAsTemplate template saved', ['saved' => $saved, 'template_id' => $template->id]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('saveAsTemplate save failed', ['error' => $e->getMessage()]);
+            return response()->json([
+                'message' => 'Failed to save template: ' . $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => 'Template saved successfully!',
+            'template_id' => $template->id,
+            'template_name' => $template->name,
+        ]);
+    }
+
     public function review(): RedirectResponse|ViewContract
     {
         $order = $this->currentOrder();
@@ -435,27 +531,32 @@ class OrderFlowController extends Controller
                 $summary['productId'] = $summary['productId'] ?? $storedDraft['product_id'];
             }
 
+            // Always prioritize the latest stored draft data over session data for design and previews
             if ($storedDraft) {
                 if (!empty($storedDraft['design'])) {
                     $summary['metadata']['design'] = $storedDraft['design'];
                 }
 
-                if (empty($summary['placeholders']) && !empty($storedDraft['placeholders'])) {
+                if (!empty($storedDraft['placeholders'])) {
                     $summary['placeholders'] = $storedDraft['placeholders'];
                 }
 
-                if (empty($summary['previewImages']) && !empty($storedDraft['preview_images'])) {
+                // Always use the stored draft's preview images as they are the most recent
+                if (!empty($storedDraft['preview_images'])) {
                     $summary['previewImages'] = $storedDraft['preview_images'];
                 }
 
-                if (empty($summary['previewImage']) && !empty($storedDraft['preview_image'])) {
+                if (!empty($storedDraft['preview_image'])) {
                     $summary['previewImage'] = $storedDraft['preview_image'];
                     $summary['invitationImage'] = $storedDraft['preview_image'];
                 }
 
-                if (empty($summary['orderStatus']) && !empty($storedDraft['status'])) {
+                if (!empty($storedDraft['status'])) {
                     $summary['orderStatus'] = $storedDraft['status'];
                 }
+
+                // Update session with the latest draft data
+                session()->put(static::SESSION_SUMMARY_KEY, $summary);
             }
 
             $summary['metadata'] = is_array($summary['metadata'] ?? null) ? $summary['metadata'] : [];
@@ -506,6 +607,7 @@ class OrderFlowController extends Controller
                 'editHref' => $product && $product->template ? route('design.studio', ['template' => $product->template->id]) : route('design.edit'),
                 'orderSummary' => $summary,
                 'customerReview' => $customerReview,
+                'lastEditedAt' => $storedDraft['last_edited_at'] ?? null,
             ]);
         }
 
@@ -535,50 +637,31 @@ class OrderFlowController extends Controller
         $designMeta = $item?->design_metadata ?? [];
         $placeholderItems = collect(Arr::get($designMeta, 'placeholders', []));
 
-        // If persisted order lacks design metadata, attempt to load the user's draft
-        if (empty($designMeta) && $product) {
-            $storedDraft = $this->orderFlow->loadDesignDraft($product, Auth::user());
-            if ($storedDraft) {
-                $designMeta = $storedDraft['design'] ?? [];
-                $placeholderItems = collect($storedDraft['placeholders'] ?? []);
+        // Always check for the latest stored draft and use it for design data and previews
+        $storedDraft = $product ? $this->orderFlow->loadDesignDraft($product, Auth::user()) : null;
+        if ($storedDraft) {
+            $designMeta = $storedDraft['design'] ?? $designMeta;
+            $placeholderItems = collect($storedDraft['placeholders'] ?? $placeholderItems);
 
-                if (!empty($storedDraft['preview_images'])) {
-                    $images['all'] = $storedDraft['preview_images'];
-                    $images['front'] = $storedDraft['preview_images'][0] ?? ($images['front'] ?? null);
-                    if (!empty($storedDraft['preview_images'][1])) {
-                        $images['back'] = $storedDraft['preview_images'][1];
-                    }
+            if (!empty($storedDraft['preview_images'])) {
+                $images['all'] = $storedDraft['preview_images'];
+                $images['front'] = $storedDraft['preview_images'][0] ?? ($images['front'] ?? null);
+                if (!empty($storedDraft['preview_images'][1])) {
+                    $images['back'] = $storedDraft['preview_images'][1];
                 }
+            }
 
-                if (!empty($storedDraft['preview_image'])) {
-                    $images['front'] = $storedDraft['preview_image'];
+            if (!empty($storedDraft['preview_image'])) {
+                $images['front'] = $storedDraft['preview_image'];
+                if (empty($images['all'])) {
+                    $images['all'] = [$storedDraft['preview_image']];
+                } else {
                     $images['all'][0] = $storedDraft['preview_image'];
                 }
             }
         }
 
         $customerReview = $product ? $this->orderFlow->loadCustomerReview($product->template_id, Auth::user()) : null;
-
-        $summaryPayload = session(static::SESSION_SUMMARY_KEY);
-        if (is_array($summaryPayload)) {
-            $sessionPreviewImages = array_values(array_filter($summaryPayload['previewImages'] ?? [], fn ($value) => is_string($value) && trim($value) !== ''));
-            if (!empty($sessionPreviewImages)) {
-                $images['all'] = $sessionPreviewImages;
-                $images['front'] = $sessionPreviewImages[0];
-                if (!empty($sessionPreviewImages[1])) {
-                    $images['back'] = $sessionPreviewImages[1];
-                }
-            }
-
-            if (!empty($summaryPayload['previewImage']) && is_string($summaryPayload['previewImage'])) {
-                $images['front'] = $summaryPayload['previewImage'];
-                if (empty($images['all'])) {
-                    $images['all'] = [$summaryPayload['previewImage']];
-                } else {
-                    $images['all'][0] = $summaryPayload['previewImage'];
-                }
-            }
-        }
 
         return view('customer.orderflow.review', [
             'order' => $order,
@@ -596,6 +679,7 @@ class OrderFlowController extends Controller
             'editHref' => $product && $product->template ? route('design.studio', ['template' => $product->template->id]) : route('design.edit'),
             'orderSummary' => session(static::SESSION_SUMMARY_KEY),
             'customerReview' => $customerReview,
+            'lastEditedAt' => $storedDraft['last_edited_at'] ?? null,
         ]);
     }
 
@@ -2837,5 +2921,81 @@ class OrderFlowController extends Controller
             'paymentRecords' => $payments->values()->all(),
             'paymongoMeta' => $paymongoMeta,
         ]);
+    }
+
+    protected function persistDataUrl(string $dataUrl, string $directory, string $extension, ?string $existingPath, string $field): string
+    {
+        \Illuminate\Support\Facades\Log::info('persistDataUrl called', ['directory' => $directory, 'extension' => $extension, 'field' => $field, 'dataUrl_length' => strlen($dataUrl)]);
+        if (trim((string) $dataUrl) === '') {
+            \Illuminate\Support\Facades\Log::warning('persistDataUrl: empty dataUrl', ['field' => $field]);
+            if ($existingPath) {
+                return $existingPath;
+            }
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                $field => 'Missing data payload.',
+            ]);
+        }
+
+        try {
+            $contents = $this->decodeDataUrl($dataUrl);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('persistDataUrl: decode failed', ['field' => $field, 'error' => $e->getMessage()]);
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                $field => 'Invalid data payload provided.',
+            ]);
+        }
+
+        $normalizedExistingPath = null;
+        if ($existingPath) {
+            $normalizedExistingPath = ltrim(str_replace('\\', '/', (string) $existingPath), '/');
+            $normalizedExistingPath = preg_replace('#^/?storage/#i', '', $normalizedExistingPath) ?? $normalizedExistingPath;
+        }
+
+        if ($normalizedExistingPath && \Illuminate\Support\Facades\Storage::disk('public')->exists($normalizedExistingPath)) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($normalizedExistingPath);
+        }
+
+        $directory = trim($directory, '/');
+        if ($directory !== '') {
+            \Illuminate\Support\Facades\Storage::disk('public')->makeDirectory($directory);
+        }
+
+        $filename = ($directory ? $directory . '/' : '') . 'template_' . \Illuminate\Support\Str::uuid() . '.' . $extension;
+
+        $stored = \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $contents);
+
+        if (!$stored) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                $field => 'Failed to persist exported asset on disk.',
+            ]);
+        }
+
+        return $filename;
+    }
+
+    protected function decodeDataUrl(string $dataUrl): string
+    {
+        if (!\Illuminate\Support\Str::startsWith($dataUrl, 'data:')) {
+            throw new \InvalidArgumentException('Invalid data URL header.');
+        }
+
+        $parts = explode(',', $dataUrl, 2);
+        if (count($parts) !== 2) {
+            throw new \InvalidArgumentException('Invalid data URL structure.');
+        }
+
+        [$meta, $payload] = $parts;
+
+        if (str_contains($meta, ';base64')) {
+            $decoded = base64_decode($payload, true);
+        } else {
+            $decoded = rawurldecode($payload);
+        }
+
+        if ($decoded === false || $decoded === null) {
+            throw new \RuntimeException('Unable to decode payload.');
+        }
+
+        return $decoded;
     }
 }

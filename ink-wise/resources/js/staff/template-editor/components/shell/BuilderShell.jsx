@@ -444,7 +444,7 @@ export function BuilderShell() {
       : MAX_DEVICE_PIXEL_RATIO;
 
     try {
-      dispatch({ type: 'SHOW_PREVIEW_MODAL' });
+      // dispatch({ type: 'SHOW_PREVIEW_MODAL' }); // Commented out for save to avoid modal interference
       bodyEl?.classList.add('builder-exporting');
 
       // Allow layout/styles to flush before snapshotting so export-only CSS applies.
@@ -647,34 +647,35 @@ export function BuilderShell() {
 
       let estimatedPayloadBytes = estimateJsonBytes(payload);
 
-      if (estimatedPayloadBytes > MANUAL_SAVE_PAYLOAD_BUDGET && payload.preview_images) {
-        console.warn('[InkWise Builder] Dropping secondary previews to respect payload budget.', {
-          estimatedPayloadBytes,
-          budget: MANUAL_SAVE_PAYLOAD_BUDGET,
-        });
-        payload.preview_images_truncated = true;
-        delete payload.preview_images;
-        delete payload.preview_images_meta;
-        estimatedPayloadBytes = estimateJsonBytes(payload);
-      }
+      // Temporarily disable payload trimming to ensure data is saved
+      // if (estimatedPayloadBytes > MANUAL_SAVE_PAYLOAD_BUDGET && payload.preview_images) {
+      //   console.warn('[InkWise Builder] Dropping secondary previews to respect payload budget.', {
+      //     estimatedPayloadBytes,
+      //     budget: MANUAL_SAVE_PAYLOAD_BUDGET,
+      //   });
+      //   payload.preview_images_truncated = true;
+      //   delete payload.preview_images;
+      //   delete payload.preview_images_meta;
+      //   estimatedPayloadBytes = estimateJsonBytes(payload);
+      // }
 
-      if (estimatedPayloadBytes > MANUAL_SAVE_PAYLOAD_BUDGET && payload.preview_image) {
-        console.warn('[InkWise Builder] Dropping primary preview image to reduce payload.', {
-          estimatedPayloadBytes,
-          budget: MANUAL_SAVE_PAYLOAD_BUDGET,
-        });
-        delete payload.preview_image;
-        estimatedPayloadBytes = estimateJsonBytes(payload);
-      }
+      // if (estimatedPayloadBytes > MANUAL_SAVE_PAYLOAD_BUDGET && payload.preview_image) {
+      //   console.warn('[InkWise Builder] Dropping primary preview image to reduce payload.', {
+      //     estimatedPayloadBytes,
+      //     budget: MANUAL_SAVE_PAYLOAD_BUDGET,
+      //   });
+      //   delete payload.preview_image;
+      //   estimatedPayloadBytes = estimateJsonBytes(payload);
+      // }
 
-      if (estimatedPayloadBytes > MANUAL_SAVE_PAYLOAD_BUDGET && payload.svg_markup) {
-        console.warn('[InkWise Builder] Dropping SVG markup to keep payload within limits.', {
-          estimatedPayloadBytes,
-          budget: MANUAL_SAVE_PAYLOAD_BUDGET,
-        });
-        delete payload.svg_markup;
-        estimatedPayloadBytes = estimateJsonBytes(payload);
-      }
+      // if (estimatedPayloadBytes > MANUAL_SAVE_PAYLOAD_BUDGET && payload.svg_markup) {
+      //   console.warn('[InkWise Builder] Dropping SVG markup to keep payload within limits.', {
+      //     estimatedPayloadBytes,
+      //     budget: MANUAL_SAVE_PAYLOAD_BUDGET,
+      //   });
+      //   delete payload.svg_markup;
+      //   estimatedPayloadBytes = estimateJsonBytes(payload);
+      // }
 
       const requestBody = JSON.stringify(payload);
 

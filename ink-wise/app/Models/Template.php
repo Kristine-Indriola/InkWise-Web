@@ -29,6 +29,7 @@ class Template extends Model
         'preview_back',
         'has_back_design',
         'processed_at',
+        'user_id',
     ];
 
     protected $casts = [

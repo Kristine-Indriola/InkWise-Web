@@ -321,9 +321,9 @@ public function saveCanvas(Request $request, $id)
         $imageData = str_replace(' ', '+', $imageData);
 
         $imageName = 'template_' . $id . '_' . time() . '.png';
-        $filePath = 'templates/previews/' . $imageName;
+        $filePath = 'templates/preview/' . $imageName;
 
-        // Save to storage/app/public/templates/previews
+        // Save to storage/app/public/templates/preview
         Storage::disk('public')->put($filePath, base64_decode($imageData));
 
         // Update DB preview column
@@ -343,6 +343,7 @@ public function saveCanvas(Request $request, $id)
 
     public function saveTemplate(Request $request, $id)
     {
+        Log::info('saveTemplate called for template', ['id' => $id, 'request_data_keys' => array_keys($request->all())]);
         $template = Template::findOrFail($id);
 
         $validated = $request->validate([
@@ -352,6 +353,13 @@ public function saveCanvas(Request $request, $id)
             'preview_images' => 'nullable|array',
             'preview_images_meta' => 'nullable|array',
             'template_name' => 'nullable|string|max:255',
+        ]);
+
+        Log::info('saveTemplate called', [
+            'id' => $id,
+            'has_svg_markup' => !empty($validated['svg_markup']),
+            'has_preview_image' => !empty($validated['preview_image']),
+            'has_preview_images' => !empty($validated['preview_images']),
         ]);
 
         if (!empty($validated['template_name'])) {
@@ -373,11 +381,12 @@ public function saveCanvas(Request $request, $id)
         if (!empty($validated['preview_image'])) {
             $template->preview = $this->persistDataUrl(
                 $validated['preview_image'],
-                'templates/previews',
+                'templates/preview',
                 'png',
                 $template->preview,
                 'preview_image'
             );
+            Log::info('Preview image saved', ['path' => $template->preview]);
             // Also populate preview_front and front_image for consistency
             $template->preview_front = $template->preview;
             if (empty($template->front_image)) {
@@ -392,7 +401,7 @@ public function saveCanvas(Request $request, $id)
                 if (is_string($imageData) && !empty($imageData)) {
                     $filename = $this->persistDataUrl(
                         $imageData,
-                        'templates/previews',
+                        'templates/preview',
                         'png',
                         null,
                         "preview_{$key}"
@@ -404,6 +413,7 @@ public function saveCanvas(Request $request, $id)
             }
             if (!empty($previews)) {
                 $metadata['previews'] = $previews;
+                Log::info('Multiple previews saved', ['previews' => $previews]);
                 // Also populate preview_front/front_image from the 'front' preview
                 if (isset($previews['front'])) {
                     $template->preview_front = $previews['front'];
@@ -438,6 +448,7 @@ public function saveCanvas(Request $request, $id)
                 $template->svg_path,
                 'svg_markup'
             );
+            Log::info('SVG saved', ['path' => $template->svg_path]);
         }
 
         $template->metadata = $metadata;
@@ -469,7 +480,7 @@ public function uploadPreview(Request $request, $id)
     $imgData = base64_decode($imgData);
 
     // Save to storage (public disk)
-    $filename = 'templates/previews/template_' . $id . '_' . time() . '.png';
+    $filename = 'templates/preview/template_' . $id . '_' . time() . '.png';
     Storage::disk('public')->put($filename, $imgData);
 
     // Update preview column (store path)
@@ -633,9 +644,9 @@ public function uploadToProduct(Request $request, $id)
             if ($dir && Storage::disk('public')->exists($dir)) {
                 $files = Storage::disk('public')->files($dir);
             } else {
-                // fallback: list all files under templates/previews if dir missing
-                if (Storage::disk('public')->exists('templates/previews')) {
-                    $files = Storage::disk('public')->files('templates/previews');
+                // fallback: list all files under templates/preview if dir missing
+                if (Storage::disk('public')->exists('templates/preview')) {
+                    $files = Storage::disk('public')->files('templates/preview');
                 }
             }
 
@@ -1245,7 +1256,12 @@ public function uploadToProduct(Request $request, $id)
 
     protected function persistDataUrl(string $dataUrl, string $directory, string $extension, ?string $existingPath, string $field): string
     {
+        Log::info('persistDataUrl called', ['directory' => $directory, 'extension' => $extension, 'field' => $field, 'dataUrl_length' => strlen($dataUrl)]);
         if (trim((string) $dataUrl) === '') {
+            Log::warning('persistDataUrl: empty dataUrl', ['field' => $field]);
+            if ($existingPath) {
+                return $existingPath;
+            }
             throw ValidationException::withMessages([
                 $field => 'Missing data payload.',
             ]);
@@ -1254,6 +1270,7 @@ public function uploadToProduct(Request $request, $id)
         try {
             $contents = $this->decodeDataUrl($dataUrl);
         } catch (\Throwable $e) {
+            Log::error('persistDataUrl: decode failed', ['field' => $field, 'error' => $e->getMessage()]);
             throw ValidationException::withMessages([
                 $field => 'Invalid data payload provided.',
             ]);
