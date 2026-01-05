@@ -72,7 +72,15 @@ export function BuilderTopBar({
     if (saveDisabled) {
       return;
     }
-    setIsSaveMenuOpen((open) => !open);
+    const pages = state.pages ?? [];
+    if (pages.length <= 1) {
+      // If only one page or no pages, save directly
+      if (typeof onSaveTemplate === 'function' && !isSavingTemplate) {
+        onSaveTemplate({ pageId: null });
+      }
+    } else {
+      setIsSaveMenuOpen((open) => !open);
+    }
   };
   const handleSaveChoice = (pageId) => {
     closeSaveMenu();

@@ -2,6 +2,22 @@
 
 @section('title', 'Templates')
 
+@php
+function cleanSvgContent($svgContent) {
+    if (!is_string($svgContent)) {
+        return $svgContent;
+    }
+    $trimmed = ltrim($svgContent);
+    if (strpos($trimmed, '<?xml') === 0) {
+        $svgContent = preg_replace('/^<\?xml[^>]+>\s*/', '', $trimmed);
+    }
+    if (strpos(ltrim($svgContent), '<!DOCTYPE') === 0) {
+        $svgContent = preg_replace('/^<!DOCTYPE[^>]+>\s*/i', '', ltrim($svgContent));
+    }
+    return $svgContent;
+}
+@endphp
+
 @push('styles')
     @vite('resources/css/admin/template/template.css')
     <style>
@@ -1002,20 +1018,9 @@
                                         $svgContent = '';
                                         try {
                                             $svgContent = \Illuminate\Support\Facades\Storage::disk('public')->get($svgPath);
+                                            $svgContent = cleanSvgContent($svgContent);
                                         } catch (\Exception $e) {
                                             $svgContent = '<div class="svg-error">SVG not found</div>';
-                                        }
-                                    @endphp
-                                    @php
-                                        if (is_string($svgContent)) {
-                                            // Strip XML declarations that break inline rendering in HTML
-                                            $trimmed = ltrim($svgContent);
-                                            if (strpos($trimmed, '<?xml') === 0) {
-                                                $svgContent = preg_replace('/^<\?xml[^>]+>\s*/', '', $trimmed);
-                                            }
-                                            if (strpos(ltrim($svgContent), '<!DOCTYPE') === 0) {
-                                                $svgContent = preg_replace('/^<!DOCTYPE[^>]+>\s*/i', '', ltrim($svgContent));
-                                            }
                                         }
                                     @endphp
                                     <div class="svg-preview-container" style="width:100%;height:200px;display:flex;align-items:center;justify-content:center;border:1px solid #d1d5db;background:#fff;">
@@ -1041,20 +1046,9 @@
                                         $backSvgContent = '';
                                         try {
                                             $backSvgContent = \Illuminate\Support\Facades\Storage::disk('public')->get($backSvgPath);
+                                            $backSvgContent = cleanSvgContent($backSvgContent);
                                         } catch (\Exception $e) {
                                             $backSvgContent = '<div class="svg-error">SVG not found</div>';
-                                        }
-                                    @endphp
-                                    @php
-                                        if (is_string($backSvgContent)) {
-                                            // Strip XML declarations that break inline rendering in HTML
-                                            $trimmedBack = ltrim($backSvgContent);
-                                            if (strpos($trimmedBack, '<?xml') === 0) {
-                                                $backSvgContent = preg_replace('/^<\?xml[^>]+>\s*/', '', $trimmedBack);
-                                            }
-                                            if (strpos(ltrim($backSvgContent), '<!DOCTYPE') === 0) {
-                                                $backSvgContent = preg_replace('/^<!DOCTYPE[^>]+>\s*/i', '', ltrim($backSvgContent));
-                                            }
                                         }
                                     @endphp
                                     <div class="svg-preview-container back-thumb" style="width:60px;height:60px;display:flex;align-items:center;justify-content:center;border:1px solid #d1d5db;background:#fff;position:absolute;bottom:8px;right:8px;">

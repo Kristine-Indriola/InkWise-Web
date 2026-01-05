@@ -81,6 +81,7 @@ export function createAutosaveController(options = {}) {
     };
 
     const saveNow = async (reason) => {
+        console.log('[Autosave] Saving', reason);
         if (inflightPromise) {
             try {
                 await inflightPromise;
@@ -130,6 +131,7 @@ export function createAutosaveController(options = {}) {
     };
 
     const schedule = (reason = 'change') => {
+        console.log('[Autosave] Scheduling', reason);
         pendingReason = reason;
         if (timerId) {
             clearTimeout(timerId);

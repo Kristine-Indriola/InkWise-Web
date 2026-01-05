@@ -252,6 +252,7 @@
     <div class="topbar-actions">
         <button class="topbar-action-btn" type="button" onclick="window.location.href='{{ route('templates.wedding.invitations') }}'">Change Template</button>
         <button class="topbar-action-btn" type="button">Preview</button>
+        <button class="topbar-action-btn" type="button" id="save-template-btn" data-action="save-template">Save Template</button>
         <button
             class="topbar-action-btn primary"
             type="button"
@@ -714,9 +715,11 @@
     {!! json_encode([
         'product' => $productBootstrap,
         'template' => $templateBootstrap,
+        'orderSummary' => $orderSummary,
         'routes' => [
             'autosave' => route('order.design.autosave'),
             'review' => route('order.review'),
+            'saveTemplate' => route('order.design.save-template'),
         ],
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) !!}
 </script>

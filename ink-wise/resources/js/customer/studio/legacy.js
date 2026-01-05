@@ -228,7 +228,9 @@ export function initializeCustomerStudioLegacy() {
       ? window.inkwiseStudioBootstrap
       : {};
 
+    console.log('[InkWise Studio] Bootstrap payload:', bootstrapPayload);
     const routes = bootstrapPayload?.routes ?? {};
+    console.log('[InkWise Studio] Routes:', routes);
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
       || document.head.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
       || null;
@@ -273,6 +275,70 @@ export function initializeCustomerStudioLegacy() {
       return cardBg.dataset?.frontImage || null;
     };
 
+    const applyDesignData = (designData) => {
+      if (!designData || !currentSvgRoot) {
+        return;
+      }
+
+      // Apply text customizations
+      if (designData.texts && Array.isArray(designData.texts)) {
+        designData.texts.forEach((textEntry) => {
+          const { key, value, fontFamily, fontSize, color } = textEntry;
+          const node = currentSvgRoot.querySelector(`[data-preview-node="${key}"]`);
+          if (node) {
+            // Apply text value
+            if (value !== undefined) {
+              writeNodeTextValue(node, value);
+              // Also update the input field
+              const input = document.querySelector(`input[data-preview-target="${key}"]`);
+              if (input) {
+                input.value = value;
+              }
+            }
+
+            // Apply font family
+            if (fontFamily) {
+              node.setAttribute('font-family', fontFamily);
+              node.style.fontFamily = fontFamily;
+              try { node.dataset.fontFamily = fontFamily; } catch(e){}
+            }
+
+            // Apply font size
+            if (fontSize) {
+              node.setAttribute('font-size', fontSize);
+              node.style.fontSize = fontSize;
+              try { node.dataset.fontSize = fontSize; } catch(e){}
+            }
+
+            // Apply color
+            if (color) {
+              node.setAttribute('fill', color);
+              node.style.fill = color;
+              try { node.dataset.color = color; } catch(e){}
+            }
+          }
+        });
+      }
+
+      // Apply image customizations
+      if (designData.images && Array.isArray(designData.images)) {
+        designData.images.forEach((imageEntry) => {
+          const { key, href, x, y, width, height } = imageEntry;
+          const node = currentSvgRoot.querySelector(`[data-preview-node="${key}"]`);
+          if (node) {
+            if (href) {
+              node.setAttribute('href', href);
+              node.setAttribute('xlink:href', href);
+            }
+            if (x !== undefined) node.setAttribute('x', x);
+            if (y !== undefined) node.setAttribute('y', y);
+            if (width !== undefined) node.setAttribute('width', width);
+            if (height !== undefined) node.setAttribute('height', height);
+          }
+        });
+      }
+    };
+
     const collectTextEntries = () => {
       if (!textFieldList) {
         return [];
@@ -283,11 +349,28 @@ export function initializeCustomerStudioLegacy() {
         const label = wrapper?.querySelector('.text-field-label')?.textContent?.trim()
           || input.dataset.previewTarget
           || '';
+
+        // Get font properties from the corresponding SVG node
+        const key = input.dataset.previewTarget || '';
+        const svgNode = currentSvgRoot?.querySelector(`[data-preview-node="${key}"]`);
+        let fontFamily = null;
+        let fontSize = null;
+        let color = null;
+
+        if (svgNode) {
+          fontFamily = svgNode.getAttribute('font-family') || svgNode.style.fontFamily || svgNode.dataset.fontFamily;
+          fontSize = svgNode.getAttribute('font-size') || svgNode.style.fontSize || svgNode.dataset.fontSize;
+          color = svgNode.getAttribute('fill') || svgNode.style.fill || svgNode.dataset.color;
+        }
+
         return {
-          key: input.dataset.previewTarget || '',
+          key,
           label,
           value: input.value || '',
           defaultValue: input.dataset.defaultValue || '',
+          fontFamily,
+          fontSize,
+          color,
         };
       });
     };
@@ -551,6 +634,7 @@ export function initializeCustomerStudioLegacy() {
           images: previewImages,
         },
         placeholders: placeholderLabels,
+        product_id: bootstrap.product?.id,
       };
     };
 
@@ -561,7 +645,17 @@ export function initializeCustomerStudioLegacy() {
         csrfToken,
         statusLabel: statusLabelEl,
         statusDot: statusDotEl,
+        debounce: 0, // Save immediately on change
       });
+      console.log('[InkWise Studio] Autosave initialized', autosave);
+
+      // Periodic autosave every 10 seconds as fallback
+      setInterval(() => {
+        if (autosave) {
+          console.log('[InkWise Studio] Periodic autosave trigger');
+          autosave.schedule('periodic');
+        }
+      }, 10000);
     } catch (autosaveError) {
       console.warn('[InkWise Studio] Autosave controller failed to initialize.', autosaveError);
       autosave = null;
@@ -600,6 +694,65 @@ export function initializeCustomerStudioLegacy() {
           autosave.notifyError();
           proceedButton.disabled = false;
           proceedButton.dataset.navigating = '0';
+        }
+      });
+    }
+
+    const saveTemplateButton = document.getElementById('save-template-btn');
+    if (saveTemplateButton) {
+      saveTemplateButton.addEventListener('click', async (event) => {
+        event.preventDefault();
+        if (saveTemplateButton.disabled) {
+          return;
+        }
+
+        // Prompt for template name
+        const templateName = prompt('Enter a name for your template:');
+        if (!templateName || templateName.trim() === '') {
+          return;
+        }
+
+        saveTemplateButton.disabled = true;
+        saveTemplateButton.textContent = 'Saving…';
+
+        try {
+          // Flush any pending autosave
+          if (autosave) {
+            await autosave.flush('save-template');
+          }
+
+          // Collect current design snapshot
+          const snapshot = await collectDesignSnapshot('save-template');
+
+          // Send to server
+          const response = await fetch(routes.saveTemplate, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'X-CSRF-TOKEN': csrfToken,
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              template_name: templateName.trim(),
+              ...snapshot,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Server responded with ${response.status}`);
+          }
+
+          const result = await response.json();
+          alert(`Template "${result.template_name}" saved successfully!`);
+
+        } catch (error) {
+          console.error('[InkWise Studio] Failed to save template.', error);
+          alert('Failed to save template. Please try again.');
+        } finally {
+          saveTemplateButton.disabled = false;
+          saveTemplateButton.textContent = 'Save Template';
         }
       });
     }
@@ -4164,6 +4317,12 @@ export function initializeCustomerStudioLegacy() {
           } else {
             renderDefaultFields();
           }
+        }
+
+        // Apply design data from order summary
+        const designData = bootstrapPayload?.orderSummary?.metadata?.design;
+        if (designData) {
+          applyDesignData(designData);
         }
 
         nodes.forEach((node) => {

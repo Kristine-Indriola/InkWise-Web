@@ -38,6 +38,11 @@
 			return null;
 		}
 
+		// Handle data URLs (base64 encoded images from design studio)
+		if (str_starts_with($candidate, 'data:')) {
+			return $candidate;
+		}
+
 		if (preg_match('/^(https?:)?\/\//i', $candidate) || str_starts_with($candidate, '/')) {
 			return $candidate;
 		}
@@ -97,6 +102,7 @@
 	}
 
 	$continueHref = $continueHref ?? $continueUrl ?? route('order.finalstep');
+	$lastEditedAt = $lastEditedAt ?? null;
 	$editHref = $editHref ?? route('design.edit');
 	$customerReview = $customerReview ?? null;
 @endphp
@@ -151,6 +157,14 @@
 				<div class="preview-display">
 					<div class="preview-header">
 						<h2>Final artwork preview</h2>
+						@if($lastEditedAt)
+							<div class="preview-timestamp">
+								<span class="timestamp-label">Last updated:</span>
+								<time datetime="{{ $lastEditedAt }}" title="{{ \Carbon\Carbon::parse($lastEditedAt)->format('l, F j, Y \a\t g:i A') }}">
+									{{ \Carbon\Carbon::parse($lastEditedAt)->diffForHumans() }}
+								</time>
+							</div>
+						@endif
 						<div class="preview-toggle" role="group" aria-label="Preview sides">
 							<button type="button" class="active" data-face="front" aria-pressed="true">Front</button>
 							<button type="button" data-face="back" aria-pressed="false">Back</button>
