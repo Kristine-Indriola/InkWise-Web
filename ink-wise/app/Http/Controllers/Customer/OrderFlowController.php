@@ -957,7 +957,7 @@ class OrderFlowController extends Controller
 
         // Return admin redirect URL so the client (GCash button) can redirect to admin order summary
         try {
-            $adminRedirect = route('admin.ordersummary.index', ['order' => $order->order_number]);
+            $adminRedirect = route('admin.ordersummary.show', ['order' => $order->id]);
         } catch (\Throwable $e) {
             $adminRedirect = url('/admin/ordersummary') . '/' . ($order->order_number ?? $order->id);
         }
@@ -2481,7 +2481,7 @@ class OrderFlowController extends Controller
         }
 
         try {
-            $orderSummaryUrl = route('admin.ordersummary.index', ['order' => $order->order_number ?? $order->id]);
+            $orderSummaryUrl = route('admin.ordersummary.show', ['order' => $order->id]);
         } catch (\Throwable $e) {
             $orderSummaryUrl = url('/admin/ordersummary/' . ($order->order_number ?? $order->id));
         }

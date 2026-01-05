@@ -145,7 +145,7 @@
 			card.addEventListener('click', function() {
 				const orderId = this.dataset.orderId;
 				if (orderId) {
-					window.location.href = '{{ route("admin.ordersummary.index", ":id") }}'.replace(':id', orderId);
+					window.location.href = '{{ route("admin.ordersummary.show", ["order" => ":id"]) }}'.replace(':id', orderId);
 				}
 			});
 		});
@@ -155,7 +155,7 @@
 			card.addEventListener('click', function() {
 				const orderId = this.dataset.orderId;
 				if (orderId) {
-					window.location.href = '{{ route("admin.ordersummary.index", ":id") }}'.replace(':id', orderId);
+					window.location.href = '{{ route("admin.ordersummary.show", ["order" => ":id"]) }}'.replace(':id', orderId);
 				}
 			});
 		});

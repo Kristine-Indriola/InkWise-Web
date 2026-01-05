@@ -973,8 +973,8 @@ Route::prefix('staff')->name('staff.')->middleware(\App\Http\Middleware\RoleMidd
     Route::get('/orders/{id}/summary', [StaffOrderController::class, 'summary'])->name('orders.summary');
     Route::get('/orders/{id}/status', [StaffOrderController::class, 'editStatus'])->name('orders.status.edit');
     Route::put('/orders/{id}/status', [StaffOrderController::class, 'updateStatus'])->name('orders.status.update');
-    Route::get('/orders/{id}/payment', [StaffOrderController::class, 'editPayment'])->name('orders.payment.edit');
-    Route::put('/orders/{id}/payment', [StaffOrderController::class, 'updatePayment'])->name('orders.payment.update');
+    Route::get('/orders/{order}/payment', [StaffOrderController::class, 'editPayment'])->name('orders.payment.edit');
+    Route::put('/orders/{order}/payment', [StaffOrderController::class, 'updatePayment'])->name('orders.payment.update');
     Route::patch('/orders/{order}/archive', [StaffOrderController::class, 'archive'])->name('orders.archive');
     Route::get('/orders/archived', [StaffOrderController::class, 'archived'])->name('orders.archived');
     Route::get('/notify-customers', fn () => view('staff.notify_customers'))->name('notify.customers');

@@ -11,5 +11,5 @@ Verify Email
 If you did not create an account, no further action is required.  
 
 Thanks,<br>
-{{ config('app.name') }}
+InkWise Management
 @endcomponent

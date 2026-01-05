@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Arr;
 use App\Support\Admin\OrderSummaryPresenter;
 
 class StaffOrderController extends Controller
@@ -331,65 +332,41 @@ class StaffOrderController extends Controller
 
     public function editPayment(Order $order)
     {
-        $order->loadMissing(['payments', 'rating']);
+        $order->loadMissing(['payments', 'payments.recordedBy', 'rating']);
 
         $paymentStatusOptions = $this->paymentStatusOptions();
         $metadata = $this->normalizeMetadata($order->metadata);
+        $paymentRecords = $order->paymentRecords();
+        $currencyCode = Arr::get($order->summary_snapshot ?? [], 'currency', 'PHP');
+        $latestRecord = $paymentRecords->first();
+        $latestPaymentAt = is_array($latestRecord)
+            ? ($latestRecord['recorded_at'] ?? $latestRecord['created_at'] ?? null)
+            : null;
 
-        return view('admin.orders.manage-payment', [
+        $paymentSnapshot = [
+            'grand_total' => $order->grandTotalAmount(),
+            'total_paid' => $order->totalPaid(),
+            'balance_due' => $order->balanceDue(),
+            'currency' => $currencyCode,
+            'status' => strtolower((string) ($order->payment_status ?: 'pending')),
+            'latest_payment_at' => $latestPaymentAt,
+            'total_payments' => $paymentRecords->count(),
+        ];
+
+        return view('staff.orders.manage-payment', [
             'order' => $order,
             'paymentStatusOptions' => $paymentStatusOptions,
             'metadata' => $metadata,
+            'paymentRecords' => $paymentRecords,
+            'paymentSnapshot' => $paymentSnapshot,
         ]);
     }
 
     public function updatePayment(Request $request, Order $order)
     {
-        $allowedPaymentStatuses = array_keys($this->paymentStatusOptions());
-
-        $validated = $request->validate([
-            'payment_status' => ['required', Rule::in($allowedPaymentStatuses)],
-            'payment_note' => ['nullable', 'string', 'max:1000'],
-        ]);
-
-        try {
-            $oldPaymentStatus = $order->payment_status;
-            $order->payment_status = $validated['payment_status'];
-
-            $metadata = $this->normalizeMetadata($order->metadata);
-
-            if (array_key_exists('payment_note', $validated)) {
-                $metadata['payment_note'] = $validated['payment_note'] ?: null;
-            }
-
-            $order->metadata = array_filter($metadata, function ($value) {
-                return $value !== null && $value !== '';
-            });
-
-            $saved = $order->save();
-
-            if (!$saved) {
-                return redirect()
-                    ->back()
-                    ->withInput()
-                    ->with('error', 'Failed to update payment status. Please try again.');
-            }
-
-            return redirect()
-                ->route('staff.orders.payment.edit', $order->id)
-                ->with('success', 'Payment status updated successfully.');
-        } catch (\Exception $e) {
-            \Log::error('Failed to update payment status', [
-                'order_id' => $order->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return redirect()
-                ->back()
-                ->withInput()
-                ->with('error', 'An error occurred while updating payment status: ' . $e->getMessage());
-        }
+        return redirect()
+            ->route('staff.orders.payment.edit', ['order' => $order->id])
+            ->with('error', 'Staff members are not permitted to modify payment details. Please contact an administrator.');
     }
 
     protected function statusOptions(): array

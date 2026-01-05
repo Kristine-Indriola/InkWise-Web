@@ -110,6 +110,12 @@
         color: #b91c1c;
     }
 
+    .order-stage-chip--draft,
+    .order-stage-chip--new-order {
+        background: #f3f4f6;
+        color: #1f2937;
+    }
+
     .order-status-meta {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -646,6 +652,16 @@
     }
 
     $statusLabels = $statusOptions;
+    $formatStatusLabel = static function ($statusKey) use ($statusLabels) {
+        $label = $statusLabels[$statusKey] ?? null;
+
+        if (is_string($label) && $label !== '') {
+            return $label;
+        }
+
+        return \Illuminate\Support\Str::title(str_replace('_', ' ', (string) $statusKey));
+    };
+
     $currentStatus = old('status', data_get($order, 'status', 'pending'));
     $flowIndex = array_search($currentStatus, $statusFlow, true);
     $trackingNumber = old('tracking_number', $metadata['tracking_number'] ?? '');
@@ -655,9 +671,9 @@
         $previousUrl = route('admin.orders.index');
     }
     $currentChipModifier = str_replace('_', '-', $currentStatus);
-    $currentStatusLabel = $statusLabels[$currentStatus] ?? ucfirst(str_replace('_', ' ', $currentStatus));
+    $currentStatusLabel = $formatStatusLabel($currentStatus);
     $nextStatusKey = $flowIndex !== false && $flowIndex < count($statusFlow) - 1 ? $statusFlow[$flowIndex + 1] : null;
-    $nextStatusLabel = $nextStatusKey ? ($statusLabels[$nextStatusKey] ?? ucfirst(str_replace('_', ' ', $nextStatusKey))) : null;
+    $nextStatusLabel = $nextStatusKey ? $formatStatusLabel($nextStatusKey) : null;
     $formatDateTime = function ($value) {
         try {
             if ($value instanceof \Illuminate\Support\Carbon) {
@@ -738,7 +754,7 @@
                 </p>
             </div>
             <span class="order-stage-chip order-stage-chip--{{ $currentChipModifier }}">
-                {{ $statusLabels[$currentStatus] ?? ucfirst(str_replace('_', ' ', $currentStatus)) }}
+                {{ $formatStatusLabel($currentStatus) }}
             </span>
         </header>
         <div class="order-status-meta">
@@ -757,7 +773,7 @@
             <div class="order-status-meta__item">
                 <span class="order-status-meta__label">Current stage</span>
                 <span class="order-status-meta__value">
-                    {{ $statusLabels[$currentStatus] ?? ucfirst(str_replace('_', ' ', $currentStatus)) }}
+                    {{ $formatStatusLabel($currentStatus) }}
                 </span>
             </div>
         </div>
@@ -792,7 +808,7 @@
             </div>
             <div class="status-progress-card__actions">
                 <span class="order-stage-chip order-stage-chip--{{ $currentChipModifier }}">
-                    {{ $statusLabels[$currentStatus] ?? ucfirst(str_replace('_', ' ', $currentStatus)) }}
+                    {{ $formatStatusLabel($currentStatus) }}
                 </span>
             </div>
         </header>
@@ -823,10 +839,13 @@
                     @endif
                     <div class="status-tracker__content">
                         <p class="status-tracker__title">
-                            {{ $statusLabels[$statusKey] ?? ucfirst(str_replace('_', ' ', $statusKey)) }}
+                            {{ $formatStatusLabel($statusKey) }}
                         </p>
                         <p class="status-tracker__subtitle">
                             @switch($statusKey)
+                                @case('draft')
+                                    Order submitted and awaiting admin review.
+                                    @break
                                 @case('pending')
                                     Order received.
                                     @break 

@@ -361,21 +361,39 @@
                 @php
                   $rowStatus = strtolower($order->status ?? 'processing');
                 @endphp
-                <tr data-order-id="{{ $order->id }}" data-status="{{ $rowStatus }}" data-order-url="{{ route('admin.ordersummary.index', ['order' => $order->order_number]) }}" style="cursor: pointer;">
+                <tr data-order-id="{{ $order->id }}" data-status="{{ $rowStatus }}" data-order-url="{{ route('admin.ordersummary.show', ['order' => $order->id]) }}" style="cursor: pointer;">
                   <td>{{ $order->order_number ?? ('#' . $order->id) }}</td>
                   <td>{{ optional($order->customer)->name ?? 'Guest' }}</td>
                   <td class="text-center">{{ (int) data_get($order, 'items_count', 0) }}</td>
                   <td class="text-end">{{ number_format((float) data_get($order, 'total_amount', 0), 2) }}</td>
                   <td>
                     @php
-                      $totalPaid = $order->totalPaid();
-                      $totalAmount = (float) $order->total_amount;
-                      if ($totalPaid >= $totalAmount && $totalAmount > 0) {
-                        $paymentStatus = 'paid';
-                      } elseif ($totalPaid > 0) {
-                        $paymentStatus = 'partial';
+                      $paymentStatusRaw = data_get($order, 'payment_status', 'pending');
+                      $paymentStatus = strtolower((string) ($paymentStatusRaw ?: 'pending'));
+                      $metadataRaw = data_get($order, 'metadata');
+                      if (is_string($metadataRaw) && $metadataRaw !== '') {
+                        $decodedMetadata = json_decode($metadataRaw, true);
+                        $metadata = json_last_error() === JSON_ERROR_NONE && is_array($decodedMetadata) ? $decodedMetadata : [];
+                      } elseif (is_array($metadataRaw)) {
+                        $metadata = $metadataRaw;
                       } else {
-                        $paymentStatus = 'pending';
+                        $metadata = [];
+                      }
+                      $financialMetadata = data_get($metadata, 'financial', []);
+                      $paymentsSummary = collect(data_get($order, 'payments_summary', []));
+                      $grandTotal = (float) ($paymentsSummary->get('grand_total') ?? data_get($order, 'total_amount', 0));
+                      $paidOverrideRaw = data_get($financialMetadata, 'total_paid_override');
+                      $balanceOverrideRaw = data_get($financialMetadata, 'balance_due_override');
+                      $paidOverride = is_numeric($paidOverrideRaw) ? (float) $paidOverrideRaw : null;
+                      $balanceOverride = is_numeric($balanceOverrideRaw) ? (float) $balanceOverrideRaw : null;
+                      $totalPaid = $paidOverride ?? (float) ($paymentsSummary->get('total_paid') ?? data_get($order, 'total_paid', 0));
+                      $balanceDue = $balanceOverride ?? (float) ($paymentsSummary->get('balance_due') ?? max($grandTotal - $totalPaid, 0));
+                      if ($paymentStatus !== 'paid') {
+                        if ($grandTotal > 0 && $balanceDue <= 0.01 && $totalPaid >= max($grandTotal - 0.01, 0)) {
+                          $paymentStatus = 'paid';
+                        } elseif ($totalPaid > 0 && $balanceDue > 0.01) {
+                          $paymentStatus = 'partial';
+                        }
                       }
                       $paymentClass = 'payment-' . $paymentStatus;
                     @endphp
@@ -394,7 +412,7 @@
                   </td>
                   <td>{{ optional($order->order_date)->format('M j, Y') ?? optional($order->created_at)->format('M j, Y') }}</td>
                   <td class="actions-cell">
-                    <a href="{{ route('admin.ordersummary.index', ['order' => $order->order_number]) }}" class="btn btn-outline btn-sm btn-icon" aria-label="View order {{ $order->order_number ?? $order->id }}">
+                    <a href="{{ route('admin.ordersummary.show', ['order' => $order->id]) }}" class="btn btn-outline btn-sm btn-icon" aria-label="View order {{ $order->order_number ?? $order->id }}">
                       <i class="fa-solid fa-eye" aria-hidden="true"></i>
                     </a>
                     @if(in_array(strtolower($order->status ?? ''), ['cancelled', 'completed']))

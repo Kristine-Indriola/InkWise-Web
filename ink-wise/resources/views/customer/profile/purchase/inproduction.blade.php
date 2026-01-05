@@ -13,15 +13,25 @@
 
     @php
         $statusOptions = [
-            'draft' => 'Pending',
+            'draft' => 'New Order',
             'pending' => 'Order Received',
+            'pending_awaiting_materials' => 'Pending – Awaiting Materials',
             'processing' => 'Processing',
             'in_production' => 'In Production',
             'confirmed' => 'Ready for Pickup',
             'completed' => 'Completed',
             'cancelled' => 'Cancelled',
         ];
-        $statusFlow = ['draft', 'pending', 'processing', 'in_production', 'confirmed', 'completed'];
+        $statusFlow = ['draft', 'pending', 'pending_awaiting_materials', 'processing', 'in_production', 'confirmed', 'completed'];
+        $formatStatusLabel = static function ($statusKey) use ($statusOptions) {
+            $label = $statusOptions[$statusKey] ?? null;
+
+            if (is_string($label) && $label !== '') {
+                return $label;
+            }
+
+            return \Illuminate\Support\Str::title(str_replace('_', ' ', (string) $statusKey));
+        };
         $normalizeMetadata = function ($metadata) {
             if (is_array($metadata)) {
                 return $metadata;
@@ -62,11 +72,11 @@
                 $paperStock = data_get($primaryItem, 'paperStockSelection.paper_stock_name', 'Standard');
                 $metadata = $normalizeMetadata(data_get($order, 'metadata', []));
                 $statusKey = data_get($order, 'status', 'pending');
-                $statusLabel = $statusOptions[$statusKey] ?? ucfirst(str_replace('_', ' ', $statusKey));
+                $statusLabel = $formatStatusLabel($statusKey);
                 $customerCanCancel = false; // Customers cannot cancel orders
                 $flowIndex = array_search($statusKey, $statusFlow, true);
                 $nextStatusKey = $flowIndex !== false && $flowIndex < count($statusFlow) - 1 ? $statusFlow[$flowIndex + 1] : null;
-                $nextStatusLabel = $nextStatusKey ? ($statusOptions[$nextStatusKey] ?? ucfirst(str_replace('_', ' ', $nextStatusKey))) : null;
+                $nextStatusLabel = $nextStatusKey ? $formatStatusLabel($nextStatusKey) : null;
                 $statusNote = $metadata['status_note'] ?? null;
                 $totalAmount = data_get($order, 'total_amount', 0);
                 $orderNumber = data_get($order, 'order_number', data_get($order, 'id'));

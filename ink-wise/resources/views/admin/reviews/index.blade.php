@@ -609,7 +609,7 @@
             <small class="review-author">
               By {{ $review->customer ? $review->customer->name : 'Anonymous' }}
               @if($review->order)
-                • <a href="{{ route('admin.ordersummary.index', $review->order) }}" class="order-link">Order #{{ $review->order->order_number }}</a>
+                • <a href="{{ route('admin.ordersummary.show', ['order' => $review->order_id]) }}" class="order-link">Order #{{ $review->order->order_number }}</a>
               @endif
             </small>
           </div>

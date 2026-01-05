@@ -10,5 +10,5 @@ Use the code below to reset your password for your InkWise account. The code exp
 If you didn't request this password reset, you can safely ignore this email.
 
 Thanks,<br>
-{{ config('app.name') }}
+InkWise Management
 @endcomponent

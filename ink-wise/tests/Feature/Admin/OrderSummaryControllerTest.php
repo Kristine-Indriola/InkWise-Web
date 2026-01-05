@@ -65,7 +65,7 @@ class OrderSummaryControllerTest extends TestCase
             ],
         ]);
 
-        $response = $this->actingAs($user)->get(route('admin.ordersummary.index', ['order' => $order->order_number]));
+        $response = $this->actingAs($user)->get(route('admin.ordersummary.show', ['order' => $order->id]));
 
         $response->assertOk();
         $response->assertViewIs('admin.ordersummary.index');

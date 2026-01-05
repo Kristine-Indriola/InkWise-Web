@@ -451,7 +451,7 @@
                         @endphp
                         <tr>
                             <td>
-                                <a href="{{ route('admin.ordersummary.index', ['order' => $order->order_number]) }}" class="order-number">
+                                <a href="{{ route('admin.ordersummary.show', ['order' => $order->id]) }}" class="order-number">
                                     #{{ $order->order_number }}
                                 </a>
                             </td>
@@ -472,7 +472,7 @@
                                 </span>
                             </td>
                             <td class="actions-cell">
-                                <a href="{{ route('admin.ordersummary.index', ['order' => $order->order_number]) }}" class="btn btn-outline btn-sm" title="View Order">
+                                <a href="{{ route('admin.ordersummary.show', ['order' => $order->id]) }}" class="btn btn-outline btn-sm" title="View Order">
                                     <i class="fas fa-eye"></i>
                                 </a>
                                 <a href="{{ route('admin.orders.payment.edit', ['order' => $order->id]) }}" class="btn btn-outline btn-sm" title="Manage Payment">

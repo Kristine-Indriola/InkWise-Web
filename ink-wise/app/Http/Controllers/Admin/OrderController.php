@@ -4,11 +4,14 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use App\Models\Order;
 use App\Notifications\OrderStatusUpdated;
+use App\Notifications\PaymentStatusUpdated;
 
 class OrderController extends Controller
 {
@@ -16,7 +19,7 @@ class OrderController extends Controller
     {
         // Prevent status management for completed orders
         if ($order->status === 'completed') {
-            return redirect()->route('admin.ordersummary.index', $order)
+            return redirect()->route('admin.ordersummary.show', ['order' => $order->id])
                 ->with('error', 'Cannot modify status of completed orders.');
         }
 
@@ -140,21 +143,39 @@ class OrderController extends Controller
 
     public function editPayment(Order $order)
     {
-        $order->loadMissing(['payments', 'rating']);
+        $order->loadMissing(['payments', 'payments.recordedBy', 'rating']);
 
         $paymentStatusOptions = $this->paymentStatusOptions();
         $metadata = $this->normalizeMetadata($order->metadata);
+        $paymentRecords = $order->paymentRecords();
+        $currencyCode = Arr::get($order->summary_snapshot ?? [], 'currency', 'PHP');
+        $latestRecord = $paymentRecords->first();
+        $latestPaymentAt = is_array($latestRecord)
+            ? ($latestRecord['recorded_at'] ?? $latestRecord['created_at'] ?? null)
+            : null;
+        $paymentSnapshot = [
+            'grand_total' => $order->grandTotalAmount(),
+            'total_paid' => $order->totalPaid(),
+            'balance_due' => $order->balanceDue(),
+            'currency' => $currencyCode,
+            'status' => strtolower((string) $order->payment_status ?: 'pending'),
+            'latest_payment_at' => $latestPaymentAt,
+            'total_payments' => $paymentRecords->count(),
+        ];
 
         return view('admin.orders.manage-payment', [
             'order' => $order,
             'paymentStatusOptions' => $paymentStatusOptions,
+            'editablePaymentStatuses' => $this->editablePaymentStatuses(),
             'metadata' => $metadata,
+            'paymentRecords' => $paymentRecords,
+            'paymentSnapshot' => $paymentSnapshot,
         ]);
     }
 
     public function updatePayment(Request $request, Order $order)
     {
-        $allowedPaymentStatuses = array_keys($this->paymentStatusOptions());
+        $allowedPaymentStatuses = $this->editablePaymentStatuses();
 
         $validated = $request->validate([
             'payment_status' => ['required', Rule::in($allowedPaymentStatuses)],
@@ -162,13 +183,47 @@ class OrderController extends Controller
         ]);
 
         try {
+            $paymentStatusOptions = $this->paymentStatusOptions();
             $oldPaymentStatus = $order->payment_status;
             $order->payment_status = $validated['payment_status'];
 
             $metadata = $this->normalizeMetadata($order->metadata);
 
+            $previousPaymentNoteRaw = $metadata['payment_note'] ?? null;
+            $previousPaymentNote = is_string($previousPaymentNoteRaw) ? trim($previousPaymentNoteRaw) : null;
+            if ($previousPaymentNote === '') {
+                $previousPaymentNote = null;
+            }
+
+            $currentPaymentNote = null;
+
             if (array_key_exists('payment_note', $validated)) {
-                $metadata['payment_note'] = $validated['payment_note'] ?: null;
+                $normalizedNote = is_string($validated['payment_note']) ? trim($validated['payment_note']) : null;
+                $currentPaymentNote = $normalizedNote === '' ? null : $normalizedNote;
+                $metadata['payment_note'] = $currentPaymentNote;
+            }
+
+            $financialMetadata = [];
+            if (isset($metadata['financial']) && is_array($metadata['financial'])) {
+                $financialMetadata = $metadata['financial'];
+            }
+
+            if (Str::lower((string) $order->payment_status) === 'paid') {
+                $financialMetadata['total_paid_override'] = $order->grandTotalAmount();
+                $financialMetadata['balance_due_override'] = 0.0;
+            } else {
+                unset($financialMetadata['total_paid_override'], $financialMetadata['balance_due_override']);
+            }
+
+            if (!empty($financialMetadata)) {
+                $metadata['financial'] = array_filter($financialMetadata, function ($value) {
+                    if ($value === 0 || $value === 0.0 || $value === '0') {
+                        return true;
+                    }
+                    return $value !== null && $value !== '';
+                });
+            } else {
+                unset($metadata['financial']);
             }
 
             $order->metadata = array_filter($metadata, function ($value) {
@@ -182,6 +237,63 @@ class OrderController extends Controller
                     ->back()
                     ->withInput()
                     ->with('error', 'Failed to update payment status. Please try again.');
+            }
+
+            $statusChanged = $oldPaymentStatus !== $order->payment_status;
+            $noteChanged = $previousPaymentNote !== $currentPaymentNote;
+
+            if ($statusChanged || $noteChanged) {
+                $user = Auth::user();
+                $userName = 'System';
+                if ($user) {
+                    $userName = $user->name ?? $user->email ?? 'Admin';
+                }
+
+                $oldStatusLabel = $paymentStatusOptions[$oldPaymentStatus] ?? ucfirst(str_replace('_', ' ', (string) $oldPaymentStatus));
+                $newStatusLabel = $paymentStatusOptions[$order->payment_status] ?? ucfirst(str_replace('_', ' ', (string) $order->payment_status));
+
+                $descriptionParts = [];
+
+                if ($statusChanged) {
+                    $descriptionParts[] = sprintf(
+                        'Payment status changed from "%s" to "%s".',
+                        $oldStatusLabel,
+                        $newStatusLabel
+                    );
+                }
+
+                if ($noteChanged) {
+                    if ($currentPaymentNote) {
+                        $descriptionParts[] = 'Payment note updated: "' . $currentPaymentNote . '".';
+                    } elseif ($previousPaymentNote) {
+                        $descriptionParts[] = 'Payment note removed.';
+                    }
+                }
+
+                $description = trim(implode(' ', $descriptionParts)) ?: 'Payment details updated.';
+
+                \App\Models\OrderActivity::create([
+                    'order_id' => $order->id,
+                    'activity_type' => 'payment_updated',
+                    'old_value' => $oldPaymentStatus,
+                    'new_value' => $order->payment_status,
+                    'description' => $description,
+                    'user_id' => $user ? $user->user_id : null,
+                    'user_name' => $userName,
+                    'user_role' => 'Admin',
+                ]);
+
+                $paymentStatusLabel = $newStatusLabel;
+                $customerUser = $order->user;
+                if ($customerUser) {
+                    $customerUser->notify(new PaymentStatusUpdated(
+                        $order->id,
+                        $order->order_number,
+                        $order->payment_status,
+                        $paymentStatusLabel,
+                        $currentPaymentNote
+                    ));
+                }
             }
 
             return redirect()
@@ -260,6 +372,11 @@ class OrderController extends Controller
             'failed' => 'Failed',
             'refunded' => 'Refunded',
         ];
+    }
+
+    protected function editablePaymentStatuses(): array
+    {
+        return ['partial', 'paid'];
     }
     /**
      * Check if all materials required for the order are available in inventory

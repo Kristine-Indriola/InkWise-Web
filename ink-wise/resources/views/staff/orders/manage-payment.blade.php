@@ -1,4 +1,4 @@
-@extends('layouts.admin')
+@extends('layouts.staffapp')
 
 @section('title', 'Manage Payment Transaction')
 
@@ -434,17 +434,16 @@
         'failed' => 'Failed',
         'refunded' => 'Refunded',
     ];
-    $editablePaymentStatuses = ($editablePaymentStatuses ?? ['partial', 'paid']);
-    $currentPaymentStatus = data_get($order, 'payment_status', 'pending');
+    $currentPaymentStatus = old('payment_status', data_get($order, 'payment_status', 'pending'));
     $trackingNumber = old('tracking_number', $metadata['tracking_number'] ?? '');
     $paymentNote = old('payment_note', $metadata['payment_note'] ?? '');
-    $formSelectedPaymentStatus = old('payment_status');
-    if ($formSelectedPaymentStatus === null && in_array($currentPaymentStatus, $editablePaymentStatuses, true)) {
-        $formSelectedPaymentStatus = $currentPaymentStatus;
+    $orderId = $order instanceof \Illuminate\Database\Eloquent\Model ? $order->getKey() : data_get($order, 'id');
+    if (!$orderId) {
+        $orderId = data_get($order, 'order_id');
     }
     $previousUrl = url()->previous();
     if ($previousUrl === url()->current()) {
-        $previousUrl = route('admin.orders.index');
+        $previousUrl = $orderId ? route('staff.orders.summary', ['id' => $orderId]) : route('staff.order_list.index');
     }
     $currentPaymentChipModifier = str_replace('_', '-', $currentPaymentStatus);
     $currentPaymentStatusLabel = $paymentStatusOptions[$currentPaymentStatus] ?? ucfirst(str_replace('_', ' ', $currentPaymentStatus));
@@ -461,7 +460,6 @@
         }
         return null;
     };
-    $orderId = data_get($order, 'id');
     $orderNumber = data_get($order, 'order_number', $orderId ? '#' . $orderId : 'Order');
     $customerName = data_get($order, 'customer.full_name')
         ?? data_get($order, 'customer.name')
@@ -490,22 +488,33 @@
 @endphp
 
 <main class="payment-shell">
-    @if(session('success'))
-        <div class="payment-alert payment-alert--success" role="status">
-            {{ session('success') }}
-        </div>
-    @endif
-
-    @if(session('error'))
-        <div class="payment-alert payment-alert--danger" role="alert">
-            {{ session('error') }}
-        </div>
-    @endif
-
     <a href="{{ $previousUrl }}" class="back-link">
         <span aria-hidden="true">&larr;</span>
         Back to order
     </a>
+
+    @if(session('success'))
+        <div class="payment-alert payment-alert--success" role="status" aria-live="polite">
+            <strong>{{ session('success') }}</strong>
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div class="payment-alert payment-alert--danger" role="alert" aria-live="assertive">
+            <strong>{{ session('error') }}</strong>
+        </div>
+    @endif
+
+    @if($errors->any())
+        <div class="payment-alert payment-alert--danger" role="alert" aria-live="assertive">
+            <strong>Unable to update payment details.</strong>
+            <ul style="margin: 8px 0 0; padding-left: 18px;">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
 
     <section class="payment-card">
         <header class="payment-card__header">
@@ -619,46 +628,6 @@
         </div>
     </section>
 
-    <section class="payment-form-card">
-        <h2 class="payment-info-card__title" style="margin-bottom: 20px;">Update payment status</h2>
-        <form method="POST" action="{{ route('admin.orders.payment.update', $order) }}" class="payment-form">
-            @csrf
-            @method('PUT')
-
-            <div class="form-row">
-                <div>
-                    <label for="payment_status">Payment status</label>
-                    <select id="payment_status" name="payment_status" required>
-                        <option value="" disabled {{ $formSelectedPaymentStatus ? '' : 'selected' }}>Select payment status</option>
-                        @foreach($editablePaymentStatuses as $value)
-                            @php($label = $paymentStatusOptions[$value] ?? ucfirst(str_replace('_', ' ', $value)))
-                            <option value="{{ $value }}" {{ $formSelectedPaymentStatus === $value ? 'selected' : '' }}>
-                                {{ $label }}
-                            </option>
-                        @endforeach
-                    </select>
-                    <span class="hint">Set the payment to Partial or Paid.</span>
-                    @error('payment_status')
-                        <span class="error-text">{{ $message }}</span>
-                    @enderror
-                </div>
-            </div>
-
-            <div class="form-row">
-                <div>
-                    <label for="payment_note">Payment note (optional)</label>
-                    <textarea id="payment_note" name="payment_note" rows="4" placeholder="Add context about payment collection if needed.">{{ $paymentNote }}</textarea>
-                    <span class="hint">Customers receive this note with their payment status update.</span>
-                    @error('payment_note')
-                        <span class="error-text">{{ $message }}</span>
-                    @enderror
-                </div>
-            </div>
-
-            <button type="submit">Save payment update</button>
-        </form>
-    </section>
-
     <section class="payment-info-grid">
         <article class="payment-info-card">
             <h2 class="payment-info-card__title">Payment details</h2>
@@ -670,11 +639,11 @@
                 <dt>Order date</dt>
                 <dd>{{ $placedDateDisplay ?? 'Not available' }}</dd>
                 <dt>Total amount</dt>
-				<dd>{{ $formatCurrencyAmount($totalAmount) }}</dd>
+                <dd>{{ $formatCurrencyAmount($totalAmount) }}</dd>
                 <dt>Amount paid</dt>
-				<dd>{{ $formatCurrencyAmount($paidAmount) }}</dd>
+                <dd>{{ $formatCurrencyAmount($paidAmount) }}</dd>
                 <dt>Balance due</dt>
-				<dd>{{ $formatCurrencyAmount($balanceDue) }}</dd>
+                <dd>{{ $formatCurrencyAmount($balanceDue) }}</dd>
                 <dt>Payment status</dt>
                 <dd>{{ $paymentStatusOptions[$currentPaymentStatus] ?? ucfirst(str_replace('_', ' ', $currentPaymentStatus)) }}</dd>
                 <dt>Last updated</dt>
@@ -705,6 +674,11 @@
                 @endif
             </div>
         </article>
+    </section>
+    <section class="payment-form-card">
+        <div class="payment-info-card__text">
+            <p>Payment details are read-only for staff accounts. Contact an administrator if a payment update is required.</p>
+        </div>
     </section>
 </main>
 @endsection
