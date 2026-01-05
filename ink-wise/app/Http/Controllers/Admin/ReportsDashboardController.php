@@ -288,16 +288,19 @@ class ReportsDashboardController extends Controller
                 $order->items_list = $itemsList->implode(', ');
                 $order->items_quantity = (int) $order->items->sum('quantity');
                 $order->total_amount_value = (float) $order->total_amount;
-                $order->material_cost_value = $materialCost;
-                $order->profit_value = $order->total_amount_value - $materialCost;
+                $order->material_cost_value = round($materialCost, 2);
                 $order->order_date_value = $order->order_date ?? $order->created_at;
 
+                // Determine cash realised for the order and net profit
+                $totalPaid = (float) $order->totalPaid();
+                $order->total_paid_value = $totalPaid;
+                $order->profit_value = round($totalPaid - $order->material_cost_value, 2);
+
                 // Determine payment status
-                $totalPaid = $order->totalPaid();
-                $balanceDue = $order->balanceDue();
-                if ($balanceDue == 0) {
+                $balanceDue = (float) $order->balanceDue();
+                if ($balanceDue <= 0.01) {
                     $order->payment_status = 'Full Payment';
-                } elseif ($totalPaid > 0) {
+                } elseif ($totalPaid > 0.0) {
                     $order->payment_status = 'Half Payment';
                 } else {
                     $order->payment_status = 'Unpaid';
@@ -628,8 +631,11 @@ class ReportsDashboardController extends Controller
 
         $orderCount = $filtered->count();
         $revenue = (float) $fullyPaidOrders->sum('total_amount');
-        $materialCost = (float) $fullyPaidOrders->sum('material_cost_value');
-        $profit = $revenue - $materialCost;
+        $realisedRevenue = (float) $filtered->sum(function (Order $order) {
+            return $order->total_paid_value ?? (float) $order->totalPaid();
+        });
+        $materialCost = (float) $filtered->sum('material_cost_value');
+        $profit = $realisedRevenue - $materialCost;
 
         // Calculate pending revenue from partially paid orders
         $partiallyPaidOrders = $filtered->filter(function (Order $order) {
@@ -647,7 +653,7 @@ class ReportsDashboardController extends Controller
             'materialCost' => round($materialCost, 2),
             'profit' => round($profit, 2),
             'averageOrder' => $orderCount > 0 ? round($revenue / $orderCount, 2) : 0.0,
-            'profitMargin' => $revenue > 0 ? round(($profit / $revenue) * 100, 1) : 0.0,
+            'profitMargin' => $realisedRevenue > 0 ? round(($profit / $realisedRevenue) * 100, 1) : 0.0,
         ];
     }
 

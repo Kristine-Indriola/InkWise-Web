@@ -67,6 +67,15 @@ class HomeController extends Controller
 
         $inventoryMovement = $this->buildInventoryMovementTrend();
 
+        $completedOrders = Order::query()
+            ->select(['id', 'total_amount', 'summary_snapshot', 'metadata'])
+            ->where('status', 'completed')
+            ->get();
+
+        $totalRevenue = round($completedOrders->sum(function (Order $order) {
+            return max($order->grandTotalAmount(), 0.0);
+        }), 2);
+
         return view('owner.owner-home', [
             'newOrdersCount'      => $newOrdersCount,
             'pendingOrdersCount'  => $pendingOrdersCount,
@@ -75,6 +84,7 @@ class HomeController extends Controller
             'totalRatings'        => $totalRatings,
             'topSellingProducts'  => $topSellingProducts,
             'inventoryMovement'   => $inventoryMovement,
+            'totalRevenue'        => $totalRevenue,
         ]);
     }
 
