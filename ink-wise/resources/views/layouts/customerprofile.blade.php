@@ -669,6 +669,41 @@ function clearImageSelection() {
     window.addEventListener('beforeunload', () => clearInterval(pollInterval));
 })();
 </script>
+  <script>
+  (function() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('chat') !== 'open') {
+      return;
+    }
+
+    function triggerChat() {
+      if (typeof window.openCustomerSupportChat === 'function') {
+        window.openCustomerSupportChat();
+        return;
+      }
+      const openBtn = document.getElementById('openChatBtn');
+      if (openBtn) {
+        openBtn.click();
+        return;
+      }
+      const modal = document.getElementById('chatModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        const floating = document.getElementById('chatFloatingBtn');
+        if (floating) {
+          floating.classList.add('hidden');
+        }
+      }
+    }
+
+    const kickoff = () => setTimeout(triggerChat, 200);
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', kickoff);
+    } else {
+      kickoff();
+    }
+  })();
+  </script>
 @stack('scripts')
 </body>
 </html>
