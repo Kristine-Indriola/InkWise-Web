@@ -171,11 +171,6 @@ async function compressPreviewImage(dataUrl, options = {}) {
     return dataUrl;
   }
 
-  // Preserve lossless PNG captures as-is to avoid quality loss.
-  if (dataUrl.startsWith('data:image/png')) {
-    return dataUrl;
-  }
-
   const {
     maxEdge = PREVIEW_MAX_EDGE,
     quality = PREVIEW_JPEG_QUALITY,
@@ -187,11 +182,40 @@ async function compressPreviewImage(dataUrl, options = {}) {
     const longestEdge = Math.max(image.width, image.height);
     let scale = longestEdge > maxEdge && maxEdge > 0 ? maxEdge / longestEdge : 1;
     let currentQuality = quality;
-    let output = renderCompressedImage(image, scale, currentQuality) || dataUrl;
+    const minScale = 0.4;
+    const isPng = dataUrl.startsWith('data:image/png');
 
-    while (estimateBase64Bytes(output) > maxBytes && scale > 0.4) {
-      scale = Math.max(0.4, scale * 0.9);
-      currentQuality = Math.max(PREVIEW_MIN_JPEG_QUALITY, currentQuality - 0.04);
+    let output;
+
+    if (isPng) {
+      const pngCanvas = document.createElement('canvas');
+      pngCanvas.width = Math.max(1, Math.round(image.width * scale));
+      pngCanvas.height = Math.max(1, Math.round(image.height * scale));
+      const ctx = pngCanvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(image, 0, 0, pngCanvas.width, pngCanvas.height);
+        output = pngCanvas.toDataURL('image/png');
+      } else {
+        output = dataUrl;
+      }
+
+      if (estimateBase64Bytes(output) <= maxBytes) {
+        return output;
+      }
+
+      output = renderCompressedImage(image, scale, currentQuality) || output;
+    } else {
+      output = renderCompressedImage(image, scale, currentQuality) || dataUrl;
+    }
+
+    while (estimateBase64Bytes(output) > maxBytes && (scale > minScale || currentQuality > PREVIEW_MIN_JPEG_QUALITY)) {
+      if (scale > minScale) {
+        scale = Math.max(minScale, scale * 0.9);
+      }
+      if (currentQuality > PREVIEW_MIN_JPEG_QUALITY) {
+        currentQuality = Math.max(PREVIEW_MIN_JPEG_QUALITY, currentQuality - 0.04);
+      }
+
       const attempt = renderCompressedImage(image, scale, currentQuality);
       if (!attempt) {
         break;
