@@ -59,6 +59,7 @@ class OwnerTransactionsController extends Controller
                 'payment_method' => $row['payment_method'],
                 'date' => $row['display_date'],
                 'amount' => $row['amount_display'],
+                'remaining_balance' => $row['remaining_balance_display'] ?? '—',
                 'status' => $row['status_label'],
             ];
         });
@@ -75,7 +76,7 @@ class OwnerTransactionsController extends Controller
 
         $callback = function () use ($exportRows) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Transaction ID', 'Order ID', 'Customer', 'Payment Method', 'Date', 'Amount', 'Status']);
+            fputcsv($handle, ['Transaction ID', 'Order ID', 'Customer', 'Payment Method', 'Date', 'Amount', 'Remaining Balance', 'Status']);
 
             foreach ($exportRows as $row) {
                 fputcsv($handle, array_values($row));

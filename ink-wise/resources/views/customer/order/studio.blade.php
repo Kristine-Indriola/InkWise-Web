@@ -278,20 +278,6 @@
             <i class="fa-solid fa-brush"></i>
             <span>Background</span>
         </button>
-        <button class="sidenav-btn" type="button" data-nav="template">
-            <i class="fa-regular fa-square"></i>
-            <span>Template</span>
-        </button>
-        <button class="sidenav-btn" type="button" data-nav="color">
-            <i class="fa-solid fa-fill-drip"></i>
-            <span>Template color</span>
-        </button>
-            <!-- Product options removed per request -->
-            <!-- QR-codes removed per request -->
-        <button class="sidenav-btn" type="button" data-nav="tables">
-            <i class="fa-solid fa-table"></i>
-            <span>Tables</span>
-        </button>
     </nav>
     <section class="studio-canvas-area">
         <div class="canvas-workspace">
@@ -362,6 +348,12 @@
                         ></svg>
                     </div>
                 </div>
+                <div id="mini-toolbar" class="mini-toolbar" style="display: none;">
+                    <button class="toolbar-btn" data-action="edit" title="Edit"><i class="fa-solid fa-edit"></i></button>
+                    <button class="toolbar-btn" data-action="delete" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                    <button class="toolbar-btn" data-action="duplicate" title="Duplicate"><i class="fa-solid fa-copy"></i></button>
+                    <button class="toolbar-btn" data-action="move" title="Move"><i class="fa-solid fa-arrows-alt"></i></button>
+                </div>
                 <div class="canvas-measure canvas-measure-horizontal" aria-hidden="true">
                     <span class="measure-cap"></span>
                     <span class="measure-line"></span>
@@ -386,6 +378,27 @@
                     <option value="0.25">25%</option>
                 </select>
             </div>
+        </div>
+        <!-- Floating Toolbar -->
+        <div class="floating-toolbar" id="floating-toolbar">
+            <button class="toolbar-btn" type="button" data-nav="text" title="Text">
+                <span class="toolbar-icon-text">T</span>
+            </button>
+            <button class="toolbar-btn" type="button" data-nav="uploads" title="Uploads">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+            </button>
+            <button class="toolbar-btn" type="button" data-nav="graphics" title="Graphics">
+                <i class="fa-solid fa-images"></i>
+            </button>
+            <button class="toolbar-btn" type="button" data-nav="background" title="Background">
+                <i class="fa-solid fa-brush"></i>
+            </button>
+            <button class="toolbar-btn" type="button" data-nav="tables" title="Tables">
+                <i class="fa-solid fa-table"></i>
+            </button>
+            <button class="toolbar-btn" type="button" data-nav="colors" title="Colors">
+                <i class="fa-solid fa-palette"></i>
+            </button>
         </div>
         <div class="preview-thumbs" role="tablist" aria-label="Card sides">
             <button type="button" class="preview-thumb active" data-card-thumb="front" aria-pressed="true">
@@ -533,26 +546,6 @@
     </div>
 </div>
 
-<div id="template-modal" class="modal" data-section="template" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="template-modal-title">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2 id="template-modal-title">Template</h2>
-            <div class="modal-header-actions">
-                <button type="button" aria-label="Dock panel" disabled aria-disabled="true">
-                    <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
-                </button>
-                <button type="button" class="modal-close" data-modal-close aria-label="Close panel">
-                    <i class="fa-solid fa-xmark modal-close-icon"></i>
-                </button>
-            </div>
-        </div>
-        <p class="modal-helper">Swap between coordinated template styles without starting over.</p>
-        <div class="modal-placeholder">
-            <p>Template variations will be available soon.</p>
-        </div>
-    </div>
-</div>
-
 <div id="background-modal" class="modal" data-section="background" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="background-modal-title">
     <div class="modal-content">
         <div class="modal-header">
@@ -567,32 +560,67 @@
             </div>
         </div>
         <p class="modal-helper">Swap in textures, colors, or patterns to update the canvas background.</p>
-        <div class="modal-placeholder">
-            <p>Background presets will appear here.</p>
+        <div class="color-palette">
+            <button class="color-btn" style="background-color: #ff0000;" data-color="#ff0000" title="Red"></button>
+            <button class="color-btn" style="background-color: #ff7f00;" data-color="#ff7f00" title="Orange"></button>
+            <button class="color-btn" style="background-color: #ffff00;" data-color="#ffff00" title="Yellow"></button>
+            <button class="color-btn" style="background-color: #00ff00;" data-color="#00ff00" title="Green"></button>
+            <button class="color-btn" style="background-color: #0000ff;" data-color="#0000ff" title="Blue"></button>
+            <button class="color-btn" style="background-color: #4b0082;" data-color="#4b0082" title="Indigo"></button>
+            <button class="color-btn" style="background-color: #9400d3;" data-color="#9400d3" title="Violet"></button>
+            <button class="color-btn" style="background-color: #ff69b4;" data-color="#ff69b4" title="Pink"></button>
+            <button class="color-btn" style="background-color: #a52a2a;" data-color="#a52a2a" title="Brown"></button>
+            <button class="color-btn" style="background-color: #808080;" data-color="#808080" title="Gray"></button>
+            <button class="color-btn" style="background-color: #FFFFFF;" data-color="#FFFFFF" title="White"></button>
+            <button class="color-btn" style="background-color: #000000;" data-color="#000000" title="Black"></button>
+            <button class="color-btn" style="background-color: #FFF6E5;" data-color="#FFF6E5" title="Cream"></button>
+            <button class="color-btn" style="background-color: #F5EFE8;" data-color="#F5EFE8" title="Beige"></button>
+            <button class="color-btn" style="background-color: #FFFFF0;" data-color="#FFFFF0" title="Ivory"></button>
+            <button class="color-btn" style="background-color: #D3D3D3;" data-color="#D3D3D3" title="Light Gray"></button>
+            <button class="color-btn" style="background-color: #36454F;" data-color="#36454F" title="Charcoal"></button>
+            <button class="color-btn" style="background-color: #001F3F;" data-color="#001F3F" title="Navy"></button>
+            <button class="color-btn" style="background-color: #008080;" data-color="#008080" title="Teal"></button>
+            <button class="color-btn" style="background-color: #40E0D0;" data-color="#40E0D0" title="Turquoise"></button>
+            <button class="color-btn" style="background-color: #CDEFEA;" data-color="#CDEFEA" title="Mint"></button>
+            <button class="color-btn" style="background-color: #9DC183;" data-color="#9DC183" title="Sage Green"></button>
+            <button class="color-btn" style="background-color: #228B22;" data-color="#228B22" title="Forest Green"></button>
+            <button class="color-btn" style="background-color: #800000;" data-color="#800000" title="Maroon"></button>
+            <button class="color-btn" style="background-color: #800020;" data-color="#800020" title="Burgundy"></button>
+            <button class="color-btn" style="background-color: #D4AF37;" data-color="#D4AF37" title="Gold"></button>
+            <button class="color-btn" style="background-color: #F7E7CE;" data-color="#F7E7CE" title="Champagne"></button>
+            <button class="color-btn" style="background-color: #FFDAB9;" data-color="#FFDAB9" title="Peach"></button>
+            <button class="color-btn" style="background-color: #E6E6FA;" data-color="#E6E6FA" title="Lavender"></button>
+            <button class="color-btn" style="background-color: #87CEEB;" data-color="#87CEEB" title="Sky Blue"></button>
+            <button class="color-btn" style="background-color: #FF6F61;" data-color="#FF6F61" title="Coral"></button>
+            <button class="color-btn" style="background-color: #FA8072;" data-color="#FA8072" title="Salmon"></button>
+            <button class="color-btn" style="background-color: #E63946;" data-color="#E63946" title="Rose"></button>
+            <button class="color-btn" style="background-color: #C97C8A;" data-color="#C97C8A" title="Dusty Rose"></button>
+            <button class="color-btn" style="background-color: #B784A7;" data-color="#B784A7" title="Mauve"></button>
+            <button class="color-btn" style="background-color: #8E4585;" data-color="#8E4585" title="Plum"></button>
+            <button class="color-btn" style="background-color: #614051;" data-color="#614051" title="Eggplant"></button>
+            <button class="color-btn" style="background-color: #CCCCFF;" data-color="#CCCCFF" title="Periwinkle"></button>
+            <button class="color-btn" style="background-color: #B0E0E6;" data-color="#B0E0E6" title="Powder Blue"></button>
+            <button class="color-btn" style="background-color: #4682B4;" data-color="#4682B4" title="Steel Blue"></button>
+            <button class="color-btn" style="background-color: #1560BD;" data-color="#1560BD" title="Denim"></button>
+            <button class="color-btn" style="background-color: #191970;" data-color="#191970" title="Midnight Blue"></button>
+            <button class="color-btn" style="background-color: #808000;" data-color="#808000" title="Olive"></button>
+            <button class="color-btn" style="background-color: #8A9A5B;" data-color="#8A9A5B" title="Moss Green"></button>
+            <button class="color-btn" style="background-color: #9FE2BF;" data-color="#9FE2BF" title="Seafoam"></button>
+            <button class="color-btn" style="background-color: #C2B280;" data-color="#C2B280" title="Sand"></button>
+            <button class="color-btn" style="background-color: #483C32;" data-color="#483C32" title="Taupe"></button>
+            <button class="color-btn" style="background-color: #6F4E37;" data-color="#6F4E37" title="Mocha"></button>
+            <button class="color-btn" style="background-color: #708090;" data-color="#708090" title="Slate Gray"></button>
+            <button class="color-btn" style="background-color: #BEBEBE;" data-color="#BEBEBE" title="Smoke"></button>
+        </div>
+        <div class="custom-color-section">
+            <label for="custom-color-picker">Custom Color:</label>
+            <input type="color" id="custom-color-picker" class="custom-color-input" value="#ffffff">
+            <label for="opacity-slider">Opacity:</label>
+            <input type="range" id="opacity-slider" class="opacity-slider" min="0" max="1" step="0.01" value="1">
+            <span id="opacity-value">100%</span>
         </div>
     </div>
 </div>
-
-<div id="color-modal" class="modal" data-section="color" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="color-modal-title">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2 id="color-modal-title">Template color</h2>
-            <div class="modal-header-actions">
-                <button type="button" aria-label="Dock panel" disabled aria-disabled="true">
-                    <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
-                </button>
-                <button type="button" class="modal-close" data-modal-close aria-label="Close panel">
-                    <i class="fa-solid fa-xmark modal-close-icon"></i>
-                </button>
-            </div>
-        </div>
-        <p class="modal-helper">Apply brand colors and foil finishes to your design.</p>
-        <div class="modal-placeholder">
-            <p>Color themes are on the way.</p>
-        </div>
-    </div>
-</div>
-
 <div id="qr-modal" class="modal" data-section="qr" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="qr-modal-title">
     <div class="modal-content">
         <div class="modal-header">
@@ -627,8 +655,57 @@
             </div>
         </div>
         <p class="modal-helper">Manage seating charts, table numbers, and place cards.</p>
-        <div class="modal-placeholder">
-            <p>Table planning tools will show here soon.</p>
+        <div class="table-controls">
+            <div class="control-group">
+                <label for="columns-count">Columns:</label>
+                <button class="control-btn minus" type="button" data-action="decrease" data-target="columns" aria-label="Decrease columns">-</button>
+                <span id="columns-count" aria-live="polite">3</span>
+                <button class="control-btn plus" type="button" data-action="increase" data-target="columns" aria-label="Increase columns">+</button>
+            </div>
+            <div class="control-group">
+                <label for="rows-count">Rows:</label>
+                <button class="control-btn minus" type="button" data-action="decrease" data-target="rows" aria-label="Decrease rows">-</button>
+                <span id="rows-count" aria-live="polite">3</span>
+                <button class="control-btn plus" type="button" data-action="increase" data-target="rows" aria-label="Increase rows">+</button>
+            </div>
+            <button class="add-table-btn" type="button" id="add-table-btn">Add Table</button>
+        </div>
+    </div>
+</div>
+
+<div id="colors-modal" class="modal" data-section="colors" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="colors-modal-title">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="colors-modal-title">Color Palette</h2>
+            <div class="modal-header-actions">
+                <button type="button" aria-label="Dock panel" disabled aria-disabled="true">
+                    <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
+                </button>
+                <button type="button" class="modal-close" data-modal-close aria-label="Close panel">
+                    <i class="fa-solid fa-xmark modal-close-icon"></i>
+                </button>
+            </div>
+        </div>
+        <p class="modal-helper">Choose colors for your design elements.</p>
+        <div class="color-palette">
+            <div class="color-grid">
+                <button class="color-swatch" style="background-color: #000000;" data-color="#000000" title="Black"></button>
+                <button class="color-swatch" style="background-color: #ffffff;" data-color="#ffffff" title="White"></button>
+                <button class="color-swatch" style="background-color: #ff0000;" data-color="#ff0000" title="Red"></button>
+                <button class="color-swatch" style="background-color: #00ff00;" data-color="#00ff00" title="Green"></button>
+                <button class="color-swatch" style="background-color: #0000ff;" data-color="#0000ff" title="Blue"></button>
+                <button class="color-swatch" style="background-color: #ffff00;" data-color="#ffff00" title="Yellow"></button>
+                <button class="color-swatch" style="background-color: #ff00ff;" data-color="#ff00ff" title="Magenta"></button>
+                <button class="color-swatch" style="background-color: #00ffff;" data-color="#00ffff" title="Cyan"></button>
+                <button class="color-swatch" style="background-color: #800080;" data-color="#800080" title="Purple"></button>
+                <button class="color-swatch" style="background-color: #ffa500;" data-color="#ffa500" title="Orange"></button>
+                <button class="color-swatch" style="background-color: #a52a2a;" data-color="#a52a2a" title="Brown"></button>
+                <button class="color-swatch" style="background-color: #808080;" data-color="#808080" title="Gray"></button>
+            </div>
+            <div class="color-picker-section">
+                <label for="custom-color-picker">Custom Color:</label>
+                <input type="color" id="custom-color-picker" value="#000000">
+            </div>
         </div>
     </div>
 </div>
@@ -642,6 +719,130 @@
             'review' => route('order.review'),
         ],
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) !!}
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const columnsCount = document.getElementById('columns-count');
+    const rowsCount = document.getElementById('rows-count');
+    const addTableBtn = document.getElementById('add-table-btn');
+    const miniToolbar = document.getElementById('mini-toolbar');
+    const previewSvg = document.getElementById('preview-svg');
+
+    let columns = 3;
+    let rows = 3;
+    const minValue = 1;
+    const maxValue = 10;
+
+    function updateDisplay() {
+        columnsCount.textContent = columns;
+        rowsCount.textContent = rows;
+    }
+
+    function updateButtons() {
+        document.querySelectorAll('.control-btn').forEach(btn => {
+            const target = btn.dataset.target;
+            const action = btn.dataset.action;
+            const currentValue = target === 'columns' ? columns : rows;
+            
+            if (action === 'increase' && currentValue >= maxValue) {
+                btn.disabled = true;
+            } else if (action === 'decrease' && currentValue <= minValue) {
+                btn.disabled = true;
+            } else {
+                btn.disabled = false;
+            }
+        });
+    }
+
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('control-btn')) {
+            const target = e.target.dataset.target;
+            const action = e.target.dataset.action;
+
+            if (target === 'columns') {
+                if (action === 'increase' && columns < maxValue) columns++;
+                if (action === 'decrease' && columns > minValue) columns--;
+            } else if (target === 'rows') {
+                if (action === 'increase' && rows < maxValue) rows++;
+                if (action === 'decrease' && rows > minValue) rows--;
+            }
+
+            updateDisplay();
+            updateButtons();
+        }
+
+        if (e.target.id === 'add-table-btn') {
+            // For now, show an alert with table details
+            // In a full implementation, this would add the table to the canvas
+            alert(`Adding table with ${columns} columns and ${rows} rows to the canvas. (Note: Canvas integration requires React app updates)`);
+            
+            // Reset to default
+            columns = 3;
+            rows = 3;
+            updateDisplay();
+            updateButtons();
+        }
+    });
+
+    // Mini toolbar functionality
+    if (previewSvg) {
+        previewSvg.addEventListener('click', function(e) {
+            // Check if clicked on text or image element
+            const target = e.target;
+            if (target.tagName === 'text' || target.tagName === 'image' || target.closest('text') || target.closest('image')) {
+                // Position the toolbar near the click
+                const rect = previewSvg.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                miniToolbar.style.left = (x + 10) + 'px';
+                miniToolbar.style.top = (y + 10) + 'px';
+                miniToolbar.style.display = 'flex';
+            } else {
+                miniToolbar.style.display = 'none';
+            }
+        });
+    }
+
+    // Hide toolbar when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!previewSvg.contains(e.target) && !miniToolbar.contains(e.target)) {
+            miniToolbar.style.display = 'none';
+        }
+    });
+
+    // Floating toolbar functionality
+    const floatingToolbar = document.getElementById('floating-toolbar');
+    if (floatingToolbar) {
+        floatingToolbar.addEventListener('click', function(e) {
+            if (e.target.classList.contains('toolbar-btn') || e.target.closest('.toolbar-btn')) {
+                const btn = e.target.classList.contains('toolbar-btn') ? e.target : e.target.closest('.toolbar-btn');
+                const nav = btn.dataset.nav;
+                const modal = document.getElementById(nav + '-modal');
+                if (modal) {
+                    modal.style.display = 'flex';
+                    modal.setAttribute('aria-hidden', 'false');
+                }
+            }
+        });
+    }
+
+    // Modal close functionality
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('modal-close') || e.target.classList.contains('modal-close-icon') || e.target.hasAttribute('data-modal-close')) {
+            const modal = e.target.closest('.modal');
+            if (modal) {
+                modal.style.display = 'none';
+                modal.setAttribute('aria-hidden', 'true');
+            }
+        }
+    });
+
+    // Initial setup
+    updateDisplay();
+    updateButtons();
+});
 </script>
 
 </body>

@@ -237,6 +237,10 @@
     'completed' => 'Completed',
     'cancelled' => 'Cancelled',
   ];
+  $isPaginator = $orders instanceof \Illuminate\Contracts\Pagination\Paginator;
+  $ordersCollection = $isPaginator
+    ? collect($orders->items())
+    : ($orders instanceof \Illuminate\Support\Collection ? $orders : collect($orders));
 @endphp
 <main class="admin-page-shell">
   <header class="page-header">
@@ -251,7 +255,7 @@
 
   <section class="card">
     <div class="card-body">
-      @if($orders->isEmpty())
+      @if($ordersCollection->isEmpty())
         <p>No orders found.</p>
       @else
         <div class="table-controls" style="display:flex; gap:12px; align-items:center; justify-content:space-between; margin-bottom:10px;">
@@ -287,7 +291,7 @@
               </tr>
             </thead>
             <tbody>
-              @foreach($orders as $order)
+              @foreach($ordersCollection as $order)
                 @php
                   $rowStatus = strtolower($order->status ?? 'processing');
                 @endphp
@@ -333,9 +337,6 @@
           </table>
         </div>
 
-        <div class="table-footer" style="display:flex; align-items:center; justify-content:center; margin-top:16px;">
-          <div class="pagination-links">{{ $orders->links() }}</div>
-        </div>
       @endif
     </div>
   </section>
@@ -346,17 +347,6 @@
 <script src="{{ asset('js/admin/ordersummary.js') }}"></script>
 <script src="{{ asset('js/admin/orders-table.js') }}"></script>
 <script>
-  (function(){
-    // Avoid double-init
-    if (window.__orders_per_init) return; window.__orders_per_init = true;
-    const allowed = [10,20,25,50,100];
-    const per = document.getElementById('perPageInput');
-    if (!per) return;
-    function snap(n){ n = Number(n) || 20; if (allowed.includes(n)) return n; let closest = allowed[0]; let minDiff = Math.abs(n - closest); allowed.forEach(a => { const d = Math.abs(n - a); if (d < minDiff) { minDiff = d; closest = a; }}); return closest; }
-    per.addEventListener('change', function(){ const v = snap(this.value); this.value = v; const url = new URL(window.location.href); url.searchParams.set('per_page', v); url.searchParams.delete('page'); window.location.href = url.toString(); });
-    per.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); this.dispatchEvent(new Event('change')); } });
-  })();
-
   // Make table rows clickable
   (function(){
     const tableBody = document.querySelector('.admin-orders-table tbody');

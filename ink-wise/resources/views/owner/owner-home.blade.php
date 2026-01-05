@@ -381,12 +381,12 @@
                 <path d="M15 7h4v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
             </span>
-            <span class="summary-card-label">Revenue Growth</span>
+            <span class="summary-card-label">Revenue</span>
           </div>
           <span class="summary-card-chip">Finance</span>
         </div>
-        <span class="summary-card-value" style="color:#0f172a;">{{ $revenueGrowth ?? '+12.4%' }}</span>
-        <span class="summary-card-meta">vs last period</span>
+        <span class="summary-card-value" style="color:#0f172a;">PHP {{ number_format($totalRevenue ?? 0, 2) }}</span>
+        <span class="summary-card-meta">Completed orders total</span>
       </div>
     </section>
 
