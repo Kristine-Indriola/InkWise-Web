@@ -301,6 +301,119 @@
     margin-top: 16px;
   }
 
+  .pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 0;
+    flex-wrap: wrap;
+  }
+
+  .pagination-summary {
+    font-size: 0.88rem;
+    color: #64748b;
+  }
+
+  .pagination-summary__range,
+  .pagination-summary__total {
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  .pagination-list {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .pagination-item {
+    display: flex;
+  }
+
+  .pagination-item--disabled .pagination-link {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .pagination-item--ellipsis .pagination-link {
+    cursor: default;
+  }
+
+  .pagination-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 185, 255, 0.4);
+    background: #ffffff;
+    color: #2563eb;
+    font-size: 0.88rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .pagination-link:hover {
+    background: rgba(59, 130, 246, 0.1);
+    color: #1d4ed8;
+    border-color: rgba(59, 130, 246, 0.6);
+    box-shadow: 0 10px 24px rgba(59, 130, 246, 0.15);
+  }
+
+  .pagination-link--active {
+    background: #2563eb;
+    color: #ffffff;
+    border-color: #2563eb;
+    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.3);
+    cursor: default;
+  }
+
+  .pagination-link--active:hover {
+    background: #2563eb;
+    color: #ffffff;
+    border-color: #2563eb;
+    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.3);
+  }
+
+  .pagination-icon {
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  .dark-mode .pagination-summary {
+    color: #94a3b8;
+  }
+
+  .dark-mode .pagination-summary__range,
+  .dark-mode .pagination-summary__total {
+    color: #f9fafb;
+  }
+
+  .dark-mode .pagination-link {
+    background: rgba(30, 41, 59, 0.7);
+    color: #93c5fd;
+    border-color: rgba(148, 185, 255, 0.35);
+  }
+
+  .dark-mode .pagination-link:hover {
+    background: rgba(59, 130, 246, 0.2);
+    color: #c7d2fe;
+    border-color: rgba(148, 185, 255, 0.55);
+    box-shadow: 0 10px 24px rgba(14, 165, 233, 0.25);
+  }
+
+  .dark-mode .pagination-link--active {
+    background: #1d4ed8;
+    color: #f9fafb;
+    border-color: #1d4ed8;
+    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.3);
+  }
+
   @media (max-width: 900px) {
     .owner-dashboard-shell {
       padding-right: 0;
@@ -314,6 +427,7 @@
     .materials-toolbar__search form { width: 100%; flex-direction: column; align-items: stretch; }
     .materials-toolbar__search .search-input { width: 100%; }
     .materials-toolbar__actions { width: 100%; justify-content: flex-start; }
+    .pagination { flex-direction: column; align-items: flex-start; }
   }
 
   /* Dark mode */
@@ -486,6 +600,7 @@
             <th>Payment Method</th>
             <th>Date</th>
             <th>Amount (PHP)</th>
+            <th>Remaining Balance</th>
             <th>Status</th>
           </tr>
         </thead>
@@ -498,6 +613,7 @@
               <td>{{ $transaction['payment_method'] }}</td>
               <td>{{ $transaction['display_date'] }}</td>
               <td>{{ $transaction['amount_display'] }}</td>
+              <td>{{ $transaction['remaining_balance_display'] ?? '—' }}</td>
               <td>
                 @if(!empty($transaction['status_label']) && $transaction['status_label'] !== '—')
                   <span class="badge {{ $transaction['status_class'] ?? 'stock-low' }}">{{ $transaction['status_label'] }}</span>
@@ -508,7 +624,7 @@
             </tr>
           @empty
             <tr>
-              <td colspan="7" class="text-center" style="padding:18px; color:#64748b;">No transactions found.</td>
+              <td colspan="8" class="text-center" style="padding:18px; color:#64748b;">No transactions found.</td>
             </tr>
           @endforelse
         </tbody>
@@ -517,7 +633,7 @@
 
     @if(isset($transactions) && $transactions instanceof \Illuminate\Pagination\AbstractPaginator)
       <div class="table-pagination">
-        {{ $transactions->links() }}
+        {{ $transactions->onEachSide(1)->links('owner.partials.pagination') }}
       </div>
     @endif
   </div>

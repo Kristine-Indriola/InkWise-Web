@@ -117,21 +117,13 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
 
     // Admin orders list (table) - simple closure for listing orders in the admin UI
     Route::get('/orders', function () {
-        $allowed = [10, 20, 25, 50, 100];
-        $default = 20;
-        $perPage = (int) request()->query('per_page', $default);
-        if (!in_array($perPage, $allowed, true)) {
-            $perPage = $default;
-        }
-
         $orders = \App\Models\Order::query()
             ->select(['id', 'order_number', 'customer_id', 'total_amount', 'order_date', 'status', 'payment_status'])
             ->where('archived', false)
             ->with(['customer', 'payments'])
             ->latest('order_date')
             ->latest()
-            ->paginate($perPage)
-            ->withQueryString();
+            ->get();
 
         // Render the table view inside the ordersummary folder
         return view('admin.ordersummary.tables', compact('orders'));
@@ -139,13 +131,6 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
 
     // Archived orders
     Route::get('/orders/archived', function () {
-        $allowed = [10, 20, 25, 50, 100];
-        $default = 20;
-        $perPage = (int) request()->query('per_page', $default);
-        if (!in_array($perPage, $allowed, true)) {
-            $perPage = $default;
-        }
-
         $orders = \App\Models\Order::query()
             ->select(['id', 'order_number', 'customer_id', 'total_amount', 'order_date', 'status', 'payment_status'])
             ->where('archived', true)
@@ -154,8 +139,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
             }])
             ->latest('order_date')
             ->latest()
-            ->paginate($perPage)
-            ->withQueryString();
+            ->get();
 
         // Render the archived table view
         return view('admin.ordersummary.archived', compact('orders'));

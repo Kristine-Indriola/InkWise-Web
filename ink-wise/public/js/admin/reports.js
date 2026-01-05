@@ -140,12 +140,16 @@
     const summaryNodes = {
       orders: shell.querySelector('[data-metric="orders-count"]'),
       revenue: shell.querySelector('[data-metric="revenue-total"]'),
+      pending: shell.querySelector('[data-metric="pending-revenue"]'),
+      profit: shell.querySelector('[data-metric="profit-total"]'),
       average: shell.querySelector('[data-metric="average-order"]')
     };
 
     const applySummary = (summary = {}) => {
       if (summaryNodes.orders) summaryNodes.orders.textContent = numberFormat.format(summary.orders || 0);
       if (summaryNodes.revenue) summaryNodes.revenue.textContent = moneyFormat.format(summary.revenue || 0);
+      if (summaryNodes.pending) summaryNodes.pending.textContent = moneyFormat.format(summary.pendingRevenue || 0);
+      if (summaryNodes.profit) summaryNodes.profit.textContent = moneyFormat.format(summary.profit || 0);
       if (summaryNodes.average) summaryNodes.average.textContent = moneyFormat.format(summary.averageOrder || 0);
     };
 
