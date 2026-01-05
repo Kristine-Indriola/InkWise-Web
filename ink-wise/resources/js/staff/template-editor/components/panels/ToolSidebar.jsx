@@ -23,29 +23,8 @@ function resolveInsets(zone) {
   const fallback = toNumber(zone.margin ?? zone.all ?? 0);
 
   return {
-    thumb: createPathThumb('M12 16 L44 16 L56 32 L44 48 L12 48 Z'),
-    fill: SHAPE_DEFAULT_FILL,
-    stroke: SHAPE_DEFAULT_STROKE,
-    metadata: {
-      maskVariant: 'tag-shape',
-      dropShadow: SHAPE_DEFAULT_SHADOW,
-      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
-    },
-    tags: ['gift', 'tag'],
-    stroke: SHAPE_DEFAULT_STROKE,
-    metadata: {
-      maskVariant: 'leaf',
-      dropShadow: SHAPE_DEFAULT_SHADOW,
-      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
-    },
-    tags: ['leaf', 'organic'],
-    stroke: SHAPE_DEFAULT_STROKE,
-    metadata: {
-      maskVariant: 'butterfly',
-      dropShadow: SHAPE_DEFAULT_SHADOW,
-      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
-    },
-    tags: ['butterfly', 'organic'],
+    top: toNumber(zone.top ?? fallback),
+    right: toNumber(zone.right ?? fallback),
     bottom: toNumber(zone.bottom ?? fallback),
     left: toNumber(zone.left ?? fallback),
   };

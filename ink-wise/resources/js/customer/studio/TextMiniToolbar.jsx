@@ -412,7 +412,7 @@ export function TextMiniToolbar({
   };
 
   return (
-    <div className="text-mini-toolbar" role="toolbar" aria-label={isImageSelection ? 'Image editing toolbar' : 'Text editing toolbar'}>
+    <div className={`text-mini-toolbar ${hasSelection ? 'floating' : ''}`} role="toolbar" aria-label={isImageSelection ? 'Image editing toolbar' : 'Text editing toolbar'}>
       <div className="toolbar-group toolbar-group--font">
         {isImageSelection ? (
           <>
