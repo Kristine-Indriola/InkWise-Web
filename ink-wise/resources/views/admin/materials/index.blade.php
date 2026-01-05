@@ -341,7 +341,7 @@
                         <td>
                             <span class="badge {{ $stock <= 0 ? 'stock-critical' : ($stock > 0 && $stock <= $reorder ? 'stock-low' : 'stock-ok') }}">
                                 {{ $stock }}
-                                @if($material->material_type === 'ink')
+                                @if(strtolower($material->material_type ?? '') === 'ink')
                                     ml
                                 @endif
                             </span>

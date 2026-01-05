@@ -685,18 +685,14 @@
 		: 'All Time';
 
 	$materialCollection = $materials instanceof \Illuminate\Support\Collection ? $materials : collect($materials);
+	$materialCollection = $materialCollection->filter(function ($material) {
+		return strtolower($material->material_type ?? '') !== 'ink';
+	})->values();
 	$inkCollection = $inks instanceof \Illuminate\Support\Collection ? $inks : collect($inks ?? []);
-	$combinedInventory = $materialCollection->concat($inkCollection)->values();
-
-	$specialMaterialSelections = $specialMaterialSelections instanceof \Illuminate\Support\Collection
-		? $specialMaterialSelections
-		: collect($specialMaterialSelections ?? []);
-	$specialMaterialStats = array_merge([
-		'total' => 0,
-		'pre_order' => 0,
-		'out_of_stock' => 0,
-		'total_quantity' => 0,
-	], $specialMaterialStats ?? []);
+	$inkCollection = $inkCollection->filter(function ($ink) {
+		return strtolower($ink->material_type ?? '') === 'ink';
+	})->values();
+	$combinedInventory = $materialCollection->concat($inkCollection)->unique('material_id')->values();
 
 	$evaluateMaterial = function ($material) {
 		$isInk = $material instanceof \App\Models\Ink;
@@ -989,30 +985,6 @@
 			<strong data-metric="out-stock">{{ number_format($inventoryStats['outStock'] ?? ($reportPayload['statusBreakdown']['out-of-stock'] ?? 0)) }}</strong>
 			<p>Items with zero available quantity requiring immediate action</p>
 		</article>
-		<article class="reports-summary-card" aria-labelledby="preorder-alert-heading">
-			<header>
-				<span class="summary-label" id="preorder-alert-heading">Pre-order Requests</span>
-				<i class="fi fi-rr-inbox-out" aria-hidden="true"></i>
-			</header>
-			<strong>{{ number_format($specialMaterialStats['pre_order'] ?? 0) }}</strong>
-			<p>Customer selections awaiting incoming stock</p>
-		</article>
-		<article class="reports-summary-card" aria-labelledby="outstock-alert-heading">
-			<header>
-				<span class="summary-label" id="outstock-alert-heading">Out-of-Stock Requests</span>
-				<i class="fi fi-rr-shopping-cart-add" aria-hidden="true"></i>
-			</header>
-			<strong>{{ number_format($specialMaterialStats['out_of_stock'] ?? 0) }}</strong>
-			<p>Orders attempting to use unavailable materials</p>
-		</article>
-		<article class="reports-summary-card" aria-labelledby="flagged-qty-heading">
-			<header>
-				<span class="summary-label" id="flagged-qty-heading">Flagged Units</span>
-				<i class="fi fi-rr-layers" aria-hidden="true"></i>
-			</header>
-			<strong>{{ number_format($specialMaterialStats['total_quantity'] ?? 0) }}</strong>
-			<p>Total quantity tied to pre-order or out-of-stock requests</p>
-		</article>
 	</section>
 
 	<!-- Value Summary Section -->
@@ -1041,68 +1013,6 @@
 			<strong>{{ $inventoryTurnover }}%</strong>
 			<p>Items moved during reporting period</p>
 		</article>
-	</section>
-
-	<section class="reports-panel" aria-labelledby="special-materials-heading">
-		<header class="reports-panel__header">
-			<div class="panel-header-content">
-				<h2 id="special-materials-heading">Customer Pre-order &amp; Out-of-Stock Selections</h2>
-				<p>Track customer orders requiring unavailable or pre-order materials</p>
-			</div>
-			<div class="reports-toolbar">
-				<span class="status-pill">Total {{ number_format($specialMaterialStats['total'] ?? 0) }}</span>
-			</div>
-		</header>
-		@if($specialMaterialSelections->isEmpty())
-			<div class="reports-callout-list" aria-live="polite">
-				<p class="muted">No customer selections currently require pre-ordered or out-of-stock materials.</p>
-			</div>
-		@else
-			<div class="table-wrapper">
-				<table class="reports-table" id="specialMaterialsTable">
-					<thead>
-						<tr>
-							<th scope="col">Order #</th>
-							<th scope="col">Customer</th>
-							<th scope="col">Product</th>
-							<th scope="col">Paper Stock</th>
-							<th scope="col" class="text-center">Quantity</th>
-							<th scope="col">Status</th>
-							<th scope="col">Requested</th>
-							<th scope="col">Needed Date</th>
-							<th scope="col">Notes</th>
-						</tr>
-					</thead>
-					<tbody>
-					@foreach($specialMaterialSelections as $selection)
-						<tr data-flag-status="{{ $selection['status_key'] }}">
-							<td>{{ $selection['order_number'] }}</td>
-							<td>
-								<span>{{ $selection['customer_name'] }}</span>
-								@if(!empty($selection['customer_email']))
-									<br><small class="muted">{{ $selection['customer_email'] }}</small>
-								@endif
-							</td>
-							<td>{{ $selection['product_name'] }}</td>
-							<td>
-								<strong>{{ $selection['paper_stock_name'] }}</strong>
-								@if(!empty($selection['paper_stock_status_label']))
-									<br><small class="muted">{{ $selection['paper_stock_status_label'] }}</small>
-								@endif
-							</td>
-							<td class="text-center">{{ number_format($selection['quantity']) }}</td>
-							<td>
-								<span class="status-badge status-badge--{{ $selection['status_key'] === 'pre_order' ? 'warning' : 'danger' }}">{{ $selection['status_label'] }}</span>
-							</td>
-							<td>{{ $selection['requested_at'] ?? '—' }}</td>
-							<td>{{ $selection['needed_date'] ?? '—' }}</td>
-							<td>{{ $selection['notes'] ?? '—' }}</td>
-						</tr>
-					@endforeach
-					</tbody>
-				</table>
-			</div>
-		@endif
 	</section>
 
 	<!-- Analysis & Insights Section -->
