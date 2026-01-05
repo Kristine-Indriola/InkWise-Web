@@ -9,9 +9,7 @@ class Ink extends Model
 {
     use HasFactory;
 
-    protected $table = 'materials';
-    protected $primaryKey = 'material_id';
-    public $timestamps = false;
+    protected $table = 'inks';
 
     protected $fillable = [
         'material_name',
@@ -30,7 +28,7 @@ class Ink extends Model
 
     public function inventory()
     {
-        return $this->hasOne(Inventory::class, 'material_id', 'material_id');
+        return $this->hasOne(Inventory::class, 'ink_id');
     }
 
     public function stockMovements()

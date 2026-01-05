@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\CustomerFinalized;
 use App\Models\Material;
 use App\Models\Ink;
 use App\Models\Order;
@@ -12,8 +11,7 @@ use Carbon\CarbonInterval;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Schema;
 
 class ReportsDashboardController extends Controller
 {
@@ -177,6 +175,22 @@ class ReportsDashboardController extends Controller
     private function buildReportContext(?Carbon $startDate = null, ?Carbon $endDate = null, string $paymentStatusFilter = 'all'): array
     {
         $materials = Material::with('inventory')
+            ->where(function ($query) {
+                $query->whereNull('material_type')
+                      ->orWhereRaw("LOWER(TRIM(COALESCE(material_type, ''))) != 'ink'");
+            })
+            ->when(Schema::hasColumn('materials', 'ink_color'), function ($query) {
+                $query->where(function ($q) {
+                    $q->whereNull('ink_color')
+                      ->orWhereRaw("TRIM(COALESCE(ink_color, '')) = ''");
+                });
+            })
+            ->when(Schema::hasColumn('materials', 'cost_per_ml'), function ($query) {
+                $query->whereNull('cost_per_ml');
+            })
+            ->when(Schema::hasColumn('materials', 'stock_qty_ml'), function ($query) {
+                $query->whereNull('stock_qty_ml');
+            })
             ->with(['stockMovements' => function ($query) use ($startDate, $endDate) {
                 if ($startDate && $endDate) {
                     $query->whereBetween('created_at', [$startDate, $endDate]);
@@ -203,13 +217,19 @@ class ReportsDashboardController extends Controller
             ->orderBy('material_name')
             ->get();
 
-        $allInventoryItems = $materials->concat($inks);
+        $materials->each(function ($material) {
+            $material->inventory_key = 'material-' . $material->material_id;
+        });
+
+        $inks->each(function ($ink) {
+            $ink->inventory_key = 'ink-' . $ink->id;
+        });
+
+        $allInventoryItems = $materials->concat($inks)->unique('inventory_key')->values();
         $materialLabels = $allInventoryItems->pluck('material_name');
         $materialStockLevels = $allInventoryItems->map(fn ($item) => $this->resolveStockLevel($item));
         $materialReorderLevels = $allInventoryItems->map(fn ($item) => $this->resolveReorderLevel($item));
         $inventoryStats = $this->buildInventorySummary($allInventoryItems);
-
-        [$specialMaterialStats, $specialMaterialSelections] = $this->buildSpecialMaterialReport($startDate, $endDate);
 
         $salesQuery = Order::query()
             ->with([
@@ -344,9 +364,7 @@ class ReportsDashboardController extends Controller
             'defaultSalesInterval',
             'salesSummaryTotals',
             'salesSummaryLabel',
-            'paymentSummary',
-            'specialMaterialStats',
-            'specialMaterialSelections'
+            'paymentSummary'
         );
     }
 
@@ -395,7 +413,20 @@ class ReportsDashboardController extends Controller
 
     private function resolveStockLevel($item): int
     {
-        return (int) (optional($item->inventory)->stock_level ?? $item->stock_qty ?? 0);
+        $stock = optional($item->inventory)->stock_level;
+        if ($stock !== null) {
+            return (int) $stock;
+        }
+
+        if (isset($item->stock_qty) && $item->stock_qty !== null) {
+            return (int) $item->stock_qty;
+        }
+
+        if (isset($item->stock_qty_ml) && $item->stock_qty_ml !== null) {
+            return (int) $item->stock_qty_ml;
+        }
+
+        return 0;
     }
 
     private function resolveReorderLevel($item): int
@@ -434,363 +465,6 @@ class ReportsDashboardController extends Controller
             'totalStock' => $items->sum(fn ($item) => $this->resolveStockLevel($item)),
             'totalValue' => $totalValue,
         ];
-    }
-
-    private function buildSpecialMaterialReport(?Carbon $startDate, ?Carbon $endDate): array
-    {
-        $query = CustomerFinalized::query()
-            ->with([
-                'customer:customer_id,first_name,last_name,email',
-                'product:id,name',
-                'template:id,name',
-                'order' => function ($relation) {
-                    $relation->select([
-                        'id',
-                        'order_number',
-                        'customer_id',
-                        'customer_order_id',
-                        'date_needed',
-                        'status',
-                        'order_date',
-                        'created_at',
-                        'total_amount',
-                    ])->with([
-                        'customer:customer_id,first_name,last_name,email',
-                        'customerOrder:id,customer_id,name,email,phone',
-                        'customerOrder.customer:customer_id,first_name,last_name,email',
-                    ]);
-                },
-            ])
-            ->orderByDesc('created_at');
-
-        if ($startDate) {
-            $query->where('created_at', '>=', $startDate->copy()->startOfDay());
-        }
-
-        if ($endDate) {
-            $query->where('created_at', '<=', $endDate->copy()->endOfDay());
-        }
-
-        $records = $query->get();
-
-        $mapped = $records
-            ->map(function (CustomerFinalized $record) {
-                $paperStock = $this->normalizeToArray($record->paper_stock);
-                $statusBundle = $this->resolveSpecialMaterialStatus($record, $paperStock);
-
-                if (!$statusBundle) {
-                    return null;
-                }
-
-                [$statusKey, $statusLabel] = $statusBundle;
-
-                $order = $record->order;
-                $primaryCustomer = $record->customer
-                    ?? $order?->customer
-                    ?? $order?->customerOrder?->customer;
-
-                $customerName = $primaryCustomer
-                    ? $this->composeName(
-                        $primaryCustomer->first_name ?? null,
-                        $primaryCustomer->last_name ?? null,
-                        $primaryCustomer->name ?? null
-                    )
-                    : null;
-
-                if (!$customerName && $order && $order->customerOrder) {
-                    $fallbackCustomer = $order->customerOrder->customer ?? null;
-                    $customerName = $this->composeName(
-                        $fallbackCustomer?->first_name ?? null,
-                        $fallbackCustomer?->last_name ?? null,
-                        $order->customerOrder->name ?? null
-                    );
-                }
-
-                $customerEmail = $primaryCustomer?->email
-                    ?? $order?->customerOrder?->email
-                    ?? null;
-
-                $paperStatusNormalized = $this->normalizeStatusString($paperStock['status'] ?? null);
-                $paperStatusLabel = $paperStatusNormalized
-                    ? Str::headline(str_replace('_', ' ', $paperStatusNormalized))
-                    : null;
-
-                $paperStockName = $paperStock['name']
-                    ?? $paperStock['label']
-                    ?? $paperStock['material']
-                    ?? $paperStock['paper']
-                    ?? null;
-
-                $notes = $this->resolveNotes([
-                    $paperStock['note'] ?? null,
-                    $paperStock['notes'] ?? null,
-                    $paperStock['message'] ?? null,
-                    Arr::get($record->design, 'metadata.note'),
-                    Arr::get($record->design, 'metadata.notes'),
-                    Arr::get($record->design, 'notes'),
-                ]);
-
-                return [
-                    'id' => $record->id,
-                    'status_key' => $statusKey,
-                    'status_label' => $statusLabel,
-                    'order_number' => $order?->order_number
-                        ?? ($record->order_id ? '#' . $record->order_id : '—'),
-                    'customer_name' => $customerName ?: '—',
-                    'customer_email' => $customerEmail,
-                    'product_name' => $record->product?->name
-                        ?? $record->template?->name
-                        ?? 'Custom Item',
-                    'paper_stock_name' => $paperStockName ?: 'Unspecified',
-                    'paper_stock_status_label' => $paperStatusLabel,
-                    'quantity' => (int) ($record->quantity ?? 0),
-                    'requested_at' => $this->formatReportDate($record->created_at),
-                    'needed_date' => $this->formatReportDate($order?->date_needed ?? $record->estimated_date),
-                    'notes' => $notes ?: null,
-                    'created_at' => $record->created_at instanceof Carbon
-                        ? $record->created_at->copy()
-                        : ($record->created_at ? Carbon::parse($record->created_at) : Carbon::now()),
-                ];
-            })
-            ->filter();
-
-        $sorted = $mapped->sort(function (array $a, array $b) {
-            $priorityA = $a['status_key'] === 'pre_order' ? 0 : 1;
-            $priorityB = $b['status_key'] === 'pre_order' ? 0 : 1;
-
-            if ($priorityA !== $priorityB) {
-                return $priorityA <=> $priorityB;
-            }
-
-            $timestampA = $a['created_at'] instanceof Carbon ? $a['created_at']->timestamp : 0;
-            $timestampB = $b['created_at'] instanceof Carbon ? $b['created_at']->timestamp : 0;
-
-            return $timestampB <=> $timestampA;
-        })->values();
-
-        $selections = $sorted->map(function (array $selection) {
-            $selection['notes'] = $selection['notes'] ?? '—';
-
-            return Arr::except($selection, ['created_at']);
-        });
-
-        $stats = [
-            'total' => $selections->count(),
-            'pre_order' => $selections->where('status_key', 'pre_order')->count(),
-            'out_of_stock' => $selections->where('status_key', 'out_of_stock')->count(),
-            'total_quantity' => (int) $selections->sum('quantity'),
-        ];
-
-        return [$stats, $selections];
-    }
-
-    private function normalizeToArray($value): array
-    {
-        if (is_array($value)) {
-            return $value;
-        }
-
-        if ($value instanceof Collection) {
-            return $value->toArray();
-        }
-
-        if (is_string($value)) {
-            $decoded = json_decode($value, true);
-
-            return is_array($decoded) ? $decoded : [];
-        }
-
-        if (is_object($value) && method_exists($value, 'toArray')) {
-            return (array) $value->toArray();
-        }
-
-        if (is_object($value)) {
-            return (array) $value;
-        }
-
-        return [];
-    }
-
-    private function resolveSpecialMaterialStatus(CustomerFinalized $record, array $paperStock): ?array
-    {
-        $candidates = collect([
-            $record->pre_order_status ?? null,
-            Arr::get($record->design, 'metadata.pre_order_status'),
-            Arr::get($paperStock, 'status'),
-            Arr::get($paperStock, 'state'),
-            Arr::get($paperStock, 'availability'),
-            Arr::get($paperStock, 'availability_status'),
-        ])->filter()->map(fn ($value) => $this->normalizeStatusString($value));
-
-        $isPreOrder = $candidates->contains(function ($value) {
-            return $value && in_array($value, [
-                'pre_order',
-                'preorder',
-                'pre-order',
-                'pre_ordered',
-                'preorder_requested',
-                'backorder',
-                'back_order',
-            ], true);
-        }) || $this->isTruthyFlag(Arr::get($paperStock, 'preorder'))
-            || $this->isTruthyFlag(Arr::get($paperStock, 'is_preorder'))
-            || $this->isTruthyFlag(Arr::get($paperStock, 'requires_preorder'))
-            || $this->isTruthyFlag(Arr::get($paperStock, 'pre_order'));
-
-        $isOutOfStock = $candidates->contains(function ($value) {
-            return $value && in_array($value, [
-                'out_of_stock',
-                'out-of-stock',
-                'out_stock',
-                'outstock',
-                'sold_out',
-                'sold-out',
-                'unavailable',
-                'no_stock',
-                'not_available',
-                'stockout',
-            ], true);
-        });
-
-        if (!$isOutOfStock) {
-            $quantities = collect([
-                Arr::get($paperStock, 'available'),
-                Arr::get($paperStock, 'quantity'),
-                Arr::get($paperStock, 'stock'),
-                Arr::get($paperStock, 'remaining'),
-                Arr::get($paperStock, 'quantity_available'),
-            ])->filter(fn ($value) => is_numeric($value))->map(fn ($value) => (int) $value);
-
-            if ($quantities->isNotEmpty() && $quantities->min() === 0) {
-                $isOutOfStock = true;
-            }
-        }
-
-        if (!$isPreOrder && !$isOutOfStock) {
-            return null;
-        }
-
-        if ($isPreOrder) {
-            return ['pre_order', 'Pre-order'];
-        }
-
-        return ['out_of_stock', 'Out of Stock'];
-    }
-
-    private function formatReportDate($value): ?string
-    {
-        if (!$value) {
-            return null;
-        }
-
-        try {
-            if ($value instanceof Carbon) {
-                return $value->format('M j, Y');
-            }
-
-            return Carbon::parse($value)->format('M j, Y');
-        } catch (\Throwable $e) {
-            return null;
-        }
-    }
-
-    private function isTruthyFlag($value): bool
-    {
-        if (is_bool($value)) {
-            return $value;
-        }
-
-        if (is_numeric($value)) {
-            return (int) $value > 0;
-        }
-
-        if (is_string($value)) {
-            $normalized = $this->normalizeStatusString($value);
-
-            return $normalized !== null && in_array($normalized, [
-                '1', 'true', 'yes', 'y', 'pending', 'pre_order', 'preorder', 'requested', 'on',
-            ], true);
-        }
-
-        return false;
-    }
-
-    private function normalizeStatusString($value): ?string
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        if (is_bool($value)) {
-            return $value ? 'true' : 'false';
-        }
-
-        if (is_numeric($value)) {
-            return (string) $value;
-        }
-
-        if (!is_string($value)) {
-            return null;
-        }
-
-        $normalized = Str::lower(trim($value));
-
-        if ($normalized === '') {
-            return null;
-        }
-
-        return str_replace([' ', '-'], '_', $normalized);
-    }
-
-    private function resolveNotes(array $candidates): ?string
-    {
-        foreach ($candidates as $candidate) {
-            if ($candidate === null) {
-                continue;
-            }
-
-            if (is_array($candidate)) {
-                $flattened = collect($candidate)
-                    ->flatten()
-                    ->filter(function ($entry) {
-                        return is_scalar($entry) && trim((string) $entry) !== '';
-                    })
-                    ->implode(', ');
-
-                if ($flattened !== '') {
-                    return $flattened;
-                }
-
-                continue;
-            }
-
-            if (is_string($candidate)) {
-                $trimmed = trim($candidate);
-
-                if ($trimmed !== '') {
-                    return $trimmed;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private function composeName(?string $first, ?string $last, ?string $fallback = null): ?string
-    {
-        $full = trim(collect([$first, $last])->filter()->implode(' '));
-
-        if ($full !== '') {
-            return $full;
-        }
-
-        if ($fallback !== null) {
-            $trimmed = trim($fallback);
-
-            return $trimmed === '' ? null : $trimmed;
-        }
-
-        return null;
     }
 
     private function buildSalesIntervals(Collection $orders, ?Carbon $rangeStart = null, ?Carbon $rangeEnd = null): array

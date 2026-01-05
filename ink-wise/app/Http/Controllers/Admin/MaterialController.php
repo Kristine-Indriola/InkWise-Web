@@ -15,6 +15,7 @@ use App\Notifications\MaterialRestockedNotification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 class MaterialController extends Controller
@@ -105,7 +106,11 @@ class MaterialController extends Controller
 
     public function index(Request $request)
     {
-        $materialsQuery = Material::with('inventory');
+        $materialsQuery = Material::with('inventory')
+            ->where(function ($query) {
+                $query->whereNull('material_type')
+                      ->orWhereRaw("LOWER(TRIM(COALESCE(material_type, ''))) != 'ink'");
+            });
 
         // Status filters applied to materials' inventory
         if ($request->status === 'low') {
@@ -149,43 +154,53 @@ class MaterialController extends Controller
 
         $materials = $materialsQuery->get();
 
-        // Build inks query so occasion and search filters can apply consistently
         $inksQuery = Ink::with('inventory');
+        $inksTableHasInkColor = Schema::hasColumn('inks', 'ink_color');
+        $inksTableHasUnit = Schema::hasColumn('inks', 'unit');
 
         if ($request->status === 'low') {
-            $inksQuery->whereHas('inventory', function($q) {
-                $q->whereColumn('stock_level', '<=', 'reorder_level')
-                  ->where('stock_level', '>', 0);
+            $inksQuery->whereHas('inventory', function ($query) {
+                $query->whereColumn('stock_level', '<=', 'reorder_level')
+                      ->where('stock_level', '>', 0);
             });
         }
 
         if ($request->status === 'out') {
-            $inksQuery->whereHas('inventory', function($q) {
-                $q->where('stock_level', '<=', 0);
+            $inksQuery->whereHas('inventory', function ($query) {
+                $query->where('stock_level', '<=', 0);
             });
         }
 
         if ($request->filled('occasion')) {
             $occasion = $request->occasion;
             if ($occasion !== 'all') {
-                $inksQuery->whereRaw("FIND_IN_SET(?, occasion)", [$occasion]);
+                $inksQuery->whereRaw('FIND_IN_SET(?, occasion)', [$occasion]);
             } else {
-                $inksQuery->where(function($q) {
-                    $q->whereRaw("FIND_IN_SET('wedding', occasion)")
-                      ->whereRaw("FIND_IN_SET('birthday', occasion)")
-                      ->whereRaw("FIND_IN_SET('baptism', occasion)")
-                      ->whereRaw("FIND_IN_SET('corporate', occasion)");
+                $inksQuery->where(function ($query) {
+                    $query->whereRaw("FIND_IN_SET('wedding', occasion)")
+                          ->whereRaw("FIND_IN_SET('birthday', occasion)")
+                          ->whereRaw("FIND_IN_SET('baptism', occasion)")
+                          ->whereRaw("FIND_IN_SET('corporate', occasion)");
                 });
             }
         }
+
         if ($request->filled('search')) {
             $search = $request->search;
-            $inksQuery->where(function($q) use ($search) {
-                $q->where('material_name', 'like', "%{$search}%")
-                  ->orWhere('ink_color', 'like', "%{$search}%")
-                  ->orWhere('material_type', 'like', "%{$search}%");
+            $inksQuery->where(function ($query) use ($search, $inksTableHasInkColor, $inksTableHasUnit) {
+                $query->where('material_name', 'like', "%{$search}%")
+                      ->orWhere('material_type', 'like', "%{$search}%");
+
+                if ($inksTableHasInkColor) {
+                    $query->orWhere('ink_color', 'like', "%{$search}%");
+                }
+
+                if ($inksTableHasUnit) {
+                    $query->orWhere('unit', 'like', "%{$search}%");
+                }
             });
         }
+
         $inks = $inksQuery->get();
 
         $materialLowCount = $materials->filter(function($material) {
@@ -195,7 +210,10 @@ class MaterialController extends Controller
         })->count();
 
         $inkLowCount = $inks->filter(function($ink) {
-            $stock = optional($ink->inventory)->stock_level ?? $ink->stock_qty ?? 0;
+            $stock = optional($ink->inventory)->stock_level;
+            if ($stock === null) {
+                $stock = $ink->stock_qty ?? $ink->stock_qty_ml ?? 0;
+            }
             $reorder = optional($ink->inventory)->reorder_level ?? 10;
             return $stock > 0 && $stock <= $reorder;
         })->count();
@@ -206,7 +224,10 @@ class MaterialController extends Controller
         })->count();
 
         $inkOutCount = $inks->filter(function($ink) {
-            $stock = optional($ink->inventory)->stock_level ?? $ink->stock_qty ?? 0;
+            $stock = optional($ink->inventory)->stock_level;
+            if ($stock === null) {
+                $stock = $ink->stock_qty ?? $ink->stock_qty_ml ?? 0;
+            }
             return $stock <= 0;
         })->count();
 
@@ -219,7 +240,12 @@ class MaterialController extends Controller
             if ($stock !== null) {
                 return $stock;
             }
-            return $ink->stock_qty ?? 0;
+
+            if (!is_null($ink->stock_qty)) {
+                return (int) $ink->stock_qty;
+            }
+
+            return (int) ($ink->stock_qty_ml ?? 0);
         });
 
         $summary = [
