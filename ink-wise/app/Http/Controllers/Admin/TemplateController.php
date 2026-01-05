@@ -45,7 +45,9 @@ class TemplateController extends Controller
         // Debug: log the prefix and isStaff value
         Log::info('TemplateController::index - Prefix: ' . $prefix . ', isStaff: ' . ($isStaff ? 'true' : 'false'));
 
-        return view('staff.templates.index', compact('templates', 'type'));
+        $templateBootstrap = null;
+
+        return view('staff.templates.index', compact('templates', 'type', 'templateBootstrap'));
     }
 
     // Show uploaded templates
@@ -272,7 +274,23 @@ class TemplateController extends Controller
         // TEMPORARY: Force staff views for debugging
         $isStaff = true;
 
-        return view('staff.templates.editor', compact('template'));
+        $templateBootstrap = [
+            'id' => $template->id,
+            'name' => $template->name,
+            'has_back_design' => false,
+            'svg_path' => $template->svg_path ? \App\Support\ImageResolver::url($template->svg_path) : null,
+            'back_svg_path' => null,
+            'svg_source' => $template->svg_path,
+            'back_svg_source' => null,
+            'preview' => $template->preview ? \App\Support\ImageResolver::url($template->preview) : null,
+            'preview_front' => $template->preview_front ? \App\Support\ImageResolver::url($template->preview_front) : null,
+            'preview_back' => null,
+            'front_image' => $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : null,
+            'back_image' => null,
+            'updated_at' => optional($template->updated_at)->toIso8601String(),
+        ];
+
+        return view('staff.templates.editor', compact('template', 'templateBootstrap'));
     }
    
 public function destroy($id)

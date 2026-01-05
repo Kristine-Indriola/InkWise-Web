@@ -808,26 +808,64 @@ export function initializeCustomerStudioLegacy() {
       }
     };
 
-    const applyResize = (state, dx, dy) => {
+    const applyResize = (state, dx, dy, preserveAspectRatio = false) => {
       if (state.type === 'image') {
         let newX = state.x;
         let newY = state.y;
         let newWidth = state.width;
         let newHeight = state.height;
 
-        if (state.handle.includes('e')) {
-          newWidth = state.width + dx;
-        }
-        if (state.handle.includes('w')) {
-          newWidth = state.width - dx;
-          newX = state.x + dx;
-        }
-        if (state.handle.includes('s')) {
-          newHeight = state.height + dy;
-        }
-        if (state.handle.includes('n')) {
-          newHeight = state.height - dy;
-          newY = state.y + dy;
+        // Check if this is a corner handle for aspect ratio preservation
+        const isCorner = ['nw', 'ne', 'sw', 'se'].some(c => state.handle === c);
+        const shouldPreserveRatio = preserveAspectRatio || isCorner;
+        const aspectRatio = state.width / state.height;
+
+        if (shouldPreserveRatio && isCorner) {
+          // Use the larger delta to maintain aspect ratio
+          const absDx = Math.abs(dx);
+          const absDy = Math.abs(dy);
+          
+          if (absDx > absDy) {
+            // Width change is dominant
+            if (state.handle.includes('e')) {
+              newWidth = state.width + dx;
+            } else if (state.handle.includes('w')) {
+              newWidth = state.width - dx;
+              newX = state.x + dx;
+            }
+            newHeight = newWidth / aspectRatio;
+            if (state.handle.includes('n')) {
+              newY = state.y + (state.height - newHeight);
+            }
+          } else {
+            // Height change is dominant
+            if (state.handle.includes('s')) {
+              newHeight = state.height + dy;
+            } else if (state.handle.includes('n')) {
+              newHeight = state.height - dy;
+              newY = state.y + dy;
+            }
+            newWidth = newHeight * aspectRatio;
+            if (state.handle.includes('w')) {
+              newX = state.x + (state.width - newWidth);
+            }
+          }
+        } else {
+          // Non-corner handles or no aspect ratio preservation
+          if (state.handle.includes('e')) {
+            newWidth = state.width + dx;
+          }
+          if (state.handle.includes('w')) {
+            newWidth = state.width - dx;
+            newX = state.x + dx;
+          }
+          if (state.handle.includes('s')) {
+            newHeight = state.height + dy;
+          }
+          if (state.handle.includes('n')) {
+            newHeight = state.height - dy;
+            newY = state.y + dy;
+          }
         }
 
         const MIN_SIZE = 4;
@@ -1251,10 +1289,49 @@ export function initializeCustomerStudioLegacy() {
         return [];
       }
 
-      const existing = Array.from(rootElement.querySelectorAll('[data-preview-node]'));
-      if (existing.length > 0) {
-        return existing;
-      }
+      const collected = new Map();
+      let autoNodeCounter = 0;
+
+      const ensureUniqueKey = (desiredKey, node, fallbackPrefix = 'node') => {
+        let baseKey = (desiredKey || '').toString().trim();
+        if (!baseKey) {
+          baseKey = `${fallbackPrefix}-${autoNodeCounter += 1}`;
+        }
+
+        let finalKey = baseKey;
+        let attempt = 2;
+        while (collected.has(finalKey) && collected.get(finalKey) !== node) {
+          finalKey = `${baseKey}-${attempt}`;
+          attempt += 1;
+        }
+
+        return finalKey;
+      };
+
+      const registerNode = (node, key, label = null, defaultText = null, type = 'node') => {
+        if (!node) {
+          return;
+        }
+        const finalKey = ensureUniqueKey(key, node, type);
+        node.setAttribute('data-preview-node', finalKey);
+        if (label && !node.dataset.previewLabel) {
+          node.dataset.previewLabel = label;
+        }
+        if (defaultText && !node.dataset.defaultText) {
+          node.dataset.defaultText = defaultText;
+        }
+        collected.set(finalKey, node);
+        return finalKey;
+      };
+
+      const existing = rootElement.querySelectorAll('[data-preview-node]');
+      existing.forEach((node) => {
+        const key = node.getAttribute('data-preview-node');
+        if (!key) {
+          return;
+        }
+        registerNode(node, key, node.dataset?.previewLabel || null, node.dataset?.defaultText || null, 'node');
+      });
 
       const fallbackNodes = [];
       const layers = rootElement.querySelectorAll('.canvas-layer[data-layer-id]');
@@ -1316,24 +1393,40 @@ export function initializeCustomerStudioLegacy() {
       // Add data-preview-node to all image and text elements that don't have it
       const allImages = rootElement.querySelectorAll('image, img');
       allImages.forEach((img, index) => {
-        if (!img.hasAttribute('data-preview-node')) {
-          img.setAttribute('data-preview-node', `auto-image-${index}`);
-        }
+        const key = img.getAttribute('data-preview-node') || `auto-image-${index + 1}`;
+        registerNode(img, key, img.dataset?.previewLabel || null, null, 'image');
       });
 
       const allTexts = rootElement.querySelectorAll('text, tspan');
       allTexts.forEach((txt, index) => {
-        if (!txt.hasAttribute('data-preview-node')) {
-          txt.setAttribute('data-preview-node', `auto-text-${index}`);
+        const rawDefault = (txt.dataset?.defaultText || txt.textContent || '').trim() || null;
+        const key = txt.getAttribute('data-preview-node') || `auto-text-${index + 1}`;
+        registerNode(txt, key, txt.dataset?.previewLabel || null, rawDefault, 'text');
+      });
+
+      if (fallbackNodes.length > 0) {
+        fallbackNodes.forEach((node, idx) => {
+          const key = node.getAttribute('data-preview-node') || `fallback-${idx + 1}`;
+          registerNode(node, key, node.dataset?.previewLabel || null, node.dataset?.defaultText || null, 'node');
+        });
+      }
+
+      const prioritized = [];
+      rootElement.querySelectorAll('text[data-preview-node], tspan[data-preview-node]').forEach((node) => {
+        const key = node.getAttribute('data-preview-node');
+        if (key && collected.has(key)) {
+          const resolved = collected.get(key);
+          if (resolved && !prioritized.includes(resolved)) {
+            prioritized.push(resolved);
+          }
         }
       });
 
-      // Return only elements with data-preview-node, preferring text/tspan first to populate the text panel reliably
-      const prioritized = Array.from(rootElement.querySelectorAll('text[data-preview-node], tspan[data-preview-node]'));
       if (prioritized.length > 0) {
         return prioritized;
       }
-      return Array.from(rootElement.querySelectorAll('[data-preview-node]'));
+
+      return Array.from(collected.values());
     };
 
     const hideModal = (modal) => {
@@ -3682,12 +3775,14 @@ export function initializeCustomerStudioLegacy() {
 
       textFieldList.appendChild(wrapper);
 
-      const pill = document.createElement('div');
-      pill.className = 'pill';
-      pill.dataset.previewNode = previewKey;
-      pill.dataset.defaultText = value || 'CUSTOM TEXT';
-      pill.textContent = value || 'CUSTOM TEXT';
-      extraPreviewContainer.appendChild(pill);
+      if (extraPreviewContainer) {
+        const pill = document.createElement('div');
+        pill.className = 'pill';
+        pill.dataset.previewNode = previewKey;
+        pill.dataset.defaultText = value || 'CUSTOM TEXT';
+        pill.textContent = value || 'CUSTOM TEXT';
+        extraPreviewContainer.appendChild(pill);
+      }
 
       initInput(input);
       attachDeleteHandler(wrapper);
@@ -3743,6 +3838,16 @@ export function initializeCustomerStudioLegacy() {
         if (!node.getAttribute('paint-order')) {
           node.setAttribute('paint-order', 'stroke fill');
         }
+        // Normalize font-family to match loaded Google Fonts
+        const fontFamily = node.getAttribute('font-family') || node.style.fontFamily;
+        if (fontFamily) {
+          const normalized = fontFamily.toLowerCase().replace(/[^a-z]/g, '');
+          if (normalized.includes('greatvibes')) {
+            node.setAttribute('font-family', 'Great Vibes');
+          } else if (normalized.includes('poppins')) {
+            node.setAttribute('font-family', 'Poppins');
+          }
+        }
       });
     };
 
@@ -3756,11 +3861,31 @@ export function initializeCustomerStudioLegacy() {
       try {
         let svgText = '';
         if (url.startsWith('data:image/svg+xml')) {
-          const [, dataPart = ''] = url.split(',', 2);
-          try {
-            svgText = decodeURIComponent(dataPart);
-          } catch (decodeError) {
-            svgText = dataPart;
+          const commaIndex = url.indexOf(',');
+          const meta = commaIndex >= 0 ? url.slice(0, commaIndex) : url;
+          const dataPart = commaIndex >= 0 ? url.slice(commaIndex + 1) : '';
+          const isBase64 = /;base64/i.test(meta);
+
+          if (isBase64) {
+            try {
+              const normalized = dataPart.replace(/\s+/g, '');
+              svgText = typeof window !== 'undefined' && typeof window.atob === 'function'
+                ? window.atob(normalized)
+                : atob(normalized);
+            } catch (base64Error) {
+              try {
+                svgText = decodeURIComponent(dataPart);
+              } catch (decodeError) {
+                console.warn('[InkWise Studio] Failed to decode inline SVG data URI.', base64Error, decodeError);
+                svgText = '';
+              }
+            }
+          } else {
+            try {
+              svgText = decodeURIComponent(dataPart);
+            } catch (decodeError) {
+              svgText = dataPart;
+            }
           }
         } else {
           const res = await fetch(url, { cache: 'no-store' });
@@ -3929,6 +4054,7 @@ export function initializeCustomerStudioLegacy() {
           if (nodes.length > 0) {
             let createdTextField = false;
             const seenKeys = new Set();
+            const seenLabelAndValue = new Set();
 
             nodes.forEach((node) => {
               const key = node.getAttribute('data-preview-node');
@@ -3948,6 +4074,18 @@ export function initializeCustomerStudioLegacy() {
                 createdTextField = true;
                 const labelText = node.dataset?.previewLabel || key;
                 const defaultValue = node.dataset?.defaultText || readNodeTextValue(node) || '';
+
+                // Avoid rendering duplicate entries when the label/value combo repeats (e.g., "dave text").
+                const normalizedLabel = (labelText || '').toString().trim().toLowerCase();
+                const normalizedValue = (defaultValue || '').toString().trim().toLowerCase();
+                const labelValueKey = `${normalizedLabel}|${normalizedValue}`;
+                if (normalizedLabel && seenLabelAndValue.has(labelValueKey)) {
+                  return;
+                }
+
+                if (normalizedLabel) {
+                  seenLabelAndValue.add(labelValueKey);
+                }
                 createFieldItem(key, defaultValue, labelText);
               }
             });

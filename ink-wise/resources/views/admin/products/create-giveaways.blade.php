@@ -79,7 +79,7 @@
         <input type="hidden" id="product_id" name="product_id" value="{{ $product->id }}">
     @endif
     <input type="hidden" id="template_id" name="template_id" value="">
-    <input type="hidden" name="productType" value="Giveaway">
+    <input type="hidden" id="productType" name="productType" value="Giveaway">
 
     <div class="invitation-container">
         {{-- Progress Bar --}}

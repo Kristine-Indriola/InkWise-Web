@@ -2843,6 +2843,7 @@ class OrderFlowService
                     if ($amount > 0) {
                         $ink = \App\Models\Ink::query()
                             ->with('inventory')
+                            ->where('material_type', 'ink')
                             ->whereRaw('LOWER(ink_color) = ?', [strtolower($color)])
                             ->first();
                         if ($ink && $ink->inventory) {
@@ -2855,7 +2856,8 @@ class OrderFlowService
 
         foreach ($required as $inkId => $amount) {
             $ink = \App\Models\Ink::query()->with('inventory')->find($inkId);
-            if (!$ink || !$ink->inventory || $ink->inventory->stock_qty < $amount) {
+            $availableStock = $ink->inventory ? $ink->inventory->stock_level : ($ink->stock_qty ?? 0);
+            if (!$ink || $availableStock < $amount) {
                 return false;
             }
         }
@@ -2962,6 +2964,7 @@ class OrderFlowService
                     if ($amount > 0) {
                         $ink = \App\Models\Ink::query()
                             ->with('inventory')
+                            ->where('material_type', 'ink')
                             ->whereRaw('LOWER(ink_color) = ?', [strtolower($color)])
                             ->first();
                         if ($ink) {
@@ -3055,6 +3058,7 @@ class OrderFlowService
                     if ($amount > 0) {
                         $ink = \App\Models\Ink::query()
                             ->with('inventory')
+                            ->where('material_type', 'ink')
                             ->whereRaw('LOWER(ink_color) = ?', [strtolower($color)])
                             ->first();
                         if ($ink) {

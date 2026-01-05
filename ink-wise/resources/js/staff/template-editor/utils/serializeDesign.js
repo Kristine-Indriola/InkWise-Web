@@ -16,6 +16,7 @@ export function serializeDesign(state) {
               type: node.type,
               visible: node.visible !== false,
               locked: !!node.locked,
+              editable: node.editable !== undefined ? Boolean(node.editable) : true,
               opacity: typeof node.opacity === 'number' ? node.opacity : 1,
               frame: node.frame ? { ...node.frame } : null,
               fill: node.fill ?? null,
@@ -28,6 +29,7 @@ export function serializeDesign(state) {
               borderRadius: node.borderRadius ?? 0,
               variant: node.variant ?? null,
               metadata: node.metadata ?? {},
+              replaceable: node.replaceable ?? false,
             }))
           : [],
       }))

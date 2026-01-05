@@ -93,6 +93,49 @@
                         $frontImageCount = $countElements($frontDesignData, 'changeable_images');
                         $backTextCount = $countElements($backDesignData, 'text_elements');
                         $backImageCount = $countElements($backDesignData, 'changeable_images');
+                        $frontSvgReady = !empty($template->svg_path);
+                        $frontPreviewReady = !empty($template->preview_front);
+                        $frontImageReady = !empty($template->front_image);
+                        $backSvgReady = !empty($template->back_svg_path);
+                        $backPreviewReady = !empty($template->preview_back);
+                        $backImageReady = !empty($template->back_image);
+                        $assetStatuses = [
+                            [
+                                'label' => 'Front SVG definition',
+                                'present' => $frontSvgReady,
+                                'hint' => 'Loaded into the staff and customer studios as the editable canvas.',
+                            ],
+                            [
+                                'label' => 'Front preview capture',
+                                'present' => $frontPreviewReady,
+                                'hint' => 'Used by customers to see thumbnails before entering the editor.',
+                            ],
+                            [
+                                'label' => 'Front catalog image',
+                                'present' => $frontImageReady,
+                                'hint' => 'Displayed on the product detail page and marketing cards.',
+                            ],
+                        ];
+                        if ($template->has_back_design) {
+                            $assetStatuses[] = [
+                                'label' => 'Back SVG definition',
+                                'present' => $backSvgReady,
+                                'hint' => 'Ensures the customer editor can build and save changes for the reverse side.',
+                            ];
+                            $assetStatuses[] = [
+                                'label' => 'Back preview capture',
+                                'present' => $backPreviewReady,
+                                'hint' => 'Back thumbnails shown inside the storefront studio.',
+                            ];
+                            $assetStatuses[] = [
+                                'label' => 'Back catalog image',
+                                'present' => $backImageReady,
+                                'hint' => 'Used wherever a back-of-product photo is required.',
+                            ];
+                        }
+                        $assetStatusHasMissing = collect($assetStatuses)->contains(function ($asset) {
+                            return empty($asset['present']);
+                        });
                     @endphp
 
                     @if($template && $template->design)
@@ -192,6 +235,26 @@
                                         @endif
                                     </table>
 
+                                    {{-- Highlight the customer-facing assets that must exist for the studio to render correctly. --}}
+                                    @if(!empty($assetStatuses))
+                                    <div class="mt-3">
+                                        <h6 class="mb-2">Customer Asset Health</h6>
+                                        <ul class="list-group list-group-flush border rounded">
+                                            @foreach($assetStatuses as $asset)
+                                            <li class="list-group-item d-flex justify-content-between align-items-start gap-3">
+                                                <div>
+                                                    <strong>{{ $asset['label'] }}</strong>
+                                                    <p class="mb-1 small text-muted">{{ $asset['hint'] }}</p>
+                                                </div>
+                                                <span class="badge rounded-pill {{ $asset['present'] ? 'bg-success' : 'bg-danger' }}">
+                                                    {{ $asset['present'] ? 'Ready' : 'Missing' }}
+                                                </span>
+                                            </li>
+                                            @endforeach
+                                        </ul>
+                                    </div>
+                                    @endif
+
                                     @if($frontImageCount)
                                     <h6 class="mt-4">Front Changeable Images</h6>
                                     <div class="changeable-images-list">
@@ -240,6 +303,9 @@
                                             <li>Click on text elements to edit them</li>
                                             <li>Click on changeable images to replace them</li>
                                             <li>Changes are saved automatically when you click "Save Changes"</li>
+                                            @if(!empty($assetStatuses) && $assetStatusHasMissing)
+                                            <li class="text-warning">Some customer-facing assets are missing in the health checklist above; save the affected side to regenerate the preview/SVG assets so the storefront receives the updated design.</li>
+                                            @endif
                                         </ul>
                                     </div>
                                 </div>

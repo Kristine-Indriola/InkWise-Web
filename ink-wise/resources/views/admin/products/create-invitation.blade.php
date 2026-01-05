@@ -150,7 +150,7 @@
                 <div class="responsive-grid grid-2-cols">
                     <div class="field">
                         <label for="productType">Product Type</label>
-                        <input type="hidden" name="productType" value="Invitation">
+                        <input type="hidden" id="productType" name="productType" value="Invitation">
                         <input type="text" class="styled-select" value="INVITATION" readonly>
                     </div>
                     <div class="field">
@@ -215,10 +215,26 @@
                         @endphp
                         <input type="hidden" name="paper_stocks[{{ $i }}][id]" value="{{ $stock['id'] ?? '' }}">
                         <input type="hidden" name="paper_stocks[{{ $i }}][material_id]" class="paper-stock-material-id" value="{{ $paperMaterialId ?? '' }}">
+                        <input type="hidden" name="paper_stocks[{{ $i }}][name]" class="paper-stock-name-hidden" value="{{ $stock['name'] ?? '' }}">
                         <div class="input-row">
-                            <div class="field">
-                                <label for="paper_stocks_{{ $i }}_name">Name</label>
-                                <input type="text" id="paper_stocks_{{ $i }}_name" name="paper_stocks[{{ $i }}][name]" value="{{ $stock['name'] ?? '' }}" placeholder="Enter paper stock name">
+                            <div class="field paper-stock-material-field">
+                                <label for="paper_stocks_{{ $i }}_material_select">Material</label>
+                                <select class="paper-stock-name-select" data-placeholder="Select paper material..." name="paper_stocks[{{ $i }}][material_select]" aria-label="Select paper material">
+                                    <option value="">Select paper material...</option>
+                                    @foreach($materials->where('material_type', 'paper') as $materialOption)
+                                        @php
+                                            $optionLabel = $materialOption->material_name . (!empty($materialOption->material_type) ? ' (' . $materialOption->material_type . ')' : '');
+                                            $isSelected = !empty($stock['material_id']) && $stock['material_id'] == $materialOption->material_id;
+                                        @endphp
+                                        <option value="{{ $materialOption->material_id }}"
+                                                data-material-id="{{ $materialOption->material_id }}"
+                                                data-name="{{ $materialOption->material_name }}"
+                                                data-unit-cost="{{ $materialOption->unit_cost ?? '' }}"
+                                                {{ $isSelected ? 'selected' : '' }}>
+                                            {{ $optionLabel }}
+                                        </option>
+                                    @endforeach
+                                </select>
                             </div>
                             <div class="field">
                                 <label for="paper_stocks_{{ $i }}_price">Price</label>
@@ -253,7 +269,7 @@
                                 <input type="hidden" name="addons[{{ $i }}][addon_type]" value="size">
                             </div>
                             <div class="field addon-name-field">
-                                <label for="addons_{{ $i }}_name">Name</label>
+                                <label for="addons_{{ $i }}_name">Size Number</label>
                                 <select class="addon-name-select" data-placeholder="Select addon material..." name="addons[{{ $i }}][material_select]" aria-label="Select addon material">
                                     <option value="">Select material...</option>
                                     @foreach($materials as $materialOption)
@@ -271,10 +287,6 @@
                                 </select>
                                 <input type="text" id="addons_{{ $i }}_name" name="addons[{{ $i }}][name]" class="addon-name-input" list="addon-materials-list" placeholder="Select or type material name" value="{{ $addon['name'] ?? '' }}">
                                 <input type="hidden" name="addons[{{ $i }}][material_id]" class="addon-material-id" value="{{ $addon['material_id'] ?? '' }}">
-                            </div>
-                            <div class="field">
-                                <label for="addons_{{ $i }}_price">Price</label>
-                                <input type="number" step="0.01" id="addons_{{ $i }}_price" name="addons[{{ $i }}][price]" value="{{ $addon['price'] ?? '' }}" placeholder="Price">
                             </div>
                             <div class="field">
                                 <label for="addons_{{ $i }}_image_path">Image</label>
