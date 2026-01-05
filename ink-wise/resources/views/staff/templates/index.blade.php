@@ -601,6 +601,14 @@
 @endpush
 
 @section('content')
+    @php
+        $normalizePreview = function ($value) {
+            if (!is_string($value)) {
+                return null;
+            }
+            return str_replace(["\r", "\n", "\t"], '', trim($value));
+        };
+    @endphp
     <main class="dashboard-container templates-page" role="main">
         <section class="templates-container" aria-labelledby="templates-heading">
             <div class="templates-header">
@@ -789,14 +797,15 @@
                             @if($hasMultiplePreviews)
                                 @php
                                     $orderedPreviews = collect($multiplePreviews)
-                                        ->map(function ($path, $key) use ($previewMeta) {
+                                        ->map(function ($path, $key) use ($previewMeta, $normalizePreview) {
+                                            $normalizedPath = $normalizePreview($path);
                                             $meta = $previewMeta[$key] ?? [];
                                             $label = $meta['label'] ?? \Illuminate\Support\Str::title(str_replace(['-', '_'], ' ', $key));
                                             $order = array_key_exists('order', $meta) ? (int) $meta['order'] : null;
 
                                             return [
                                                 'key' => $key,
-                                                'path' => $path,
+                                                'path' => $normalizedPath,
                                                 'label' => $label,
                                                 'order' => $order,
                                             ];

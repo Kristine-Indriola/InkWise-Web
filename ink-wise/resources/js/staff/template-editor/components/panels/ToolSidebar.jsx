@@ -3,6 +3,7 @@ import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { useBuilderStore } from '../../state/BuilderStore';
 import { createLayer } from '../../utils/pageFactory';
 import generateFontPresets from '../../utils/fontPresetGenerator';
+import { LayersPanel } from './LayersPanel';
 
 // Helper functions to constrain layers within safe zone
 function resolveInsets(zone) {
@@ -1380,7 +1381,7 @@ const normalizePixabayResults = (hits = []) => (
 );
 
 export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
-  const [activeTool, setActiveTool] = useState('text');
+  const [activeTool, setActiveTool] = useState('layers');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -7291,6 +7292,24 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
                 {isSearchingIcons ? 'Searching for icons...' : 'No icons found. Try a different search term.'}
               </div>
             ) : null}
+          </div>
+        );
+      case 'layers':
+        return (
+          <div className="builder-sidebar__content builder-sidebar__content--layers">
+            <div className="builder-sidebar__header">
+              <h2>Layers</h2>
+              <button
+                type="button"
+                className="builder-sidebar-toggle"
+                onClick={onToggleSidebar}
+                aria-label="Hide sidebar"
+                title="Hide sidebar"
+              >
+                <i className="fas fa-chevron-left" aria-hidden="true"></i>
+              </button>
+            </div>
+            <LayersPanel />
           </div>
         );
       default:

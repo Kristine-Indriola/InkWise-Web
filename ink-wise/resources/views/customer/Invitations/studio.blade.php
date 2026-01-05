@@ -126,6 +126,134 @@
         }
     };
 
+    $readSvgFile = static function ($candidate) {
+        if (!is_string($candidate) || trim($candidate) === '') {
+            return null;
+        }
+
+        $pathPart = $candidate;
+        $urlComponents = @parse_url($candidate);
+        if (is_array($urlComponents) && !empty($urlComponents['path'])) {
+            $pathPart = $urlComponents['path'];
+        }
+
+        $pathPart = urldecode((string) $pathPart);
+        if (trim($pathPart) === '') {
+            return null;
+        }
+
+        $variants = [];
+        $normalized = str_replace('\\', '/', ltrim($pathPart, '/'));
+        $variants[] = $normalized;
+        $variants[] = preg_replace('#^storage/#i', '', $normalized) ?? $normalized;
+        $variants[] = preg_replace('#^public/#i', '', $normalized) ?? $normalized;
+        $variants[] = preg_replace('#^public/storage/#i', '', $normalized) ?? $normalized;
+        $variants = array_values(array_unique(array_filter($variants, static fn ($value) => is_string($value) && $value !== '')));
+
+        $disks = array_values(array_unique(array_filter([
+            'invitation_templates',
+            'public',
+            config('filesystems.default'),
+        ], static fn ($disk) => is_string($disk) && $disk !== '')));
+
+        foreach ($variants as $variant) {
+            $trimmed = ltrim($variant, '/');
+
+            foreach ($disks as $disk) {
+                if (!config("filesystems.disks.{$disk}")) {
+                    continue;
+                }
+
+                try {
+                    if (\Illuminate\Support\Facades\Storage::disk($disk)->exists($trimmed)) {
+                        $contents = \Illuminate\Support\Facades\Storage::disk($disk)->get($trimmed);
+                        if (is_string($contents) && $contents !== '') {
+                            return $contents;
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // continue to other disks
+                }
+            }
+
+            $fileCandidates = [
+                public_path($trimmed),
+                public_path('storage/' . $trimmed),
+                storage_path('app/public/' . $trimmed),
+            ];
+
+            foreach ($fileCandidates as $filePath) {
+                if (!$filePath || !is_string($filePath)) {
+                    continue;
+                }
+
+                if (is_file($filePath)) {
+                    $contents = @file_get_contents($filePath);
+                    if (is_string($contents) && $contents !== '') {
+                        return $contents;
+                    }
+                }
+            }
+        }
+
+        return null;
+    };
+
+    $resolveSvgDataUri = static function ($value) use ($resolveImage, $readSvgFile) {
+        if (empty($value)) {
+            return null;
+        }
+
+        $candidates = [];
+        if (is_array($value)) {
+            foreach (['data', 'data_uri', 'inline', 'path', 'url', 0] as $key) {
+                if (!isset($value[$key])) {
+                    continue;
+                }
+                $candidate = $value[$key];
+                if (is_string($candidate) && $candidate !== '') {
+                    $candidates[] = $candidate;
+                }
+            }
+        } elseif (is_string($value)) {
+            $candidates[] = $value;
+        }
+
+        $candidates = array_values(array_unique(array_filter($candidates, static fn ($candidate) => is_string($candidate) && trim($candidate) !== '')));
+
+        foreach ($candidates as $candidate) {
+            if (str_starts_with($candidate, 'data:image/svg+xml')) {
+                return $candidate;
+            }
+        }
+
+        foreach ($candidates as $candidate) {
+            $resolved = $resolveImage($candidate, null);
+            if ($resolved && $resolved !== $candidate) {
+                $candidates[] = $resolved;
+            }
+        }
+
+        $candidates = array_values(array_unique(array_filter($candidates, static fn ($candidate) => is_string($candidate) && trim($candidate) !== '')));
+
+        foreach ($candidates as $candidate) {
+            if (!str_contains($candidate, '.svg') && !str_starts_with($candidate, 'data:image/svg+xml')) {
+                continue;
+            }
+
+            if (str_starts_with($candidate, 'data:image/svg+xml')) {
+                return $candidate;
+            }
+
+            $contents = $readSvgFile($candidate);
+            if (is_string($contents) && $contents !== '') {
+                return 'data:image/svg+xml;base64,' . base64_encode($contents);
+            }
+        }
+
+        return null;
+    };
+
     $templateFront = $templateModel?->preview_front
         ?? $templateModel?->front_image
         ?? $templateModel?->preview
@@ -134,8 +262,24 @@
     $templateBack = $templateModel?->preview_back
         ?? $templateModel?->back_image;
 
-    $frontSvg = $resolveImage($templateModel?->svg_path ?? null, null);
-    $backSvg = $resolveImage($templateModel?->back_svg_path ?? null, null);
+    $frontSvgPath = $templateModel?->svg_path ?? null;
+    $backSvgPath = $templateModel?->back_svg_path ?? null;
+
+    $frontSvg = $resolveSvgDataUri($frontSvgPath);
+    if (!$frontSvg) {
+        $frontSvgUrl = $resolveImage($frontSvgPath, null);
+        if (is_string($frontSvgUrl) && preg_match('/\.svg($|\?)/i', $frontSvgUrl)) {
+            $frontSvg = $frontSvgUrl;
+        }
+    }
+
+    $backSvg = $resolveSvgDataUri($backSvgPath);
+    if (!$backSvg) {
+        $backSvgUrl = $resolveImage($backSvgPath, null);
+        if (is_string($backSvgUrl) && preg_match('/\.svg($|\?)/i', $backSvgUrl)) {
+            $backSvg = $backSvgUrl;
+        }
+    }
 
     $hasBackSide = false;
     if ($templateModel) {
@@ -286,8 +430,6 @@
             <i class="fa-solid fa-fill-drip"></i>
             <span>Template color</span>
         </button>
-            <!-- Product options removed per request -->
-            <!-- QR-codes removed per request -->
         <button class="sidenav-btn" type="button" data-nav="tables">
             <i class="fa-solid fa-table"></i>
             <span>Tables</span>
@@ -344,10 +486,6 @@
                         data-back-svg="{{ $backSvg }}"
                         @endif
                         style="background-image: url('{{ $frontImage }}');"
-                        @if($canvasWidthAttr !== null) data-canvas-width="{{ $canvasWidthAttr }}" @endif
-                        @if($canvasHeightAttr !== null) data-canvas-height="{{ $canvasHeightAttr }}" @endif
-                        @if($canvasShapeAttr) data-canvas-shape="{{ $canvasShapeAttr }}" @endif
-                        @if($canvasUnitAttr) data-canvas-unit="{{ $canvasUnitAttr }}" @endif
                     >
                         <svg
                             id="preview-svg"
@@ -513,25 +651,6 @@
     </div>
 </div>
 
-<div id="product-modal" class="modal" data-section="product" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="product-modal-title">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2 id="product-modal-title">Product options</h2>
-            <div class="modal-header-actions">
-                <button type="button" aria-label="Dock panel" disabled aria-disabled="true">
-                    <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
-                </button>
-                <button type="button" class="modal-close" data-modal-close aria-label="Close panel">
-                    <i class="fa-solid fa-xmark modal-close-icon"></i>
-                </button>
-            </div>
-        </div>
-        <p class="modal-helper">Review stock, paper, and finishing options for your print.</p>
-        <div class="modal-placeholder">
-            <p>Product configuration lives here.</p>
-        </div>
-    </div>
-</div>
 
 <div id="template-modal" class="modal" data-section="template" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="template-modal-title">
     <div class="modal-content">
@@ -593,25 +712,6 @@
     </div>
 </div>
 
-<div id="qr-modal" class="modal" data-section="qr" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="qr-modal-title">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2 id="qr-modal-title">QR-codes</h2>
-            <div class="modal-header-actions">
-                <button type="button" aria-label="Dock panel" disabled aria-disabled="true">
-                    <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
-                </button>
-                <button type="button" class="modal-close" data-modal-close aria-label="Close panel">
-                    <i class="fa-solid fa-xmark modal-close-icon"></i>
-                </button>
-            </div>
-        </div>
-        <p class="modal-helper">Add scannable codes to link guests to RSVP forms or schedules.</p>
-        <div class="modal-placeholder">
-            <p>QR tools are coming soon.</p>
-        </div>
-    </div>
-</div>
 
 <div id="tables-modal" class="modal" data-section="tables" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="tables-modal-title">
     <div class="modal-content">

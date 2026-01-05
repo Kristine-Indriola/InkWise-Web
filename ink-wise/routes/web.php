@@ -774,7 +774,7 @@ Route::get('/design/studio/{template}', function (Template $template, Request $r
         session()->forget($orderKey);
     }
 
-    return view('customer.Invitations.studio', [
+    return view('customer.order.studio', [
         'product' => $product,
         'template' => $template,
         'defaultQuantity' => $defaultQuantity,
