@@ -9,5 +9,5 @@ Login Now
 @endcomponent
 
 Thanks,<br>
-{{ config('app.name') }}
+InkWise Management
 @endcomponent
