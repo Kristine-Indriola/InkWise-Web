@@ -44,13 +44,7 @@
       </template>
     </div>
 
-    <!-- Chat input -->
-    <div class="chat-input mt-2 px-2">
-      <input x-model="userInput" @keydown.enter.prevent="sendMessage()" placeholder="Type a message..." class="w-full border rounded px-3 py-2" />
-      <div class="mt-2 text-right">
-        <button @click="sendMessage()" class="bg-[#94b9ff] text-white px-4 py-1 rounded">Send</button>
-      </div>
-    </div>
+    <div class="chat-input-note px-4 py-3 text-sm text-gray-600 bg-gray-50 border-t">Select a question above to view the answer.</div>
   </div>
 </div>
 
@@ -91,9 +85,8 @@
   document.addEventListener("alpine:init", () => {
     Alpine.data("chatBot", () => ({
       open: false,
-      userInput: "",
       messages: [
-        { from: 'bot', text: "Hi! I'm InkWise Assistant. Here are some common questions:", time: '' }
+        { from: 'bot', text: "Hi! I'm InkWise Assistant. Choose a question below to see the answer.", time: '' }
       ],
       qas: [],
 
@@ -120,33 +113,6 @@
           this.messages.push({ from: "bot", text: qa.answer, image: qa.image, time: new Date().toLocaleTimeString() });
           this.scrollToBottom();
         }, 150);
-      },
-
-      async sendMessage() {
-        if (!this.userInput.trim()) return;
-        let msg = this.userInput.trim();
-        this.messages.push({ from: "user", text: msg, time: new Date().toLocaleTimeString() });
-        this.userInput = "";
-        this.scrollToBottom();
-
-        try {
-          let res = await fetch("{{ route('chatbot.reply') }}", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-CSRF-TOKEN": "{{ csrf_token() }}",
-              "Accept": "application/json"
-            },
-            body: JSON.stringify({ message: msg })
-          });
-
-          let data = await res.json();
-          this.messages.push({ from: "bot", text: data.reply || 'No response.', time: new Date().toLocaleTimeString() });
-        } catch (err) {
-          console.error("Reply error:", err);
-          this.messages.push({ from: "bot", text: "⚠️ Sorry, something went wrong.", time: '' });
-        }
-        this.scrollToBottom();
       },
 
       scrollToBottom() {
