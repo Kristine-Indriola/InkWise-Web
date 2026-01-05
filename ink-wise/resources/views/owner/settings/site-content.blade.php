@@ -274,13 +274,13 @@ body.owner-layout {
       <div class="content-preview">
         <h4 style="margin: 0 0 12px 0; color: #1e293b; font-size: 14px;">📋 Live Preview</h4>
         <div style="font-size: 13px; line-height: 1.5;">
-          <strong>{{ $settings->contact_heading ?: 'Your Heading Here' }}</strong><br>
-          <em>{{ $settings->contact_subheading ?: 'Your intro text appears here...' }}</em><br><br>
-          <strong>{{ $settings->contact_company ?: 'Company Name' }}</strong><br>
-          📍 {{ $settings->contact_address ?: '123 Main St, City, State' }}<br>
-          📞 {{ $settings->contact_phone ?: '(555) 123-4567' }}<br>
-          ✉️ {{ $settings->contact_email ?: 'info@company.com' }}<br>
-          🕒 {{ $settings->contact_hours ?: 'Mon-Fri: 9AM-5PM' }}
+          <strong data-preview-target="contact_heading" data-placeholder="Your Heading Here">{{ $settings->contact_heading ?: 'Your Heading Here' }}</strong><br>
+          <em data-preview-target="contact_subheading" data-placeholder="Your intro text appears here...">{{ $settings->contact_subheading ?: 'Your intro text appears here...' }}</em><br><br>
+          <strong data-preview-target="contact_company" data-placeholder="Company Name">{{ $settings->contact_company ?: 'Company Name' }}</strong><br>
+          📍 <span data-preview-target="contact_address" data-placeholder="123 Main St, City, State">{{ $settings->contact_address ?: '123 Main St, City, State' }}</span><br>
+          📞 <span data-preview-target="contact_phone" data-placeholder="(555) 123-4567">{{ $settings->contact_phone ?: '(555) 123-4567' }}</span><br>
+          ✉️ <span data-preview-target="contact_email" data-placeholder="info@company.com">{{ $settings->contact_email ?: 'info@company.com' }}</span><br>
+          🕒 <span data-preview-target="contact_hours" data-placeholder="Mon-Fri: 9AM-5PM" style="white-space: pre-line;">{{ $settings->contact_hours ?: 'Mon-Fri: 9AM-5PM' }}</span>
         </div>
       </div>
 
@@ -369,8 +369,8 @@ body.owner-layout {
       <div class="content-preview">
         <h4 style="margin: 0 0 12px 0; color: #1e293b; font-size: 14px;">📋 Live Preview</h4>
         <div style="font-size: 13px; line-height: 1.5;">
-          <strong>{{ $settings->about_heading ?: 'About Our Company' }}</strong><br>
-          <span style="color: #64748b;">{{ $settings->about_body ?: 'Tell your customers about your business, mission, and what makes you unique...' }}</span>
+          <strong data-preview-target="about_heading" data-placeholder="About Our Company">{{ $settings->about_heading ?: 'About Our Company' }}</strong><br>
+          <span data-preview-target="about_body" data-placeholder="Tell your customers about your business, mission, and what makes you unique..." style="color: #64748b; white-space: pre-line;">{{ $settings->about_body ?: 'Tell your customers about your business, mission, and what makes you unique...' }}</span>
         </div>
       </div>
 
@@ -425,27 +425,43 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Real-time preview updates
     const fields = [
-        { input: 'contact_heading', preview: '.contact-section .content-preview strong' },
-        { input: 'contact_subheading', preview: '.contact-section .content-preview em' },
-        { input: 'contact_company', preview: '.contact-section .content-preview strong:nth-of-type(2)' },
-        { input: 'contact_address', preview: '.contact-section .content-preview span:nth-of-type(1)' },
-        { input: 'contact_phone', preview: '.contact-section .content-preview span:nth-of-type(2)' },
-        { input: 'contact_email', preview: '.contact-section .content-preview span:nth-of-type(3)' },
-        { input: 'contact_hours', preview: '.contact-section .content-preview span:nth-of-type(4)' },
-        { input: 'about_heading', preview: '.about-section .content-preview strong' },
-        { input: 'about_body', preview: '.about-section .content-preview span' }
+      { input: 'contact_heading', selector: '[data-preview-target="contact_heading"]' },
+      { input: 'contact_subheading', selector: '[data-preview-target="contact_subheading"]' },
+      { input: 'contact_company', selector: '[data-preview-target="contact_company"]' },
+      { input: 'contact_address', selector: '[data-preview-target="contact_address"]' },
+      { input: 'contact_phone', selector: '[data-preview-target="contact_phone"]' },
+      { input: 'contact_email', selector: '[data-preview-target="contact_email"]' },
+      { input: 'contact_hours', selector: '[data-preview-target="contact_hours"]', allowHtml: true },
+      { input: 'about_heading', selector: '[data-preview-target="about_heading"]' },
+      { input: 'about_body', selector: '[data-preview-target="about_body"]', allowHtml: true }
     ];
 
-    fields.forEach(field => {
-        const input = document.getElementById(field.input);
-        const preview = document.querySelector(field.preview);
-        
-        if (input && preview) {
-            input.addEventListener('input', function() {
-                const value = this.value || this.placeholder || 'Not set';
-                preview.textContent = value;
-            });
+    fields.forEach(({ input, selector, allowHtml }) => {
+      const inputEl = document.getElementById(input);
+      const previewEl = document.querySelector(selector);
+
+      if (!inputEl || !previewEl) {
+        return;
+      }
+
+      const placeholder = previewEl.dataset.placeholder || inputEl.placeholder || 'Not set';
+
+      const applyValue = rawValue => {
+        const value = (rawValue || '').trim();
+        const display = value !== '' ? value : placeholder;
+
+        if (allowHtml) {
+          previewEl.innerHTML = display.replace(/\n/g, '<br>');
+        } else {
+          previewEl.textContent = display;
         }
+      };
+
+      applyValue(inputEl.value);
+
+      inputEl.addEventListener('input', () => {
+        applyValue(inputEl.value);
+      });
     });
 
     // Add visual feedback on form submission

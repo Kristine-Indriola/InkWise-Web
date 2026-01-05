@@ -3,38 +3,32 @@
 
   <div class="layout-container section-content">
     @php($settings = $siteSettings ?? \App\Models\SiteSetting::current())
+    @php($contactHeading = trim($settings->contact_heading ?? '') ?: 'Get In Touch')
+    @php($contactSubheading = trim($settings->contact_subheading ?? '') ?: 'We would love to hear from you. Reach out anytime.')
+    @php($contactCompany = trim($settings->contact_company ?? '') ?: 'InkWise Studio')
+    @php($contactAddress = trim($settings->contact_address ?? '') ?: '123 Main Street, Suite 200, Metro City, State 12345')
+    @php($contactPhone = trim($settings->contact_phone ?? '') ?: '(555) 123-4567')
+    @php($contactEmail = trim($settings->contact_email ?? '') ?: 'hello@inkwise.studio')
+    @php($contactHoursLines = $settings->contactHoursLines())
+    @php($contactHoursLines = $contactHoursLines && count($contactHoursLines) ? $contactHoursLines : ['Mon-Fri: 9:00 AM - 6:00 PM', 'Sat: 10:00 AM - 3:00 PM'])
 
-    <h2 class="text-3xl font-bold text-center mb-6 text-gray-800">{{ $settings->contact_heading }}</h2>
+    <h2 class="text-3xl font-bold text-center mb-6 text-gray-800">{{ $contactHeading }}</h2>
 
-    @if(filled($settings->contact_subheading))
-      <p class="text-center text-gray-600 mb-10">
-        {{ $settings->contact_subheading }}
-      </p>
-    @endif
+    <p class="text-center text-gray-600 mb-10">
+      {{ $contactSubheading }}
+    </p>
 
     <div class="grid md:grid-cols-2 gap-10">
-      <!-- Contact Info -->
       <div class="text-black">
-        @if(filled($settings->contact_company))
-          <h3 class="text-xl font-semibold mb-4" style="font-family: 'Playfair Display', serif;">{{ $settings->contact_company }}</h3>
-        @endif
+        <h3 class="text-xl font-semibold mb-4" style="font-family: 'Playfair Display', serif;">{{ $contactCompany }}</h3>
 
-        @if(filled($settings->contact_address))
-          <p class="mb-3"><strong>📍 Address:</strong> {{ $settings->contact_address }}</p>
-        @endif
+        <p class="mb-3"><strong>📍 Address:</strong> {{ $contactAddress }}</p>
 
-        @if(filled($settings->contact_phone))
-          <p class="mb-3"><strong>📞 Phone:</strong> {{ $settings->contact_phone }}</p>
-        @endif
+        <p class="mb-3"><strong>📞 Phone:</strong> {{ $contactPhone }}</p>
 
-        @if(filled($settings->contact_email))
-          <p class="mb-3"><strong>✉️ Email:</strong> {{ $settings->contact_email }}</p>
-        @endif
+        <p class="mb-3"><strong>✉️ Email:</strong> {{ $contactEmail }}</p>
 
-        @php($hoursLines = $settings->contactHoursLines())
-        @if($hoursLines)
-          <p><strong>🕒 Business Hours:</strong><br>{!! collect($hoursLines)->map(fn ($line) => e($line))->implode('<br>') !!}</p>
-        @endif
+        <p><strong>🕒 Business Hours:</strong><br>{!! collect($contactHoursLines)->map(fn ($line) => e($line))->implode('<br>') !!}</p>
       </div>
 
         <!-- Contact Form -->
