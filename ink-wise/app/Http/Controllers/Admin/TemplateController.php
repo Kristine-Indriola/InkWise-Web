@@ -1259,14 +1259,30 @@ public function uploadToProduct(Request $request, $id)
             ]);
         }
 
-        if ($existingPath && Storage::disk('public')->exists($existingPath)) {
-            Storage::disk('public')->delete($existingPath);
+        $normalizedExistingPath = null;
+        if ($existingPath) {
+            $normalizedExistingPath = ltrim(str_replace('\\', '/', (string) $existingPath), '/');
+            $normalizedExistingPath = preg_replace('#^/?storage/#i', '', $normalizedExistingPath) ?? $normalizedExistingPath;
+        }
+
+        if ($normalizedExistingPath && Storage::disk('public')->exists($normalizedExistingPath)) {
+            Storage::disk('public')->delete($normalizedExistingPath);
         }
 
         $directory = trim($directory, '/');
+        if ($directory !== '') {
+            Storage::disk('public')->makeDirectory($directory);
+        }
+
         $filename = ($directory ? $directory . '/' : '') . 'template_' . Str::uuid() . '.' . $extension;
 
-        Storage::disk('public')->put($filename, $contents);
+        $stored = Storage::disk('public')->put($filename, $contents);
+
+        if (!$stored) {
+            throw ValidationException::withMessages([
+                $field => 'Failed to persist exported asset on disk.',
+            ]);
+        }
 
         return $filename;
     }
