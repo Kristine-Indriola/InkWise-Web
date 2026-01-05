@@ -685,8 +685,13 @@
 		: 'All Time';
 
 	$materialCollection = $materials instanceof \Illuminate\Support\Collection ? $materials : collect($materials);
+	$inkCollection = $inks instanceof \Illuminate\Support\Collection ? $inks : collect($inks ?? []);
+	$combinedInventory = $materialCollection->concat($inkCollection)->values();
 
 	$evaluateMaterial = function ($material) {
+		$isInk = $material instanceof \App\Models\Ink;
+		$unitLabel = $material->unit ?? ($isInk ? 'ml' : 'units');
+		$unitLabel = is_string($unitLabel) && trim($unitLabel) !== '' ? trim($unitLabel) : ($isInk ? 'ml' : 'units');
 		$stockLevel = optional($material->inventory)->stock_level
 			?? $material->stock_qty
 			?? 0;
@@ -697,12 +702,13 @@
 		$lastRestock = optional($material->inventory)->last_restock_date ?? null;
 		$stockValue = $stockLevel * $unitCost;
 
-		$hasMovementData = $material instanceof \App\Models\Material;
+		$hasMovementData = $material instanceof \App\Models\Material || $isInk;
 
 		// Calculate stock movements when tracking is available
-		$movements = $hasMovementData ? $material->stockMovements : collect();
+		$movements = $hasMovementData ? ($material->stockMovements ?? collect()) : collect();
+		$movements = $movements instanceof \Illuminate\Support\Collection ? $movements : collect($movements);
 		$stockIn = $hasMovementData ? $movements->where('movement_type', 'restock')->sum('quantity') : 0;
-		$stockOut = $hasMovementData ? abs($movements->whereIn('movement_type', ['used', 'issued', 'sold'])->sum('quantity')) : 0;
+		$stockOut = $hasMovementData ? abs($movements->whereIn('movement_type', ['usage', 'used', 'issued', 'sold'])->sum('quantity')) : 0;
 		$adjustments = $hasMovementData ? $movements->where('movement_type', 'adjustment')->sum('quantity') : 0;
 
 		// Calculate beginning stock (current stock - movements in period)
@@ -763,6 +769,8 @@
 			'stock' => $stockLevel,
 			'reorder' => $reorderLevel,
 			'unit_cost' => $unitCost,
+			'unit_label' => $unitLabel,
+			'is_ink' => $isInk,
 			'status' => $status,
 			'status_key' => $statusKey,
 			'action' => $action,
@@ -781,7 +789,7 @@
 		];
 	};
 
-	$materialSnapshots = $materialCollection->map($evaluateMaterial);
+	$materialSnapshots = $combinedInventory->map($evaluateMaterial);
 	$movementSnapshots = $materialSnapshots->filter(fn ($snapshot) => $snapshot['movement_tracked']);
 	$movementStockOut = $movementSnapshots->sum('stock_out');
 	$averageBeginningStock = (float) ($movementSnapshots->avg('beginning_stock') ?? 0);
@@ -815,8 +823,14 @@
 	$outOfStockItems = $materialSnapshots->where('status_key', 'out-of-stock');
 	$lowStockItems = $materialSnapshots->where('status_key', 'low');
 
-	$recentlyRestocked = $materialSnapshots->filter(fn ($snapshot) => $snapshot['stock_in'] > 0)->sortByDesc('stock_in')->take(5);
-	$recentlyUsed = $materialSnapshots->filter(fn ($snapshot) => $snapshot['stock_out'] > 0)->sortByDesc('stock_out')->take(5);
+	$recentlyRestocked = $materialSnapshots
+		->filter(fn ($snapshot) => ($snapshot['stock_in'] ?? 0) > 0)
+		->sortByDesc('stock_in')
+		->take(5);
+	$recentlyUsed = $materialSnapshots
+		->filter(fn ($snapshot) => ($snapshot['stock_out'] ?? 0) > 0)
+		->sortByDesc('stock_out')
+		->take(5);
 
 	$reportPayload = [
 		'inventory' => [
@@ -1061,7 +1075,7 @@
 				@if($recentlyRestocked->isNotEmpty())
 					<ul class="analysis-list">
 						@foreach($recentlyRestocked as $item)
-							<li>{{ $item['model']->material_name }} (+{{ number_format($item['stock_in']) }} units)</li>
+							<li>{{ $item['model']->material_name }} (+{{ number_format($item['stock_in']) }} {{ $item['unit_label'] }})</li>
 						@endforeach
 					</ul>
 				@endif
@@ -1073,7 +1087,7 @@
 				@if($recentlyUsed->isNotEmpty())
 					<ul class="analysis-list">
 						@foreach($recentlyUsed as $item)
-							<li>{{ $item['model']->material_name }} (-{{ number_format($item['stock_out']) }} units)</li>
+							<li>{{ $item['model']->material_name }} (-{{ number_format($item['stock_out']) }} {{ $item['unit_label'] }})</li>
 						@endforeach
 					</ul>
 				@endif
@@ -1185,32 +1199,39 @@
 							};
 							$rowClass = in_array($snapshot['status_key'], ['low', 'out-of-stock'], true) ? 'needs-attention' : '';
 							$movementTracked = $snapshot['movement_tracked'];
+							$categoryDisplay = $material->material_type
+								?? ($material instanceof \App\Models\Ink ? 'Ink' : 'Uncategorized');
+							$unitLabel = trim($snapshot['unit_label'] ?? ($material->unit ?? ($snapshot['is_ink'] ?? false ? 'ml' : 'units')));
+							if ($unitLabel === '') {
+								$unitLabel = $snapshot['is_ink'] ? 'ml' : 'units';
+							}
 							$beginningDisplay = $movementTracked && $snapshot['beginning_stock'] !== null
-								? number_format($snapshot['beginning_stock'])
+								? number_format($snapshot['beginning_stock']) . ' ' . $unitLabel
 								: 'N/A';
 							$stockInDisplay = $movementTracked && $snapshot['stock_in'] !== null
-								? number_format($snapshot['stock_in'])
+								? number_format($snapshot['stock_in']) . ' ' . $unitLabel
 								: 'N/A';
 							$stockOutDisplay = $movementTracked && $snapshot['stock_out'] !== null
-								? number_format($snapshot['stock_out'])
+								? number_format($snapshot['stock_out']) . ' ' . $unitLabel
 								: 'N/A';
+							$endingDisplay = number_format($snapshot['ending_stock']) . ' ' . $unitLabel;
 						@endphp
 						<tr data-stock-status="{{ $snapshot['status_key'] }}" class="{{ $rowClass }}">
 							<td>{{ $material->material_name }}</td>
-							<td>{{ $material->material_type }}</td>
-							<td>{{ $material->unit ?? 'pcs' }}</td>
+							<td>{{ $categoryDisplay }}</td>
+							<td>{{ $unitLabel }}</td>
 							<td class="text-center">{{ number_format($snapshot['reorder']) }}</td>
 							<td class="text-center">{{ $beginningDisplay }}</td>
 							<td class="text-center">{{ $stockInDisplay }}</td>
 							<td class="text-center">{{ $stockOutDisplay }}</td>
-							<td class="text-center">{{ number_format($snapshot['ending_stock']) }}</td>
+							<td class="text-center">{{ $endingDisplay }}</td>
 							<td class="text-end">₱{{ number_format($snapshot['unit_cost'], 2) }}</td>
 							<td class="text-end">₱{{ number_format($snapshot['stock_value'], 2) }}</td>
 							<td><span class="{{ $statusClass }}">{{ $snapshot['status'] }}</span></td>
 						</tr>
 					@empty
 						<tr>
-							<td colspan="11" class="text-center">No materials found.</td>
+							<td colspan="11" class="text-center">No inventory items found.</td>
 						</tr>
 					@endforelse
 					</tbody>

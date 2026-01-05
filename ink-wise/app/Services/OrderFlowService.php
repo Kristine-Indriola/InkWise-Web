@@ -14,12 +14,16 @@ use App\Models\ProductAddon;
 use App\Models\ProductBulkOrder;
 use App\Models\ProductColor;
 use App\Models\ProductMaterial;
+use App\Models\InkStockMovement;
 use App\Models\ProductPaperStock;
 use App\Models\ProductEnvelope;
+use App\Models\Ink;
+use App\Models\StockMovement;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -27,6 +31,13 @@ class OrderFlowService
 {
     public const DEFAULT_TAX_RATE = 0.0;
     public const DEFAULT_SHIPPING_FEE = 0.0;
+
+    private const CMYK_RATIOS = [
+        'cyan' => 0.30,
+        'magenta' => 0.30,
+        'yellow' => 0.30,
+        'black' => 0.10,
+    ];
 
     public function resolveProduct(?Product $product, ?int $productId = null): ?Product
     {
@@ -1968,23 +1979,38 @@ class OrderFlowService
                 return null;
             }
 
-            $key = Str::lower(trim($name));
-            if ($key === '') {
+            $normalized = Str::of($name)->lower()->trim()->value();
+            if ($normalized === '') {
                 return null;
             }
 
-            if (!array_key_exists($key, $materialNameCache)) {
-                $material = Material::query()
-                    ->with('inventory')
-                    ->whereRaw('LOWER(material_name) = ?', [$key])
-                    ->first();
+            $compact = preg_replace('/[^a-z0-9]/', '', $normalized) ?? '';
+            $lookupKeys = array_values(array_filter(array_unique([$normalized, $compact])));
 
-                $materialNameCache[$key] = $material ?: false;
+            foreach ($lookupKeys as $lookupKey) {
+                if (array_key_exists($lookupKey, $materialNameCache)) {
+                    $cached = $materialNameCache[$lookupKey];
+                    return $cached instanceof Material ? $cached : null;
+                }
             }
 
-            $cached = $materialNameCache[$key];
+            $material = Material::query()
+                ->with('inventory')
+                ->where(function ($query) use ($normalized, $compact) {
+                    $query->whereRaw('LOWER(material_name) = ?', [$normalized]);
 
-            return $cached instanceof Material ? $cached : null;
+                    if ($compact !== '' && $compact !== $normalized) {
+                        $query->orWhereRaw("REPLACE(REPLACE(REPLACE(LOWER(material_name), ' ', ''), '-', ''), '_', '') = ?", [$compact]);
+                    }
+                })
+                ->orderByDesc('updated_at')
+                ->first();
+
+            foreach ($lookupKeys as $lookupKey) {
+                $materialNameCache[$lookupKey] = $material ?: false;
+            }
+
+            return $material ?: null;
         };
 
         $accumulateMaterial = function (OrderItem $item, ?Material $material, float $perUnitQty, array $meta = []) use (&$materialTotals, &$materialCache) {
@@ -2040,6 +2066,12 @@ class OrderFlowService
             ], $meta);
         };
 
+        $inkUsageContext = $this->determineInkUsageDistribution($order);
+        $inkUsageTotalsMl = $inkUsageContext['totals_ml'] ?? [];
+        $inkUsageTotalsUnits = $inkUsageContext['totals_units'] ?? [];
+        $orderInkSnapshots = $inkUsageContext['items'] ?? [];
+        $orderItemsById = $order->items->keyBy('id');
+
         foreach ($order->items as $item) {
             $productMaterialUsageFound = false;
             if ($item->product_id) {
@@ -2093,6 +2125,38 @@ class OrderFlowService
                     || in_array($productType, ['giveaway', 'souvenir', 'souvenirs'], true);
 
                 if ($eligibleForFallback) {
+                    $metaMaterialId = Arr::get($item->design_metadata ?? [], 'material_id')
+                        ?? Arr::get($item->design_metadata ?? [], 'material.material_id');
+
+                    if (!$metaMaterialId && $item->line_type === OrderItem::LINE_TYPE_GIVEAWAY) {
+                        $giveawayMeta = Arr::get($order->metadata ?? [], 'giveaways.' . ($item->product_id ?? $item->id))
+                            ?? Arr::get($order->metadata ?? [], 'giveaways.' . ($item->design_metadata['product_id'] ?? ''))
+                            ?? Arr::get($order->metadata ?? [], 'giveaway');
+                        $metaMaterialId = Arr::get($giveawayMeta ?? [], 'material_id')
+                            ?? Arr::get($giveawayMeta ?? [], 'material.material_id');
+                    }
+
+                    if ($metaMaterialId) {
+                        $fallbackMaterial = $materialCache[$metaMaterialId] ??=
+                            Material::query()->with('inventory')->find($metaMaterialId);
+
+                        if ($fallbackMaterial) {
+                            $perUnitOverride = Arr::get($item->design_metadata ?? [], 'material_qty_per_unit');
+                            if (!is_numeric($perUnitOverride) || (float) $perUnitOverride <= 0) {
+                                $perUnitOverride = 1.0;
+                            } else {
+                                $perUnitOverride = (float) $perUnitOverride;
+                            }
+
+                            $accumulateMaterial($item, $fallbackMaterial, $perUnitOverride, [
+                                'source' => 'product_fallback',
+                                'fallback_id' => $metaMaterialId,
+                            ]);
+
+                            $productMaterialUsageFound = true;
+                        }
+                    }
+
                     $fallbackNames = array_filter([
                         $item->product?->name,
                         Arr::get($item->design_metadata ?? [], 'name'),
@@ -2148,11 +2212,28 @@ class OrderFlowService
                     $paperStock = $paperStockCache[$fallbackKey];
                 }
 
-                if ($paperStock && $paperStock->material) {
-                    $accumulateMaterial($item, $paperStock->material, 1.0, [
+                if ($paperStock) {
+                    $paperMaterial = $paperStock->material;
+                    if (!$paperMaterial) {
+                        $fallbackNames = array_filter([
+                            $paperStock->material_name ?? null,
+                            $paperStock->name ?? null,
+                        ], fn ($value) => is_string($value) && trim($value) !== '');
+
+                        foreach ($fallbackNames as $candidateName) {
+                            $paperMaterial = $resolveMaterialByName($candidateName);
+                            if ($paperMaterial) {
+                                break;
+                            }
+                        }
+                    }
+
+                    if ($paperMaterial) {
+                        $accumulateMaterial($item, $paperMaterial, 1.0, [
                         'paper_stock_id' => $paperStock->id,
                         'source' => 'paper_stock',
                     ]);
+                    }
                 }
             }
 
@@ -2173,6 +2254,16 @@ class OrderFlowService
                 }
 
                 if (!$envelopeMaterial) {
+                    $metaMaterialId = Arr::get($item->design_metadata ?? [], 'material_id')
+                        ?? Arr::get($item->design_metadata ?? [], 'material.material_id')
+                        ?? Arr::get($order->metadata ?? [], 'envelope.material_id')
+                        ?? Arr::get($order->metadata ?? [], 'envelope.material.material_id');
+
+                    if ($metaMaterialId) {
+                        $envelopeMaterial = $materialCache[$metaMaterialId] ??=
+                            Material::query()->with('inventory')->find($metaMaterialId);
+                    }
+
                     $candidateNames = array_filter([
                         $envelope?->envelope_material_name,
                         Arr::get($item->design_metadata ?? [], 'material'),
@@ -2237,37 +2328,31 @@ class OrderFlowService
             }
         }
 
-        // Process ink usage
-        foreach ($order->items as $item) {
-            $totalAverageInk = $item->product?->inkUsage?->sum('average_usage_ml') ?? 0;
-            $totalInk = $totalAverageInk * $item->quantity;
-            if ($totalInk > 0) {
-                $cyanMl = $totalInk * 0.3;
-                $magentaMl = $totalInk * 0.3;
-                $yellowMl = $totalInk * 0.3;
-                $blackMl = $totalInk * 0.1;
+        if (!empty($orderInkSnapshots)) {
+            foreach ($orderInkSnapshots as $snapshot) {
+                $item = $orderItemsById->get($snapshot['order_item_id'] ?? null);
+                if (!$item) {
+                    continue;
+                }
 
-                $inkMaterials = [
-                    'Cyan Ink' => $cyanMl,
-                    'Magenta Ink' => $magentaMl,
-                    'Yellow Ink' => $yellowMl,
-                    'Black Ink' => $blackMl,
-                ];
+                foreach (($snapshot['distribution_ml'] ?? []) as $colorKey => $amount) {
+                    if ($amount <= 0) {
+                        continue;
+                    }
 
-                foreach ($inkMaterials as $name => $amount) {
-                    if ($amount > 0) {
-                        $material = $resolveMaterialByName($name);
-                        if ($material) {
-                            $accumulateMaterial($item, $material, $amount, [
-                                'source' => 'ink_cmyk',
-                                'ink_type' => strtolower(str_replace(' Ink', '', $name)),
-                                'quantity_mode' => 'total',
-                            ]);
-                        }
+                    $material = $resolveMaterialByName(Str::headline($colorKey) . ' Ink');
+                    if ($material) {
+                        $accumulateMaterial($item, $material, $amount, [
+                            'source' => 'ink_cmyk',
+                            'ink_type' => $colorKey,
+                            'quantity_mode' => 'per_order',
+                        ]);
                     }
                 }
             }
         }
+
+        $this->syncOrderInkUsage($order, $inkUsageTotalsMl, $orderInkSnapshots, $inkUsageTotalsUnits);
 
         $now = now();
 
@@ -2614,6 +2699,18 @@ class OrderFlowService
 
         $applied = $currentMaterialStock - $newMaterialStock;
 
+        $movementQuantity = (int) round($applied);
+        if ($movementQuantity !== 0) {
+            $movementType = $movementQuantity > 0 ? 'usage' : 'restock';
+
+            StockMovement::create([
+                'material_id' => $material->getKey(),
+                'movement_type' => $movementType,
+                'quantity' => abs($movementQuantity),
+                'user_id' => Auth::id(),
+            ]);
+        }
+
         return [
             'applied' => $applied,
             'shortage' => $shortage,
@@ -2638,23 +2735,38 @@ class OrderFlowService
                 return null;
             }
 
-            $key = Str::lower(trim($name));
-            if ($key === '') {
+            $normalized = Str::of($name)->lower()->trim()->value();
+            if ($normalized === '') {
                 return null;
             }
 
-            if (!array_key_exists($key, $materialNameCache)) {
-                $material = Material::query()
-                    ->with('inventory')
-                    ->whereRaw('LOWER(material_name) = ?', [$key])
-                    ->first();
+            $compact = preg_replace('/[^a-z0-9]/', '', $normalized) ?? '';
+            $lookupKeys = array_values(array_filter(array_unique([$normalized, $compact])));
 
-                $materialNameCache[$key] = $material ?: false;
+            foreach ($lookupKeys as $lookupKey) {
+                if (array_key_exists($lookupKey, $materialNameCache)) {
+                    $cached = $materialNameCache[$lookupKey];
+                    return $cached instanceof Material ? $cached : null;
+                }
             }
 
-            $cached = $materialNameCache[$key];
+            $material = Material::query()
+                ->with('inventory')
+                ->where(function ($query) use ($normalized, $compact) {
+                    $query->whereRaw('LOWER(material_name) = ?', [$normalized]);
 
-            return $cached instanceof Material ? $cached : null;
+                    if ($compact !== '' && $compact !== $normalized) {
+                        $query->orWhereRaw("REPLACE(REPLACE(REPLACE(LOWER(material_name), ' ', ''), '-', ''), '_', '') = ?", [$compact]);
+                    }
+                })
+                ->orderByDesc('updated_at')
+                ->first();
+
+            foreach ($lookupKeys as $lookupKey) {
+                $materialNameCache[$lookupKey] = $material ?: false;
+            }
+
+            return $material ?: null;
         };
 
         $checkMaterial = function (Material $material, float $requiredQty) use (&$shortages) {
@@ -2715,8 +2827,25 @@ class OrderFlowService
                     ->with(['material.inventory'])
                     ->find($paperStockId);
 
-                if ($paperStock && $paperStock->material) {
-                    $checkMaterial($paperStock->material, $quantity); // Assuming 1 per unit
+                if ($paperStock) {
+                    $paperMaterial = $paperStock->material;
+                    if (!$paperMaterial) {
+                        $fallbackNames = array_filter([
+                            $paperStock->material_name ?? null,
+                            $paperStock->name ?? null,
+                        ], fn ($value) => is_string($value) && trim($value) !== '');
+
+                        foreach ($fallbackNames as $candidateName) {
+                            $paperMaterial = $resolveMaterialByName($candidateName);
+                            if ($paperMaterial) {
+                                break;
+                            }
+                        }
+                    }
+
+                    if ($paperMaterial) {
+                        $checkMaterial($paperMaterial, $quantity); // Assuming 1 per unit
+                    }
                 }
             }
 
@@ -2821,43 +2950,53 @@ class OrderFlowService
             'items.product.inkUsage',
         ]);
 
-        $required = [];
+        $requiredTotals = [];
 
         foreach ($order->items as $item) {
-            $totalAverageInk = $item->product?->inkUsage?->sum('average_usage_ml') ?? 0;
-            $totalInk = $totalAverageInk * $item->quantity;
-            if ($totalInk > 0) {
-                $cyanMl = $totalInk * 0.3;
-                $magentaMl = $totalInk * 0.3;
-                $yellowMl = $totalInk * 0.3;
-                $blackMl = $totalInk * 0.1;
+            $quantity = max(0, (int) $item->quantity);
+            if ($quantity === 0) {
+                continue;
+            }
 
-                $inkMaterials = [
-                    'Cyan' => $cyanMl,
-                    'Magenta' => $magentaMl,
-                    'Yellow' => $yellowMl,
-                    'Black' => $blackMl,
-                ];
+            $averageUsage = (float) ($item->product?->inkUsage?->sum('average_usage_ml') ?? 0);
+            $totalInk = round($averageUsage * $quantity, 4);
+            if ($totalInk <= 0.0) {
+                continue;
+            }
 
-                foreach ($inkMaterials as $color => $amount) {
-                    if ($amount > 0) {
-                        $ink = \App\Models\Ink::query()
-                            ->with('inventory')
-                            ->where('material_type', 'ink')
-                            ->whereRaw('LOWER(ink_color) = ?', [strtolower($color)])
-                            ->first();
-                        if ($ink && $ink->inventory) {
-                            $required[$ink->getKey()] = ($required[$ink->getKey()] ?? 0) + $amount;
-                        }
-                    }
+            $distribution = $this->splitInkIntoComponents($totalInk);
+            foreach ($distribution as $color => $amount) {
+                if ($amount <= 0.0) {
+                    continue;
                 }
+
+                $requiredTotals[$color] = ($requiredTotals[$color] ?? 0.0) + $amount;
             }
         }
 
-        foreach ($required as $inkId => $amount) {
-            $ink = \App\Models\Ink::query()->with('inventory')->find($inkId);
-            $availableStock = $ink->inventory ? $ink->inventory->stock_level : ($ink->stock_qty ?? 0);
-            if (!$ink || $availableStock < $amount) {
+        if (empty($requiredTotals)) {
+            return true;
+        }
+
+        $requiredUnits = $this->distributeInkTotals($requiredTotals);
+
+        foreach ($requiredUnits as $color => $units) {
+            if ($units <= 0) {
+                continue;
+            }
+
+            $ink = $this->resolveInkByColorKey($color);
+            if (!$ink || !$ink->inventory) {
+                return false;
+            }
+
+            $available = max(
+                (int) ($ink->inventory->stock_level ?? 0),
+                (int) ($ink->stock_qty ?? 0),
+                (int) ($ink->stock_qty_ml ?? 0)
+            );
+
+            if ($available < $units) {
                 return false;
             }
         }
@@ -2937,48 +3076,438 @@ class OrderFlowService
         ]);
     }
 
-    public function deductInkStock(Order $order): void
+    protected function determineInkUsageDistribution(Order $order): array
     {
         $order->loadMissing([
             'items.product',
             'items.product.inkUsage',
+            'items.inkUsage',
         ]);
 
+        $totalsMl = array_fill_keys(array_keys(self::CMYK_RATIOS), 0.0);
+        $totalsUnits = array_fill_keys(array_keys(self::CMYK_RATIOS), 0);
+        $perItemSnapshots = [];
+
         foreach ($order->items as $item) {
-            $totalAverageInk = $item->product?->inkUsage?->sum('average_usage_ml') ?? 0;
-            $totalInk = $totalAverageInk * $item->quantity;
-            if ($totalInk > 0) {
-                $cyanMl = $totalInk * 0.3;
-                $magentaMl = $totalInk * 0.3;
-                $yellowMl = $totalInk * 0.3;
-                $blackMl = $totalInk * 0.1;
+            $item->inkUsage()->delete();
 
-                $inkMaterials = [
-                    'Cyan' => $cyanMl,
-                    'Magenta' => $magentaMl,
-                    'Yellow' => $yellowMl,
-                    'Black' => $blackMl,
-                ];
+            $quantity = max(0, (int) $item->quantity);
+            if ($quantity === 0) {
+                continue;
+            }
 
-                foreach ($inkMaterials as $color => $amount) {
-                    if ($amount > 0) {
-                        $ink = \App\Models\Ink::query()
-                            ->with('inventory')
-                            ->where('material_type', 'ink')
-                            ->whereRaw('LOWER(ink_color) = ?', [strtolower($color)])
-                            ->first();
-                        if ($ink) {
-                            $this->adjustInkStock($ink, $amount);
-                        }
-                    }
+            $averageUsage = (float) ($item->product?->inkUsage?->sum('average_usage_ml') ?? 0);
+            $totalInk = round($averageUsage * $quantity, 4);
+            if ($totalInk <= 0.0) {
+                continue;
+            }
+
+            $distributionMl = $this->splitInkIntoComponents($totalInk);
+            $distributionUnits = $this->distributeInkTotals($distributionMl);
+
+            $item->inkUsage()->create([
+                'average_usage_ml' => round($averageUsage, 4),
+                'total_ink_ml' => $totalInk,
+            ]);
+
+            foreach ($distributionMl as $color => $amount) {
+                $totalsMl[$color] = round(($totalsMl[$color] ?? 0.0) + $amount, 4);
+            }
+
+            foreach ($distributionUnits as $color => $units) {
+                $totalsUnits[$color] = ($totalsUnits[$color] ?? 0) + (int) $units;
+            }
+
+            $perItemSnapshots[] = [
+                'order_item_id' => $item->id,
+                'line_type' => $item->line_type,
+                'product_id' => $item->product_id,
+                'quantity' => $quantity,
+                'average_usage_ml' => round($averageUsage, 4),
+                'total_ink_ml' => $totalInk,
+                'distribution_ml' => $distributionMl,
+                'distribution_units' => $distributionUnits,
+            ];
+        }
+
+        $totalsMl = array_filter($totalsMl, static fn ($value) => $value > 0.0);
+        $totalsUnits = array_filter($totalsUnits, static fn ($value) => $value > 0);
+
+        return [
+            'totals_ml' => $totalsMl,
+            'totals_units' => $totalsUnits,
+            'items' => $perItemSnapshots,
+        ];
+    }
+
+    protected function splitInkIntoComponents(float $totalInk): array
+    {
+        $totalInk = max(0.0, round($totalInk, 4));
+
+        if ($totalInk <= 0.0) {
+            return array_fill_keys(array_keys(self::CMYK_RATIOS), 0.0);
+        }
+
+        $ratios = self::CMYK_RATIOS;
+        $colors = array_keys($ratios);
+        $lastColor = end($colors) ?: null;
+        $components = [];
+        $allocated = 0.0;
+
+        foreach ($ratios as $color => $ratio) {
+            if ($lastColor !== null && $color === $lastColor) {
+                $amount = round($totalInk - $allocated, 4);
+            } else {
+                $amount = round($totalInk * $ratio, 4);
+                $allocated = round($allocated + $amount, 4);
+            }
+
+            $components[$color] = max(0.0, $amount);
+        }
+
+        $delta = round($totalInk - array_sum($components), 4);
+        if ($delta !== 0.0 && $lastColor !== null) {
+            $components[$lastColor] = max(0.0, round($components[$lastColor] + $delta, 4));
+        }
+
+        return $components;
+    }
+
+    protected function distributeInkTotals(array $totals): array
+    {
+        $filtered = [];
+        foreach ($totals as $color => $value) {
+            $key = $this->normalizeInkColorKey((string) $color);
+            if ($key === '') {
+                continue;
+            }
+
+            $filtered[$key] = round((float) $value, 4);
+        }
+
+        if (empty($filtered)) {
+            return [];
+        }
+
+        $positive = array_filter($filtered, static fn ($value) => $value > 0);
+        if (empty($positive)) {
+            return array_fill_keys(array_keys($filtered), 0);
+        }
+
+        $allocation = array_fill_keys(array_keys($filtered), 0);
+        $fractions = [];
+
+        foreach ($positive as $color => $amount) {
+            $base = (int) floor($amount);
+            $allocation[$color] = $base;
+            $fractions[$color] = $amount - $base;
+        }
+
+        $targetTotal = (int) round(array_sum($filtered));
+
+        if ($targetTotal <= 0) {
+            return array_fill_keys(array_keys($filtered), 0);
+        }
+
+        $allocatedBase = array_sum($allocation);
+        $remainder = $targetTotal - $allocatedBase;
+
+        if ($remainder > 0 && !empty($fractions)) {
+            arsort($fractions);
+            $keys = array_keys($fractions);
+            $index = 0;
+            $count = count($keys);
+
+            while ($remainder > 0) {
+                $color = $keys[$index % $count];
+                $allocation[$color] += 1;
+                $remainder--;
+                $index++;
+            }
+        } elseif ($remainder < 0 && !empty($fractions)) {
+            asort($fractions);
+            $keys = array_keys($fractions);
+            $index = 0;
+            $count = count($keys);
+
+            while ($remainder < 0) {
+                $color = $keys[$index % $count];
+                if ($allocation[$color] > 0) {
+                    $allocation[$color] -= 1;
+                    $remainder++;
+                }
+
+                $index++;
+                if ($index > $count * 2) {
+                    break;
                 }
             }
         }
+
+        return array_map('intval', $allocation);
     }
 
-    protected function adjustInkStock(\App\Models\Ink $ink, float $delta): array
+    protected function extractInkUsageState($metadata): array
     {
-        $inkRecord = \App\Models\Ink::query()
+        if (is_string($metadata)) {
+            $decoded = json_decode($metadata, true);
+            $metadata = is_array($decoded) ? $decoded : [];
+        } elseif (!is_array($metadata)) {
+            $metadata = [];
+        }
+
+        $inkUsage = (array) ($metadata['ink_usage'] ?? []);
+
+        $previousApplied = [];
+        foreach ((array) ($inkUsage['applied'] ?? []) as $color => $amount) {
+            $key = $this->normalizeInkColorKey((string) $color);
+            if ($key === '') {
+                continue;
+            }
+
+            $previousApplied[$key] = (int) round((float) $amount);
+        }
+
+        $previousRequired = [];
+        foreach ((array) ($inkUsage['required'] ?? []) as $color => $amount) {
+            $key = $this->normalizeInkColorKey((string) $color);
+            if ($key === '') {
+                continue;
+            }
+
+            $previousRequired[$key] = (int) round((float) $amount);
+        }
+
+        $previousShortages = [];
+        foreach ((array) ($inkUsage['shortages'] ?? []) as $color => $amount) {
+            $key = $this->normalizeInkColorKey((string) $color);
+            if ($key === '') {
+                continue;
+            }
+
+            $previousShortages[$key] = (int) round((float) $amount);
+        }
+
+        return [$metadata, $previousApplied, $previousRequired, $previousShortages];
+    }
+
+    protected function normalizeInkColorKey(string $color): string
+    {
+        $normalized = Str::of($color)
+            ->lower()
+            ->replace([' ink', '-ink', '_ink'], '')
+            ->replace(['-', '_', ' '], '')
+            ->trim()
+            ->value();
+
+        if (!is_string($normalized) || $normalized === '') {
+            return '';
+        }
+
+        $sanitized = preg_replace('/[^a-z0-9]/', '', $normalized);
+
+        return is_string($sanitized) ? $sanitized : '';
+    }
+
+    protected function resolveInkByColorKey(string $colorKey): ?Ink
+    {
+        $normalized = $this->normalizeInkColorKey($colorKey);
+        if ($normalized === '') {
+            return null;
+        }
+
+        $headline = Str::headline($normalized);
+        $candidates = array_values(array_unique(array_filter([
+            $normalized,
+            $normalized . ' ink',
+            Str::of($headline)->lower()->value(),
+            Str::of($headline . ' Ink')->lower()->value(),
+        ])));
+
+        if (empty($candidates)) {
+            return null;
+        }
+
+        $exactMatch = Ink::query()
+            ->with('inventory')
+            ->where(function ($query) use ($candidates) {
+                foreach ($candidates as $index => $candidate) {
+                    if ($index === 0) {
+                        $query->whereRaw('LOWER(ink_color) = ?', [$candidate]);
+                    } else {
+                        $query->orWhereRaw('LOWER(ink_color) = ?', [$candidate]);
+                    }
+                }
+            })
+            ->orderByDesc('updated_at')
+            ->first();
+
+        if ($exactMatch) {
+            return $exactMatch;
+        }
+
+        return Ink::query()
+            ->with('inventory')
+            ->where(function ($query) use ($candidates) {
+                foreach ($candidates as $index => $candidate) {
+                    $pattern = '%' . $candidate . '%';
+                    if ($index === 0) {
+                        $query->whereRaw('LOWER(ink_color) LIKE ?', [$pattern]);
+                    } else {
+                        $query->orWhereRaw('LOWER(ink_color) LIKE ?', [$pattern]);
+                    }
+                }
+            })
+            ->orderByDesc('updated_at')
+            ->first();
+    }
+
+    // Reconcile ink stock against required totals while tracking applied amounts in metadata.
+    protected function syncOrderInkUsage(Order $order, array $requiredTotalsMl, array $itemSnapshots = [], ?array $requiredTotalsUnits = null): void
+    {
+        $aggregatedMl = [];
+        foreach ($requiredTotalsMl as $color => $amount) {
+            $key = $this->normalizeInkColorKey((string) $color);
+            if ($key === '') {
+                continue;
+            }
+
+            $aggregatedMl[$key] = round((float) $amount, 4);
+        }
+
+        if ($requiredTotalsUnits === null) {
+            $requiredUnits = $this->distributeInkTotals($aggregatedMl);
+        } else {
+            $requiredUnits = [];
+            foreach ($requiredTotalsUnits as $color => $amount) {
+                $key = $this->normalizeInkColorKey((string) $color);
+                if ($key === '') {
+                    continue;
+                }
+
+                $requiredUnits[$key] = max(0, (int) $amount);
+            }
+        }
+
+        foreach ($aggregatedMl as $color => $amount) {
+            if (!array_key_exists($color, $requiredUnits)) {
+                $requiredUnits[$color] = 0;
+            }
+        }
+
+        DB::transaction(function () use ($order, $aggregatedMl, $requiredUnits, $itemSnapshots) {
+            $lockedOrder = Order::query()->whereKey($order->getKey())->lockForUpdate()->first();
+            if (!$lockedOrder) {
+                return;
+            }
+
+            [$metadata, $previousApplied, $previousRequired, $previousShortages] = $this->extractInkUsageState($lockedOrder->metadata);
+
+            $requiredUnitsLocal = $requiredUnits;
+            foreach ($previousApplied as $key => $_) {
+                if (!array_key_exists($key, $requiredUnitsLocal)) {
+                    $requiredUnitsLocal[$key] = 0;
+                }
+            }
+
+            $allKeys = array_values(array_unique(array_merge(
+                array_keys($requiredUnitsLocal),
+                array_keys($previousApplied)
+            )));
+
+            if (empty($allKeys) && empty($previousApplied)) {
+                if (isset($metadata['ink_usage'])) {
+                    unset($metadata['ink_usage']);
+                    $lockedOrder->update(['metadata' => $metadata]);
+                    $order->setAttribute('metadata', $metadata);
+                }
+                return;
+            }
+
+            $shortages = [];
+            $updatedApplied = $previousApplied;
+
+            foreach ($allKeys as $key) {
+                $requiredQty = (int) ($requiredUnitsLocal[$key] ?? 0);
+                $previousQty = (int) ($previousApplied[$key] ?? 0);
+                $diffQty = $requiredQty - $previousQty;
+
+                if ($diffQty === 0) {
+                    continue;
+                }
+
+                $ink = $this->resolveInkByColorKey($key);
+                if (!$ink) {
+                    continue;
+                }
+
+                $adjustment = $this->adjustInkStock($ink, $diffQty);
+                $appliedDelta = (int) round($adjustment['applied'] ?? $diffQty);
+
+                if ($diffQty > 0 && $appliedDelta < $diffQty) {
+                    $shortages[$key] = ($shortages[$key] ?? 0) + ($diffQty - $appliedDelta);
+                }
+
+                $updatedApplied[$key] = max(0, $previousQty + $appliedDelta);
+            }
+
+            $filteredRequired = array_filter($requiredUnitsLocal, static fn ($value) => (int) $value !== 0);
+            $filteredApplied = array_filter($updatedApplied, static fn ($value) => (int) $value !== 0);
+
+            if (empty($filteredRequired) && empty($filteredApplied)) {
+                if (isset($metadata['ink_usage'])) {
+                    unset($metadata['ink_usage']);
+                    $lockedOrder->update(['metadata' => $metadata]);
+                    $order->setAttribute('metadata', $metadata);
+                }
+                return;
+            }
+
+            $rawTotals = array_filter($aggregatedMl, static fn ($value) => $value > 0.0);
+            $inkMetadata = [
+                'required' => $filteredRequired,
+                'applied' => $filteredApplied,
+                'raw_required_ml' => array_map(static fn ($value) => round((float) $value, 4), $rawTotals),
+                'total_required_ml' => round(array_sum($aggregatedMl), 4),
+                'items' => array_values($itemSnapshots),
+                'shortages' => $shortages,
+                'updated_at' => now()->toIso8601String(),
+            ];
+
+            $inkMetadata = array_filter($inkMetadata, function ($value) {
+                if (is_array($value)) {
+                    return !empty($value);
+                }
+
+                return $value !== null;
+            });
+
+            $existingMetadata = $metadata['ink_usage'] ?? null;
+            if ($existingMetadata === $inkMetadata) {
+                $order->setAttribute('metadata', $metadata);
+                return;
+            }
+
+            $metadata['ink_usage'] = $inkMetadata;
+            $lockedOrder->update(['metadata' => $metadata]);
+            $order->setAttribute('metadata', $metadata);
+        });
+    }
+
+    public function deductInkStock(Order $order): void
+    {
+        $context = $this->determineInkUsageDistribution($order);
+        $this->syncOrderInkUsage(
+            $order,
+            $context['totals_ml'] ?? [],
+            $context['items'] ?? [],
+            $context['totals_units'] ?? []
+        );
+    }
+
+    protected function adjustInkStock(Ink $ink, float $delta): array
+    {
+        $inkRecord = Ink::query()
             ->whereKey($ink->getKey())
             ->lockForUpdate()
             ->with(['inventory' => function ($query) {
@@ -3021,6 +3550,18 @@ class OrderFlowService
 
         $applied = $currentInkStock - $newInkStock;
 
+        $movementQuantity = (int) round($applied);
+        if ($movementQuantity !== 0) {
+            $movementType = $movementQuantity > 0 ? 'usage' : 'restock';
+
+            InkStockMovement::create([
+                'ink_id' => $ink->getKey(),
+                'movement_type' => $movementType,
+                'quantity' => abs($movementQuantity),
+                'user_id' => Auth::id(),
+            ]);
+        }
+
         return [
             'applied' => $applied,
             'shortage' => $shortage,
@@ -3033,40 +3574,46 @@ class OrderFlowService
 
     public function restoreInkStock(Order $order): void
     {
-        $order->loadMissing([
-            'items.product',
-            'items.product.inkUsage',
-        ]);
+        $metadata = $order->metadata;
+        if (is_string($metadata)) {
+            $decoded = json_decode($metadata, true);
+            $metadata = is_array($decoded) ? $decoded : [];
+        } elseif (!is_array($metadata)) {
+            $metadata = [];
+        }
 
-        foreach ($order->items as $item) {
-            $totalAverageInk = $item->product?->inkUsage?->sum('average_usage_ml') ?? 0;
-            $totalInk = $totalAverageInk * $item->quantity;
-            if ($totalInk > 0) {
-                $cyanMl = $totalInk * 0.3;
-                $magentaMl = $totalInk * 0.3;
-                $yellowMl = $totalInk * 0.3;
-                $blackMl = $totalInk * 0.1;
+        $appliedUsage = data_get($metadata, 'ink_usage.applied', []);
+        if (!empty($appliedUsage)) {
+            $this->syncOrderInkUsage($order, []);
+            return;
+        }
 
-                $inkMaterials = [
-                    'Cyan' => $cyanMl,
-                    'Magenta' => $magentaMl,
-                    'Yellow' => $yellowMl,
-                    'Black' => $blackMl,
-                ];
+        $context = $this->determineInkUsageDistribution($order);
+        $requiredUnits = $context['totals_units'] ?? [];
 
-                foreach ($inkMaterials as $color => $amount) {
-                    if ($amount > 0) {
-                        $ink = \App\Models\Ink::query()
-                            ->with('inventory')
-                            ->where('material_type', 'ink')
-                            ->whereRaw('LOWER(ink_color) = ?', [strtolower($color)])
-                            ->first();
-                        if ($ink) {
-                            $this->adjustInkStock($ink, -$amount); // Negative to restore
-                        }
-                    }
-                }
+        if (empty($requiredUnits)) {
+            $rawTotals = $context['totals_ml'] ?? [];
+            $requiredUnits = $this->distributeInkTotals($rawTotals);
+        }
+
+        if (empty($requiredUnits)) {
+            return;
+        }
+
+        foreach ($requiredUnits as $color => $units) {
+            if ($units <= 0) {
+                continue;
             }
+
+            $ink = $this->resolveInkByColorKey($color);
+            if ($ink) {
+                $this->adjustInkStock($ink, -1 * $units);
+            }
+        }
+
+        if (!empty($metadata) && isset($metadata['ink_usage'])) {
+            unset($metadata['ink_usage']);
+            $order->update(['metadata' => $metadata]);
         }
     }
 }

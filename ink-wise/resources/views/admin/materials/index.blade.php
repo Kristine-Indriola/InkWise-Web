@@ -454,6 +454,16 @@
                             <span class="status-label {{ $inkStatusClass }}">{{ $statusRemark }}</span>
                         </td>
                         <td class="actions-col text-center">
+                            <button type="button"
+                                    class="btn btn-sm btn-success btn-restock"
+                                    data-action="{{ route('admin.inks.restock', $ink->id) }}"
+                                    data-name="{{ $ink->material_name }}"
+                                    data-unit="{{ $ink->unit ?? 'can' }}"
+                                    data-stock="{{ $stockLevel }}"
+                                    title="Restock"
+                                    aria-label="Restock {{ $ink->material_name }}">
+                                <i class="fa-solid fa-boxes-stacked"></i>
+                            </button>
                             <a href="{{ route('admin.inks.edit', $ink->id) }}" class="btn btn-sm btn-warning" title="Edit">
                                 <i class="fa-solid fa-pen-to-square"></i>
                             </a>
