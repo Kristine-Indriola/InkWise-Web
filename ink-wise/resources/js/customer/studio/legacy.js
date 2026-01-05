@@ -3749,6 +3749,8 @@ export function initializeCustomerStudioLegacy() {
     inputs.forEach(initInput);
 
     const createCustomField = (previewKey, value = '') => {
+      const sideForField = normalizeSideKey(currentSide);
+      const sanitizedValue = sanitizeTextValue(value);
       const wrapper = document.createElement('div');
       wrapper.className = 'text-field-item';
 
@@ -3762,8 +3764,11 @@ export function initializeCustomerStudioLegacy() {
       input.className = 'text-field-input';
       input.placeholder = 'Add your text';
       input.dataset.previewTarget = previewKey;
-      input.value = value;
-      input.dataset.defaultValue = value || '';
+      input.dataset.templateSide = sideForField;
+      input.value = sanitizedValue;
+      input.dataset.defaultValue = sanitizedValue || '';
+      setStoredTextValue(sideForField, previewKey, sanitizedValue);
+      captureDefaultTextValue(sideForField, previewKey, sanitizedValue);
       wrapper.appendChild(input);
 
       const delBtn = document.createElement('button');
@@ -3817,6 +3822,22 @@ export function initializeCustomerStudioLegacy() {
 
     const normalizeSvgTextVisibility = (root) => {
       if (!root) return;
+
+      const findAncestorFill = (node) => {
+        let current = node?.parentNode || null;
+        while (current) {
+          const attrFill = typeof current.getAttribute === 'function' ? current.getAttribute('fill') : null;
+          const styleFill = current.style?.fill;
+          const dataFill = current.dataset?.color || current.dataset?.defaultColor || null;
+          const candidate = attrFill || styleFill || dataFill;
+          if (candidate && candidate !== 'none' && candidate !== 'transparent') {
+            return candidate;
+          }
+          current = current.parentNode || null;
+        }
+        return null;
+      };
+
       const texts = root.querySelectorAll('text, tspan');
       texts.forEach((node) => {
         node.removeAttribute('opacity');
@@ -3824,14 +3845,61 @@ export function initializeCustomerStudioLegacy() {
         if (node.style && node.style.mixBlendMode) {
           node.style.mixBlendMode = 'normal';
         }
-        const fill = node.getAttribute('fill');
-        if (!fill || fill === 'none') {
-          node.setAttribute('fill', '#111');
+
+        const rawAttributeFill = node.getAttribute('fill');
+        const inlineFill = node.style?.fill;
+        const datasetFill = node.dataset?.color;
+        let resolvedFill = rawAttributeFill && rawAttributeFill !== 'none' ? rawAttributeFill : null;
+
+        if ((!resolvedFill || resolvedFill === 'transparent') && inlineFill && inlineFill !== 'none') {
+          resolvedFill = inlineFill;
         }
+
+        if ((!resolvedFill || resolvedFill === 'transparent') && datasetFill && datasetFill !== 'none') {
+          resolvedFill = datasetFill;
+        }
+
+        if ((!resolvedFill || resolvedFill === 'transparent') && typeof window !== 'undefined' && typeof window.getComputedStyle === 'function') {
+          try {
+            const computedFill = window.getComputedStyle(node).fill;
+            if (computedFill && computedFill !== 'none' && computedFill !== 'transparent') {
+              resolvedFill = computedFill;
+            }
+          } catch (error) {
+            // Swallow computed style failures (e.g. detached nodes)
+          }
+        }
+
+        if (!resolvedFill || resolvedFill === 'transparent' || resolvedFill === 'none') {
+          const inheritedFill = findAncestorFill(node);
+          if (inheritedFill && inheritedFill !== 'none' && inheritedFill !== 'transparent') {
+            resolvedFill = inheritedFill;
+          }
+        }
+
+        const normalizedFill = normalizeHexColor(resolvedFill || '')
+          || rgbStringToHex(resolvedFill || '')
+          || (resolvedFill && resolvedFill !== 'none' && resolvedFill !== 'transparent' ? resolvedFill : null);
+
+        const fallbackFill = '#111111';
+        const finalFill = normalizedFill || fallbackFill;
+
+        node.setAttribute('fill', finalFill);
+        if (node.style) {
+          node.style.fill = finalFill;
+          node.style.fillOpacity = '1';
+          node.style.strokeOpacity = '1';
+        }
+
+        if (node.dataset) {
+          node.dataset.color = finalFill;
+          if (normalizedFill) {
+            node.dataset.defaultColor = normalizedFill;
+          }
+        }
+
         node.removeAttribute('fill-opacity');
         node.removeAttribute('stroke-opacity');
-        node.style.fillOpacity = '1';
-        node.style.strokeOpacity = '1';
         if (!node.getAttribute('stroke')) {
           node.setAttribute('stroke', 'none');
         }
@@ -4280,6 +4348,7 @@ export function initializeCustomerStudioLegacy() {
           svgText?.remove();
         }
 
+        deleteStoredTextValue(normalizeSideKey(currentSide), previewKey);
         autosave?.schedule('remove-text-field');
       });
     };
@@ -5995,8 +6064,14 @@ export function initializeCustomerStudioLegacy() {
       if (e.target.matches('#textFieldList input')) {
         setTimeout(() => {
           const active = document.activeElement;
-          if (!active || (!active.matches('#textFieldList input') && !active.closest('.studio-react-widgets'))) {
-            document.body.classList.remove('text-toolbar-visible');
+          const inputFocused = active && typeof active.matches === 'function' && active.matches('#textFieldList input');
+          const toolbarFocused = active && typeof active.closest === 'function' && active.closest('.studio-react-widgets');
+          if (!inputFocused && !toolbarFocused) {
+            if (activeTextKey || activeImageKey || backgroundSelected) {
+              syncToolbarVisibility();
+            } else {
+              document.body.classList.remove('text-toolbar-visible');
+            }
           }
         }, 100);
       }
