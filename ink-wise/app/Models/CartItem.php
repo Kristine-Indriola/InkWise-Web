@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CartItem extends Model
 {
+    // Use production table name
+    protected $table = 'customer_cart_items';
+
     protected $fillable = [
         'cart_id',
         'session_id',
