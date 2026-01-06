@@ -1031,7 +1031,7 @@
                 <label class="option-card payment-option" data-payment-type="gcash-deposit-cod">
                     <input type="radio" name="paymentMethod" value="gcash-deposit-cod">
                     <div class="option-content">
-                        <h3>50% GCash Deposit + Cash on Delivery</h3>
+                        <h3>50% GCash Deposit + Cash on Pickup</h3>
                         <p>Pay ₱{{ number_format($totalAmount / 2, 2) }} deposit now via GCash, ₱{{ number_format($totalAmount / 2, 2) }} cash on delivery.</p>
                         <span class="option-tag">Required Deposit</span>
                     </div>

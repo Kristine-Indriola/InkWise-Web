@@ -493,6 +493,7 @@ export function initializeCustomerStudioLegacy() {
     let uploadedFrontImage = null;
     let uploadedBackImage = null;
     let autosave = null;
+    let autosaveHeartbeatTimer = null;
     let activeTextKey = null;
     let activeImageKey = null;
     let backgroundSelected = false;
@@ -628,6 +629,7 @@ export function initializeCustomerStudioLegacy() {
           texts,
           images: imageEntries,
           canvas: canvasMeta,
+          placeholders: placeholderLabels,
         },
         preview: {
           image: previewImage,
@@ -648,6 +650,45 @@ export function initializeCustomerStudioLegacy() {
         debounce: 0, // Save immediately on change
       });
       console.log('[InkWise Studio] Autosave initialized', autosave);
+
+      const flushAutosave = (reason) => {
+        if (!autosave) {
+          return;
+        }
+        try {
+          void autosave.flush(reason);
+        } catch (flushError) {
+          console.debug('[InkWise Studio] Autosave flush skipped.', flushError);
+        }
+      };
+
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'hidden') {
+          flushAutosave('visibility-hidden');
+        }
+      };
+
+      const handlePageHide = () => {
+        flushAutosave('page-hide');
+      };
+
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      window.addEventListener('pagehide', handlePageHide);
+      window.addEventListener('beforeunload', handlePageHide);
+
+      autosaveHeartbeatTimer = window.setInterval(() => {
+        flushAutosave('heartbeat');
+      }, 60000);
+
+      window.addEventListener('unload', () => {
+        if (autosaveHeartbeatTimer) {
+          window.clearInterval(autosaveHeartbeatTimer);
+          autosaveHeartbeatTimer = null;
+        }
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('pagehide', handlePageHide);
+        window.removeEventListener('beforeunload', handlePageHide);
+      });
 
       // Periodic autosave every 10 seconds as fallback
       setInterval(() => {
@@ -723,21 +764,40 @@ export function initializeCustomerStudioLegacy() {
 
           // Collect current design snapshot
           const snapshot = await collectDesignSnapshot('save-template');
+          const designPayload = Object.assign({}, snapshot && snapshot.design ? snapshot.design : {});
+          const snapshotPlaceholders = snapshot && Array.isArray(snapshot.placeholders) ? snapshot.placeholders : [];
+          designPayload.placeholders = snapshotPlaceholders;
+          if (snapshot && snapshot.product_id) {
+            designPayload.product_id = snapshot.product_id;
+          }
+
+          const previewImage = snapshot && snapshot.preview ? snapshot.preview.image || null : null;
+          const previewImages = snapshot && snapshot.preview && Array.isArray(snapshot.preview.images)
+            ? snapshot.preview.images.filter(Boolean)
+            : [];
+          const requestBody = {
+            template_name: templateName.trim(),
+            design: designPayload,
+            preview_image: previewImage,
+            preview_images: previewImages,
+            placeholders: snapshotPlaceholders,
+          };
+
+          const headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          };
+          if (csrfToken) {
+            headers['X-CSRF-TOKEN'] = csrfToken;
+          }
 
           // Send to server
           const response = await fetch(routes.saveTemplate, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'X-CSRF-TOKEN': csrfToken,
-              'X-Requested-With': 'XMLHttpRequest',
-            },
+            headers,
             credentials: 'same-origin',
-            body: JSON.stringify({
-              template_name: templateName.trim(),
-              ...snapshot,
-            }),
+            body: JSON.stringify(requestBody),
           });
 
           if (!response.ok) {

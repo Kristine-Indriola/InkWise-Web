@@ -321,9 +321,9 @@ public function saveCanvas(Request $request, $id)
         $imageData = str_replace(' ', '+', $imageData);
 
         $imageName = 'template_' . $id . '_' . time() . '.png';
-        $filePath = 'templates/preview/' . $imageName;
+        $filePath = 'saved_templates/previews/' . $imageName;
 
-        // Save to storage/app/public/templates/preview
+        // Save to storage/app/public/saved_templates/previews
         Storage::disk('public')->put($filePath, base64_decode($imageData));
 
         // Update DB preview column
@@ -343,6 +343,7 @@ public function saveCanvas(Request $request, $id)
 
     public function saveTemplate(Request $request, $id)
     {
+        $this->expandCompressedPayload($request);
         Log::info('saveTemplate called for template', ['id' => $id, 'request_data_keys' => array_keys($request->all())]);
         $template = Template::findOrFail($id);
 
@@ -360,6 +361,7 @@ public function saveCanvas(Request $request, $id)
             'has_svg_markup' => !empty($validated['svg_markup']),
             'has_preview_image' => !empty($validated['preview_image']),
             'has_preview_images' => !empty($validated['preview_images']),
+            'has_design' => !empty($validated['design']),
         ]);
 
         if (!empty($validated['template_name'])) {
@@ -381,7 +383,7 @@ public function saveCanvas(Request $request, $id)
         if (!empty($validated['preview_image'])) {
             $template->preview = $this->persistDataUrl(
                 $validated['preview_image'],
-                'templates/preview',
+                'saved_templates/previews',
                 'png',
                 $template->preview,
                 'preview_image'
@@ -401,7 +403,7 @@ public function saveCanvas(Request $request, $id)
                 if (is_string($imageData) && !empty($imageData)) {
                     $filename = $this->persistDataUrl(
                         $imageData,
-                        'templates/preview',
+                        'saved_templates/previews',
                         'png',
                         null,
                         "preview_{$key}"
@@ -443,7 +445,7 @@ public function saveCanvas(Request $request, $id)
         if (!empty($validated['svg_markup'])) {
             $template->svg_path = $this->persistDataUrl(
                 $validated['svg_markup'],
-                'templates/svg',
+                'saved_templates/svg',
                 'svg',
                 $template->svg_path,
                 'svg_markup'
@@ -453,7 +455,7 @@ public function saveCanvas(Request $request, $id)
 
         $template->metadata = $metadata;
         $this->synchronizeTemplateSideState($template, $metadata);
-        $template->status = $template->status ?? 'draft';
+        $template->status = 'draft'; // Always set to draft when manually saving
         $template->save();
 
         $prefix = $request->route()->getPrefix();
@@ -480,7 +482,7 @@ public function uploadPreview(Request $request, $id)
     $imgData = base64_decode($imgData);
 
     // Save to storage (public disk)
-    $filename = 'templates/preview/template_' . $id . '_' . time() . '.png';
+    $filename = 'saved_templates/previews/template_' . $id . '_' . time() . '.png';
     Storage::disk('public')->put($filename, $imgData);
 
     // Update preview column (store path)
@@ -503,6 +505,7 @@ public function uploadPreview(Request $request, $id)
 
     public function autosave(Request $request, $id)
     {
+        $this->expandCompressedPayload($request);
         $template = Template::findOrFail($id);
 
         $validated = $request->validate([
@@ -644,9 +647,9 @@ public function uploadToProduct(Request $request, $id)
             if ($dir && Storage::disk('public')->exists($dir)) {
                 $files = Storage::disk('public')->files($dir);
             } else {
-                // fallback: list all files under templates/preview if dir missing
-                if (Storage::disk('public')->exists('templates/preview')) {
-                    $files = Storage::disk('public')->files('templates/preview');
+                // fallback: list all files under saved_templates/previews if dir missing
+                if (Storage::disk('public')->exists('saved_templates/previews')) {
+                    $files = Storage::disk('public')->files('saved_templates/previews');
                 }
             }
 
@@ -811,6 +814,19 @@ public function uploadToProduct(Request $request, $id)
             'status_updated_at' => now(),
             'metadata' => $metadata,
         ])->save();
+
+        // Create a product if one doesn't exist
+        if (!$template->product) {
+            $product = Product::create([
+                'name' => $template->name,
+                'product_type' => $template->product_type,
+                'event_type' => $template->event_type,
+                'template_id' => $template->id,
+                'base_price' => $template->base_price ?? 100,
+                'description' => $template->description,
+                'theme_style' => $template->theme_style,
+            ]);
+        }
 
         // Flip any related products back to published once the template is re-uploaded
         // Send notification to all admin users
@@ -1238,6 +1254,149 @@ public function uploadToProduct(Request $request, $id)
         }
 
         return false;
+    }
+
+    protected function expandCompressedPayload(Request $request): void
+    {
+        if (!$request->filled('compressed_payload')) {
+            return;
+        }
+
+        $encoding = strtolower((string) $request->input('payload_encoding', 'deflate-base64'));
+        $compressed = $request->input('compressed_payload');
+
+        if (!is_string($compressed) || trim($compressed) === '') {
+            throw ValidationException::withMessages([
+                'compressed_payload' => 'Compressed payload is empty.',
+            ]);
+        }
+
+        $binary = base64_decode($compressed, true);
+        if ($binary === false) {
+            throw ValidationException::withMessages([
+                'compressed_payload' => 'Compressed payload must be valid base64 data.',
+            ]);
+        }
+
+        switch ($encoding) {
+            case 'deflate-base64':
+            case 'zlib-base64':
+                $json = $this->attemptPayloadInflate($binary);
+                break;
+            case 'gzip-base64':
+                $json = @gzdecode($binary);
+                break;
+            default:
+                throw ValidationException::withMessages([
+                    'payload_encoding' => 'Unsupported payload encoding: ' . $encoding,
+                ]);
+        }
+
+        if ($json === false || $json === null || $json === '') {
+            $this->logFailedInflateSample($binary);
+            throw ValidationException::withMessages([
+                'compressed_payload' => 'Failed to decompress payload contents.',
+            ]);
+        }
+
+        $decoded = json_decode($json, true);
+        if (!is_array($decoded)) {
+            throw ValidationException::withMessages([
+                'compressed_payload' => 'Decompressed payload is not valid JSON.',
+            ]);
+        }
+
+        $request->merge($decoded);
+        $request->request->remove('compressed_payload');
+        $request->request->remove('payload_encoding');
+        if ($request->request->has('payload_version')) {
+            $request->request->remove('payload_version');
+        }
+
+        Log::info('Compressed payload expanded', [
+            'encoding' => $encoding,
+            'expanded_keys' => array_keys($decoded),
+            'compressed_bytes' => strlen($binary),
+            'expanded_bytes' => strlen($json),
+        ]);
+    }
+
+    protected function attemptPayloadInflate(string $binary): string|false
+    {
+        $attempts = [
+            'gzuncompress' => fn ($payload) => @gzuncompress($payload),
+            'gzinflate' => fn ($payload) => @gzinflate($payload),
+            'gzdecode' => fn ($payload) => @gzdecode($payload),
+            'zlib_decode' => function ($payload) {
+                if (!function_exists('zlib_decode')) {
+                    return false;
+                }
+                return @zlib_decode($payload);
+            },
+            'inflate_raw' => function ($payload) {
+                if (!function_exists('inflate_init') || !defined('ZLIB_ENCODING_RAW')) {
+                    return false;
+                }
+                $resource = @inflate_init(ZLIB_ENCODING_RAW);
+                if ($resource === false) {
+                    return false;
+                }
+                $result = @inflate_add($resource, $payload, ZLIB_FINISH);
+                if ($result === false || $result === null || $result === '') {
+                    return false;
+                }
+                return $result;
+            },
+            'inflate_zlib' => function ($payload) {
+                if (!function_exists('inflate_init') || !defined('ZLIB_ENCODING_ZLIB')) {
+                    return false;
+                }
+                $resource = @inflate_init(ZLIB_ENCODING_ZLIB);
+                if ($resource === false) {
+                    return false;
+                }
+                $result = @inflate_add($resource, $payload, ZLIB_FINISH);
+                if ($result === false || $result === null || $result === '') {
+                    return false;
+                }
+                return $result;
+            },
+            'inflate_gzip' => function ($payload) {
+                if (!function_exists('inflate_init') || !defined('ZLIB_ENCODING_GZIP')) {
+                    return false;
+                }
+                $resource = @inflate_init(ZLIB_ENCODING_GZIP);
+                if ($resource === false) {
+                    return false;
+                }
+                $result = @inflate_add($resource, $payload, ZLIB_FINISH);
+                if ($result === false || $result === null || $result === '') {
+                    return false;
+                }
+                return $result;
+            },
+        ];
+
+        foreach ($attempts as $label => $callback) {
+            $result = $callback($binary);
+            if ($result !== false && $result !== null && $result !== '') {
+                Log::debug('Compressed payload inflate succeeded', ['strategy' => $label, 'compressed_bytes' => strlen($binary)]);
+                return $result;
+            }
+        }
+
+        Log::warning('Compressed payload inflate failed using available strategies', ['compressed_bytes' => strlen($binary)]);
+        return false;
+    }
+
+    protected function logFailedInflateSample(string $binary): void
+    {
+        $prefix = substr($binary, 0, 16);
+        $hex = bin2hex($prefix);
+        Log::debug('Compressed payload header sample', [
+            'hex_prefix' => $hex,
+            'length' => strlen($binary),
+        ]);
     }
 
     protected function normalizePreviewPath($value): ?string
