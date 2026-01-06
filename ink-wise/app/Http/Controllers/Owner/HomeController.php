@@ -40,7 +40,7 @@ class HomeController extends Controller
             })
             ->groupBy('order_items.product_id', 'order_items.product_name')
             ->orderByDesc('total_sold')
-            ->limit(4)
+            ->limit(5)
             ->get();
 
         $topSellingProducts = [
