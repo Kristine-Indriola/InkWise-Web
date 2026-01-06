@@ -1030,13 +1030,23 @@ function cleanSvgContent($svgContent) {
                                     <img class="preview-clickable" src="{{ \App\Support\ImageResolver::url($front) }}" alt="Preview of {{ $template->name }}" loading="lazy">
                                 @endif
                             @else
-                                <div class="preview-placeholder">
-                                    <div class="placeholder-icon">
-                                        <i class="fas fa-image"></i>
+                                @if(!empty($template->design))
+                                    <div class="preview-placeholder">
+                                        <div class="placeholder-icon">
+                                            <i class="fas fa-file-alt"></i>
+                                        </div>
+                                        <span class="placeholder-text">Template saved</span>
+                                        <p class="placeholder-hint">Open in editor to see preview</p>
                                     </div>
-                                    <span class="placeholder-text">No preview available</span>
-                                    <p class="placeholder-hint">Upload images in editor</p>
-                                </div>
+                                @else
+                                    <div class="preview-placeholder">
+                                        <div class="placeholder-icon">
+                                            <i class="fas fa-image"></i>
+                                        </div>
+                                        <span class="placeholder-text">No preview available</span>
+                                        <p class="placeholder-hint">Upload images in editor</p>
+                                    </div>
+                                @endif
                             @endif
                             @if($back)
                                 @if($isSvgBack)

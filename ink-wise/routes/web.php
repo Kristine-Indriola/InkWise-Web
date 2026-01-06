@@ -776,7 +776,7 @@ Route::post('/design/autosave', [OrderFlowController::class, 'autosaveDesign'])
     // ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('order.design.autosave');
 Route::post('/design/save-template', [OrderFlowController::class, 'saveAsTemplate'])
-    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer,staff')
     ->name('order.design.save-template');
 
 /**Order Forms & Pages*/
