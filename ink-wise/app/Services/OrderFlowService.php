@@ -24,6 +24,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -961,6 +962,8 @@ class OrderFlowService
 
     public function persistDesignDraft(Product $product, array $payload, ?Authenticatable $user = null): CustomerTemplateCustom
     {
+        Log::info('persistDesignDraft called', ['payload_keys' => array_keys($payload)]);
+
         $user = $user ?? Auth::user();
         $userId = $user?->getAuthIdentifier();
         $customerId = $user?->customer?->customer_id;
@@ -978,6 +981,38 @@ class OrderFlowService
 
         $record = CustomerTemplateCustom::query()->firstOrNew($match);
 
+        // Process preview_image
+        $previewImage = Arr::get($payload, 'preview_image');
+        if ($previewImage && Str::startsWith($previewImage, 'data:')) {
+            $extension = str_contains($previewImage, 'svg') ? 'svg' : 'png';
+            $previewImage = $this->persistDataUrl($previewImage, 'customer/designs/preview', $extension, $record->preview_image, 'preview_image');
+        }
+
+        // Process preview_images
+        $previewImages = Arr::get($payload, 'preview_images', []);
+        $processedPreviewImages = [];
+        foreach ($previewImages as $key => $image) {
+            if (is_string($image) && Str::startsWith($image, 'data:')) {
+                $extension = str_contains($image, 'svg') ? 'svg' : 'png';
+                $processedPreviewImages[$key] = $this->persistDataUrl($image, 'customer/designs/preview', $extension, $record->preview_images[$key] ?? null, 'preview_images.' . $key);
+            } else {
+                $processedPreviewImages[$key] = $image;
+            }
+        }
+
+        // Process svg
+        $design = Arr::get($payload, 'design', []);
+        $svgPath = $record->svg_path;
+        if (isset($design['sides'])) {
+            foreach ($design['sides'] as $side => $sideData) {
+                if (isset($sideData['svg']) && is_string($sideData['svg'])) {
+                    $svgDataUrl = 'data:image/svg+xml;base64,' . base64_encode($sideData['svg']);
+                    $svgPath = $this->persistDataUrl($svgDataUrl, 'customer/designs/svg', 'svg', $svgPath, 'svg');
+                    break; // save only one for now
+                }
+            }
+        }
+
         $record->fill([
             'customer_id' => $customerId,
             'user_id' => $userId,
@@ -987,11 +1022,12 @@ class OrderFlowService
             'order_item_id' => Arr::get($payload, 'order_item_id'),
             'status' => Arr::get($payload, 'status', 'draft'),
             'is_locked' => (bool) Arr::get($payload, 'is_locked', false),
-            'design' => Arr::get($payload, 'design', []),
+            'design' => $design,
             'summary' => Arr::get($payload, 'summary'),
             'placeholders' => Arr::get($payload, 'placeholders', []),
-            'preview_image' => Arr::get($payload, 'preview_image'),
-            'preview_images' => Arr::get($payload, 'preview_images', []),
+            'preview_image' => $previewImage,
+            'preview_images' => $processedPreviewImages,
+            'svg_path' => $svgPath,
             'last_edited_at' => Arr::get($payload, 'last_edited_at') ? Carbon::parse(Arr::get($payload, 'last_edited_at')) : now(),
         ]);
 
@@ -1953,6 +1989,7 @@ class OrderFlowService
         $envelopeCache = [];
         $addonCache = [];
         $materialNameCache = [];
+        $materialOrderingColumn = Schema::hasColumn('materials', 'updated_at') ? 'updated_at' : 'material_id';
 
         $existingUsageRecords = ProductMaterial::query()
             ->where('order_id', $order->id)
@@ -1974,7 +2011,7 @@ class OrderFlowService
             ]);
         });
 
-        $resolveMaterialByName = function (?string $name) use (&$materialNameCache) {
+        $resolveMaterialByName = function (?string $name) use (&$materialNameCache, $materialOrderingColumn) {
             if (!$name) {
                 return null;
             }
@@ -2003,7 +2040,7 @@ class OrderFlowService
                         $query->orWhereRaw("REPLACE(REPLACE(REPLACE(LOWER(material_name), ' ', ''), '-', ''), '_', '') = ?", [$compact]);
                     }
                 })
-                ->orderByDesc('updated_at')
+                ->orderByDesc($materialOrderingColumn)
                 ->first();
 
             foreach ($lookupKeys as $lookupKey) {
@@ -2986,15 +3023,22 @@ class OrderFlowService
             }
 
             $ink = $this->resolveInkByColorKey($color);
-            if (!$ink || !$ink->inventory) {
-                return false;
+            if (!$ink) {
+                // Ink not configured; treat as non-blocking but surface via metadata later.
+                continue;
             }
 
+            $inventoryStock = optional($ink->inventory)->stock_level;
+
             $available = max(
-                (int) ($ink->inventory->stock_level ?? 0),
+                (int) ($inventoryStock ?? 0),
                 (int) ($ink->stock_qty ?? 0),
                 (int) ($ink->stock_qty_ml ?? 0)
             );
+
+            if ($available <= 0) {
+                return false;
+            }
 
             if ($available < $units) {
                 return false;
@@ -3030,7 +3074,19 @@ class OrderFlowService
 
         $extrasTotal = round($paperTotal + $addonsTotal + $inkTotal, 2);
 
-        $subtotal = round($baseSubtotal + $extrasTotal, 2);
+        $additionalLineItemsTotal = $order->items
+            ->reject(fn ($item) => $item->is($invitationItem))
+            ->sum(function (OrderItem $item) {
+                $subtotal = $item->subtotal;
+
+                if ($subtotal === null) {
+                    $subtotal = $item->unit_price * $item->quantity;
+                }
+
+                return (float) $subtotal;
+            });
+
+        $subtotal = round($baseSubtotal + $extrasTotal + $additionalLineItemsTotal, 2);
         $tax = 0.0;
         $shipping = $order->shipping_fee !== null ? (float) $order->shipping_fee : static::DEFAULT_SHIPPING_FEE;
         $total = round($subtotal + $shipping, 2);
@@ -3328,6 +3384,8 @@ class OrderFlowService
             return null;
         }
 
+        $orderByColumn = Schema::hasColumn('inks', 'updated_at') ? 'updated_at' : 'id';
+
         $exactMatch = Ink::query()
             ->with('inventory')
             ->where(function ($query) use ($candidates) {
@@ -3339,7 +3397,7 @@ class OrderFlowService
                     }
                 }
             })
-            ->orderByDesc('updated_at')
+            ->orderByDesc($orderByColumn)
             ->first();
 
         if ($exactMatch) {
@@ -3358,7 +3416,7 @@ class OrderFlowService
                     }
                 }
             })
-            ->orderByDesc('updated_at')
+            ->orderByDesc($orderByColumn)
             ->first();
     }
 
@@ -3615,5 +3673,72 @@ class OrderFlowService
             unset($metadata['ink_usage']);
             $order->update(['metadata' => $metadata]);
         }
+    }
+
+    private function decodeDataUrl(string $dataUrl): string
+    {
+        if (!Str::startsWith($dataUrl, 'data:')) {
+            throw new \InvalidArgumentException('Invalid data URL header.');
+        }
+
+        $parts = explode(',', $dataUrl, 2);
+        if (count($parts) !== 2) {
+            throw new \InvalidArgumentException('Invalid data URL structure.');
+        }
+
+        [$meta, $payload] = $parts;
+
+        if (str_contains($meta, ';base64')) {
+            $decoded = base64_decode($payload, true);
+        } else {
+            $decoded = rawurldecode($payload);
+        }
+
+        if ($decoded === false || $decoded === null) {
+            throw new \RuntimeException('Unable to decode payload.');
+        }
+
+        return $decoded;
+    }
+
+    private function persistDataUrl(string $dataUrl, string $directory, string $extension, ?string $existingPath, string $field): string
+    {
+        if (trim((string) $dataUrl) === '') {
+            if ($existingPath) {
+                return $existingPath;
+            }
+            throw new \InvalidArgumentException('Missing data payload.');
+        }
+
+        try {
+            $contents = $this->decodeDataUrl($dataUrl);
+        } catch (\Throwable $e) {
+            throw new \InvalidArgumentException('Invalid data payload provided.');
+        }
+
+        $normalizedExistingPath = null;
+        if ($existingPath) {
+            $normalizedExistingPath = ltrim(str_replace('\\', '/', (string) $existingPath), '/');
+            $normalizedExistingPath = preg_replace('#^/?storage/#i', '', $normalizedExistingPath) ?? $normalizedExistingPath;
+        }
+
+        if ($normalizedExistingPath && Storage::disk('public')->exists($normalizedExistingPath)) {
+            Storage::disk('public')->delete($normalizedExistingPath);
+        }
+
+        $directory = trim($directory, '/');
+        if ($directory !== '') {
+            Storage::disk('public')->makeDirectory($directory);
+        }
+
+        $filename = ($directory ? $directory . '/' : '') . 'design_' . Str::uuid() . '.' . $extension;
+
+        $stored = Storage::disk('public')->put($filename, $contents);
+
+        if (!$stored) {
+            throw new \InvalidArgumentException('Failed to persist exported asset on disk.');
+        }
+
+        return $filename;
     }
 }

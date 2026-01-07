@@ -2,6 +2,22 @@
 
 @section('title', 'Templates')
 
+@php
+function cleanSvgContent($svgContent) {
+    if (!is_string($svgContent)) {
+        return $svgContent;
+    }
+    $trimmed = ltrim($svgContent);
+    if (strpos($trimmed, '<?xml') === 0) {
+        $svgContent = preg_replace('/^<\?xml[^>]+>\s*/', '', $trimmed);
+    }
+    if (strpos(ltrim($svgContent), '<!DOCTYPE') === 0) {
+        $svgContent = preg_replace('/^<!DOCTYPE[^>]+>\s*/i', '', ltrim($svgContent));
+    }
+    return $svgContent;
+}
+@endphp
+
 @push('styles')
     @vite('resources/css/admin/template/template.css')
     <style>
@@ -343,6 +359,120 @@
         .preview-item:hover {
             border-color: #9ca3af;
         }
+
+        /* Preview Placeholder Styles */
+        .preview-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .preview-placeholder:hover {
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+            border-color: #94a3b8;
+        }
+
+        .placeholder-icon {
+            font-size: 48px;
+            color: #cbd5e1;
+            margin-bottom: 12px;
+            animation: placeholderPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes placeholderPulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.6;
+                transform: scale(1.05);
+            }
+        }
+
+        .placeholder-text {
+            font-size: 14px;
+            color: #64748b;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .placeholder-hint {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 4px;
+            text-align: center;
+        }
+
+        .back-placeholder {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+            border: 2px dashed #cbd5e1;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #cbd5e1;
+            font-size: 24px;
+        }
+
+        .back-placeholder:hover {
+            background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
+            border-color: #94a3b8;
+        }
+
+        /* Draft Badge */
+        .badge-draft {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 10;
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 8px rgba(251, 191, 36, 0.4);
+        }
+
+        .template-card--draft {
+            border: 2px solid rgba(251, 191, 36, 0.3);
+            background: linear-gradient(135deg, rgba(254, 243, 199, 0.2), rgba(253, 230, 138, 0.1));
+        }
+
+        .template-card--draft:hover {
+            border-color: rgba(251, 191, 36, 0.5);
+            box-shadow: 0 8px 24px rgba(251, 191, 36, 0.2);
+        }
+
+        /* Preview Clickable Hover Effect */
+        .preview-clickable {
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .preview-clickable:hover {
+            transform: scale(1.02);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .template-card__top {
+            position: relative;
+        }
     </style>
 @endpush
 
@@ -350,6 +480,45 @@
     @vite('resources/js/admin/template/template.js')
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Preview Modal Click Handlers
+            const previewModal = document.getElementById('previewModal');
+            const modalImg = document.getElementById('modalImg');
+            const closePreview = document.getElementById('closePreview');
+
+            if (previewModal && modalImg && closePreview) {
+                // Handle preview clicks
+                document.addEventListener('click', function(e) {
+                    if (e.target.classList.contains('preview-clickable')) {
+                        const imgSrc = e.target.dataset.previewImg || e.target.src;
+                        if (imgSrc) {
+                            modalImg.src = imgSrc;
+                            previewModal.style.display = 'flex';
+                            setTimeout(() => previewModal.classList.add('active'), 10);
+                        }
+                    }
+                });
+
+                // Close modal
+                closePreview.addEventListener('click', function() {
+                    previewModal.classList.remove('active');
+                    setTimeout(() => {
+                        previewModal.style.display = 'none';
+                        modalImg.src = '';
+                    }, 300);
+                });
+
+                // Close on backdrop click
+                previewModal.addEventListener('click', function(e) {
+                    if (e.target === previewModal) {
+                        previewModal.classList.remove('active');
+                        setTimeout(() => {
+                            previewModal.style.display = 'none';
+                            modalImg.src = '';
+                        }, 300);
+                    }
+                });
+            }
+
             // Create toast notification system
             function showToast(message, type = 'success', duration = 3000) {
                 // Remove existing toasts
@@ -608,6 +777,11 @@
             }
             return str_replace(["\r", "\n", "\t"], '', trim($value));
         };
+
+        // Get preview templates from session
+        $previewTemplates = session('preview_templates', []);
+        // Convert associative array to simple array for iteration
+        $previewTemplates = array_values($previewTemplates);
     @endphp
     <main class="dashboard-container templates-page" role="main">
         <section class="templates-container" aria-labelledby="templates-heading">
@@ -698,22 +872,32 @@
                 {{-- Render any session previews first --}}
                 @if(isset($previewTemplates) && count($previewTemplates))
                     @foreach($previewTemplates as $preview)
-                        <article class="template-card" role="listitem">
+                        <article class="template-card template-card--draft" role="listitem">
+                            <span class="badge badge-draft">Draft</span>
                             <div class="template-preview">
-                                @if(!empty($preview['front_image']))
-                                    <img src="{{ \App\Support\ImageResolver::url($preview['front_image']) }}" alt="Preview of {{ $preview['name'] }}">
+                                @if(!empty($preview['front_image_path']))
+                                    <img class="preview-clickable" src="{{ \App\Support\ImageResolver::url($preview['front_image_path']) }}" alt="Preview of {{ $preview['name'] }}" loading="lazy">
                                 @elseif(!empty($preview['front_svg_content']))
                                     <div class="svg-preview-container" style="width:100%;height:200px;display:flex;align-items:center;justify-content:center;border:1px solid #d1d5db;background:#fff;">
                                         {!! $preview['front_svg_content'] !!}
                                     </div>
                                 @else
-                                    <span>No preview</span>
+                                    <div class="preview-placeholder">
+                                        <div class="placeholder-icon">
+                                            <i class="fas fa-image"></i>
+                                        </div>
+                                        <span class="placeholder-text">No preview available</span>
+                                    </div>
                                 @endif
-                                @if(!empty($preview['back_image']))
-                                    <img src="{{ \App\Support\ImageResolver::url($preview['back_image']) }}" alt="Back of {{ $preview['name'] }}" class="back-thumb">
+                                @if(!empty($preview['back_image_path']))
+                                    <img class="back-thumb preview-clickable" src="{{ \App\Support\ImageResolver::url($preview['back_image_path']) }}" alt="Back of {{ $preview['name'] }}" loading="lazy">
                                 @elseif(!empty($preview['back_svg_content']))
                                     <div class="svg-preview-container back-thumb" style="width:60px;height:60px;display:flex;align-items:center;justify-content:center;border:1px solid #d1d5db;background:#fff;position:absolute;bottom:8px;right:8px;">
                                         {!! $preview['back_svg_content'] !!}
+                                    </div>
+                                @else
+                                    <div class="back-thumb back-placeholder" title="No back preview">
+                                        <i class="fas fa-file-image"></i>
                                     </div>
                                 @endif
                             </div>
@@ -834,30 +1018,35 @@
                                         $svgContent = '';
                                         try {
                                             $svgContent = \Illuminate\Support\Facades\Storage::disk('public')->get($svgPath);
+                                            $svgContent = cleanSvgContent($svgContent);
                                         } catch (\Exception $e) {
                                             $svgContent = '<div class="svg-error">SVG not found</div>';
-                                        }
-                                    @endphp
-                                    @php
-                                        if (is_string($svgContent)) {
-                                            // Strip XML declarations that break inline rendering in HTML
-                                            $trimmed = ltrim($svgContent);
-                                            if (strpos($trimmed, '<?xml') === 0) {
-                                                $svgContent = preg_replace('/^<\?xml[^>]+>\s*/', '', $trimmed);
-                                            }
-                                            if (strpos(ltrim($svgContent), '<!DOCTYPE') === 0) {
-                                                $svgContent = preg_replace('/^<!DOCTYPE[^>]+>\s*/i', '', ltrim($svgContent));
-                                            }
                                         }
                                     @endphp
                                     <div class="svg-preview-container" style="width:100%;height:200px;display:flex;align-items:center;justify-content:center;border:1px solid #d1d5db;background:#fff;">
                                         {!! $svgContent !!}
                                     </div>
                                 @else
-                                    <img src="{{ \App\Support\ImageResolver::url($front) }}" alt="Preview of {{ $template->name }}" loading="lazy">
+                                    <img class="preview-clickable" src="{{ \App\Support\ImageResolver::url($front) }}" alt="Preview of {{ $template->name }}" loading="lazy">
                                 @endif
                             @else
-                                <span>No preview</span>
+                                @if(!empty($template->design))
+                                    <div class="preview-placeholder">
+                                        <div class="placeholder-icon">
+                                            <i class="fas fa-file-alt"></i>
+                                        </div>
+                                        <span class="placeholder-text">Template saved</span>
+                                        <p class="placeholder-hint">Open in editor to see preview</p>
+                                    </div>
+                                @else
+                                    <div class="preview-placeholder">
+                                        <div class="placeholder-icon">
+                                            <i class="fas fa-image"></i>
+                                        </div>
+                                        <span class="placeholder-text">No preview available</span>
+                                        <p class="placeholder-hint">Upload images in editor</p>
+                                    </div>
+                                @endif
                             @endif
                             @if($back)
                                 @if($isSvgBack)
@@ -867,28 +1056,21 @@
                                         $backSvgContent = '';
                                         try {
                                             $backSvgContent = \Illuminate\Support\Facades\Storage::disk('public')->get($backSvgPath);
+                                            $backSvgContent = cleanSvgContent($backSvgContent);
                                         } catch (\Exception $e) {
                                             $backSvgContent = '<div class="svg-error">SVG not found</div>';
-                                        }
-                                    @endphp
-                                    @php
-                                        if (is_string($backSvgContent)) {
-                                            // Strip XML declarations that break inline rendering in HTML
-                                            $trimmedBack = ltrim($backSvgContent);
-                                            if (strpos($trimmedBack, '<?xml') === 0) {
-                                                $backSvgContent = preg_replace('/^<\?xml[^>]+>\s*/', '', $trimmedBack);
-                                            }
-                                            if (strpos(ltrim($backSvgContent), '<!DOCTYPE') === 0) {
-                                                $backSvgContent = preg_replace('/^<!DOCTYPE[^>]+>\s*/i', '', ltrim($backSvgContent));
-                                            }
                                         }
                                     @endphp
                                     <div class="svg-preview-container back-thumb" style="width:60px;height:60px;display:flex;align-items:center;justify-content:center;border:1px solid #d1d5db;background:#fff;position:absolute;bottom:8px;right:8px;">
                                         {!! $backSvgContent !!}
                                     </div>
                                 @else
-                                    <img src="{{ \App\Support\ImageResolver::url($back) }}" alt="Back of {{ $template->name }}" class="back-thumb" loading="lazy">
+                                    <img class="back-thumb preview-clickable" src="{{ \App\Support\ImageResolver::url($back) }}" alt="Back of {{ $template->name }}" loading="lazy" data-preview-img="{{ \App\Support\ImageResolver::url($back) }}">
                                 @endif
+                            @else
+                                <div class="back-thumb back-placeholder" title="No back preview">
+                                    <i class="fas fa-file-image"></i>
+                                </div>
                             @endif
                         </div>
                         <div class="template-info">
@@ -941,9 +1123,9 @@
             </div>
         @endif
 
-        <div id="previewModal">
-            <span id="closePreview" aria-label="Close preview" role="button">&times;</span>
-            <img id="modalImg" src="" alt="Template preview modal">
+        <div id="previewModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:10000;align-items:center;justify-content:center;opacity:0;transition:opacity 0.3s ease;">
+            <span id="closePreview" aria-label="Close preview" role="button" style="position:absolute;top:20px;right:40px;color:white;font-size:40px;font-weight:bold;cursor:pointer;z-index:10001;transition:color 0.2s;" onmouseover="this.style.color='#ddd'" onmouseout="this.style.color='white'">&times;</span>
+            <img id="modalImg" src="" alt="Template preview modal" style="max-width:90%;max-height:90%;object-fit:contain;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
         </div>
     </main>
 @endsection

@@ -23,29 +23,8 @@ function resolveInsets(zone) {
   const fallback = toNumber(zone.margin ?? zone.all ?? 0);
 
   return {
-    thumb: createPathThumb('M12 16 L44 16 L56 32 L44 48 L12 48 Z'),
-    fill: SHAPE_DEFAULT_FILL,
-    stroke: SHAPE_DEFAULT_STROKE,
-    metadata: {
-      maskVariant: 'tag-shape',
-      dropShadow: SHAPE_DEFAULT_SHADOW,
-      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
-    },
-    tags: ['gift', 'tag'],
-    stroke: SHAPE_DEFAULT_STROKE,
-    metadata: {
-      maskVariant: 'leaf',
-      dropShadow: SHAPE_DEFAULT_SHADOW,
-      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
-    },
-    tags: ['leaf', 'organic'],
-    stroke: SHAPE_DEFAULT_STROKE,
-    metadata: {
-      maskVariant: 'butterfly',
-      dropShadow: SHAPE_DEFAULT_SHADOW,
-      highlightInset: SHAPE_DEFAULT_HIGHLIGHT,
-    },
-    tags: ['butterfly', 'organic'],
+    top: toNumber(zone.top ?? fallback),
+    right: toNumber(zone.right ?? fallback),
     bottom: toNumber(zone.bottom ?? fallback),
     left: toNumber(zone.left ?? fallback),
   };
@@ -1866,11 +1845,11 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
   const hasTriggeredQuoteSearchRef = useRef(false);
 
   // Styled text presets (loaded from Google Fonts list + sample text)
+  const styledPerPage = 12;
   const [styledPresets, setStyledPresets] = useState([]);
   const [styledPage, setStyledPage] = useState(1);
   const [isLoadingStyledPresets, setIsLoadingStyledPresets] = useState(false);
   const [hasMoreStyledPresets, setHasMoreStyledPresets] = useState(true);
-  const styledPerPage = 12;
   const styledContainerRef = useRef(null);
   const styledObserverRef = useRef(null);
 
@@ -3590,11 +3569,27 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
     'VISUAL CONCEPT',
   ];
 
-  const loadStyledPresets = useCallback((page = 1) => {
-    if (isLoadingStyledPresets || !hasMoreStyledPresets) return;
+  useEffect(() => {
+    if (styledPresets.length > 0) {
+      return;
+    }
+
+    const initialPresets = [...curatedFontCombos];
+    setStyledPresets(initialPresets);
+    setStyledPage(initialPresets.length > 0
+      ? Math.ceil(initialPresets.length / styledPerPage) + 1
+      : 1);
+    setHasMoreStyledPresets(false);
+  }, [curatedFontCombos, styledPerPage, styledPresets.length]);
+
+  const loadStyledPresets = useCallback((page) => {
+    const targetPage = page ?? styledPage;
+    if (isLoadingStyledPresets || !hasMoreStyledPresets) {
+      return;
+    }
     setIsLoadingStyledPresets(true);
     try {
-      const start = (page - 1) * styledPerPage;
+      const start = (targetPage - 1) * styledPerPage;
       const slice = curatedFontCombos.slice(start, start + styledPerPage);
 
       if (slice.length === 0) {
@@ -3602,13 +3597,24 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
         return;
       }
 
-      setStyledPresets((prev) => [...prev, ...slice]);
-      setStyledPage(page + 1);
-      setHasMoreStyledPresets(start + styledPerPage < curatedFontCombos.length);
+      setStyledPresets((prev) => {
+        const existingIds = new Set(prev.map((preset) => preset.id));
+        const next = [...prev];
+        slice.forEach((preset) => {
+          if (!existingIds.has(preset.id)) {
+            next.push(preset);
+          }
+        });
+        return next;
+      });
+
+      const nextHasMore = start + styledPerPage < curatedFontCombos.length;
+      setHasMoreStyledPresets(nextHasMore);
+      setStyledPage(targetPage + 1);
     } finally {
       setIsLoadingStyledPresets(false);
     }
-  }, [hasMoreStyledPresets, isLoadingStyledPresets, styledPerPage]);
+  }, [hasMoreStyledPresets, isLoadingStyledPresets, styledPage, styledPerPage]);
 
   // Initialize styled presets when text tool becomes active
   useEffect(() => {
@@ -3747,9 +3753,23 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
   useEffect(() => {
     try {
       const generated = generateFontPresets(curatedFontCombos, { perCategory: 24 });
-      // prefer generated presets if styledPresets hasn't been customized elsewhere
       if (generated && generated.length) {
-        setStyledPresets(generated);
+        setStyledPresets((prev) => {
+          if (!prev?.length) {
+            return generated;
+          }
+
+          const seen = new Set(prev.map((preset) => preset.id));
+          const merged = [...prev];
+
+          generated.forEach((preset) => {
+            if (!seen.has(preset.id)) {
+              merged.push(preset);
+            }
+          });
+
+          return merged;
+        });
       }
     } catch (err) {
       console.warn('Failed to generate font presets', err);

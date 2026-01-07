@@ -2,6 +2,7 @@
 
 namespace App\Support\Owner;
 
+use App\Models\Order;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -63,20 +64,50 @@ class TransactionPresenter
             ? trim($transactionId)
             : (is_numeric($transactionId) ? (string) $transactionId : '—');
 
-        $orderId = data_get($transaction, 'order_id')
+        $customerFacingOrderId = data_get($transaction, 'order.order_number')
             ?? data_get($transaction, 'order.reference')
-            ?? data_get($transaction, 'order.order_number')
-            ?? data_get($transaction, 'order.id');
-        if (is_array($orderId)) {
-            $orderId = $orderId['order_number'] ?? $orderId['id'] ?? null;
+            ?? data_get($transaction, 'order.metadata.customer_reference')
+            ?? data_get($transaction, 'order.customerOrder.reference');
+
+        if (is_array($customerFacingOrderId)) {
+            $customerFacingOrderId = $customerFacingOrderId['order_number']
+                ?? $customerFacingOrderId['reference']
+                ?? $customerFacingOrderId['id']
+                ?? null;
         }
-        if ($orderId instanceof \DateTimeInterface) {
-            $orderId = $orderId->format('Y-m-d');
+
+        if ($customerFacingOrderId instanceof \DateTimeInterface) {
+            $customerFacingOrderId = $customerFacingOrderId->format('Y-m-d');
         }
-        if (is_numeric($orderId)) {
-            $orderId = '#' . ltrim((string) $orderId, '#');
+
+        if ($customerFacingOrderId !== null && $customerFacingOrderId !== '') {
+            $orderId = trim((string) $customerFacingOrderId);
+        } else {
+            $fallbackOrderId = data_get($transaction, 'customer_order_id')
+                ?? data_get($transaction, 'order.customerOrder.id')
+                ?? data_get($transaction, 'order_id')
+                ?? data_get($transaction, 'order.id');
+
+            if (is_array($fallbackOrderId)) {
+                $fallbackOrderId = $fallbackOrderId['order_number']
+                    ?? $fallbackOrderId['reference']
+                    ?? $fallbackOrderId['id']
+                    ?? null;
+            }
+
+            if ($fallbackOrderId instanceof \DateTimeInterface) {
+                $fallbackOrderId = $fallbackOrderId->format('Y-m-d');
+            }
+
+            if ($fallbackOrderId === null || $fallbackOrderId === '') {
+                $orderId = '—';
+            } else {
+                $orderId = (string) $fallbackOrderId;
+                if (is_numeric($fallbackOrderId)) {
+                    $orderId = '#' . ltrim($orderId, '#');
+                }
+            }
         }
-        $orderId = $orderId ? (string) $orderId : '—';
 
         $customerName = data_get($transaction, 'customer_name')
             ?? data_get($transaction, 'customer.name')
@@ -153,10 +184,49 @@ class TransactionPresenter
             : '—';
         $statusClass = $statusLabel === '—' ? null : self::resolveBadgeClass($statusRaw);
 
+        $remainingBalanceValue = null;
+        $orderRelation = data_get($transaction, 'order');
+
+        if ($orderRelation instanceof Order) {
+            $remainingBalanceValue = $orderRelation->balanceDue();
+        } elseif (is_object($orderRelation) && method_exists($orderRelation, 'balanceDue')) {
+            try {
+                $remainingBalanceValue = $orderRelation->balanceDue();
+            } catch (\Throwable $e) {
+                $remainingBalanceValue = null;
+            }
+        } elseif (is_array($orderRelation)) {
+            $remainingBalanceValue = $orderRelation['balance_due']
+                ?? $orderRelation['balanceDue']
+                ?? $orderRelation['remaining_balance']
+                ?? $orderRelation['balance']
+                ?? null;
+        }
+
+        if ($remainingBalanceValue === null) {
+            $remainingBalanceValue = data_get($transaction, 'balance_due')
+                ?? data_get($transaction, 'remaining_balance')
+                ?? data_get($transaction, 'order.balance_due');
+        }
+
+        $remainingBalanceNumeric = null;
+        $remainingBalanceDisplay = '—';
+
+        if (is_numeric($remainingBalanceValue)) {
+            $remainingBalanceNumeric = max((float) $remainingBalanceValue, 0.0);
+            $remainingBalanceDisplay = $currencyPrefix . number_format($remainingBalanceNumeric, 2);
+        }
+
         $amountSearchTokens = [];
         if ($amountNumeric !== null) {
             $amountSearchTokens[] = number_format($amountNumeric, 2, '.', '');
             $amountSearchTokens[] = preg_replace('/[^0-9]/', '', number_format($amountNumeric, 2, '.', ''));
+        }
+
+        $balanceSearchTokens = [];
+        if ($remainingBalanceNumeric !== null) {
+            $balanceSearchTokens[] = number_format($remainingBalanceNumeric, 2, '.', '');
+            $balanceSearchTokens[] = preg_replace('/[^0-9]/', '', number_format($remainingBalanceNumeric, 2, '.', ''));
         }
 
         $searchTargets = array_filter([
@@ -168,10 +238,12 @@ class TransactionPresenter
             $paymentMethod,
             $displayDate,
             $amountDisplay,
+            $remainingBalanceDisplay,
             $statusLabel,
             data_get($transaction, 'provider'),
             $currency,
             ...$amountSearchTokens,
+            ...$balanceSearchTokens,
         ], static fn ($value) => $value !== null && $value !== '');
 
         return [
@@ -183,6 +255,8 @@ class TransactionPresenter
             'display_date' => $displayDate,
             'amount_display' => $amountDisplay,
             'amount_numeric' => $amountNumeric,
+            'remaining_balance_display' => $remainingBalanceDisplay,
+            'remaining_balance_numeric' => $remainingBalanceNumeric,
             'status_raw' => $statusRaw,
             'status_label' => $statusLabel,
             'status_class' => $statusClass,

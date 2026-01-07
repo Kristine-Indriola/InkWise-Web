@@ -10,29 +10,33 @@ class RoleMiddleware
     /**
      * Handle an incoming request.
      */
-    public function handle($request, Closure $next, $role)
+    public function handle($request, Closure $next, ...$roles)
     {
+        $expectedRoles = $roles ?: ['customer'];
+
         if (!Auth::check()) {
-            // Redirect to appropriate login page based on expected role
-            if ($role === 'customer') {
+            if (in_array('customer', $expectedRoles, true)) {
                 return redirect()->route('dashboard', ['modal' => 'login'])
                     ->with('show_login_modal', true)
                     ->withErrors(['error' => '❌ Please log in to access this page.']);
             }
+
             return redirect('/login');
         }
 
-        if (Auth::user()->role !== $role) {
-            // Log out the user and redirect to appropriate login
-            Auth::logout();
-            
-            if ($role === 'customer') {
+        $userRole = Auth::user()->role;
+        if (!in_array($userRole, $expectedRoles, true)) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            if (in_array('customer', $expectedRoles, true)) {
                 return redirect()->route('dashboard', ['modal' => 'login'])
                     ->with('show_login_modal', true)
                     ->withErrors(['error' => '❌ You must be logged in as a customer to access this page.']);
             }
-            
-            return redirect('/unauthorized'); // you can make a custom 403 page
+
+            return redirect('/unauthorized');
         }
 
         return $next($request);

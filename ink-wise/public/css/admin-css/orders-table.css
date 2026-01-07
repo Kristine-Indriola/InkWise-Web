@@ -104,6 +104,12 @@
 /* pagination centered in footer */
 .table-footer { justify-content: center; }
 
+/* Compact pagination arrows for a lighter control footprint */
+.pagination-links svg {
+  width: 14px;
+  height: 14px;
+}
+
 /* Remove any subtle stroke around the table container/card */
 .card, .card-body, .table-responsive {
   border: none !important;

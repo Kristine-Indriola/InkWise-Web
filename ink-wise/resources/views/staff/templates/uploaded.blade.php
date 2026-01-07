@@ -99,4 +99,81 @@
             <img id="modalImg" src="" alt="Template preview modal">
         </div>
     </main>
+
+    <script>
+        // Preview modal functionality
+        function openPreview(src) {
+            document.getElementById('modalImg').src = src;
+            document.getElementById('previewModal').classList.add('is-visible');
+        }
+
+        document.getElementById('closePreview').onclick = function() {
+            document.getElementById('previewModal').classList.remove('is-visible');
+        }
+
+        window.onclick = function(event) {
+            if (event.target == document.getElementById('previewModal')) {
+                document.getElementById('previewModal').classList.remove('is-visible');
+            }
+        }
+
+        // Template actions
+        function editTemplate(id) {
+            window.location.href = `/staff/templates/${id}/edit`;
+        }
+
+        function duplicateTemplate(id) {
+            if (confirm('Are you sure you want to duplicate this template?')) {
+                // Implement duplicate logic
+                fetch(`/staff/templates/${id}/duplicate`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        'Content-Type': 'application/json'
+                    }
+                }).then(response => {
+                    if (response.ok) {
+                        location.reload();
+                    } else {
+                        alert('Failed to duplicate template');
+                    }
+                });
+            }
+        }
+
+        function deleteTemplate(id) {
+            if (confirm('Are you sure you want to delete this template? This action cannot be undone.')) {
+                fetch(`/staff/templates/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    }
+                }).then(response => {
+                    if (response.ok) {
+                        location.reload();
+                    } else {
+                        alert('Failed to delete template');
+                    }
+                });
+            }
+        }
+
+        // Search functionality
+        document.getElementById('template-search').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const cards = document.querySelectorAll('.template-card');
+
+            cards.forEach(card => {
+                const title = card.querySelector('.template-title').textContent.toLowerCase();
+                const description = card.querySelector('.template-description')?.textContent.toLowerCase() || '';
+                const category = card.querySelector('.template-category').textContent.toLowerCase();
+
+                if (title.includes(searchTerm) || description.includes(searchTerm) || category.includes(searchTerm)) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+    </script>
 @endsection

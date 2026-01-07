@@ -150,6 +150,14 @@
 		</article>
 		<article class="reports-summary-card">
 			<header>
+				<span class="summary-label">Profit</span>
+				<i class="fi fi-rr-trending-up" aria-hidden="true"></i>
+			</header>
+			<strong data-metric="profit-total">₱{{ number_format($salesSummary['profit'] ?? 0, 2) }}</strong>
+			<p>Net revenue after material costs.</p>
+		</article>
+		<article class="reports-summary-card">
+			<header>
 				<span class="summary-label">Avg. Order</span>
 				<i class="fi fi-rr-circle-dollar" aria-hidden="true"></i>
 			</header>
@@ -238,6 +246,7 @@
 							<th scope="col" class="text-center">Qty</th>
 							<th scope="col" class="text-center">Payment Status</th>
 							<th scope="col" class="text-end">Total (PHP)</th>
+							<th scope="col" class="text-end">Profit (PHP)</th>
 							<th scope="col">Date</th>
 						</tr>
 					</thead>
@@ -250,11 +259,12 @@
 							<td class="text-center">{{ $sale->items_quantity }}</td>
 							<td class="text-center">{{ $sale->payment_status }}</td>
 							<td class="text-end">{{ number_format($sale->total_amount_value, 2) }}</td>
+							<td class="text-end">{{ number_format($sale->profit_value, 2) }}</td>
 							<td>{{ optional($sale->order_date_value)->format('M d, Y') }}</td>
 						</tr>
 					@empty
 						<tr>
-							<td colspan="7" class="text-center">No sales records available.</td>
+							<td colspan="8" class="text-center">No sales records available.</td>
 						</tr>
 					@endforelse
 					</tbody>

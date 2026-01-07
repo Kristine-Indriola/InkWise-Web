@@ -228,7 +228,9 @@ export function initializeCustomerStudioLegacy() {
       ? window.inkwiseStudioBootstrap
       : {};
 
+    console.log('[InkWise Studio] Bootstrap payload:', bootstrapPayload);
     const routes = bootstrapPayload?.routes ?? {};
+    console.log('[InkWise Studio] Routes:', routes);
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
       || document.head.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
       || null;
@@ -273,6 +275,70 @@ export function initializeCustomerStudioLegacy() {
       return cardBg.dataset?.frontImage || null;
     };
 
+    const applyDesignData = (designData) => {
+      if (!designData || !currentSvgRoot) {
+        return;
+      }
+
+      // Apply text customizations
+      if (designData.texts && Array.isArray(designData.texts)) {
+        designData.texts.forEach((textEntry) => {
+          const { key, value, fontFamily, fontSize, color } = textEntry;
+          const node = currentSvgRoot.querySelector(`[data-preview-node="${key}"]`);
+          if (node) {
+            // Apply text value
+            if (value !== undefined) {
+              writeNodeTextValue(node, value);
+              // Also update the input field
+              const input = document.querySelector(`input[data-preview-target="${key}"]`);
+              if (input) {
+                input.value = value;
+              }
+            }
+
+            // Apply font family
+            if (fontFamily) {
+              node.setAttribute('font-family', fontFamily);
+              node.style.fontFamily = fontFamily;
+              try { node.dataset.fontFamily = fontFamily; } catch(e){}
+            }
+
+            // Apply font size
+            if (fontSize) {
+              node.setAttribute('font-size', fontSize);
+              node.style.fontSize = fontSize;
+              try { node.dataset.fontSize = fontSize; } catch(e){}
+            }
+
+            // Apply color
+            if (color) {
+              node.setAttribute('fill', color);
+              node.style.fill = color;
+              try { node.dataset.color = color; } catch(e){}
+            }
+          }
+        });
+      }
+
+      // Apply image customizations
+      if (designData.images && Array.isArray(designData.images)) {
+        designData.images.forEach((imageEntry) => {
+          const { key, href, x, y, width, height } = imageEntry;
+          const node = currentSvgRoot.querySelector(`[data-preview-node="${key}"]`);
+          if (node) {
+            if (href) {
+              node.setAttribute('href', href);
+              node.setAttribute('xlink:href', href);
+            }
+            if (x !== undefined) node.setAttribute('x', x);
+            if (y !== undefined) node.setAttribute('y', y);
+            if (width !== undefined) node.setAttribute('width', width);
+            if (height !== undefined) node.setAttribute('height', height);
+          }
+        });
+      }
+    };
+
     const collectTextEntries = () => {
       if (!textFieldList) {
         return [];
@@ -283,11 +349,28 @@ export function initializeCustomerStudioLegacy() {
         const label = wrapper?.querySelector('.text-field-label')?.textContent?.trim()
           || input.dataset.previewTarget
           || '';
+
+        // Get font properties from the corresponding SVG node
+        const key = input.dataset.previewTarget || '';
+        const svgNode = currentSvgRoot?.querySelector(`[data-preview-node="${key}"]`);
+        let fontFamily = null;
+        let fontSize = null;
+        let color = null;
+
+        if (svgNode) {
+          fontFamily = svgNode.getAttribute('font-family') || svgNode.style.fontFamily || svgNode.dataset.fontFamily;
+          fontSize = svgNode.getAttribute('font-size') || svgNode.style.fontSize || svgNode.dataset.fontSize;
+          color = svgNode.getAttribute('fill') || svgNode.style.fill || svgNode.dataset.color;
+        }
+
         return {
-          key: input.dataset.previewTarget || '',
+          key,
           label,
           value: input.value || '',
           defaultValue: input.dataset.defaultValue || '',
+          fontFamily,
+          fontSize,
+          color,
         };
       });
     };
@@ -410,6 +493,7 @@ export function initializeCustomerStudioLegacy() {
     let uploadedFrontImage = null;
     let uploadedBackImage = null;
     let autosave = null;
+    let autosaveHeartbeatTimer = null;
     let activeTextKey = null;
     let activeImageKey = null;
     let backgroundSelected = false;
@@ -545,12 +629,14 @@ export function initializeCustomerStudioLegacy() {
           texts,
           images: imageEntries,
           canvas: canvasMeta,
+          placeholders: placeholderLabels,
         },
         preview: {
           image: previewImage,
           images: previewImages,
         },
         placeholders: placeholderLabels,
+        product_id: bootstrap.product?.id,
       };
     };
 
@@ -561,7 +647,56 @@ export function initializeCustomerStudioLegacy() {
         csrfToken,
         statusLabel: statusLabelEl,
         statusDot: statusDotEl,
+        debounce: 0, // Save immediately on change
       });
+      console.log('[InkWise Studio] Autosave initialized', autosave);
+
+      const flushAutosave = (reason) => {
+        if (!autosave) {
+          return;
+        }
+        try {
+          void autosave.flush(reason);
+        } catch (flushError) {
+          console.debug('[InkWise Studio] Autosave flush skipped.', flushError);
+        }
+      };
+
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'hidden') {
+          flushAutosave('visibility-hidden');
+        }
+      };
+
+      const handlePageHide = () => {
+        flushAutosave('page-hide');
+      };
+
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      window.addEventListener('pagehide', handlePageHide);
+      window.addEventListener('beforeunload', handlePageHide);
+
+      autosaveHeartbeatTimer = window.setInterval(() => {
+        flushAutosave('heartbeat');
+      }, 60000);
+
+      window.addEventListener('unload', () => {
+        if (autosaveHeartbeatTimer) {
+          window.clearInterval(autosaveHeartbeatTimer);
+          autosaveHeartbeatTimer = null;
+        }
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('pagehide', handlePageHide);
+        window.removeEventListener('beforeunload', handlePageHide);
+      });
+
+      // Periodic autosave every 10 seconds as fallback
+      setInterval(() => {
+        if (autosave) {
+          console.log('[InkWise Studio] Periodic autosave trigger');
+          autosave.schedule('periodic');
+        }
+      }, 10000);
     } catch (autosaveError) {
       console.warn('[InkWise Studio] Autosave controller failed to initialize.', autosaveError);
       autosave = null;
@@ -600,6 +735,84 @@ export function initializeCustomerStudioLegacy() {
           autosave.notifyError();
           proceedButton.disabled = false;
           proceedButton.dataset.navigating = '0';
+        }
+      });
+    }
+
+    const saveTemplateButton = document.getElementById('save-template-btn');
+    if (saveTemplateButton) {
+      saveTemplateButton.addEventListener('click', async (event) => {
+        event.preventDefault();
+        if (saveTemplateButton.disabled) {
+          return;
+        }
+
+        // Prompt for template name
+        const templateName = prompt('Enter a name for your template:');
+        if (!templateName || templateName.trim() === '') {
+          return;
+        }
+
+        saveTemplateButton.disabled = true;
+        saveTemplateButton.textContent = 'Saving…';
+
+        try {
+          // Flush any pending autosave
+          if (autosave) {
+            await autosave.flush('save-template');
+          }
+
+          // Collect current design snapshot
+          const snapshot = await collectDesignSnapshot('save-template');
+          const designPayload = Object.assign({}, snapshot && snapshot.design ? snapshot.design : {});
+          const snapshotPlaceholders = snapshot && Array.isArray(snapshot.placeholders) ? snapshot.placeholders : [];
+          designPayload.placeholders = snapshotPlaceholders;
+          if (snapshot && snapshot.product_id) {
+            designPayload.product_id = snapshot.product_id;
+          }
+
+          const previewImage = snapshot && snapshot.preview ? snapshot.preview.image || null : null;
+          const previewImages = snapshot && snapshot.preview && Array.isArray(snapshot.preview.images)
+            ? snapshot.preview.images.filter(Boolean)
+            : [];
+          const requestBody = {
+            template_name: templateName.trim(),
+            design: designPayload,
+            preview_image: previewImage,
+            preview_images: previewImages,
+            placeholders: snapshotPlaceholders,
+          };
+
+          const headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          };
+          if (csrfToken) {
+            headers['X-CSRF-TOKEN'] = csrfToken;
+          }
+
+          // Send to server
+          const response = await fetch(routes.saveTemplate, {
+            method: 'POST',
+            headers,
+            credentials: 'same-origin',
+            body: JSON.stringify(requestBody),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Server responded with ${response.status}`);
+          }
+
+          const result = await response.json();
+          alert(`Template "${result.template_name}" saved successfully!`);
+
+        } catch (error) {
+          console.error('[InkWise Studio] Failed to save template.', error);
+          alert('Failed to save template. Please try again.');
+        } finally {
+          saveTemplateButton.disabled = false;
+          saveTemplateButton.textContent = 'Save Template';
         }
       });
     }
@@ -3749,6 +3962,8 @@ export function initializeCustomerStudioLegacy() {
     inputs.forEach(initInput);
 
     const createCustomField = (previewKey, value = '') => {
+      const sideForField = normalizeSideKey(currentSide);
+      const sanitizedValue = sanitizeTextValue(value);
       const wrapper = document.createElement('div');
       wrapper.className = 'text-field-item';
 
@@ -3762,8 +3977,11 @@ export function initializeCustomerStudioLegacy() {
       input.className = 'text-field-input';
       input.placeholder = 'Add your text';
       input.dataset.previewTarget = previewKey;
-      input.value = value;
-      input.dataset.defaultValue = value || '';
+      input.dataset.templateSide = sideForField;
+      input.value = sanitizedValue;
+      input.dataset.defaultValue = sanitizedValue || '';
+      setStoredTextValue(sideForField, previewKey, sanitizedValue);
+      captureDefaultTextValue(sideForField, previewKey, sanitizedValue);
       wrapper.appendChild(input);
 
       const delBtn = document.createElement('button');
@@ -3817,6 +4035,22 @@ export function initializeCustomerStudioLegacy() {
 
     const normalizeSvgTextVisibility = (root) => {
       if (!root) return;
+
+      const findAncestorFill = (node) => {
+        let current = node?.parentNode || null;
+        while (current) {
+          const attrFill = typeof current.getAttribute === 'function' ? current.getAttribute('fill') : null;
+          const styleFill = current.style?.fill;
+          const dataFill = current.dataset?.color || current.dataset?.defaultColor || null;
+          const candidate = attrFill || styleFill || dataFill;
+          if (candidate && candidate !== 'none' && candidate !== 'transparent') {
+            return candidate;
+          }
+          current = current.parentNode || null;
+        }
+        return null;
+      };
+
       const texts = root.querySelectorAll('text, tspan');
       texts.forEach((node) => {
         node.removeAttribute('opacity');
@@ -3824,14 +4058,61 @@ export function initializeCustomerStudioLegacy() {
         if (node.style && node.style.mixBlendMode) {
           node.style.mixBlendMode = 'normal';
         }
-        const fill = node.getAttribute('fill');
-        if (!fill || fill === 'none') {
-          node.setAttribute('fill', '#111');
+
+        const rawAttributeFill = node.getAttribute('fill');
+        const inlineFill = node.style?.fill;
+        const datasetFill = node.dataset?.color;
+        let resolvedFill = rawAttributeFill && rawAttributeFill !== 'none' ? rawAttributeFill : null;
+
+        if ((!resolvedFill || resolvedFill === 'transparent') && inlineFill && inlineFill !== 'none') {
+          resolvedFill = inlineFill;
         }
+
+        if ((!resolvedFill || resolvedFill === 'transparent') && datasetFill && datasetFill !== 'none') {
+          resolvedFill = datasetFill;
+        }
+
+        if ((!resolvedFill || resolvedFill === 'transparent') && typeof window !== 'undefined' && typeof window.getComputedStyle === 'function') {
+          try {
+            const computedFill = window.getComputedStyle(node).fill;
+            if (computedFill && computedFill !== 'none' && computedFill !== 'transparent') {
+              resolvedFill = computedFill;
+            }
+          } catch (error) {
+            // Swallow computed style failures (e.g. detached nodes)
+          }
+        }
+
+        if (!resolvedFill || resolvedFill === 'transparent' || resolvedFill === 'none') {
+          const inheritedFill = findAncestorFill(node);
+          if (inheritedFill && inheritedFill !== 'none' && inheritedFill !== 'transparent') {
+            resolvedFill = inheritedFill;
+          }
+        }
+
+        const normalizedFill = normalizeHexColor(resolvedFill || '')
+          || rgbStringToHex(resolvedFill || '')
+          || (resolvedFill && resolvedFill !== 'none' && resolvedFill !== 'transparent' ? resolvedFill : null);
+
+        const fallbackFill = '#111111';
+        const finalFill = normalizedFill || fallbackFill;
+
+        node.setAttribute('fill', finalFill);
+        if (node.style) {
+          node.style.fill = finalFill;
+          node.style.fillOpacity = '1';
+          node.style.strokeOpacity = '1';
+        }
+
+        if (node.dataset) {
+          node.dataset.color = finalFill;
+          if (normalizedFill) {
+            node.dataset.defaultColor = normalizedFill;
+          }
+        }
+
         node.removeAttribute('fill-opacity');
         node.removeAttribute('stroke-opacity');
-        node.style.fillOpacity = '1';
-        node.style.strokeOpacity = '1';
         if (!node.getAttribute('stroke')) {
           node.setAttribute('stroke', 'none');
         }
@@ -4098,6 +4379,12 @@ export function initializeCustomerStudioLegacy() {
           }
         }
 
+        // Apply design data from order summary
+        const designData = bootstrapPayload?.orderSummary?.metadata?.design;
+        if (designData) {
+          applyDesignData(designData);
+        }
+
         nodes.forEach((node) => {
           const key = node.getAttribute('data-preview-node');
           if (!key) return;
@@ -4280,6 +4567,7 @@ export function initializeCustomerStudioLegacy() {
           svgText?.remove();
         }
 
+        deleteStoredTextValue(normalizeSideKey(currentSide), previewKey);
         autosave?.schedule('remove-text-field');
       });
     };
@@ -5995,8 +6283,14 @@ export function initializeCustomerStudioLegacy() {
       if (e.target.matches('#textFieldList input')) {
         setTimeout(() => {
           const active = document.activeElement;
-          if (!active || (!active.matches('#textFieldList input') && !active.closest('.studio-react-widgets'))) {
-            document.body.classList.remove('text-toolbar-visible');
+          const inputFocused = active && typeof active.matches === 'function' && active.matches('#textFieldList input');
+          const toolbarFocused = active && typeof active.closest === 'function' && active.closest('.studio-react-widgets');
+          if (!inputFocused && !toolbarFocused) {
+            if (activeTextKey || activeImageKey || backgroundSelected) {
+              syncToolbarVisibility();
+            } else {
+              document.body.classList.remove('text-toolbar-visible');
+            }
           }
         }, 100);
       }
