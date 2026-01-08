@@ -12,6 +12,16 @@
   background-color: #f8fafc;
 }
 
+/* Ensure text is always visible even when web fonts fail */
+* {
+  font-family: inherit;
+}
+
+/* Canvas text layers should always have fallbacks */
+.canvas-layer__text {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+}
+
 body {
   margin: 0;
 }

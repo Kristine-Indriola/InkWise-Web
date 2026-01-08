@@ -30,9 +30,8 @@
     <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-solid-straight/css/uicons-solid-straight.css" onerror="this.onerror=null; console.warn('Flaticon solid-straight failed to load')">
     <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-brands/css/uicons-brands.css" onerror="this.onerror=null; console.warn('Flaticon brands failed to load')">
     
-    {{-- Font Awesome - primary and fallback --}}
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-Avb2QiuDEEvB4bZJYdft2mNjVShBftLdPG8FJ0V7irTLQ8Uo0qcPxh4Plq7G5tGm0rU+1SPhVotteLpBERwTkw==" crossorigin="anonymous" referrerpolicy="no-referrer" onerror="this.onerror=null; console.warn('Font Awesome CDN failed, loading from kit')">
-    <script src="https://kit.fontawesome.com/eb0420111f.js" crossorigin="anonymous" onerror="console.warn('Font Awesome Kit failed to load')"></script>
+    {{-- Font Awesome - local installation --}}
+    <link rel="stylesheet" href="{{ asset('assets/fontawesome/css/all.min.css') }}" onerror="console.warn('Font Awesome local failed to load')">
 
     <style>
         :root {

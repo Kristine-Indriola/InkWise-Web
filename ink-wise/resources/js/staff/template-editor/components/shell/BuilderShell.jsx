@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { toJpeg, toPng, toSvg } from 'html-to-image';
 import html2canvas from 'html2canvas';
 import { deflate, gzip } from 'pako';
 
@@ -28,7 +27,7 @@ const PAYLOAD_COMPRESSION_ENCODING = 'gzip-base64';
 const PAYLOAD_VERSION = 1;
 const POST_FAILSAFE_LIMIT = 1_600_000; // conservative ceiling to dodge strict post_max_size limits
 
-const waitForNextFrame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)))));
+const waitForNextFrame = () => new Promise((resolve) => setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)))), 100));
 
 async function captureCanvasRaster(canvas, pixelRatio, backgroundColor = '#ffffff') {
   const diagnostics = {
@@ -39,14 +38,26 @@ async function captureCanvasRaster(canvas, pixelRatio, backgroundColor = '#fffff
     attempts: [],
   };
 
-  if (!canvas) {
-    console.error('[InkWise Builder] Canvas element is null - cannot capture preview');
-    diagnostics.error = 'canvas-null';
-    return { dataUrl: null, diagnostics };
-  }
+  console.error('[InkWise Builder] CAPTURE FUNCTION CALLED - Starting canvas capture for template save');
+  alert('Canvas capture starting... check console for details');
+  console.log('[InkWise Builder] Starting canvas capture for template save');
+  console.log('[InkWise Builder] Canvas element:', canvas);
+  console.log('[InkWise Builder] Canvas exists:', !!canvas);
 
-  const stage = canvas.closest('.canvas-viewport__stage');
-  const target = stage || canvas;
+  // Add a timeout to prevent hanging
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Canvas capture timeout after 30 seconds')), 30000);
+  });
+
+  async function performCapture() {
+    if (!canvas) {
+      console.error('[InkWise Builder] Canvas element is null - cannot capture preview');
+      diagnostics.error = 'canvas-null';
+      return { dataUrl: null, diagnostics };
+    }
+
+    const stage = canvas.closest('.canvas-viewport__stage');
+  const target = stage ? stage : canvas; // Prefer stage element over fold-container
   diagnostics.stageFound = !!stage;
   const surface = target.parentElement;
 
@@ -58,15 +69,63 @@ async function captureCanvasRaster(canvas, pixelRatio, backgroundColor = '#fffff
 
   console.log('[InkWise Builder] Capture target:', target.className, 'size', captureWidth, 'x', captureHeight, 'children:', target.children.length);
 
+  // Check for transforms that might cause issues
+  const computedStyle = window.getComputedStyle(target);
+  console.log('[InkWise Builder] Target transform:', computedStyle.transform);
+  console.log('[InkWise Builder] Target transform-origin:', computedStyle.transformOrigin);
+  console.log('[InkWise Builder] Target position:', computedStyle.position);
+  console.log('[InkWise Builder] Target display:', computedStyle.display);
+  console.log('[InkWise Builder] Target visibility:', computedStyle.visibility);
+
   if (target.children.length === 0) {
     console.warn('[InkWise Builder] WARNING: Canvas has no child elements - preview will be blank!');
   } else {
     const elementTypes = Array.from(target.querySelectorAll('*'))
-      .map((el) => el.className)
+      .map((el) => el.className + ' (' + el.tagName + ')')
       .filter(Boolean)
       .slice(0, 10);
     console.log('[InkWise Builder] Canvas has', target.children.length, 'child elements');
     console.log('[InkWise Builder] Element classes found:', elementTypes);
+
+    // Check for actual content
+    const textElements = target.querySelectorAll('[data-preview-node]');
+    console.log('[InkWise Builder] Found', textElements.length, 'elements with data-preview-node');
+
+    const images = target.querySelectorAll('img');
+    console.log('[InkWise Builder] Found', images.length, 'img elements');
+
+    const textContent = Array.from(textElements).map(el => el.textContent?.trim()).filter(Boolean);
+    console.log('[InkWise Builder] Text content found:', textContent);
+
+    // Check visibility of elements
+    const allElements = target.querySelectorAll('*');
+    const visibleElements = Array.from(allElements).filter(el => {
+      const style = window.getComputedStyle(el);
+      return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+    });
+    console.log('[InkWise Builder] Visible elements:', visibleElements.length, 'out of', allElements.length);
+
+    // Check for fonts that need to load
+    const fontFamilies = new Set();
+    allElements.forEach(el => {
+      const style = window.getComputedStyle(el);
+      const fontFamily = style.fontFamily;
+      if (fontFamily && fontFamily !== 'inherit') {
+        // Extract the first font family name
+        const primaryFont = fontFamily.split(',')[0].replace(/['"]/g, '').trim();
+        if (primaryFont && !primaryFont.includes('system-ui') && !primaryFont.includes('sans-serif') && !primaryFont.includes('serif')) {
+          fontFamilies.add(primaryFont);
+        }
+      }
+    });
+    console.log('[InkWise Builder] Fonts to check:', Array.from(fontFamilies));
+
+    // For canvas capture, skip font loading and rely on CSS fallbacks
+    // This ensures text renders even when Google Fonts fail
+    console.log('[InkWise Builder] Skipping font loading for canvas capture - using CSS fallbacks');
+
+    // Small delay to ensure CSS fallbacks are applied
+    await new Promise(resolve => setTimeout(resolve, 100));
   }
   diagnostics.targetChildren = target.children.length;
 
@@ -80,38 +139,94 @@ async function captureCanvasRaster(canvas, pixelRatio, backgroundColor = '#fffff
   const originalCanvasOrigin = canvas.style.transformOrigin;
   const originalCanvasBackground = canvas.style.background;
 
+  const originalSurfaceOverflow = surface?.style?.overflow;
+
   try {
     if (stage) {
       stage.style.transform = 'none';
       stage.style.transformOrigin = 'top left';
       stage.style.willChange = 'auto';
       stage.style.background = backgroundColor;
+      stage.style.width = `${captureWidth}px`;
+      stage.style.height = `${captureHeight}px`;
     }
     canvas.style.transform = 'none';
     canvas.style.transformOrigin = 'top left';
     canvas.style.background = backgroundColor;
+    canvas.style.width = `${captureWidth}px`;
+    canvas.style.height = `${captureHeight}px`;
+
+    if (surface) {
+      surface.style.overflow = 'visible';
+    }
+
+    // Force reflow
+    target.offsetHeight;
+
+    console.log('[InkWise Builder] Target dimensions after transform removal:', target.offsetWidth, 'x', target.offsetHeight);
+    console.log('[InkWise Builder] Target computed style:', window.getComputedStyle(target));
+
+    // Wait for all images to load
+    const images = target.querySelectorAll('img');
+    if (images.length > 0) {
+      console.log('[InkWise Builder] Waiting for', images.length, 'images to load');
+      await Promise.all(Array.from(images).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          setTimeout(() => resolve(), 5000); // Timeout after 5 seconds
+        });
+      }));
+      console.log('[InkWise Builder] All images loaded or timed out');
+    }
 
     try {
-      console.log('[InkWise Builder] Attempting html-to-image capture on stage first');
-      const png = await toPng(target, {
-        cacheBust: true,
-        pixelRatio,
+      console.log('[InkWise Builder] Attempting html2canvas capture on stage (only method - html-to-image disabled due to CORS)');
+
+      const html2canvasPromise = html2canvas(target, {
+        scale: pixelRatio,
+        useCORS: true,
+        allowTaint: true,
         backgroundColor,
         width: captureWidth,
         height: captureHeight,
-        filter: (node) => !node.classList?.contains('canvas-layer__resize-handle'),
+        scrollX: 0,
+        scrollY: 0,
+        logging: false, // Reduce noise
+        removeContainer: true,
+        foreignObjectRendering: false, // Use canvas rendering to avoid CORS issues
+        imageTimeout: 10000,
+        ignoreElements: (element) => {
+          // Skip elements that might cause CORS issues
+          return element.tagName === 'LINK' && element.rel === 'stylesheet' && (
+            element.href && (
+              element.href.includes('fonts.googleapis.com') ||
+              element.href.includes('fonts.gstatic.com') ||
+              element.href.includes('cdn.jsdelivr.net') ||
+              element.href.includes('stackpath.bootstrapcdn.com')
+            )
+          );
+        },
       });
 
-      if (png && png.length >= 100) {
-        console.log('[InkWise Builder] html-to-image stage capture succeeded, PNG length:', png.length);
-        diagnostics.attempts.push({ method: 'html-to-image-stage', success: true, length: png.length });
-        return { dataUrl: png, diagnostics };
+      const html2canvasTimeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('html2canvas timeout')), 15000)
+      );
+
+      const canvasResult = await Promise.race([html2canvasPromise, html2canvasTimeout]);
+
+      const dataUrl = canvasResult.toDataURL('image/png');
+      if (dataUrl && dataUrl.length >= 100) {
+        console.log('[InkWise Builder] html2canvas stage capture succeeded, PNG length:', dataUrl.length);
+        diagnostics.attempts.push({ method: 'html2canvas-stage', success: true, length: dataUrl.length });
+        return { dataUrl, diagnostics };
       }
-      console.warn('[InkWise Builder] html-to-image stage capture produced empty output, falling back');
-      diagnostics.attempts.push({ method: 'html-to-image-stage', success: false, reason: 'empty-output', length: png?.length || 0 });
+      console.warn('[InkWise Builder] html2canvas stage capture produced empty output');
+      diagnostics.attempts.push({ method: 'html2canvas-stage', success: false, reason: 'empty-output', length: dataUrl?.length || 0 });
     } catch (stageCaptureError) {
-      console.error('[InkWise Builder] html-to-image stage capture failed:', stageCaptureError.message);
-      diagnostics.attempts.push({ method: 'html-to-image-stage', success: false, error: stageCaptureError.message });
+      console.error('[InkWise Builder] Stage capture failed:', stageCaptureError.message);
+      diagnostics.attempts.push({ method: 'stage-capture', success: false, error: stageCaptureError.message });
     }
   } finally {
     if (stage) {
@@ -119,10 +234,18 @@ async function captureCanvasRaster(canvas, pixelRatio, backgroundColor = '#fffff
       stage.style.transformOrigin = originalStageOrigin ?? '';
       stage.style.background = originalStageBackground ?? '';
       stage.style.willChange = originalStageWillChange ?? '';
+      stage.style.width = '';
+      stage.style.height = '';
     }
     canvas.style.transform = originalCanvasTransform;
     canvas.style.transformOrigin = originalCanvasOrigin;
     canvas.style.background = originalCanvasBackground;
+    canvas.style.width = '';
+    canvas.style.height = '';
+
+    if (surface) {
+      surface.style.overflow = originalSurfaceOverflow ?? '';
+    }
   }
 
   const clone = target.cloneNode(true);
@@ -134,6 +257,10 @@ async function captureCanvasRaster(canvas, pixelRatio, backgroundColor = '#fffff
   clone.style.width = `${captureWidth}px`;
   clone.style.height = `${captureHeight}px`;
   clone.style.background = backgroundColor;
+  clone.style.willChange = 'auto';
+  clone.style.display = 'block';
+  clone.style.visibility = 'hidden';
+  clone.style.opacity = '0';
 
   document.body.appendChild(clone);
 
@@ -154,38 +281,35 @@ async function captureCanvasRaster(canvas, pixelRatio, backgroundColor = '#fffff
   try {
     console.log('[InkWise Builder] Attempting html2canvas capture (cloned node) at', captureWidth, 'x', captureHeight);
 
-    const captureWithHtml2Canvas = async (sourceNode) => html2canvas(sourceNode, {
-      scale: pixelRatio,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor,
-      width: captureWidth,
-      height: captureHeight,
-      scrollX: 0,
-      scrollY: 0,
-      logging: true,
-      removeContainer: true,
-      foreignObjectRendering: true,
-      imageTimeout: 8000,
-    });
-
-    const captureWithHtmlToImage = async (sourceNode) => {
-      try {
-        const png = await toPng(sourceNode, {
-          cacheBust: true,
-          pixelRatio,
-          backgroundColor,
-          width: captureWidth,
-          height: captureHeight,
-          filter: (node) => !node.classList?.contains('canvas-layer__resize-handle'),
-        });
-        console.log('[InkWise Builder] html-to-image capture succeeded, PNG length:', png?.length);
-        return png && png.length >= 100 ? png : null;
-      } catch (imageError) {
-        console.error('[InkWise Builder] html-to-image capture failed:', imageError.message);
-        diagnostics.attempts.push({ method: 'html-to-image-clone', success: false, error: imageError.message });
-        return null;
-      }
+    const captureWithHtml2Canvas = async (sourceNode) => {
+      const promise = html2canvas(sourceNode, {
+        scale: pixelRatio,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor,
+        width: captureWidth,
+        height: captureHeight,
+        scrollX: 0,
+        scrollY: 0,
+        logging: false,
+        removeContainer: true,
+        foreignObjectRendering: false,
+        imageTimeout: 8000,
+        ignoreElements: (element) => {
+          return element.tagName === 'LINK' && element.rel === 'stylesheet' && (
+            element.href && (
+              element.href.includes('fonts.googleapis.com') ||
+              element.href.includes('fonts.gstatic.com') ||
+              element.href.includes('cdn.jsdelivr.net') ||
+              element.href.includes('stackpath.bootstrapcdn.com')
+            )
+          );
+        },
+      });
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('html2canvas clone timeout')), 15000)
+      );
+      return Promise.race([promise, timeout]);
     };
 
     const capturedCanvas = await captureWithHtml2Canvas(clone);
@@ -222,22 +346,13 @@ async function captureCanvasRaster(canvas, pixelRatio, backgroundColor = '#fffff
     }
 
     if (!result) {
-      console.warn('[InkWise Builder] Falling back to html-to-image for clone capture');
-      result = await captureWithHtmlToImage(clone);
-      if (result) {
-        diagnostics.attempts.push({ method: 'html-to-image-clone', success: true, length: result.length });
-      }
-    }
-
-    if (!result) {
-      console.warn('[InkWise Builder] Falling back to html-to-image for original target');
-      result = await captureWithHtmlToImage(target);
-      if (result) {
-        diagnostics.attempts.push({ method: 'html-to-image-target', success: true, length: result.length });
-      }
+      console.warn('[InkWise Builder] All html2canvas attempts failed - canvas capture will be empty');
+      diagnostics.attempts.push({ method: 'final-failure', success: false, reason: 'all-methods-failed' });
     }
 
     if (result) {
+      console.error('[InkWise Builder] CAPTURE SUCCESSFUL - Returning data URL, length:', result.length);
+      alert('Canvas capture successful! Length: ' + result.length);
       return { dataUrl: result, diagnostics };
     }
 
@@ -261,29 +376,13 @@ async function captureCanvasRaster(canvas, pixelRatio, backgroundColor = '#fffff
         return { dataUrl: result, diagnostics };
       }
     } catch (fallbackError) {
-      console.error('[InkWise Builder] Final fallback also failed:', fallbackError);
+      console.error('[InkWise Builder] Final html2canvas fallback also failed:', fallbackError);
       diagnostics.attempts.push({ method: 'html2canvas-basic', success: false, error: fallbackError.message });
     }
 
-    try {
-      console.log('[InkWise Builder] Attempting final html-to-image capture after exception');
-      const result = await toPng(target, {
-        cacheBust: true,
-        pixelRatio,
-        backgroundColor,
-        width: captureWidth,
-        height: captureHeight,
-      });
-      if (result && result.length >= 100) {
-        console.log('[InkWise Builder] Final html-to-image fallback succeeded, PNG length:', result.length);
-        diagnostics.attempts.push({ method: 'html-to-image-final', success: true, length: result.length });
-        return { dataUrl: result, diagnostics };
-      }
-    } catch (ultimateError) {
-      console.error('[InkWise Builder] html-to-image fallback after exception failed:', ultimateError.message);
-      diagnostics.attempts.push({ method: 'html-to-image-final', success: false, error: ultimateError.message });
-    }
-    diagnostics.error = diagnostics.error || 'final-fallback-failed';
+    diagnostics.error = diagnostics.error || 'all-html2canvas-failed';
+    console.error('[InkWise Builder] CAPTURE COMPLETED - All html2canvas methods failed, returning null');
+    alert('Canvas capture completed - all methods failed due to CORS issues');
     return { dataUrl: null, diagnostics };
   } finally {
     if (surface) {
@@ -298,6 +397,16 @@ async function captureCanvasRaster(canvas, pixelRatio, backgroundColor = '#fffff
       clone.parentNode.removeChild(clone);
     }
   }
+}
+
+try {
+  const capturePromise = performCapture();
+  return await Promise.race([capturePromise, timeoutPromise]);
+} catch (error) {
+  console.error('[InkWise Builder] Capture failed with timeout or error:', error);
+  alert('Canvas capture failed: ' + error.message);
+  return { dataUrl: null, diagnostics: { ...diagnostics, error: error.message } };
+}
 }
 
 function derivePreviewKey(page, index) {
