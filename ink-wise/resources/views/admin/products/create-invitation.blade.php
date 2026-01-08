@@ -263,11 +263,7 @@
                     <div class="addon-row" data-row-index="{{ $i }}">
                         <input type="hidden" name="addons[{{ $i }}][id]" value="{{ $addon['id'] ?? '' }}">
                         <div class="input-row">
-                            <div class="field">
-                                <label>Size Type</label>
-                                <input type="text" value="Size" readonly style="background: #f7f9ff; cursor: not-allowed; opacity: 0.8;">
-                                <input type="hidden" name="addons[{{ $i }}][addon_type]" value="size">
-                            </div>
+                            <input type="hidden" name="addons[{{ $i }}][addon_type]" value="size">
                             <div class="field addon-name-field">
                                 <label for="addons_{{ $i }}_name">Size Number</label>
                                 <select class="addon-name-select" data-placeholder="Select addon material..." name="addons[{{ $i }}][material_select]" aria-label="Select addon material">

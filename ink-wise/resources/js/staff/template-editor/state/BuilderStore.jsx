@@ -16,14 +16,23 @@ function normalizePages(template) {
 }
 
 const initialState = ({ template }) => {
-  const pages = applyPageStructure(normalizePages(template), template);
+  const normalizedTemplate = {
+    ...template,
+    // Default to no fold and 4.5" × 6.25" when server data omits sizing/fold
+    fold_type: template?.fold_type || null,
+    width_inch: template?.width_inch ?? 4.5,
+    height_inch: template?.height_inch ?? 6.25,
+    sizes: template?.sizes ?? [],
+  };
+
+  const pages = applyPageStructure(normalizePages(normalizedTemplate), normalizedTemplate);
   const fallbackPageId = pages[0]?.id ?? 'page-0';
   const configuredActiveId = template?.design?.activePageId;
   const activePageExists = pages.some((page) => page.id === configuredActiveId);
   const activePageId = activePageExists ? configuredActiveId : fallbackPageId;
 
   return {
-    template,
+    template: normalizedTemplate,
     pages,
     activePageId,
     selectedLayerId: getFirstLayerId(pages, activePageId),
@@ -34,10 +43,13 @@ const initialState = ({ template }) => {
     inspectorOpen: true,
     recentlyUploadedImages: [],
     showPreviewModal: false,
+    sizes: template?.sizes ?? [],
+    selectedSizes: template?.selected_sizes ?? [],
     history: {
       undoStack: [],
       redoStack: [],
     },
+    imageHistory: {}, // layerId -> { history: [], currentIndex: 0 }
   };
 };
 
@@ -121,9 +133,50 @@ function reducer(state, action) {
         return { ...page, nodes };
       });
 
-      return commitPages(state, pages, {
+      // Track image history for image layers when image properties change
+      let newState = commitPages(state, pages, {
         selectedLayerId: ensureSelectedLayer(state, pages, action.layerId),
       });
+
+      const updatedLayer = pages
+        .find(p => p.id === action.pageId)
+        ?.nodes.find(n => n.id === action.layerId);
+      
+      if (updatedLayer && (updatedLayer.type === 'image' || updatedLayer.metadata?.isImageFrame)) {
+        const imageProps = ['brightness', 'contrast', 'saturation', 'flipHorizontal', 'flipVertical', 'objectFit'];
+        const hasImageChanges = Object.keys(action.props).some(key => 
+          key === 'metadata' && action.props.metadata && 
+          Object.keys(action.props.metadata).some(metaKey => imageProps.includes(metaKey))
+        ) || (action.props.frame && 'rotation' in action.props.frame);
+
+        if (hasImageChanges) {
+          const currentImageState = {
+            brightness: updatedLayer.metadata?.brightness ?? 100,
+            contrast: updatedLayer.metadata?.contrast ?? 100,
+            saturation: updatedLayer.metadata?.saturation ?? 100,
+            flipHorizontal: updatedLayer.metadata?.flipHorizontal ?? false,
+            flipVertical: updatedLayer.metadata?.flipVertical ?? false,
+            objectFit: updatedLayer.metadata?.objectFit ?? 'cover',
+            rotation: updatedLayer.frame?.rotation ?? 0,
+          };
+
+          newState = {
+            ...newState,
+            imageHistory: {
+              ...newState.imageHistory,
+              [action.layerId]: {
+                history: [
+                  ...(newState.imageHistory[action.layerId]?.history ?? []),
+                  currentImageState,
+                ],
+                currentIndex: (newState.imageHistory[action.layerId]?.currentIndex ?? -1) + 1,
+              },
+            },
+          };
+        }
+      }
+
+      return newState;
     }
     case 'ALIGN_SELECTED_LAYER': {
       if (!state.selectedLayerId) {
@@ -459,6 +512,89 @@ function reducer(state, action) {
       return {
         ...state,
         showPreviewModal: false,
+      };
+    case 'SELECT_SIZE':
+      return {
+        ...state,
+        selectedSizes: action.sizeId
+          ? [...new Set([...state.selectedSizes, action.sizeId])]
+          : state.selectedSizes,
+      };
+    case 'DESELECT_SIZE':
+      return {
+        ...state,
+        selectedSizes: state.selectedSizes.filter(id => id !== action.sizeId),
+      };
+    case 'SET_SELECTED_SIZES':
+      return {
+        ...state,
+        selectedSizes: Array.isArray(action.sizeIds) ? action.sizeIds : [],
+      };
+    case 'PUSH_IMAGE_HISTORY':
+      return {
+        ...state,
+        imageHistory: {
+          ...state.imageHistory,
+          [action.layerId]: {
+            history: [
+              ...(state.imageHistory[action.layerId]?.history ?? []),
+              action.imageState,
+            ],
+            currentIndex: (state.imageHistory[action.layerId]?.currentIndex ?? -1) + 1,
+          },
+        },
+      };
+    case 'NAVIGATE_IMAGE_HISTORY':
+      const layerHistory = state.imageHistory[action.layerId];
+      if (!layerHistory || layerHistory.history.length === 0) {
+        return state;
+      }
+      
+      let newIndex = layerHistory.currentIndex;
+      if (action.direction === 'BACK') {
+        newIndex = Math.max(0, layerHistory.currentIndex - 1);
+      } else if (action.direction === 'FORWARD') {
+        newIndex = Math.min(layerHistory.history.length - 1, layerHistory.currentIndex + 1);
+      } else if (action.direction === 'FRONT') {
+        newIndex = layerHistory.history.length - 1;
+      } else if (action.direction === 'BACKWARD') {
+        newIndex = Math.max(0, layerHistory.currentIndex - 1);
+      }
+      
+      if (newIndex === layerHistory.currentIndex) {
+        return state;
+      }
+      
+      const targetState = layerHistory.history[newIndex];
+      const pageIndex = state.pages.findIndex(p => p.id === state.activePageId);
+      if (pageIndex === -1) return state;
+      
+      const layerIndex = state.pages[pageIndex].nodes.findIndex(n => n.id === action.layerId);
+      if (layerIndex === -1) return state;
+      
+      const updatedPages = [...state.pages];
+      updatedPages[pageIndex] = {
+        ...updatedPages[pageIndex],
+        nodes: [...updatedPages[pageIndex].nodes],
+      };
+      updatedPages[pageIndex].nodes[layerIndex] = {
+        ...updatedPages[pageIndex].nodes[layerIndex],
+        metadata: {
+          ...updatedPages[pageIndex].nodes[layerIndex].metadata,
+          ...targetState,
+        },
+      };
+      
+      return {
+        ...state,
+        pages: updatedPages,
+        imageHistory: {
+          ...state.imageHistory,
+          [action.layerId]: {
+            ...layerHistory,
+            currentIndex: newIndex,
+          },
+        },
       };
     default:
       return state;

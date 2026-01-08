@@ -276,6 +276,24 @@ class TemplateController extends Controller
         // TEMPORARY: Force staff views for debugging
         $isStaff = true;
 
+        // Fetch available sizes
+        $sizes = \App\Models\ProductSize::with('material')
+            ->select('id', 'size', 'size_type', 'price', 'material_id')
+            ->get()
+            ->map(function ($size) {
+                return [
+                    'id' => $size->id,
+                    'size' => $size->size,
+                    'type' => $size->size_type,
+                    'price' => $size->price,
+                    'material' => $size->material ? [
+                        'id' => $size->material->material_id,
+                        'name' => $size->material->material_name,
+                        'type' => $size->material->material_type,
+                    ] : null,
+                ];
+            });
+
         $templateBootstrap = [
             'id' => $template->id,
             'name' => $template->name,
@@ -292,6 +310,9 @@ class TemplateController extends Controller
             'width_inch' => $template->width_inch,
             'height_inch' => $template->height_inch,
             'fold_type' => $template->fold_type,
+            'sizes' => $template->sizes,
+            'selected_sizes' => $template->metadata['selected_sizes'] ?? [],
+            'available_sizes' => $sizes,
             'updated_at' => optional($template->updated_at)->toIso8601String(),
         ];
 
@@ -412,6 +433,8 @@ public function saveCanvas(Request $request, $id)
             'preview_images_meta' => 'nullable|array',
             'template_name' => 'nullable|string|max:255',
             'template' => 'nullable|array',
+            'template.*.selected_sizes' => 'nullable|array',
+            'template.*.selected_sizes.*' => 'integer',
             'category' => 'nullable|string|max:255',
             'assets' => 'nullable|array',
             'preview_video' => 'nullable|string',
@@ -453,6 +476,12 @@ public function saveCanvas(Request $request, $id)
             }
             if (isset($validated['template']['fold_type'])) {
                 $template->fold_type = $validated['template']['fold_type'];
+            }
+            if (isset($validated['template']['sizes'])) {
+                $template->sizes = $validated['template']['sizes'];
+            }
+            if (isset($validated['template']['selected_sizes'])) {
+                $metadata['selected_sizes'] = $validated['template']['selected_sizes'];
             }
         }
 
@@ -766,7 +795,7 @@ public function uploadPreview(Request $request, $id)
             $template->name = $validated['template_name'];
         }
 
-        // Persist optional template fields (width/height/fold_type) if provided during autosave
+        // Persist optional template fields (width/height/fold_type/sizes) if provided during autosave
         if (!empty($validated['template']) && is_array($validated['template'])) {
             if (isset($validated['template']['width_inch'])) {
                 $template->width_inch = (float) $validated['template']['width_inch'];
@@ -776,6 +805,9 @@ public function uploadPreview(Request $request, $id)
             }
             if (isset($validated['template']['fold_type'])) {
                 $template->fold_type = $validated['template']['fold_type'];
+            }
+            if (isset($validated['template']['sizes'])) {
+                $template->sizes = $validated['template']['sizes'];
             }
         }
 

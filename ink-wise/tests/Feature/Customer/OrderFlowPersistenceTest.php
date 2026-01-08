@@ -11,7 +11,7 @@ use App\Models\Inventory;
 use App\Models\CustomerOrder;
 use App\Services\OrderFlowService;
 use Illuminate\Support\Str;
-use App\Models\ProductAddon;
+use App\Models\ProductSize;
 use App\Models\ProductBulkOrder;
 use App\Models\ProductColor;
 use App\Models\ProductEnvelope;
@@ -49,7 +49,7 @@ class OrderFlowPersistenceTest extends TestCase
             'price' => 150,
         ]);
 
-        $addon = ProductAddon::create([
+        $addon = ProductSize::create([
             'product_id' => $product->id,
             'addon_type' => 'trim',
             'name' => 'Gold Foil',
@@ -771,7 +771,7 @@ class OrderFlowPersistenceTest extends TestCase
             'price' => 5.0,
         ]);
 
-        $envelopeAddon = ProductAddon::create([
+        $envelopeAddon = ProductSize::create([
             'product_id' => $envelopeProduct->id,
             'addon_type' => 'liner',
             'name' => 'Luxury Liner',

@@ -73,7 +73,7 @@
     "isEntry": true
   },
   "resources/js/staff/template-editor/main.jsx": {
-    "file": "assets/main-C3ILQHlj.js",
+    "file": "assets/main-D3c-MwVb.js",
     "name": "main",
     "src": "resources/js/staff/template-editor/main.jsx",
     "isEntry": true,
@@ -87,7 +87,7 @@
       "resources/js/staff/template-editor/utils/recentImagesDB.js"
     ],
     "css": [
-      "assets/main-BZkOtWcW.css"
+      "assets/main-DpPKJWjJ.css"
     ]
   },
   "resources/js/staff/template-editor/utils/recentImagesDB.js": {

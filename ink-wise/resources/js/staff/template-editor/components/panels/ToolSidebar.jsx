@@ -117,6 +117,7 @@ const TOOL_SECTIONS = [
   { id: 'draw', label: 'Draw', description: 'Draw shapes and lines.', icon: 'fa-solid fa-pencil' },
   { id: 'background', label: 'Color', description: 'Set background.', icon: 'fa-solid fa-palette' },
   { id: 'colors', label: 'Palletes', description: 'Generate color palettes.', icon: 'fa-solid fa-palette' },
+  { id: 'sizes', label: 'Sizes', description: 'Select product sizes.', icon: 'fa-solid fa-expand' },
   { id: 'layers', label: 'Layers', description: 'Manage layers.', icon: 'fa-solid fa-layer-group' },
   { id: 'quotes', label: 'Quotes', description: 'Add quotes.', icon: 'fa-solid fa-quote-left' },
 ];
@@ -1390,8 +1391,8 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
   const [colorPickerTab, setColorPickerTab] = useState('gradient');
   const [solidPickerColor, setSolidPickerColor] = useState('#ffffff');
   const [solidHexDraft, setSolidHexDraft] = useState('#ffffff');
-  const [gradientColorStops, setGradientColorStops] = useState(['#C97A8C', '#A855F7']);
-  const [gradientInputs, setGradientInputs] = useState(['#C97A8C', '#A855F7']);
+  const [gradientColorStops, setGradientColorStops] = useState(['#F3E3C9', '#FFFDF4']);
+  const [gradientInputs, setGradientInputs] = useState(['#F3E3C9', '#FFFDF4']);
   const [selectedGradientStyle, setSelectedGradientStyle] = useState('linear');
   const [gradientAngle, setGradientAngle] = useState(120);
   const [activeGradientStop, setActiveGradientStop] = useState(0);
@@ -3676,6 +3677,17 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
   }, [activePage?.background, normalizeColorForInput]);
 
   useEffect(() => {
+    if (typeof activePage?.background !== 'string') {
+      return;
+    }
+    const match = activePage.background.match(/gradient\([^,]+,\s*([^,]+),\s*([^)]+)\)/i);
+    if (match) {
+      const stops = [match[1].trim(), match[2].trim()].map((stop) => stop.toUpperCase());
+      setGradientColorStops(stops);
+    }
+  }, [activePage?.background]);
+
+  useEffect(() => {
     setSolidPickerColor(backgroundColorInput);
   }, [backgroundColorInput]);
 
@@ -5164,38 +5176,25 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
     };
   }, [generateColorPalette, currentPaletteSets.length, activeTool]);
 
-  const applyColorToSelection = useCallback((color) => {
+  const applyColorToActiveTarget = useCallback((color) => {
     if (!activePage) {
-      return;
+      return 'none';
     }
 
-    const targetLayerId = state.selectedLayerId;
-    if (!targetLayerId) {
-      setPaletteError('Select a layer on the canvas, then click a color swatch.');
-      return;
-    }
+    const selectedId = state.selectedLayerId;
+    const selectedLayer = selectedId ? activePage.nodes?.find((node) => node.id === selectedId) : null;
+    const isShape = selectedLayer && selectedLayer.type === 'shape';
 
-    const targetLayer = activePage.nodes?.find((node) => node.id === targetLayerId);
-    if (!targetLayer) {
-      setPaletteError('Select a layer on the canvas, then click a color swatch.');
-      return;
-    }
-
-    dispatch({
-      type: 'UPDATE_LAYER_PROPS',
-      pageId: activePage.id,
-      layerId: targetLayerId,
-      props: { fill: color },
-    });
-
-    rememberColor(color);
-
-    setPaletteError('');
-  }, [activePage, dispatch, rememberColor, state.selectedLayerId]);
-
-  const applyColorToBackground = useCallback((color) => {
-    if (!activePage) {
-      return;
+    if (isShape) {
+      dispatch({
+        type: 'UPDATE_LAYER_PROPS',
+        pageId: activePage.id,
+        layerId: selectedId,
+        props: { fill: color },
+      });
+      rememberColor(color);
+      setPaletteError('');
+      return 'layer';
     }
 
     dispatch({
@@ -5204,7 +5203,12 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       props: { background: color },
     });
     setPaletteError('');
-  }, [activePage, dispatch]);
+    return 'background';
+  }, [activePage, dispatch, rememberColor, state.selectedLayerId]);
+
+  const applyColorToSelection = useCallback((color) => {
+    applyColorToActiveTarget(color);
+  }, [applyColorToActiveTarget]);
 
   const handleSolidColorImmediateApply = useCallback((value, alpha = 1) => {
     if (!value) {
@@ -5216,8 +5220,8 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
     setSolidHexDraft(normalized.toUpperCase());
     rememberColor(normalized);
     const colorWithAlpha = alpha < 1 ? `rgba(${hexToRgb(normalized)}, ${alpha})` : normalized;
-    applyColorToBackground(colorWithAlpha);
-  }, [applyColorToBackground, normalizeColorForInput, rememberColor]);
+    applyColorToActiveTarget(colorWithAlpha);
+  }, [applyColorToActiveTarget, normalizeColorForInput, rememberColor]);
 
   const handleSolidHexInput = useCallback((rawValue) => {
     if (!rawValue) {
@@ -5243,11 +5247,11 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
   const handleColorTabChange = useCallback((tab) => {
     setColorPickerTab(tab);
     if (tab === 'gradient') {
-      applyColorToBackground(buildGradientValue(selectedGradientStyle, gradientColorStops, gradientAngle, backgroundOpacity / 100));
+      applyColorToActiveTarget(buildGradientValue(selectedGradientStyle, gradientColorStops, gradientAngle, backgroundOpacity / 100));
       return;
     }
     handleSolidColorImmediateApply(solidPickerColor, backgroundOpacity / 100);
-  }, [applyColorToBackground, backgroundOpacity, buildGradientValue, gradientAngle, gradientColorStops, handleSolidColorImmediateApply, selectedGradientStyle, solidPickerColor]);
+  }, [applyColorToActiveTarget, backgroundOpacity, buildGradientValue, gradientAngle, gradientColorStops, handleSolidColorImmediateApply, selectedGradientStyle, solidPickerColor]);
 
   const handleGradientColorChange = useCallback((index, value) => {
     const normalized = normalizeColorForInput(value);
@@ -5255,20 +5259,20 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       const nextStops = [...prevStops];
       nextStops[index] = normalized;
       if (colorPickerTab === 'gradient') {
-        applyColorToBackground(
+        applyColorToActiveTarget(
           buildGradientValue(selectedGradientStyle, nextStops, gradientAngle, backgroundOpacity / 100),
         );
       }
       return nextStops;
     });
     rememberColor(normalized);
-  }, [applyColorToBackground, backgroundOpacity, buildGradientValue, colorPickerTab, gradientAngle, normalizeColorForInput, rememberColor, selectedGradientStyle]);
+  }, [applyColorToActiveTarget, backgroundOpacity, buildGradientValue, colorPickerTab, gradientAngle, normalizeColorForInput, rememberColor, selectedGradientStyle]);
 
   const handleGradientStyleSelect = useCallback((styleId) => {
     setSelectedGradientStyle(styleId);
     setColorPickerTab('gradient');
-    applyColorToBackground(buildGradientValue(styleId, gradientColorStops, gradientAngle, backgroundOpacity / 100));
-  }, [applyColorToBackground, backgroundOpacity, buildGradientValue, gradientAngle, gradientColorStops]);
+    applyColorToActiveTarget(buildGradientValue(styleId, gradientColorStops, gradientAngle, backgroundOpacity / 100));
+  }, [applyColorToActiveTarget, backgroundOpacity, buildGradientValue, gradientAngle, gradientColorStops]);
 
   const handleAddGradientStop = useCallback(() => {
     setGradientColorStops((prevStops) => {
@@ -5297,23 +5301,23 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
     const numeric = Math.max(0, Math.min(360, Number(nextAngle)));
     setGradientAngle(numeric);
     if (colorPickerTab === 'gradient') {
-      applyColorToBackground(
+      applyColorToActiveTarget(
         buildGradientValue(selectedGradientStyle, gradientColorStops, numeric, backgroundOpacity / 100),
       );
     }
-  }, [applyColorToBackground, backgroundOpacity, buildGradientValue, colorPickerTab, gradientColorStops, selectedGradientStyle]);
+  }, [applyColorToActiveTarget, backgroundOpacity, buildGradientValue, colorPickerTab, gradientColorStops, selectedGradientStyle]);
 
   const handleBackgroundOpacityChange = useCallback((nextValue) => {
     const numeric = Math.max(0, Math.min(100, Number(nextValue)));
     setBackgroundOpacity(numeric);
     if (colorPickerTab === 'gradient') {
-      applyColorToBackground(
+      applyColorToActiveTarget(
         buildGradientValue(selectedGradientStyle, gradientColorStops, gradientAngle, numeric / 100),
       );
     } else {
       handleSolidColorImmediateApply(solidPickerColor, numeric / 100);
     }
-  }, [applyColorToBackground, buildGradientValue, colorPickerTab, gradientAngle, gradientColorStops, handleSolidColorImmediateApply, selectedGradientStyle, solidPickerColor]);
+  }, [applyColorToActiveTarget, buildGradientValue, colorPickerTab, gradientAngle, gradientColorStops, handleSolidColorImmediateApply, selectedGradientStyle, solidPickerColor]);
 
   const handleRecentColorClick = useCallback((color) => {
     if (colorPickerTab === 'solid') {
@@ -5325,14 +5329,14 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
 
   const handleApplyBackground = useCallback(() => {
     if (colorPickerTab === 'gradient') {
-      applyColorToBackground(
+      applyColorToActiveTarget(
         buildGradientValue(selectedGradientStyle, gradientColorStops, gradientAngle, backgroundOpacity / 100),
       );
       gradientColorStops.forEach((stop) => rememberColor(stop));
       return;
     }
     handleSolidColorImmediateApply(solidPickerColor, backgroundOpacity / 100);
-  }, [applyColorToBackground, backgroundOpacity, buildGradientValue, colorPickerTab, gradientAngle, gradientColorStops, handleSolidColorImmediateApply, rememberColor, selectedGradientStyle, solidPickerColor]);
+  }, [applyColorToActiveTarget, backgroundOpacity, buildGradientValue, colorPickerTab, gradientAngle, gradientColorStops, handleSolidColorImmediateApply, rememberColor, selectedGradientStyle, solidPickerColor]);
 
   const handleDefaultGradientClick = useCallback((gradient) => {
     const match = gradient.match(/linear-gradient\(90deg, ([^,]+), ([^)]+)\)/);
@@ -6830,7 +6834,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
         return (
           <div className="builder-sidebar__content">
             <div className="builder-sidebar__header">
-              <h2>Background</h2>
+              <h2>Colors</h2>
               <button
                 type="button"
                 className="builder-sidebar-toggle"
@@ -7257,6 +7261,48 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
             ) : null}
           </div>
         );
+      case 'canvas':
+        return (
+          <div className="builder-sidebar__content builder-sidebar__content--background">
+            <div className="builder-sidebar__header">
+              <div>
+                <h2>Canvas Color</h2>
+                <p>Adjust the background color without affecting other elements.</p>
+              </div>
+              <button
+                type="button"
+                className="builder-sidebar-toggle"
+                onClick={onToggleSidebar}
+                aria-label="Hide sidebar"
+                title="Hide sidebar"
+              >
+                <i className="fas fa-chevron-left" aria-hidden="true"></i>
+              </button>
+            </div>
+
+            <div className="builder-sidebar__section" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <label className="inspector-field" style={{ margin: 0 }}>
+                <span className="inspector-field__label">Background color</span>
+                <input
+                  type="color"
+                  className="inspector-field__control inspector-field__control--color"
+                  value={backgroundColorInput}
+                  onChange={(e) => handleSolidColorImmediateApply(e.target.value, backgroundOpacity / 100)}
+                  aria-label="Canvas background color"
+                  style={{ width: '100%', maxWidth: '140px' }}
+                />
+              </label>
+              <input
+                type="text"
+                className="inspector-field__control"
+                value={solidHexDraft}
+                onChange={(e) => handleSolidHexInput(e.target.value)}
+                aria-label="Hex color"
+                placeholder="#FFFFFF"
+              />
+            </div>
+          </div>
+        );
       case 'layers':
         return (
           <div className="builder-sidebar__content builder-sidebar__content--layers">
@@ -7273,6 +7319,62 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
               </button>
             </div>
             <LayersPanel />
+          </div>
+        );
+      case 'sizes':
+        return (
+          <div className="builder-sidebar__content">
+            <div className="builder-sidebar__header">
+              <h2>Sizes</h2>
+              <button
+                type="button"
+                className="builder-sidebar-toggle"
+                onClick={onToggleSidebar}
+                aria-label="Hide sidebar"
+                title="Hide sidebar"
+              >
+                <i className="fas fa-chevron-left" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div className="sizes-panel">
+              <p className="sizes-panel__subtitle">
+                Select the available sizes for this template. Staff users can choose from these options when creating orders.
+              </p>
+              <div className="sizes-panel__list">
+                {state.sizes.map((size) => (
+                  <div key={size.id} className="sizes-panel__item">
+                    <label className="sizes-panel__label">
+                      <input
+                        type="checkbox"
+                        checked={state.selectedSizes.includes(size.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            dispatch({ type: 'SELECT_SIZE', sizeId: size.id });
+                          } else {
+                            dispatch({ type: 'DESELECT_SIZE', sizeId: size.id });
+                          }
+                        }}
+                        className="sizes-panel__checkbox"
+                      />
+                      <span className="sizes-panel__name">
+                        {size.size} {size.type && `(${size.type})`}
+                        {size.material && (
+                          <small className="sizes-panel__material">
+                            {size.material.name} {size.material.type && `(${size.material.type})`}
+                          </small>
+                        )}
+                      </span>
+                      {size.price && (
+                        <span className="sizes-panel__price">${size.price}</span>
+                      )}
+                    </label>
+                  </div>
+                ))}
+              </div>
+              {state.sizes.length === 0 && (
+                <p className="sizes-panel__empty">No sizes available. Add sizes in the admin panel first.</p>
+              )}
+            </div>
           </div>
         );
       default:

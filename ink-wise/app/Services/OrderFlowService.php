@@ -10,7 +10,7 @@ use App\Models\Material;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
-use App\Models\ProductAddon;
+use App\Models\ProductSize;
 use App\Models\ProductBulkOrder;
 use App\Models\ProductColor;
 use App\Models\ProductMaterial;
@@ -474,15 +474,15 @@ class OrderFlowService
         }
 
         if (empty($addons) && !empty($addonIds)) {
-            $addons = ProductAddon::query()
+            $addons = ProductSize::query()
                 ->whereIn('id', collect($addonIds)->filter()->map(fn ($id) => (int) $id)->all())
                 ->get()
-                ->map(function (ProductAddon $addon) {
+                ->map(function (ProductSize $addon) {
                     return [
                         'id' => $addon->id,
-                        'name' => $addon->name ?? 'Add-on',
+                        'name' => $addon->size ?? 'Size',
                         'price' => $addon->price ?? 0,
-                        'type' => $addon->addon_type,
+                        'type' => $addon->size_type,
                     ];
                 })
                 ->values()
@@ -1577,7 +1577,7 @@ class OrderFlowService
         $item->addons()->whereNotIn('addon_id', $addonIds->all())->delete();
 
         if ($addonIds->isNotEmpty()) {
-            $addons = ProductAddon::query()->whereIn('id', $addonIds)->get();
+            $addons = ProductSize::query()->whereIn('id', $addonIds)->get();
             foreach ($addons as $addon) {
                 $requestedQuantity = max(1, (int) ($addonQuantitiesPayload->get($addon->id, $quantity)));
 
@@ -2329,7 +2329,7 @@ class OrderFlowService
                     $addon = null;
                     if ($addonSelection->addon_id) {
                         $addon = $addonCache[$addonSelection->addon_id] ??=
-                            ProductAddon::query()
+                            ProductSize::query()
                                 ->with(['material.inventory'])
                                 ->find($addonSelection->addon_id);
                     }
@@ -2889,7 +2889,7 @@ class OrderFlowService
             // Check addons
             $addonIds = $summary['addonIds'] ?? [];
             if (!empty($addonIds)) {
-                $addons = ProductAddon::query()
+                $addons = ProductSize::query()
                     ->with(['material.inventory'])
                     ->whereIn('id', $addonIds)
                     ->get();
