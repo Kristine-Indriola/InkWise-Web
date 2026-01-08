@@ -51,10 +51,7 @@ class ImageResolver
             return $path;
         }
 
-        $normalized = preg_replace('#^/?storage/#i', '', str_replace('\\', '/', $path)) ?? '';
-        if ($normalized === '') {
-            return $placeholder;
-        }
+        $normalized = str_replace('\\', '/', $path);
 
         $publicRoot = str_replace('\\', '/', public_path());
         $storageRoot = str_replace('\\', '/', storage_path('app/public'));
@@ -66,6 +63,9 @@ class ImageResolver
         if (Str::startsWith($normalized, $storageRoot)) {
             $normalized = ltrim(Str::after($normalized, $storageRoot), '/');
         }
+
+        // Normalize common prefixes: remove leading 'storage/' if present
+        $normalized = preg_replace('#^/?storage/#i', '', $normalized) ?? $normalized;
 
         // Remove leading public/ if still present
         $normalized = preg_replace('#^/?public/#i', '', $normalized) ?? $normalized;
