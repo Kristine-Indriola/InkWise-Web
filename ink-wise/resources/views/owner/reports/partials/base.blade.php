@@ -12,9 +12,16 @@
   $tableEmptyText = $tableConfig['emptyText'] ?? 'No records found.';
   $tableShowEmpty = (bool) ($tableConfig['showEmpty'] ?? false);
   $activeRange = $activeRange ?? request('range', 'all');
-  $activeRange = in_array($activeRange, ['daily', 'weekly', 'monthly', 'yearly', 'all'], true) ? $activeRange : 'all';
+  $activeRange = in_array($activeRange, ['daily', 'weekly', 'monthly', 'yearly', 'all', 'custom'], true) ? $activeRange : 'all';
   $rangeReload = (bool) ($rangeReload ?? false);
   $showGenerateControls = (bool) ($showGenerateControls ?? true);
+  $ownerFilters = is_array($filters ?? null) ? $filters : [];
+  $orderStatusFilterEnabled = (bool) ($orderStatusFilterEnabled ?? false);
+  $paymentStatusFilterEnabled = (bool) ($paymentStatusFilterEnabled ?? false);
+  $orderStatusFilter = $orderStatusFilterEnabled ? ($ownerFilters['orderStatus'] ?? 'completed') : null;
+  $paymentStatusFilter = $paymentStatusFilterEnabled ? ($ownerFilters['paymentStatus'] ?? 'all') : null;
+  $customStartDate = $ownerFilters['startDate'] ?? null;
+  $customEndDate = $ownerFilters['endDate'] ?? null;
   $summaryCardIcons = [
     'revenue' => [
       'class' => 'summary-card-icon--revenue',
@@ -49,9 +56,13 @@
       'svg' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 16V9a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 13h3a2 2 0 0 1 2 2v3H16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 16h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M7 16v1a2 2 0 0 0 2 2h2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
     ],
   ];
+
+  $hasSalesContext = isset($salesIntervals) && is_array($salesIntervals) && !empty($salesIntervals);
+  $salesShellId = $hasSalesContext ? 'adminSalesReportsShell' : null;
 @endphp
 
 <link rel="stylesheet" href="{{ asset('css/admin-css/materials.css') }}">
+<link rel="stylesheet" href="{{ asset('css/admin-css/reports.css') }}">
 
 <style>
   .owner-dashboard-shell {
@@ -212,8 +223,11 @@
   }
 
   .summary-card-meta {
-    color: #6b7280;
+    display: block;
+    margin-top: 8px;
+    color: #475569;
     font-size: 0.84rem;
+    font-weight: 600;
   }
 
   .summary-card-chip {
@@ -281,7 +295,8 @@
     color: #475569;
   }
 
-  .materials-toolbar__search select {
+  .materials-toolbar__search select,
+  .materials-toolbar__search input[type="date"] {
     min-width: 160px;
     padding: 8px 12px;
     border-radius: 10px;
@@ -292,7 +307,8 @@
     transition: border-color 0.18s ease, box-shadow 0.18s ease;
   }
 
-  .materials-toolbar__search select:focus {
+  .materials-toolbar__search select:focus,
+  .materials-toolbar__search input[type="date"]:focus {
     outline: none;
     border-color: rgba(59, 130, 246, 0.32);
     box-shadow: 0 12px 28px rgba(59, 130, 246, 0.08);
@@ -319,7 +335,7 @@
     border-collapse: collapse;
     font-size: 0.95rem;
     color: #0f172a;
-    min-width: 880px;
+    min-width: 960px;
   }
 
   .owner-dashboard-inner .table thead th {
@@ -378,6 +394,11 @@
     font-size: 0.86rem;
   }
 
+  .text-danger {
+    color: #dc2626;
+    font-weight: 600;
+  }
+
   .table-cell-emphasis {
     font-weight: 600;
     color: #0f172a;
@@ -427,7 +448,13 @@
   .dark-mode .summary-card-icon--inventory-pending { background: rgba(34, 197, 94, 0.32); color: #a7f3d0; }
   .dark-mode .chart-card { background: #1f2937; box-shadow: 0 16px 32px rgba(15, 23, 42, 0.5); }
   .dark-mode .chart-card h4 { color: #f9fafb; }
-  .dark-mode .materials-toolbar__search select { background: #374151; border-color: #4b5563; color: #f9fafb; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); }
+  .dark-mode .materials-toolbar__search select,
+  .dark-mode .materials-toolbar__search input[type="date"] {
+    background: #374151;
+    border-color: #4b5563;
+    color: #f9fafb;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  }
   .dark-mode .owner-dashboard-inner .table-wrapper { background: #1f2937; border-color: rgba(148, 185, 255, 0.32); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04); }
   .dark-mode .owner-dashboard-inner .table { color: #f9fafb; }
   .dark-mode .owner-dashboard-inner .table thead th { background: rgba(148, 185, 255, 0.22); color: #0f172a; }
@@ -588,7 +615,7 @@
       </div>
     </header>
 
-    <div class="page-inner owner-dashboard-inner">
+    <div class="page-inner owner-dashboard-inner" @if($salesShellId) id="{{ $salesShellId }}" @endif>
       @if(!empty($summaryCards))
         <section class="summary-grid" aria-label="{{ $pageTitle }} summary">
           @foreach($summaryCards as $card)
@@ -603,6 +630,8 @@
               $iconData = $iconKey && isset($summaryCardIcons[$iconKey]) ? $summaryCardIcons[$iconKey] : null;
               $iconClass = $iconData ? 'summary-card-icon ' . $iconData['class'] : null;
               $iconSvg = $iconData['svg'] ?? null;
+              $metricKey = $card['metric'] ?? null;
+              $metaHtml = $card['metaHtml'] ?? null;
             @endphp
             @if($href)
               <a href="{{ $href }}" class="summary-card">
@@ -617,8 +646,12 @@
                     <span class="{{ $chipClass }}">{{ $chipText }}</span>
                   @endif
                 </div>
-                <span class="summary-card-value">{{ $card['value'] ?? '—' }}</span>
-                <span class="summary-card-meta">{{ $card['meta'] ?? '' }}</span>
+                <span @class(['summary-card-value']) @if($metricKey) data-metric="{{ $metricKey }}" @endif>{{ $card['value'] ?? '—' }}</span>
+                @if($metaHtml)
+                  <span class="summary-card-meta">{!! $metaHtml !!}</span>
+                @else
+                  <span class="summary-card-meta">{{ $card['meta'] ?? '' }}</span>
+                @endif
               </a>
             @else
               <div class="summary-card">
@@ -633,11 +666,62 @@
                     <span class="{{ $chipClass }}">{{ $chipText }}</span>
                   @endif
                 </div>
-                <span class="summary-card-value">{{ $card['value'] ?? '—' }}</span>
-                <span class="summary-card-meta">{{ $card['meta'] ?? '' }}</span>
+                <span @class(['summary-card-value']) @if($metricKey) data-metric="{{ $metricKey }}" @endif>{{ $card['value'] ?? '—' }}</span>
+                @if($metaHtml)
+                  <span class="summary-card-meta">{!! $metaHtml !!}</span>
+                @else
+                  <span class="summary-card-meta">{{ $card['meta'] ?? '' }}</span>
+                @endif
               </div>
             @endif
           @endforeach
+        </section>
+      @endif
+
+      @if(!empty($paymentSummary ?? []))
+        <section class="reports-panel" aria-label="Payment insights">
+          <header class="reports-panel__header">
+            <div>
+              <h2>Payment insights</h2>
+              <p class="reports-subtext">Collection status across completed orders.</p>
+            </div>
+          </header>
+          <div class="reports-summary-grid">
+            <article class="reports-summary-card">
+              <header>
+                <span class="summary-label">Total collected</span>
+                <i class="fa-solid fa-wallet" aria-hidden="true"></i>
+              </header>
+              <strong>₱{{ number_format($paymentSummary['totalPaid'] ?? 0, 2) }}</strong>
+              <p>Cash realised from completed orders.</p>
+            </article>
+            <article class="reports-summary-card">
+              <header>
+                <span class="summary-label">Fully paid orders</span>
+                <i class="fa-solid fa-badge-check" aria-hidden="true"></i>
+              </header>
+              <strong>{{ number_format($paymentSummary['full']['count'] ?? 0) }}</strong>
+              <p>₱{{ number_format($paymentSummary['full']['amount'] ?? 0, 2) }} collected.</p>
+            </article>
+            <article class="reports-summary-card">
+              <header>
+                <span class="summary-label">Half payments</span>
+                <i class="fa-solid fa-circle-half-stroke" aria-hidden="true"></i>
+              </header>
+              <strong>{{ number_format($paymentSummary['half']['count'] ?? 0) }}</strong>
+              <p>₱{{ number_format($paymentSummary['half']['amount'] ?? 0, 2) }} paid, ₱{{ number_format($paymentSummary['half']['balance'] ?? 0, 2) }} due.</p>
+            </article>
+            @if(isset($salesSummaryTotals['estimatedSales']))
+              <article class="reports-summary-card">
+                <header>
+                  <span class="summary-label">Estimated pipeline</span>
+                  <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+                </header>
+                <strong>₱{{ number_format($salesSummaryTotals['estimatedSales'] ?? 0, 2) }}</strong>
+                <p>Forecast value of in-progress, non-completed orders.</p>
+              </article>
+            @endif
+          </div>
         </section>
       @endif
 
@@ -650,7 +734,35 @@
             <option value="weekly" {{ $activeRange === 'weekly' ? 'selected' : '' }}>Last 7 days</option>
             <option value="monthly" {{ $activeRange === 'monthly' ? 'selected' : '' }}>Last 30 days</option>
             <option value="yearly" {{ $activeRange === 'yearly' ? 'selected' : '' }}>This year</option>
+            <option value="custom" {{ $activeRange === 'custom' ? 'selected' : '' }}>Custom range</option>
           </select>
+          <label for="reportStartDate">Start date</label>
+          <input id="reportStartDate" type="date" name="start_date" value="{{ $customStartDate ?? '' }}" aria-label="Custom start date">
+          <label for="reportEndDate">End date</label>
+          <input id="reportEndDate" type="date" name="end_date" value="{{ $customEndDate ?? '' }}" aria-label="Custom end date">
+          @if($orderStatusFilterEnabled)
+            <label for="orderStatusSelect">Order status</label>
+            @php
+              $orderStatusCurrent = $orderStatusFilter ?? 'completed';
+            @endphp
+            <select id="orderStatusSelect" name="order_status" aria-label="Filter reports by order status">
+              <option value="completed" {{ $orderStatusCurrent === 'completed' ? 'selected' : '' }}>Completed</option>
+              <option value="not_completed" {{ $orderStatusCurrent === 'not_completed' ? 'selected' : '' }}>Not completed</option>
+              <option value="all" {{ $orderStatusCurrent === 'all' ? 'selected' : '' }}>All statuses</option>
+            </select>
+          @endif
+          @if($paymentStatusFilterEnabled)
+            <label for="paymentStatusSelect">Payment</label>
+            @php
+              $paymentStatusCurrent = $paymentStatusFilter ?? 'all';
+            @endphp
+            <select id="paymentStatusSelect" name="payment_status" aria-label="Filter reports by payment status">
+              <option value="all" {{ $paymentStatusCurrent === 'all' ? 'selected' : '' }}>All payments</option>
+              <option value="full" {{ $paymentStatusCurrent === 'full' ? 'selected' : '' }}>Fully paid</option>
+              <option value="partial" {{ $paymentStatusCurrent === 'partial' ? 'selected' : '' }}>Partial payment</option>
+              <option value="unpaid" {{ $paymentStatusCurrent === 'unpaid' ? 'selected' : '' }}>Unpaid</option>
+            </select>
+          @endif
         </div>
         <div class="materials-toolbar__actions">
           @if($showGenerateControls)
@@ -787,14 +899,53 @@
   </main>
 </section>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+@php
+  $ownerReportIntervals = is_array($salesIntervals ?? null) ? $salesIntervals : [];
+  $ownerDefaultInterval = $defaultSalesInterval ?? (count($ownerReportIntervals) ? array_key_first($ownerReportIntervals) : 'daily');
+@endphp
+
+@if($hasSalesContext)
+  @php
+    $ownerReportPayload = [
+      'sales' => [
+        'intervals' => $ownerReportIntervals,
+        'defaultInterval' => $ownerDefaultInterval,
+        'summary' => $salesSummaryTotals ?? [],
+        'rangeLabel' => $salesSummaryLabel ?? null,
+      ],
+      'filters' => [
+        'range' => $activeRange ?? 'all',
+        'orderStatus' => $orderStatusFilterEnabled ? ($orderStatusFilter ?? 'completed') : null,
+        'paymentStatus' => $paymentStatusFilterEnabled ? ($paymentStatusFilter ?? 'all') : null,
+        'startDate' => $customStartDate,
+        'endDate' => $customEndDate,
+      ],
+      'payments' => [
+        'summary' => $paymentSummary ?? [],
+      ],
+    ];
+  @endphp
+  <script>
+    window.__INKWISE_REPORTS__ = @json($ownerReportPayload);
+  </script>
+@endif
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" data-chartjs-src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js" defer></script>
+@if($hasSalesContext)
+  <script src="{{ asset('js/admin/reports.js') }}" defer></script>
+@endif
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const ownerReportsState = {
     activeRange: @json($activeRange),
     rangeReload: @json($rangeReload),
+    orderStatus: @json($orderStatusFilterEnabled ? ($orderStatusFilter ?? 'completed') : null),
+    paymentStatus: @json($paymentStatusFilterEnabled ? ($paymentStatusFilter ?? 'all') : null),
+    startDate: @json($customStartDate),
+    endDate: @json($customEndDate),
   };
   function isPlainObject(value) {
     return Object.prototype.toString.call(value) === '[object Object]';
@@ -1031,6 +1182,7 @@ document.addEventListener('DOMContentLoaded', function () {
         case 'yearly':
           show = (diffDays >= 0 && diffDays <= 365);
           break;
+        case 'custom':
         case 'all':
         default:
           show = true;
@@ -1047,8 +1199,76 @@ document.addEventListener('DOMContentLoaded', function () {
     return sel.value || (window.currentReportFilter || 'all');
   }
 
+  function navigateWithFilters() {
+    const url = new URL(window.location.href);
+    const rangeSel = document.getElementById('reportFilterSelect');
+    const orderSel = document.getElementById('orderStatusSelect');
+    const paymentSel = document.getElementById('paymentStatusSelect');
+
+    const startInput = document.getElementById('reportStartDate');
+    const endInput = document.getElementById('reportEndDate');
+
+    const startValue = startInput ? startInput.value : '';
+    const endValue = endInput ? endInput.value : '';
+
+    let rangeValue = rangeSel ? (rangeSel.value || 'all') : (ownerReportsState.activeRange || 'all');
+    const hasCustomDates = Boolean(startValue) || Boolean(endValue);
+
+    if (hasCustomDates) {
+      rangeValue = 'custom';
+      if (rangeSel) {
+        rangeSel.value = 'custom';
+      }
+    }
+
+    ownerReportsState.activeRange = rangeValue;
+    ownerReportsState.startDate = startValue || null;
+    ownerReportsState.endDate = endValue || null;
+
+    if (rangeValue === 'all' && !hasCustomDates) {
+      url.searchParams.delete('range');
+    } else {
+      url.searchParams.set('range', rangeValue);
+    }
+
+    if (orderSel) {
+      const orderValue = orderSel.value || 'completed';
+      if (orderValue === 'completed') {
+        url.searchParams.delete('order_status');
+      } else {
+        url.searchParams.set('order_status', orderValue);
+      }
+    }
+
+    if (paymentSel) {
+      const paymentValue = paymentSel.value || 'all';
+      if (paymentValue === 'all') {
+        url.searchParams.delete('payment_status');
+      } else {
+        url.searchParams.set('payment_status', paymentValue);
+      }
+      ownerReportsState.paymentStatus = paymentValue;
+    }
+
+    if (startValue) {
+      url.searchParams.set('start_date', startValue);
+    } else {
+      url.searchParams.delete('start_date');
+    }
+
+    if (endValue) {
+      url.searchParams.set('end_date', endValue);
+    } else {
+      url.searchParams.delete('end_date');
+    }
+
+    window.location.assign(url.toString());
+  }
+
   (function initReportFilters() {
     const sel = document.getElementById('reportFilterSelect');
+    const startInput = document.getElementById('reportStartDate');
+    const endInput = document.getElementById('reportEndDate');
     if (!sel) return;
 
     if (ownerReportsState.activeRange) {
@@ -1057,16 +1277,71 @@ document.addEventListener('DOMContentLoaded', function () {
 
     window.currentReportFilter = sel.value || ownerReportsState.activeRange || 'all';
 
+    const orderSel = document.getElementById('orderStatusSelect');
+    if (orderSel) {
+      if (ownerReportsState.orderStatus !== null && ownerReportsState.orderStatus !== undefined) {
+        orderSel.value = ownerReportsState.orderStatus || 'completed';
+      }
+      orderSel.addEventListener('change', () => {
+        ownerReportsState.orderStatus = orderSel.value || 'completed';
+        navigateWithFilters();
+      });
+    }
+
+    const paymentSel = document.getElementById('paymentStatusSelect');
+    if (paymentSel) {
+      if (ownerReportsState.paymentStatus !== null && ownerReportsState.paymentStatus !== undefined) {
+        paymentSel.value = ownerReportsState.paymentStatus || 'all';
+      }
+      paymentSel.addEventListener('change', () => {
+        ownerReportsState.paymentStatus = paymentSel.value || 'all';
+        navigateWithFilters();
+      });
+    }
+
+    if (startInput) {
+      if (ownerReportsState.startDate) {
+        startInput.value = ownerReportsState.startDate;
+      }
+      startInput.addEventListener('change', () => {
+        ownerReportsState.startDate = startInput.value || null;
+        if (startInput.value || (endInput && endInput.value)) {
+          ownerReportsState.activeRange = 'custom';
+          sel.value = 'custom';
+        }
+        navigateWithFilters();
+      });
+    }
+
+    if (endInput) {
+      if (ownerReportsState.endDate) {
+        endInput.value = ownerReportsState.endDate;
+      }
+      endInput.addEventListener('change', () => {
+        ownerReportsState.endDate = endInput.value || null;
+        if (endInput.value || (startInput && startInput.value)) {
+          ownerReportsState.activeRange = 'custom';
+          sel.value = 'custom';
+        }
+        navigateWithFilters();
+      });
+    }
+
     function onChange() {
       window.currentReportFilter = sel.value || 'all';
-      if (ownerReportsState.rangeReload) {
-        const url = new URL(window.location.href);
-        if (window.currentReportFilter === 'all') {
-          url.searchParams.delete('range');
-        } else {
-          url.searchParams.set('range', window.currentReportFilter);
+      ownerReportsState.activeRange = window.currentReportFilter;
+      if (ownerReportsState.activeRange !== 'custom') {
+        ownerReportsState.startDate = null;
+        ownerReportsState.endDate = null;
+        if (startInput) {
+          startInput.value = '';
         }
-        window.location.assign(url.toString());
+        if (endInput) {
+          endInput.value = '';
+        }
+      }
+      if (ownerReportsState.rangeReload) {
+        navigateWithFilters();
         return;
       }
       try {

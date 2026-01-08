@@ -464,7 +464,9 @@
     $totalTransactions = (int) ($summaryTotals['total_transactions'] ?? 0);
     $totalAmount = (float) ($summaryTotals['total_amount'] ?? 0.00);
     $paidCount = (int) ($summaryTotals['paid_count'] ?? 0);
+    $paidAmount = (float) ($summaryTotals['paid_amount'] ?? 0.00);
     $pendingCount = (int) ($summaryTotals['pending_count'] ?? 0);
+    $pendingAmount = (float) ($summaryTotals['pending_amount'] ?? 0.00);
 
     $transformedRows = $transformedRows ?? collect();
     if (!($transformedRows instanceof \Illuminate\Support\Collection)) {
@@ -473,32 +475,6 @@
 
     if (!isset($statusGroups) || !is_array($statusGroups)) {
       $statusGroups = \App\Support\Owner\TransactionPresenter::statusGroups();
-    }
-
-    if ($totalTransactions === 0) {
-      if (isset($transactions) && $transactions instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator) {
-        $totalTransactions = (int) $transactions->total();
-      } else {
-        $totalTransactions = $transformedRows->count();
-      }
-    }
-
-    if ($totalAmount <= 0 && $transformedRows->isNotEmpty()) {
-      $totalAmount = $transformedRows->reduce(static function ($carry, $row) {
-        return $carry + ($row['amount_numeric'] ?? 0);
-      }, 0);
-    }
-
-    if ($paidCount === 0) {
-      $paidCount = $transformedRows->filter(static function ($row) use ($statusGroups) {
-        return in_array($row['status_raw'], $statusGroups['paid'], true);
-      })->count();
-    }
-
-    if ($pendingCount === 0) {
-      $pendingCount = $transformedRows->filter(static function ($row) use ($statusGroups) {
-        return in_array($row['status_raw'], $statusGroups['pending'], true);
-      })->count();
     }
 
     $activeStatus = \Illuminate\Support\Str::lower((string) request()->query('status', 'all'));
@@ -527,7 +503,7 @@
           <span class="summary-card-chip accent">All</span>
         </div>
         <span class="summary-card-value">{{ number_format($totalTransactions) }}</span>
-        <span class="summary-card-meta">Transactions recorded</span>
+        <span class="summary-card-meta">Processed volume ₱{{ number_format($totalAmount, 2) }}</span>
       </a>
 
   <a href="{{ request()->fullUrlWithQuery(['status' => null]) }}" class="summary-card summary-card--link" aria-label="Total amount">
@@ -541,7 +517,7 @@
           <span class="summary-card-chip accent">PHP</span>
         </div>
         <span class="summary-card-value">₱{{ number_format($totalAmount, 2) }}</span>
-        <span class="summary-card-meta">Collected / processed</span>
+        <span class="summary-card-meta">Across {{ number_format($totalTransactions) }} payments</span>
       </a>
 
       <a href="{{ request()->fullUrlWithQuery(['status' => 'paid']) }}" class="summary-card summary-card--link {{ $activeStatus === 'paid' ? 'summary-card--active' : '' }}" aria-label="Paid transactions">
@@ -555,7 +531,7 @@
           <span class="summary-card-chip accent">Settled</span>
         </div>
         <span class="summary-card-value">{{ number_format($paidCount) }}</span>
-        <span class="summary-card-meta">Confirmed payments</span>
+        <span class="summary-card-meta">Collected ₱{{ number_format($paidAmount, 2) }}</span>
       </a>
 
       <a href="{{ request()->fullUrlWithQuery(['status' => 'pending']) }}" class="summary-card summary-card--link {{ $activeStatus === 'pending' ? 'summary-card--active' : '' }}" aria-label="Pending transactions">
@@ -569,7 +545,7 @@
           <span class="summary-card-chip accent">Review</span>
         </div>
         <span class="summary-card-value">{{ number_format($pendingCount) }}</span>
-        <span class="summary-card-meta">Awaiting confirmation</span>
+        <span class="summary-card-meta">Outstanding ₱{{ number_format($pendingAmount, 2) }}</span>
       </a>
     </section>
     <section class="materials-toolbar" aria-label="Transactions search">

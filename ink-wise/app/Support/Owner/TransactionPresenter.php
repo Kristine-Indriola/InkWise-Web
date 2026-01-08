@@ -24,6 +24,20 @@ class TransactionPresenter
             'awaiting confirmation',
             'awaiting_confirmation',
         ],
+        'partial' => [
+            'partial',
+            'partial payment',
+            'partial_payment',
+            'partial-payment',
+            'partially paid',
+            'partially_paid',
+            'partially-paid',
+            'deposit',
+            'downpayment',
+            'down payment',
+            'installment',
+            'installment payment',
+        ],
         'failed' => ['failed', 'cancelled', 'canceled', 'refunded', 'void', 'declined'],
     ];
 
