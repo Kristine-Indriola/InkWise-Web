@@ -1,5 +1,5 @@
 import SvgTemplateEditor from './svg-template-editor.jsx';
-import { createAutosaveController } from './autosave';
+import { createAutosaveController } from './autosave.jsx';
 
 export function initializeCustomerStudioLegacy() {
   if (typeof window !== 'undefined') {
@@ -3538,6 +3538,24 @@ export function initializeCustomerStudioLegacy() {
       }
     };
 
+    const syncToolbarPosition = () => {
+      try {
+        const target = cardBg || document.querySelector('.preview-canvas-wrapper') || document.querySelector('.canvas-stage') || previewSvg;
+        if (!target) return;
+        const rect = target.getBoundingClientRect();
+        const top = (window.scrollY || window.pageYOffset) + rect.top + 8; // small offset from top edge
+        const left = rect.left + rect.width / 2;
+        document.documentElement.style.setProperty('--inkwise-toolbar-top', `${top}px`);
+        document.documentElement.style.setProperty('--inkwise-toolbar-left', `${left}px`);
+      } catch (e) {
+        // ignore positioning errors
+      }
+    };
+
+    // Keep toolbar positioned when window layout changes
+    window.addEventListener('resize', syncToolbarPosition);
+    window.addEventListener('scroll', syncToolbarPosition);
+
     const updateOverlaySelectionState = () => {
       overlayDataByNode.forEach(({ overlay, type }) => {
         if (!overlay) {
@@ -3635,6 +3653,7 @@ export function initializeCustomerStudioLegacy() {
       }
       updateOverlaySelectionState();
       syncToolbarVisibility();
+      syncToolbarPosition();
       broadcastActiveElementChange();
     };
 
@@ -3653,6 +3672,7 @@ export function initializeCustomerStudioLegacy() {
       }
       updateOverlaySelectionState();
       syncToolbarVisibility();
+      syncToolbarPosition();
       broadcastActiveElementChange();
     };
 
@@ -3666,6 +3686,7 @@ export function initializeCustomerStudioLegacy() {
       activeImageKey = null;
       updateOverlaySelectionState();
       syncToolbarVisibility();
+      syncToolbarPosition();
       broadcastActiveElementChange();
     };
 
@@ -3900,6 +3921,25 @@ export function initializeCustomerStudioLegacy() {
     };
 
     inputs.forEach(initInput);
+
+    // Ensure clicking on the text panel (the field list) activates the
+    // corresponding preview node so the mini toolbar appears even when the
+    // user clicks the label or wrapper instead of the input itself.
+    if (textFieldList) {
+      textFieldList.addEventListener('click', (ev) => {
+        const item = ev.target.closest('.text-field-item');
+        if (!item) return;
+        const input = item.querySelector('input[data-preview-target]');
+        if (input && input.dataset && input.dataset.previewTarget) {
+          try {
+            input.focus();
+          } catch (e) {
+            // ignore
+          }
+          setActiveTextKey(input.dataset.previewTarget);
+        }
+      });
+    }
 
     const createCustomField = (previewKey, value = '') => {
       const sideForField = normalizeSideKey(currentSide);
@@ -4638,9 +4678,15 @@ export function initializeCustomerStudioLegacy() {
       autosave?.schedule('initial-load');
     }
 
-    // Delegate clicks inside the preview area: clicking any element with
-    // data-preview-node will open the Text modal and focus the corresponding field.
-    const previewArea = document.querySelector('.preview-overlay');
+    // Delegate clicks inside the preview area or canvas wrapper: clicking any
+    // element with `data-preview-node` will open the Text modal and focus the
+    // corresponding field. Use several fallbacks for different DOM layouts so
+    // the handler fires when clicking the canvas or empty areas as well.
+    const previewArea = document.querySelector('.preview-overlay')
+      || document.querySelector('.preview-canvas-wrapper')
+      || document.querySelector('.canvas-stage')
+      || (previewSvg ? previewSvg.parentNode : null);
+
     if (previewArea) {
       previewArea.addEventListener('click', (ev) => {
         const node = ev.target.closest('[data-preview-node]');
@@ -4655,7 +4701,24 @@ export function initializeCustomerStudioLegacy() {
               openTextModalAndFocus(name);
             }
           }
+          return;
         }
+
+        // If user clicked on the canvas but not directly on a preview node,
+        // try to find a nearby overlay or default to clearing selection.
+        const overlay = ev.target.closest('.editor-overlay, .canvas-overlay-layer');
+        if (overlay && overlay.dataset && overlay.dataset.previewNode) {
+          const key = overlay.dataset.previewNode;
+          if (overlay.dataset.type === 'image') {
+            setActiveImageKey(key);
+          } else {
+            setActiveTextKey(key);
+          }
+          return;
+        }
+
+        // Click on blank canvas area: clear selections so toolbar hides.
+        clearOverlays();
       });
     }
 

@@ -381,26 +381,6 @@
             </div>
         </div>
         <!-- Floating Toolbar -->
-        <div class="floating-toolbar" id="floating-toolbar">
-            <button class="toolbar-btn" type="button" data-nav="text" title="Text">
-                <span class="toolbar-icon-text">T</span>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="uploads" title="Uploads">
-                <i class="fa-solid fa-cloud-arrow-up"></i>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="graphics" title="Graphics">
-                <i class="fa-solid fa-images"></i>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="background" title="Background">
-                <i class="fa-solid fa-brush"></i>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="tables" title="Tables">
-                <i class="fa-solid fa-table"></i>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="colors" title="Colors">
-                <i class="fa-solid fa-palette"></i>
-            </button>
-        </div>
         <div class="preview-thumbs" role="tablist" aria-label="Card sides">
             <button type="button" class="preview-thumb active" data-card-thumb="front" aria-pressed="true">
                 <div class="thumb-preview" @if($frontImage) style="background-image: url('{{ $frontImage }}');" @endif>

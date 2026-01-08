@@ -11,13 +11,13 @@ body.text-toolbar-visible .studio-react-widgets {
   display: flex;
 }
 
-/* Allow the toolbar to float in the canvas area, centered */
+/* Position toolbar above the canvas using CSS variables provided by legacy script. */
 .studio-react-widgets {
   position: fixed;
-  top: 120px;
-  left: 50%;
+  top: var(--inkwise-toolbar-top, 120px);
+  left: var(--inkwise-toolbar-left, 50%);
   transform: translateX(-50%);
-  z-index: 50;
+  z-index: 1200;
 }
 
 .text-mini-toolbar {
@@ -34,10 +34,8 @@ body.text-toolbar-visible .studio-react-widgets {
 }
 
 .text-mini-toolbar.floating {
-  position: absolute;
-  top: 150px;
-  left: 50%;
-  transform: translateX(-50%);
+  /* keep internal floating style; container handles absolute placement */
+  position: relative;
   z-index: 1000;
 }
 

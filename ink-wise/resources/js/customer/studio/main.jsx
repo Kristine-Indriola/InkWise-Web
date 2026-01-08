@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { initializeCustomerStudioLegacy } from './legacy';
+import { initializeCustomerStudioLegacy } from './legacy.jsx';
 import TextMiniToolbar from './TextMiniToolbar.jsx';
 import './status.css';
 import './text-toolbar.css';
