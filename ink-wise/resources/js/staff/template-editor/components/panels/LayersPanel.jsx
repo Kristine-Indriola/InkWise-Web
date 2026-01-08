@@ -50,7 +50,7 @@ const categorizeLayerType = (layer) => {
 
 export function LayersPanel() {
   const { state, dispatch } = useBuilderStore();
-  const activePage = state.pages.find((page) => page.id === state.activePageId) ?? state.pages[0];
+  const activePage = state.pages?.find((page) => page.id === state.activePageId) ?? state.pages?.[0];
 
   if (!activePage) {
     return null;

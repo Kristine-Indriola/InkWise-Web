@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Socialite\Facades\Socialite;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AddressController;
@@ -179,6 +180,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         // Move these two lines inside this group and fix the path:
         Route::post('{id}/save-canvas', [AdminTemplateController::class, 'saveCanvas'])->name('saveCanvas');
         Route::post('{id}/save-template', [AdminTemplateController::class, 'saveTemplate'])->name('saveTemplate');
+        Route::post('{id}/test-save', [AdminTemplateController::class, 'testSave'])->name('testSave');
         Route::post('{id}/upload-preview', [AdminTemplateController::class, 'uploadPreview'])->name('uploadPreview');
         Route::post('{id}/autosave', [AdminTemplateController::class, 'autosave'])->name('autosave');
         // Add new API routes
@@ -1028,6 +1030,7 @@ Route::prefix('staff')->name('staff.')->middleware(\App\Http\Middleware\RoleMidd
         // Move these two lines inside this group and fix the path:
         Route::post('{id}/save-canvas', [App\Http\Controllers\Admin\TemplateController::class, 'saveCanvas'])->name('saveCanvas');
         Route::post('{id}/save-template', [App\Http\Controllers\Admin\TemplateController::class, 'saveTemplate'])->name('saveTemplate');
+        Route::post('{id}/test-save', [App\Http\Controllers\Admin\TemplateController::class, 'testSave'])->name('testSave');
         Route::post('{id}/upload-preview', [App\Http\Controllers\Admin\TemplateController::class, 'uploadPreview'])->name('uploadPreview');
         Route::post('{id}/autosave', [App\Http\Controllers\Admin\TemplateController::class, 'autosave'])->name('autosave');
         // Add new API routes
@@ -1098,6 +1101,19 @@ require __DIR__.'/auth.php';
 // Graphics proxy routes (search endpoints used by client-side graphics panel)
 Route::get('/graphics/svgrepo', [GraphicsProxyController::class, 'svgrepo'])->name('graphics.svgrepo');
 Route::get('/graphics/unsplash', [GraphicsProxyController::class, 'unsplash'])->name('graphics.unsplash');
+
+if (app()->environment('local')) {
+    Route::get('/storage/{path}', function (string $path) {
+        $relativePath = ltrim($path, '/');
+        $disk = Storage::disk('public');
+
+        if (!$disk->exists($relativePath)) {
+            abort(404);
+        }
+
+        return $disk->response($relativePath);
+    })->where('path', '.*');
+}
 
 
 

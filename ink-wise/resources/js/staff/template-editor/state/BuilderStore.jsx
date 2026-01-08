@@ -9,10 +9,10 @@ function normalizePages(template) {
   const rawPages = template?.design?.pages;
 
   if (Array.isArray(rawPages) && rawPages.length > 0) {
-    return rawPages.map((page, index) => createPage(page, index, rawPages.length));
+    return rawPages.map((page, index) => createPage(page, index, rawPages.length, template));
   }
 
-  return [createPage(null, 0, 1)];
+  return [createPage(null, 0, 1, template)];
 }
 
 const initialState = ({ template }) => {
@@ -51,7 +51,7 @@ function reducer(state, action) {
       };
     case 'ADD_PAGE': {
       const nextTotal = state.pages.length + 1;
-      const newPage = createPage(action.page, state.pages.length, nextTotal);
+      const newPage = createPage(action.page, state.pages.length, nextTotal, state.template);
       const nextPages = [...state.pages, newPage];
       return commitPages(state, nextPages, {
         activePageId: newPage.id,
@@ -96,6 +96,12 @@ function reducer(state, action) {
         page.id === action.pageId ? { ...page, ...action.props } : page
       ));
       return commitPages(state, pages);
+    }
+    case 'UPDATE_TEMPLATE_PROPS': {
+      return {
+        ...state,
+        template: { ...state.template, ...action.props },
+      };
     }
     case 'SELECT_LAYER':
       return {

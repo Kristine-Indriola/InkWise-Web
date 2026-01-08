@@ -5,6 +5,20 @@ import { useBuilderStore } from '../../state/BuilderStore';
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 3;
 const STEP = 0.1;
+const DPI = 96;
+
+const INVITATION_SIZES = [
+  { label: '5.88" × 9.25"', width: 5.88, height: 9.25 },
+  { label: '4.5" × 6.25"', width: 4.5, height: 6.25 },
+  { label: '6.75" × 6.75"', width: 6.75, height: 6.75 },
+  // Add more sizes as needed
+];
+
+const FOLD_TYPES = [
+  { value: 'bifold', label: 'Bi-Fold' },
+  { value: 'gatefold', label: 'Gate-Fold' },
+  { value: 'zfold', label: 'Z-Fold' },
+];
 
 export function CanvasToolbar() {
   const { state, dispatch } = useBuilderStore();
@@ -34,6 +48,23 @@ export function CanvasToolbar() {
     }
   };
 
+  const handleSizeChange = (event) => {
+    const index = parseInt(event.target.value, 10);
+    if (!isNaN(index) && INVITATION_SIZES[index] && activePage) {
+      const size = INVITATION_SIZES[index];
+      const widthPx = Math.round(size.width * DPI);
+      const heightPx = Math.round(size.height * DPI);
+      dispatch({ type: 'UPDATE_PAGE_PROPS', pageId: activePage.id, props: { width: widthPx, height: heightPx } });
+      // Optionally update template width_inch and height_inch
+      dispatch({ type: 'UPDATE_TEMPLATE_PROPS', props: { width_inch: size.width, height_inch: size.height } });
+    }
+  };
+
+  const handleFoldTypeChange = (event) => {
+    const foldType = event.target.value;
+    dispatch({ type: 'UPDATE_TEMPLATE_PROPS', props: { fold_type: foldType } });
+  };
+
   const alignSelection = (mode) => {
     if (!hasSelection) {
       return;
@@ -44,6 +75,28 @@ export function CanvasToolbar() {
   return (
     <div className="canvas-toolbar" role="toolbar" aria-label="Canvas controls">
       <div className="canvas-toolbar__group">
+        <div className="canvas-toolbar__page-size">
+          <label className="canvas-toolbar__label">Fold Type</label>
+          <select className="canvas-toolbar__select" onChange={handleFoldTypeChange} value={state.template?.fold_type || ''} aria-label="Fold type">
+            <option value="">No Fold</option>
+            {FOLD_TYPES.map((fold) => (
+              <option key={fold.value} value={fold.value}>
+                {fold.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="canvas-toolbar__page-size">
+          <label className="canvas-toolbar__label">Size</label>
+          <select className="canvas-toolbar__select" onChange={handleSizeChange} aria-label="Invitation size">
+            <option value="">Select size</option>
+            {INVITATION_SIZES.map((size, index) => (
+              <option key={index} value={index}>
+                {size.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="canvas-toolbar__page-size">
           <label className="canvas-toolbar__label">Page</label>
           <div className="canvas-toolbar__dimensions">

@@ -295,6 +295,22 @@
   font-weight: 600;
 }
 
+.canvas-toolbar__select {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 4px;
+  background: #ffffff;
+  color: var(--builder-text);
+  font-size: 0.8rem;
+  min-width: 120px;
+}
+
+.canvas-toolbar__select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
 .canvas-toolbar__slider {
   width: 120px;
   height: 4px;
@@ -1043,7 +1059,6 @@ body.builder-exporting .canvas-layer {
   border-style: none !important;
   border-width: 0 !important;
   box-shadow: none !important;
-  background: transparent !important;
   cursor: default !important;
 }
 
@@ -1052,7 +1067,6 @@ body.builder-exporting .canvas-layer.is-selected {
   border-style: none !important;
   border-width: 0 !important;
   box-shadow: none !important;
-  background: transparent !important;
   outline: none !important;
 }
 

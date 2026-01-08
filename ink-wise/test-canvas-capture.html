@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas Capture Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .test-canvas {
+            border: 2px solid #ccc;
+            padding: 20px;
+            margin: 20px 0;
+            background: white;
+        }
+        .canvas-layer {
+            position: relative;
+            margin: 10px 0;
+            padding: 10px;
+        }
+        .canvas-layer__text {
+            font-size: 24px;
+            color: #333;
+        }
+        .canvas-layer__image {
+            width: 100px;
+            height: 100px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        #result {
+            margin-top: 20px;
+        }
+        #preview {
+            max-width: 100%;
+            border: 2px solid #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>Canvas Capture Test</h1>
+    <p>This test simulates the structure used in the template editor to verify html2canvas can capture it correctly.</p>
+    
+    <div class="canvas-viewport">
+        <div class="canvas-viewport__stage">
+            <div class="fold-container" id="testCanvas">
+                <div class="panel">
+                    <div class="canvas-layer is-text" data-preview-node="node1">
+                        <div class="canvas-layer__text" style="font-size: 32px; font-family: Arial; color: #FF6B9D;">
+                            Happy Birthday!
+                        </div>
+                    </div>
+                    <div class="canvas-layer is-text" data-preview-node="node2">
+                        <div class="canvas-layer__text" style="font-size: 24px; font-family: Arial; color: #333;">
+                            Join us for a celebration
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <button onclick="testCapture('stage')">Capture .canvas-viewport__stage</button>
+    <button onclick="testCapture('fold')">Capture .fold-container</button>
+    <button onclick="testCapture('panel')">Capture .panel</button>
+    
+    <div id="result"></div>
+    
+    <script>
+        async function testCapture(target) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Capturing...</p>';
+            
+            let element;
+            if (target === 'stage') {
+                element = document.querySelector('.canvas-viewport__stage');
+            } else if (target === 'fold') {
+                element = document.querySelector('.fold-container');
+            } else if (target === 'panel') {
+                element = document.querySelector('.panel');
+            }
+            
+            if (!element) {
+                resultDiv.innerHTML = '<p style="color: red;">Element not found!</p>';
+                return;
+            }
+            
+            console.log('Capturing element:', element.className, 'children:', element.children.length);
+            
+            try {
+                const canvas = await html2canvas(element, {
+                    backgroundColor: '#ffffff',
+                    scale: 2,
+                    logging: true,
+                    allowTaint: true,
+                    useCORS: true
+                });
+                
+                const dataUrl = canvas.toDataURL('image/png');
+                const sizeKB = (dataUrl.length * 0.75 / 1024).toFixed(1);
+                
+                resultDiv.innerHTML = `
+                    <p style="color: green;">✓ Capture successful!</p>
+                    <p>Target: ${element.className}</p>
+                    <p>Size: ${canvas.width} x ${canvas.height} pixels</p>
+                    <p>Data size: ${sizeKB} KB</p>
+                    <p>Preview:</p>
+                    <img id="preview" src="${dataUrl}" alt="Captured preview">
+                `;
+                
+                console.log('Capture successful, size:', sizeKB, 'KB');
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <p style="color: red;">✗ Capture failed!</p>
+                    <p>Error: ${error.message}</p>
+                `;
+                console.error('Capture error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

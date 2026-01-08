@@ -115,8 +115,8 @@ const TOOL_SECTIONS = [
   { id: 'photos', label: 'Photos', description: 'Add photos and images.', icon: 'fa-solid fa-image' },
   { id: 'icons', label: 'Icons', description: 'Insert icons and symbols.', icon: 'fa-solid fa-icons' },
   { id: 'draw', label: 'Draw', description: 'Draw shapes and lines.', icon: 'fa-solid fa-pencil' },
-  { id: 'background', label: 'Background', description: 'Set background.', icon: 'fa-solid fa-palette' },
-  { id: 'colors', label: 'Colors', description: 'Generate color palettes.', icon: 'fa-solid fa-palette' },
+  { id: 'background', label: 'Color', description: 'Set background.', icon: 'fa-solid fa-palette' },
+  { id: 'colors', label: 'Palletes', description: 'Generate color palettes.', icon: 'fa-solid fa-palette' },
   { id: 'layers', label: 'Layers', description: 'Manage layers.', icon: 'fa-solid fa-layer-group' },
   { id: 'quotes', label: 'Quotes', description: 'Add quotes.', icon: 'fa-solid fa-quote-left' },
 ];
@@ -3662,7 +3662,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
   const textPanelCanvasRef = useRef(null);
 
   const activePage = useMemo(
-    () => state.pages.find((page) => page.id === state.activePageId) ?? state.pages[0],
+    () => state.pages?.find((page) => page.id === state.activePageId) ?? state.pages?.[0],
     [state.pages, state.activePageId],
   );
 
@@ -3746,7 +3746,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       layer.frame = constrainFrameToSafeZone(layer.frame, activePage, safeInsets);
     }
 
-    dispatch({ type: 'ADD_LAYER', pageId: activePage.id, layer });
+    dispatch({ type: 'ADD_LAYER', pageId: activePage.id, panelId: state.activePanelId, layer });
   };
 
   // Generate many short presets (1-2 words) for categories like birthday, corporate, baptism, wedding
@@ -3910,7 +3910,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       layer.frame = constrainFrameToSafeZone(layer.frame, activePage, safeInsets);
     }
 
-    dispatch({ type: 'ADD_LAYER', pageId: activePage.id, layer });
+    dispatch({ type: 'ADD_LAYER', pageId: activePage.id, panelId: state.activePanelId, layer });
   };
 
   const handleAddImagePlaceholder = () => {
@@ -3989,11 +3989,11 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
             }
 
             try {
-              dispatch({ type: 'ADD_LAYER', pageId: activePage.id, layer });
-              console.log('Layer dispatched to store');
+              dispatch({ type: 'SET_PANEL_IMAGE', panelId: state.activePanelId, imageData: { dataUrl: imageUrl, fileName: file.name } });
+              console.log('Panel image dispatched to store');
             } catch (dispatchError) {
-              console.error('Error dispatching layer:', dispatchError);
-              alert('Failed to add image to canvas. Please try again.');
+              console.error('Error dispatching panel image:', dispatchError);
+              alert('Failed to add image to panel. Please try again.');
             }
 
             // Persist the file to IndexedDB and add to recent images for the sidebar
@@ -4006,7 +4006,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
               dispatch({ type: 'ADD_RECENTLY_UPLOADED_IMAGE', dataUrl: objectUrl, fileName: file.name, id });
             } catch (err) {
               console.error('Failed to persist or dispatch recent image from sidebar:', err);
-              // Fallback: do nothing — layer was already added
+              // Fallback: do nothing — image was already added to panel
             }
           } catch (err) {
             console.error('Error creating layer from uploaded image:', err);
@@ -4038,46 +4038,12 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
 
   const handleUseRecentFromSidebar = (image) => {
     if (!activePage) return;
-      try {
-      // Measure the image to size it larger in the canvas
-      const img = new Image();
-      img.onload = () => {
-        const naturalW = img.naturalWidth || img.width;
-        const naturalH = img.naturalHeight || img.height;
-        const maxW = Math.round(activePage.width * 0.85);
-        const maxH = Math.round(activePage.height * 0.85);
-        const scale = Math.min(1, maxW / naturalW, maxH / naturalH);
-        const width = Math.max(1, Math.round(naturalW * scale));
-        const height = Math.max(1, Math.round(naturalH * scale));
-        const x = Math.round((activePage.width - width) / 2);
-        const y = Math.round((activePage.height - height) / 2);
-
-        const layer = createLayer('image', activePage, {
-          name: image.fileName || 'Uploaded image',
-          content: image.dataUrl,
-          metadata: { objectFit: 'cover', imageScale: 1, imageOffsetX: 0, imageOffsetY: 0 },
-        });
-        layer.frame = { x, y, width, height, rotation: 0 };
-
-        if (layer.frame) {
-          layer.frame = constrainFrameToSafeZone(layer.frame, activePage, safeInsets);
-        }
-
-        dispatch({ type: 'ADD_LAYER', pageId: activePage.id, layer });
-      };
-      img.onerror = () => {
-        // fallback: create a default-sized layer
-        const layer = createLayer('image', activePage, {
-          name: image.fileName || 'Uploaded image',
-          content: image.dataUrl,
-          metadata: { objectFit: 'cover', imageScale: 1, imageOffsetX: 0, imageOffsetY: 0 },
-        });
-        dispatch({ type: 'ADD_LAYER', pageId: activePage.id, layer });
-      };
-      img.src = image.dataUrl;
+    try {
+      dispatch({ type: 'SET_PANEL_IMAGE', panelId: state.activePanelId, imageData: { dataUrl: image.dataUrl, fileName: image.fileName } });
+      console.log('Recent image set to active panel');
     } catch (err) {
-      console.error('Failed to add recent image to canvas:', err);
-      alert('Could not add image to canvas. Check console for details.');
+      console.error('Failed to set recent image to panel:', err);
+      alert('Could not add image to panel. Check console for details.');
     }
   };
 
@@ -5026,7 +4992,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
             if (layer.frame) {
               layer.frame = constrainFrameToSafeZone(layer.frame, activePage, safeInsets);
             }
-            dispatch({ type: 'ADD_LAYER', pageId: activePage.id, layer });
+            dispatch({ type: 'ADD_LAYER', pageId: activePage.id, panelId: state.activePanelId, layer });
           };
           img.src = dataUrl;
         };
@@ -5539,7 +5505,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
         layer.frame = constrainFrameToSafeZone(layer.frame, activePage, safeInsets);
       }
 
-      dispatch({ type: 'ADD_LAYER', pageId: activePage.id, layer });
+      dispatch({ type: 'ADD_LAYER', pageId: activePage.id, panelId: state.activePanelId, layer });
     });
   }, [activePage, dispatch, ensureFontLoaded, safeInsets]);
 
@@ -5597,7 +5563,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
           if (layer.frame) {
             layer.frame = constrainFrameToSafeZone(layer.frame, activePage, safeInsets);
           }
-          dispatch({ type: 'ADD_LAYER', pageId: activePage.id, layer });
+          dispatch({ type: 'ADD_LAYER', pageId: activePage.id, panelId: state.activePanelId, layer });
         };
         img.src = dataUrl;
       };
@@ -5868,7 +5834,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       layer.frame = constrainFrameToSafeZone(layer.frame, activePage, safeInsets);
     }
 
-    dispatch({ type: 'ADD_LAYER', pageId: activePage.id, layer });
+    dispatch({ type: 'ADD_LAYER', pageId: activePage.id, panelId: state.activePanelId, layer });
   };
 
   const handleQuoteSearch = useCallback(async (rawQuery) => {
@@ -6205,7 +6171,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       layer.frame = constrainFrameToSafeZone(layer.frame, activePage, safeInsets);
     }
 
-    dispatch({ type: 'ADD_LAYER', pageId: activePage.id, layer });
+    dispatch({ type: 'ADD_LAYER', pageId: activePage.id, panelId: state.activePanelId, layer });
   };
 
   const handleUseDefaultQuote = (quote) => {
@@ -6225,7 +6191,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       layer.frame = constrainFrameToSafeZone(layer.frame, activePage, safeInsets);
     }
 
-    dispatch({ type: 'ADD_LAYER', pageId: activePage.id, layer });
+    dispatch({ type: 'ADD_LAYER', pageId: activePage.id, panelId: state.activePanelId, layer });
   };
 
 
@@ -6327,35 +6293,12 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       const reader = new FileReader();
       reader.onload = () => {
         const dataUrl = reader.result;
-        const img = new Image();
-        img.onload = () => {
-          const naturalW = img.naturalWidth || img.width;
-          const naturalH = img.naturalHeight || img.height;
-          const maxW = Math.round(activePage.width * 0.85);
-          const maxH = Math.round(activePage.height * 0.85);
-          const scale = Math.min(1, maxW / naturalW, maxH / naturalH);
-          const width = Math.max(1, Math.round(naturalW * scale));
-          const height = Math.max(1, Math.round(naturalH * scale));
-          const x = Math.round((activePage.width - width) / 2);
-          const y = Math.round((activePage.height - height) / 2);
-          const layer = createLayer('image', activePage, {
-            name: photo?.description || `${photo?.providerLabel ?? 'Stock'} image`,
-            content: dataUrl,
-            metadata: {
-              objectFit: 'cover',
-              imageScale: 1,
-              imageOffsetX: 0,
-              imageOffsetY: 0,
-              attribution: photo?.credit,
-            },
-          });
-          layer.frame = { x, y, width, height, rotation: 0 };
-          if (layer.frame) {
-            layer.frame = constrainFrameToSafeZone(layer.frame, activePage, safeInsets);
-          }
-          dispatch({ type: 'ADD_LAYER', pageId: activePage.id, layer });
-        };
-        img.src = dataUrl;
+        const layer = createLayer('image', activePage, {
+          content: dataUrl,
+          name: photo?.description || `${photo?.providerLabel ?? 'Stock'} image`,
+        });
+        dispatch({ type: 'ADD_LAYER', pageId: activePage.id, panelId: state.activePanelId, layer });
+        console.log('Photo added as layer');
       };
       reader.readAsDataURL(blob);
     } catch (error) {

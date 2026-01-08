@@ -30,6 +30,9 @@ class Template extends Model
         'has_back_design',
         'processed_at',
         'user_id',
+        'width_inch',
+        'height_inch',
+        'fold_type',
     ];
 
     protected $casts = [
