@@ -961,8 +961,52 @@ export function InspectorPanel() {
     handleLayerChange({ borderRadius: Math.max(0, nextValue) });
   };
 
+  const textAreaRef = useRef(null);
+
+  const updateTextContentWithResize = (contentValue) => {
+    if (!selectedLayer || !activePage) return;
+
+    const fontSize = Number(selectedLayer.fontSize) || 48;
+    const lineHeightPx = fontSize * 1.2;
+    const lineCount = Math.max(1, contentValue.split('\n').length);
+    const paddingY = 16; // matches ~0.5rem top/bottom padding on canvas text
+    const nextHeight = Math.max(
+      Math.round(lineCount * lineHeightPx + paddingY),
+      Math.round(lineHeightPx + paddingY)
+    );
+
+    const nextFrame = selectedLayer.frame
+      ? { ...selectedLayer.frame, height: nextHeight }
+      : null;
+
+    handleLayerChange({
+      content: contentValue,
+      ...(nextFrame ? { frame: nextFrame } : {}),
+    });
+  };
+
   const handleTextContentChange = (event) => {
-    handleLayerChange({ content: event.target.value });
+    updateTextContentWithResize(event.target.value);
+  };
+
+  const handleTextNext = () => {
+    if (!selectedLayer || !activePage) return;
+
+    const currentContent = selectedLayer.content ?? '';
+    const nextContent = currentContent.endsWith('\n')
+      ? currentContent
+      : `${currentContent}\n`;
+
+    updateTextContentWithResize(nextContent);
+
+    // keep typing on a new line in the same textbox
+    requestAnimationFrame(() => {
+      const el = textAreaRef.current;
+      if (!el) return;
+      const cursorPos = nextContent.length;
+      el.focus();
+      el.setSelectionRange(cursorPos, cursorPos);
+    });
   };
 
   const handleFontSizeChange = (event) => {
@@ -1355,6 +1399,22 @@ export function InspectorPanel() {
               aria-label="Page background color"
             />
           </label>
+          {typeof activePage.background === 'string' && activePage.background.includes('gradient') && (
+            <div className="inspector-field" style={{ margin: 0 }}>
+              <span className="inspector-field__label">Gradient preview</span>
+              <div
+                aria-label="Canvas background gradient preview"
+                style={{
+                  borderRadius: '0.75rem',
+                  border: '1px solid #e2e8f0',
+                  background: activePage.background,
+                  minHeight: 64,
+                  width: '100%',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.6)',
+                }}
+              />
+            </div>
+          )}
           <label className="inspector-field" style={{ margin: 0 }}>
             <span className="inspector-field__label">Fold Type</span>
             <select
@@ -1629,12 +1689,25 @@ export function InspectorPanel() {
           <div className="inspector-section__content">
             <label className="inspector-field">
               <span className="inspector-field__label">Content</span>
-              <textarea
-                className="inspector-field__control inspector-field__control--textarea"
-                value={selectedLayer.content ?? ''}
-                onChange={handleTextContentChange}
-                rows={3}
-              />
+              <div className="inspector-field__textarea-group">
+                <textarea
+                  ref={textAreaRef}
+                  className="inspector-field__control inspector-field__control--textarea"
+                  value={selectedLayer.content ?? ''}
+                  onChange={handleTextContentChange}
+                  rows={3}
+                  placeholder="Enter your text here..."
+                />
+                <button
+                  type="button"
+                  className="inspector-field__next-btn"
+                  onClick={handleTextNext}
+                  title="Save current row and move to next"
+                  aria-label="Add next text row"
+                >
+                  Next
+                </button>
+              </div>
             </label>
             <label className="inspector-field">
               <span className="inspector-field__label">Font</span>
@@ -1917,6 +1990,48 @@ export function InspectorPanel() {
                 <span className="inspector-field__value">{saturation}%</span>
               </label>
             </div>
+
+            <div className="inspector-field">
+              <span className="inspector-field__label">Image History</span>
+              <div className="inspector-segmented inspector-segmented--compact" role="group" aria-label="Navigate image history">
+                <button
+                  type="button"
+                  className="inspector-segmented__option"
+                  onClick={() => dispatch({ type: 'NAVIGATE_IMAGE_HISTORY', layerId: selectedLayer.id, direction: 'BACK' })}
+                  title="Move to previous image state"
+                >
+                  <i className="fa-solid fa-backward" aria-hidden="true"></i>
+                  <span>Back</span>
+                </button>
+                <button
+                  type="button"
+                  className="inspector-segmented__option"
+                  onClick={() => dispatch({ type: 'NAVIGATE_IMAGE_HISTORY', layerId: selectedLayer.id, direction: 'BACKWARD' })}
+                  title="Move one step back in history"
+                >
+                  <i className="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                  <span>Backward</span>
+                </button>
+                <button
+                  type="button"
+                  className="inspector-segmented__option"
+                  onClick={() => dispatch({ type: 'NAVIGATE_IMAGE_HISTORY', layerId: selectedLayer.id, direction: 'FORWARD' })}
+                  title="Move one step forward in history"
+                >
+                  <i className="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                  <span>Forward</span>
+                </button>
+                <button
+                  type="button"
+                  className="inspector-segmented__option"
+                  onClick={() => dispatch({ type: 'NAVIGATE_IMAGE_HISTORY', layerId: selectedLayer.id, direction: 'FRONT' })}
+                  title="Move to latest image state"
+                >
+                  <i className="fa-solid fa-forward" aria-hidden="true"></i>
+                  <span>Front</span>
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -2018,7 +2133,6 @@ export function InspectorPanel() {
 
         <div className="inspector-panel__body inspector-panel__body--unified">
           {renderPagesSection()}
-          {renderPageSection()}
           {selectedLayer ? (
             <>
               {renderPositionSection()}

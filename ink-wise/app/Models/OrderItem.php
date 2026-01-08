@@ -40,9 +40,14 @@ class OrderItem extends Model
 		return $this->hasOne(OrderItemPaperStock::class);
 	}
 
+	public function sizes(): HasMany
+	{
+		return $this->hasMany(OrderItemSize::class);
+	}
+
 	public function addons(): HasMany
 	{
-		return $this->hasMany(OrderItemAddon::class);
+		return $this->hasMany(OrderItemSize::class);
 	}
 
 	public function inkUsage(): HasMany

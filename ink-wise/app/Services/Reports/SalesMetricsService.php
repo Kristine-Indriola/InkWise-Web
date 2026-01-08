@@ -49,7 +49,7 @@ class SalesMetricsService
                 'customerOrder:id,name',
                 'items:id,order_id,product_name,quantity',
                 'items.paperStockSelection.paperStock.material:material_id,unit_cost',
-                'items.addons.productAddon.material:material_id,unit_cost',
+                'items.addons.productSize.material:material_id,unit_cost',
                 'payments:order_id,amount,status',
             ])
             ->latest('order_date');

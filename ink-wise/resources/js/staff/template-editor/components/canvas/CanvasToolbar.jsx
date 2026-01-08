@@ -55,14 +55,18 @@ export function CanvasToolbar() {
       const widthPx = Math.round(size.width * DPI);
       const heightPx = Math.round(size.height * DPI);
       dispatch({ type: 'UPDATE_PAGE_PROPS', pageId: activePage.id, props: { width: widthPx, height: heightPx } });
-      // Optionally update template width_inch and height_inch
-      dispatch({ type: 'UPDATE_TEMPLATE_PROPS', props: { width_inch: size.width, height_inch: size.height } });
+      // Update template dimensions and sizes
+      dispatch({ type: 'UPDATE_TEMPLATE_PROPS', props: { 
+        width_inch: size.width, 
+        height_inch: size.height,
+        sizes: [size] // Store the selected size in the sizes array
+      } });
     }
   };
 
   const handleFoldTypeChange = (event) => {
     const foldType = event.target.value;
-    dispatch({ type: 'UPDATE_TEMPLATE_PROPS', props: { fold_type: foldType } });
+    dispatch({ type: 'UPDATE_TEMPLATE_PROPS', props: { fold_type: foldType || null } });
   };
 
   const alignSelection = (mode) => {
@@ -96,31 +100,6 @@ export function CanvasToolbar() {
               </option>
             ))}
           </select>
-        </div>
-        <div className="canvas-toolbar__page-size">
-          <label className="canvas-toolbar__label">Page</label>
-          <div className="canvas-toolbar__dimensions">
-            <input
-              type="number"
-              className="canvas-toolbar__input"
-              value={activePage?.width ?? 400}
-              onChange={handleWidthChange}
-              min="1"
-              max="5000"
-              aria-label="Page width"
-            />
-            <span className="canvas-toolbar__separator">×</span>
-            <input
-              type="number"
-              className="canvas-toolbar__input"
-              value={activePage?.height ?? 400}
-              onChange={handleHeightChange}
-              min="1"
-              max="5000"
-              aria-label="Page height"
-            />
-            <span className="canvas-toolbar__unit">px</span>
-          </div>
         </div>
       </div>
       <div className="canvas-toolbar__group">

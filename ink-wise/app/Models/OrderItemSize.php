@@ -6,16 +6,16 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class OrderItemAddon extends Model
+class OrderItemSize extends Model
 {
     use HasFactory;
 
-    protected $table = 'order_item_addons';
+    protected $table = 'order_item_sizes';
 
     protected $guarded = [];
 
     protected $casts = [
-        'addon_price' => 'float',
+        'size_price' => 'float',
         'quantity' => 'integer',
         'pricing_metadata' => 'array',
         'created_at' => 'datetime',
@@ -27,8 +27,8 @@ class OrderItemAddon extends Model
         return $this->belongsTo(OrderItem::class);
     }
 
-    public function productAddon(): BelongsTo
+    public function productSize(): BelongsTo
     {
-        return $this->belongsTo(ProductAddon::class, 'addon_id');
+        return $this->belongsTo(ProductSize::class, 'size_id');
     }
 }

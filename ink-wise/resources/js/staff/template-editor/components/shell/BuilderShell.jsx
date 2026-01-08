@@ -829,6 +829,7 @@ export function BuilderShell() {
     }
 
     const designSnapshot = serializeDesign(state);
+    const activePage = state.pages?.find((p) => p.id === state.activePageId) || state.pages?.[0] || null;
     const serialized = JSON.stringify(designSnapshot);
 
     if (initialRenderRef.current) {
@@ -871,6 +872,10 @@ export function BuilderShell() {
           width_inch: state.template?.width_inch ?? null,
           height_inch: state.template?.height_inch ?? null,
           fold_type: state.template?.fold_type ?? null,
+          sizes: state.template?.sizes ?? null,
+          page_width_px: activePage?.width ?? null,
+          page_height_px: activePage?.height ?? null,
+          page_background: activePage?.background ?? null,
         },
       };
 
@@ -1243,6 +1248,11 @@ export function BuilderShell() {
           width_inch: state.template?.width_inch ?? null,
           height_inch: state.template?.height_inch ?? null,
           fold_type: state.template?.fold_type ?? null,
+          sizes: state.template?.sizes ?? null,
+          selected_sizes: state.selectedSizes ?? [],
+          page_width_px: activePage?.width ?? null,
+          page_height_px: activePage?.height ?? null,
+          page_background: activePage?.background ?? null,
         },
       };
 

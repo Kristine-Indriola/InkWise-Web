@@ -85,11 +85,19 @@ class Product extends Model
     }
 
     /**
-     * Relationship: addons
+     * Relationship: sizes
+     */
+    public function sizes()
+    {
+        return $this->hasMany(ProductSize::class);
+    }
+
+    /**
+     * Relationship: addons (legacy)
      */
     public function addons()
     {
-        return $this->hasMany(ProductAddon::class);
+        return $this->hasMany(ProductSize::class);
     }
 
     /**

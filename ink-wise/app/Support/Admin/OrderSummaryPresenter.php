@@ -260,9 +260,9 @@ class OrderSummaryPresenter
 
         if ($item->addons->isNotEmpty()) {
             foreach ($item->addons as $addon) {
-                $addonName = $addon->productAddon?->name ?? $addon->addon_name ?? 'Add-on';
-                $addonType = $addon->addon_type ? Str::headline(str_replace('_', ' ', $addon->addon_type)) : null;
-                $addonPrice = static::toFloat($addon->addon_price);
+                $addonName = $addon->productSize?->size ?? $addon->size ?? 'Size';
+                $addonType = $addon->size_type ? Str::headline(str_replace('_', ' ', $addon->size_type)) : null;
+                $addonPrice = static::toFloat($addon->size_price);
 
                 $label = $addonType
                     ? sprintf('%s (%s)', $addonName, $addonType)
@@ -296,9 +296,9 @@ class OrderSummaryPresenter
         if ($item->addons->isNotEmpty()) {
             $options['addons'] = $item->addons->map(function ($addon) {
                 return [
-                    'name' => $addon->productAddon?->name ?? $addon->addon_name,
-                    'type' => $addon->addon_type,
-                    'price' => static::toFloat($addon->addon_price),
+                    'name' => $addon->productSize?->size ?? $addon->size,
+                    'type' => $addon->size_type,
+                    'price' => static::toFloat($addon->size_price),
                 ];
             })->toArray();
         }

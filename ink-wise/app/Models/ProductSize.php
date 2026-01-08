@@ -7,15 +7,15 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Models\Material;
 
-class ProductAddon extends Model
+class ProductSize extends Model
 {
     use HasFactory;
 
     protected $fillable = [
         'product_id',
         'material_id',
-        'addon_type',
-        'name',
+        'size_type',
+        'size',
         'price',
         'image_path',
     ];
