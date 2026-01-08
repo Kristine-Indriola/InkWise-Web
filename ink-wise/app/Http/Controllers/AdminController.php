@@ -13,6 +13,8 @@ use App\Models\Product;
 use App\Models\Staff;
 use App\Models\StockMovement;
 use App\Models\User;
+use App\Support\ImageResolver;
+use App\Services\OrderFlowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -213,59 +215,195 @@ class AdminController extends Controller
 
     private function buildSalesPreviewSection(): array
     {
-        $coalesceExpression = 'DATE(COALESCE(order_date, created_at))';
+        $now = Carbon::now();
 
-        $today = Carbon::today();
-        $startOfWeek = Carbon::now()->startOfWeek();
-        $endOfWeek = Carbon::now()->endOfWeek();
-        $startOfMonth = Carbon::now()->startOfMonth();
-        $endOfMonth = Carbon::now()->endOfMonth();
+        $today = $now->copy()->startOfDay();
+        $yesterday = $today->copy()->subDay();
 
-        $baseQuery = fn () => Order::query()
-            ->where('status', 'completed');
+        $startOfWeek = $now->copy()->startOfWeek();
+        $endOfWeek = $now->copy()->endOfWeek();
+        $previousWeekEnd = $startOfWeek->copy()->subDay();
+        $previousWeekStart = $previousWeekEnd->copy()->startOfWeek();
 
-        $dailySales = (clone $baseQuery())
-            ->whereRaw("{$coalesceExpression} = ?", [$today->toDateString()])
-            ->sum('total_amount');
+        $startOfMonth = $now->copy()->startOfMonth();
+        $endOfMonth = $now->copy()->endOfMonth();
+        $previousMonthEnd = $startOfMonth->copy()->subDay();
+        $previousMonthStart = $previousMonthEnd->copy()->startOfMonth();
 
-        $weeklySales = (clone $baseQuery())
-            ->whereRaw("{$coalesceExpression} BETWEEN ? AND ?", [$startOfWeek->toDateString(), $endOfWeek->toDateString()])
-            ->sum('total_amount');
+        $startOfYear = $now->copy()->startOfYear();
+        $previousYtdEnd = $now->copy()->subYear();
+        $previousYtdStart = $previousYtdEnd->copy()->startOfYear();
 
-        $monthlySales = (clone $baseQuery())
-            ->whereRaw("{$coalesceExpression} BETWEEN ? AND ?", [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
-            ->sum('total_amount');
+        $dailyDetail = $this->makeSalesPeriodDetail($today, $today, $yesterday, $yesterday, 'Today');
+        $weeklyDetail = $this->makeSalesPeriodDetail($startOfWeek, $endOfWeek, $previousWeekStart, $previousWeekEnd, 'This Week');
+        $monthlyDetail = $this->makeSalesPeriodDetail($startOfMonth, $endOfMonth, $previousMonthStart, $previousMonthEnd, 'This Month');
+
+        $currentYtd = $this->summariseSalesWindow($startOfYear, $now);
+        $previousYtd = $this->summariseSalesWindow($previousYtdStart, $previousYtdEnd);
+
+        $yearToDate = [
+            'current' => $currentYtd,
+            'previous' => $previousYtd,
+            'salesDelta' => $this->calculateDelta($currentYtd['sales'], $previousYtd['sales']),
+            'ordersDelta' => $this->calculateDelta($currentYtd['orders'], $previousYtd['orders']),
+        ];
 
         $trend = $this->buildSalesTrendDataset();
 
         $bestSelling = OrderItem::query()
-            ->selectRaw('COALESCE(product_name, "Custom Design") as label, SUM(quantity) as quantity, COUNT(DISTINCT order_id) as orders_count')
+            ->selectRaw('order_items.product_id, COALESCE(order_items.product_name, "Custom Design") as label, SUM(order_items.quantity) as quantity, COUNT(DISTINCT order_items.order_id) as orders_count, SUM(COALESCE(order_items.subtotal, order_items.quantity * order_items.unit_price, 0)) as total_revenue, MAX(products.image) as product_image')
             ->whereHas('order', function ($query) {
                 $query->where('status', '!=', 'cancelled');
             })
-            ->groupBy('label')
-            ->orderByDesc('quantity')
+            ->leftJoin('products', 'order_items.product_id', '=', 'products.id')
+            ->groupBy('order_items.product_id', 'label')
+            ->orderByDesc('total_revenue')
             ->limit(5)
             ->get();
+
+        $productIds = $bestSelling
+            ->pluck('product_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $productLookup = Product::query()
+            ->with([
+                'images',
+                'template',
+                'uploads' => fn ($query) => $query->orderBy('created_at')->limit(4),
+            ])
+            ->whereIn('id', $productIds)
+            ->get()
+            ->keyBy('id');
+
+        $orderFlow = app(OrderFlowService::class);
+
+        $bestSelling = $bestSelling->map(function (OrderItem $item) use ($productLookup, $orderFlow) {
+            $product = $item->product_id ? $productLookup->get($item->product_id) : null;
+            $imageUrl = null;
+
+            if ($product) {
+                $images = $orderFlow->resolveProductImages($product);
+                $imageUrl = $images['front'] ?? null;
+            }
+
+            $item->setAttribute('image_url', $imageUrl ? $imageUrl : ImageResolver::url($item->product_image ?? null));
+
+            return $item;
+        });
 
         $recentTransactions = Payment::query()
             ->with([
                 'order:id,order_number,status',
                 'recordedBy:user_id,name',
             ])
-            ->latest('recorded_at')
-            ->latest()
-            ->take(6)
+            ->orderByDesc(DB::raw('COALESCE(recorded_at, created_at)'))
+            ->limit(6)
             ->get();
 
+        $paymentMethodBreakdown = $this->buildPaymentMethodBreakdown($now);
+
         return [
-            'daily' => round((float) $dailySales, 2),
-            'weekly' => round((float) $weeklySales, 2),
-            'monthly' => round((float) $monthlySales, 2),
+            'daily' => $dailyDetail['sales'],
+            'weekly' => $weeklyDetail['sales'],
+            'monthly' => $monthlyDetail['sales'],
             'trend' => $trend,
             'bestSelling' => $bestSelling,
             'recentTransactions' => $recentTransactions,
+            'periodDetails' => [
+                'daily' => $dailyDetail,
+                'weekly' => $weeklyDetail,
+                'monthly' => $monthlyDetail,
+            ],
+            'yearToDate' => $yearToDate,
+            'paymentMethodBreakdown' => $paymentMethodBreakdown,
         ];
+    }
+
+    private function summariseSalesWindow(Carbon $start, Carbon $end): array
+    {
+        $startDate = $start->copy()->startOfDay();
+        $endDate = $end->copy()->endOfDay();
+
+        $coalesceExpression = 'DATE(COALESCE(order_date, created_at))';
+        $revenueStatuses = ['processing', 'in_production', 'confirmed', 'completed'];
+
+        $query = Order::query()
+            ->where('archived', false)
+            ->whereIn('status', $revenueStatuses)
+            ->whereRaw("{$coalesceExpression} BETWEEN ? AND ?", [$startDate->toDateString(), $endDate->toDateString()]);
+
+        $orderCount = (clone $query)->count();
+        $salesTotal = (clone $query)->sum('total_amount');
+
+        if ($salesTotal <= 0.0 && $orderCount > 0) {
+            $salesTotal = (clone $query)
+                ->select(['id', 'total_amount', 'summary_snapshot', 'metadata'])
+                ->get()
+                ->sum(fn (Order $order) => $order->grandTotalAmount());
+        }
+
+        $average = $orderCount > 0 ? round($salesTotal / $orderCount, 2) : 0.0;
+
+        return [
+            'sales' => round((float) $salesTotal, 2),
+            'orders' => $orderCount,
+            'average' => $average,
+        ];
+    }
+
+    private function makeSalesPeriodDetail(Carbon $currentStart, Carbon $currentEnd, Carbon $previousStart, Carbon $previousEnd, string $label): array
+    {
+        $currentMetrics = $this->summariseSalesWindow($currentStart, $currentEnd);
+        $previousMetrics = $this->summariseSalesWindow($previousStart, $previousEnd);
+
+        return [
+            'label' => $label,
+            'range' => [
+                'start' => $currentStart->copy()->toDateString(),
+                'end' => $currentEnd->copy()->toDateString(),
+            ],
+            'sales' => $currentMetrics['sales'],
+            'orders' => $currentMetrics['orders'],
+            'average' => $currentMetrics['average'],
+            'previous' => $previousMetrics,
+            'salesDelta' => $this->calculateDelta($currentMetrics['sales'], $previousMetrics['sales']),
+            'ordersDelta' => $this->calculateDelta($currentMetrics['orders'], $previousMetrics['orders']),
+        ];
+    }
+
+    private function buildPaymentMethodBreakdown(Carbon $now): array
+    {
+        $windowStart = $now->copy()->subDays(30)->startOfDay();
+        $timestampExpression = 'COALESCE(recorded_at, created_at)';
+
+        $rows = Payment::query()
+            ->selectRaw('COALESCE(method, "Unspecified") as method_label, COUNT(*) as usage_count, SUM(amount) as total_amount_sum')
+            ->whereNotNull('amount')
+            ->where('amount', '>', 0)
+            ->whereRaw("{$timestampExpression} BETWEEN ? AND ?", [$windowStart, $now])
+            ->groupBy('method_label')
+            ->orderByDesc('total_amount_sum')
+            ->limit(5)
+            ->get();
+
+        $totalAmount = (float) $rows->sum('total_amount_sum');
+
+        return $rows
+            ->map(function (Payment $payment) use ($totalAmount) {
+                $total = (float) ($payment->total_amount_sum ?? 0.0);
+                $share = $totalAmount > 0.0 ? round(($total / $totalAmount) * 100, 1) : 0.0;
+
+                return [
+                    'method' => $payment->method_label,
+                    'count' => (int) ($payment->usage_count ?? 0),
+                    'total' => round($total, 2),
+                    'share' => $share,
+                ];
+            })
+            ->values()
+            ->toArray();
     }
 
     private function buildInventoryMonitorSection(Collection $materials): array
@@ -307,6 +445,10 @@ class AdminController extends Controller
 
     private function buildCustomerInsightsSection(): array
     {
+        $now = Carbon::now();
+        $recentWindowStart = $now->copy()->subDays(90)->startOfDay();
+        $frequencyWindowStart = $now->copy()->subDays(30)->startOfDay();
+
         $topCustomers = Order::query()
             ->selectRaw('customer_id, COUNT(*) as order_count, SUM(total_amount) as total_spent')
             ->where('status', '!=', 'cancelled')
@@ -326,6 +468,91 @@ class AdminController extends Controller
                 ];
             });
 
+        $recentOrders = Order::query()
+            ->select(['customer_id', 'order_date', 'created_at'])
+            ->where('status', '!=', 'cancelled')
+            ->whereNotNull('customer_id')
+            ->whereRaw('COALESCE(order_date, created_at) >= ?', [$recentWindowStart])
+            ->get()
+            ->groupBy('customer_id');
+
+        $totalRecentOrders = (int) $recentOrders->flatten(1)->count();
+        $uniqueRecentCustomers = (int) $recentOrders->keys()->count();
+        $orderFrequency = $uniqueRecentCustomers > 0 ? round($totalRecentOrders / $uniqueRecentCustomers, 2) : 0.0;
+
+        $averageOrderGap = $recentOrders
+            ->map(function ($orders) {
+                $sorted = $orders
+                    ->map(fn ($order) => Carbon::parse($order->order_date ?? $order->created_at))
+                    ->filter()
+                    ->sort()
+                    ->values();
+
+                if ($sorted->count() < 2) {
+                    return null;
+                }
+
+                $gaps = [];
+                for ($i = 1; $i < $sorted->count(); $i++) {
+                    $gaps[] = $sorted[$i - 1]->diffInDays($sorted[$i]);
+                }
+
+                return collect($gaps)->avg();
+            })
+            ->filter()
+            ->avg();
+
+        $orderGapDays = $averageOrderGap !== null ? round((float) $averageOrderGap, 1) : null;
+
+        $frequencyWindowOrders = Order::query()
+            ->selectRaw('CASE 
+                WHEN HOUR(COALESCE(order_date, created_at)) BETWEEN 5 AND 11 THEN "Morning"
+                WHEN HOUR(COALESCE(order_date, created_at)) BETWEEN 12 AND 16 THEN "Afternoon"
+                WHEN HOUR(COALESCE(order_date, created_at)) BETWEEN 17 AND 21 THEN "Evening"
+                ELSE "Late Night"
+            END as bucket_label, COUNT(*) as total_orders')
+            ->where('status', '!=', 'cancelled')
+            ->whereRaw('COALESCE(order_date, created_at) >= ?', [$frequencyWindowStart])
+            ->groupBy('bucket_label')
+            ->get()
+            ->mapWithKeys(function ($row) {
+                return [
+                    $row->bucket_label => (int) ($row->total_orders ?? 0),
+                ];
+            });
+
+        $timeOfDayBuckets = collect(['Morning', 'Afternoon', 'Evening', 'Late Night'])
+            ->mapWithKeys(fn ($label) => [$label => (int) ($frequencyWindowOrders[$label] ?? 0)])
+            ->all();
+
+        $dayOfWeekRows = Order::query()
+            ->selectRaw('DAYOFWEEK(COALESCE(order_date, created_at)) as day_index, COUNT(*) as total_orders')
+            ->where('status', '!=', 'cancelled')
+            ->whereRaw('COALESCE(order_date, created_at) >= ?', [$frequencyWindowStart])
+            ->groupBy('day_index')
+            ->get();
+
+        $dayLabels = [
+            1 => 'Sunday',
+            2 => 'Monday',
+            3 => 'Tuesday',
+            4 => 'Wednesday',
+            5 => 'Thursday',
+            6 => 'Friday',
+            7 => 'Saturday',
+        ];
+
+        $dayOfWeekBreakdown = collect($dayLabels)
+            ->map(function ($label, $index) use ($dayOfWeekRows) {
+                $total = optional($dayOfWeekRows->firstWhere('day_index', (int) $index))->total_orders ?? 0;
+
+                return [
+                    'label' => $label,
+                    'total' => (int) $total,
+                ];
+            })
+            ->values();
+
         $repeatCustomersCount = Order::query()
             ->selectRaw('customer_id, COUNT(*) as orders_count')
             ->where('status', '!=', 'cancelled')
@@ -335,15 +562,37 @@ class AdminController extends Controller
             ->count();
 
         $popularDesigns = OrderItem::query()
-            ->selectRaw('COALESCE(product_name, "Custom Design") as label, SUM(quantity) as quantity')
+            ->selectRaw('product_id, SUM(quantity) as total_selections')
             ->whereHas('order', function ($query) {
                 $query->where('status', '!=', 'cancelled');
             })
-            ->groupBy('label')
-            ->orderByDesc('quantity')
+            ->whereNotNull('product_id')
+            ->groupBy('product_id')
+            ->orderByDesc('total_selections')
             ->limit(6)
-            ->pluck('quantity', 'label')
-            ->map(fn ($qty) => (int) $qty)
+            ->get()
+            ->map(function ($orderItem) {
+                $product = $orderItem->product()->with('template')->first();
+                if (!$product) {
+                    return null;
+                }
+
+                $image = null;
+                if ($product->template && $product->template->front_image) {
+                    $image = '/storage/' . $product->template->front_image;
+                } elseif ($product->image) {
+                    $image = '/storage/' . $product->image;
+                }
+
+                return [
+                    'product_id' => $product->id,
+                    'product_name' => $product->name,
+                    'orders' => (int) $orderItem->total_selections,
+                    'image' => $image,
+                ];
+            })
+            ->filter()
+            ->values()
             ->all();
 
         $peakOrderDays = Order::query()
@@ -365,6 +614,19 @@ class AdminController extends Controller
             'repeatCustomers' => $repeatCustomersCount,
             'popularDesigns' => $popularDesigns,
             'peakOrderDays' => $peakOrderDays,
+            'orderFrequency' => [
+                'averagePerCustomer' => $orderFrequency,
+                'averageGapDays' => $orderGapDays,
+                'orderCount' => $totalRecentOrders,
+                'customerCount' => $uniqueRecentCustomers,
+                'window' => [
+                    'start' => $recentWindowStart->toDateString(),
+                    'end' => $now->toDateString(),
+                ],
+                'windowLabel' => 'Last 90 days',
+            ],
+            'timeOfDayBuckets' => $timeOfDayBuckets,
+            'dayOfWeekBreakdown' => $dayOfWeekBreakdown,
         ];
     }
 
@@ -513,7 +775,6 @@ class AdminController extends Controller
             ->where('status', '!=', 'cancelled')
             ->where('date_needed', '>=', Carbon::now()->startOfDay())
             ->orderBy('date_needed')
-            ->take(6)
             ->get()
             ->map(function (Order $order) {
                 return [
@@ -600,27 +861,58 @@ class AdminController extends Controller
         ];
     }
 
-    private function buildSalesTrendDataset(int $days = 14): array
+    private function buildSalesTrendDataset(int $weeks = 8): array
     {
-        $days = max(1, $days);
+        $weeks = max(1, $weeks);
 
-        $startDate = Carbon::now()->subDays($days - 1)->startOfDay();
-        $dateRange = collect(range(0, $days - 1))->map(fn ($offset) => $startDate->copy()->addDays($offset));
+        $now = Carbon::now();
+        $currentWeekEnd = $now->copy()->endOfWeek();
+        $firstWeekStart = $currentWeekEnd->copy()->subWeeks($weeks - 1)->startOfWeek();
 
-        $rawData = Order::query()
-            ->selectRaw('DATE(COALESCE(order_date, created_at)) as bucket_day, SUM(total_amount) as total_sales')
+        $ordersInWindow = Order::query()
+            ->select(['id', 'total_amount', 'summary_snapshot', 'metadata', 'order_date', 'created_at'])
             ->where('status', 'completed')
-            ->whereRaw('DATE(COALESCE(order_date, created_at)) >= ?', [$startDate->toDateString()])
-            ->groupBy('bucket_day')
-            ->pluck('total_sales', 'bucket_day');
+            ->whereRaw('DATE(COALESCE(order_date, created_at)) BETWEEN ? AND ?', [
+                $firstWeekStart->toDateString(),
+                $currentWeekEnd->toDateString(),
+            ])
+            ->get();
+
+        $weeklyTotals = $ordersInWindow
+            ->groupBy(function (Order $order) {
+                $timestamp = $order->order_date ?? $order->created_at;
+
+                if (!$timestamp) {
+                    return null;
+                }
+
+                return Carbon::parse($timestamp)->startOfWeek()->toDateString();
+            })
+            ->filter(function ($group, $key) {
+                return !is_null($key);
+            })
+            ->map(function ($orders) {
+                return $orders->sum(function (Order $order) {
+                    $amount = (float) ($order->total_amount ?? 0);
+
+                    if ($amount > 0) {
+                        return $amount;
+                    }
+
+                    return (float) $order->grandTotalAmount();
+                });
+            });
 
         $labels = [];
         $values = [];
 
-        foreach ($dateRange as $date) {
-            $key = $date->toDateString();
-            $labels[] = $date->format('M d');
-            $values[] = round((float) ($rawData[$key] ?? 0), 2);
+        for ($i = 0; $i < $weeks; $i++) {
+            $weekStart = $firstWeekStart->copy()->addWeeks($i);
+            $weekEnd = $weekStart->copy()->endOfWeek();
+            $bucketKey = $weekStart->toDateString();
+
+            $labels[] = 'Week of ' . $weekStart->format('M d');
+            $values[] = round((float) ($weeklyTotals->get($bucketKey, 0)), 2);
         }
 
         return [

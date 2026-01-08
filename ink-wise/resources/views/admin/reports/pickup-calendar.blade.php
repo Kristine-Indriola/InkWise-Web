@@ -31,6 +31,7 @@
 				<select id="filterPeriod" name="period">
 					<option value="day" {{ $period === 'day' ? 'selected' : '' }}>Next Day</option>
 					<option value="week" {{ $period === 'week' ? 'selected' : '' }}>Next Week</option>
+					<option value="current_month" {{ $period === 'current_month' ? 'selected' : '' }}>Current Month</option>
 					<option value="month" {{ $period === 'month' ? 'selected' : '' }}>Next Month</option>
 					<option value="year" {{ $period === 'year' ? 'selected' : '' }}>Current Year</option>
 				</select>

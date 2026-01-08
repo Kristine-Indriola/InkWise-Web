@@ -32,12 +32,14 @@
 	$salesSummary = $salesSummaryTotals ?? ($activeIntervalData['summary'] ?? ['orders' => 0, 'revenue' => 0, 'averageOrder' => 0]);
 	$salesRangeLabel = $salesSummaryLabel ?? ($activeIntervalData['range_label'] ?? null);
 
-	$currentFilters = $filters ?? ['startDate' => null, 'endDate' => null];
+	$currentFilters = $filters ?? ['startDate' => null, 'endDate' => null, 'orderStatus' => 'completed'];
 	$paymentSummary = $paymentSummary ?? [
 		'totalPaid' => 0,
 		'full' => ['count' => 0, 'amount' => 0],
 		'half' => ['count' => 0, 'amount' => 0, 'balance' => 0],
 	];
+	$orderStatusCurrent = $currentFilters['orderStatus'] ?? 'completed';
+	$paymentStatusCurrent = $currentFilters['paymentStatus'] ?? 'all';
 
 	$reportPayload = [
 		'sales' => [
@@ -49,7 +51,8 @@
 		'filters' => [
 			'startDate' => $currentFilters['startDate'] ?? null,
 			'endDate' => $currentFilters['endDate'] ?? null,
-			'paymentStatus' => $currentFilters['paymentStatus'] ?? 'all',
+			'paymentStatus' => $paymentStatusCurrent,
+			'orderStatus' => $orderStatusCurrent,
 		],
 		'payments' => [
 			'summary' => $paymentSummary,
@@ -61,7 +64,7 @@
 	<header class="page-header reports-page-header">
 		<div>
 			<h1 class="page-title">Sales analytics</h1>
-			<p class="page-subtitle">Visualize order momentum, revenue growth, and  KPIs.</p>
+			<p class="page-subtitle">Visualize order momentum, revenue growth, and KPIs.</p>
 		</div>
 		<div class="page-header__quick-actions">
 			<a href="{{ route('admin.reports.inventory') }}" class="pill-link">
@@ -102,19 +105,27 @@
 				>
 			</div>
 			<div class="reports-filter-field">
+				<label for="filterOrderStatus">Order Status</label>
+				<select id="filterOrderStatus" name="order_status">
+					<option value="completed" {{ $orderStatusCurrent === 'completed' ? 'selected' : '' }}>Completed</option>
+					<option value="not_completed" {{ $orderStatusCurrent === 'not_completed' ? 'selected' : '' }}>Not completed</option>
+					<option value="all" {{ $orderStatusCurrent === 'all' ? 'selected' : '' }}>All statuses</option>
+				</select>
+			</div>
+			<div class="reports-filter-field">
 				<label for="filterPaymentStatus">Payment Status</label>
 				<select id="filterPaymentStatus" name="payment_status">
-					<option value="all" {{ ($currentFilters['paymentStatus'] ?? 'all') === 'all' ? 'selected' : '' }}>All Orders</option>
-					<option value="full" {{ ($currentFilters['paymentStatus'] ?? 'all') === 'full' ? 'selected' : '' }}>Full Payment</option>
-					<option value="half" {{ ($currentFilters['paymentStatus'] ?? 'all') === 'half' ? 'selected' : '' }}>Half Payment</option>
-					<option value="unpaid" {{ ($currentFilters['paymentStatus'] ?? 'all') === 'unpaid' ? 'selected' : '' }}>Unpaid</option>
+					<option value="all" {{ $paymentStatusCurrent === 'all' ? 'selected' : '' }}>All payments</option>
+					<option value="full" {{ $paymentStatusCurrent === 'full' ? 'selected' : '' }}>Fully paid</option>
+					<option value="partial" {{ $paymentStatusCurrent === 'partial' ? 'selected' : '' }}>Partial payment</option>
+					<option value="unpaid" {{ $paymentStatusCurrent === 'unpaid' ? 'selected' : '' }}>Unpaid</option>
 				</select>
 			</div>
 			<div class="reports-filter-actions">
 				<button type="submit" class="btn btn-primary">
 					<i class="fi fi-rr-filter" aria-hidden="true"></i> Apply
 				</button>
-				@if ($currentFilters['startDate'] || $currentFilters['endDate'] || ($currentFilters['paymentStatus'] ?? 'all') !== 'all')
+				@if ($currentFilters['startDate'] || $currentFilters['endDate'] || $paymentStatusCurrent !== 'all' || $orderStatusCurrent !== 'completed')
 					<a href="{{ route('admin.reports.sales') }}" class="pill-link">
 						<i class="fi fi-rr-refresh" aria-hidden="true"></i> Reset
 					</a>
@@ -130,64 +141,94 @@
 				<i class="fi fi-rr-shopping-cart" aria-hidden="true"></i>
 			</header>
 			<strong data-metric="orders-count">{{ number_format($salesSummary['orders'] ?? 0) }}</strong>
-			<p>Total orders captured this period.</p>
+			<p>Orders matching your filters.</p>
 		</article>
 		<article class="reports-summary-card">
 			<header>
-				<span class="summary-label">Revenue</span>
+				<span class="summary-label">Fully paid revenue</span>
 				<i class="fi fi-rr-chart-histogram" aria-hidden="true"></i>
 			</header>
-			<strong data-metric="revenue-total">₱{{ number_format($salesSummary['revenue'] ?? 0, 2) }}</strong>
-			<p>Gross sales from fully paid orders.</p>
+			<strong data-metric="revenue-paid">₱{{ number_format($salesSummary['revenue'] ?? 0, 2) }}</strong>
+			<p>Revenue recognized from fully settled orders.</p>
 		</article>
 		<article class="reports-summary-card">
 			<header>
-				<span class="summary-label">Pending Revenue</span>
-				<i class="fi fi-rr-chart-line-up" aria-hidden="true"></i>
+				<span class="summary-label">Material cost</span>
+				<i class="fi fi-rr-layers" aria-hidden="true"></i>
 			</header>
-			<strong data-metric="pending-revenue">₱{{ number_format($salesSummary['pendingRevenue'] ?? 0, 2) }}</strong>
-			<p>Outstanding payments from partial orders.</p>
+			<strong data-metric="material-cost">₱{{ number_format($salesSummary['materialCost'] ?? 0, 2) }}</strong>
+			<p>Materials consumed by fulfilled orders.</p>
 		</article>
 		<article class="reports-summary-card">
 			<header>
-				<span class="summary-label">Profit</span>
+				<span class="summary-label">Net profit</span>
 				<i class="fi fi-rr-trending-up" aria-hidden="true"></i>
 			</header>
 			<strong data-metric="profit-total">₱{{ number_format($salesSummary['profit'] ?? 0, 2) }}</strong>
-			<p>Net revenue after material costs.</p>
+			<p>
+				Profit after material costs.
+				<span data-metric="profit-margin">{{ number_format($salesSummary['profitMargin'] ?? 0, 1) }}% margin</span>
+			</p>
 		</article>
 		<article class="reports-summary-card">
 			<header>
-				<span class="summary-label">Avg. Order</span>
+				<span class="summary-label">Pending balance</span>
+				<i class="fi fi-rr-chart-line-up" aria-hidden="true"></i>
+			</header>
+			<strong data-metric="pending-revenue">₱{{ number_format($salesSummary['pendingRevenue'] ?? 0, 2) }}</strong>
+			<p>Outstanding balances from partial payments.</p>
+		</article>
+		<article class="reports-summary-card">
+			<header>
+				<span class="summary-label">Avg. order value</span>
 				<i class="fi fi-rr-circle-dollar" aria-hidden="true"></i>
 			</header>
 			<strong data-metric="average-order">₱{{ number_format($salesSummary['averageOrder'] ?? 0, 2) }}</strong>
-			<p>Average amount spent per order.</p>
+			<p>Average revenue per completed order.</p>
 		</article>
-		<article class="reports-summary-card">
-			<header>
-				<span class="summary-label">Total Payment</span>
-				<i class="fa-solid fa-wallet" aria-hidden="true"></i>
-			</header>
-			<strong data-metric="total-payment">₱{{ number_format($paymentSummary['totalPaid'] ?? 0, 2) }}</strong>
-			<p>Collected across completed orders.</p>
-		</article>
-		<article class="reports-summary-card">
-			<header>
-				<span class="summary-label">Half Payment</span>
-				<i class="fa-solid fa-coins" aria-hidden="true"></i>
-			</header>
-			<strong data-metric="half-payment">₱{{ number_format($paymentSummary['half']['amount'] ?? 0, 2) }}</strong>
-			<p>{{ number_format($paymentSummary['half']['count'] ?? 0) }} partial orders in progress.</p>
-		</article>
-		<article class="reports-summary-card">
-			<header>
-				<span class="summary-label">Full Payment</span>
-				<i class="fa-solid fa-badge-check" aria-hidden="true"></i>
-			</header>
-			<strong data-metric="full-payment">₱{{ number_format($paymentSummary['full']['amount'] ?? 0, 2) }}</strong>
-			<p>{{ number_format($paymentSummary['full']['count'] ?? 0) }} orders paid in full.</p>
-		</article>
+	</section>
+
+	<section class="reports-panel" aria-label="Payment insights">
+		<header class="reports-panel__header">
+			<div>
+				<h2>Payment insights</h2>
+				<p class="reports-subtext">Collection status across completed orders.</p>
+			</div>
+		</header>
+		<div class="reports-summary-grid">
+			<article class="reports-summary-card">
+				<header>
+					<span class="summary-label">Total collected</span>
+					<i class="fa-solid fa-wallet" aria-hidden="true"></i>
+				</header>
+				<strong>₱{{ number_format($paymentSummary['totalPaid'] ?? 0, 2) }}</strong>
+				<p>Cash realised from completed orders.</p>
+			</article>
+			<article class="reports-summary-card">
+				<header>
+					<span class="summary-label">Fully paid orders</span>
+					<i class="fa-solid fa-badge-check" aria-hidden="true"></i>
+				</header>
+				<strong>{{ number_format($paymentSummary['full']['count'] ?? 0) }}</strong>
+				<p>₱{{ number_format($paymentSummary['full']['amount'] ?? 0, 2) }} collected in full.</p>
+			</article>
+			<article class="reports-summary-card">
+				<header>
+					<span class="summary-label">Partial payments</span>
+					<i class="fa-solid fa-coins" aria-hidden="true"></i>
+				</header>
+				<strong>{{ number_format($paymentSummary['half']['count'] ?? 0) }}</strong>
+				<p>₱{{ number_format($paymentSummary['half']['amount'] ?? 0, 2) }} received • ₱{{ number_format($paymentSummary['half']['balance'] ?? 0, 2) }} due.</p>
+			</article>
+			<article class="reports-summary-card">
+				<header>
+					<span class="summary-label">Estimated pipeline</span>
+					<i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+				</header>
+				<strong>₱{{ number_format($salesSummary['estimatedSales'] ?? 0, 2) }}</strong>
+				<p>Forecast value of in-progress, non-completed orders.</p>
+			</article>
+		</div>
 	</section>
 
 	<section class="reports-panel" aria-label="Sales trend">

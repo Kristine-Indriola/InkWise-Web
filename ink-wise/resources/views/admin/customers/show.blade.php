@@ -220,7 +220,7 @@
             color: #065f46;
             border: 1px solid #a7f3d0;
         }
-        .status-pending {
+        .status-pending, .status-draft, .status-awaiting_payment, .status-pending_awaiting_materials {
             background: #fef3c7;
             color: #92400e;
             border: 1px solid #fde68a;
@@ -326,6 +326,34 @@
 @endpush
 
 @section('content')
+@php
+    $statusLabels = [
+        'draft' => 'New Order',
+        'pending' => 'Order Received',
+        'pending_awaiting_materials' => 'Awaiting Materials',
+        'awaiting_payment' => 'Awaiting Payment',
+        'processing' => 'Processing',
+        'in_production' => 'In Production',
+        'confirmed' => 'Ready for Pickup',
+        'to_receive' => 'To Receive',
+        'completed' => 'Completed',
+        'cancelled' => 'Cancelled',
+        'return_requested' => 'Return Requested',
+        'refund_in_review' => 'Refund In Review',
+        'refunded' => 'Refunded',
+    ];
+
+    $formatStatusLabel = static function ($status) use ($statusLabels) {
+        if ($status === null || $status === '') {
+            return 'Unknown';
+        }
+
+        $normalized = strtolower((string) $status);
+
+        return $statusLabels[$normalized]
+            ?? ucwords(str_replace(['_', '-'], ' ', $normalized));
+    };
+@endphp
 <main class="admin-page-shell customer-detail-page" role="main">
     <a href="{{ route('admin.customers.index') }}" class="back-button">
         <i class="fi fi-rr-arrow-left"></i>
@@ -421,8 +449,13 @@
                         </div>
                         <div style="text-align: right;">
                             <div class="order-amount">₱{{ number_format($order->total_amount, 2) }}</div>
-                            <span class="order-status status-{{ $order->status }}">
-                                {{ ucfirst(str_replace('_', ' ', $order->status)) }}
+                            @php
+                                $statusKey = strtolower((string) ($order->status ?? 'unknown'));
+                                $statusClass = preg_replace('/[^a-z0-9_-]+/', '-', $statusKey) ?: 'unknown';
+                                $statusLabel = $formatStatusLabel($order->status);
+                            @endphp
+                            <span class="order-status status-{{ $statusClass }}">
+                                {{ $statusLabel }}
                             </span>
                         </div>
                     </li>
