@@ -234,8 +234,8 @@
             'flags' => [
                 'betaMockupPreview' => (bool) config('services.inkwise.enable_mockup_preview', false),
                 'enableFilters' => true,
-                // Enable manual "Save template" button in the builder UI
-                'disableManualSave' => false,
+                // Disable manual "Save template" button in the builder UI
+                'disableManualSave' => true,
             ],
             'user' => [
                 'id' => auth()->id(),

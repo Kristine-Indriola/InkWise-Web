@@ -505,7 +505,9 @@ public function saveCanvas(Request $request, $id)
                 Log::info('✓ Preview image saved successfully', ['path' => $template->preview]);
                 // Also populate preview_front and front_image for consistency
                 $template->preview_front = $template->preview;
-                $template->front_image = $template->preview;
+                if (empty($template->front_image)) {
+                    $template->front_image = $template->preview;
+                }
             } catch (ValidationException $e) {
                 Log::error('❌ Preview image save failed', ['error' => $e->getMessage()]);
             }
@@ -561,21 +563,21 @@ public function saveCanvas(Request $request, $id)
                 }
             }
             if (!empty($previews)) {
-                $normalizedPreviews = [];
-                foreach ($previews as $key => $path) {
-                    $normalizedPreviews[$key] = $this->normalizePreviewPath($path);
-                }
-                $metadata['previews'] = $normalizedPreviews;
-                Log::info('Multiple previews saved', ['previews' => $normalizedPreviews]);
+                $metadata['previews'] = $previews;
+                Log::info('Multiple previews saved', ['previews' => $previews]);
                 // Also populate preview_front/front_image from the 'front' preview
-                if (isset($normalizedPreviews['front'])) {
-                    $template->preview_front = $normalizedPreviews['front'];
-                    $template->front_image = $normalizedPreviews['front'];
+                if (isset($previews['front'])) {
+                    $template->preview_front = $previews['front'];
+                    if (empty($template->front_image)) {
+                        $template->front_image = $previews['front'];
+                    }
                 }
                 // Populate back fields if back preview exists
-                if (isset($normalizedPreviews['back'])) {
-                    $template->preview_back = $normalizedPreviews['back'];
-                    $template->back_image = $normalizedPreviews['back'];
+                if (isset($previews['back'])) {
+                    $template->preview_back = $previews['back'];
+                    if (empty($template->back_image)) {
+                        $template->back_image = $previews['back'];
+                    }
                 }
             }
         } elseif (array_key_exists('preview_images', $validated)) {
