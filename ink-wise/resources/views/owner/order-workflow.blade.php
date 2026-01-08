@@ -174,6 +174,10 @@
         <h1 class="page-title">Orders</h1>
         <p class="page-subtitle">Confirmed orders and workflow status</p>
       </div>
+      <div class="page-header__quick-actions">
+        <a href="{{ route('owner.order.archived') }}" class="pill-link">Archived Orders</a>
+        <a href="{{ route('owner.pickup.calendar') }}" class="pill-link">Pickup Calendar</a>
+      </div>
     </header>
 
   <div class="page-inner owner-dashboard-inner">

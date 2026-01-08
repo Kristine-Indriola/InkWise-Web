@@ -46,7 +46,15 @@ class AdminCustomerController extends Controller
         $completedOrders = $orders->where('status', 'completed')->count();
         $pendingOrders = $orders->whereIn('status', ['draft', 'pending', 'processing', 'confirmed', 'in_production'])->count();
         $cancelledOrders = $orders->where('status', 'cancelled')->count();
-        $totalSpent = $orders->where('status', 'completed')->sum('total_amount');
+        $totalSpent = $orders->sum(function (Order $order) {
+            $amount = $order->total_amount;
+
+            if (!is_numeric($amount) || (float) $amount <= 0) {
+                return $order->grandTotalAmount();
+            }
+
+            return (float) $amount;
+        });
         
         // Get ratings
         $ratings = $orders->filter(function($order) {

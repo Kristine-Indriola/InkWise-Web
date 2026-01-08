@@ -15,5 +15,13 @@
     'activeRange' => $activeRange ?? 'monthly',
     'rangeReload' => true,
     'showGenerateControls' => false,
+    'orderStatusFilterEnabled' => $orderStatusFilterEnabled ?? false,
+    'paymentStatusFilterEnabled' => $paymentStatusFilterEnabled ?? false,
+    'salesIntervals' => $salesIntervals ?? [],
+    'defaultSalesInterval' => $defaultSalesInterval ?? null,
+    'salesSummaryTotals' => $salesSummaryTotals ?? [],
+    'salesSummaryLabel' => $salesSummaryLabel ?? null,
+    'paymentSummary' => $paymentSummary ?? [],
+    'filters' => $filters ?? [],
 ])
 @endsection

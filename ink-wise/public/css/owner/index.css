@@ -489,6 +489,7 @@ body.sidebar-collapsed .sidebar > * {
   flex: 1;
   padding: 25px var(--owner-main-horizontal-gap, 24px);
   margin-left: var(--owner-sidebar-width, 230px);
+  margin-top: 80px; /* Account for fixed topbar height (64px) + spacing */
   transition: margin-left 0.32s ease;
 }
 

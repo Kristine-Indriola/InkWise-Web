@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { toJpeg, toPng, toSvg } from 'html-to-image';
+import { deflate, gzip } from 'pako';
 
 import { useBuilderStore } from '../../state/BuilderStore';
 import { ToolSidebar } from '../panels/ToolSidebar';
@@ -21,6 +22,10 @@ const PREVIEW_MIN_JPEG_QUALITY = 0.82;
 const PREVIEW_MAX_BYTES = 3_200_000; // individual preview budget
 const PREVIEW_TOTAL_BUDGET = 5_000_000; // combined preview payload budget
 const MANUAL_SAVE_PAYLOAD_BUDGET = 7_500_000; // safety budget for full save payloads
+const AUTOSAVE_PAYLOAD_BUDGET = 5_000_000;
+const PAYLOAD_COMPRESSION_ENCODING = 'gzip-base64';
+const PAYLOAD_VERSION = 1;
+const POST_FAILSAFE_LIMIT = 1_600_000; // conservative ceiling to dodge strict post_max_size limits
 
 const waitForNextFrame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)))));
 
@@ -29,25 +34,74 @@ async function captureCanvasRaster(canvas, pixelRatio, backgroundColor = '#fffff
     return null;
   }
 
+  // Find the surface element (parent of the canvas)
+  const surface = canvas.parentElement;
+  const originalSurfaceBackground = surface?.style?.background;
+  const originalCanvasBackground = canvas.style.background;
+  const originalCanvasBackgroundColor = canvas.backgroundColor;
+
+  // Set backgrounds to white for clean capture
+  if (surface) {
+    surface.style.background = backgroundColor;
+  }
+  canvas.style.background = backgroundColor;
+
+  // If this is a Fabric.js canvas, also set the canvas background
+  if (canvas.backgroundColor !== undefined) {
+    canvas.backgroundColor = backgroundColor;
+    canvas.renderAll && canvas.renderAll();
+  }
+
   try {
     // Prefer lossless PNG first for maximum fidelity.
-    return await toPng(canvas, {
+    const result = await toPng(canvas, {
       cacheBust: true,
       pixelRatio,
       quality: PREVIEW_JPEG_QUALITY,
       backgroundColor,
     });
+
+    // Restore original backgrounds
+    if (surface) {
+      surface.style.background = originalSurfaceBackground;
+    }
+    canvas.style.background = originalCanvasBackground;
+    if (canvas.backgroundColor !== undefined) {
+      canvas.backgroundColor = originalCanvasBackgroundColor;
+      canvas.renderAll && canvas.renderAll();
+    }
+    return result;
   } catch (pngError) {
     console.warn('[InkWise Builder] PNG preview capture failed, falling back to JPEG.', pngError);
     try {
-      return await toJpeg(canvas, {
+      const result = await toJpeg(canvas, {
         cacheBust: true,
         pixelRatio,
         quality: PREVIEW_JPEG_QUALITY,
         backgroundColor,
       });
+
+      // Restore original backgrounds
+      if (surface) {
+        surface.style.background = originalSurfaceBackground;
+      }
+      canvas.style.background = originalCanvasBackground;
+      if (canvas.backgroundColor !== undefined) {
+        canvas.backgroundColor = originalCanvasBackgroundColor;
+        canvas.renderAll && canvas.renderAll();
+      }
+      return result;
     } catch (jpegError) {
       console.warn('[InkWise Builder] JPEG preview capture failed.', jpegError);
+      // Restore original backgrounds even on failure
+      if (surface) {
+        surface.style.background = originalSurfaceBackground;
+      }
+      canvas.style.background = originalCanvasBackground;
+      if (canvas.backgroundColor !== undefined) {
+        canvas.backgroundColor = originalCanvasBackgroundColor;
+        canvas.renderAll && canvas.renderAll();
+      }
       return null;
     }
   }
@@ -120,6 +174,151 @@ function estimateJsonBytes(value) {
       return 0;
     }
   }
+}
+
+function measureStringBytes(value) {
+  if (typeof value !== 'string') {
+    return 0;
+  }
+
+  try {
+    return new TextEncoder().encode(value).length;
+  } catch (err) {
+    console.warn('[InkWise Builder] Failed to measure string length with TextEncoder.', err);
+  }
+
+  return value.length;
+}
+
+function base64EncodeBinaryString(binaryString) {
+  if (typeof window !== 'undefined' && typeof window.btoa === 'function') {
+    return window.btoa(binaryString);
+  }
+
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(binaryString, 'binary').toString('base64');
+  }
+
+  throw new Error('No base64 encoder available for payload compression.');
+}
+
+function prepareCompressedJsonPayload(payload, thresholdBytes = MANUAL_SAVE_PAYLOAD_BUDGET, forceCompression = false) {
+  const json = JSON.stringify(payload);
+
+  let byteLength = json.length;
+  try {
+    byteLength = new TextEncoder().encode(json).length;
+  } catch (err) {
+    console.warn('[InkWise Builder] Failed to measure JSON payload length with TextEncoder.', err);
+  }
+
+  if (!forceCompression && (!Number.isFinite(thresholdBytes) || byteLength <= thresholdBytes)) {
+    return {
+      body: json,
+      headers: {},
+      compressed: false,
+      originalBytes: byteLength,
+      bodyBytes: byteLength,
+    };
+  }
+
+  try {
+    const compressed = compressor(json, { level: 9 });
+    const compressedBinary = String.fromCharCode(...compressed);
+    const compressedBytes = compressedBinary.length;
+    const base64Payload = base64EncodeBinaryString(compressedBinary);
+    const requestPayload = {
+      payload_version: PAYLOAD_VERSION,
+      payload_encoding: PAYLOAD_COMPRESSION_ENCODING,
+      compressed_payload: base64Payload,
+    };
+
+    const body = JSON.stringify(requestPayload);
+    const bodyBytes = measureStringBytes(body);
+
+    return {
+      body,
+      headers: {
+        'X-Payload-Compressed': PAYLOAD_COMPRESSION_ENCODING,
+        'X-Original-Payload-Bytes': String(byteLength),
+        'X-Compressed-Payload-Bytes': String(compressedBytes),
+      },
+      compressed: true,
+      originalBytes: byteLength,
+      compressedBytes,
+      bodyBytes,
+    };
+  } catch (err) {
+    console.warn('[InkWise Builder] Payload compression failed, sending raw JSON.', err);
+    return {
+      body: json,
+      headers: {},
+      compressed: false,
+      originalBytes: byteLength,
+      bodyBytes: byteLength,
+    };
+  }
+}
+
+function buildManualSaveVariant(basePayload, { stripPreviewImages = false, stripPrimaryPreview = false, stripSvgMarkup = false } = {}) {
+  const next = { ...basePayload };
+
+  if (stripPreviewImages) {
+    delete next.preview_images;
+    delete next.preview_images_meta;
+    next.preview_images_truncated = true;
+  }
+
+  if (stripPrimaryPreview) {
+    delete next.preview_image;
+  }
+
+  if (stripSvgMarkup) {
+    delete next.svg_markup;
+  }
+
+  return next;
+}
+
+function prepareManualSaveRequest(basePayload) {
+  const attempts = [
+    { id: 'full', options: {} },
+    { id: 'no-preview-images', options: { stripPreviewImages: true } },
+    { id: 'no-previews', options: { stripPreviewImages: true, stripPrimaryPreview: true } },
+    { id: 'minimal', options: { stripPreviewImages: true, stripPrimaryPreview: true, stripSvgMarkup: true } },
+  ];
+
+  let bestAttempt = null;
+
+  for (const attempt of attempts) {
+    const payloadVariant = buildManualSaveVariant(basePayload, attempt.options);
+    const prepared = prepareCompressedJsonPayload(payloadVariant, MANUAL_SAVE_PAYLOAD_BUDGET, true);
+
+    if (!bestAttempt || prepared.bodyBytes < bestAttempt.prepared.bodyBytes) {
+      bestAttempt = { prepared, payload: payloadVariant, id: attempt.id, trimmed: attempt.id !== 'full' };
+    }
+
+    if (prepared.bodyBytes <= POST_FAILSAFE_LIMIT) {
+      if (attempt.id !== 'full') {
+        console.warn('[InkWise Builder] Trimmed manual save payload to stay within POST budget.', {
+          variant: attempt.id,
+          bodyBytes: prepared.bodyBytes,
+          limit: POST_FAILSAFE_LIMIT,
+        });
+      }
+      return { prepared, payload: payloadVariant, id: attempt.id, trimmed: attempt.id !== 'full' };
+    }
+  }
+
+  if (bestAttempt) {
+    console.error('[InkWise Builder] Manual save payload exceeds failsafe limit even after trimming.', {
+      smallestBytes: bestAttempt.prepared.bodyBytes,
+      limit: POST_FAILSAFE_LIMIT,
+    });
+    return bestAttempt;
+  }
+
+  throw new Error('Failed to prepare manual save payload.');
 }
 
 function getPreviewPriority(entry) {
@@ -362,19 +561,55 @@ export function BuilderShell() {
 
       setAutosaveStatus('saving');
 
+      let autosavePayload = {
+        design: designSnapshot,
+        canvas: designSnapshot.canvas,
+        template_name: state.template?.name ?? null,
+      };
+
+      let preparedAutosave = prepareCompressedJsonPayload(autosavePayload, AUTOSAVE_PAYLOAD_BUDGET, true);
+
+      if (preparedAutosave.bodyBytes > POST_FAILSAFE_LIMIT && autosavePayload.canvas) {
+        const trimmedPayload = { ...autosavePayload };
+        delete trimmedPayload.canvas;
+        const retried = prepareCompressedJsonPayload(trimmedPayload, AUTOSAVE_PAYLOAD_BUDGET, true);
+
+        if (retried.bodyBytes < preparedAutosave.bodyBytes) {
+          console.warn('[InkWise Builder] Trimmed autosave payload (removed canvas state) to fit POST budget.', {
+            originalBytes: preparedAutosave.bodyBytes,
+            trimmedBytes: retried.bodyBytes,
+            limit: POST_FAILSAFE_LIMIT,
+          });
+          preparedAutosave = retried;
+          autosavePayload = trimmedPayload;
+        } else {
+          console.error('[InkWise Builder] Autosave payload exceeds failsafe limit even after trimming canvas.', {
+            bodyBytes: preparedAutosave.bodyBytes,
+            retriedBytes: retried.bodyBytes,
+            limit: POST_FAILSAFE_LIMIT,
+          });
+        }
+      }
+
+      if (preparedAutosave.compressed) {
+        console.debug('[InkWise Builder] Compressed autosave payload.', {
+          originalBytes: preparedAutosave.originalBytes,
+          compressedBytes: preparedAutosave.compressedBytes,
+          requestBytes: preparedAutosave.bodyBytes,
+          threshold: AUTOSAVE_PAYLOAD_BUDGET,
+        });
+      }
+
       fetch(routes.autosave, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
           'X-CSRF-TOKEN': csrfToken,
+          ...preparedAutosave.headers,
         },
         credentials: 'same-origin',
-        body: JSON.stringify({
-          design: designSnapshot,
-          canvas: designSnapshot.canvas,
-          template_name: state.template?.name ?? null,
-        }),
+        body: preparedAutosave.body,
         signal: controller.signal,
       })
         .then(async (response) => {
@@ -428,8 +663,11 @@ export function BuilderShell() {
     }
     if (!canvasRef.current) {
       setSaveTemplateError('Canvas not ready yet.');
+      console.error('[InkWise Builder] Canvas ref is null during save attempt');
       return;
     }
+
+    console.log('[InkWise Builder] Starting save with canvas ref:', canvasRef.current);
     if (isSavingTemplate) {
       return;
     }
@@ -500,8 +738,10 @@ export function BuilderShell() {
         await ensurePageActive(page.id);
         await waitForNextFrame();
 
-        const backgroundColor = page?.background || '#ffffff';
+        const backgroundColor = '#ffffff'; // Always use white background for previews
+        console.log('[InkWise Builder] Capturing preview for page', page.id, 'with background', backgroundColor);
         const rasterDataUrl = await captureCanvasRaster(canvasRef.current, pixelRatio, backgroundColor);
+        console.log('[InkWise Builder] Capture result:', rasterDataUrl ? 'success' : 'failed');
         if (!rasterDataUrl) {
           continue;
         }
@@ -613,7 +853,28 @@ export function BuilderShell() {
       const svgMarkup = extractSvgMarkup(svgDataUrl);
       const svgPayload = encodeSvgMarkup(svgMarkup);
 
-      const shouldIncludePreview = previewImage && estimateBase64Bytes(previewImage) <= PREVIEW_MAX_BYTES;
+      console.log('[InkWise Builder] Preview capture results:', {
+        previewImagesCount: Object.keys(previewImages).length,
+        hasPrimaryPreview: !!previewImage,
+        hasSvg: !!svgPayload,
+        previewImageLength: previewImage ? previewImage.length : 0
+      });
+
+      // If no preview was captured, create a simple white placeholder
+      let finalPreviewImage = previewImage;
+      if (!finalPreviewImage) {
+        console.log('[InkWise Builder] No preview captured, creating fallback white preview');
+        // Create a simple 400x400 white PNG as data URL
+        const canvas = document.createElement('canvas');
+        canvas.width = 400;
+        canvas.height = 400;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, 400, 400);
+        finalPreviewImage = canvas.toDataURL('image/png');
+      }
+
+      const shouldIncludePreview = finalPreviewImage && estimateBase64Bytes(finalPreviewImage) <= PREVIEW_MAX_BYTES;
 
       const payload = {
         design: designSnapshot,
@@ -628,7 +889,7 @@ export function BuilderShell() {
       }
 
       if (shouldIncludePreview) {
-        payload.preview_image = previewImage;
+        payload.preview_image = finalPreviewImage;
       }
 
       if (Object.keys(previewImages).length > 0) {
@@ -645,39 +906,25 @@ export function BuilderShell() {
         payload.svg_markup = svgPayload;
       }
 
-      let estimatedPayloadBytes = estimateJsonBytes(payload);
+      const { prepared: preparedPayload, id: payloadVariant } = prepareManualSaveRequest(payload);
 
-      // Temporarily disable payload trimming to ensure data is saved
-      // if (estimatedPayloadBytes > MANUAL_SAVE_PAYLOAD_BUDGET && payload.preview_images) {
-      //   console.warn('[InkWise Builder] Dropping secondary previews to respect payload budget.', {
-      //     estimatedPayloadBytes,
-      //     budget: MANUAL_SAVE_PAYLOAD_BUDGET,
-      //   });
-      //   payload.preview_images_truncated = true;
-      //   delete payload.preview_images;
-      //   delete payload.preview_images_meta;
-      //   estimatedPayloadBytes = estimateJsonBytes(payload);
-      // }
+      if (preparedPayload.compressed) {
+        console.info('[InkWise Builder] Compressed manual-save payload.', {
+          originalBytes: preparedPayload.originalBytes,
+          compressedBytes: preparedPayload.compressedBytes,
+          requestBytes: preparedPayload.bodyBytes,
+          variant: payloadVariant,
+          threshold: MANUAL_SAVE_PAYLOAD_BUDGET,
+        });
+      }
 
-      // if (estimatedPayloadBytes > MANUAL_SAVE_PAYLOAD_BUDGET && payload.preview_image) {
-      //   console.warn('[InkWise Builder] Dropping primary preview image to reduce payload.', {
-      //     estimatedPayloadBytes,
-      //     budget: MANUAL_SAVE_PAYLOAD_BUDGET,
-      //   });
-      //   delete payload.preview_image;
-      //   estimatedPayloadBytes = estimateJsonBytes(payload);
-      // }
-
-      // if (estimatedPayloadBytes > MANUAL_SAVE_PAYLOAD_BUDGET && payload.svg_markup) {
-      //   console.warn('[InkWise Builder] Dropping SVG markup to keep payload within limits.', {
-      //     estimatedPayloadBytes,
-      //     budget: MANUAL_SAVE_PAYLOAD_BUDGET,
-      //   });
-      //   delete payload.svg_markup;
-      //   estimatedPayloadBytes = estimateJsonBytes(payload);
-      // }
-
-      const requestBody = JSON.stringify(payload);
+      if (preparedPayload.bodyBytes > POST_FAILSAFE_LIMIT) {
+        console.error('[InkWise Builder] Manual save payload still exceeds failsafe limit after trimming.', {
+          bodyBytes: preparedPayload.bodyBytes,
+          limit: POST_FAILSAFE_LIMIT,
+          variant: payloadVariant,
+        });
+      }
 
       const response = await fetch(saveTemplateRoute, {
         method: 'POST',
@@ -685,9 +932,10 @@ export function BuilderShell() {
           'Content-Type': 'application/json',
           Accept: 'application/json',
           'X-CSRF-TOKEN': csrfToken,
+          ...preparedPayload.headers,
         },
         credentials: 'same-origin',
-        body: requestBody,
+        body: preparedPayload.body,
       });
 
       if (!response.ok) {

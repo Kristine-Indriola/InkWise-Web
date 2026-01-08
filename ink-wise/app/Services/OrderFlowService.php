@@ -24,6 +24,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -1988,6 +1989,7 @@ class OrderFlowService
         $envelopeCache = [];
         $addonCache = [];
         $materialNameCache = [];
+        $materialOrderingColumn = Schema::hasColumn('materials', 'updated_at') ? 'updated_at' : 'material_id';
 
         $existingUsageRecords = ProductMaterial::query()
             ->where('order_id', $order->id)
@@ -2009,7 +2011,7 @@ class OrderFlowService
             ]);
         });
 
-        $resolveMaterialByName = function (?string $name) use (&$materialNameCache) {
+        $resolveMaterialByName = function (?string $name) use (&$materialNameCache, $materialOrderingColumn) {
             if (!$name) {
                 return null;
             }
@@ -2038,7 +2040,7 @@ class OrderFlowService
                         $query->orWhereRaw("REPLACE(REPLACE(REPLACE(LOWER(material_name), ' ', ''), '-', ''), '_', '') = ?", [$compact]);
                     }
                 })
-                ->orderByDesc('updated_at')
+                ->orderByDesc($materialOrderingColumn)
                 ->first();
 
             foreach ($lookupKeys as $lookupKey) {
@@ -3021,15 +3023,22 @@ class OrderFlowService
             }
 
             $ink = $this->resolveInkByColorKey($color);
-            if (!$ink || !$ink->inventory) {
-                return false;
+            if (!$ink) {
+                // Ink not configured; treat as non-blocking but surface via metadata later.
+                continue;
             }
 
+            $inventoryStock = optional($ink->inventory)->stock_level;
+
             $available = max(
-                (int) ($ink->inventory->stock_level ?? 0),
+                (int) ($inventoryStock ?? 0),
                 (int) ($ink->stock_qty ?? 0),
                 (int) ($ink->stock_qty_ml ?? 0)
             );
+
+            if ($available <= 0) {
+                return false;
+            }
 
             if ($available < $units) {
                 return false;
@@ -3065,7 +3074,19 @@ class OrderFlowService
 
         $extrasTotal = round($paperTotal + $addonsTotal + $inkTotal, 2);
 
-        $subtotal = round($baseSubtotal + $extrasTotal, 2);
+        $additionalLineItemsTotal = $order->items
+            ->reject(fn ($item) => $item->is($invitationItem))
+            ->sum(function (OrderItem $item) {
+                $subtotal = $item->subtotal;
+
+                if ($subtotal === null) {
+                    $subtotal = $item->unit_price * $item->quantity;
+                }
+
+                return (float) $subtotal;
+            });
+
+        $subtotal = round($baseSubtotal + $extrasTotal + $additionalLineItemsTotal, 2);
         $tax = 0.0;
         $shipping = $order->shipping_fee !== null ? (float) $order->shipping_fee : static::DEFAULT_SHIPPING_FEE;
         $total = round($subtotal + $shipping, 2);
@@ -3363,6 +3384,8 @@ class OrderFlowService
             return null;
         }
 
+        $orderByColumn = Schema::hasColumn('inks', 'updated_at') ? 'updated_at' : 'id';
+
         $exactMatch = Ink::query()
             ->with('inventory')
             ->where(function ($query) use ($candidates) {
@@ -3374,7 +3397,7 @@ class OrderFlowService
                     }
                 }
             })
-            ->orderByDesc('updated_at')
+            ->orderByDesc($orderByColumn)
             ->first();
 
         if ($exactMatch) {
@@ -3393,7 +3416,7 @@ class OrderFlowService
                     }
                 }
             })
-            ->orderByDesc('updated_at')
+            ->orderByDesc($orderByColumn)
             ->first();
     }
 

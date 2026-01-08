@@ -161,6 +161,8 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     // Payments
     Route::get('/payments', [\App\Http\Controllers\Admin\PaymentController::class, 'index'])
         ->name('payments.index');
+    Route::get('/payments/export', [\App\Http\Controllers\Admin\PaymentController::class, 'export'])
+        ->name('payments.export');
 
 
     // Templates 
@@ -776,7 +778,7 @@ Route::post('/design/autosave', [OrderFlowController::class, 'autosaveDesign'])
     // ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('order.design.autosave');
 Route::post('/design/save-template', [OrderFlowController::class, 'saveAsTemplate'])
-    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer,staff')
     ->name('order.design.save-template');
 
 /**Order Forms & Pages*/
@@ -911,6 +913,8 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     // Other pagesgut
     Route::get('/order/workflow', [OwnerOrderWorkflowController::class, 'index'])->name('order.workflow');
     Route::get('/order/workflow/data', [OwnerOrderWorkflowController::class, 'data'])->name('order.workflow.data');
+    Route::get('/order/archived', [OwnerOrderWorkflowController::class, 'archived'])->name('order.archived');
+    Route::get('/pickup/calendar', [OwnerOrderWorkflowController::class, 'pickupCalendar'])->name('pickup.calendar');
     Route::get('/inventory', [OwnerInventoryController::class, 'index'])->name('inventory.index');
     Route::get('/inventory/track', [OwnerInventoryController::class, 'track'])->name('inventory-track');
     Route::get('/products', [OwnerProductsController::class, 'index'])->name('products.index');

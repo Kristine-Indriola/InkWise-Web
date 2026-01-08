@@ -4,55 +4,133 @@ namespace App\Http\Controllers\Owner;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Services\Reports\SalesMetricsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\DB;
-use Carbon\CarbonPeriod;
 
 class OwnerSalesReportsController extends Controller
 {
+    protected SalesMetricsService $salesMetrics;
+
+    public function __construct(SalesMetricsService $salesMetrics)
+    {
+        $this->salesMetrics = $salesMetrics;
+    }
+
     public function index(Request $request)
     {
-        $rangeKey = Str::lower((string) $request->query('range', 'monthly'));
-        [$start, $end, $rangeLabel, $normalizedRange] = $this->resolveRange($rangeKey);
+        $rangeKey = Str::lower((string) $request->query('range', 'all'));
+        [$customStart, $customEnd] = $this->resolveCustomDateRange($request);
 
-        $orders = $this->queryCompletedOrders($start, $end);
-        $metrics = $this->calculateMetrics($orders);
-        $chartSeries = $this->buildChartSeries($orders, $normalizedRange, $start, $end);
-        $recentSalesRows = $this->buildRecentSalesRows();
+        if ($customStart && $customEnd && $customEnd->lessThan($customStart)) {
+            [$customStart, $customEnd] = [$customEnd->copy(), $customStart->copy()];
+        }
+
+        if ($customStart || $customEnd) {
+            $start = $customStart?->copy();
+            $end = $customEnd?->copy();
+            $normalizedRange = 'custom';
+            $rangeLabel = $this->formatCustomRangeLabel($start, $end);
+        } else {
+            [$start, $end, $rangeLabel, $normalizedRange] = $this->resolveRange($rangeKey);
+        }
+
+        $orderStatusFilter = Str::lower((string) $request->query('order_status', 'completed'));
+        $orderStatusFilter = match ($orderStatusFilter) {
+            'all' => 'all',
+            'not_completed', 'incomplete', 'pending' => 'not_completed',
+            default => 'completed',
+        };
+
+        $paymentStatusFilter = Str::lower((string) $request->query('payment_status', 'all'));
+        $paymentStatusFilter = match ($paymentStatusFilter) {
+            'full', 'fully-paid', 'paid' => 'full',
+            'half', 'partial', 'partially-paid', 'partially_paid' => 'half',
+            'unpaid', 'none' => 'unpaid',
+            default => 'all',
+        };
+
+        $reportContext = $this->salesMetrics->compute($start, $end, $paymentStatusFilter, $orderStatusFilter);
+
+        $salesSummaryTotals = $reportContext['salesSummaryTotals'];
+        $paymentSummary = $reportContext['paymentSummary'];
+        $salesIntervals = $reportContext['salesIntervals'];
+        $defaultSalesInterval = $reportContext['defaultSalesInterval'];
+        $salesSummaryLabel = $reportContext['salesSummaryLabel'];
+        $salesCollection = $reportContext['sales'];
+
+        $chartSeries = $this->buildChartSeriesFromIntervals($salesIntervals, $defaultSalesInterval);
+        $recentSalesRows = $this->buildRecentSalesRowsFromCollection($salesCollection);
+
+        $rangeChip = match ($normalizedRange) {
+            'daily' => 'Today',
+            'weekly' => 'Last 7 days',
+            'monthly' => 'Last 30 days',
+            'yearly' => 'This year',
+            'custom' => $this->formatCustomChipLabel($start, $end),
+            default => 'All time',
+        };
 
         $summaryCards = [
             [
-                'label' => 'Total Sales',
-                'chip' => ['text' => 'Revenue', 'accent' => true],
-                'icon' => 'revenue',
-                'value' => $this->formatCurrency($metrics['total_sales']),
-                'meta' => $rangeLabel,
-            ],
-            [
-                'label' => 'Orders Fulfilled',
-                'chip' => ['text' => 'Orders', 'accent' => true],
+                'label' => 'Orders',
+                'chip' => ['text' => $rangeChip, 'accent' => false],
                 'icon' => 'orders',
-                'value' => number_format($metrics['orders_fulfilled']),
-                'meta' => 'Completed orders • ' . $rangeLabel,
+                'value' => number_format($salesSummaryTotals['orders'] ?? 0),
+                'metric' => 'orders-count',
+                'meta' => 'Orders matching your filters.',
             ],
             [
-                'label' => 'Average Order Value',
-                'chip' => ['text' => 'AOV', 'accent' => true],
-                'icon' => 'average-order',
-                'value' => $this->formatCurrency($metrics['average_order_value']),
-                'meta' => 'Per completed order',
+                'label' => 'Fully Paid Revenue',
+                'chip' => ['text' => 'Collected', 'accent' => true],
+                'icon' => 'revenue',
+                'value' => $this->formatCurrency($salesSummaryTotals['revenue'] ?? 0),
+                'metric' => 'revenue-paid',
+                'meta' => 'Revenue recognized from fully settled orders.',
             ],
             [
-                'label' => 'Profit',
-                'chip' => ['text' => 'Profit', 'accent' => true],
+                'label' => 'Material Cost',
+                'chip' => ['text' => 'Cost of goods', 'accent' => false],
+                'icon' => 'inventory-total',
+                'value' => $this->formatCurrency($salesSummaryTotals['materialCost'] ?? 0),
+                'metric' => 'material-cost',
+                'meta' => 'Materials consumed by fulfilled orders.',
+            ],
+            [
+                'label' => 'Net Profit',
+                'chip' => ['text' => 'Margin', 'accent' => true],
                 'icon' => 'profit',
-                'value' => $this->formatCurrency($metrics['profit']),
-                'meta' => 'After material costs • ' . $rangeLabel,
+                'value' => $this->formatCurrency($salesSummaryTotals['profit'] ?? 0),
+                'metric' => 'profit-total',
+                'meta' => 'Profit after material costs.',
+                'metaHtml' => sprintf('Profit after material costs. <span data-metric="profit-margin">%s margin</span>', $this->formatPercent($salesSummaryTotals['profitMargin'] ?? 0)),
+            ],
+            [
+                'label' => 'Pending Balance',
+                'chip' => ['text' => 'Receivables', 'accent' => false],
+                'icon' => 'inventory-pending',
+                'value' => $this->formatCurrency($salesSummaryTotals['pendingRevenue'] ?? 0),
+                'metric' => 'pending-revenue',
+                'meta' => 'Outstanding balances from partial payments.',
+            ],
+            [
+                'label' => 'Avg. Order Value',
+                'chip' => ['text' => 'Efficiency', 'accent' => false],
+                'icon' => 'average-order',
+                'value' => $this->formatCurrency($salesSummaryTotals['averageOrder'] ?? 0),
+                'metric' => 'average-order',
+                'meta' => 'Average revenue per completed order.',
             ],
         ];
+
+        $paymentStatusQueryValue = match ($paymentStatusFilter) {
+            'full' => 'full',
+            'half' => 'partial',
+            'unpaid' => 'unpaid',
+            default => 'all',
+        };
 
         return view('owner.reports.sales', [
             'summaryCards' => $summaryCards,
@@ -64,213 +142,104 @@ class OwnerSalesReportsController extends Controller
                 ],
             ],
             'activeRange' => $normalizedRange,
+            'rangeLabel' => $rangeLabel,
             'tableConfig' => [
-                'headers' => ['Order ID', 'Customer', 'Items', 'Qty', 'Total (PHP)', 'Date'],
+                'headers' => ['Order ID', 'Customer', 'Items', 'Qty', 'Payment Status', 'Total (PHP)', 'Profit (PHP)', 'Date'],
                 'rows' => $recentSalesRows,
                 'emptyText' => 'No recent sales found.',
                 'showEmpty' => true,
             ],
+            'salesSummaryTotals' => $salesSummaryTotals,
+            'salesSummaryLabel' => $salesSummaryLabel,
+            'paymentSummary' => $paymentSummary,
+            'salesIntervals' => $salesIntervals,
+            'rangeReload' => true,
+            'orderStatusFilterEnabled' => true,
+            'paymentStatusFilterEnabled' => true,
+            'filters' => [
+                'range' => $normalizedRange,
+                'orderStatus' => $orderStatusFilter,
+                'paymentStatus' => $paymentStatusQueryValue,
+                'startDate' => $start?->format('Y-m-d'),
+                'endDate' => $end?->format('Y-m-d'),
+            ],
         ]);
     }
 
-    protected function queryCompletedOrders(?Carbon $start, ?Carbon $end): Collection
+    protected function resolveCustomDateRange(Request $request): array
     {
-        $query = Order::query()
-            ->with([
-                'items.paperStockSelection.paperStock.material',
-                'items.addons.productAddon.material',
-            ])
-            ->where('status', 'completed');
+        $startInput = trim((string) $request->query('start_date', ''));
+        $endInput = trim((string) $request->query('end_date', ''));
 
+        $startDate = null;
+        $endDate = null;
+
+        if ($startInput !== '') {
+            try {
+                $startDate = Carbon::parse($startInput)->startOfDay();
+            } catch (\Throwable $e) {
+                $startDate = null;
+            }
+        }
+
+        if ($endInput !== '') {
+            try {
+                $endDate = Carbon::parse($endInput)->endOfDay();
+            } catch (\Throwable $e) {
+                $endDate = null;
+            }
+        }
+
+        return [$startDate, $endDate];
+    }
+
+    protected function formatCustomRangeLabel(?Carbon $start, ?Carbon $end): string
+    {
         if ($start && $end) {
-            $query->whereBetween(DB::raw('COALESCE(order_date, created_at)'), [$start, $end]);
+            return sprintf('%s - %s', $start->format('M j, Y'), $end->format('M j, Y'));
         }
 
-        return $query->get();
+        if ($start) {
+            return sprintf('From %s', $start->format('M j, Y'));
+        }
+
+        if ($end) {
+            return sprintf('Up to %s', $end->format('M j, Y'));
+        }
+
+        return 'Custom range';
     }
 
-    protected function calculateMetrics(Collection $orders): array
+    protected function formatCustomChipLabel(?Carbon $start, ?Carbon $end): string
     {
-        $orderCount = $orders->count();
-        $totalSales = (float) $orders->sum(fn (Order $order) => (float) $order->total_amount);
+        if ($start && $end) {
+            return $start->format('M j') . ' - ' . $end->format('M j');
+        }
 
-        $materialCost = $orders->sum(function (Order $order) {
-            return $this->estimateMaterialCost($order);
-        });
+        if ($start) {
+            return 'From ' . $start->format('M j');
+        }
 
-        $profit = $totalSales - $materialCost;
+        if ($end) {
+            return 'Through ' . $end->format('M j');
+        }
 
-        return [
-            'total_sales' => round($totalSales, 2),
-            'orders_fulfilled' => $orderCount,
-            'average_order_value' => $orderCount > 0 ? round($totalSales / $orderCount, 2) : 0.0,
-            'profit' => round($profit, 2),
-        ];
+        return 'Custom range';
     }
 
-    protected function buildRecentSalesRows(int $limit = 10): array
+    protected function buildChartSeriesFromIntervals(array $intervals, string $activeKey): array
     {
-        $timezone = $this->timezone();
+        $active = $intervals[$activeKey] ?? reset($intervals) ?? null;
 
-        $orders = Order::query()
-            ->with([
-                'items',
-                'customer',
-                'customerOrder',
-            ])
-            ->where('status', 'completed')
-            ->orderByDesc(DB::raw('COALESCE(order_date, created_at)'))
-            ->limit($limit)
-            ->get();
-
-        return $orders->map(function (Order $order) use ($timezone) {
-            $moment = $this->resolveOrderMoment($order, $timezone);
-            [$itemSummary, $quantity] = $this->summarizeOrderItems($order);
-
-            return [
-                'date_iso' => $moment?->toDateString(),
-                'date_index' => 5,
-                'columns' => [
-                    ['text' => $this->formatOrderNumber($order), 'emphasis' => true],
-                    ['text' => $this->resolveCustomerName($order)],
-                    ['text' => $itemSummary, 'muted' => true],
-                    ['text' => $quantity > 0 ? number_format($quantity) : '—', 'numeric' => true],
-                    ['text' => number_format((float) $order->total_amount, 2), 'numeric' => true],
-                    ['text' => $moment ? $moment->format('M d, Y') : '—', 'muted' => true],
-                ],
-            ];
-        })->toArray();
-    }
-
-    protected function buildChartSeries(Collection $orders, string $range, ?Carbon $start, ?Carbon $end): array
-    {
-        $timezone = $this->timezone();
-        $now = Carbon::now($timezone);
-
-        $moments = $orders
-            ->map(fn (Order $order) => $this->resolveOrderMoment($order, $timezone))
-            ->filter();
-
-        $effectiveStart = $start?->copy();
-        $effectiveEnd = $end?->copy();
-
-        if (!$effectiveStart && $moments->isNotEmpty()) {
-            $effectiveStart = $moments->min()?->copy();
-        }
-
-        if (!$effectiveEnd && $moments->isNotEmpty()) {
-            $effectiveEnd = $moments->max()?->copy();
-        }
-
-        if (!$effectiveStart) {
-            $effectiveStart = match ($range) {
-                'daily' => $now->copy()->startOfDay(),
-                'weekly' => $now->copy()->subDays(6)->startOfDay(),
-                'monthly' => $now->copy()->subDays(29)->startOfDay(),
-                'yearly' => $now->copy()->startOfYear(),
-                default => $now->copy()->subMonths(5)->startOfMonth(),
-            };
-        }
-
-        if (!$effectiveEnd) {
-            $effectiveEnd = match ($range) {
-                'daily' => $effectiveStart->copy()->endOfDay(),
-                'weekly', 'monthly' => $now->copy()->endOfDay(),
-                'yearly' => $now->copy()->endOfDay(),
-                default => $now->copy()->endOfMonth(),
-            };
-        }
-
-        // Normalize ordering of start/end
-        if ($effectiveEnd->lessThan($effectiveStart)) {
-            [$effectiveStart, $effectiveEnd] = [$effectiveEnd->copy(), $effectiveStart->copy()];
-        }
-
-        $labels = [];
-        $buckets = [];
-
-        switch ($range) {
-            case 'daily':
-                $labels = array_map(fn ($hour) => sprintf('%02d:00', $hour), range(0, 23));
-                $buckets = array_fill(0, 24, 0.0);
-
-                foreach ($orders as $order) {
-                    $moment = $this->resolveOrderMoment($order, $timezone);
-                    if (!$moment || !$moment->isSameDay($effectiveStart)) {
-                        continue;
-                    }
-
-                    $hour = (int) $moment->format('G');
-                    $buckets[$hour] += (float) $order->total_amount;
-                }
-
-                break;
-
-            case 'weekly':
-            case 'monthly':
-                $period = CarbonPeriod::create($effectiveStart->copy()->startOfDay(), '1 day', $effectiveEnd->copy()->startOfDay());
-                foreach ($period as $date) {
-                    $key = $date->format('Y-m-d');
-                    $labels[] = $date->format('M j');
-                    $buckets[$key] = 0.0;
-                }
-
-                foreach ($orders as $order) {
-                    $moment = $this->resolveOrderMoment($order, $timezone);
-                    if (!$moment) {
-                        continue;
-                    }
-
-                    if ($moment->lt($effectiveStart) || $moment->gt($effectiveEnd)) {
-                        continue;
-                    }
-
-                    $key = $moment->copy()->startOfDay()->format('Y-m-d');
-                    if (array_key_exists($key, $buckets)) {
-                        $buckets[$key] += (float) $order->total_amount;
-                    }
-                }
-
-                break;
-
-            case 'yearly':
-            case 'all':
-            default:
-                $startMonth = $effectiveStart->copy()->startOfMonth();
-                $endMonth = $effectiveEnd->copy()->endOfMonth();
-                $period = CarbonPeriod::create($startMonth, '1 month', $endMonth);
-
-                foreach ($period as $date) {
-                    $key = $date->format('Y-m');
-                    $labels[] = $date->format('M Y');
-                    $buckets[$key] = 0.0;
-                }
-
-                foreach ($orders as $order) {
-                    $moment = $this->resolveOrderMoment($order, $timezone);
-                    if (!$moment) {
-                        continue;
-                    }
-
-                    if ($moment->lt($startMonth) || $moment->gt($endMonth)) {
-                        continue;
-                    }
-
-                    $key = $moment->copy()->startOfMonth()->format('Y-m');
-                    if (array_key_exists($key, $buckets)) {
-                        $buckets[$key] += (float) $order->total_amount;
-                    }
-                }
-
-                break;
-        }
-
-        $values = array_values(array_map(fn ($value) => round((float) $value, 2), $buckets));
+        $labels = $active['labels'] ?? [];
+        $totals = $active['totals'] ?? [];
 
         if (empty($labels)) {
             $labels = ['No data'];
-            $values = [0.0];
+            $totals = [0.0];
         }
+
+        $values = array_map(fn ($value) => round((float) $value, 2), $totals);
 
         return [
             'type' => 'line',
@@ -299,28 +268,39 @@ class OwnerSalesReportsController extends Controller
         ];
     }
 
-    protected function estimateMaterialCost(Order $order): float
+    protected function buildRecentSalesRowsFromCollection(Collection $orders): array
     {
-        $cost = 0.0;
+        $timezone = $this->timezone();
 
-        foreach ($order->items as $item) {
-            $quantity = max((int) $item->quantity, 1);
+        return $orders
+            ->sortByDesc(function (Order $order) {
+                return $order->order_date_value ?? $order->order_date ?? $order->created_at;
+            })
+            ->take(100)
+            ->map(function (Order $order) use ($timezone) {
+                $moment = $this->resolveOrderMoment($order, $timezone);
+                $itemsSummary = $order->items_list ?? '—';
+                $quantity = (int) ($order->items_quantity ?? 0);
+                $profit = (float) ($order->profit_value ?? 0);
+                $totalAmount = (float) ($order->total_amount_value ?? 0);
 
-            $paperStockMaterialCost = data_get($item, 'paperStockSelection.paperStock.material.unit_cost');
-            if ($paperStockMaterialCost !== null) {
-                $cost += (float) $paperStockMaterialCost * $quantity;
-            }
-
-            foreach ($item->addons as $addon) {
-                $addonMaterialCost = data_get($addon, 'productAddon.material.unit_cost');
-                if ($addonMaterialCost !== null) {
-                    $addonQty = max((int) ($addon->quantity ?? 1), 1);
-                    $cost += (float) $addonMaterialCost * $addonQty;
-                }
-            }
-        }
-
-        return round($cost, 2);
+                return [
+                    'date_iso' => $moment?->toDateString(),
+                    'date_index' => 7,
+                    'columns' => [
+                        ['text' => $this->formatOrderNumber($order), 'emphasis' => true],
+                        ['text' => $order->customer_name ?? '-'],
+                        ['text' => $itemsSummary, 'muted' => true],
+                        ['text' => $quantity > 0 ? number_format($quantity) : '—', 'numeric' => true],
+                        ['text' => $order->payment_status ?? '-', 'muted' => ($order->payment_status ?? '') !== 'Full Payment'],
+                        ['text' => number_format($totalAmount, 2), 'numeric' => true],
+                        ['text' => number_format($profit, 2), 'numeric' => true, 'class' => $profit < 0 ? 'text-danger' : null],
+                        ['text' => $moment ? $moment->format('M d, Y') : '—', 'muted' => true],
+                    ],
+                ];
+            })
+            ->values()
+            ->toArray();
     }
 
     protected function resolveRange(string $rangeKey): array
@@ -389,61 +369,19 @@ class OwnerSalesReportsController extends Controller
         return Str::startsWith($number, '#') ? $number : '#' . ltrim($number, '#');
     }
 
-    protected function resolveCustomerName(Order $order): string
-    {
-        $customer = $order->customer;
-        $customerOrder = $order->customerOrder;
-
-        $parts = collect([
-            optional($customer)->first_name,
-            optional($customer)->middle_name,
-            optional($customer)->last_name,
-        ])->filter()->implode(' ');
-
-        if ($parts !== '') {
-            return $parts;
-        }
-
-        if ($customerOrder && !empty($customerOrder->name)) {
-            return $customerOrder->name;
-        }
-
-        if ($customer && !empty($customer->email)) {
-            return $customer->email;
-        }
-
-        if ($customerOrder && !empty($customerOrder->email)) {
-            return $customerOrder->email;
-        }
-
-        return 'Guest customer';
-    }
-
-    protected function summarizeOrderItems(Order $order): array
-    {
-        $items = $order->items ?? collect();
-        $names = $items->pluck('product_name')->filter()->values();
-        $quantity = (int) $items->sum('quantity');
-
-        if ($names->isEmpty()) {
-            return ['—', $quantity];
-        }
-
-        $primary = $names->take(2)->implode(', ');
-        $extraCount = max($names->count() - 2, 0);
-
-        if ($extraCount > 0) {
-            $primary .= ' +' . $extraCount . ' more';
-        }
-
-        return [$primary, $quantity];
-    }
-
     protected function formatCurrency(float $value): string
     {
         $formatted = number_format($value, 2);
 
         return '₱' . $formatted;
+    }
+
+    protected function formatPercent(float $value): string
+    {
+        $rounded = round($value, 1);
+        $formatted = number_format($rounded, 1, '.', ',');
+
+        return rtrim(rtrim($formatted, '0'), '.') . '%';
     }
 
     protected function timezone(): string
