@@ -51,7 +51,10 @@ class ImageResolver
             return $path;
         }
 
-        $normalized = str_replace('\\', '/', $path);
+        $normalized = preg_replace('#^/?storage/#i', '', str_replace('\\', '/', $path)) ?? '';
+        if ($normalized === '') {
+            return $placeholder;
+        }
 
         $publicRoot = str_replace('\\', '/', public_path());
         $storageRoot = str_replace('\\', '/', storage_path('app/public'));
@@ -64,9 +67,6 @@ class ImageResolver
             $normalized = ltrim(Str::after($normalized, $storageRoot), '/');
         }
 
-        // Normalize common prefixes: remove leading 'storage/' if present
-        $normalized = preg_replace('#^/?storage/#i', '', $normalized) ?? $normalized;
-
         // Remove leading public/ if still present
         $normalized = preg_replace('#^/?public/#i', '', $normalized) ?? $normalized;
 
@@ -75,6 +75,32 @@ class ImageResolver
             if (Storage::disk('public')->exists($normalized)) {
                 // return root-relative path so the browser uses the same host/port as the page
                 return '/' . ltrim('storage/' . ltrim($normalized, '/'), '/');
+            }
+            
+            // Try alternate paths with 'previews' instead of 'preview'
+            $alternateNormalized = str_replace('/preview/', '/previews/', $normalized);
+            if ($alternateNormalized !== $normalized && Storage::disk('public')->exists($alternateNormalized)) {
+                return '/' . ltrim('storage/' . ltrim($alternateNormalized, '/'), '/');
+            }
+            
+            // Try with just checking if the parent directory has any similar files
+            $pathInfo = pathinfo($normalized);
+            if (isset($pathInfo['dirname']) && isset($pathInfo['filename'])) {
+                $dir = $pathInfo['dirname'];
+                $filename = $pathInfo['filename'];
+                $ext = $pathInfo['extension'] ?? 'png';
+                
+                // Check if there's a file with similar name pattern (for renamed/regenerated files)
+                try {
+                    $files = Storage::disk('public')->files($dir);
+                    foreach ($files as $file) {
+                        if (basename($file) === basename($normalized)) {
+                            return '/' . ltrim('storage/' . ltrim($file, '/'), '/');
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // ignore
+                }
             }
         } catch (\Throwable $e) {
             // ignore and fallback to public path

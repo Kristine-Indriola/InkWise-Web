@@ -229,13 +229,20 @@ const DEFAULT_FONT_OPTIONS = [
 
 const DEFAULT_FONT_MAP = new Map(DEFAULT_FONT_OPTIONS.map((font) => [font.family, font]));
 
+const FOLD_TYPES = [
+  { value: 'bifold', label: 'Bi-Fold' },
+  { value: 'gatefold', label: 'Gate-Fold' },
+  { value: 'zfold', label: 'Z-Fold' },
+];
+
 export function InspectorPanel() {
   const { state, dispatch } = useBuilderStore();
-  const activePage = state.pages.find((page) => page.id === state.activePageId) ?? state.pages[0];
+  const activePage = state.pages?.find((page) => page.id === state.activePageId) ?? state.pages?.[0];
+  const hidePageSection = String(state.template?.id) === '112';
   const safeInsets = useMemo(() => resolveInsets(activePage?.safeZone), [activePage?.safeZone]);
   const selectedLayer = useMemo(() => {
     if (!activePage) return null;
-    return activePage.nodes.find((node) => node.id === state.selectedLayerId) ?? null;
+    return activePage.nodes?.find((node) => node.id === state.selectedLayerId) ?? null;
   }, [activePage, state.selectedLayerId]);
   const selectedLayerSide = selectedLayer?.side ?? 'front';
 
@@ -796,6 +803,11 @@ export function InspectorPanel() {
       setEditingPageName('');
     }
   };
+
+  const handleFoldTypeChange = (event) => {
+    const foldType = event.target.value;
+    dispatch({ type: 'UPDATE_TEMPLATE_PROPS', props: { fold_type: foldType } });
+  };
   const handleLayerChange = (props) => {
     if (!selectedLayer) {
       return;
@@ -1234,10 +1246,6 @@ export function InspectorPanel() {
       return;
     }
 
-    const confirmed = window.confirm(`Delete "${selectedLayer.name}"? You can undo this action if needed.`);
-    if (!confirmed) {
-      return;
-    }
     dispatch({ type: 'REMOVE_LAYER', pageId: activePage.id, layerId: selectedLayer.id });
   };
 
@@ -1328,35 +1336,54 @@ export function InspectorPanel() {
     </div>
   );
 
-  const renderPageSection = () => (
-    <div className="inspector-panel__group">
-      <div className="inspector-section__header">
-        <h3>Page</h3>
-        <span className="inspector-section__meta">{activePage.width} × {activePage.height}px</span>
+  const renderPageSection = () => {
+    if (hidePageSection) return null;
+    return (
+      <div className="inspector-panel__group">
+        <div className="inspector-section__header">
+          <h3>Page</h3>
+          <span className="inspector-section__meta">{activePage.width} × {activePage.height}px</span>
+        </div>
+        <div className="inspector-field" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <label className="inspector-field" style={{ margin: 0 }}>
+            <span className="inspector-field__label">Background</span>
+            <input
+              type="color"
+              className="inspector-field__control inspector-field__control--color"
+              value={normalizeColorInput(activePage.background, '#ffffff')}
+              onChange={handlePageBackgroundChange}
+              aria-label="Page background color"
+            />
+          </label>
+          <label className="inspector-field" style={{ margin: 0 }}>
+            <span className="inspector-field__label">Fold Type</span>
+            <select
+              className="inspector-field__control"
+              value={state.template?.fold_type || ''}
+              onChange={handleFoldTypeChange}
+              aria-label="Fold type"
+            >
+              <option value="">No Fold</option>
+              {FOLD_TYPES.map((fold) => (
+                <option key={fold.value} value={fold.value}>
+                  {fold.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="builder-btn inspector-btn"
+            onClick={handleToggleShapePalette}
+            ref={shapeButtonRef}
+            style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem', height: 'auto', alignSelf: 'flex-start' }}
+          >
+            SHAPES
+          </button>
+        </div>
       </div>
-      <div className="inspector-field" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        <label className="inspector-field" style={{ margin: 0 }}>
-          <span className="inspector-field__label">Background</span>
-          <input
-            type="color"
-            className="inspector-field__control inspector-field__control--color"
-            value={normalizeColorInput(activePage.background, '#ffffff')}
-            onChange={handlePageBackgroundChange}
-            aria-label="Page background color"
-          />
-        </label>
-        <button
-          type="button"
-          className="builder-btn inspector-btn"
-          onClick={handleToggleShapePalette}
-          ref={shapeButtonRef}
-          style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem', height: 'auto', alignSelf: 'flex-start' }}
-        >
-          SHAPES
-        </button>
-      </div>
-    </div>
-  );
+    );
+  };
 
 
   const renderPositionSection = () => {

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { toJpeg, toPng, toSvg } from 'html-to-image';
+import html2canvas from 'html2canvas';
 import { deflate, gzip } from 'pako';
 
 import { useBuilderStore } from '../../state/BuilderStore';
@@ -30,79 +31,271 @@ const POST_FAILSAFE_LIMIT = 1_600_000; // conservative ceiling to dodge strict p
 const waitForNextFrame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)))));
 
 async function captureCanvasRaster(canvas, pixelRatio, backgroundColor = '#ffffff') {
+  const diagnostics = {
+    stageFound: false,
+    targetChildren: 0,
+    captureWidth: 0,
+    captureHeight: 0,
+    attempts: [],
+  };
+
   if (!canvas) {
-    return null;
+    console.error('[InkWise Builder] Canvas element is null - cannot capture preview');
+    diagnostics.error = 'canvas-null';
+    return { dataUrl: null, diagnostics };
   }
 
-  // Find the surface element (parent of the canvas)
-  const surface = canvas.parentElement;
-  const originalSurfaceBackground = surface?.style?.background;
-  const originalCanvasBackground = canvas.style.background;
-  const originalCanvasBackgroundColor = canvas.backgroundColor;
+  const stage = canvas.closest('.canvas-viewport__stage');
+  const target = stage || canvas;
+  diagnostics.stageFound = !!stage;
+  const surface = target.parentElement;
 
-  // Set backgrounds to white for clean capture
+  const rect = target.getBoundingClientRect();
+  const captureWidth = Math.max(1, Math.round(target.scrollWidth || rect.width));
+  const captureHeight = Math.max(1, Math.round(target.scrollHeight || rect.height));
+  diagnostics.captureWidth = captureWidth;
+  diagnostics.captureHeight = captureHeight;
+
+  console.log('[InkWise Builder] Capture target:', target.className, 'size', captureWidth, 'x', captureHeight, 'children:', target.children.length);
+
+  if (target.children.length === 0) {
+    console.warn('[InkWise Builder] WARNING: Canvas has no child elements - preview will be blank!');
+  } else {
+    const elementTypes = Array.from(target.querySelectorAll('*'))
+      .map((el) => el.className)
+      .filter(Boolean)
+      .slice(0, 10);
+    console.log('[InkWise Builder] Canvas has', target.children.length, 'child elements');
+    console.log('[InkWise Builder] Element classes found:', elementTypes);
+  }
+  diagnostics.targetChildren = target.children.length;
+
+  await new Promise((resolve) => setTimeout(resolve, 80));
+
+  const originalStageTransform = stage?.style.transform ?? null;
+  const originalStageOrigin = stage?.style.transformOrigin ?? null;
+  const originalStageBackground = stage?.style.background ?? null;
+  const originalStageWillChange = stage?.style.willChange ?? null;
+  const originalCanvasTransform = canvas.style.transform;
+  const originalCanvasOrigin = canvas.style.transformOrigin;
+  const originalCanvasBackground = canvas.style.background;
+
+  try {
+    if (stage) {
+      stage.style.transform = 'none';
+      stage.style.transformOrigin = 'top left';
+      stage.style.willChange = 'auto';
+      stage.style.background = backgroundColor;
+    }
+    canvas.style.transform = 'none';
+    canvas.style.transformOrigin = 'top left';
+    canvas.style.background = backgroundColor;
+
+    try {
+      console.log('[InkWise Builder] Attempting html-to-image capture on stage first');
+      const png = await toPng(target, {
+        cacheBust: true,
+        pixelRatio,
+        backgroundColor,
+        width: captureWidth,
+        height: captureHeight,
+        filter: (node) => !node.classList?.contains('canvas-layer__resize-handle'),
+      });
+
+      if (png && png.length >= 100) {
+        console.log('[InkWise Builder] html-to-image stage capture succeeded, PNG length:', png.length);
+        diagnostics.attempts.push({ method: 'html-to-image-stage', success: true, length: png.length });
+        return { dataUrl: png, diagnostics };
+      }
+      console.warn('[InkWise Builder] html-to-image stage capture produced empty output, falling back');
+      diagnostics.attempts.push({ method: 'html-to-image-stage', success: false, reason: 'empty-output', length: png?.length || 0 });
+    } catch (stageCaptureError) {
+      console.error('[InkWise Builder] html-to-image stage capture failed:', stageCaptureError.message);
+      diagnostics.attempts.push({ method: 'html-to-image-stage', success: false, error: stageCaptureError.message });
+    }
+  } finally {
+    if (stage) {
+      stage.style.transform = originalStageTransform ?? '';
+      stage.style.transformOrigin = originalStageOrigin ?? '';
+      stage.style.background = originalStageBackground ?? '';
+      stage.style.willChange = originalStageWillChange ?? '';
+    }
+    canvas.style.transform = originalCanvasTransform;
+    canvas.style.transformOrigin = originalCanvasOrigin;
+    canvas.style.background = originalCanvasBackground;
+  }
+
+  const clone = target.cloneNode(true);
+  clone.style.position = 'absolute';
+  clone.style.top = '-100000px';
+  clone.style.left = '-100000px';
+  clone.style.transform = 'none';
+  clone.style.transformOrigin = 'top left';
+  clone.style.width = `${captureWidth}px`;
+  clone.style.height = `${captureHeight}px`;
+  clone.style.background = backgroundColor;
+
+  document.body.appendChild(clone);
+
+  const originalSurfaceBackground = surface?.style?.background;
+  const originalTargetBackground = target.style.background;
+  const originalTargetBgColor = target.backgroundColor;
+
   if (surface) {
     surface.style.background = backgroundColor;
   }
-  canvas.style.background = backgroundColor;
+  target.style.background = backgroundColor;
 
-  // If this is a Fabric.js canvas, also set the canvas background
-  if (canvas.backgroundColor !== undefined) {
-    canvas.backgroundColor = backgroundColor;
-    canvas.renderAll && canvas.renderAll();
+  if (target.backgroundColor !== undefined) {
+    target.backgroundColor = backgroundColor;
+    target.renderAll && target.renderAll();
   }
 
   try {
-    // Prefer lossless PNG first for maximum fidelity.
-    const result = await toPng(canvas, {
-      cacheBust: true,
-      pixelRatio,
-      quality: PREVIEW_JPEG_QUALITY,
+    console.log('[InkWise Builder] Attempting html2canvas capture (cloned node) at', captureWidth, 'x', captureHeight);
+
+    const captureWithHtml2Canvas = async (sourceNode) => html2canvas(sourceNode, {
+      scale: pixelRatio,
+      useCORS: true,
+      allowTaint: true,
       backgroundColor,
+      width: captureWidth,
+      height: captureHeight,
+      scrollX: 0,
+      scrollY: 0,
+      logging: true,
+      removeContainer: true,
+      foreignObjectRendering: true,
+      imageTimeout: 8000,
     });
 
-    // Restore original backgrounds
+    const captureWithHtmlToImage = async (sourceNode) => {
+      try {
+        const png = await toPng(sourceNode, {
+          cacheBust: true,
+          pixelRatio,
+          backgroundColor,
+          width: captureWidth,
+          height: captureHeight,
+          filter: (node) => !node.classList?.contains('canvas-layer__resize-handle'),
+        });
+        console.log('[InkWise Builder] html-to-image capture succeeded, PNG length:', png?.length);
+        return png && png.length >= 100 ? png : null;
+      } catch (imageError) {
+        console.error('[InkWise Builder] html-to-image capture failed:', imageError.message);
+        diagnostics.attempts.push({ method: 'html-to-image-clone', success: false, error: imageError.message });
+        return null;
+      }
+    };
+
+    const capturedCanvas = await captureWithHtml2Canvas(clone);
+    diagnostics.attempts.push({ method: 'html2canvas-clone', success: !!capturedCanvas, width: capturedCanvas?.width ?? 0, height: capturedCanvas?.height ?? 0 });
+
+    const normalizeCanvasResult = (canvasElement) => {
+      if (!canvasElement) {
+        return null;
+      }
+      if (canvasElement.width < 2 || canvasElement.height < 2) {
+        console.error('[InkWise Builder] html2canvas produced empty canvas:', canvasElement.width, 'x', canvasElement.height);
+        diagnostics.attempts.push({ method: 'html2canvas-normalize', success: false, reason: 'tiny-canvas', width: canvasElement.width, height: canvasElement.height });
+        return null;
+      }
+
+      const dataUrl = canvasElement.toDataURL('image/png');
+      console.log('[InkWise Builder] PNG data URL length:', dataUrl?.length, 'bytes');
+      if (!dataUrl || dataUrl.length < 100) {
+        console.error('[InkWise Builder] Generated PNG is too small (likely empty):', dataUrl?.length, 'bytes');
+        diagnostics.attempts.push({ method: 'html2canvas-normalize', success: false, reason: 'tiny-data-url', length: dataUrl?.length || 0 });
+        return null;
+      }
+      diagnostics.attempts.push({ method: 'html2canvas-normalize', success: true, length: dataUrl.length });
+      return dataUrl;
+    };
+
+    let result = normalizeCanvasResult(capturedCanvas);
+
+    if (!result) {
+      console.warn('[InkWise Builder] html2canvas clone capture failed or produced empty output, retrying with original target');
+      const fallbackCanvas = await captureWithHtml2Canvas(target);
+      diagnostics.attempts.push({ method: 'html2canvas-target', success: !!fallbackCanvas, width: fallbackCanvas?.width ?? 0, height: fallbackCanvas?.height ?? 0 });
+      result = normalizeCanvasResult(fallbackCanvas);
+    }
+
+    if (!result) {
+      console.warn('[InkWise Builder] Falling back to html-to-image for clone capture');
+      result = await captureWithHtmlToImage(clone);
+      if (result) {
+        diagnostics.attempts.push({ method: 'html-to-image-clone', success: true, length: result.length });
+      }
+    }
+
+    if (!result) {
+      console.warn('[InkWise Builder] Falling back to html-to-image for original target');
+      result = await captureWithHtmlToImage(target);
+      if (result) {
+        diagnostics.attempts.push({ method: 'html-to-image-target', success: true, length: result.length });
+      }
+    }
+
+    if (result) {
+      return { dataUrl: result, diagnostics };
+    }
+
+    console.error('[InkWise Builder] All capture attempts failed');
+    diagnostics.error = 'all-attempts-failed';
+    return { dataUrl: null, diagnostics };
+  } catch (error) {
+    console.error('[InkWise Builder] html2canvas capture exception:', error.message, error.stack);
+    diagnostics.error = `exception:${error.message}`;
+    try {
+      console.log('[InkWise Builder] Attempting final fallback capture with minimal settings');
+      const basicCanvas = await html2canvas(target, {
+        scale: 1,
+        backgroundColor,
+        logging: true,
+      });
+      if (basicCanvas && basicCanvas.width >= 2 && basicCanvas.height >= 2) {
+        const result = basicCanvas.toDataURL('image/png');
+        console.log('[InkWise Builder] Basic fallback succeeded, PNG length:', result?.length);
+        diagnostics.attempts.push({ method: 'html2canvas-basic', success: true, length: result?.length || 0 });
+        return { dataUrl: result, diagnostics };
+      }
+    } catch (fallbackError) {
+      console.error('[InkWise Builder] Final fallback also failed:', fallbackError);
+      diagnostics.attempts.push({ method: 'html2canvas-basic', success: false, error: fallbackError.message });
+    }
+
+    try {
+      console.log('[InkWise Builder] Attempting final html-to-image capture after exception');
+      const result = await toPng(target, {
+        cacheBust: true,
+        pixelRatio,
+        backgroundColor,
+        width: captureWidth,
+        height: captureHeight,
+      });
+      if (result && result.length >= 100) {
+        console.log('[InkWise Builder] Final html-to-image fallback succeeded, PNG length:', result.length);
+        diagnostics.attempts.push({ method: 'html-to-image-final', success: true, length: result.length });
+        return { dataUrl: result, diagnostics };
+      }
+    } catch (ultimateError) {
+      console.error('[InkWise Builder] html-to-image fallback after exception failed:', ultimateError.message);
+      diagnostics.attempts.push({ method: 'html-to-image-final', success: false, error: ultimateError.message });
+    }
+    diagnostics.error = diagnostics.error || 'final-fallback-failed';
+    return { dataUrl: null, diagnostics };
+  } finally {
     if (surface) {
       surface.style.background = originalSurfaceBackground;
     }
-    canvas.style.background = originalCanvasBackground;
-    if (canvas.backgroundColor !== undefined) {
-      canvas.backgroundColor = originalCanvasBackgroundColor;
-      canvas.renderAll && canvas.renderAll();
+    target.style.background = originalTargetBackground;
+    if (target.backgroundColor !== undefined) {
+      target.backgroundColor = originalTargetBgColor;
+      target.renderAll && target.renderAll();
     }
-    return result;
-  } catch (pngError) {
-    console.warn('[InkWise Builder] PNG preview capture failed, falling back to JPEG.', pngError);
-    try {
-      const result = await toJpeg(canvas, {
-        cacheBust: true,
-        pixelRatio,
-        quality: PREVIEW_JPEG_QUALITY,
-        backgroundColor,
-      });
-
-      // Restore original backgrounds
-      if (surface) {
-        surface.style.background = originalSurfaceBackground;
-      }
-      canvas.style.background = originalCanvasBackground;
-      if (canvas.backgroundColor !== undefined) {
-        canvas.backgroundColor = originalCanvasBackgroundColor;
-        canvas.renderAll && canvas.renderAll();
-      }
-      return result;
-    } catch (jpegError) {
-      console.warn('[InkWise Builder] JPEG preview capture failed.', jpegError);
-      // Restore original backgrounds even on failure
-      if (surface) {
-        surface.style.background = originalSurfaceBackground;
-      }
-      canvas.style.background = originalCanvasBackground;
-      if (canvas.backgroundColor !== undefined) {
-        canvas.backgroundColor = originalCanvasBackgroundColor;
-        canvas.renderAll && canvas.renderAll();
-      }
-      return null;
+    if (clone && clone.parentNode) {
+      clone.parentNode.removeChild(clone);
     }
   }
 }
@@ -486,7 +679,7 @@ function encodeSvgMarkup(markup) {
 
 export function BuilderShell() {
   const { state, routes, csrfToken, dispatch } = useBuilderStore();
-  const activePage = state.pages.find((page) => page.id === state.activePageId) ?? state.pages[0];
+  const activePage = state.pages?.find((page) => page.id === state.activePageId) ?? state.pages?.[0];
   const [isSidebarHidden, setIsSidebarHidden] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState('idle');
   const [lastSavedAt, setLastSavedAt] = useState(state.template?.updated_at ?? null);
@@ -565,6 +758,11 @@ export function BuilderShell() {
         design: designSnapshot,
         canvas: designSnapshot.canvas,
         template_name: state.template?.name ?? null,
+        template: {
+          width_inch: state.template?.width_inch ?? null,
+          height_inch: state.template?.height_inch ?? null,
+          fold_type: state.template?.fold_type ?? null,
+        },
       };
 
       let preparedAutosave = prepareCompressedJsonPayload(autosavePayload, AUTOSAVE_PAYLOAD_BUDGET, true);
@@ -709,6 +907,7 @@ export function BuilderShell() {
       let previewPayloadTrimmed = false;
       let primaryPreviewCandidate = null;
       let svgDataUrl = null;
+      const captureDiagnostics = [];
 
       const originalActivePageId = state.activePageId;
       const originalSelectedLayerId = state.selectedLayerId;
@@ -739,14 +938,44 @@ export function BuilderShell() {
         await waitForNextFrame();
 
         const backgroundColor = '#ffffff'; // Always use white background for previews
-        console.log('[InkWise Builder] Capturing preview for page', page.id, 'with background', backgroundColor);
-        const rasterDataUrl = await captureCanvasRaster(canvasRef.current, pixelRatio, backgroundColor);
-        console.log('[InkWise Builder] Capture result:', rasterDataUrl ? 'success' : 'failed');
+        console.log('[InkWise Builder] === Capturing preview for page', page.id, 'with background', backgroundColor, '===');
+        console.log('[InkWise Builder] Page details:', { id: page.id, name: page.name, width: page.width, height: page.height, nodesCount: page.nodes?.length });
+        
+        const captureOutcome = await captureCanvasRaster(canvasRef.current, pixelRatio, backgroundColor);
+        const rasterDataUrl = typeof captureOutcome === 'string'
+          ? captureOutcome
+          : captureOutcome?.dataUrl ?? null;
+        const captureDetails = typeof captureOutcome === 'object' && captureOutcome !== null && 'diagnostics' in captureOutcome
+          ? captureOutcome.diagnostics
+          : null;
+        if (captureDetails) {
+          captureDiagnostics.push({ pageId: page.id, order: index, diagnostics: captureDetails });
+        }
+        console.log('[InkWise Builder] Capture result:', rasterDataUrl ? `SUCCESS (${rasterDataUrl.length} chars)` : 'FAILED - NO DATA');
+        
         if (!rasterDataUrl) {
+          console.error('[InkWise Builder] ❌ CRITICAL: No raster data URL returned for page', page.id);
+          console.error('[InkWise Builder] This will result in a blank/white preview being saved!');
+          console.error('[InkWise Builder] Possible causes:');
+          console.error('[InkWise Builder]   1. Canvas has no rendered content (check page.nodes)');
+          console.error('[InkWise Builder]   2. Canvas elements are not properly mounted in DOM');
+          console.error('[InkWise Builder]   3. Image assets failed to load');
+          console.error('[InkWise Builder]   4. CORS issues with external assets');
+          pendingPreviewEntries.push({
+            key: `__diag_fail__${page.id}-${index}`,
+            data: null,
+            meta: { diagnostics: captureDetails, pageId: page.id, order: index, failure: true },
+            bytes: 0,
+            diagnostics: captureDetails,
+          });
           continue;
         }
 
-        const compressedImage = await compressPreviewImage(rasterDataUrl);
+        let compressedImage = await compressPreviewImage(rasterDataUrl);
+        if (!compressedImage) {
+          console.log('[InkWise Builder] Compression failed, using original raster data');
+          compressedImage = rasterDataUrl;
+        }
         if (!compressedImage) {
           continue;
         }
@@ -775,6 +1004,7 @@ export function BuilderShell() {
           data: compressedImage,
           meta: entryMeta,
           bytes: estimateBase64Bytes(compressedImage),
+          diagnostics: captureDetails,
         });
 
         if (!primaryPreviewCandidate) {
@@ -786,12 +1016,16 @@ export function BuilderShell() {
 
         if (!svgDataUrl) {
           try {
-            svgDataUrl = await toSvg(canvasRef.current, {
+            console.log('[InkWise Builder] Attempting SVG capture for page', page.id);
+            const svgTarget = canvasRef.current.querySelector('.canvas-viewport__stage') || canvasRef.current;
+            svgDataUrl = await toSvg(svgTarget, {
               cacheBust: true,
               filter: (node) => !node.classList?.contains('canvas-layer__resize-handle'),
+              backgroundColor: '#ffffff',
             });
+            console.log('[InkWise Builder] SVG capture succeeded, length:', svgDataUrl?.length);
           } catch (captureError) {
-            console.warn('[InkWise Builder] SVG snapshot capture failed.', captureError);
+            console.error('[InkWise Builder] SVG snapshot capture failed:', captureError.message, captureError.stack);
           }
         }
       }
@@ -841,6 +1075,9 @@ export function BuilderShell() {
         previewImages = {};
         previewImagesMeta = {};
         for (const entry of selectedEntries) {
+          if (!entry.data) {
+            continue;
+          }
           previewImages[entry.key] = entry.data;
           previewImagesMeta[entry.key] = entry.meta;
         }
@@ -853,17 +1090,28 @@ export function BuilderShell() {
       const svgMarkup = extractSvgMarkup(svgDataUrl);
       const svgPayload = encodeSvgMarkup(svgMarkup);
 
-      console.log('[InkWise Builder] Preview capture results:', {
-        previewImagesCount: Object.keys(previewImages).length,
-        hasPrimaryPreview: !!previewImage,
-        hasSvg: !!svgPayload,
-        previewImageLength: previewImage ? previewImage.length : 0
+      console.log('[InkWise Builder] SVG capture:', {
+        svgDataUrlLength: svgDataUrl ? svgDataUrl.length : 0,
+        svgMarkupLength: svgMarkup ? svgMarkup.length : 0,
+        svgPayloadLength: svgPayload ? svgPayload.length : 0,
       });
+
+      console.log('[InkWise Builder] === Preview capture results ===');
+      console.log('[InkWise Builder] Preview images count:', Object.keys(previewImages).length);
+      console.log('[InkWise Builder] Has primary preview:', !!previewImage);
+      console.log('[InkWise Builder] Has SVG:', !!svgPayload);
+      console.log('[InkWise Builder] Primary preview length:', previewImage ? previewImage.length : 0, 'bytes');
+      
+      if (Object.keys(previewImages).length === 0) {
+        console.error('[InkWise Builder] ⚠️  WARNING: No preview images were captured!');
+        console.error('[InkWise Builder] The template will be saved with a blank white preview.');
+      }
 
       // If no preview was captured, create a simple white placeholder
       let finalPreviewImage = previewImage;
       if (!finalPreviewImage) {
-        console.log('[InkWise Builder] No preview captured, creating fallback white preview');
+        console.warn('[InkWise Builder] ⚠️  No preview captured, creating fallback white preview');
+        console.warn('[InkWise Builder] This indicates the canvas capture failed for all pages!');
         // Create a simple 400x400 white PNG as data URL
         const canvas = document.createElement('canvas');
         canvas.width = 400;
@@ -872,13 +1120,21 @@ export function BuilderShell() {
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, 400, 400);
         finalPreviewImage = canvas.toDataURL('image/png');
+        console.warn('[InkWise Builder] Created dummy preview of length:', finalPreviewImage.length);
+      } else {
+        console.log('[InkWise Builder] ✓ Using captured preview of', finalPreviewImage.length, 'bytes');
       }
 
-      const shouldIncludePreview = finalPreviewImage && estimateBase64Bytes(finalPreviewImage) <= PREVIEW_MAX_BYTES;
+      const shouldIncludePreview = !!finalPreviewImage;
 
       const payload = {
         design: designSnapshot,
         template_name: state.template?.name ?? null,
+        template: {
+          width_inch: state.template?.width_inch ?? null,
+          height_inch: state.template?.height_inch ?? null,
+          fold_type: state.template?.fold_type ?? null,
+        },
       };
 
       if (requestedPageId) {
@@ -906,10 +1162,40 @@ export function BuilderShell() {
         payload.svg_markup = svgPayload;
       }
 
+      if (captureDiagnostics.length > 0) {
+        payload.capture_diagnostics = captureDiagnostics;
+      }
+
+      // Fallback: if no preview captured, use dummy
+      if (!payload.preview_image) {
+        console.log('[InkWise Builder] No preview captured, using dummy');
+        payload.preview_image = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+      }
+
+      // Fallback: if no SVG, use dummy
+      if (!payload.svg_markup) {
+        console.log('[InkWise Builder] No SVG captured, using dummy');
+        payload.svg_markup = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="white"/></svg>');
+      }
+
+      console.log('[InkWise Builder] === Final payload validation ===');
+      console.log('[InkWise Builder] Design pages:', designSnapshot.pages?.length || 0);
+      console.log('[InkWise Builder] Design nodes in page 0:', designSnapshot.pages?.[0]?.nodes?.length || 0);
+      console.log('[InkWise Builder] Preview image size:', payload.preview_image?.length || 0, 'bytes');
+      console.log('[InkWise Builder] SVG markup size:', payload.svg_markup?.length || 0, 'bytes');
+      console.log('[InkWise Builder] Additional preview images:', Object.keys(payload.preview_images || {}).length);
+      
+      if (!designSnapshot.pages || designSnapshot.pages.length === 0) {
+        console.error('[InkWise Builder] ❌ CRITICAL: Design has no pages!');
+      } else if (!designSnapshot.pages[0].nodes || designSnapshot.pages[0].nodes.length === 0) {
+        console.error('[InkWise Builder] ❌ CRITICAL: First page has no nodes (design elements)!');
+        console.error('[InkWise Builder] This will result in an empty template being saved.');
+      }
+      
       const { prepared: preparedPayload, id: payloadVariant } = prepareManualSaveRequest(payload);
 
       if (preparedPayload.compressed) {
-        console.info('[InkWise Builder] Compressed manual-save payload.', {
+        console.info('[InkWise Builder] ✓ Compressed manual-save payload.', {
           originalBytes: preparedPayload.originalBytes,
           compressedBytes: preparedPayload.compressedBytes,
           requestBytes: preparedPayload.bodyBytes,
@@ -919,12 +1205,14 @@ export function BuilderShell() {
       }
 
       if (preparedPayload.bodyBytes > POST_FAILSAFE_LIMIT) {
-        console.error('[InkWise Builder] Manual save payload still exceeds failsafe limit after trimming.', {
+        console.error('[InkWise Builder] ❌ Manual save payload still exceeds failsafe limit after trimming.', {
           bodyBytes: preparedPayload.bodyBytes,
           limit: POST_FAILSAFE_LIMIT,
           variant: payloadVariant,
         });
       }
+      
+      console.log('[InkWise Builder] === Sending save request to server ===');
 
       const response = await fetch(saveTemplateRoute, {
         method: 'POST',

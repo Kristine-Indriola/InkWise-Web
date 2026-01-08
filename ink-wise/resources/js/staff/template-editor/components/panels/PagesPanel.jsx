@@ -71,7 +71,7 @@ export function PagesPanel() {
 
   const commitRename = (pageId, name) => {
     const trimmed = name.trim();
-    const target = state.pages.find((item) => item.id === pageId);
+    const target = state.pages?.find((item) => item.id === pageId);
 
     if (!target) {
       stopEditing();

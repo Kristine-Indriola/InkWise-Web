@@ -5,11 +5,11 @@ import { derivePageLabel } from '../../utils/pageFactory';
 
 export function BuilderStatusBar() {
   const { state } = useBuilderStore();
-  const activePage = state.pages.find((page) => page.id === state.activePageId) ?? state.pages[0];
+  const activePage = state.pages?.find((page) => page.id === state.activePageId) ?? state.pages?.[0];
   const layers = Array.isArray(activePage?.nodes) ? activePage.nodes : [];
   const selectedLayer = layers.find((layer) => layer.id === state.selectedLayerId) ?? null;
 
-  const activePageIndex = state.pages.findIndex((page) => page.id === activePage?.id);
+  const activePageIndex = state.pages?.findIndex((page) => page.id === activePage?.id);
   const sideLabel = derivePageLabel(activePage?.pageType, activePageIndex >= 0 ? activePageIndex : 0, state.pages.length);
   const displayName = typeof activePage?.name === 'string' && activePage.name.trim() !== ''
     ? activePage.name.trim()
