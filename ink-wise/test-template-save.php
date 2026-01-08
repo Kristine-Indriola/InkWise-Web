@@ -177,7 +177,7 @@ if (empty($issues)) {
 }
 
 echo "\n--- Next Steps ---\n";
-echo "1. Open the editor: http://localhost/staff/templates/{$template->id}/editor\n";
+echo "1. Open the editor: http://127.0.0.1:8000/staff/templates/{$template->id}/editor\n";
 echo "2. Open browser DevTools (F12) → Console\n";
 echo "3. Click Save Template\n";
 echo "4. Monitor console logs for detailed save progress\n";

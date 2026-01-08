@@ -648,7 +648,7 @@ export function CanvasViewport({ page, canvasRef }) {
 
 
   return (
-    <section className="canvas-viewport" aria-label="Template canvas" ref={viewportRef}>
+    <section className="canvas-viewport" id="canvas-viewport" aria-label="Template canvas" ref={viewportRef}>
       <div
         className="canvas-viewport__surface"
         role="img"
@@ -919,7 +919,7 @@ export function CanvasViewport({ page, canvasRef }) {
                           style={{
                             color: layer.fill || '#0f172a',
                             fontSize: layer.fontSize ? `${layer.fontSize}px` : undefined,
-                            fontFamily: layer.fontFamily,
+                            fontFamily: `${layer.fontFamily}, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif`,
                             fontWeight: layer.fontWeight ?? undefined,
                             textAlign: layer.textAlign ?? 'center',
                           }}
