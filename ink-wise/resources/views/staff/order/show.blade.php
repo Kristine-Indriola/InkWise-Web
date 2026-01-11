@@ -1183,6 +1183,34 @@
 		</div>
 	</section>
 
+	@php
+		$savedTemplate = data_get($order, 'metadata.template') ?? null;
+		$savedGallery = [];
+		if ($savedTemplate) {
+			if (!empty($savedTemplate['preview_images']) && is_array($savedTemplate['preview_images'])) {
+				$savedGallery = $savedTemplate['preview_images'];
+			} elseif (!empty($savedTemplate['preview_image'])) {
+				$savedGallery = [$savedTemplate['preview_image']];
+			}
+		}
+	@endphp
+
+	@if($savedTemplate && !empty($savedGallery))
+		<section class="status-info-card" style="margin-top:12px;">
+			<h3 style="margin:0 0 8px 0;">Saved Template</h3>
+			<div style="display:flex;gap:12px;align-items:center;">
+				<img src="{{ $savedTemplate['preview_image'] ?? ($savedGallery[0] ?? '') }}" alt="Saved template preview" style="max-width:220px;max-height:160px;object-fit:contain;border:1px solid #e6eef9;border-radius:8px;">
+				<div>
+					<div style="font-weight:600;margin-bottom:6px;">{{ $savedTemplate['template_name'] ?? 'Saved template' }}</div>
+					<div style="color:#475569;font-size:0.95rem;margin-bottom:8px;">This template was saved by the customer.</div>
+					<button type="button" class="btn btn-primary" data-preview-trigger data-preview-title="{{ $savedTemplate['template_name'] ?? 'Saved template' }}" data-preview-gallery='@json($savedGallery)' data-preview-materials='[]'>
+						<i class="fi fi-rr-download" aria-hidden="true"></i> Preview / Download
+					</button>
+				</div>
+			</div>
+		</section>
+	@endif
+
 	<section class="status-progress-card" data-status-card>
 		<header class="status-progress-card__header">
 			<div>
@@ -2659,6 +2687,25 @@ document.addEventListener('DOMContentLoaded', function () {
 		body.classList.add('ordersummary-modal-open');
 		lastFocusedElement = trigger;
 		modal.focus();
+
+		// Ensure download button will download all pages when multiple images exist
+		downloadEl.addEventListener('click', function (evt) {
+			if (!gallery || !Array.isArray(gallery) || gallery.length <= 1) return; // default single-file behavior
+			evt.preventDefault();
+			gallery.forEach(function (entry, i) {
+				try {
+					const a = document.createElement('a');
+					a.href = entry.src;
+					const safeLabel = (entry.label || 'page').replace(/[^a-z0-9-_\.]/gi, '_');
+					a.download = (previewTitle || 'Order') + '-' + safeLabel + '-' + (i + 1) + '.png';
+					document.body.appendChild(a);
+					a.click();
+					a.remove();
+				} catch (err) {
+					console.error('Download failed for gallery item', err);
+				}
+			});
+		});
 	};
 
 	document.querySelectorAll('[data-preview-trigger]').forEach(function (trigger) {

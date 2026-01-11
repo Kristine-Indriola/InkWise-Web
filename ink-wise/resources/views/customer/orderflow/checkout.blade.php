@@ -8,10 +8,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="{{ asset('css/customer/customer.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/customer/customertemplates.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/customer/customertemplate.css') }}">
     <link rel="stylesheet" href="{{ asset('css/customer/template.css') }}">
     <script src="{{ asset('js/customer/customer.js') }}" defer></script>
-    <script src="{{ asset('js/customer/customertemplate.js') }}" defer></script>
     <script src="{{ asset('js/customer/template.js') }}" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.10.2/cdn.min.js" defer></script>
     <link rel="icon" type="image/png" href="{{ asset('adminimage/ink.png') }}">
@@ -797,7 +796,11 @@
     $subtotal = $order?->subtotal_amount ?? 0;
     $taxAmount = $order?->tax_amount ?? 0;
     $shippingFee = $order?->shipping_fee ?? 0;
-    $totalAmount = $order?->total_amount ?? 0;
+    // Use order's grandTotalAmount for consistency across all calculations
+    $totalAmount = (float) ($order?->grandTotalAmount() ?? data_get($orderSummary, 'totalAmount', 0));
+    // Calculate deposit and remaining amounts properly to avoid rounding issues
+    $depositAmountDisplay = round($totalAmount * 100 / 2) / 100;
+    $remainingAmountDisplay = $totalAmount - $depositAmountDisplay;
     $paymentRecordsCollection = collect($paymentRecords ?? []);
     $calculatedPaid = $paidAmount ?? $paymentRecordsCollection
         ->filter(fn ($payment) => ($payment['status'] ?? null) === 'paid')
@@ -814,7 +817,7 @@
     $shippingAddress = $customerOrder->address ?? '';
     $shippingCity = $customerOrder->city ?? '';
     $shippingPostal = $customerOrder->postal_code ?? '';
-    $taxRate = $subtotal > 0 ? round($taxAmount / $subtotal, 4) : 0.12;
+    $taxRate = 0; // No tax
     $hasPendingPayment = ($paymongoMeta['status'] ?? null) === 'awaiting_next_action';
     $pendingPaymentUrl = $paymongoMeta['next_action_url'] ?? null;
     $paymentMode = $paymongoMeta['mode'] ?? 'half';
@@ -827,8 +830,8 @@
             return $date;
         }
     };
-    $taxAmount = $subtotal * $taxRate;
-    $totalAmount = $subtotal + $shippingFee + $taxAmount;
+    $taxAmount = 0; // No tax
+    // $totalAmount = $subtotal + $shippingFee + $taxAmount; // Use order's total_amount instead
     $checkoutQuantity = $orderItem?->quantity
         ?? ($orderSummary['quantity'] ?? null)
         ?? null;
@@ -906,10 +909,6 @@
                     <span>Shipping</span>
                     <strong id="shippingAmount">{{ $shippingFee > 0 ? '₱' . number_format($shippingFee, 2) : 'Free' }}</strong>
                 </div>
-                <div class="summary-item">
-                    <span>Tax</span>
-                    <strong id="taxAmount">₱{{ number_format($taxAmount, 2) }}</strong>
-                </div>
                 <hr class="summary-divider">
                 <div class="summary-item">
                     <span>Total paid via GCash</span>
@@ -930,7 +929,7 @@
                 @else
                 <p class="note">Recorded payments total ₱{{ number_format($paidAmountDisplay, 2) }}. Outstanding balance: ₱{{ number_format($balanceDueDisplay, 2) }}.</p>
                 @endif
-            </div>
+            </hr>
 
             <button type="button" class="btn-continue" id="continueToShipping" style="margin-top: 24px;">
                 Continue to Shipping
@@ -942,6 +941,10 @@
                 <h1 class="section-title">Fulfillment Information</h1>
                 <p class="section-subtitle">Please provide your contact details for order pickup</p>
             </header>
+
+            <div id="savedTemplatePreview" style="display:none; margin-bottom:12px;">
+                <!-- Saved template preview will be injected here -->
+            </div>
 
             {{-- If user has saved addresses, auto-fill shipping inputs from the first one but keep fields editable --}}
             @php
@@ -974,6 +977,9 @@
             <div class="fieldset info-row">
                 <label>Contact number
                     <input type="tel" id="phone" placeholder="09XX XXX XXXX" value="{{ $shippingPhone }}">
+                </label>
+                <label>Quantity
+                    <input type="number" id="checkoutQuantity" name="quantity" value="{{ $checkoutQuantity }}" min="10" max="200">
                 </label>
             </div>
 
@@ -1011,8 +1017,7 @@
                 </button>
             </div>
 
-            {{-- No dynamic select behavior: fields are prefilled server-side from first saved address (if any) and remain editable --}}
-            <input type="hidden" id="checkoutQuantity" name="quantity" value="{{ $checkoutQuantity }}">
+
         </section>
 
         <section class="card glass-card fade-border checkout-form checkout-section" id="payment">
@@ -1031,8 +1036,8 @@
                 <label class="option-card payment-option" data-payment-type="gcash-deposit-cod">
                     <input type="radio" name="paymentMethod" value="gcash-deposit-cod">
                     <div class="option-content">
-                        <h3>50% GCash Deposit + Cash on Pickup</h3>
-                        <p>Pay ₱{{ number_format($totalAmount / 2, 2) }} deposit now via GCash, ₱{{ number_format($totalAmount / 2, 2) }} cash on delivery.</p>
+                        <h3>50% GCash Deposit + Pay on Pickup</h3>
+                        <p>Pay ₱{{ number_format($depositAmountDisplay, 2) }} deposit now via GCash, ₱{{ number_format($remainingAmountDisplay, 2) }} cash on delivery.</p>
                         <span class="option-tag">Required Deposit</span>
                     </div>
                 </label>
@@ -1042,7 +1047,7 @@
                     <input type="radio" name="paymentMethod" value="gcash-split">
                     <div class="option-content">
                         <h3>50% GCash Deposit + GCash Balance</h3>
-                        <p>Pay ₱{{ number_format($totalAmount / 2, 2) }} deposit now, ₱{{ number_format($totalAmount / 2, 2) }} via GCash after confirmation.</p>
+                        <p>Pay ₱{{ number_format($depositAmountDisplay, 2) }} deposit now, ₱{{ number_format($remainingAmountDisplay, 2) }} via GCash after confirmation.</p>
                         <span class="option-tag">All Digital</span>
                     </div>
                 </label>
@@ -1132,6 +1137,38 @@
                 });
             };
 
+            // Render saved template preview (safe to call even if not saved)
+            const renderSavedTemplatePreview = () => {
+                try {
+                    const container = document.getElementById('savedTemplatePreview');
+                    if (!container) return;
+                    // Prefer explicit saved template, then saved-template storage, then the final-step payload
+                    const stored = window.savedCustomerTemplate
+                        || (window.sessionStorage && JSON.parse(window.sessionStorage.getItem('inkwise-saved-template') || 'null'))
+                        || (window.sessionStorage && JSON.parse(window.sessionStorage.getItem('inkwise-finalstep') || 'null'))
+                        || null;
+                    if (!stored) {
+                        container.style.display = 'none';
+                        container.innerHTML = '';
+                        return;
+                    }
+
+                    let html = '<div style="display:flex; align-items:center; gap:12px;">';
+                    // various possible preview keys: preview, previewImage, previewImages
+                    const previewSrc = stored.preview || stored.previewImage || (Array.isArray(stored.previewImages) ? stored.previewImages[0] : null) || null;
+                    if (previewSrc) {
+                        html += `<img src="${previewSrc}" alt="Saved template" style="width:96px; height:96px; object-fit:cover; border-radius:8px; border:1px solid rgba(0,0,0,0.06);">`;
+                    }
+                    html += `<div style="flex:1;"><div style="font-weight:600;">Saved template</div><div style="font-size:13px; color:var(--text-muted);">${stored.name || ''}</div></div>`;
+                    html += '</div>';
+
+                    container.innerHTML = html;
+                    container.style.display = 'block';
+                } catch (err) {
+                    console.debug('renderSavedTemplatePreview error', err);
+                }
+            };
+
             const showStep = (stepNumber) => {
                 // Hide all sections
                 document.querySelectorAll('.checkout-section').forEach(section => {
@@ -1149,6 +1186,11 @@
 
                 if (stepNumber === 3) {
                     populateReviewInfo();
+                }
+
+                if (stepNumber === 2) {
+                    // render preview of saved template (if any)
+                    renderSavedTemplatePreview();
                 }
             };
 
@@ -1205,16 +1247,18 @@
                     let paymentDetails = '';
 
                     if (selectedPayment?.value === 'gcash-deposit-cod') {
-                        const depositAmount = currentTotal / 2;
-                        const remainingAmount = currentTotal / 2;
+                        const remaining = (paymentConfig.balance ?? Math.max(currentTotal - (recordedPaidAmount ?? 0), 0));
+                        const depositAmount = Math.round(remaining * 100 / 2) / 100;
+                        const remainingAmount = Math.max(remaining - depositAmount, 0);
                         paymentDetails = `
                             <div><strong>50% GCash Deposit + Cash on Delivery</strong></div>
                             <div>Deposit: ₱${depositAmount.toFixed(2)} (Pay now via GCash)</div>
                             <div>Remaining: ₱${remainingAmount.toFixed(2)} (Pay on delivery)</div>
                         `;
                     } else if (selectedPayment?.value === 'gcash-split') {
-                        const depositAmount = currentTotal / 2;
-                        const remainingAmount = currentTotal / 2;
+                        const remaining = (paymentConfig.balance ?? Math.max(currentTotal - (recordedPaidAmount ?? 0), 0));
+                        const depositAmount = Math.round(remaining * 100 / 2) / 100;
+                        const remainingAmount = Math.max(remaining - depositAmount, 0);
                         paymentDetails = `
                             <div><strong>50% GCash Deposit + GCash Balance</strong></div>
                             <div>Deposit: ₱${depositAmount.toFixed(2)} (Pay now via GCash)</div>
@@ -1227,8 +1271,77 @@
             };
 
             // Step navigation event listeners
-            document.getElementById('continueToShipping')?.addEventListener('click', () => {
+            const saveCustomerTemplate = async () => {
+                try {
+                    const stored = window.orderSummary || (window.sessionStorage && JSON.parse(window.sessionStorage.getItem('inkwise-finalstep') || 'null')) || null;
+                    if (!stored || !stored.metadata || !stored.metadata.design) {
+                        return { success: false, message: 'No design data available to save.' };
+                    }
+
+                    const payload = {
+                        template_name: stored.templateName || ('My template ' + new Date().toISOString()),
+                        design: stored.metadata.design,
+                        preview_image: stored.previewImage || (Array.isArray(stored.previewImages) ? stored.previewImages[0] : null),
+                        preview_images: stored.previewImages || [],
+                    };
+
+                    const localCsrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+
+                    const res = await fetch('{{ route('order.design.save-template') }}', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': localCsrf,
+                        },
+                        body: JSON.stringify(payload),
+                    });
+
+                    let data = null;
+                    let textBody = null;
+                    try { data = await res.json(); } catch (e) { try { textBody = await res.text(); } catch (e2) { textBody = null; } }
+
+                    if (!res.ok) {
+                        if (res.status === 419 || res.status === 401) {
+                            return { success: false, message: 'Authentication or session expired. Please refresh the page and sign in.' };
+                        }
+                        const errMsg = (data && data.message) ? data.message : (textBody ? textBody : (`Status ${res.status}`));
+                        return { success: false, message: 'Unable to save template: ' + errMsg };
+                    }
+
+                    // Persist saved template info for other pages/scripts
+                    try {
+                        const saved = { id: data.template_id ?? null, name: data.template_name ?? payload.template_name, preview: payload.preview_image };
+                        window.sessionStorage.setItem('inkwise-saved-template', JSON.stringify(saved));
+                        window.savedCustomerTemplate = saved;
+                    } catch (e) {
+                        // ignore storage errors
+                    }
+
+                    return { success: true, data };
+                } catch (err) {
+                    console.error('saveCustomerTemplate error', err);
+                    return { success: false, message: err?.message ?? 'Unexpected error' };
+                }
+            };
+
+            document.getElementById('continueToShipping')?.addEventListener('click', async () => {
+                // Attempt to save customer's template before proceeding to shipping
+                if (window && window.orderSummary) {
+                    const result = await saveCustomerTemplate();
+                    if (result.success) {
+                        showPaymentMessage('success', 'Template saved to your account.');
+                    } else {
+                        // Non-fatal: allow user to continue but inform them
+                        showPaymentMessage('error', result.message || 'Could not save template.');
+                    }
+                    // small delay so user sees the message, but continue flow immediately
+                }
+
                 showStep(2);
+                // render saved template preview if available
+                renderSavedTemplatePreview();
             });
 
             document.getElementById('backToSummary')?.addEventListener('click', () => {
@@ -1238,6 +1351,33 @@
             document.getElementById('continueToPayment')?.addEventListener('click', () => {
                 if (validateShippingStep()) {
                     clearPaymentMessage();
+                    // Ensure any saved template is included in the final-step summary
+                    try {
+                        const saved = JSON.parse(window.sessionStorage.getItem('inkwise-saved-template') || 'null');
+                        let summary = window.orderSummary || (window.sessionStorage && JSON.parse(window.sessionStorage.getItem('inkwise-finalstep') || 'null')) || {};
+                        if (saved) {
+                            summary = summary || {};
+                            summary.template = summary.template || {};
+                            summary.template.template_id = saved.id ?? summary.template.template_id ?? null;
+                            summary.template.template_name = saved.name ?? summary.template.template_name ?? summary.template_name ?? (summary.template?.name ?? null);
+                            // Use preview_image fields for compatibility with finalstep view
+                            summary.previewImage = summary.previewImage || saved.preview || summary.previewImage || null;
+                            if (!summary.previewImages || !Array.isArray(summary.previewImages) || summary.previewImages.length === 0) {
+                                summary.previewImages = saved.preview ? [saved.preview] : (summary.previewImages || []);
+                            } else if (saved.preview && !summary.previewImages.includes(saved.preview)) {
+                                summary.previewImages.unshift(saved.preview);
+                            }
+                        }
+                        try {
+                            window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(summary));
+                            window.orderSummary = summary;
+                        } catch (e) {
+                            // ignore storage errors
+                        }
+                    } catch (err) {
+                        // ignore parsing errors
+                    }
+
                     showStep(3);
                 }
             });
@@ -1257,14 +1397,44 @@
             }
             showStep(initialStep);
 
+            // Ensure we have a client-side reference to the summary
+            try {
+                if (!window.orderSummary && window.sessionStorage) {
+                    const stored = window.sessionStorage.getItem('inkwise-finalstep');
+                    if (stored) window.orderSummary = JSON.parse(stored);
+                }
+            } catch (err) { /* ignore */ }
+
+            // Wire quantity input to recalc totals
+            const quantityInput = document.getElementById('checkoutQuantity');
+            if (quantityInput) {
+                quantityInput.addEventListener('input', () => {
+                    // update in-memory orderSummary quantity if present
+                    const parsed = Number.parseInt(quantityInput.value, 10);
+                    if (!Number.isNaN(parsed) && parsed > 0) {
+                        try {
+                            if (window.orderSummary) {
+                                window.orderSummary.quantity = parsed;
+                                window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(window.orderSummary));
+                            }
+                        } catch (err) { /* ignore */ }
+                        recalcTotals();
+                        // also refresh payment UI
+                        const activePayment = document.querySelector('input[name="paymentMethod"]:checked');
+                        if (activePayment) updatePaymentSummary(activePayment.value);
+                    }
+                });
+            }
+
             const priceFormatter = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' });
             const subtotal = @json($subtotal ?? 0);
             const baseShipping = @json($shippingFee ?? 0);
             const taxRate = @json($taxRate ?? 0);
+            const orderTotalAmount = @json($totalAmount ?? 0); // Use the order's total amount
             let recordedPaidAmount = @json($paidAmountDisplay ?? 0);
             let currentShippingCost = Number(baseShipping ?? 0);
             let currentTax = Number((subtotal ?? 0) * (taxRate ?? 0));
-            let currentTotal = Number((subtotal ?? 0) + currentShippingCost + currentTax);
+            let currentTotal = Number(orderTotalAmount); // Use order total instead of calculation
             const paymentConfig = {
                 createUrl: '{{ route('payment.gcash.create') }}',
                 resumeUrl: @json($pendingPaymentUrl ?? null),
@@ -1277,7 +1447,6 @@
             const shippingRadios = document.querySelectorAll('input[name="shippingOption"]');
             const paymentRadios = document.querySelectorAll('input[name="paymentMethod"]');
             const shippingAmountEl = document.getElementById('shippingAmount');
-            const taxAmountEl = document.getElementById('taxAmount');
             const grandTotalEl = document.getElementById('grandTotal');
             const paidAmountEl = document.getElementById('paidAmount');
             const balanceAmountEl = document.getElementById('balanceAmount');
@@ -1299,13 +1468,7 @@
                 paymentAlert.textContent = '';
             };
 
-            const updatePayButton = () => {
-                // No longer needed - handled within the payment step
-            };
 
-            const updateMarkAsPaidButton = () => {
-                // No longer needed - handled within the payment step
-            };
 
             // Update summary area when payment method changes
             const updateSummaryForPaymentMethod = (method) => {
@@ -1313,14 +1476,9 @@
                 const paymentStatusPill = document.querySelector('.summary-status strong.status-pill');
                 if (method === 'gcash') {
                     // Show only GCash button
-                    payButton.style.display = 'inline-block';
-                    codButton.style.display = 'none';
-                    updatePayButton();
                     if (paymentHelper) paymentHelper.innerHTML = "You&rsquo;ll be redirected to GCash to authorize this payment. Ensure your account is ready for ₱420.68.";
                 } else if (method === 'cod') {
                     // Show only COD button
-                    payButton.style.display = 'none';
-                    codButton.style.display = 'inline-block';
                     if (paymentHelper) paymentHelper.innerHTML = "You must pay upon delivery.";
                 }
             };
@@ -1349,28 +1507,26 @@
             };
 
             const recalcTotals = () => {
-                if (!shippingAmountEl || !taxAmountEl || !grandTotalEl) return;
-                const selectedShipping = document.querySelector('input[name="shippingOption"]:checked');
-                const shippingCost = Number(selectedShipping?.dataset.cost ?? baseShipping ?? 0);
-                const tax = (subtotal ?? 0) * (taxRate ?? 0);
-                const total = (subtotal ?? 0) + shippingCost + tax;
+                if (!shippingAmountEl || !grandTotalEl) return;
+
+                // Always base totals on the server-provided order total to avoid client-side drift.
+                // `orderTotalAmount` is injected from the server and represents the authoritative total due.
+                const total = Number(orderTotalAmount || 0);
                 const balance = Math.max(total - (recordedPaidAmount ?? 0), 0);
 
-                currentShippingCost = shippingCost;
-                currentTax = tax;
+                currentShippingCost = Number(baseShipping ?? 0);
+                currentTax = 0; // No tax
                 currentTotal = total;
 
-                shippingAmountEl.textContent = shippingCost === 0 ? 'Free' : priceFormatter.format(shippingCost);
-                taxAmountEl.textContent = priceFormatter.format(tax);
+                shippingAmountEl.textContent = currentShippingCost === 0 ? 'Free' : priceFormatter.format(currentShippingCost);
                 grandTotalEl.textContent = priceFormatter.format(total);
                 if (paidAmountEl) paidAmountEl.textContent = priceFormatter.format(recordedPaidAmount ?? 0);
                 if (balanceAmountEl) balanceAmountEl.textContent = priceFormatter.format(balance);
 
                 paymentConfig.balance = balance;
-                paymentConfig.depositAmount = balance <= 0 ? 0 : Math.min(Number((total / 2).toFixed(2)), balance);
+                // Deposit should be computed from the remaining balance (not the full order total)
+                paymentConfig.depositAmount = balance <= 0 ? 0 : Math.min(Math.round(balance * 100 / 2) / 100, balance);
                 paymentConfig.isFullyPaid = paymentConfig.balance <= 0.01;
-
-                // No need to update buttons anymore
             };
 
             const applyPaymentLocally = (amount, options = {}) => {
@@ -1433,8 +1589,9 @@
 
                 switch (paymentType) {
                     case 'gcash-deposit-cod':
-                        const depositCod = currentTotal / 2;
-                        const remainingCod = currentTotal / 2;
+                        const remainingForCod = (paymentConfig.balance ?? Math.max(currentTotal - (recordedPaidAmount ?? 0), 0));
+                        const depositCod = Math.round(remainingForCod * 100 / 2) / 100;
+                        const remainingCod = Math.max(remainingForCod - depositCod, 0);
                         summaryDiv.style.display = 'block';
                         breakdownHTML = `
                             <div class="payment-breakdown-item">
@@ -1453,8 +1610,9 @@
                         break;
 
                     case 'gcash-split':
-                        const depositSplit = currentTotal / 2;
-                        const remainingSplit = currentTotal / 2;
+                        const remainingForSplit = (paymentConfig.balance ?? Math.max(currentTotal - (recordedPaidAmount ?? 0), 0));
+                        const depositSplit = Math.round(remainingForSplit * 100 / 2) / 100;
+                        const remainingSplit = Math.max(remainingForSplit - depositSplit, 0);
                         summaryDiv.style.display = 'block';
                         breakdownHTML = `
                             <div class="payment-breakdown-item">
@@ -1502,11 +1660,17 @@
 
                 clearPaymentMessage();
 
+                // Build payload without any base/total price fields to ensure server uses
+                // authoritative totals and remaining balance. Also include an explicit
+                // flag so server-side handlers can ignore any base price if present.
+                const metadata = paymentAmount ? { payment_amount: paymentAmount } : {};
+                metadata.omit_base_price = true;
+
                 const payload = {
                     quantity: readQuantityInput(),
                     paper_stock_id: document.querySelector('input[name="paper_stock_id"]')?.value ?? undefined,
                     addons: collectAddonSelections(),
-                    metadata: paymentAmount ? { payment_amount: paymentAmount } : {},
+                    metadata,
                     payment_method: selectedPaymentMethod,
                 };
 
@@ -1584,10 +1748,11 @@
                 const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value;
                 let amount = 0;
 
+                const remaining = (paymentConfig.balance ?? Math.max(currentTotal - (recordedPaidAmount ?? 0), 0));
                 if (paymentMethod === 'gcash-deposit-cod' || paymentMethod === 'gcash-split') {
-                    amount = currentTotal / 2; // Always 50% deposit
+                    amount = Math.round(remaining * 100 / 2) / 100; // Always 50% of remaining balance
                 } else if (paymentMethod === 'gcash-full') {
-                    amount = currentTotal; // Full payment
+                    amount = remaining; // Full outstanding balance
                 } else {
                     amount = Number(paymentConfig.depositAmount > 0 ? paymentConfig.depositAmount : paymentConfig.balance);
                 }
@@ -1609,11 +1774,13 @@
                             'X-CSRF-TOKEN': csrfToken,
                         },
                         body: JSON.stringify({
-                            name: contact.name,
-                            email: contact.email,
-                            phone: contact.phone,
-                            mode,
-                        }),
+                                name: contact.name,
+                                email: contact.email,
+                                phone: contact.phone,
+                                mode,
+                                // Ensure server charges the same amount shown in the UI
+                                amount: amount,
+                            }),
                     });
 
                     const data = await response.json();
@@ -1666,11 +1833,12 @@
                     let paymentAmount = 0;
                     let finalPaymentMethod = selectedPaymentMethod;
 
+                    const remainingOutstanding = (paymentConfig.balance ?? Math.max(currentTotal - (recordedPaidAmount ?? 0), 0));
                     if (selectedPaymentMethod === 'gcash-deposit-cod') {
-                        paymentAmount = currentTotal / 2; // Always 50% deposit
+                        paymentAmount = Math.round(remainingOutstanding * 100 / 2) / 100; // 50% of remaining
                         finalPaymentMethod = 'gcash_deposit_cod';
                     } else if (selectedPaymentMethod === 'gcash-split') {
-                        paymentAmount = currentTotal / 2; // Always 50% deposit
+                        paymentAmount = Math.round(remainingOutstanding * 100 / 2) / 100; // 50% of remaining
                         finalPaymentMethod = 'gcash_split';
                     }
 
@@ -1700,25 +1868,7 @@
                 });
             }
 
-            if (markAsPaidButton) {
-                markAsPaidButton.addEventListener('click', () => {
-                    if (paymentConfig.isFullyPaid) {
-                        showPaymentMessage('info', 'This order is already fully paid.');
-                        return;
-                    }
 
-                    window.location.href = '{{ route("customer.my_purchase.toship") }}';
-                });
-            }
-
-            if (codButton) {
-                codButton.addEventListener('click', async () => {
-                    const result = await persistFinalStepSelections('cod', { redirectOnSuccess: true });
-                    if (result?.success && !result.handledRedirect) {
-                        window.location.href = '{{ route("customer.my_purchase.toship") }}';
-                    }
-                });
-            }
 
             recalcTotals();
 
@@ -1760,6 +1910,8 @@
                     }
                 });
             }
+
+            
         });
     </script>
 
@@ -1791,6 +1943,9 @@
 
             window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(summaryData));
             console.log('Saved to sessionStorage:', summaryData);
+
+            // expose for other scripts to reference and update dynamically
+            window.orderSummary = summaryData;
 
             // Check payment mode and adjust payment options
             const paymentMode = summaryData.paymentMode || 'half';

@@ -636,18 +636,65 @@ export function initializeCustomerStudioLegacy() {
           images: previewImages,
         },
         placeholders: placeholderLabels,
-        product_id: bootstrap.product?.id,
+        product_id: bootstrapPayload?.product?.id ?? null,
       };
+    };
+
+    const persistPreviewToSession = (result = {}, snapshot = {}) => {
+      const summary = (result && result.summary) ? result.summary : {};
+      const fromSummary = Array.isArray(summary.previewImages)
+        ? summary.previewImages.filter(Boolean)
+        : (Array.isArray(summary.preview_images) ? summary.preview_images.filter(Boolean) : []);
+      const fromSnapshot = Array.isArray(snapshot?.preview?.images)
+        ? snapshot.preview.images.filter(Boolean)
+        : [];
+
+      const previewImages = fromSummary.length ? fromSummary : fromSnapshot;
+      const primary = summary.previewImage
+        || summary.preview_image
+        || summary.preview
+        || snapshot?.preview?.image
+        || previewImages[0]
+        || null;
+
+      if (!primary && !previewImages.length) {
+        return; // nothing useful to persist
+      }
+
+      const payload = {
+        templateName: summary.productName || summary.templateName || document.title || 'Saved template',
+        previewImage: primary || '',
+        previewImages: previewImages.length ? previewImages : (primary ? [primary] : []),
+        metadata: {
+          template: { name: summary.productName || summary.templateName || 'Saved template' },
+        },
+      };
+
+      try { window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(payload)); } catch (e) { /* ignore */ }
+      try {
+        const short = { id: null, name: payload.templateName, preview: payload.previewImage };
+        window.sessionStorage.setItem('inkwise-saved-template', JSON.stringify(short));
+        window.savedCustomerTemplate = short;
+      } catch (e) { /* ignore */ }
+    };
+
+    const collectSnapshotWithPersist = (...args) => {
+      const snap = collectDesignSnapshot(...args);
+      try { persistPreviewToSession({}, snap); } catch (_) { /* ignore */ }
+      return snap;
     };
 
     try {
       autosave = createAutosaveController({
-        collectSnapshot: collectDesignSnapshot,
+        collectSnapshot: collectSnapshotWithPersist,
         routes,
         csrfToken,
         statusLabel: statusLabelEl,
         statusDot: statusDotEl,
         debounce: 0, // Save immediately on change
+        onAfterSave: (result, snapshot) => {
+          try { persistPreviewToSession(result, snapshot); } catch (e) { /* non-fatal */ }
+        },
       });
       console.log('[InkWise Studio] Autosave initialized', autosave);
 
@@ -702,12 +749,68 @@ export function initializeCustomerStudioLegacy() {
       autosave = null;
     }
 
+    const buildReviewSavePayload = async () => {
+      const snapshot = await collectDesignSnapshot('proceed-review');
+
+      const design = snapshot?.design || {};
+      const sides = design.sides || {};
+      const firstSideKey = Object.keys(sides)[0];
+      const sideData = firstSideKey ? sides[firstSideKey] : null;
+      let designSvg = sideData?.svg || null;
+      if (!designSvg && previewSvg) {
+        try {
+          const serializer = new XMLSerializer();
+          designSvg = serializer.serializeToString(previewSvg);
+        } catch (_) {
+          designSvg = null;
+        }
+      }
+      if (!designSvg) {
+        const fallbackSvg = bootstrapPayload?.svg?.front || bootstrapPayload?.svg?.back || null;
+        if (fallbackSvg) {
+          designSvg = fallbackSvg;
+        }
+      }
+      const previewImage = sideData?.preview
+        || snapshot?.preview?.image
+        || extractBackgroundUrl(firstSideKey || 'front');
+
+      const canvasMeta = design.canvas || {};
+      const canvasWidth = canvasMeta.width ?? (cardBg ? parseNullableNumber(cardBg.dataset.canvasWidth) : null);
+      const canvasHeight = canvasMeta.height ?? (cardBg ? parseNullableNumber(cardBg.dataset.canvasHeight) : null);
+      const backgroundColor = (() => {
+        try {
+          if (!cardBg) return null;
+          const cs = window.getComputedStyle(cardBg);
+          return cs?.backgroundColor || cardBg.dataset?.backgroundColor || cardBg.style?.backgroundColor || null;
+        } catch (_) {
+          return null;
+        }
+      })();
+
+      return {
+        design_svg: designSvg,
+        design_json: design,
+        preview_image: previewImage,
+        canvas_width: canvasWidth,
+        canvas_height: canvasHeight,
+        background_color: backgroundColor,
+        template_id: bootstrapPayload?.template?.id ?? bootstrapPayload?.template_id ?? null,
+        order_item_id: bootstrapPayload?.orderSummary?.order_item_id
+          ?? bootstrapPayload?.orderSummary?.orderItemId
+          ?? bootstrapPayload?.orderSummary?.item_id
+          ?? null,
+      };
+    };
+
     const proceedButton = document.querySelector('[data-action="proceed-review"]');
     if (proceedButton) {
       const destination = proceedButton.dataset.destination
         || routes.review
         || proceedButton.getAttribute('href')
         || window.location.href;
+
+      const reviewSaveUrl = routes.saveReview || routes.reviewSave || routes.review_design || routes.reviewDesign || null;
 
       proceedButton.addEventListener('click', async (event) => {
         event.preventDefault();
@@ -722,19 +825,57 @@ export function initializeCustomerStudioLegacy() {
           window.location.href = destination;
         };
 
-        if (!autosave) {
-          navigate();
-          return;
-        }
+        const revertState = () => {
+          proceedButton.disabled = false;
+          proceedButton.dataset.navigating = '0';
+        };
 
         try {
-          await autosave.flush('navigate');
+          if (autosave) {
+            await autosave.flush('navigate');
+          }
+
+          const payload = await buildReviewSavePayload();
+          if (!payload.template_id) {
+            throw new Error('Missing template identifier.');
+          }
+          if (!payload.design_svg) {
+            throw new Error('Missing design SVG content.');
+          }
+
+          if (!reviewSaveUrl) {
+            throw new Error('Save endpoint unavailable.');
+          }
+
+          const headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          };
+          if (csrfToken) {
+            headers['X-CSRF-TOKEN'] = csrfToken;
+          }
+
+          const response = await fetch(reviewSaveUrl, {
+            method: 'POST',
+            headers,
+            credentials: 'same-origin',
+            body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+            const text = await response.text().catch(() => '');
+            throw new Error(`Save failed (${response.status}): ${text}`);
+          }
+
           navigate();
         } catch (navigationError) {
           console.error('[InkWise Studio] Unable to save before navigating.', navigationError);
-          autosave.notifyError();
-          proceedButton.disabled = false;
-          proceedButton.dataset.navigating = '0';
+          if (autosave) {
+            autosave.notifyError();
+          }
+          alert('We could not save your latest design. Please try again before continuing.');
+          revertState();
         }
       });
     }
@@ -4185,6 +4326,13 @@ export function initializeCustomerStudioLegacy() {
 
         previewSvg.innerHTML = svgText;
         previewSvg.style.display = 'block';
+        
+        // Hide loading state
+        const loadingEl = document.getElementById('canvas-loading');
+        if (loadingEl) {
+            loadingEl.style.display = 'none';
+        }
+        
         previewSvg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
         previewSvg.setAttribute('width', '100%');
         previewSvg.setAttribute('height', '100%');

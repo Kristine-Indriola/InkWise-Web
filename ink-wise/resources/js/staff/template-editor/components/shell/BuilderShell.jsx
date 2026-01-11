@@ -800,6 +800,7 @@ export function BuilderShell() {
   const controllerRef = useRef(null);
   const initialRenderRef = useRef(true);
   const canvasRef = useRef(null);
+  const saveInProgressRef = useRef(false);
 
   const handleBoundaryReset = useCallback(() => {
     if (typeof window !== 'undefined') {
@@ -980,10 +981,12 @@ export function BuilderShell() {
     }
 
     console.log('[InkWise Builder] Starting save with canvas ref:', canvasRef.current);
-    if (isSavingTemplate) {
+    if (isSavingTemplate || saveInProgressRef.current) {
+      console.log('[InkWise Builder] Save already in progress, skipping');
       return;
     }
 
+    saveInProgressRef.current = true;
     setIsSavingTemplate(true);
     setSaveTemplateError(null);
 
@@ -1386,6 +1389,7 @@ export function BuilderShell() {
     } finally {
       bodyEl?.classList.remove('builder-exporting');
       setIsSavingTemplate(false);
+      saveInProgressRef.current = false;
     }
   }, [saveTemplateRoute, csrfToken, isSavingTemplate, state, routes, dispatch]);
 

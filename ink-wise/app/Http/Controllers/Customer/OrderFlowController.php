@@ -15,6 +15,8 @@ use App\Models\User;
 use App\Notifications\NewOrderPlaced;
 use App\Models\Cart;
 use App\Models\CartItem;
+use App\Models\CustomerReview;
+use App\Models\CustomerFinalized;
 use App\Models\CustomerTemplateCustom;
 use App\Services\OrderFlowService;
 use Illuminate\Contracts\View\View as ViewContract;
@@ -29,7 +31,9 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class OrderFlowController extends Controller
 {
@@ -120,8 +124,8 @@ class OrderFlowController extends Controller
             $summary['unitPrice'] = $summary['unitPrice'] ?? $summary['unit_price'] ?? $unitPrice;
             $summary['subtotalAmount'] = $summary['subtotalAmount'] ?? $summary['subtotal_amount'] ?? round(($summary['unitPrice'] ?? $unitPrice) * ($summary['quantity'] ?? $quantity), 2);
             $summary['taxAmount'] = $summary['taxAmount'] ?? $taxAmount;
-            $summary['shippingFee'] = $summary['shippingFee'] ?? $shippingFee;
-            $summary['totalAmount'] = $summary['totalAmount'] ?? $summary['total_amount'] ?? round(($summary['subtotalAmount'] ?? $subtotal) + $summary['taxAmount'] + $summary['shippingFee'], 2);
+            $summary['shippingFee'] = static::DEFAULT_SHIPPING_FEE;
+            $summary['totalAmount'] = $summary['totalAmount'] ?? $summary['total_amount'] ?? round(($summary['subtotalAmount'] ?? $subtotal) + $summary['taxAmount'], 2);
         } else {
             $summary = [
                 'orderId' => null,
@@ -134,7 +138,7 @@ class OrderFlowController extends Controller
                 'unitPrice' => $unitPrice,
                 'subtotalAmount' => $subtotal,
                 'taxAmount' => $taxAmount,
-                'shippingFee' => $shippingFee,
+                'shippingFee' => static::DEFAULT_SHIPPING_FEE,
                 'totalAmount' => $total,
                 'previewImages' => $images['all'] ?? [],
                 'previewImage' => $images['front'] ?? null,
@@ -308,7 +312,8 @@ class OrderFlowController extends Controller
 
     public function autosaveDesign(Request $request): JsonResponse
     {
-        Log::info('Autosave design called', ['payload' => $request->all()]);
+        try {
+            Log::info('Autosave design called', ['payload' => $request->all()]);
 
         $payload = $request->validate([
             'design' => ['required', 'array'],
@@ -327,6 +332,7 @@ class OrderFlowController extends Controller
             'placeholders' => ['nullable', 'array'],
             'placeholders.*' => ['nullable', 'string'],
             'product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'template_id' => ['nullable', 'integer'],
         ]);
 
         $placeholders = collect(Arr::get($payload, 'placeholders', []))
@@ -368,8 +374,6 @@ class OrderFlowController extends Controller
             $summary['placeholders'] = $placeholders;
         }
 
-        session()->put(static::SESSION_SUMMARY_KEY, $summary);
-
         $order = $this->currentOrder(false);
 
         $product = $order?->items->first()?->product;
@@ -381,32 +385,99 @@ class OrderFlowController extends Controller
         }
 
         if ($product) {
-            $this->orderFlow->persistDesignDraft($product, [
-                'design' => $designMeta,
-                'placeholders' => $placeholders,
-                'preview_image' => $primaryPreview,
-                'preview_images' => $previewImages,
-                'summary' => $summary,
-                'status' => $summary['orderStatus'] ?? 'draft',
-                'is_locked' => false,
-                'order_id' => $order?->id,
-                'order_item_id' => $order?->items->first()?->id,
-                'last_edited_at' => $designMeta['updated_at'] ?? Carbon::now()->toIso8601String(),
-            ], Auth::user());
+            $summary['productId'] = $summary['productId'] ?? $product->id;
+            $summary['id'] = $summary['id'] ?? $product->template_id;
+            $summary['template_id'] = $summary['template_id'] ?? $product->template_id;
+        } else {
+            $templateId = Arr::get($payload, 'template_id');
+            if ($templateId) {
+                $summary['id'] = $summary['id'] ?? $templateId;
+                $summary['template_id'] = $summary['template_id'] ?? $templateId;
+            }
+            if (!empty($payload['product_id'])) {
+                $summary['productId'] = $summary['productId'] ?? (int) $payload['product_id'];
+            }
+        }
+
+        session()->put(static::SESSION_SUMMARY_KEY, $summary);
+
+        if ($product) {
+            try {
+                $this->orderFlow->persistDesignDraft($product, [
+                    'design' => $designMeta,
+                    'placeholders' => $placeholders,
+                    'preview_image' => $primaryPreview,
+                    'preview_images' => $previewImages,
+                    'summary' => $summary,
+                    'status' => $summary['orderStatus'] ?? 'draft',
+                    'is_locked' => false,
+                    'order_id' => $order?->id,
+                    'order_item_id' => $order?->items->first()?->id,
+                    'last_edited_at' => $designMeta['updated_at'] ?? Carbon::now()->toIso8601String(),
+                ], Auth::user());
+            } catch (\Throwable $e) {
+                Log::warning('persistDesignDraft failed during autosave', ['error' => $e->getMessage()]);
+            }
         }
 
         if ($order) {
-            DB::transaction(function () use (&$order, $designMeta, $placeholders, $summary) {
-                $previewImages = $summary['previewImages'] ?? [];
-                $previewImage = $summary['previewImage'] ?? null;
+            try {
+                DB::transaction(function () use (&$order, $designMeta, $placeholders, $summary) {
+                    $previewImages = $summary['previewImages'] ?? [];
+                    $previewImage = $summary['previewImage'] ?? null;
 
-                $order = $this->orderFlow->applyDesignAutosave($order, [
-                    'design' => $designMeta,
-                    'placeholders' => $placeholders,
-                    'preview_image' => $previewImage,
-                    'preview_images' => $previewImages,
-                ]);
-            });
+                    $order = $this->orderFlow->applyDesignAutosave($order, [
+                        'design' => $designMeta,
+                        'placeholders' => $placeholders,
+                        'preview_image' => $previewImage,
+                        'preview_images' => $previewImages,
+                    ]);
+                });
+            } catch (\Throwable $e) {
+                Log::warning('applyDesignAutosave failed', ['error' => $e->getMessage()]);
+            }
+        }
+
+        // Persist design into the active cart item when columns exist
+        $cartItem = CartItem::query()
+            ->where('session_id', session()->getId())
+            ->latest()
+            ->first();
+
+        if ($cartItem) {
+            try {
+                $firstSideKey = array_key_first($designMeta['sides'] ?? []) ?? 'front';
+                $firstSide = $designMeta['sides'][$firstSideKey] ?? [];
+                $designSvg = is_string($firstSide['svg'] ?? null) ? $firstSide['svg'] : null;
+                $designJsonEncoded = $designMeta ? json_encode($designMeta) : null;
+                $canvasWidth = data_get($designMeta, 'canvas.width');
+                $canvasHeight = data_get($designMeta, 'canvas.height');
+                $backgroundColor = data_get($designMeta, 'canvas.background')
+                    ?? data_get($designMeta, 'canvas.background_color')
+                    ?? data_get($designMeta, 'background_color');
+
+                if (Schema::hasColumn($cartItem->getTable(), 'design_svg') && $designSvg) {
+                    $cartItem->design_svg = $designSvg;
+                }
+                if (Schema::hasColumn($cartItem->getTable(), 'design_json') && $designJsonEncoded) {
+                    $cartItem->design_json = $designJsonEncoded;
+                }
+                if (Schema::hasColumn($cartItem->getTable(), 'canvas_width') && $canvasWidth !== null) {
+                    $cartItem->canvas_width = $canvasWidth;
+                }
+                if (Schema::hasColumn($cartItem->getTable(), 'canvas_height') && $canvasHeight !== null) {
+                    $cartItem->canvas_height = $canvasHeight;
+                }
+                if (Schema::hasColumn($cartItem->getTable(), 'background_color') && $backgroundColor) {
+                    $cartItem->background_color = $backgroundColor;
+                }
+                if (Schema::hasColumn($cartItem->getTable(), 'preview_image') && $primaryPreview) {
+                    $cartItem->preview_image = $primaryPreview;
+                }
+                $cartItem->save();
+            } catch (\Throwable $e) {
+                Log::warning('cartItem save failed during autosave', ['error' => $e->getMessage()]);
+            }
         }
 
         return response()->json([
@@ -415,6 +486,173 @@ class OrderFlowController extends Controller
             'order_id' => $order?->id,
             'summary' => $summary,
             'review_url' => route('order.review'),
+        ]);
+        } catch (\Throwable $e) {
+            Log::error('Autosave design failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            // Do not block the UX; acknowledge receipt so user can continue.
+            return response()->json([
+                'message' => 'Design saved (degraded mode).',
+                'review_url' => route('order.review'),
+            ], 200);
+        }
+    }
+
+    public function saveReviewDesign(Request $request): JsonResponse
+    {
+        \Illuminate\Support\Facades\Log::info('saveReviewDesign called', ['request_all' => $request->all()]);
+
+        $validated = $request->validate([
+            'template_id' => ['required', 'integer'],
+            'design_svg' => ['nullable', 'string'],
+            'design_json' => ['nullable'],
+            'preview_image' => ['nullable', 'string'],
+            'canvas_width' => ['nullable', 'integer'],
+            'canvas_height' => ['nullable', 'integer'],
+            'background_color' => ['nullable', 'string', 'max:20'],
+            'order_item_id' => ['nullable', 'integer'],
+        ]);
+
+        $designJson = $validated['design_json'];
+        if (is_string($designJson)) {
+            $decoded = json_decode($designJson, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                return response()->json(['message' => 'Invalid design_json payload.'], 422);
+            }
+            $designJson = $decoded;
+        } elseif ($designJson === null) {
+            $designJson = [];
+        } elseif (!is_array($designJson)) {
+            return response()->json(['message' => 'design_json must be an object or array.'], 422);
+        }
+
+        $designJson = $this->stripHeavyDesignFields($designJson);
+
+        $designSvg = $this->normalizeDesignSvg($validated['design_svg'] ?? '');
+
+        if ($designSvg === '') {
+            $designSvg = null;
+        }
+
+        $user = Auth::user();
+        $customerId = $user?->customer?->customer_id;
+        $orderItemId = $validated['order_item_id'] ? (int) $validated['order_item_id'] : null;
+
+        $match = [];
+        if ($orderItemId) {
+            $match['order_item_id'] = $orderItemId;
+        } else {
+            $match['template_id'] = (int) $validated['template_id'];
+            if ($customerId) {
+                $match['customer_id'] = $customerId;
+            }
+        }
+
+        $review = CustomerReview::query()->firstOrNew($match ?: ['template_id' => (int) $validated['template_id']]);
+
+        try {
+            $previewImage = $this->persistReviewPreview($validated['preview_image'] ?? null, $review->preview_image ?? null);
+        } catch (\Throwable $e) {
+            report($e);
+            $previewImage = $review->preview_image ?? null;
+        }
+
+        $review->fill([
+            'customer_id' => $customerId,
+            'template_id' => (int) $validated['template_id'],
+            'order_item_id' => $orderItemId,
+            'design_svg' => $designSvg,
+            'design_json' => $designJson,
+            'preview_image' => $previewImage,
+            'canvas_width' => $validated['canvas_width'] ?? null,
+            'canvas_height' => $validated['canvas_height'] ?? null,
+            'background_color' => $validated['background_color'] ?? null,
+        ]);
+
+        \Illuminate\Support\Facades\Log::info('About to save CustomerReview', [
+            'review_id' => $review->id,
+            'customer_id' => $customerId,
+            'template_id' => $validated['template_id'],
+            'order_item_id' => $orderItemId,
+            'design_svg_length' => strlen($designSvg),
+            'design_json_size' => is_array($designJson) ? count($designJson) : strlen(json_encode($designJson)),
+        ]);
+
+        try {
+            $review->save();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to save CustomerReview', [
+                'error' => $e->getMessage(),
+                'review_id' => $review->id,
+                'customer_id' => $customerId,
+                'template_id' => $validated['template_id'],
+            ]);
+            report($e);
+
+            return response()->json([
+                'message' => 'Unable to save your design. Please try again.',
+            ], 500);
+        }
+
+        $previewUrl = $this->resolvePreviewAsset($previewImage);
+
+        return response()->json([
+            'message' => 'Design saved for review.',
+            'review_id' => $review->id,
+            'order_item_id' => $review->order_item_id,
+            'preview_image' => $previewUrl,
+        ]);
+    }
+
+    public function continueReview(Request $request): JsonResponse
+    {
+        $order = $this->currentOrder(false);
+        $summary = $request->input('summary');
+
+        if (is_string($summary)) {
+            $decoded = json_decode($summary, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $summary = $decoded;
+            }
+        }
+
+        if (!is_array($summary) || empty($summary)) {
+            $summary = session(static::SESSION_SUMMARY_KEY);
+        }
+
+        if (!is_array($summary) || empty($summary)) {
+            return response()->json([
+                'message' => 'No order summary found to continue.',
+            ], 422);
+        }
+
+        session()->put(static::SESSION_SUMMARY_KEY, $summary);
+
+        $productId = $summary['productId'] ?? $summary['product_id'] ?? null;
+        $product = $productId ? $this->orderFlow->resolveProduct(null, (int) $productId) : null;
+        if (!$product && $order) {
+            $product = optional($order->items->first())->product;
+        }
+
+        if (!$product) {
+            return response()->json([
+                'message' => 'Unable to locate the product for this review.',
+            ], 422);
+        }
+
+        try {
+            $record = $this->orderFlow->persistFinalizedSelection($order, $summary, $product);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'Unable to save your review progress. Please try again.',
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => 'Review saved.',
+            'redirect' => route('order.finalstep'),
+            'customer_order_item_id' => $record->id ?? null,
         ]);
     }
 
@@ -446,8 +684,10 @@ class OrderFlowController extends Controller
         $template->name = $validated['template_name'];
         $template->design = $validated['design'];
         $template->status = 'draft'; // Customer templates are drafts
-        $template->user_id = $user->id; // Associate with the customer who created it
-        $template->customer_id = $user->customer?->customer_id; // Associate with customer record
+        // If the request comes from an unauthenticated session, allow saving
+        // the template without a user association instead of throwing a fatal error.
+        $template->user_id = $user?->id ?? null; // Associate with the customer who created it (if any)
+        $template->customer_id = $user?->customer?->customer_id ?? null; // Associate with customer record (if any)
 
         if ($product) {
             $template->product_id = $product->id;
@@ -543,12 +783,17 @@ class OrderFlowController extends Controller
 
                 // Always use the stored draft's preview images as they are the most recent
                 if (!empty($storedDraft['preview_images'])) {
-                    $summary['previewImages'] = $storedDraft['preview_images'];
+                    $summary['preview_images'] = $this->resolvePreviewAssets($storedDraft['preview_images']);
+                    $summary['previewImages'] = $summary['preview_images'];
                 }
 
                 if (!empty($storedDraft['preview_image'])) {
-                    $summary['previewImage'] = $storedDraft['preview_image'];
-                    $summary['invitationImage'] = $storedDraft['preview_image'];
+                    $summary['previewImage'] = $this->resolvePreviewAsset($storedDraft['preview_image']);
+                    $summary['invitationImage'] = $this->resolvePreviewAsset($storedDraft['preview_image']);
+                    if (empty($summary['preview_images'])) {
+                        $summary['preview_images'] = [$summary['previewImage']];
+                    }
+                    $summary['previewImages'] = $summary['previewImages'] ?? $summary['preview_images'] ?? [];
                 }
 
                 if (!empty($storedDraft['status'])) {
@@ -569,7 +814,7 @@ class OrderFlowController extends Controller
             $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
             $placeholderItems = collect($summary['placeholders'] ?? []);
 
-            $customerReview = $this->orderFlow->loadCustomerReview($product->template_id, Auth::user());
+            $customerReview = $this->orderFlow->loadCustomerReview($product->template_id, Auth::user(), $summary['order_item_id'] ?? null);
 
             $summaryPreviewImages = array_values(array_filter($summary['previewImages'] ?? [], fn ($value) => is_string($value) && trim($value) !== ''));
             if (!empty($summaryPreviewImages)) {
@@ -644,24 +889,30 @@ class OrderFlowController extends Controller
             $placeholderItems = collect($storedDraft['placeholders'] ?? $placeholderItems);
 
             if (!empty($storedDraft['preview_images'])) {
-                $images['all'] = $storedDraft['preview_images'];
-                $images['front'] = $storedDraft['preview_images'][0] ?? ($images['front'] ?? null);
-                if (!empty($storedDraft['preview_images'][1])) {
-                    $images['back'] = $storedDraft['preview_images'][1];
+                $resolvedDraftImages = $this->resolvePreviewAssets($storedDraft['preview_images']);
+                if (!empty($resolvedDraftImages)) {
+                    $images['all'] = $resolvedDraftImages;
+                    $images['front'] = $resolvedDraftImages[0] ?? ($images['front'] ?? null);
+                    if (!empty($resolvedDraftImages[1])) {
+                        $images['back'] = $resolvedDraftImages[1];
+                    }
                 }
             }
 
             if (!empty($storedDraft['preview_image'])) {
-                $images['front'] = $storedDraft['preview_image'];
-                if (empty($images['all'])) {
-                    $images['all'] = [$storedDraft['preview_image']];
-                } else {
-                    $images['all'][0] = $storedDraft['preview_image'];
+                $resolvedPreview = $this->resolvePreviewAsset($storedDraft['preview_image']);
+                if ($resolvedPreview) {
+                    $images['front'] = $resolvedPreview;
+                    if (empty($images['all'])) {
+                        $images['all'] = [$resolvedPreview];
+                    } else {
+                        $images['all'][0] = $resolvedPreview;
+                    }
                 }
             }
         }
 
-        $customerReview = $product ? $this->orderFlow->loadCustomerReview($product->template_id, Auth::user()) : null;
+        $customerReview = $product ? $this->orderFlow->loadCustomerReview($product->template_id, Auth::user(), $item?->id) : null;
 
         return view('customer.orderflow.review', [
             'order' => $order,
@@ -789,6 +1040,42 @@ class OrderFlowController extends Controller
     {
         $order = $this->currentOrder();
 
+        $applyFinalizedPreview = function (?CustomerFinalized $finalized, array &$summary, array &$images): void {
+            if (!$finalized) {
+                return;
+            }
+
+            $finalizedPreviews = array_values(array_filter($finalized->preview_images ?? []));
+            $primaryPreview = $finalized->preview_image ?? ($finalizedPreviews[0] ?? null);
+
+            if (!empty($finalizedPreviews)) {
+                $images['all'] = $finalizedPreviews;
+                $images['front'] = $finalizedPreviews[0] ?? ($images['front'] ?? null);
+                if (!empty($finalizedPreviews[1])) {
+                    $images['back'] = $finalizedPreviews[1];
+                }
+            } elseif ($primaryPreview) {
+                $images['front'] = $primaryPreview;
+                $images['all'] = [$primaryPreview];
+            }
+
+            if ($primaryPreview && empty($summary['previewImage'])) {
+                $summary['previewImage'] = $primaryPreview;
+            }
+
+            if (!empty($finalizedPreviews) && empty($summary['previewImages'])) {
+                $summary['previewImages'] = $finalizedPreviews;
+            }
+
+            if (!empty($finalized->design) && empty(data_get($summary, 'metadata.design'))) {
+                $summary['metadata']['design'] = $finalized->design;
+            }
+
+            if (!empty($finalized->design) && empty($summary['design'])) {
+                $summary['design'] = $finalized->design;
+            }
+        };
+
         // Session-only or product-preview path
         if (!$order) {
             $summary = session(static::SESSION_SUMMARY_KEY);
@@ -827,6 +1114,45 @@ class OrderFlowController extends Controller
             $selectedPaperStockId = $summary['paperStockId'] ?? null;
             $selectedAddonIds = $summary['addonIds'] ?? [];
 
+            // Always check for the latest stored draft and use it for design data and previews
+            $storedDraft = $product ? $this->orderFlow->loadDesignDraft($product, Auth::user()) : null;
+            if ($storedDraft) {
+                if (!empty($storedDraft['preview_images'])) {
+                    $resolvedDraftImages = $this->resolvePreviewAssets($storedDraft['preview_images']);
+                    if (!empty($resolvedDraftImages)) {
+                        $images['all'] = $resolvedDraftImages;
+                        $images['front'] = $resolvedDraftImages[0] ?? ($images['front'] ?? null);
+                        if (!empty($resolvedDraftImages[1])) {
+                            $images['back'] = $resolvedDraftImages[1];
+                        }
+                    }
+                }
+
+                if (!empty($storedDraft['preview_image'])) {
+                    $resolvedPreview = $this->resolvePreviewAsset($storedDraft['preview_image']);
+                    if ($resolvedPreview) {
+                        $images['front'] = $resolvedPreview;
+                        if (empty($images['all'])) {
+                            $images['all'] = [$resolvedPreview];
+                        } else {
+                            $images['all'][0] = $resolvedPreview;
+                        }
+                    }
+                }
+
+                // Also update the summary with stored draft preview images for JavaScript access
+                if (!empty($storedDraft['preview_images'])) {
+                    $images['preview_images'] = $this->resolvePreviewAssets($storedDraft['preview_images']);
+                }
+                if (!empty($storedDraft['preview_image'])) {
+                    $images['previewImage'] = $this->resolvePreviewAsset($storedDraft['preview_image']);
+                }
+            }
+
+            $finalized = $this->orderFlow->findFinalizedSelection($order, $product);
+            $applyFinalizedPreview($finalized, $summary, $images);
+            session()->put(static::SESSION_SUMMARY_KEY, $summary);
+
             $quantityOptions = $this->orderFlow->buildQuantityOptions($product, $selectedQuantity);
             $paperStockOptions = $this->orderFlow->buildPaperStockOptions($product, $selectedPaperStockId);
             $addonGroups = $this->orderFlow->buildAddonGroups($product, $selectedAddonIds);
@@ -841,6 +1167,10 @@ class OrderFlowController extends Controller
             $minPickupDate = Carbon::tomorrow();
             $maxPickupDate = Carbon::now()->addMonths(2);
             $resolvedPickupDate = $this->resolvePickupDate(null, $summary, $minPickupDate, $maxPickupDate);
+
+            // Calculate totals for session-only order
+            $totals = $this->orderFlow->calculateTotalsFromSummary($summary);
+            $summary = array_merge($summary, $totals);
 
             return view('customer.orderflow.finalstep', [
                 'order' => $orderPlaceholder,
@@ -861,6 +1191,7 @@ class OrderFlowController extends Controller
                 'estimatedDeliveryMinDate' => $minPickupDate->format('Y-m-d'),
                 'estimatedDeliveryMaxDate' => $maxPickupDate->format('Y-m-d'),
                 'orderSummary' => $summary,
+                'itemTotal' => $summary['totalAmount'] ?? 0,
             ]);
         }
 
@@ -884,7 +1215,46 @@ class OrderFlowController extends Controller
         $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
         $selectedQuantity = $item?->quantity;
         $selectedPaperStockId = $item?->paperStockSelection?->paper_stock_id;
-        $selectedAddonIds = $item?->addons?->pluck('addon_id')->filter()->values()->all();
+        $selectedAddonIds = $item?->addons?->pluck('size_id')->filter()->values()->all();
+
+        $summaryPayload = session(static::SESSION_SUMMARY_KEY) ?: [];
+
+        // Always check for the latest stored draft and use it for design data and previews
+        $storedDraft = $product ? $this->orderFlow->loadDesignDraft($product, Auth::user()) : null;
+        if ($storedDraft) {
+            if (!empty($storedDraft['preview_images'])) {
+                $resolvedDraftImages = $this->resolvePreviewAssets($storedDraft['preview_images']);
+                if (!empty($resolvedDraftImages)) {
+                    $images['all'] = $resolvedDraftImages;
+                    $images['front'] = $resolvedDraftImages[0] ?? ($images['front'] ?? null);
+                    if (!empty($resolvedDraftImages[1])) {
+                        $images['back'] = $resolvedDraftImages[1];
+                    }
+                    $summaryPayload['preview_images'] = $resolvedDraftImages;
+                    $summaryPayload['previewImages'] = $resolvedDraftImages;
+                }
+            }
+
+            if (!empty($storedDraft['preview_image'])) {
+                $resolvedPreview = $this->resolvePreviewAsset($storedDraft['preview_image']);
+                if ($resolvedPreview) {
+                    $images['front'] = $resolvedPreview;
+                    if (empty($images['all'])) {
+                        $images['all'] = [$resolvedPreview];
+                    } else {
+                        $images['all'][0] = $resolvedPreview;
+                    }
+                    $summaryPayload['previewImage'] = $resolvedPreview;
+                    if (empty($summaryPayload['preview_images'])) {
+                        $summaryPayload['preview_images'] = [$resolvedPreview];
+                    }
+                    $summaryPayload['previewImages'] = $summaryPayload['previewImages'] ?? $summaryPayload['preview_images'] ?? [];
+                }
+            }
+        }
+        $finalized = $this->orderFlow->findFinalizedSelection($order, $product);
+        $applyFinalizedPreview($finalized, $summaryPayload, $images);
+        session()->put(static::SESSION_SUMMARY_KEY, $summaryPayload);
 
         $quantityOptions = $this->orderFlow->buildQuantityOptions($product, $selectedQuantity);
         $paperStockOptions = $this->orderFlow->buildPaperStockOptions($product, $selectedPaperStockId);
@@ -895,10 +1265,27 @@ class OrderFlowController extends Controller
         $minQty = 20;
         $maxQty = null;
 
-        $summaryPayload = session(static::SESSION_SUMMARY_KEY);
         $minPickupDate = Carbon::tomorrow();
         $maxPickupDate = Carbon::now()->addMonths(2);
         $resolvedPickupDate = $this->resolvePickupDate($order, $summaryPayload, $minPickupDate, $maxPickupDate);
+
+        // Calculate detailed totals breakdown for the view
+        if ($summaryPayload && isset($summaryPayload['productId'])) {
+            $totals = $this->orderFlow->calculateTotalsFromSummary($summaryPayload);
+            $summaryPayload = array_merge($summaryPayload, $totals);
+        }
+
+        // Get quantity and total from orderSummary to match the summary page
+        $productId = $product->id ?? null;
+        $itemFromSummary = $productId ? collect($summaryPayload['items'] ?? [])->first(function ($i) use ($productId) {
+            return ($i['product_id'] ?? $i['id'] ?? $i['productId']) == $productId;
+        }) : null;
+        if ($itemFromSummary) {
+            $selectedQuantity = $itemFromSummary['quantity'] ?? $itemFromSummary['qty'] ?? $selectedQuantity;
+            $itemTotal = $itemFromSummary['total'] ?? $itemFromSummary['totalAmount'] ?? $itemFromSummary['total_amount'] ?? $itemFromSummary['price'] ?? 0;
+        } else {
+            $itemTotal = $item?->total_amount ?? 0;
+        }
 
         return view('customer.orderflow.finalstep', [
             'order' => $order,
@@ -919,6 +1306,7 @@ class OrderFlowController extends Controller
             'estimatedDeliveryMinDate' => $minPickupDate->format('Y-m-d'),
             'estimatedDeliveryMaxDate' => $maxPickupDate->format('Y-m-d'),
             'orderSummary' => $summaryPayload,
+            'itemTotal' => $itemTotal,
         ]);
     }
 
@@ -959,7 +1347,7 @@ class OrderFlowController extends Controller
                     'status' => 'pending',
                     'subtotal_amount' => $summary['subtotalAmount'] ?? 0,
                     'tax_amount' => $summary['taxAmount'] ?? 0,
-                    'shipping_fee' => $summary['shippingFee'] ?? static::DEFAULT_SHIPPING_FEE,
+                    'shipping_fee' => static::DEFAULT_SHIPPING_FEE,
                     'total_amount' => $summary['totalAmount'] ?? 0,
                     'shipping_option' => 'standard',
                     'payment_method' => null,
@@ -1401,7 +1789,7 @@ class OrderFlowController extends Controller
             // update totals
             $summary['subtotalAmount'] = ($summary['subtotalAmount'] ?? 0);
             $summary['taxAmount'] = round(($summary['subtotalAmount']) * static::DEFAULT_TAX_RATE, 2);
-            $summary['totalAmount'] = round(($summary['subtotalAmount'] + $summary['taxAmount'] + ($summary['shippingFee'] ?? static::DEFAULT_SHIPPING_FEE) + ($summary['extras']['envelope'] ?? 0) + ($summary['extras']['giveaway'] ?? 0)), 2);
+            $summary['totalAmount'] = round(($summary['subtotalAmount'] + $summary['taxAmount'] + ($summary['extras']['envelope'] ?? 0) + ($summary['extras']['giveaway'] ?? 0)), 2);
 
             session()->put(static::SESSION_SUMMARY_KEY, $summary);
 
@@ -1563,7 +1951,7 @@ class OrderFlowController extends Controller
             // update totals
             $summary['subtotalAmount'] = ($summary['subtotalAmount'] ?? 0);
             $summary['taxAmount'] = round(($summary['subtotalAmount']) * static::DEFAULT_TAX_RATE, 2);
-            $summary['totalAmount'] = round(($summary['subtotalAmount'] + $summary['taxAmount'] + ($summary['shippingFee'] ?? static::DEFAULT_SHIPPING_FEE) + ($summary['extras']['envelope'] ?? 0) + ($summary['extras']['giveaway'] ?? 0)), 2);
+            $summary['totalAmount'] = round(($summary['subtotalAmount'] + $summary['taxAmount'] + ($summary['extras']['envelope'] ?? 0) + ($summary['extras']['giveaway'] ?? 0)), 2);
 
             session()->put(static::SESSION_SUMMARY_KEY, $summary);
 
@@ -1631,7 +2019,7 @@ class OrderFlowController extends Controller
             // update totals
             $summary['subtotalAmount'] = ($summary['subtotalAmount'] ?? 0);
             $summary['taxAmount'] = round(($summary['subtotalAmount']) * static::DEFAULT_TAX_RATE, 2);
-            $summary['totalAmount'] = round(($summary['subtotalAmount'] + $summary['taxAmount'] + ($summary['shippingFee'] ?? static::DEFAULT_SHIPPING_FEE) + ($summary['extras']['envelope'] ?? 0) + ($summary['extras']['giveaway'] ?? 0)), 2);
+            $summary['totalAmount'] = round(($summary['subtotalAmount'] + $summary['taxAmount'] + ($summary['extras']['envelope'] ?? 0) + ($summary['extras']['giveaway'] ?? 0)), 2);
 
             session()->put(static::SESSION_SUMMARY_KEY, $summary);
 
@@ -1676,9 +2064,57 @@ class OrderFlowController extends Controller
 
         if ($order) {
             $this->updateSessionSummary($order);
+
+            // Update summary snapshot to reflect the latest totals
+            $primaryItem = $this->orderFlow->primaryInvitationItem($order);
+            if ($primaryItem instanceof OrderItem) {
+                $order->update([
+                    'summary_snapshot' => $this->orderFlow->buildSummarySnapshot($order, $primaryItem),
+                ]);
+            }
         }
 
         $summary = session(static::SESSION_SUMMARY_KEY) ?? null;
+
+        // Always check for the latest stored draft and use it for design data and previews
+        if ($summary && is_array($summary)) {
+            $productId = $summary['productId'] ?? null;
+            $product = $productId ? $this->orderFlow->resolveProduct(null, $productId) : null;
+            $storedDraft = $product ? $this->orderFlow->loadDesignDraft($product, Auth::user()) : null;
+
+            if ($storedDraft) {
+                // Always prioritize the latest stored draft data over session data for design and previews
+                if (!empty($storedDraft['design'])) {
+                    $summary['metadata']['design'] = $storedDraft['design'];
+                }
+
+                if (!empty($storedDraft['placeholders'])) {
+                    $summary['placeholders'] = $storedDraft['placeholders'];
+                }
+
+                // Always use the stored draft's preview images as they are the most recent
+                if (!empty($storedDraft['preview_images'])) {
+                    $summary['preview_images'] = $this->resolvePreviewAssets($storedDraft['preview_images']);
+                    $summary['previewImages'] = $summary['preview_images'];
+                }
+
+                if (!empty($storedDraft['preview_image'])) {
+                    $summary['previewImage'] = $this->resolvePreviewAsset($storedDraft['preview_image']);
+                    $summary['invitationImage'] = $this->resolvePreviewAsset($storedDraft['preview_image']);
+                    if (empty($summary['preview_images'])) {
+                        $summary['preview_images'] = [$summary['previewImage']];
+                    }
+                    $summary['previewImages'] = $summary['previewImages'] ?? $summary['preview_images'] ?? [];
+                }
+
+                if (!empty($storedDraft['status'])) {
+                    $summary['orderStatus'] = $storedDraft['status'];
+                }
+
+                // Update session with the latest draft data
+                session()->put(static::SESSION_SUMMARY_KEY, $summary);
+            }
+        }
 
         // If the session summary exists but lacks option lists (quantity, paper,
         // addons), attempt to enrich it from the product so the cart view can
@@ -1737,6 +2173,11 @@ class OrderFlowController extends Controller
                 // client-side script receive the option lists.
                 session()->put(static::SESSION_SUMMARY_KEY, $summary);
             }
+
+            // Always calculate totals to ensure they are up to date
+            $totals = $this->orderFlow->calculateTotalsFromSummary($summary);
+            $summary = array_merge($summary, $totals);
+            session()->put(static::SESSION_SUMMARY_KEY, $summary);
         }
 
         if ($request->expectsJson()) {
@@ -1758,6 +2199,16 @@ class OrderFlowController extends Controller
     {
         $order = $this->currentOrder();
         if (!$order) {
+            $summary = session(static::SESSION_SUMMARY_KEY);
+            if ($summary) {
+                return response()->json([
+                    'order_id' => null,
+                    'order_number' => null,
+                    'data' => $summary,
+                    'updated_at' => Carbon::now()->toIso8601String(),
+                ]);
+            }
+
             return response()->json([
                 'message' => 'No active order found for the current session.',
             ], 404);
@@ -1821,12 +2272,23 @@ class OrderFlowController extends Controller
 
         session()->put(static::SESSION_SUMMARY_KEY, $base);
 
+        // Calculate and add totals to the summary
+        $totals = $this->orderFlow->calculateTotalsFromSummary($base);
+        $base = array_merge($base, $totals);
+        session()->put(static::SESSION_SUMMARY_KEY, $base);
+
         $order = $this->currentOrder();
         if ($order) {
             DB::transaction(function () use (&$order, $base) {
                 $order = $this->orderFlow->initializeOrderFromSummary($order, $base);
                 $this->orderFlow->recalculateOrderTotals($order);
                 $order->refresh();
+                $primaryItem = $this->orderFlow->primaryInvitationItem($order);
+                if ($primaryItem instanceof OrderItem) {
+                    $order->update([
+                        'summary_snapshot' => $this->orderFlow->buildSummarySnapshot($order, $primaryItem),
+                    ]);
+                }
                 $this->updateSessionSummary($order);
             });
         }
@@ -1906,6 +2368,17 @@ class OrderFlowController extends Controller
                 return redirect()->route('customer.my_purchase.cancelled');
             }
             // For other statuses like 'draft' or 'pending', continue with checkout
+            // Recalculate totals to ensure they are up to date
+            $this->orderFlow->recalculateOrderTotals($order);
+            $order->refresh();
+
+            // Update summary snapshot to reflect recalculated totals
+            $primaryItem = $this->orderFlow->primaryInvitationItem($order);
+            if ($primaryItem instanceof OrderItem) {
+                $order->update([
+                    'summary_snapshot' => $this->orderFlow->buildSummarySnapshot($order, $primaryItem),
+                ]);
+            }
         }
 
         // If there is no persisted Order yet, but we have a session summary,
@@ -1931,7 +2404,7 @@ class OrderFlowController extends Controller
                     'status' => 'draft',
                     'subtotal_amount' => $summary['subtotalAmount'] ?? 0,
                     'tax_amount' => $summary['taxAmount'] ?? 0,
-                    'shipping_fee' => $summary['shippingFee'] ?? static::DEFAULT_SHIPPING_FEE,
+                    'shipping_fee' => static::DEFAULT_SHIPPING_FEE,
                     'total_amount' => $summary['totalAmount'] ?? 0,
                     'shipping_option' => 'standard',
                     'payment_method' => null,
@@ -1987,8 +2460,8 @@ class OrderFlowController extends Controller
             ->filter(fn ($payment) => ($payment['status'] ?? null) === 'paid')
             ->sum(fn ($payment) => (float) ($payment['amount'] ?? 0)), 2);
 
-        $balanceDue = round(max(($order->total_amount ?? 0) - $paidAmount, 0), 2);
-        $defaultDeposit = round(max($order->total_amount / 2, 0), 2);
+        $balanceDue = round(max(($order->grandTotalAmount() ?? 0) - $paidAmount, 0), 2);
+        $defaultDeposit = round(max($order->grandTotalAmount() / 2, 0), 2);
         $depositAmount = $balanceDue <= 0 ? 0 : min($defaultDeposit, $balanceDue);
 
         $paymongoMeta = $metadata['paymongo'] ?? [];
@@ -2021,7 +2494,7 @@ class OrderFlowController extends Controller
         $metadata = $order->metadata ?? [];
         $metadata['payments'][] = [
             'method' => 'gcash',
-            'amount' => $order->total_amount,
+            'amount' => $order->grandTotalAmount(),
             'status' => 'paid',
             'recorded_at' => now()->toIso8601String(),
         ];
@@ -2487,7 +2960,7 @@ class OrderFlowController extends Controller
                 'items.product.images',
                 'items.product.uploads',
                 'items.paperStockSelection.paperStock',
-                'items.addons.productAddon',
+                'items.addons.productSize',
                 'customerOrder',
             ]);
         }
@@ -2585,6 +3058,67 @@ class OrderFlowController extends Controller
             $recipients,
             new NewOrderPlaced($order->id, $order->order_number, $customerName, $totalAmount, $orderSummaryUrl)
         );
+    }
+
+    /**
+     * Normalize preview asset paths to safe, browser-consumable URLs without double-prefixing.
+     */
+    private function resolvePreviewAsset(?string $value): ?string
+    {
+        if (!$value || trim($value) === '') {
+            return null;
+        }
+
+        $trimmed = trim($value);
+
+        if (Str::startsWith($trimmed, ['data:', 'http://', 'https://'])) {
+            return $trimmed;
+        }
+
+        $normalized = ltrim(str_replace('\\', '/', $trimmed), '/');
+        $normalized = preg_replace('#^storage/#i', '', $normalized) ?? $normalized;
+        $normalized = preg_replace('#^public/#i', '', $normalized) ?? $normalized;
+
+        return Storage::url($normalized);
+    }
+
+    private function resolvePreviewAssets($values): array
+    {
+        // Accept JSON-encoded arrays or raw scalars and normalize to a flat array of strings
+        if (is_string($values)) {
+            $decoded = json_decode($values, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $values = $decoded;
+            } else {
+                $values = [$values];
+            }
+        } elseif (!is_array($values)) {
+            $values = [$values];
+        }
+
+        $flattened = [];
+        foreach ($values as $value) {
+            // Handle associative entries like ['url' => '...'] or objects with common keys
+            if (is_array($value)) {
+                $value = $value['url']
+                    ?? $value['path']
+                    ?? $value['preview']
+                    ?? $value['image']
+                    ?? null;
+            } elseif (is_object($value)) {
+                $value = $value->url
+                    ?? $value->path
+                    ?? $value->preview
+                    ?? $value->image
+                    ?? null;
+            }
+
+            if (is_string($value)) {
+                $flattened[] = $this->resolvePreviewAsset($value);
+            }
+        }
+
+        return array_values(array_filter($flattened));
     }
 
     private function resolvePickupDate(?Order $order, ?array $summaryPayload, Carbon $minDate, Carbon $maxDate): Carbon
@@ -2971,6 +3505,61 @@ class OrderFlowController extends Controller
         }
 
         return $filename;
+    }
+
+    private function persistReviewPreview(?string $previewImage, ?string $existingPath = null): ?string
+    {
+        if (!$previewImage || trim($previewImage) === '') {
+            return $existingPath;
+        }
+
+        if (Str::startsWith($previewImage, 'data:')) {
+            $extension = str_contains(strtolower($previewImage), 'svg') ? 'svg' : 'png';
+            return $this->persistDataUrl($previewImage, 'customer/reviews', $extension, $existingPath, 'preview_image');
+        }
+
+        return $previewImage;
+    }
+
+    private function normalizeDesignSvg(string $value): string
+    {
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        if (Str::startsWith($trimmed, 'data:image/svg+xml')) {
+            try {
+                return $this->decodeDataUrl($trimmed);
+            } catch (\Throwable $e) {
+                return $trimmed;
+            }
+        }
+
+        return $trimmed;
+    }
+
+    private function stripHeavyDesignFields(array $design): array
+    {
+        if (!isset($design['sides']) || !is_array($design['sides'])) {
+            return $design;
+        }
+
+        foreach ($design['sides'] as $key => $side) {
+            if (!is_array($side)) {
+                continue;
+            }
+
+            if (isset($side['svg'])) {
+                unset($design['sides'][$key]['svg']);
+            }
+
+            if (isset($side['preview']) && is_string($side['preview']) && str_starts_with($side['preview'], 'data:')) {
+                unset($design['sides'][$key]['preview']);
+            }
+        }
+
+        return $design;
     }
 
     protected function decodeDataUrl(string $dataUrl): string

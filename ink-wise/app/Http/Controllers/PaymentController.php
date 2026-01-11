@@ -41,6 +41,7 @@ class PaymentController extends Controller
             'email' => ['nullable', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:64'],
             'mode' => ['nullable', 'in:half,full,balance_payment'],
+            'amount' => ['required', 'numeric', 'min:0.01'],
         ]);
 
         if (empty($this->secretKey)) {
@@ -86,10 +87,12 @@ class PaymentController extends Controller
             ], 409);
         }
 
-        $amountToCharge = ($mode === 'full' || $mode === 'balance_payment') ? $summary['balance'] : $summary['deposit_due'];
+        $amountToCharge = $validated['amount'];
 
         Log::info('GCash amount to charge', [
             'amount_to_charge' => $amountToCharge,
+            'requested_amount' => $validated['amount'],
+            'balance' => $summary['balance'],
             'mode' => $mode,
         ]);
 
@@ -517,10 +520,10 @@ class PaymentController extends Controller
 
         $successful = $payments->filter(fn ($payment) => Arr::get($payment, 'status') === 'paid');
         $totalPaid = round($successful->sum(fn ($payment) => (float) Arr::get($payment, 'amount', 0)), 2);
-        $balance = round(max(($order->total_amount ?? 0) - $totalPaid, 0), 2);
+        $balance = round(max(($order->grandTotalAmount() ?? 0) - $totalPaid, 0), 2);
         $depositDue = $balance <= 0
             ? 0
-            : min(round(max($order->total_amount / 2, 0), 2), $balance);
+            : min(round(max($order->grandTotalAmount() / 2, 0), 2), $balance);
 
         return [
             'metadata' => $metadata,

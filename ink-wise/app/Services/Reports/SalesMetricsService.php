@@ -86,8 +86,8 @@ class SalesMetricsService
                     }
 
                     foreach ($item->addons as $addon) {
-                        if ($addon->productAddon && $addon->productAddon->material) {
-                            $materialCost += ($addon->productAddon->material->unit_cost ?? 0) * ($addon->quantity ?? 1);
+                        if ($addon->productSize && $addon->productSize->material) {
+                            $materialCost += ($addon->productSize->material->unit_cost ?? 0) * ($addon->quantity ?? 1);
                         }
                     }
                 }

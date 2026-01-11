@@ -27,6 +27,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  // Base edit URL (without size) used to build studio link with chosen size
+  const baseEditHref = editBtn ? (editBtn.dataset?.baseHref || editBtn.href) : null;
+
+  const getChosenSize = () => {
+    return (selectionState['size'] && selectionState['size'].name) || document.body?.dataset?.selectedSize || '';
+  };
+
+  const updateEditHref = () => {
+    if (!editBtn || !baseEditHref) return;
+    try {
+      const url = new URL(baseEditHref, window.location.origin);
+      const sz = getChosenSize();
+      if (sz) url.searchParams.set('size', sz);
+      if (productId) url.searchParams.set('product', productId);
+      editBtn.href = url.toString();
+      // update visible size label if present
+      const labelEl = document.getElementById('selectedSizeLabel');
+      if (labelEl) labelEl.textContent = sz || document.body?.dataset?.selectedSize || '';
+    } catch (err) {
+      // ignore
+    }
+  };
+
   const writeSelectionStore = (store) => {
     try {
       window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(store));
@@ -202,6 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
       editBtn.dataset.selectedOptions = JSON.stringify(selectionState);
     }
     persistSelectionState();
+    updateEditHref();
   };
 
   const showToast = (message, duration = 3200) => {

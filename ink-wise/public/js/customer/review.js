@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const unresolvedPlaceholders = document.querySelectorAll('.placeholder-list li');
   const placeholderCounter = document.querySelector('[data-placeholder-count]');
   const toast = document.getElementById('reviewToast');
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
   let toastTimeout = null;
 
   if (placeholderCounter) {
@@ -152,19 +153,60 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  continueBtn?.addEventListener('click', (event) => {
+    const postReviewProgress = async () => {
+      const saveUrl = continueBtn?.dataset.saveUrl;
+      if (!saveUrl) return { ok: true };
+
+      // If window.summaryData is missing, let backend pull from session by sending null.
+      const summaryPayload = window.summaryData || null;
+
+      try {
+        const response = await fetch(saveUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': csrfToken || '',
+          },
+          body: JSON.stringify({ summary: summaryPayload }),
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const message = data?.message || 'Unable to save your review progress.';
+          throw new Error(message);
+        }
+
+        return { ok: true, redirect: data?.redirect };
+      } catch (error) {
+        // Do not block navigation; notify and still allow redirect if provided.
+        showToast(error?.message || 'We could not save your review. Please try again.');
+        return { ok: false, redirect: null };
+      }
+    };
+
+    continueBtn?.addEventListener('click', async (event) => {
     if (continueBtn.disabled) {
       event.preventDefault();
       showToast('Please confirm you have reviewed your design.');
       return;
     }
-    const target = continueBtn.dataset.href;
-    if (target) {
-      window.location.href = target;
-    } else {
-      event.preventDefault();
-      showToast('Flow placeholder only — wire up the continue action later.');
-    }
+
+      continueBtn.disabled = true;
+      continueBtn.setAttribute('aria-disabled', 'true');
+
+      const result = await postReviewProgress();
+      const target = result.redirect || continueBtn.dataset.href;
+
+      if (target) {
+        window.location.href = target;
+        return;
+      }
+
+      // If save failed and no target, re-enable and notify.
+      continueBtn.disabled = false;
+      continueBtn.removeAttribute('aria-disabled');
+      showToast('We could not save your review. Please try again.');
   });
 
   const updatePlaceholderToggle = (btn, expanded, count) => {

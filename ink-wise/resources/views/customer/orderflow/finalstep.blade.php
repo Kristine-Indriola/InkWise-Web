@@ -12,7 +12,7 @@
 		@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Seasons&display=swap');
 		@import url('https://fonts.cdnfonts.com/css/edwardian-script-itc');
 	</style>
-	<script src="https://cdn.tailwindcss.com"></script>
+	@vite(['resources/css/app.css'])
 	<link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-bold-rounded/css/uicons-bold-rounded.css">
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 	<link rel="stylesheet" href="{{ asset('css/customer/orderflow-finalstep.css') }}">
@@ -75,6 +75,153 @@
 		@media (max-width: 1024px) {
 			.nav-icon-button {
 				box-shadow: none;
+			}
+		}
+
+		/* Payment summary styling */
+		.payment-summary {
+			background: rgba(255, 255, 255, 0.95);
+			backdrop-filter: blur(10px);
+			border: 1px solid rgba(15, 23, 42, 0.08);
+			border-radius: 1rem;
+			padding: 1.5rem;
+			box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
+		}
+
+		.payment-summary h3 {
+			margin-bottom: 1rem;
+			font-weight: 600;
+			color: #0f172a;
+		}
+
+		.payment-summary dl {
+			margin: 0;
+		}
+
+		.payment-summary dt {
+			color: #64748b;
+		}
+
+		.payment-summary dd {
+			font-weight: 500;
+			color: #0f172a;
+		}
+
+		.payment-summary .border-t {
+			border-top-color: #e2e8f0;
+		}
+
+		/* Base Price Section Styling */
+		.base-price-section {
+			padding: 2rem 0;
+			background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+			border-bottom: 1px solid #e2e8f0;
+		}
+
+		.base-price-card {
+			max-width: 1200px;
+			margin: 0 auto;
+			padding: 0 1rem;
+		}
+
+		.base-price-content {
+			background: rgba(255, 255, 255, 0.95);
+			backdrop-filter: blur(10px);
+			border: 1px solid rgba(15, 23, 42, 0.08);
+			border-radius: 1rem;
+			padding: 2rem;
+			box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
+		}
+
+		.base-price-header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			margin-bottom: 1.5rem;
+		}
+
+		.base-price-header h2 {
+			font-size: 1.5rem;
+			font-weight: 600;
+			color: #0f172a;
+			margin: 0;
+		}
+
+		.base-price-amount {
+			text-align: right;
+		}
+
+		.price-label {
+			display: block;
+			font-size: 0.875rem;
+			color: #64748b;
+			margin-bottom: 0.25rem;
+		}
+
+		.price-value {
+			display: block;
+			font-size: 2rem;
+			font-weight: 700;
+			color: #0f172a;
+		}
+
+		.base-price-notice {
+			display: flex;
+			align-items: flex-start;
+			gap: 1rem;
+			padding: 1.5rem;
+			background: #fef3c7;
+			border: 1px solid #f59e0b;
+			border-radius: 0.75rem;
+		}
+
+		.notice-icon {
+			flex-shrink: 0;
+			width: 2rem;
+			height: 2rem;
+			color: #d97706;
+		}
+
+		.notice-content {
+			flex: 1;
+		}
+
+		.notice-title {
+			font-size: 1rem;
+			font-weight: 600;
+			color: #92400e;
+			margin: 0 0 0.5rem 0;
+		}
+
+		.notice-text {
+			font-size: 0.875rem;
+			color: #a16207;
+			margin: 0;
+			line-height: 1.5;
+		}
+
+		@media (max-width: 768px) {
+			.base-price-header {
+				flex-direction: column;
+				align-items: flex-start;
+				gap: 1rem;
+			}
+
+			.base-price-amount {
+				text-align: left;
+			}
+
+			.price-value {
+				font-size: 1.75rem;
+			}
+
+			.base-price-notice {
+				flex-direction: column;
+				text-align: center;
+			}
+
+			.notice-icon {
+				align-self: center;
 			}
 		}
 	</style>
@@ -371,15 +518,39 @@
 	$uploads = $product->uploads ?? collect();
 	$images = $product->product_images ?? $product->images ?? optional($proof)->images ?? null;
 	$templateRef = $product->template ?? ($templateRef ?? optional($proof)->template ?? null);
+	$basePricePerPiece = $templateRef ? ($templateRef->price ?? 5.00) : 5.00;
 
 	$frontImage = $finalArtwork['front'] ?? ($finalArtworkFront ?? null);
 	$backImage = $finalArtwork['back'] ?? ($finalArtworkBack ?? null);
 
 	$resolveImage = function ($candidate) {
 		if (!$candidate) return null;
+		if (str_starts_with($candidate, 'data:')) return $candidate;
 		if (preg_match('/^(https?:)?\/\//i', $candidate) || str_starts_with($candidate, '/')) return $candidate;
 		try { return \Illuminate\Support\Facades\Storage::url($candidate); } catch (\Throwable $e) { return null; }
 	};
+
+	$summaryPayload = is_array($orderSummary ?? null) ? $orderSummary : [];
+	$summaryImages = $summaryPayload['preview_images'] ?? $summaryPayload['previewImages'] ?? null;
+	if (!isset($summaryPayload['previewImage']) && is_array($summaryImages) && !empty($summaryImages[0])) {
+		$summaryPayload['previewImage'] = $summaryImages[0];
+	}
+
+	if (!$frontImage && is_array($summaryImages) && !empty($summaryImages[0])) {
+		$frontImage = $resolveImage($summaryImages[0]);
+	}
+
+	if (!$backImage && is_array($summaryImages) && !empty($summaryImages[1])) {
+		$backImage = $resolveImage($summaryImages[1]);
+	}
+
+	if (!$frontImage && !empty($summaryPayload['previewImage'])) {
+		$frontImage = $resolveImage($summaryPayload['previewImage']);
+	}
+
+	if (!$backImage && !empty($summaryPayload['back_preview'])) {
+		$backImage = $resolveImage($summaryPayload['back_preview']);
+	}
 
 	if (!$frontImage && $images) {
 		$frontImage = $resolveImage($images->final_front ?? $images->front ?? $images->preview ?? null);
@@ -393,6 +564,10 @@
 	if (!$backImage && isset($templateRef)) {
 		$backImage = $resolveImage($templateRef->preview_back ?? $templateRef->back_image ?? null);
 	}
+
+	// Normalize any chosen previews so relative paths (e.g., customer/designs/final-previews/*) resolve correctly
+	$frontImage = $resolveImage($frontImage);
+	$backImage = $resolveImage($backImage);
 
 	if (!$frontImage && $uploads->isNotEmpty()) {
 		$first = $uploads->firstWhere(fn($upload) => str_starts_with($upload->mime_type ?? '', 'image/'));
@@ -519,6 +694,28 @@
 @php
 	$processingDays = $estimatedDeliveryDays ?? ($processingDays ?? null) ?? 7;
 @endphp
+
+@php
+    $formatMoney = static fn ($amount) => '₱' . number_format((float) ($amount ?? 0), 2);
+    $invitationSubtotal = (float) ($orderSummary['subtotalAmount'] ?? 0);
+    $extras = $orderSummary['extras'] ?? [];
+    $envelopeTotal = (float) ($extras['envelope'] ?? 0);
+    $giveawayTotal = (float) ($extras['giveaway'] ?? 0);
+    $paperExtras = (float) ($extras['paper'] ?? 0);
+    $addonsExtra = (float) ($extras['addons'] ?? 0);
+    $shipping = (float) ($orderSummary['shippingFee'] ?? 0);
+    $tax = (float) ($orderSummary['taxAmount'] ?? 0);
+    $grandTotal = (float) ($orderSummary['totalAmount'] ?? 0);
+
+    // Calculate invitation total (base + paper + addons)
+    $invitationTotalCalc = $invitationSubtotal + $paperExtras + $addonsExtra;
+
+    // Calculate envelope total
+    $envelopeTotalCalc = $envelopeTotal;
+
+    // Calculate giveaway total
+    $giveawayTotalCalc = $giveawayTotal;
+@endphp
 <main class="finalstep-shell" data-storage-key="inkwise-finalstep" data-envelope-url="{{ $envelopeUrl }}" data-cart-url="{{ route('order.addtocart') }}" data-save-url="{{ $finalStepSaveUrl }}" data-fallback-samples="false" data-product-id="{{ $product->id ?? '' }}" data-product-name="{{ $resolvedProductName }}" data-processing-days="{{ $processingDays }}">
 	<header class="finalstep-header">
 		<div class="finalstep-header__content">
@@ -528,8 +725,36 @@
 			</a>
 			<h1>Finalize your order</h1>
 			<p>Review your artwork, choose finishing touches, and confirm the final details before checkout.</p>
+
+			<!-- Saved template preview (moved into artwork preview card) -->
 		</div>
 	</header>
+
+	<!-- Base Price Display -->
+	<section class="base-price-section">
+		<div class="base-price-card">
+			<div class="base-price-content">
+				<div class="base-price-header">
+					<h2>Base Price</h2>
+					<div class="base-price-amount">
+						<span class="price-label">Base price per piece</span>
+						<span class="price-value">{{ $formatMoney($basePricePerPiece) }}</span>
+					</div>
+				</div>
+				<div class="base-price-notice">
+					<div class="notice-icon">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+						</svg>
+					</div>
+					<div class="notice-content">
+						<p class="notice-title">Total will change based on your material selections</p>
+						<p class="notice-text">The final price includes your chosen paper stock, add-ons, envelopes, giveaways, shipping, and applicable taxes. Select your options below to see the complete breakdown.</p>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
 
 	<div class="finalstep-layout">
 		<section class="finalstep-preview" data-product-name="{{ $resolvedProductName }}">
@@ -551,6 +776,8 @@
 						</div>
 					</div>
 				</div>
+			
+				<!-- saved-template container removed; previews will replace artwork images directly -->
 				<ul class="preview-meta">
 					<li><span class="meta-label">Product</span><span class="meta-value">{{ $resolvedProductName }}</span></li>
 					@if(isset($product->size))
@@ -577,9 +804,10 @@
 								<input type="number" id="quantityInput" name="quantity" value="{{ $selectedQuantity ?? $minQty }}" min="{{ $minQty }}" {{ $maxQty ? 'max="' . $maxQty . '"' : '' }} required>
 								<div class="price-display">
 									<span class="meta-label">Total:</span>
-									<span id="priceDisplay" class="meta-value">₱0.00</span>
+									<span id="priceDisplay" class="meta-value">{{ $formatMoney($itemTotal ?? 0) }}</span>
 								</div>
 							</div>
+							<p class="text-slate-600 text-sm">Base price: {{ $formatMoney($basePricePerPiece) }} per piece</p>
 							<div id="quantityError" class="error-message" style="display: none;">Quantity must be at least {{ $minQty }}</div>
 							<p class="bulk-note">{{ $quantityNote }}</p>
 						</div>
@@ -666,10 +894,12 @@
 					</div>
 
 					<div class="form-fixed-section form-fixed-section--bottom">
-						<div class="order-meta">
-							<div class="order-total">
-								<span class="meta-label">Total</span>
-								<span class="meta-value" data-order-total>₱0.00</span>
+	
+									<div class="mt-4 flex items-center justify-between text-base font-semibold border-t border-slate-200 pt-2">
+										<dt class="text-slate-900">Total due</dt>
+										<dd class="text-slate-900" data-order-total>{{ $formatMoney($grandTotal) }}</dd>
+									</div>
+								</dl>
 							</div>
 						</div>
 
@@ -923,3 +1153,205 @@
 
 </body>
 </html>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+	// no DOM container required; we will replace the artwork images directly
+
+	let saved = null;
+	try {
+		// Prefer explicit saved-template key
+		saved = JSON.parse(window.sessionStorage.getItem('inkwise-saved-template') || 'null');
+	} catch (err) {
+		saved = null;
+	}
+
+	// Fallbacks: finalstep summary, order_summary_payload, or legacy keys
+	if (!saved) {
+		const keys = ['inkwise-finalstep', 'order_summary_payload', 'inkwise-addtocart'];
+		for (const k of keys) {
+			try {
+				const summary = JSON.parse(window.sessionStorage.getItem(k) || 'null');
+				if (summary) {
+					if (summary.template) { saved = summary.template; break; }
+					if (summary.metadata && summary.metadata.template) { saved = summary.metadata.template; break; }
+					if (summary.previewImage || (Array.isArray(summary.preview_images) && summary.preview_images.length)) {
+						saved = {
+							template_name: summary.productName || summary.template_name || 'Saved template',
+							preview_image: summary.previewImage || (Array.isArray(summary.preview_images) ? summary.preview_images[0] : null),
+							preview_images: summary.preview_images || summary.previewImages || [],
+						};
+						break;
+					}
+				}
+			} catch (e) {
+				// ignore parse errors
+			}
+		}
+	}
+
+	if (!saved) return;
+
+	const resolvePreviewUrl = (candidate) => {
+		if (!candidate || typeof candidate !== 'string') return '';
+		const trimmed = candidate.trim();
+		if (trimmed === '') return '';
+		if (/^(data:|https?:|\/\/|\/)/i.test(trimmed)) return trimmed;
+		// assume storage path -> prefix with /storage/
+		return '/storage/' + trimmed.replace(/^\/+/, '');
+	};
+
+	const candidate = saved.preview_image || (Array.isArray(saved.preview_images) ? saved.preview_images[0] : '') || saved.preview || saved.previewImage || '';
+	const resolvedCandidate = resolvePreviewUrl(candidate);
+
+	let backCandidate = '';
+
+	// Replace artwork preview images in the preview card with the saved preview(s)
+		try {
+			const frontImg = document.querySelector('.card-flip .card-face.front img');
+			const backImg = document.querySelector('.card-flip .card-face.back img');
+		if (frontImg && resolvedCandidate) {
+			frontImg.src = resolvedCandidate;
+		}
+
+		// If a second preview exists, use it for the back face
+		if (Array.isArray(saved.preview_images) && saved.preview_images.length > 1) {
+			backCandidate = resolvePreviewUrl(saved.preview_images[1]);
+		} else if (saved.back_preview) {
+			backCandidate = resolvePreviewUrl(saved.back_preview);
+		}
+
+		if (backImg) {
+			if (backCandidate) {
+				backImg.src = backCandidate;
+			} else {
+				// No explicit back preview — keep the server-provided back image (do nothing)
+			}
+			// Ensure the back face is visible so users can toggle to it
+			backImg.closest('.card-face')?.classList.remove('hidden');
+		}
+	} catch (e) {
+		console.warn('Failed to replace preview images with saved template', e);
+	}
+
+	// Persist a small finalstep payload to sessionStorage so other pages (review/checkout)
+	// can detect and render the customer's edited template preview.
+	try {
+		const finalStepKey = 'inkwise-finalstep';
+		const savedTemplateKey = 'inkwise-saved-template';
+		const productName = document.querySelector('main')?.dataset?.productName || document.title || 'Saved template';
+		const previewImagesArr = [];
+		if (Array.isArray(saved?.preview_images) && saved.preview_images.length) {
+			for (const p of saved.preview_images) {
+				const r = resolvePreviewUrl(p);
+				if (r) previewImagesArr.push(r);
+			}
+		}
+		if (resolvedCandidate && !previewImagesArr.length) previewImagesArr.push(resolvedCandidate);
+		if (backCandidate && previewImagesArr.length === 1 && previewImagesArr[0] !== backCandidate) previewImagesArr.push(backCandidate);
+
+		const finalstepPayload = {
+			templateName: productName,
+			previewImage: previewImagesArr[0] || resolvedCandidate || '',
+			previewImages: previewImagesArr,
+			metadata: {
+				template: { name: productName }
+			}
+		};
+
+		try { window.sessionStorage.setItem(finalStepKey, JSON.stringify(finalstepPayload)); } catch (e) { /* ignore storage errors */ }
+		try {
+			const short = { id: null, name: finalstepPayload.templateName, preview: finalstepPayload.previewImage };
+			window.sessionStorage.setItem(savedTemplateKey, JSON.stringify(short));
+			window.savedCustomerTemplate = short;
+		} catch (e) { /* ignore */ }
+	} catch (e) {
+		// non-fatal
+	}
+
+	// If the client-side preview is still the example placeholder, try to fetch
+	// the server-side session summary which may contain persisted preview images.
+	(async () => {
+		try {
+			const resp = await fetch('/order/summary.json', { method: 'GET', headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+			if (!resp.ok) return;
+			const json = await resp.json();
+			const srv = json?.data ?? null;
+			if (!srv) return;
+			const srvImages = Array.isArray(srv.previewImages)
+				? srv.previewImages.filter(Boolean)
+				: (Array.isArray(srv.preview_images) ? srv.preview_images.filter(Boolean) : []);
+			const srvPrimary = srv.previewImage || srv.preview_image || srvImages[0] || null;
+			if (!srvPrimary) return;
+			// ignore obvious example placeholders
+			if (String(srvPrimary).includes('example.com')) return;
+
+			const resolved = (function (candidate) {
+				if (!candidate) return '';
+				if (/^(data:|https?:|\/\/|\/)/i.test(candidate)) return candidate;
+				return '/storage/' + String(candidate).replace(/^\/+/, '');
+			})(srvPrimary);
+
+			if (resolved) {
+				try { window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(Object.assign({}, JSON.parse(window.sessionStorage.getItem('inkwise-finalstep') || '{}'), { previewImage: resolved, previewImages: srvImages.map((s) => s && String(s).includes('example.com') ? null : (s && /^(data:|https?:|\/\/|\/)/i.test(s) ? s : '/storage/' + String(s).replace(/^\/+/, ''))).filter(Boolean) }))); } catch (e) { /* ignore */ }
+				try { window.sessionStorage.setItem('inkwise-saved-template', JSON.stringify({ id: null, name: srv.productName || document.title || 'Saved template', preview: resolved })); } catch (e) { /* ignore */ }
+				const frontImg = document.querySelector('.card-flip .card-face.front img');
+				const backImg = document.querySelector('.card-flip .card-face.back img');
+				if (frontImg) frontImg.src = resolved;
+				if (backImg && srvImages.length > 1) backImg.src = (srvImages[1].includes('example.com') ? backImg.src : (srvImages[1]));
+			}
+		} catch (e) {
+			// non-fatal
+		}
+	})();
+	});
+	</script>
+
+	<script>
+	document.addEventListener('DOMContentLoaded', function () {
+		// Accessible modal helpers for preOrderModal
+		window.showPreOrderModal = function () {
+			const modal = document.getElementById('preOrderModal');
+			if (!modal) return;
+			modal.removeAttribute('aria-hidden');
+			try { modal.inert = false; } catch (e) { /* inert may not be supported */ }
+			modal.style.display = 'block';
+			const btn = modal.querySelector('#preOrderConfirm');
+			if (btn) btn.focus();
+		};
+
+		window.hidePreOrderModal = function (returnFocusSelector) {
+			const modal = document.getElementById('preOrderModal');
+			if (!modal) return;
+			modal.setAttribute('aria-hidden', 'true');
+			try { modal.inert = true; } catch (e) { /* inert may not be supported */ }
+			modal.style.display = 'none';
+			if (returnFocusSelector) {
+				const opener = document.querySelector(returnFocusSelector);
+				if (opener) opener.focus();
+			}
+		};
+
+		// Wire modal action buttons
+		const confirmBtn = document.getElementById('preOrderConfirm');
+		const cancelBtn = document.getElementById('preOrderCancel');
+		if (confirmBtn) {
+			confirmBtn.addEventListener('click', function () {
+				hidePreOrderModal();
+			});
+		}
+		if (cancelBtn) {
+			cancelBtn.addEventListener('click', function () {
+				hidePreOrderModal();
+			});
+		}
+
+		// Attach open handlers to any element that may open the modal
+		document.querySelectorAll('[data-open-preorder]').forEach(el => {
+			el.addEventListener('click', function (e) {
+				e.preventDefault();
+				window.showPreOrderModal();
+			});
+		});
+	});
+	</script>

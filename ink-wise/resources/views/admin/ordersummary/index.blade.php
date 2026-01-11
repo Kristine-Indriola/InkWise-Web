@@ -1642,7 +1642,42 @@
 											})
 											->unique(fn ($option) => \Illuminate\Support\Str::lower($option))
 											->values();
-										$images = collect(data_get($item, 'preview_images', data_get($item, 'images', [])))->filter();
+										// Prefer any customer-saved draft previews (CustomerTemplateCustom)
+										$imagesSource = data_get($item, 'preview_images', data_get($item, 'images', []));
+										try {
+											$customerDraft = null;
+											// Use the original Eloquent order model when available (`orderModel`)
+											if (isset($orderModel) && ($orderModel->id ?? null) && (data_get($item, 'id') || data_get($item, 'order_item_id'))) {
+												$orderItemId = data_get($item, 'id', data_get($item, 'order_item_id'));
+												$customerDraft = \App\Models\CustomerTemplateCustom::query()
+													->where('order_id', $orderModel->id)
+													->where('order_item_id', $orderItemId)
+													->latest('id')
+													->first();
+											}
+
+											if (!$customerDraft && isset($order) && ($order?->customer_id ?? null)) {
+												// Fallback: find by customer/product/template match
+												$customerDraft = \App\Models\CustomerTemplateCustom::query()
+													->where('customer_id', $order->customer_id)
+													->where('product_id', data_get($item, 'product_id'))
+													->latest('id')
+													->first();
+											}
+
+											if ($customerDraft) {
+												$draftImages = data_get($customerDraft, 'preview_images', data_get($customerDraft, 'preview_images', []));
+												if (!empty($draftImages)) {
+													$imagesSource = $draftImages;
+												} elseif (!empty($customerDraft->preview_image ?? null)) {
+													$imagesSource = [$customerDraft->preview_image];
+												}
+											}
+										} catch (\Throwable $e) {
+											// ignore and fall back to item images
+										}
+
+										$images = collect($imagesSource)->filter();
 										$itemMaterialBuckets = [
 											'paper' => [],
 											'addon' => [],
@@ -1918,6 +1953,31 @@
 													}
 
 													$gallery = $galleryEntries->values();
+													// Prepare a client-friendly gallery with normalized URLs so the
+													// preview JS doesn't request relative paths that 404.
+													$galleryForClient = $gallery->map(function ($entry) {
+														$src = is_array($entry) ? ($entry['src'] ?? '') : (is_string($entry) ? $entry : '');
+														$src = trim((string) $src);
+														if ($src === '') {
+															return null;
+														}
+
+														if (preg_match('/^https?:\/\//i', $src)) {
+															$url = $src;
+														} elseif (preg_match('/^\/?storage\//i', $src)) {
+															$url = asset(ltrim($src, '/'));
+														} elseif (str_starts_with($src, '/')) {
+															$url = url($src);
+														} else {
+															$url = asset('storage/' . ltrim($src, '/'));
+														}
+
+														return array_filter([
+															'src' => $url,
+															'orientation' => $entry['orientation'] ?? null,
+															'label' => $entry['label'] ?? null,
+														], function ($v) { return $v !== null && $v !== ''; });
+													})->filter()->values();
 													$itemMaterialsList = collect($itemMaterialBuckets)
 														->flatMap(function ($rows, $type) {
 															return collect($rows)->map(function ($row) use ($type) {
@@ -1939,6 +1999,25 @@
 													$primaryImage = is_array($primaryImageEntry) ? ($primaryImageEntry['src'] ?? null) : (is_string($primaryImageEntry) ? $primaryImageEntry : null);
 													$primaryImageLabel = is_array($primaryImageEntry) ? ($primaryImageEntry['label'] ?? null) : null;
 													$previewTitle = data_get($item, 'name', 'Custom product');
+
+													// Normalize image URL for browser consumption. Accept absolute URLs, storage paths,
+													// and relative paths. Fallback to placeholder when missing.
+													$primaryImageUrl = null;
+													if (!empty($primaryImage)) {
+														$trimmed = trim((string) $primaryImage);
+														if (preg_match('/^https?:\/\//i', $trimmed)) {
+															$primaryImageUrl = $trimmed;
+														} elseif (preg_match('/^\/?storage\//i', $trimmed)) {
+															$primaryImageUrl = asset(ltrim($trimmed, '/'));
+														} elseif (str_starts_with($trimmed, '/')) {
+															$primaryImageUrl = url($trimmed);
+														} else {
+															// Common case: stored in storage/app/public or relative path like "customerimages/..."
+															$primaryImageUrl = asset('storage/' . ltrim($trimmed, '/'));
+														}
+													} else {
+														$primaryImageUrl = asset('images/placeholder.png');
+													}
 												@endphp
 												@if($gallery->isNotEmpty())
 													<button
@@ -1946,11 +2025,11 @@
 														class="item-cell__thumb-button"
 														data-preview-trigger
 														data-preview-title="{{ $previewTitle }}"
-														data-preview-gallery='@json($gallery)'
+														data-preview-gallery='@json($galleryForClient)'
 														data-preview-materials='@json($itemMaterialsList)'
 														aria-label="View artwork preview for {{ $previewTitle }}"
 													>
-														<img src="{{ $primaryImage }}" alt="{{ $primaryImageLabel ? $previewTitle . ' ' . strtolower($primaryImageLabel) : $previewTitle . ' preview' }}" class="item-cell__thumb">
+														<img src="{{ $primaryImageUrl }}" alt="{{ $primaryImageLabel ? $previewTitle . ' ' . strtolower($primaryImageLabel) : $previewTitle . ' preview' }}" class="item-cell__thumb">
 													</button>
 												@endif
 												<div>

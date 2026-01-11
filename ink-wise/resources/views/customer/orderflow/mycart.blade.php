@@ -22,9 +22,7 @@
 </head>
 <body class="bg-slate-50 text-slate-900"
     data-envelope-total="{{ $envelopeTotalCalc ?? 0 }}"
-    data-giveaway-total="{{ $giveawayTotalCalc ?? 0 }}"
-    data-shipping="{{ $shipping ?? 0 }}"
-    data-tax="{{ $tax ?? 0 }}">
+    data-giveaway-total="{{ $giveawayTotalCalc ?? 0 }}">
 @php
     $resolveRoute = static function (string $name, string $fallbackPath) {
         try {
@@ -162,7 +160,7 @@
                 'addonItems' => data_get($orderSummary, 'addonItems', data_get($orderSummary, 'addons', [])),
                 'total' => $invitationSubtotal + $paperExtras + $addonsExtra,
                 'preview' => $extractPreview($orderSummary),
-                'previewImages' => data_get($orderSummary, 'previewImages', []),
+                'previewImages' => data_get($orderSummary, 'previewImages', data_get($orderSummary, 'preview_images', [])),
                 'estimated_date' => data_get($orderSummary, 'estimated_date') ?? data_get($orderSummary, 'dateNeeded'),
                 'estimated_date_label' => data_get($orderSummary, 'dateNeededLabel') ?? data_get($orderSummary, 'estimated_date_label'),
                 'is_preorder' => data_get($orderSummary, 'metadata.final_step.is_preorder') ?? false,
@@ -202,19 +200,15 @@
         }
 
         $qty = $extractQty($item);
-        $unit = data_get($item, 'unitPrice')
-            ?? data_get($item, 'unit_price')
-            ?? data_get($item, 'price')
-            ?? data_get($item, 'paperStockPrice')
-            ?? data_get($item, 'paper_stock_price')
-            ?? 0;
+        $basePrice = data_get($item, 'basePricePerPiece') ?? 0;
+        $paperPrice = data_get($item, 'paperStockPrice') ?? 0;
 
-        return max(0, $qty * (float) $unit);
+        return max(0, $qty * ((float) $basePrice + (float) $paperPrice));
     };
 
     $invitationTotalCalc = $invitationItems->sum(fn ($item) => $computeInvitationTotal($item));
     if ($invitationTotalCalc <= 0) {
-        $invitationTotalCalc = $invitationSubtotal + $paperExtras + $addonsExtra;
+        $invitationTotalCalc = $paperExtras;
     }
 
     $envelopeTotalCalc = $envelopeItems->sum(fn ($item) => $extractTotal($item));
@@ -227,7 +221,18 @@
         $giveawayTotalCalc = $giveawayTotal;
     }
 
-    $grandTotal = $invitationTotalCalc + $envelopeTotalCalc + $giveawayTotalCalc + $shipping + $tax;
+    $grandTotal = $invitationTotalCalc + $envelopeTotalCalc + $giveawayTotalCalc;
+
+    // Use the totalAmount from session summary if available (should be the authoritative source from database)
+    $sessionTotalAmount = (float) data_get($orderSummary, 'totalAmount', 0);
+    if ($sessionTotalAmount > 0) {
+        $grandTotal = $sessionTotalAmount;
+    }
+
+    // For persisted orders, use the order's grandTotalAmount to ensure consistency with payment calculations
+    if ($order) {
+        $grandTotal = $order->grandTotalAmount();
+    }
 @endphp
 
     @include('partials.topbar')
@@ -279,6 +284,49 @@
                 }
             } catch (err) {
                 console.warn('Error syncing session data:', err);
+            }
+        })();
+    </script>
+
+    <script>
+        // If the browser has a saved edited template, apply its preview to the order cards
+        (function () {
+            try {
+                const raw = window.sessionStorage.getItem('inkwise-saved-template') || window.sessionStorage.getItem('inkwise-finalstep');
+                if (!raw) return;
+                const parsed = JSON.parse(raw);
+                // inkwise-finalstep may contain a nested saved template under metadata.template or template
+                let candidate = parsed && parsed.preview ? parsed.preview : null;
+                if (!candidate && parsed && parsed.template) {
+                    candidate = parsed.template.preview || parsed.template.preview_image || parsed.template.previewImage || parsed.template.preview_images && parsed.template.preview_images[0];
+                }
+                if (!candidate && parsed && parsed.metadata && parsed.metadata.template) {
+                    const t = parsed.metadata.template;
+                    candidate = t.preview || t.preview_image || (Array.isArray(t.preview_images) ? t.preview_images[0] : null) || t.previewImage;
+                }
+                if (!candidate && parsed && parsed.previewImage) {
+                    candidate = parsed.previewImage;
+                }
+                if (!candidate && parsed && parsed.preview_images && parsed.preview_images.length) {
+                    candidate = parsed.preview_images[0];
+                }
+                if (!candidate) return;
+
+                // Find order card images and replace with candidate preview
+                const cards = document.querySelectorAll('.bg-white.border.rounded-xl img, .glass-card img');
+                if (!cards || cards.length === 0) return;
+
+                const resolved = candidate;
+                cards.forEach((img) => {
+                    try {
+                        img.src = resolved;
+                        img.closest('a')?.setAttribute('href', resolved);
+                    } catch (e) {
+                        // ignore
+                    }
+                });
+            } catch (e) {
+                console.warn('Apply saved template preview failed', e);
             }
         })();
     </script>
@@ -340,13 +388,13 @@
                                 $invPreviewGallery = collect([$invPreview]);
                             }
                             $invUnitPrice = (float) (
-                                data_get($invitation, 'unitPrice')
+                                data_get($invitation, 'paperStockPrice')
+                                ?? data_get($invitation, 'paper_stock_price')
+                                ?? data_get($orderSummary, 'paperStockPrice')
+                                ?? data_get($invitation, 'unitPrice')
                                 ?? data_get($invitation, 'unit_price')
                                 ?? data_get($invitation, 'price')
-                                ?? data_get($invitation, 'paperStockPrice')
-                                ?? data_get($invitation, 'paper_stock_price')
                                 ?? data_get($orderSummary, 'unitPrice')
-                                ?? data_get($orderSummary, 'paperStockPrice')
                                 ?? 0
                             );
                             $invMeta = (array) data_get($invitation, 'metadata', []);
@@ -725,28 +773,14 @@
                                 <dt class="text-slate-600">Giveaways</dt>
                                     <dd class="font-medium text-slate-900" id="summary-give-total">{{ $formatMoney($giveawayTotalCalc) }}</dd>
                             </div>
-                            @if($paperExtras > 0)
-                                <div class="flex items-center justify-between">
-                                    <dt class="text-slate-600">Paper options</dt>
-                                    <dd class="font-medium text-slate-900">{{ $formatMoney($paperExtras) }}</dd>
-                                </div>
-                            @endif
                             @if($addonsExtra > 0)
                                 <div class="flex items-center justify-between">
                                     <dt class="text-slate-600">Add-ons</dt>
                                     <dd class="font-medium text-slate-900">{{ $formatMoney($addonsExtra) }}</dd>
                                 </div>
                             @endif
-                            <div class="flex items-center justify-between">
-                                <dt class="text-slate-600">Shipping</dt>
-                                <dd class="font-medium text-slate-900">{{ $formatMoney($shipping) }}</dd>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <dt class="text-slate-600">Tax</dt>
-                                <dd class="font-medium text-slate-900">{{ $formatMoney($tax) }}</dd>
-                            </div>
                             <div class="mt-4 flex items-center justify-between text-base font-semibold">
-                                <dt class="text-slate-900">Total due</dt>
+                                <dt class="text-slate-900">Total amount</dt>
                                 <dd class="text-slate-900" id="summary-grand-total">{{ $formatMoney($grandTotal) }}</dd>
                             </div>
                         </dl>

@@ -1,26 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ $product->name ?? optional($template)->name ?? 'InkWise Studio' }} &mdash; InkWise</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css">
-    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-solid-rounded/css/uicons-solid-rounded.css">
-    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-solid-straight/css/uicons-solid-straight.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@flaticon/flaticon-uicons/css/all/all.css">
-    @if(app()->environment('local'))
-        @viteReactRefresh
-    @endif
-    @vite([
-        'resources/css/customer/studio.css',
-        'resources/js/customer/studio/main.jsx',
-    ])
-</head>
+@include('customer.studio._head')
 <body>
 @php
     $defaultFront = asset('Customerimages/invite/wedding2.png');
@@ -114,6 +92,21 @@
     $canvasShapeAttr = $templateCanvas && $templateCanvas['shape'] ? $templateCanvas['shape'] : null;
     $canvasUnitAttr = $templateCanvas ? ($templateCanvas['unit'] ?? 'px') : null;
 
+    // Parse size parameter (e.g., "4.5x6.25") and override canvas dimensions
+    $selectedSize = request()->query('size');
+    $parsedSize = null;
+    if ($selectedSize && preg_match('/^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)$/', $selectedSize, $matches)) {
+        $parsedSize = [
+            'width' => (float) $matches[1],
+            'height' => (float) $matches[2],
+            'unit' => 'in'
+        ];
+        // Convert inches to pixels (assuming 96 DPI)
+        $canvasWidthAttr = (string) round($parsedSize['width'] * 96);
+        $canvasHeightAttr = (string) round($parsedSize['height'] * 96);
+        $canvasUnitAttr = 'px';
+    }
+
     $resolveImage = static function ($path, $fallback) {
         if (!$path) {
             return $fallback;
@@ -126,6 +119,134 @@
         }
     };
 
+    $readSvgFile = static function ($candidate) {
+        if (!is_string($candidate) || trim($candidate) === '') {
+            return null;
+        }
+
+        $pathPart = $candidate;
+        $urlComponents = @parse_url($candidate);
+        if (is_array($urlComponents) && !empty($urlComponents['path'])) {
+            $pathPart = $urlComponents['path'];
+        }
+
+        $pathPart = urldecode((string) $pathPart);
+        if (trim($pathPart) === '') {
+            return null;
+        }
+
+        $variants = [];
+        $normalized = str_replace('\\', '/', ltrim($pathPart, '/'));
+        $variants[] = $normalized;
+        $variants[] = preg_replace('#^storage/#i', '', $normalized) ?? $normalized;
+        $variants[] = preg_replace('#^public/#i', '', $normalized) ?? $normalized;
+        $variants[] = preg_replace('#^public/storage/#i', '', $normalized) ?? $normalized;
+        $variants = array_values(array_unique(array_filter($variants, static fn ($value) => is_string($value) && $value !== '')));
+
+        $disks = array_values(array_unique(array_filter([
+            'invitation_templates',
+            'public',
+            config('filesystems.default'),
+        ], static fn ($disk) => is_string($disk) && $disk !== '')));
+
+        foreach ($variants as $variant) {
+            $trimmed = ltrim($variant, '/');
+
+            foreach ($disks as $disk) {
+                if (!config("filesystems.disks.{$disk}")) {
+                    continue;
+                }
+
+                try {
+                    if (\Illuminate\Support\Facades\Storage::disk($disk)->exists($trimmed)) {
+                        $contents = \Illuminate\Support\Facades\Storage::disk($disk)->get($trimmed);
+                        if (is_string($contents) && $contents !== '') {
+                            return $contents;
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // continue to other disks
+                }
+            }
+
+            $fileCandidates = [
+                public_path($trimmed),
+                public_path('storage/' . $trimmed),
+                storage_path('app/public/' . $trimmed),
+            ];
+
+            foreach ($fileCandidates as $filePath) {
+                if (!$filePath || !is_string($filePath)) {
+                    continue;
+                }
+
+                if (is_file($filePath)) {
+                    $contents = @file_get_contents($filePath);
+                    if (is_string($contents) && $contents !== '') {
+                        return $contents;
+                    }
+                }
+            }
+        }
+
+        return null;
+    };
+
+    $resolveSvgDataUri = static function ($value) use ($resolveImage, $readSvgFile) {
+        if (empty($value)) {
+            return null;
+        }
+
+        $candidates = [];
+        if (is_array($value)) {
+            foreach (['data', 'data_uri', 'inline', 'path', 'url', 0] as $key) {
+                if (!isset($value[$key])) {
+                    continue;
+                }
+                $candidate = $value[$key];
+                if (is_string($candidate) && $candidate !== '') {
+                    $candidates[] = $candidate;
+                }
+            }
+        } elseif (is_string($value)) {
+            $candidates[] = $value;
+        }
+
+        $candidates = array_values(array_unique(array_filter($candidates, static fn ($candidate) => is_string($candidate) && trim($candidate) !== '')));
+
+        foreach ($candidates as $candidate) {
+            if (str_starts_with($candidate, 'data:image/svg+xml')) {
+                return $candidate;
+            }
+        }
+
+        foreach ($candidates as $candidate) {
+            $resolved = $resolveImage($candidate, null);
+            if ($resolved && $resolved !== $candidate) {
+                $candidates[] = $resolved;
+            }
+        }
+
+        $candidates = array_values(array_unique(array_filter($candidates, static fn ($candidate) => is_string($candidate) && trim($candidate) !== '')));
+
+        foreach ($candidates as $candidate) {
+            if (!str_contains($candidate, '.svg') && !str_starts_with($candidate, 'data:image/svg+xml')) {
+                continue;
+            }
+
+            if (str_starts_with($candidate, 'data:image/svg+xml')) {
+                return $candidate;
+            }
+
+            $contents = $readSvgFile($candidate);
+            if (is_string($contents) && $contents !== '') {
+                return 'data:image/svg+xml;base64,' . base64_encode($contents);
+            }
+        }
+
+        return null;
+    };
+
     $templateFront = $templateModel?->preview_front
         ?? $templateModel?->front_image
         ?? $templateModel?->preview
@@ -134,8 +255,8 @@
     $templateBack = $templateModel?->preview_back
         ?? $templateModel?->back_image;
 
-    $frontSvg = $resolveImage($templateModel?->svg_path ?? null, null);
-    $backSvg = $resolveImage($templateModel?->back_svg_path ?? null, null);
+    $frontSvg = $resolveSvgDataUri($templateModel?->svg_path ?? null);
+    $backSvg = $resolveSvgDataUri($templateModel?->back_svg_path ?? null);
 
     $hasBackSide = false;
     if ($templateModel) {
@@ -240,8 +361,10 @@
         </div>
     </div>
     <div class="topbar-center">
-        <span class="topbar-status-dot" aria-hidden="true"></span>
-        <span class="topbar-status-label">Saved</span>
+        <div class="topbar-status">
+            <span class="topbar-status-dot" aria-hidden="true"></span>
+            <span class="topbar-status-label">Saved</span>
+        </div>
         <div class="topbar-history-controls" role="group" aria-label="History controls">
             <button type="button" class="topbar-icon-btn" aria-label="View history"><i class="fa-regular fa-clock"></i></button>
             <button type="button" class="topbar-icon-btn" aria-label="Undo"><i class="fa-solid fa-rotate-left"></i></button>
@@ -303,6 +426,11 @@
                 </div>
             </div>
             <div class="canvas-stage">
+                <!-- Loading state -->
+                <div id="canvas-loading" class="canvas-loading">
+                    <div class="loading-spinner"></div>
+                    <p>Loading template...</p>
+                </div>
                 <div class="canvas-measure canvas-measure-vertical" aria-hidden="true">
                     <span class="measure-cap"></span>
                     <span class="measure-line"></span>
@@ -711,18 +839,50 @@
     </div>
 </div>
 
-<script type="application/json" id="inkwise-customer-studio-bootstrap">
-    {!! json_encode([
+@php
+    $selectedSize = request()->query('size')
+        ?? $product?->size
+        ?? (is_array($product?->sizes ?? null) ? ($product->sizes[0] ?? null) : null)
+        ?? (($templateModel?->width_inch && $templateModel?->height_inch) ? ($templateModel->width_inch . 'x' . $templateModel->height_inch) : null)
+        ?? config('invitations.default_size', '5x7');
+
+    $bootstrapPayload = [
+        'csrfToken' => csrf_token(),
         'product' => $productBootstrap,
         'template' => $templateBootstrap,
-        'orderSummary' => $orderSummary,
+        'assets' => [
+            'front_image' => $frontImage,
+            'back_image' => $hasBackSide ? $backImage : null,
+            'default_front' => $defaultFront,
+            'default_back' => $defaultBack,
+            'brand_logo' => asset('images/logo.png'),
+            'preview_images' => [
+                'front' => $templateBootstrap['preview_front'] ?? null,
+                'back' => $templateBootstrap['preview_back'] ?? null,
+            ],
+        ],
+        'svg' => [
+            'front' => $frontSvg,
+            'back' => $backSvg,
+        ],
+        'selection' => [
+            'size' => $selectedSize ?? null,
+        ],
+        'flags' => [
+            'has_back' => $hasBackSide,
+        ],
         'routes' => [
             'autosave' => route('order.design.autosave'),
-            'review' => route('order.review'),
             'saveTemplate' => route('order.design.save-template'),
+            'review' => route('order.review'),
+            'saveReview' => route('order.review.design'),
+            'change_template' => route('templates.wedding.invitations'),
         ],
-    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) !!}
-</script>
+        'orderSummary' => $orderSummary ?? null,
+    ];
+@endphp
+
+@include('customer.studio._bootstrap')
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {

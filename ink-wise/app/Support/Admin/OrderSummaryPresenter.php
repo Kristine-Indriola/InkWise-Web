@@ -220,9 +220,71 @@ class OrderSummaryPresenter
                 $options = static::deriveOptionsFromRelations($item);
             }
 
-            $previewImages = Arr::get($metadata, 'preview_images')
-                ?? Arr::get($metadata, 'images')
-                ?? Arr::get($summary, 'preview_images');
+                $previewImages = Arr::get($metadata, 'preview_images')
+                    ?? Arr::get($metadata, 'images')
+                    ?? Arr::get($summary, 'preview_images');
+
+                // If no preview images found in metadata/summary, fall back to related product/template images
+                if (empty($previewImages)) {
+                    $prod = $item->product ?? null;
+                    $collected = [];
+
+                    // Helper to normalize a candidate image
+                    $resolveCandidate = function ($candidate) use (&$collected, $prod) {
+                        if (!$candidate) return;
+                        if (is_string($candidate) && trim($candidate) !== '') {
+                            $collected[] = $candidate;
+                            return;
+                        }
+
+                        if (is_array($candidate)) {
+                            $src = $candidate['url'] ?? $candidate['src'] ?? $candidate['preview'] ?? null;
+                            if ($src) $collected[] = $src;
+                            return;
+                        }
+
+                        if (is_object($candidate)) {
+                            // common ORM relations may expose url or filename
+                            $src = $candidate->url ?? $candidate->src ?? $candidate->preview ?? null;
+                            if ($src) {
+                                $collected[] = $src;
+                                return;
+                            }
+                            if (property_exists($candidate, 'filename') && $prod) {
+                                try {
+                                    $collected[] = asset('storage/uploads/products/' . ($prod->id ?? 'generic') . '/' . ($candidate->filename ?? ''));
+                                } catch (\Throwable $_e) {
+                                    // ignore
+                                }
+                            }
+                        }
+                    };
+
+                    // Template attached to product
+                    if ($prod && isset($prod->template)) {
+                        $tpl = $prod->template;
+                        $resolveCandidate($tpl->preview_front ?? $tpl->front_image ?? $tpl->preview ?? $tpl->image ?? null);
+                        $resolveCandidate($tpl->preview_back ?? $tpl->back_image ?? null);
+                    }
+
+                    // Product images relation
+                    if ($prod && ($prod->product_images ?? null)) {
+                        foreach ($prod->product_images as $pi) {
+                            $resolveCandidate($pi);
+                        }
+                    }
+
+                    // Product uploads fallback
+                    if ($prod && ($prod->uploads ?? null)) {
+                        foreach ($prod->uploads as $up) {
+                            $resolveCandidate($up);
+                        }
+                    }
+
+                    if (!empty($collected)) {
+                        $previewImages = $collected;
+                    }
+                }
 
             return [
                 'id' => $item->id,

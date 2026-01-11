@@ -171,6 +171,27 @@ export function TextMiniToolbar({
 
   // When CMYK changes, update the color preview and notify parent
   useEffect(() => {
+    // Try to read initial selection from the bridge so toolbar reflects current element
+    try {
+      const bridge = typeof window !== 'undefined' ? window.inkwiseToolbar : null;
+      if (bridge && typeof bridge.getSelection === 'function') {
+        const sel = bridge.getSelection();
+        if (sel) {
+          if (sel.fontFamily) {
+            const found = FONT_OPTIONS.find((f) => f.family === sel.fontFamily || f.name === sel.fontFamily);
+            if (found) setSelectedOption(found);
+          }
+          if (Number.isFinite(Number(sel.fontSize))) {
+            setFontSize(Number(sel.fontSize));
+          }
+          if (sel.color) {
+            setColor(String(sel.color));
+          }
+        }
+      }
+    } catch (e) {
+      // non-fatal - ignore
+    }
     if (activeTab === 'cmyk') {
       try {
         const hex = cmykToHex(cVal, mVal, yVal, kVal);
@@ -289,12 +310,31 @@ export function TextMiniToolbar({
       }
     };
 
+    const handleEsc = (event) => {
+      if (event.key === 'Escape' || event.key === 'Esc') {
+        setIsFontModalOpen(false);
+        setIsColorModalOpen(false);
+        setIsFormatModalOpen(false);
+        setIsCaseModalOpen(false);
+        setIsAlignModalOpen(false);
+        setIsListModalOpen(false);
+        setIsNumberModalOpen(false);
+        setIsOpacityModalOpen(false);
+        setIsRotationModalOpen(false);
+        setIsLayersModalOpen(false);
+        setIsMoreModalOpen(false);
+        setIsEffectsModalOpen(false);
+      }
+    };
+
     if (isFontModalOpen || isColorModalOpen || isFormatModalOpen || isCaseModalOpen || isAlignModalOpen || isListModalOpen || isNumberModalOpen || isEffectsModalOpen || isOpacityModalOpen || isRotationModalOpen || isLayersModalOpen || isMoreModalOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEsc);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEsc);
     };
   }, [isFontModalOpen, isColorModalOpen]);
 
@@ -431,6 +471,8 @@ export function TextMiniToolbar({
               setIsFontModalOpen((prev) => !prev);
             }}
             aria-label={isTextSelection ? 'Choose font family' : 'Font selection available for text elements'}
+            aria-haspopup="listbox"
+            aria-expanded={isFontModalOpen}
             disabled={!isTextSelection}
           >
             {isTextSelection ? selectedOption.name : 'Select element'} <i className="fa-solid fa-chevron-down" aria-hidden="true" />
@@ -487,6 +529,7 @@ export function TextMiniToolbar({
             setIsColorModalOpen((v) => !v);
           }}
           disabled={!hasSelection}
+          aria-expanded={isColorModalOpen}
         >
           <span className="color-swatch__chip" style={{ background: color }} />
         </button>

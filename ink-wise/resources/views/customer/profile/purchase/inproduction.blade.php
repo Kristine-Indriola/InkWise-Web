@@ -304,6 +304,74 @@
                             @endforeach
                         </div>
                     @endif
+                    @php
+                        // Show any saved/edited template attached to the order metadata
+                        $templateMeta = $metadata['template'] ?? $metadata['saved_template'] ?? $metadata['design_template'] ?? null;
+                        if (is_string($templateMeta) && $templateMeta !== '') {
+                            $decoded = json_decode($templateMeta, true);
+                            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                                $templateMeta = $decoded;
+                            }
+                        }
+
+                        $templatePreview = null;
+                        $templatePreviews = [];
+                        if (is_array($templateMeta) && !empty($templateMeta)) {
+                            $maybeSingle = $templateMeta['preview_image'] ?? $templateMeta['preview'] ?? $templateMeta['previewImage'] ?? null;
+                            if ($maybeSingle) {
+                                $templatePreview = $resolveDesignImageUrl($maybeSingle) ?? null;
+                            }
+                            $maybeList = $templateMeta['preview_images'] ?? $templateMeta['previewImages'] ?? $templateMeta['images'] ?? [];
+                            if (is_array($maybeList)) {
+                                foreach ($maybeList as $p) {
+                                    $resolved = $resolveDesignImageUrl($p);
+                                    if ($resolved) {
+                                        $templatePreviews[] = $resolved;
+                                    }
+                                }
+                            }
+                        }
+
+                        // Fallback: prefer order-level design preview (persisted from finalstep)
+                        if (!$templatePreview) {
+                            $designPreviewMeta = $metadata['design_preview'] ?? null;
+                            if (is_array($designPreviewMeta) && !empty($designPreviewMeta)) {
+                                $maybe = $designPreviewMeta['image'] ?? (is_array($designPreviewMeta['images'] ?? null) ? ($designPreviewMeta['images'][0] ?? null) : null);
+                                if ($maybe) {
+                                    $templatePreview = $resolveDesignImageUrl($maybe) ?? $templatePreview;
+                                }
+                                if (empty($templatePreviews) && !empty($designPreviewMeta['images']) && is_array($designPreviewMeta['images'])) {
+                                    foreach ($designPreviewMeta['images'] as $p) {
+                                        $resolved = $resolveDesignImageUrl($p);
+                                        if ($resolved) {
+                                            $templatePreviews[] = $resolved;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    @endphp
+
+                    @if($templatePreview || count($templatePreviews))
+                        <div class="mt-3 saved-template-card" data-order-number="{{ $orderNumber }}">
+                            <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Edited template</div>
+                            <div class="flex items-center gap-3 mt-2">
+                                @if($templatePreview)
+                                    <a href="{{ $templatePreview }}" target="_blank" rel="noopener" class="block">
+                                        <img src="{{ $templatePreview }}" alt="Saved template preview" class="w-20 h-20 object-cover rounded border border-gray-200">
+                                    </a>
+                                @elseif(count($templatePreviews))
+                                    <a href="{{ $templatePreviews[0] }}" target="_blank" rel="noopener" class="block">
+                                        <img src="{{ $templatePreviews[0] }}" alt="Saved template preview" class="w-20 h-20 object-cover rounded border border-gray-200">
+                                    </a>
+                                @endif
+                                <div class="flex-1 text-sm text-gray-600">
+                                    <div class="font-medium">{{ $templateMeta['template_name'] ?? $templateMeta['name'] ?? 'Saved template' }}</div>
+                                    <div class="text-xs text-gray-400">Click image to open full preview</div>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
                 </div>
                 <div class="flex flex-col items-end gap-2">
                     <div class="text-gray-700 font-bold">₱{{ number_format($totalAmount, 2) }}</div>
@@ -339,6 +407,7 @@
                                 @endif>
                             View Design Proof{{ $hasDesignEntries ? ($designEntries->count() > 1 ? 's' : '') : '' }}
                         </button>
+                        <button type="button" class="px-4 py-2 bg-blue-50 text-blue-700 rounded font-semibold js-apply-saved-template" data-order-number="{{ $orderNumber }}">Show Edited Template</button>
                        
                         @if($customerCanCancel)
                         <button type="button" class="px-4 py-2 border border-red-500 text-red-500 hover:bg-red-50 rounded font-semibold js-cancel-production-order" data-order-id="{{ data_get($order, 'id') }}">Cancel Order</button>
@@ -506,6 +575,47 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
+    <script>
+    // Per-order apply saved template button handler
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.js-apply-saved-template').forEach(btn => {
+            btn.addEventListener('click', function () {
+                try {
+                    const saved = JSON.parse(window.sessionStorage.getItem('inkwise-saved-template') || 'null');
+                    if (!saved || !saved.preview) {
+                        alert('No saved edited template found in this browser session. Please save your template first.');
+                        return;
+                    }
+
+                    // find the closest order card for this button
+                    const card = btn.closest('.bg-white.border.rounded-xl');
+                    if (!card) return;
+
+                    const img = card.querySelector('img.w-24.h-24, img.w-20.h-20');
+                    if (img) {
+                        img.src = saved.preview;
+                        img.alt = saved.name || 'Edited template';
+                    }
+
+                    // update any proof thumbnails in the expanded panel
+                    const panel = card.querySelector('[id^="design-"]');
+                    if (panel) {
+                        const thumbs = panel.querySelectorAll('img');
+                        thumbs.forEach(t => { t.src = saved.preview; t.alt = saved.name || 'Edited template'; });
+                    }
+
+                    // show a brief feedback
+                    btn.textContent = 'Applied';
+                    setTimeout(() => { btn.textContent = 'Show Edited Template'; }, 2500);
+                } catch (e) {
+                    console.error('apply saved template error', e);
+                    alert('Failed to apply saved template.');
+                }
+            });
+        });
+    });
+    </script>
+
 <script>
 // Toggle design proof galleries
 document.addEventListener('DOMContentLoaded', function () {
@@ -528,6 +638,188 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
+});
+</script>
+
+<script>
+// Inject most-recent saved template from sessionStorage when present
+document.addEventListener('DOMContentLoaded', function () {
+    try {
+        // Look for saved template in multiple sessionStorage keys
+        let saved = JSON.parse(window.sessionStorage.getItem('inkwise-saved-template') || 'null');
+        if ((!saved || !saved.preview) && (window.sessionStorage.getItem('inkwise-finalstep') || window.sessionStorage.getItem('order_summary_payload'))) {
+            try {
+                const summary = JSON.parse(window.sessionStorage.getItem('inkwise-finalstep') || window.sessionStorage.getItem('order_summary_payload') || 'null');
+                if (summary) {
+                    // Try multiple shapes
+                    if (summary.template) saved = summary.template;
+                    else if (summary.metadata && summary.metadata.template) saved = summary.metadata.template;
+                    else if (summary.design_preview) saved = { preview: summary.design_preview.image || (Array.isArray(summary.design_preview.images) ? summary.design_preview.images[0] : null), name: summary.productName || summary.template_name };
+                }
+            } catch (e) {
+                // ignore
+            }
+        }
+        if (!saved || !saved.preview) {
+            return;
+        }
+
+        const list = document.querySelector('.space-y-4');
+        if (!list) return;
+
+        // avoid duplicates: skip if an identical preview is already shown
+        const found = list.querySelector(`.saved-template-card img[src="${saved.preview}"]`);
+        if (found) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'bg-white border rounded-xl p-4 shadow-sm flex flex-col gap-4 md:flex-row md:items-center saved-template-card';
+        wrapper.setAttribute('data-saved', 'true');
+
+        wrapper.innerHTML = `
+            <img src="${saved.preview}" alt="${saved.name || 'Saved template'}" class="w-24 h-24 object-cover rounded-lg border">
+            <div class="flex-1 space-y-1">
+                <div class="font-semibold text-lg text-[#a6b7ff]">${(saved.name || 'Saved template')}</div>
+                <div class="text-sm text-gray-500">Your recently edited template</div>
+            </div>
+            <div class="flex flex-col items-end gap-2">
+                <a href="${saved.preview}" target="_blank" class="px-4 py-2 bg-[#a6b7ff] hover:bg-[#8f9ffd] text-white rounded font-semibold">Open template</a>
+            </div>
+        `;
+
+        list.insertBefore(wrapper, list.firstChild);
+    } catch (e) {
+        // ignore
+    }
+});
+</script>
+
+<script>
+// Replace order card product image with customer's edited template preview when available
+document.addEventListener('DOMContentLoaded', function () {
+    try {
+        let saved = JSON.parse(window.sessionStorage.getItem('inkwise-saved-template') || 'null');
+        if ((!saved || !saved.preview) && (window.sessionStorage.getItem('inkwise-finalstep') || window.sessionStorage.getItem('order_summary_payload'))) {
+            try {
+                const summary = JSON.parse(window.sessionStorage.getItem('inkwise-finalstep') || window.sessionStorage.getItem('order_summary_payload') || 'null');
+                if (summary) {
+                    if (summary.template) saved = summary.template;
+                    else if (summary.metadata && summary.metadata.template) saved = summary.metadata.template;
+                    else if (summary.design_preview) saved = { preview: summary.design_preview.image || (Array.isArray(summary.design_preview.images) ? summary.design_preview.images[0] : null), preview_back: Array.isArray(summary.design_preview.images) ? summary.design_preview.images[1] : null };
+                }
+            } catch (e) {
+                // ignore
+            }
+        }
+        if (!saved || !saved.preview) return;
+
+        const cards = Array.from(document.querySelectorAll('.bg-white.border.rounded-xl'));
+        cards.forEach(card => {
+            // prefer not to replace if a server-side saved-template-card already present for this order
+            if (card.querySelector('.saved-template-card')) return;
+
+            // find the primary image in the card
+            const img = card.querySelector('img.w-24.h-24, img.w-20.h-20');
+            if (!img) return;
+
+            // Determine front/back urls from saved payload
+            const frontUrl = saved.preview || saved.preview_image || (Array.isArray(saved.preview_images) ? saved.preview_images[0] : null);
+            const backUrl = saved.preview_back || (Array.isArray(saved.preview_images) && saved.preview_images.length > 1 ? saved.preview_images[1] : null);
+            if (!frontUrl) return;
+
+            // If back exists, render a two-thumb preview; otherwise replace single image
+            try {
+                if (backUrl) {
+                    // avoid duplicating if already rendered
+                    if (card.querySelector('.twopreview')) return;
+
+                    const container = document.createElement('div');
+                    container.className = 'twopreview flex gap-2 items-center';
+
+                    const f = document.createElement('img');
+                    f.src = frontUrl;
+                    f.alt = saved.name || 'Edited front';
+                    f.className = 'w-20 h-20 object-cover rounded border border-gray-200 cursor-pointer';
+                    f.setAttribute('data-preview-role', 'front');
+
+                    const b = document.createElement('img');
+                    b.src = backUrl;
+                    b.alt = saved.name || 'Edited back';
+                    b.className = 'w-20 h-20 object-cover rounded border border-gray-200 cursor-pointer';
+                    b.setAttribute('data-preview-role', 'back');
+
+                    // replace the original img with container
+                    img.replaceWith(container);
+                    container.appendChild(f);
+                    container.appendChild(b);
+
+                    // if original img was in an anchor, preserve link behavior on each thumb
+                    const anchor = img.closest('a');
+                    if (anchor) {
+                        f.addEventListener('click', () => { anchor.href = frontUrl; anchor.target = '_blank'; anchor.click(); });
+                        b.addEventListener('click', () => { anchor.href = backUrl; anchor.target = '_blank'; anchor.click(); });
+                    }
+
+                    // integrate with lightbox: clicking opens larger preview
+                    f.addEventListener('click', (e) => { e.preventDefault(); openDesignLightbox && openDesignLightbox(frontUrl); });
+                    b.addEventListener('click', (e) => { e.preventDefault(); openDesignLightbox && openDesignLightbox(backUrl); });
+                } else {
+                    // single preview - replace src/alt and keep link if present
+                    if (img.src === frontUrl) return;
+                    img.src = frontUrl;
+                    img.alt = saved.name || 'Edited template';
+                    const anchor = img.closest('a');
+                    if (anchor) {
+                        anchor.href = frontUrl;
+                    }
+                    // make image open lightbox too
+                    img.style.cursor = 'pointer';
+                    img.addEventListener('click', (e) => { e.preventDefault(); openDesignLightbox && openDesignLightbox(frontUrl); });
+                }
+            } catch (e) {
+                // ignore DOM errors
+            }
+        });
+    } catch (e) {
+        // ignore
+    }
+});
+</script>
+
+<!-- Lightbox modal for design proofs -->
+<div id="designLightbox" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); align-items:center; justify-content:center; z-index:1200;">
+    <div style="position:relative; max-width:90vw; max-height:90vh;">
+        <button id="designLightboxClose" style="position:absolute; top:-12px; right:-12px; background:#fff; border-radius:999px; border:none; width:36px; height:36px; cursor:pointer;">×</button>
+        <img id="designLightboxImg" src="" alt="Preview" style="display:block; max-width:90vw; max-height:90vh; object-fit:contain; border-radius:8px;" />
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Attach click handler to design proof thumbnails and main card images
+    const openLightbox = (src) => {
+        const lb = document.getElementById('designLightbox');
+        const img = document.getElementById('designLightboxImg');
+        if (!lb || !img) return;
+        img.src = src;
+        lb.style.display = 'flex';
+    };
+
+    document.body.addEventListener('click', function (ev) {
+        const target = ev.target;
+        if (!target) return;
+
+        // If clicking a design thumbnail or primary image, open lightbox
+        if (target.matches('.group.block img') || target.matches('.w-20.h-20') || target.matches('.w-24.h-24') || target.closest('.design-proof-thumb')) {
+            ev.preventDefault();
+            const src = target.src || target.getAttribute('data-src') || (target.closest('a')?.href || '');
+            if (src) openLightbox(src);
+        }
+    });
+
+    const closeBtn = document.getElementById('designLightboxClose');
+    const lightbox = document.getElementById('designLightbox');
+    if (closeBtn) closeBtn.addEventListener('click', () => { if (lightbox) lightbox.style.display='none'; });
+    if (lightbox) lightbox.addEventListener('click', (ev) => { if (ev.target === lightbox) lightbox.style.display='none'; });
 });
 </script>
 @endsection

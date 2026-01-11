@@ -46,7 +46,7 @@ body {
 
 .flip-container {
   perspective: 1200px;
-  width: min(340px, 100%);
+  width: min(320px, 100%);
   aspect-ratio: 2.25 / 3;
   margin: 0 auto;
   transition: transform 0.4s ease;
@@ -354,6 +354,16 @@ body {
   object-fit: cover;
   border-radius: 8px;
   transition: transform 0.25s ease;
+}
+
+/* Make Size (additional) addon preview images smaller */
+.addon-additional .feature-card-media {
+  min-height: 88px;
+  padding: 12px;
+}
+.addon-additional .feature-card-media img {
+  max-width: 84px;
+  max-height: 64px;
 }
 
 .feature-card-info {
