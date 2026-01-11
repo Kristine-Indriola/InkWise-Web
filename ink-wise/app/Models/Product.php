@@ -28,10 +28,12 @@ class Product extends Model
         'date_available',
         'published_at',
         'unpublished_reason',
+        'sizes',
     ];
 
     protected $casts = [
         'published_at' => 'datetime',
+        'sizes' => 'array',
     ];
 
     public function scopePublished($query)

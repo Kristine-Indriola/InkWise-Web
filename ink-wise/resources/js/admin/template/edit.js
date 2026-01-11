@@ -40,12 +40,84 @@ document.addEventListener("DOMContentLoaded", () => {
     let dragging = false, resizing = false, dragOffset = {x:0, y:0}, dragBox = null, dragType = null;
     let draggingMedia = false, resizingMedia = false, dragOffsetMedia = {x:0, y:0}, dragMediaBox = null;
     let editingTextarea = null, editingBox = null;
+    let previewImage = null; // Preview image background
+    let svgImage = null; // SVG overlay image
+
+    // ========================
+    // Design Data Loading
+    // ========================
+    function loadDesignData(designData) {
+        // Clear existing boxes
+        textBoxes = [];
+        mediaBoxes = [];
+        
+        // Process pages (usually just one page)
+        if (designData.pages && Array.isArray(designData.pages)) {
+            designData.pages.forEach(page => {
+                if (page.nodes && Array.isArray(page.nodes)) {
+                    page.nodes.forEach(node => {
+                        if (node.type === 'text') {
+                            // Add text box
+                            textBoxes.push({
+                                x: (node.frame?.x || 0),
+                                y: (node.frame?.y || 0),
+                                w: (node.frame?.width || 100),
+                                h: (node.frame?.height || 50),
+                                text: node.content || '',
+                                fontSize: node.fontSize || 24,
+                                color: node.fill || '#000000',
+                                fontFamily: node.fontFamily || 'Arial, sans-serif',
+                                textAlign: node.textAlign || 'left',
+                                fontStyle: node.fontStyle || 'normal',
+                                fontWeight: node.fontWeight || '400',
+                                textTransform: node.textTransform || 'none',
+                                textDecoration: node.textDecoration || '',
+                            });
+                        } else if (node.type === 'image') {
+                            // Add image box
+                            const img = new Image();
+                            img.onload = function() {
+                                draw(); // Redraw when image loads
+                            };
+                            img.src = node.src || '';
+                            
+                            mediaBoxes.push({
+                                type: 'image',
+                                img: img,
+                                x: (node.frame?.x || 0),
+                                y: (node.frame?.y || 0),
+                                w: (node.frame?.width || 100),
+                                h: (node.frame?.height || 100),
+                                locked: false,
+                            });
+                        } else if (node.type === 'shape') {
+                            // For shapes, we'll render them via SVG overlay
+                            // This will be handled in the draw function
+                        }
+                    });
+                }
+            });
+        }
+        
+        draw(); // Initial draw
+    }
 
     // ========================
     // Drawing
     // ========================
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw preview image as background if available
+        if (previewImage && previewImage.complete && previewImage.naturalWidth > 0) {
+            ctx.drawImage(previewImage, 0, 0, canvas.width, canvas.height);
+        }
+        
+        // Draw SVG overlay if available
+        if (svgImage && svgImage.complete && svgImage.naturalWidth > 0) {
+            ctx.drawImage(svgImage, 0, 0, canvas.width, canvas.height);
+        }
+        
         drawMedia();
         textBoxes.forEach(box => {
             ctx.save();
@@ -1050,6 +1122,42 @@ crossIcon.setAttribute("aria-label", "Delete");
             document.getElementById("redoBtn")?.click();
         }
     });
+    
+    // Load preview image and design data if available
+    const bootstrapScript = document.getElementById('inkwise-builder-bootstrap');
+    if (bootstrapScript) {
+        try {
+            const bootstrapData = JSON.parse(bootstrapScript.textContent);
+            
+            // Load preview image
+            const previewUrl = bootstrapData.template?.preview_front;
+            if (previewUrl) {
+                previewImage = new Image();
+                previewImage.onload = function() {
+                    draw(); // Redraw canvas when preview image loads
+                };
+                previewImage.src = previewUrl;
+            }
+            
+            // Load SVG overlay
+            const svgUrl = bootstrapData.template?.svg_path;
+            if (svgUrl) {
+                svgImage = new Image();
+                svgImage.onload = function() {
+                    draw(); // Redraw canvas when SVG loads
+                };
+                svgImage.src = svgUrl;
+            }
+            
+            // Load design data
+            const designData = bootstrapData.template?.design;
+            if (designData && designData.pages) {
+                loadDesignData(designData);
+            }
+        } catch (error) {
+            console.error('Failed to load bootstrap data:', error);
+        }
+    }
     
 });
 console.log(window.TEMPLATE_ID, window.CSRF_TOKEN);

@@ -345,6 +345,40 @@
                     <div><dt>Product Type</dt><dd>{{ $product->product_type ?? '—' }}</dd></div>
                     @if($product->product_type === 'Invitation')
                     <div><dt>Theme / Style</dt><dd>{{ $product->theme_style ?? '—' }}</dd></div>
+                    @php
+                        $sizeDisplay = '—';
+                        // Prefer template explicit inch columns
+                        if ($product->template) {
+                            $t = $product->template;
+                            if (!empty($t->width_inch) || !empty($t->height_inch)) {
+                                $fmt = function ($v) {
+                                    if ($v === null || $v === '') return null;
+                                    $f = floatval($v);
+                                    if (floor($f) == $f) return (string) intval($f);
+                                    return rtrim(rtrim(number_format($f, 2, '.', ''), '0'), '.');
+                                };
+                                $w = $fmt($t->width_inch);
+                                $h = $fmt($t->height_inch);
+                                if ($w !== null && $h !== null) {
+                                    $sizeDisplay = $w . 'x' . $h . ' in';
+                                } elseif ($w !== null) {
+                                    $sizeDisplay = $w . 'x in';
+                                } elseif ($h !== null) {
+                                    $sizeDisplay = 'x' . $h . ' in';
+                                }
+                            } elseif (!empty($product->size)) {
+                                $sizeDisplay = $product->size;
+                            } elseif (!empty($product->invitation_size)) {
+                                $sizeDisplay = $product->invitation_size;
+                            } elseif (!empty($t->size)) {
+                                $sizeDisplay = $t->size;
+                            }
+                        } else {
+                            if (!empty($product->size)) $sizeDisplay = $product->size;
+                            elseif (!empty($product->invitation_size)) $sizeDisplay = $product->invitation_size;
+                        }
+                    @endphp
+                    <div><dt>Size</dt><dd>{{ $sizeDisplay }}</dd></div>
                     @endif
                     <div><dt>Base Price</dt><dd>
                         @if($product->base_price !== null)

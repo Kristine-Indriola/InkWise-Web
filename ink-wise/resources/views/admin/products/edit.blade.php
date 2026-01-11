@@ -57,6 +57,7 @@
         'estimated_ink_usage_ml' => old('estimated_ink_usage_ml', $inkUsageDefault),
         'lead_time' => old('lead_time', $leadTimeDefault),
         'date_available' => old('date_available', $dateAvailableValue),
+        'sizes' => old('sizes', is_array($product->sizes ?? null) ? implode(', ', $product->sizes) : ($product->sizes ?? '')),
     ];
 
     $productTypeNormalized = strtolower($defaults['product_type'] ?? '');
@@ -145,6 +146,19 @@
                     <label for="themeStyle">Theme / Style</label>
                     <input type="text" id="themeStyle" name="themeStyle" value="{{ $defaults['theme_style'] }}">
                 </div>
+                <div class="field">
+                    <label for="productSizes">Sizes</label>
+                    <input type="text" id="productSizes" name="sizes" list="product-sizes" placeholder="e.g. 5x7, 4x6, A5" value="{{ $defaults['sizes'] }}">
+                    <datalist id="product-sizes">
+                        <option value="5x7">5x7</option>
+                        <option value="4x6">4x6</option>
+                        <option value="A5">A5</option>
+                        <option value="A6">A6</option>
+                        <option value="6x8">6x8</option>
+                        <option value="Square">Square</option>
+                    </datalist>
+                    <small class="field-help">Comma-separated sizes (stored in product sizes)</small>
+                </div>
                 @endif
 
                 <div class="field">
@@ -216,9 +230,9 @@
                     <div class="dynamic-row paper-stock-row" data-index="{{ $index }}">
                         <div class="form-grid grid-4-cols">
                             <div class="field">
-                                <label>Material *</label>
+                                <label>Paper *</label>
                                 <select name="paper_stocks[{{ $index }}][material_id]" required>
-                                    <option value="">Select material</option>
+                                    <option value="">Select paper</option>
                                     @foreach($materials as $material)
                                         <option value="{{ $material->id }}" {{ ($stock['material_id'] ?? '') == $material->id ? 'selected' : '' }}>
                                             {{ $material->name }}

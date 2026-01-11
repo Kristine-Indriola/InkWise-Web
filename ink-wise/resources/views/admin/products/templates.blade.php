@@ -383,7 +383,7 @@
     document.querySelectorAll('.view-front-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             const url = btn.dataset.frontUrl;
-            if (!url) reback alert('No front image available');
+            if (!url) { alert('No front image available'); return; }
             document.getElementById('modalImage').src = url;
             document.getElementById('imageModal').style.display = 'flex';
         });
@@ -392,7 +392,7 @@
     document.querySelectorAll('.view-back-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             const url = btn.dataset.backUrl;
-            if (!url) reback alert('No back image available');
+            if (!url) { alert('No back image available'); return; }
             document.getElementById('modalImage').src = url;
             document.getElementById('imageModal').style.display = 'flex';
         });
@@ -406,10 +406,10 @@
         const meta = document.querySelector('meta[name="csrf-token"]');
         if (meta && meta.getAttribute) {
             const v = meta.getAttribute('content');
-            if (v) reback v;
+            if (v) return v;
         }
         const hidden = document.querySelector('input[name="_token"]');
-        reback hidden ? hidden.value : '';
+        return hidden ? hidden.value : '';
     }
 
     // reback modal variables
@@ -427,7 +427,7 @@
         const note = document.getElementById('rebackNote').value.trim();
         if (note === '') {
             alert('Please provide a note for the staff.');
-            reback;
+            return;
         }
 
         // Hide modal
@@ -456,9 +456,9 @@
                 const card = currentrebackBtn ? currentrebackBtn.closest('.template-card') : null;
                 if (card) card.remove();
                 alert('Template rebacked to staff.');
-                reback;
+                return;
             }
-            reback res.json().then(data => {
+            return res.json().then(data => {
                 throw new Error(data?.message || 'reback failed.');
             }).catch(() => {
                 throw new Error('reback failed.');
@@ -547,6 +547,17 @@
             invitationNameField.value = data.name;
         }
 
+        // Populate size if provided by template metadata
+        const invitationSizeField = document.getElementById('invitationSize');
+        var sizeCandidates = [data.size, data.dimensions, data.template_size, data.metadata && data.metadata.size, data.metadata && data.metadata.dimensions];
+        for (var i=0;i<sizeCandidates.length;i++) {
+            var val = sizeCandidates[i];
+            if (val) {
+                try { if (invitationSizeField) invitationSizeField.value = val; } catch(e){}
+                break;
+            }
+        }
+
         const eventTypeField = document.getElementById('eventType');
         if (eventTypeField && data.event_type) {
             eventTypeField.value = data.event_type;
@@ -588,6 +599,10 @@
         // Navigate to next page (Basic Info)
         if (typeof Navigation !== 'undefined' && Navigation.showPage) {
             Navigation.showPage(1);
+            if (typeof updateSizeDisplay === 'function') {
+                // ensure size display updates immediately when template is selected
+                updateSizeDisplay();
+            }
         }
     }
 
@@ -617,7 +632,7 @@
     // Function to populate paper stocks section
     function populatePaperStocks(paperStocks) {
         const container = document.getElementById('paper-stocks-container');
-        if (!container) reback;
+        if (!container) return;
 
         // Clear existing entries
         const existingEntries = container.querySelectorAll('.paper-stock-entry');
@@ -631,7 +646,7 @@
     // Function to populate addons section
     function populateAddons(addons) {
         const container = document.getElementById('addons-container');
-        if (!container) reback;
+        if (!container) return;
 
         // Clear existing entries
         const existingEntries = container.querySelectorAll('.addon-entry');
@@ -645,7 +660,7 @@
     // Function to populate colors section
     function populateColors(colors) {
         const container = document.getElementById('colors-container');
-        if (!container) reback;
+        if (!container) return;
 
         // Clear existing entries
         const existingEntries = container.querySelectorAll('.color-entry');
@@ -659,7 +674,7 @@
     // Function to populate bulk orders section
     function populateBulkOrders(bulkOrders) {
         const container = document.getElementById('bulk-orders-container');
-        if (!container) reback;
+        if (!container) return;
 
         // Clear existing entries
         const existingEntries = container.querySelectorAll('.bulk-order-entry');

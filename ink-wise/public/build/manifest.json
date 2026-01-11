@@ -19,7 +19,7 @@
     "isEntry": true
   },
   "resources/css/app.css": {
-    "file": "assets/app-DejVJwVo.css",
+    "file": "assets/app-DVc-eH8c.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -33,8 +33,13 @@
     "src": "resources/css/customer/editing.css",
     "isEntry": true
   },
+  "resources/css/customer/studio.css": {
+    "file": "assets/studio-De-7S7R6.css",
+    "src": "resources/css/customer/studio.css",
+    "isEntry": true
+  },
   "resources/js/admin/template/editor.js": {
-    "file": "assets/editor-B58b___x.js",
+    "file": "assets/editor-DQCUFCIa.js",
     "name": "editor",
     "src": "resources/js/admin/template/editor.js",
     "isEntry": true
@@ -66,6 +71,18 @@
     "src": "resources/js/customer/editing.js",
     "isEntry": true
   },
+  "resources/js/customer/studio/main.jsx": {
+    "file": "assets/main-GrFFe1Jg.js",
+    "name": "main",
+    "src": "resources/js/customer/studio/main.jsx",
+    "isEntry": true,
+    "imports": [
+      "_client-Cv0X-2PX.js"
+    ],
+    "css": [
+      "assets/main-6oxhY28X.css"
+    ]
+  },
   "resources/js/customer/studio/svg-template-editor.jsx": {
     "file": "assets/svg-template-editor-BqTHRGij.js",
     "name": "svg-template-editor",
@@ -73,7 +90,7 @@
     "isEntry": true
   },
   "resources/js/staff/template-editor/main.jsx": {
-    "file": "assets/main-D3c-MwVb.js",
+    "file": "assets/main-DrrrAtLK.js",
     "name": "main",
     "src": "resources/js/staff/template-editor/main.jsx",
     "isEntry": true,

@@ -22,10 +22,12 @@ class ProductUpload extends Model
         'back_image',
         'preview_image',
         'design_data',
+        'sizes',
     ];
 
     protected $casts = [
         'design_data' => 'array',
+        'sizes' => 'array',
     ];
 
     public function template()

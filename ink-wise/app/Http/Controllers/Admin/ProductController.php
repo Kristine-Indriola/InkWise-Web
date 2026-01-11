@@ -283,6 +283,56 @@ class ProductController extends Controller
             $frontUrl,
         ]);
 
+        // Prefer explicit width/height columns (inches) when present
+        $resolvedSize = null;
+        if (!empty($template->width_inch) || !empty($template->height_inch)) {
+            $formatInch = function ($v) {
+                if ($v === null || $v === '') return null;
+                $float = floatval($v);
+                if (floor($float) == $float) {
+                    return (string) intval($float);
+                }
+                return rtrim(rtrim(number_format($float, 2, '.', ''), '0'), '.');
+            };
+
+            $w = $formatInch($template->width_inch);
+            $h = $formatInch($template->height_inch);
+            if ($w !== null && $h !== null) {
+                $resolvedSize = $w . 'x' . $h;
+            } elseif ($w !== null) {
+                $resolvedSize = $w . 'x';
+            } elseif ($h !== null) {
+                $resolvedSize = 'x' . $h;
+            }
+        }
+
+        // Fallback: attempt to resolve a size/dimensions string from template metadata or design
+        if ($resolvedSize === null) {
+            $sizeCandidates = [
+                $template->size ?? null,
+                $template->dimensions ?? null,
+                data_get($metadata, 'size'),
+                data_get($metadata, 'dimensions'),
+                data_get($design, 'size'),
+                data_get($design, 'dimensions'),
+            ];
+
+            $resolveSize = function (array $candidates) {
+                foreach ($candidates as $candidate) {
+                    if (empty($candidate)) continue;
+                    if (is_array($candidate) && isset($candidate['width']) && isset($candidate['height'])) {
+                        return $candidate['width'] . 'x' . $candidate['height'];
+                    }
+                    if (is_string($candidate) && trim($candidate) !== '') {
+                        return trim($candidate);
+                    }
+                }
+                return null;
+            };
+
+            $resolvedSize = $resolveSize($sizeCandidates);
+        }
+
         return response()->json([
             'template_name' => $template->name,
             'name' => $template->name,
@@ -290,6 +340,7 @@ class ProductController extends Controller
             'product_type' => $template->product_type,
             'event_type' => $template->event_type,
             'theme_style' => $template->theme_style,
+            'size' => $resolvedSize,
             'front_image' => $frontUrl,
             'back_image' => $backUrl,
             'front_preview' => $frontUrl,
@@ -396,6 +447,8 @@ class ProductController extends Controller
             'preview_images_existing.front' => 'nullable|string',
             'preview_images_existing.back' => 'nullable|string',
             'preview_images_existing.preview' => 'nullable|string',
+            'sizes' => 'nullable|string',
+            'invitation_size' => 'nullable|string',
         ]);
 
         $resolveTemplatePreviews = function (?Template $template): array {
@@ -529,6 +582,17 @@ class ProductController extends Controller
             $leadTimeInput = $validated['lead_time'] ?? null;
             $leadTimeDays = is_numeric($leadTimeInput) ? (int) $leadTimeInput : null;
 
+            // Parse sizes input (comma separated) into array for storage
+            $sizesInput = $request->input('sizes');
+            // Fallback to invitation_size if sizes not provided
+            if (empty($sizesInput)) {
+                $sizesInput = $request->input('invitation_size');
+            }
+            $sizesArray = null;
+            if (is_string($sizesInput) && trim($sizesInput) !== '') {
+                $sizesArray = array_values(array_filter(array_map('trim', explode(',', $sizesInput))));
+            }
+
             // Get the actual template_id from Template if provided
             $actualTemplateId = $validated['template_id'] ?? null;
 
@@ -544,6 +608,7 @@ class ProductController extends Controller
                 'lead_time' => $leadTimeInput,
                 'lead_time_days' => $leadTimeDays,
                 'date_available' => !empty($validated['date_available']) ? $validated['date_available'] : null,
+                'sizes' => $sizesArray,
             ];
 
             if (!empty($validated['product_id'])) {
@@ -554,8 +619,25 @@ class ProductController extends Controller
                 }
                 $product->update($data);
             } else {
-                $data['image'] = $imagePath;
-                $product = Product::create($data);
+                // Check if a product already exists for this template
+                if (!empty($actualTemplateId)) {
+                    $existingProduct = Product::where('template_id', $actualTemplateId)->first();
+                    if ($existingProduct) {
+                        // Update existing product instead of creating duplicate
+                        $previousTemplateId = $existingProduct->template_id;
+                        if ($imagePath) {
+                            $data['image'] = $imagePath;
+                        }
+                        $existingProduct->update($data);
+                        $product = $existingProduct;
+                    } else {
+                        $data['image'] = $imagePath;
+                        $product = Product::create($data);
+                    }
+                } else {
+                    $data['image'] = $imagePath;
+                    $product = Product::create($data);
+                }
             }
 
             // Get template data if template_id is provided
@@ -885,7 +967,7 @@ class ProductController extends Controller
         // Check if this is a publish request (no file) or actual file upload
         if (!$request->hasFile('file')) {
             // This is a publish request - create a ProductUpload record to mark as published
-            $upload = ProductUpload::create([
+                $upload = ProductUpload::create([
                 'product_id' => $product->id,
                 'template_id' => $product->template_id,
                 'template_name' => $product->name,
@@ -896,7 +978,8 @@ class ProductController extends Controller
                 'front_image' => $product->images ? $product->images->front : null,
                 'back_image' => $product->images ? $product->images->back : null,
                 'preview_image' => $product->images ? $product->images->preview : ($product->image ?: null),
-                'design_data' => null, // Could populate from product data if needed
+                    'design_data' => null, // Could populate from product data if needed
+                    'sizes' => $product->sizes ?? null,
             ]);
 
             $product->forceFill([
@@ -950,6 +1033,7 @@ class ProductController extends Controller
                 'back_image' => $product->images ? $product->images->back : null,
                 'preview_image' => $product->images ? $product->images->preview : ($product->image ?: null),
                 'design_data' => null,
+                'sizes' => $product->sizes ?? null,
             ]);
 
             $product->forceFill([

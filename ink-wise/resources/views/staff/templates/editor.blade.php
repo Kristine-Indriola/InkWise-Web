@@ -212,6 +212,9 @@
                 'width_inch' => $template->width_inch,
                 'height_inch' => $template->height_inch,
                 'fold_type' => $template->fold_type,
+                'preview_front' => $template->preview_front ? \App\Support\ImageResolver::url($template->preview_front) : null,
+                'preview_back' => $template->preview_back ? \App\Support\ImageResolver::url($template->preview_back) : null,
+                'svg_path' => $template->svg_path ? \App\Support\ImageResolver::url($template->svg_path) : null,
                 'updated_at' => optional($template->updated_at)->toIso8601String(),
             ],
             'routes' => [

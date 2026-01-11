@@ -26,6 +26,7 @@ class OrderSummaryController extends Controller
 
         return view('admin.ordersummary.index', [
             'order' => $presented,
+            'orderModel' => $orderModel,
         ]);
     }
 }

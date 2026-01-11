@@ -776,7 +776,7 @@ Route::get('/design/edit/{product?}', [OrderFlowController::class, 'edit'])
 Route::post('/order/cart/items', [OrderFlowController::class, 'storeDesignSelection'])
     ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('order.cart.add');
-Route::post('/design/autosave', [OrderFlowController::class, 'autosaveDesign'])
+Route::any('/design/autosave', [OrderFlowController::class, 'autosaveDesign'])
     // ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('order.design.autosave');
 Route::post('/design/save-template', [OrderFlowController::class, 'saveAsTemplate'])
@@ -787,6 +787,12 @@ Route::post('/design/save-template', [OrderFlowController::class, 'saveAsTemplat
 Route::get('/order/review', [OrderFlowController::class, 'review'])
     ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('order.review');
+Route::post('/order/review/design', [OrderFlowController::class, 'saveReviewDesign'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.review.design');
+Route::post('/order/review/continue', [OrderFlowController::class, 'continueReview'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.review.continue');
 Route::get('/order/finalstep', [OrderFlowController::class, 'finalStep'])
     ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('order.finalstep');

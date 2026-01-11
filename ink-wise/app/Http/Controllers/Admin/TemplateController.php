@@ -425,6 +425,21 @@ public function saveCanvas(Request $request, $id)
         
         $template = Template::findOrFail($id);
 
+        // Prevent duplicate saves within a short time window
+        if ($template->updated_at && $template->updated_at->diffInSeconds(now()) < 5) {
+            Log::info('Template save skipped - recently saved', [
+                'template_id' => $id,
+                'last_updated' => $template->updated_at,
+                'seconds_since' => $template->updated_at->diffInSeconds(now()),
+            ]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Template already saved recently',
+                'template_id' => $template->id,
+                'redirect' => route('staff.templates.index'),
+            ]);
+        }
+
         $validated = $request->validate([
             'design' => 'required|array',
             'svg_markup' => 'nullable|string',
@@ -634,19 +649,33 @@ public function saveCanvas(Request $request, $id)
                 Log::warning('SVG save failed', ['error' => $e->getMessage()]);
             }
         } else {
-            // Fallback: save dummy SVG if none provided
+            // Try to generate SVG from template if available
+            $generatedSvg = null;
             try {
-                $dummySvg = 'data:image/svg+xml;base64,' . base64_encode('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="white"/></svg>');
-                $template->svg_path = $this->persistDataUrl(
-                    $dummySvg,
-                    'templates/svg',
-                    'svg',
-                    $template->svg_path,
-                    'dummy_svg'
-                );
-                Log::info('Dummy SVG saved', ['path' => $template->svg_path]);
-            } catch (ValidationException $e) {
-                Log::warning('Dummy SVG save failed', ['error' => $e->getMessage()]);
+                $generatedSvg = $this->generateSvgFromTemplate($template->id);
+                Log::info('SVG generated from template');
+            } catch (\Exception $e) {
+                Log::warning('SVG generation from template failed', ['error' => $e->getMessage()]);
+            }
+
+            if ($generatedSvg) {
+                try {
+                    $template->svg_path = $this->persistDataUrl(
+                        $generatedSvg,
+                        'templates/svg',
+                        'svg',
+                        $template->svg_path,
+                        'generated_svg'
+                    );
+                    Log::info('Generated SVG saved', ['path' => $template->svg_path]);
+                } catch (ValidationException $e) {
+                    Log::warning('Generated SVG save failed', ['error' => $e->getMessage()]);
+                    // Fallback to dummy SVG if generation and saving both fail
+                    $this->saveDummySvg($template);
+                }
+            } else {
+                // Fallback: save dummy SVG if no design data or generation failed
+                $this->saveDummySvg($template);
             }
         }
 
@@ -774,6 +803,19 @@ public function uploadPreview(Request $request, $id)
         $this->expandCompressedPayload($request);
         $template = Template::findOrFail($id);
 
+        // Prevent duplicate autosaves within a short time window
+        if ($template->updated_at && $template->updated_at->diffInSeconds(now()) < 2) {
+            Log::info('Template autosave skipped - recently saved', [
+                'template_id' => $id,
+                'last_updated' => $template->updated_at,
+                'seconds_since' => $template->updated_at->diffInSeconds(now()),
+            ]);
+            return response()->json([
+                'success' => true,
+                'saved_at' => $template->updated_at->toIso8601String(),
+            ]);
+        }
+
         $validated = $request->validate([
             'design' => 'required|array',
             'canvas' => 'nullable|array',
@@ -822,6 +864,48 @@ public function uploadPreview(Request $request, $id)
             $template->metadata = $metadata;
         }
 
+        // Generate and save SVG from design data during autosave
+        $this->ensureTemplateStorageDirectories();
+        $metadata = $this->normalizeTemplateMetadata($template->metadata ?? []);
+
+        // Persist JSON design file to disk
+        $designPath = $this->persistDesignJson(
+            $validated['design'],
+            'templates/assets',
+            $metadata['json_path'] ?? null
+        );
+        $metadata['json_path'] = $designPath;
+
+        // Try to generate SVG from template
+        $generatedSvg = null;
+        try {
+            $generatedSvg = $this->generateSvgFromTemplate($template->id, $designPath);
+            Log::info('SVG generated from template during save');
+        } catch (\Exception $e) {
+            Log::warning('SVG generation from template failed during save', ['error' => $e->getMessage()]);
+        }
+
+        if ($generatedSvg) {
+            try {
+                $template->svg_path = $this->persistDataUrl(
+                    $generatedSvg,
+                    'templates/svg',
+                    'svg',
+                    $template->svg_path,
+                    'generated_svg'
+                );
+                Log::info('Generated SVG saved during autosave', ['path' => $template->svg_path]);
+            } catch (ValidationException $e) {
+                Log::warning('Generated SVG save failed during autosave', ['error' => $e->getMessage()]);
+                // Fallback to dummy SVG if generation and saving both fail
+                $this->saveDummySvg($template);
+            }
+        } else {
+            // Fallback: save dummy SVG if no design data or generation failed
+            $this->saveDummySvg($template);
+        }
+
+        $template->metadata = $metadata;
         $template->save();
 
         Log::info('Template autosave persisted', [
@@ -1098,8 +1182,20 @@ public function uploadToProduct(Request $request, $id)
             'metadata' => $metadata,
         ])->save();
 
-        // Create a product if one doesn't exist
-        if (!$template->product) {
+        // Create or update a product
+        $product = $template->products()->first();
+        if ($product) {
+            // Update existing product
+            $product->update([
+                'name' => $template->name,
+                'product_type' => $template->product_type,
+                'event_type' => $template->event_type,
+                'base_price' => $template->base_price ?? 100,
+                'description' => $template->description,
+                'theme_style' => $template->theme_style,
+            ]);
+        } else {
+            // Create new product
             $product = Product::create([
                 'name' => $template->name,
                 'product_type' => $template->product_type,
@@ -1810,5 +1906,347 @@ public function uploadToProduct(Request $request, $id)
         }
 
         return $decoded;
+    }
+
+    /**
+     * Generate SVG content from design data
+     *
+     * @param string|array $designData JSON string or array of design data
+     * @return string|null Base64 encoded data URL of generated SVG or null if generation fails
+     */
+    protected function generateSvgFromTemplate($templateId, $jsonPath = null): ?string
+    {
+        try {
+            $template = Template::findOrFail($templateId);
+            $metadata = $this->normalizeTemplateMetadata($template->metadata ?? []);
+
+            // Use provided jsonPath if given (for when metadata not yet saved)
+            $jsonPath = $jsonPath ?? $metadata['json_path'] ?? null;
+            if ($jsonPath && Storage::disk('public')->exists($jsonPath)) {
+                try {
+                    $contents = Storage::disk('public')->get($jsonPath);
+                    $decoded = json_decode($contents, true);
+                    if (is_array($decoded)) {
+                        $designData = $decoded;
+                        Log::info('Loaded design data from asset file for SVG generation', ['template_id' => $templateId, 'json_path' => $jsonPath]);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to read design JSON from asset file', ['template_id' => $templateId, 'json_path' => $jsonPath, 'error' => $e->getMessage()]);
+                }
+            }
+
+            // Fallback to design stored on the model
+            if (!isset($designData) && !empty($template->design)) {
+                $design = $template->design;
+                if (is_string($design)) {
+                    $decoded = json_decode($design, true);
+                    if (is_array($decoded)) {
+                        $designData = $decoded;
+                        Log::info('Loaded design data from database for SVG generation', ['template_id' => $templateId]);
+                    }
+                } elseif (is_array($design)) {
+                    $designData = $design;
+                    Log::info('Loaded design data from database array for SVG generation', ['template_id' => $templateId]);
+                }
+            }
+
+            if (!isset($designData)) {
+                Log::warning('No design data found for SVG generation', ['template_id' => $templateId]);
+                return null;
+            }
+
+            // Extract pages and layers
+            $page = null;
+            if (isset($designData['pages']) && is_array($designData['pages'])) {
+                $page = $designData['pages'][0] ?? null;
+            }
+
+            $layers = [];
+            if ($page) {
+                if (isset($page['layers']) && is_array($page['layers'])) {
+                    $layers = $page['layers'];
+                } elseif (isset($page['nodes']) && is_array($page['nodes'])) {
+                    $layers = $page['nodes'];
+                }
+            }
+
+            // Get canvas dimensions from page definition or fallback
+            $canvasWidth = isset($page['width']) ? (int) $page['width'] : 414;
+            $canvasHeight = isset($page['height']) ? (int) $page['height'] : 896;
+            $pageBackground = $page['background'] ?? null;
+
+            // Separate text, image, and shape layers
+            $textElements = [];
+            $imageElements = [];
+            $shapeElements = [];
+            foreach ($layers as $layer) {
+                if (!isset($layer['visible']) || !$layer['visible']) {
+                    continue;
+                }
+
+                $frame = $layer['frame'] ?? [];
+                $frameX = $frame['x'] ?? 0;
+                $frameY = $frame['y'] ?? 0;
+                $frameWidth = $frame['width'] ?? 0;
+                $frameHeight = $frame['height'] ?? 0;
+
+                if (($layer['type'] ?? null) === 'text') {
+                    $textAlign = $layer['textAlign'] ?? 'center';
+                    $x = match ($textAlign) {
+                        'right' => $frameX + $frameWidth,
+                        'left' => $frameX,
+                        default => $frameX + ($frameWidth / 2),
+                    };
+                    $y = $frameY + ($frameHeight / 2);
+
+                    $textElements[] = [
+                        'x' => $x,
+                        'y' => $y,
+                        'text' => $layer['content'] ?? '',
+                        'font_size' => $layer['fontSize'] ?? 24,
+                        'color' => $layer['fill'] ?? '#000000',
+                        'font_family' => $layer['fontFamily'] ?? 'Arial, sans-serif',
+                        'font_weight' => $layer['fontWeight'] ?? 'normal',
+                        'text_align' => $textAlign,
+                    ];
+                } elseif (($layer['type'] ?? null) === 'image') {
+                    $rawSrc = $layer['src'] ?? ($layer['content'] ?? null);
+                    if ($rawSrc && !str_starts_with($rawSrc, 'data:image')) {
+                        $mime = $this->guessImageMime($rawSrc) ?? 'image/jpeg';
+                        $rawSrc = 'data:' . $mime . ';base64,' . $rawSrc;
+                    }
+
+                    $imageElements[] = [
+                        'x' => $frameX,
+                        'y' => $frameY,
+                        'width' => $frameWidth ?: 150,
+                        'height' => $frameHeight ?: 150,
+                        'src' => $rawSrc,
+                        'borderRadius' => $layer['borderRadius'] ?? 0,
+                    ];
+                } elseif (($layer['type'] ?? null) === 'shape') {
+                    $shapeElements[] = [
+                        'x' => $frameX,
+                        'y' => $frameY,
+                        'width' => $frameWidth ?: 100,
+                        'height' => $frameHeight ?: 100,
+                        'fill' => $layer['fill'] ?? '#cccccc',
+                        'stroke' => $layer['stroke'] ?? null,
+                        'borderRadius' => $layer['borderRadius'] ?? 0,
+                        'variant' => $layer['variant'] ?? 'rectangle',
+                    ];
+                }
+            }
+
+            // If no elements, return null to use dummy SVG
+            if (empty($textElements) && empty($imageElements) && empty($shapeElements)) {
+                return null;
+            }
+
+            // Generate SVG content
+            $svgContent = $this->buildSvgContent(
+                $textElements,
+                $imageElements,
+                $shapeElements,
+                $canvasWidth,
+                $canvasHeight,
+                $pageBackground
+            );
+
+            // Convert to base64 data URL
+            return 'data:image/svg+xml;base64,' . base64_encode($svgContent);
+
+        } catch (\Exception $e) {
+            Log::warning('Failed to generate SVG from template', ['template_id' => $templateId, 'error' => $e->getMessage()]);
+            return null;
+        }
+    }
+
+    /**
+     * Build SVG content from text, image, and shape elements
+     *
+     * @param array $textElements
+     * @param array $imageElements
+     * @param array $shapeElements
+     * @param int $canvasWidth
+     * @param int $canvasHeight
+     * @return string SVG markup
+     */
+    protected function buildSvgContent(array $textElements, array $imageElements, array $shapeElements, int $canvasWidth = 414, int $canvasHeight = 896, ?string $backgroundFill = null): string
+    {
+        $defs = '';
+        $gradientCounter = 0;
+
+        $resolveFill = function (?string $fill) use (&$defs, &$gradientCounter): ?string {
+            if (!$fill) {
+                return null;
+            }
+
+            if (stripos($fill, 'linear-gradient') === 0) {
+                $gradientCounter++;
+                $gradientId = 'inkwise-grad-' . $gradientCounter;
+                $defs .= $this->buildLinearGradientDef($gradientId, $fill);
+                return 'url(#' . $gradientId . ')';
+            }
+
+            return $fill;
+        };
+
+        $resolvedBackgroundFill = $resolveFill($backgroundFill) ?? '#ffffff';
+
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' . $canvasWidth . '" height="' . $canvasHeight . '" viewBox="0 0 ' . $canvasWidth . ' ' . $canvasHeight . '" preserveAspectRatio="xMidYMid meet">';
+
+        // Solid/gradient background
+        $svg .= '<rect width="' . $canvasWidth . '" height="' . $canvasHeight . '" fill="' . htmlspecialchars($resolvedBackgroundFill) . '"/>';
+
+        // Add shape elements (drawn beneath images/text to preserve stacking order)
+        foreach ($shapeElements as $shapeElement) {
+            $x = $shapeElement['x'];
+            $y = $shapeElement['y'];
+            $width = $shapeElement['width'];
+            $height = $shapeElement['height'];
+            $fill = $resolveFill($shapeElement['fill'] ?? null) ?? 'transparent';
+            $stroke = $shapeElement['stroke'] ?? null;
+            $borderRadius = $shapeElement['borderRadius'] ?? 0;
+            $variant = $shapeElement['variant'] ?? 'rectangle';
+
+            if ($variant === 'rectangle' || !$variant) {
+                $rx = $borderRadius > 0 ? ' rx="' . $borderRadius . '" ry="' . $borderRadius . '"' : '';
+                $strokeAttr = $stroke ? ' stroke="' . htmlspecialchars($stroke) . '" stroke-width="1"' : '';
+                $svg .= '<rect x="' . $x . '" y="' . $y . '" width="' . $width . '" height="' . $height . '" fill="' . htmlspecialchars($fill) . '"' . $strokeAttr . $rx . '/>';
+            }
+        }
+
+        // Add image elements
+        foreach ($imageElements as $imageElement) {
+            $x = $imageElement['x'];
+            $y = $imageElement['y'];
+            $width = $imageElement['width'];
+            $height = $imageElement['height'];
+            $src = $imageElement['src'];
+            $borderRadius = $imageElement['borderRadius'] ?? 0;
+
+            if ($src) {
+                $clipPathId = null;
+                if ($borderRadius > 0) {
+                    $clipPathId = 'inkwise-img-clip-' . (++$gradientCounter);
+                    $defs .= '<clipPath id="' . $clipPathId . '"><rect x="' . $x . '" y="' . $y . '" width="' . $width . '" height="' . $height . '" rx="' . $borderRadius . '" ry="' . $borderRadius . '"/></clipPath>';
+                }
+
+                $clipAttr = $clipPathId ? ' clip-path="url(#' . $clipPathId . ')"' : '';
+                $svg .= '<image x="' . $x . '" y="' . $y . '" width="' . $width . '" height="' . $height . '" href="' . htmlspecialchars($src) . '" preserveAspectRatio="xMidYMid slice"' . $clipAttr . '/>';
+            } else {
+                $svg .= '<rect x="' . $x . '" y="' . $y . '" width="' . $width . '" height="' . $height . '" fill="#cccccc" stroke="#999999" stroke-width="2"/>';
+                $svg .= '<text x="' . ($x + $width / 2) . '" y="' . ($y + $height / 2) . '" text-anchor="middle" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" fill="#666666">Image</text>';
+            }
+        }
+
+        // Add text elements
+        foreach ($textElements as $textElement) {
+            $x = $textElement['x'];
+            $y = $textElement['y'];
+            $text = htmlspecialchars($textElement['text']);
+            $fontSize = $textElement['font_size'];
+            $color = $textElement['color'];
+            $fontFamily = $textElement['font_family'];
+            $fontWeight = $textElement['font_weight'] ?? 'normal';
+            $textAlign = $textElement['text_align'];
+
+            $textAnchor = match ($textAlign) {
+                'left' => 'start',
+                'right' => 'end',
+                default => 'middle',
+            };
+
+            $fontWeightAttr = $fontWeight && $fontWeight !== 'normal'
+                ? ' font-weight="' . $fontWeight . '"'
+                : '';
+
+            $svg .= '<text x="' . $x . '" y="' . $y . '" font-family="' . $fontFamily . '"' . $fontWeightAttr . ' font-size="' . $fontSize . '" fill="' . $color . '" text-anchor="' . $textAnchor . '" dominant-baseline="middle">' . $text . '</text>';
+        }
+
+        // Inject defs just inside the root if any were collected
+        if (!empty($defs)) {
+            $svg = str_replace('<svg ', '<svg ', $svg); // no-op placeholder to keep structure
+            $svg = substr_replace($svg, '<defs>' . $defs . '</defs>', strpos($svg, '>') + 1, 0);
+        }
+
+        $svg .= '</svg>';
+
+        return $svg;
+    }
+
+    protected function buildLinearGradientDef(string $id, string $cssGradient): string
+    {
+        // Example input: linear-gradient(90deg, #D5DCE3, #FFFFFF)
+        if (!preg_match('/linear-gradient\(([^,]+),\s*([^,]+),\s*([^\)]+)\)/i', $cssGradient, $matches)) {
+            return '';
+        }
+
+        $angleRaw = trim($matches[1]);
+        $colorStart = trim($matches[2]);
+        $colorEnd = trim($matches[3]);
+
+        $angleValue = (float) str_replace('deg', '', $angleRaw);
+        // CSS 0deg points up; SVG 0deg points right. Shift by -90deg to align.
+        $radians = deg2rad($angleValue - 90);
+        $dx = cos($radians);
+        $dy = sin($radians);
+
+        $x1 = 50 - ($dx * 50);
+        $y1 = 50 - ($dy * 50);
+        $x2 = 50 + ($dx * 50);
+        $y2 = 50 + ($dy * 50);
+
+        return '<linearGradient id="' . $id . '" x1="' . $x1 . '%" y1="' . $y1 . '%" x2="' . $x2 . '%" y2="' . $y2 . '%">'
+            . '<stop offset="0%" stop-color="' . $colorStart . '"/>'
+            . '<stop offset="100%" stop-color="' . $colorEnd . '"/>'
+            . '</linearGradient>';
+    }
+
+    protected function guessImageMime(string $raw): ?string
+    {
+        $prefix = substr($raw, 0, 10);
+        if (str_starts_with($raw, '<svg')) {
+            return 'image/svg+xml';
+        }
+        if (str_starts_with($raw, '\\x89PNG') || str_starts_with($raw, 'iVBORw0KGgo')) {
+            return 'image/png';
+        }
+        if (str_starts_with($raw, '/9j/') || str_starts_with($raw, '\\xff\\xd8')) {
+            return 'image/jpeg';
+        }
+        if (str_starts_with($raw, 'R0lGOD')) {
+            return 'image/gif';
+        }
+
+        // Heuristic: base64 strings often use A-Z a-z 0-9 / + characters; default to jpeg
+        if (preg_match('/^[A-Za-z0-9+\/=]+$/', $raw)) {
+            return 'image/jpeg';
+        }
+
+        return null;
+    }
+
+    /**
+     * Save dummy SVG as fallback
+     *
+     * @param \App\Models\Template $template
+     */
+    protected function saveDummySvg($template): void
+    {
+        try {
+            $dummySvg = 'data:image/svg+xml;base64,' . base64_encode('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="white"/></svg>');
+            $template->svg_path = $this->persistDataUrl(
+                $dummySvg,
+                'templates/svg',
+                'svg',
+                $template->svg_path,
+                'dummy_svg'
+            );
+            Log::info('Dummy SVG saved', ['path' => $template->svg_path]);
+        } catch (ValidationException $e) {
+            Log::warning('Dummy SVG save failed', ['error' => $e->getMessage()]);
+        }
     }
 }

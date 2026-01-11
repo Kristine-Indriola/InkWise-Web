@@ -3,6 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="csrf-token" content="{{ csrf_token() }}">
 	<title>Design Review &mdash; InkWise</title>
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,16 +22,38 @@
 	$frontImage = $finalArtwork['front'] ?? $finalArtworkFront ?? null;
 	$backImage = $finalArtwork['back'] ?? $finalArtworkBack ?? null;
 	$summaryData = $orderSummary ?? [];
+
+	// Normalize preview images to handle both camelCase and snake_case keys
+	$summaryPreviewImages = [];
+	if (is_array($summaryData)) {
+		$summaryPreviewImages = $summaryData['previewImages'] ?? $summaryData['preview_images'] ?? [];
+		if (!is_array($summaryPreviewImages)) {
+			$summaryPreviewImages = [];
+		}
+		// Promote snake_case to camelCase so window.summaryData matches
+		if (!isset($summaryData['previewImages']) && isset($summaryData['preview_images'])) {
+			$summaryData['previewImages'] = $summaryPreviewImages;
+		}
+		// Ensure a primary previewImage exists for consumers expecting a single image
+		if (empty($summaryData['previewImage']) && !empty($summaryPreviewImages[0])) {
+			$summaryData['previewImage'] = $summaryPreviewImages[0];
+		}
+	}
+
 	if (!$frontImage && is_array($summaryData) && !empty($summaryData['previewImage'])) {
 		$frontImage = $summaryData['previewImage'];
 	}
 
-	if ((!$backImage || $backImage === $frontImage) && is_array($summaryData) && !empty(data_get($summaryData, 'previewImages.1'))) {
-		$backImage = data_get($summaryData, 'previewImages.1');
+	if (!$frontImage && !empty($summaryPreviewImages[0])) {
+		$frontImage = $summaryPreviewImages[0];
 	}
 
-	if (is_array($summaryData) && empty(data_get($summaryData, 'previewImages.1')) && empty($backImage) && !empty(data_get($summaryData, 'previewImages.0'))) {
-		$backImage = data_get($summaryData, 'previewImages.0');
+	if ((!$backImage || $backImage === $frontImage) && !empty($summaryPreviewImages[1])) {
+		$backImage = $summaryPreviewImages[1];
+	}
+
+	if (empty($backImage) && !empty($summaryPreviewImages[0])) {
+		$backImage = $summaryPreviewImages[0];
 	}
 
 	$resolveImage = function ($candidate) {
@@ -70,6 +93,21 @@
 		$backImage = $resolveImage($templateRef->preview_back ?? $templateRef->back_image ?? null);
 	}
 
+	// Normalize any selected previews so relative saved paths resolve via /storage/
+	$frontImage = $resolveImage($frontImage);
+	$backImage = $resolveImage($backImage);
+
+	if ($customerReview && !empty($customerReview->design_svg)) {
+		$frontImage = 'data:image/svg+xml;base64,' . base64_encode($customerReview->design_svg);
+	}
+
+	if ($customerReview && empty($customerReview->design_svg) && !empty($customerReview->preview_image)) {
+		$resolvedPreview = $resolveImage($customerReview->preview_image);
+		if ($resolvedPreview) {
+			$frontImage = $resolvedPreview;
+		}
+	}
+
 	if (!$frontImage && $uploads->isNotEmpty()) {
 		$first = $uploads->firstWhere(fn ($upload) => str_starts_with($upload->mime_type ?? '', 'image/'));
 		if ($first) {
@@ -105,6 +143,9 @@
 	$lastEditedAt = $lastEditedAt ?? null;
 	$editHref = $editHref ?? route('design.edit');
 	$customerReview = $customerReview ?? null;
+	if (!$lastEditedAt && $customerReview) {
+		$lastEditedAt = optional($customerReview->updated_at ?? $customerReview->created_at)->toIso8601String();
+	}
 @endphp
 
 	<div class="review-shell">
@@ -220,6 +261,7 @@
 	    <button type="button"
 	    	id="continueBtn"
 	    	data-href="{{ $continueHref ?? '' }}"
+	    	data-save-url="{{ route('order.review.continue') }}"
 	    	disabled
 	    >
 					Continue
@@ -231,14 +273,40 @@
 	</div>
 
 	<div id="reviewToast" class="review-toast" role="status" aria-live="polite"></div>
-@if(!empty($orderSummary))
 	<script>
 		document.addEventListener('DOMContentLoaded', () => {
-			const summaryData = {!! \Illuminate\Support\Js::from($orderSummary) !!};
+			const summaryData = {!! \Illuminate\Support\Js::from($orderSummary ?? []) !!};
 			window.summaryData = summaryData;
-			window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(summaryData));
+			try { window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(summaryData)); } catch (e) {}
+
+			// Fallback: replace preview images with saved template from sessionStorage if available
+			try {
+				const saved = JSON.parse(window.sessionStorage.getItem('inkwise-finalstep') || window.sessionStorage.getItem('inkwise-saved-template') || 'null');
+				const frontImg = document.querySelector('.card-flip .card-face.front img');
+				const backImg = document.querySelector('.card-flip .card-face.back img');
+				const resolve = (candidate) => {
+					if (!candidate || typeof candidate !== 'string') return '';
+					const trimmed = candidate.trim();
+					if (!trimmed) return '';
+					if (/^(data:|https?:|\/\/|\/)/i.test(trimmed)) return trimmed;
+					return '/storage/' + trimmed.replace(/^\/+/, '');
+				};
+
+				if (saved && frontImg) {
+					const previewImages = saved.previewImages || saved.preview_images || [];
+					const primary = saved.previewImage || saved.preview_image || previewImages[0] || saved.preview || (saved.template && saved.template.preview_image) || null;
+					const back = previewImages[1] || saved.back_preview || null;
+					const resolvedFront = resolve(primary);
+					if (resolvedFront) frontImg.src = resolvedFront;
+					if (backImg) {
+						const resolvedBack = resolve(back);
+						if (resolvedBack) backImg.src = resolvedBack;
+					}
+				}
+			} catch (e) {
+				// non-fatal
+			}
 		});
 	</script>
-@endif
 </body>
 </html>

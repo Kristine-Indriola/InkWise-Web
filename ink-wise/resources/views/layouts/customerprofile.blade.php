@@ -23,8 +23,8 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ asset('css/customer/customer.css') }}">
     <link rel="stylesheet" href="{{ asset('css/customer/customerprofile.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/customer/customertemplates.css') }}">
-    <script src="{{ asset('js/customer/customertemplate.js') }}" defer></script>
+    <link rel="stylesheet" href="{{ asset('css/customer/customertemplate.css') }}">
+    <script src="{{ asset('js/customer/template.js') }}" defer></script>
     <script src="{{ asset('js/customer/customerprofile.js') }}" defer></script>
     <!-- Alpine.js for interactivity -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.10.2/cdn.min.js" defer></script>
@@ -707,3 +707,67 @@ function clearImageSelection() {
 @stack('scripts')
 </body>
 </html>
+
+<script>
+// Accessible click/touch toggle for the user dropdown
+document.addEventListener('DOMContentLoaded', function () {
+  try {
+    const btn = document.getElementById('userDropdownBtn');
+    const menu = document.getElementById('userDropdownMenu');
+    if (!btn || !menu) return;
+
+    // Ensure ARIA attributes
+    btn.setAttribute('aria-haspopup', 'true');
+    btn.setAttribute('aria-expanded', 'false');
+
+    function hideMenu() {
+      menu.classList.add('hidden', 'opacity-0', 'pointer-events-none');
+      menu.classList.remove('opacity-100', 'block', 'pointer-events-auto');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+
+    function showMenu() {
+      menu.classList.remove('hidden', 'opacity-0', 'pointer-events-none');
+      menu.classList.add('opacity-100', 'block', 'pointer-events-auto');
+      btn.setAttribute('aria-expanded', 'true');
+    }
+
+    btn.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      if (menu.classList.contains('hidden')) {
+        showMenu();
+      } else {
+        hideMenu();
+      }
+    });
+
+    // Close when clicking outside
+    document.addEventListener('click', function (ev) {
+      if (!menu.contains(ev.target) && !btn.contains(ev.target)) {
+        hideMenu();
+      }
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape') {
+        hideMenu();
+      }
+    });
+
+    // Make sure keyboard focus toggles also hide when focus leaves
+    menu.addEventListener('focusout', function (ev) {
+      // if focus moves outside the menu and button, hide
+      setTimeout(() => {
+        const active = document.activeElement;
+        if (!menu.contains(active) && active !== btn) {
+          hideMenu();
+        }
+      }, 10);
+    });
+  } catch (e) {
+    // don't break the page if script errors
+    console.warn('user dropdown toggle failed', e);
+  }
+});
+</script>
