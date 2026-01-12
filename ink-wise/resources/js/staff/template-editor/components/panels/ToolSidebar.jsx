@@ -3926,18 +3926,23 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
   };
 
   const handleAddImagePlaceholder = () => {
+    console.log('handleAddImagePlaceholder called');
     if (!activePage) {
+      console.log('No active page, returning');
       return;
     }
 
     // Trigger file input for image upload
+    console.log('Triggering file input click, fileInputRef.current:', fileInputRef.current);
     fileInputRef.current?.click();
   };
 
   const handleFileSelect = async (event) => {
+    console.log('handleFileSelect called with event:', event);
+    console.log('Files selected:', event.target.files);
     const file = event.target.files[0];
     if (!file || !activePage) {
-      console.log('No file selected or no active page');
+      console.log('No file selected or no active page', { file, activePage });
       return;
     }
 
@@ -3999,6 +4004,9 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
             if (layer.frame) {
               layer.frame = constrainFrameToSafeZone(layer.frame, activePage, safeInsets);
             }
+
+            console.log('Adding layer to canvas:', layer);
+            dispatch({ type: 'ADD_LAYER', pageId: activePage.id, panelId: state.activePanelId, layer });
 
             try {
               dispatch({ type: 'SET_PANEL_IMAGE', panelId: state.activePanelId, imageData: { dataUrl: imageUrl, fileName: file.name } });
@@ -6653,7 +6661,10 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
                   <button
                     type="button"
                     className="tool-action-btn builder-upload-card__button"
-                    onClick={handleAddImagePlaceholder}
+                    onClick={() => {
+                      console.log('Upload button clicked');
+                      fileInputRef.current?.click();
+                    }}
                   >
                     Upload image
                   </button>
@@ -7438,6 +7449,7 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
       </nav>
       <input
         type="file"
+        id="image-upload-input"
         ref={fileInputRef}
         onChange={handleFileSelect}
         accept="image/*"

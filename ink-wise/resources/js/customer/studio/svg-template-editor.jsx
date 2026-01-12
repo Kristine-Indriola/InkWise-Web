@@ -815,52 +815,69 @@ class SvgTemplateEditor {
         input.click();
     }
 
-    handleImageUpload(file, triggerElement) {
+    async handleImageUpload(file, triggerElement) {
         const self = this;
-        const reader = new FileReader();
         const resolvedTarget = triggerElement && triggerElement.__inkwiseImageContent
             ? triggerElement.__inkwiseImageContent
             : triggerElement;
 
-        reader.onload = function(e) {
-            const imageUrl = e.target.result;
-            if (!imageUrl) {
-                return;
-            }
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || null;
+        const formData = new FormData();
+        formData.append('image', file);
+        if (csrfToken) {
+            formData.append('_token', csrfToken);
+        }
 
-            const updatedElement = self.applyImageSourceToNode(resolvedTarget, imageUrl) || resolvedTarget;
-            if (triggerElement && updatedElement && triggerElement.__inkwiseImageContent !== updatedElement) {
-                triggerElement.__inkwiseImageContent = updatedElement;
-            }
+        let uploadedUrl = null;
 
-            const event = new CustomEvent('svgImageChanged', {
-                detail: {
-                    element: updatedElement,
-                    imageUrl,
-                    file,
-                },
+        try {
+            const response = await fetch('/design/upload-image', {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin',
             });
-            self.svg.dispatchEvent(event);
 
-            if (self.options.onImageChange) {
-                self.options.onImageChange(updatedElement, imageUrl, file);
+            if (!response.ok) {
+                const text = await response.text().catch(() => '');
+                throw new Error(`Upload failed (${response.status}): ${text}`);
             }
 
-            self.updateBoundingBox(triggerElement || updatedElement);
-        };
-
-        reader.onerror = function(error) {
-            console.error('SvgTemplateEditor: Failed to read selected image file', error);
+            const data = await response.json();
+            uploadedUrl = data.url || data.path || null;
+        } catch (error) {
+            console.error('SvgTemplateEditor: Failed to upload image', error);
+            alert('We could not upload your image. Please try again.');
             const uploadErrorEvent = new CustomEvent('svgImageUploadFailed', {
-                detail: {
-                    error,
-                    file,
-                },
+                detail: { error, file },
             });
             self.svg.dispatchEvent(uploadErrorEvent);
-        };
+            return;
+        }
 
-        reader.readAsDataURL(file);
+        if (!uploadedUrl) {
+            alert('Upload did not return a usable image URL.');
+            return;
+        }
+
+        const updatedElement = self.applyImageSourceToNode(resolvedTarget, uploadedUrl) || resolvedTarget;
+        if (triggerElement && updatedElement && triggerElement.__inkwiseImageContent !== updatedElement) {
+            triggerElement.__inkwiseImageContent = updatedElement;
+        }
+
+        const event = new CustomEvent('svgImageChanged', {
+            detail: {
+                element: updatedElement,
+                imageUrl: uploadedUrl,
+                file,
+            },
+        });
+        self.svg.dispatchEvent(event);
+
+        if (self.options.onImageChange) {
+            self.options.onImageChange(updatedElement, uploadedUrl, file);
+        }
+
+        self.updateBoundingBox(triggerElement || updatedElement);
     }
 
     showTextEditDialog(element) {
@@ -1020,37 +1037,35 @@ class SvgTemplateEditor {
     }
 
     getSvgString() {
-        // Temporarily hide editor overlays for clean SVG export
-        const overlayLayer = this.svg.closest('.preview-card-bg')?.querySelector('.canvas-overlay-layer');
-        const wasVisible = overlayLayer?.style.display !== 'none';
-        if (overlayLayer && wasVisible) {
-            overlayLayer.style.display = 'none';
-        }
+        // Clone the element so we don't interfere with the live editor state during serialization
+        const clone = this.svg.cloneNode(true);
 
-        // Temporarily remove SVG bounding boxes
-        const boundingBoxes = this.svg.querySelectorAll('.svg-bounding-box');
-        const removedBoxes = [];
-        boundingBoxes.forEach(box => {
-            if (box.parentNode) {
-                removedBoxes.push({ element: box, parent: box.parentNode });
-                box.parentNode.removeChild(box);
-            }
+        // Remove editor-only UI elements from the export
+        clone.querySelectorAll('.svg-bounding-box, .inkwise-editor-marker, [data-editor-only="true"]').forEach(el => {
+            el.parentNode?.removeChild(el);
         });
 
-        const svgString = new XMLSerializer().serializeToString(this.svg);
+        // Ensure root SVG attributes are set for high-fidelity standalone viewing
+        clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+        
+        // Remove UI scaling styles to allow the SVG to render at its natural viewBox size
+        clone.style.width = '';
+        clone.style.height = '';
+        clone.style.maxWidth = '';
+        clone.style.maxHeight = '';
+        clone.removeAttribute('preserveAspectRatio');
 
-        // Restore bounding boxes
-        removedBoxes.forEach(({ element, parent }) => {
-            if (parent) {
-                parent.appendChild(element);
-            }
-        });
+        // Inject required font definitions and CSS resets
+        const styleEl = document.createElementNS(SVG_NS, 'style');
+        styleEl.id = 'inkwise-export-styles';
+        styleEl.textContent = `
+            @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+            text { white-space: pre; }
+        `;
+        clone.insertBefore(styleEl, clone.firstChild);
 
-        // Restore overlay visibility
-        if (overlayLayer && wasVisible) {
-            overlayLayer.style.display = '';
-        }
-
+        const svgString = new XMLSerializer().serializeToString(clone);
         return svgString;
     }
 

@@ -3,6 +3,10 @@
 @section('title', 'In Production')
 
 @section('content')
+<style>
+    /* SVG container styling for thumbnails */
+    .svg-container svg { width: 100%; height: 100%; object-fit: cover; }
+</style>
 <div class="bg-white rounded-2xl shadow p-6">
        <div class="flex border-b text-base font-semibold mb-4">
     <a href="{{ route('customer.my_purchase.topay') }}" class="px-4 py-2 text-gray-500 hover:text-[#a6b7ff] js-purchase-tab">To Pay</a>
@@ -247,6 +251,11 @@
 
                 $designToggleId = 'design-' . md5((string) $orderNumber . '-' . $loop->index);
                 $hasDesignEntries = $designEntries->isNotEmpty();
+                
+                // Get payment method and status
+                $paymentMethod = data_get($order, 'payment_method');
+                $paymentStatusRaw = data_get($order, 'payment_status', 'pending');
+                $paymentStatusLabel = ucfirst(str_replace('_', ' ', $paymentStatusRaw ?? 'pending'));
             @endphp
 
             <div class="bg-white border rounded-xl p-4 shadow-sm flex flex-col gap-4 md:flex-row md:items-center">
@@ -257,6 +266,9 @@
                     <div class="text-sm text-gray-500">Quantity: {{ $totalQuantity ?: '—' }} pcs</div>
                     <div class="text-sm text-gray-500">Primary paper: {{ $paperStock }}</div>
                     <div class="text-sm text-gray-500">Status: <span class="font-semibold text-[#a6b7ff]">{{ $statusLabel }}</span></div>
+                    @if($paymentMethod)
+                        <div class="text-sm text-gray-500">Payment: <span class="font-semibold {{ $paymentStatusRaw === 'paid' ? 'text-green-600' : ($paymentStatusRaw === 'partial' ? 'text-yellow-600' : 'text-gray-600') }}">{{ strtoupper($paymentMethod) }} - {{ $paymentStatusLabel }}</span></div>
+                    @endif
                     <div class="text-sm text-gray-500">Next step: {{ $nextStatusLabel ?? 'All steps complete' }}</div>
                     @if($trackingNumber)
                         <div class="text-sm text-gray-500">Tracking: {{ $trackingNumber }}</div>
@@ -350,9 +362,71 @@
                                 }
                             }
                         }
+
+                        // Try to load customerReview SVG for this order's template
+                        $orderCustomerReview = null;
+                        $orderTemplateId = $primaryItem ? data_get($primaryItem, 'product.template_id') : null;
+                        if (!$orderTemplateId && $primaryItem) {
+                            $orderTemplateId = data_get($primaryItem, 'template_id');
+                        }
+                        if ($orderTemplateId && auth()->user()) {
+                            $customerId = auth()->user()->customer?->customer_id;
+                            if ($customerId) {
+                                $orderCustomerReview = \App\Models\CustomerReview::where('template_id', $orderTemplateId)
+                                    ->where('customer_id', $customerId)
+                                    ->latest('updated_at')
+                                    ->first();
+                            }
+                        }
                     @endphp
 
-                    @if($templatePreview || count($templatePreviews))
+                    @if($orderCustomerReview && !empty($orderCustomerReview->design_svg))
+                        @php
+                            // Try to get back image from various sources
+                            $backImageUrl = null;
+                            
+                            // Check template previews
+                            if (!empty($templatePreviews) && count($templatePreviews) > 1) {
+                                $backImageUrl = $templatePreviews[1] ?? null;
+                            }
+                            
+                            // Check design entries for back image
+                            if (!$backImageUrl && $designEntries->isNotEmpty()) {
+                                $firstEntry = $designEntries->first();
+                                if (!empty($firstEntry['images']) && count($firstEntry['images']) > 1) {
+                                    $backImageUrl = $firstEntry['images'][1] ?? null;
+                                }
+                            }
+                            
+                            // Fallback to product back image
+                            if (!$backImageUrl && $primaryItem) {
+                                $productBackImage = data_get($primaryItem, 'product.back_image') 
+                                    ?? data_get($primaryItem, 'product.preview_back')
+                                    ?? data_get($primaryItem, 'product.images.back');
+                                if ($productBackImage) {
+                                    $backImageUrl = $resolveDesignImageUrl($productBackImage);
+                                }
+                            }
+                        @endphp
+                        <div class="mt-3 saved-template-card" data-order-number="{{ $orderNumber }}">
+                            <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Edited template</div>
+                            <div class="flex items-center gap-3 mt-2">
+                                <div class="w-20 h-20 overflow-hidden rounded border border-gray-200 bg-slate-50 cursor-pointer hover:ring-2 hover:ring-[#a6b7ff] transition js-svg-preview-trigger"
+                                     data-svg-id="svg-modal-{{ $loop->index }}"
+                                     data-back-image="{{ $backImageUrl ?? '' }}">
+                                    <div class="svg-container w-full h-full" style="pointer-events: none;">
+                                        {!! $orderCustomerReview->design_svg !!}
+                                    </div>
+                                </div>
+                                <div class="flex-1 text-sm text-gray-600">
+                                    <div class="font-medium">{{ $templateMeta['template_name'] ?? $templateMeta['name'] ?? 'Saved template' }}</div>
+                                    <div class="text-xs text-gray-400">Click to view front & back</div>
+                                </div>
+                            </div>
+                            {{-- Hidden container for modal SVG content --}}
+                            <template id="svg-modal-{{ $loop->index }}">{!! $orderCustomerReview->design_svg !!}</template>
+                        </div>
+                    @elseif($templatePreview || count($templatePreviews))
                         <div class="mt-3 saved-template-card" data-order-number="{{ $orderNumber }}">
                             <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Edited template</div>
                             <div class="flex items-center gap-3 mt-2">
@@ -377,11 +451,30 @@
                     <div class="text-gray-700 font-bold">₱{{ number_format($totalAmount, 2) }}</div>
                     @php
                         // Check if order has remaining balance to pay
+                        // Prefer computed values from route, fallback to metadata-based calculation
                         $hasRemainingBalance = false;
-                        $metadata = $normalizeMetadata(data_get($order, 'metadata', []));
-                        $payments = collect($metadata['payments'] ?? []);
-                        $paidAmount = $payments->filter(fn($payment) => ($payment['status'] ?? null) === 'paid')->sum(fn($payment) => (float)($payment['amount'] ?? 0));
-                        $remainingBalance = max(($totalAmount ?? 0) - $paidAmount, 0);
+                        
+                        // Use computed values if available (from route)
+                        $computedPaid = data_get($order, 'computed_total_paid');
+                        $computedBalance = data_get($order, 'computed_balance_due');
+                        
+                        if ($computedPaid !== null) {
+                            $paidAmount = (float) $computedPaid;
+                            $remainingBalance = (float) $computedBalance;
+                        } else {
+                            // Fallback: compute from payments relationship
+                            $orderPayments = $order->payments ?? collect();
+                            if ($orderPayments instanceof \Illuminate\Database\Eloquent\Collection || $orderPayments instanceof \Illuminate\Support\Collection) {
+                                $paidAmount = $orderPayments->filter(fn($p) => strtolower($p->status ?? '') === 'paid')->sum('amount');
+                            } else {
+                                // Last fallback: read from metadata
+                                $metadata = $normalizeMetadata(data_get($order, 'metadata', []));
+                                $metaPayments = collect($metadata['payments'] ?? []);
+                                $paidAmount = $metaPayments->filter(fn($payment) => ($payment['status'] ?? null) === 'paid')->sum(fn($payment) => (float)($payment['amount'] ?? 0));
+                            }
+                            $remainingBalance = max(($totalAmount ?? 0) - $paidAmount, 0);
+                        }
+                        
                         $hasRemainingBalance = $remainingBalance > 0.01; // More than 1 cent remaining
                     @endphp
                     @if($hasRemainingBalance)
@@ -407,7 +500,7 @@
                                 @endif>
                             View Design Proof{{ $hasDesignEntries ? ($designEntries->count() > 1 ? 's' : '') : '' }}
                         </button>
-                        <button type="button" class="px-4 py-2 bg-blue-50 text-blue-700 rounded font-semibold js-apply-saved-template" data-order-number="{{ $orderNumber }}">Show Edited Template</button>
+                       
                        
                         @if($customerCanCancel)
                         <button type="button" class="px-4 py-2 border border-red-500 text-red-500 hover:bg-red-50 rounded font-semibold js-cancel-production-order" data-order-id="{{ data_get($order, 'id') }}">Cancel Order</button>
@@ -642,184 +735,186 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 <script>
-// Inject most-recent saved template from sessionStorage when present
+// SVG Preview Modal for saved templates with front/back navigation
 document.addEventListener('DOMContentLoaded', function () {
-    try {
-        // Look for saved template in multiple sessionStorage keys
-        let saved = JSON.parse(window.sessionStorage.getItem('inkwise-saved-template') || 'null');
-        if ((!saved || !saved.preview) && (window.sessionStorage.getItem('inkwise-finalstep') || window.sessionStorage.getItem('order_summary_payload'))) {
-            try {
-                const summary = JSON.parse(window.sessionStorage.getItem('inkwise-finalstep') || window.sessionStorage.getItem('order_summary_payload') || 'null');
-                if (summary) {
-                    // Try multiple shapes
-                    if (summary.template) saved = summary.template;
-                    else if (summary.metadata && summary.metadata.template) saved = summary.metadata.template;
-                    else if (summary.design_preview) saved = { preview: summary.design_preview.image || (Array.isArray(summary.design_preview.images) ? summary.design_preview.images[0] : null), name: summary.productName || summary.template_name };
-                }
-            } catch (e) {
-                // ignore
-            }
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'svg-preview-modal';
+    overlay.className = 'fixed inset-0 z-[100] hidden items-center justify-center bg-black/80 px-4';
+    overlay.style.display = 'none';
+
+    const frame = document.createElement('div');
+    frame.className = 'relative max-w-4xl w-full max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col';
+
+    const header = document.createElement('div');
+    header.className = 'flex items-center justify-between p-4 border-b';
+    
+    const titleArea = document.createElement('div');
+    titleArea.className = 'flex items-center gap-3';
+    titleArea.innerHTML = '<h3 class="text-lg font-semibold text-gray-800">Your Saved Design</h3>';
+    
+    const viewLabel = document.createElement('span');
+    viewLabel.id = 'view-label';
+    viewLabel.className = 'text-sm font-medium text-[#7c3aed] bg-[#ede9fe] px-2 py-1 rounded';
+    viewLabel.textContent = 'Front';
+    titleArea.appendChild(viewLabel);
+    header.appendChild(titleArea);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.innerHTML = '&times;';
+    closeBtn.className = 'h-10 w-10 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-800 text-2xl leading-none transition';
+    header.appendChild(closeBtn);
+
+    const content = document.createElement('div');
+    content.className = 'flex-1 overflow-auto p-4 bg-slate-50 flex items-center justify-center relative';
+    content.style.minHeight = '400px';
+
+    // Navigation buttons
+    const prevBtn = document.createElement('button');
+    prevBtn.id = 'prev-view-btn';
+    prevBtn.type = 'button';
+    prevBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>';
+    prevBtn.className = 'absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white/90 hover:bg-white shadow-lg text-gray-700 flex items-center justify-center transition z-10 hidden';
+    
+    const nextBtn = document.createElement('button');
+    nextBtn.id = 'next-view-btn';
+    nextBtn.type = 'button';
+    nextBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>';
+    nextBtn.className = 'absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white/90 hover:bg-white shadow-lg text-gray-700 flex items-center justify-center transition z-10 hidden';
+
+    const displayContainer = document.createElement('div');
+    displayContainer.id = 'svg-modal-content';
+    displayContainer.className = 'svg-modal-display flex items-center justify-center';
+    
+    content.appendChild(prevBtn);
+    content.appendChild(displayContainer);
+    content.appendChild(nextBtn);
+
+    frame.appendChild(header);
+    frame.appendChild(content);
+    overlay.appendChild(frame);
+    document.body.appendChild(overlay);
+
+    // Style for modal SVG and images
+    const style = document.createElement('style');
+    style.textContent = `
+        .svg-modal-display svg {
+            max-width: 100%;
+            max-height: 70vh;
+            width: auto;
+            height: auto;
         }
-        if (!saved || !saved.preview) {
-            return;
+        .svg-modal-display img {
+            max-width: 100%;
+            max-height: 70vh;
+            width: auto;
+            height: auto;
+            object-fit: contain;
         }
+    `;
+    document.head.appendChild(style);
 
-        const list = document.querySelector('.space-y-4');
-        if (!list) return;
+    // State for modal
+    let currentView = 0; // 0 = front (SVG), 1 = back (image)
+    let frontSvgContent = '';
+    let backImageUrl = '';
 
-        // avoid duplicates: skip if an identical preview is already shown
-        const found = list.querySelector(`.saved-template-card img[src="${saved.preview}"]`);
-        if (found) return;
-
-        const wrapper = document.createElement('div');
-        wrapper.className = 'bg-white border rounded-xl p-4 shadow-sm flex flex-col gap-4 md:flex-row md:items-center saved-template-card';
-        wrapper.setAttribute('data-saved', 'true');
-
-        wrapper.innerHTML = `
-            <img src="${saved.preview}" alt="${saved.name || 'Saved template'}" class="w-24 h-24 object-cover rounded-lg border">
-            <div class="flex-1 space-y-1">
-                <div class="font-semibold text-lg text-[#a6b7ff]">${(saved.name || 'Saved template')}</div>
-                <div class="text-sm text-gray-500">Your recently edited template</div>
-            </div>
-            <div class="flex flex-col items-end gap-2">
-                <a href="${saved.preview}" target="_blank" class="px-4 py-2 bg-[#a6b7ff] hover:bg-[#8f9ffd] text-white rounded font-semibold">Open template</a>
-            </div>
-        `;
-
-        list.insertBefore(wrapper, list.firstChild);
-    } catch (e) {
-        // ignore
-    }
-});
-</script>
-
-<script>
-// Replace order card product image with customer's edited template preview when available
-document.addEventListener('DOMContentLoaded', function () {
-    try {
-        let saved = JSON.parse(window.sessionStorage.getItem('inkwise-saved-template') || 'null');
-        if ((!saved || !saved.preview) && (window.sessionStorage.getItem('inkwise-finalstep') || window.sessionStorage.getItem('order_summary_payload'))) {
-            try {
-                const summary = JSON.parse(window.sessionStorage.getItem('inkwise-finalstep') || window.sessionStorage.getItem('order_summary_payload') || 'null');
-                if (summary) {
-                    if (summary.template) saved = summary.template;
-                    else if (summary.metadata && summary.metadata.template) saved = summary.metadata.template;
-                    else if (summary.design_preview) saved = { preview: summary.design_preview.image || (Array.isArray(summary.design_preview.images) ? summary.design_preview.images[0] : null), preview_back: Array.isArray(summary.design_preview.images) ? summary.design_preview.images[1] : null };
-                }
-            } catch (e) {
-                // ignore
+    const updateView = () => {
+        if (currentView === 0) {
+            // Show front SVG
+            displayContainer.innerHTML = frontSvgContent;
+            viewLabel.textContent = 'Front';
+        } else {
+            // Show back image
+            if (backImageUrl) {
+                displayContainer.innerHTML = `<img src="${backImageUrl}" alt="Back view" class="rounded shadow-sm" />`;
+            } else {
+                displayContainer.innerHTML = '<div class="text-gray-400 text-center p-8">Back view not available</div>';
             }
+            viewLabel.textContent = 'Back';
         }
-        if (!saved || !saved.preview) return;
-
-        const cards = Array.from(document.querySelectorAll('.bg-white.border.rounded-xl'));
-        cards.forEach(card => {
-            // prefer not to replace if a server-side saved-template-card already present for this order
-            if (card.querySelector('.saved-template-card')) return;
-
-            // find the primary image in the card
-            const img = card.querySelector('img.w-24.h-24, img.w-20.h-20');
-            if (!img) return;
-
-            // Determine front/back urls from saved payload
-            const frontUrl = saved.preview || saved.preview_image || (Array.isArray(saved.preview_images) ? saved.preview_images[0] : null);
-            const backUrl = saved.preview_back || (Array.isArray(saved.preview_images) && saved.preview_images.length > 1 ? saved.preview_images[1] : null);
-            if (!frontUrl) return;
-
-            // If back exists, render a two-thumb preview; otherwise replace single image
-            try {
-                if (backUrl) {
-                    // avoid duplicating if already rendered
-                    if (card.querySelector('.twopreview')) return;
-
-                    const container = document.createElement('div');
-                    container.className = 'twopreview flex gap-2 items-center';
-
-                    const f = document.createElement('img');
-                    f.src = frontUrl;
-                    f.alt = saved.name || 'Edited front';
-                    f.className = 'w-20 h-20 object-cover rounded border border-gray-200 cursor-pointer';
-                    f.setAttribute('data-preview-role', 'front');
-
-                    const b = document.createElement('img');
-                    b.src = backUrl;
-                    b.alt = saved.name || 'Edited back';
-                    b.className = 'w-20 h-20 object-cover rounded border border-gray-200 cursor-pointer';
-                    b.setAttribute('data-preview-role', 'back');
-
-                    // replace the original img with container
-                    img.replaceWith(container);
-                    container.appendChild(f);
-                    container.appendChild(b);
-
-                    // if original img was in an anchor, preserve link behavior on each thumb
-                    const anchor = img.closest('a');
-                    if (anchor) {
-                        f.addEventListener('click', () => { anchor.href = frontUrl; anchor.target = '_blank'; anchor.click(); });
-                        b.addEventListener('click', () => { anchor.href = backUrl; anchor.target = '_blank'; anchor.click(); });
-                    }
-
-                    // integrate with lightbox: clicking opens larger preview
-                    f.addEventListener('click', (e) => { e.preventDefault(); openDesignLightbox && openDesignLightbox(frontUrl); });
-                    b.addEventListener('click', (e) => { e.preventDefault(); openDesignLightbox && openDesignLightbox(backUrl); });
-                } else {
-                    // single preview - replace src/alt and keep link if present
-                    if (img.src === frontUrl) return;
-                    img.src = frontUrl;
-                    img.alt = saved.name || 'Edited template';
-                    const anchor = img.closest('a');
-                    if (anchor) {
-                        anchor.href = frontUrl;
-                    }
-                    // make image open lightbox too
-                    img.style.cursor = 'pointer';
-                    img.addEventListener('click', (e) => { e.preventDefault(); openDesignLightbox && openDesignLightbox(frontUrl); });
-                }
-            } catch (e) {
-                // ignore DOM errors
-            }
-        });
-    } catch (e) {
-        // ignore
-    }
-});
-</script>
-
-<!-- Lightbox modal for design proofs -->
-<div id="designLightbox" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); align-items:center; justify-content:center; z-index:1200;">
-    <div style="position:relative; max-width:90vw; max-height:90vh;">
-        <button id="designLightboxClose" style="position:absolute; top:-12px; right:-12px; background:#fff; border-radius:999px; border:none; width:36px; height:36px; cursor:pointer;">×</button>
-        <img id="designLightboxImg" src="" alt="Preview" style="display:block; max-width:90vw; max-height:90vh; object-fit:contain; border-radius:8px;" />
-    </div>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    // Attach click handler to design proof thumbnails and main card images
-    const openLightbox = (src) => {
-        const lb = document.getElementById('designLightbox');
-        const img = document.getElementById('designLightboxImg');
-        if (!lb || !img) return;
-        img.src = src;
-        lb.style.display = 'flex';
     };
 
-    document.body.addEventListener('click', function (ev) {
-        const target = ev.target;
-        if (!target) return;
+    const updateNavButtons = () => {
+        const hasBack = !!backImageUrl;
+        prevBtn.classList.toggle('hidden', currentView === 0);
+        nextBtn.classList.toggle('hidden', currentView === 1 || !hasBack);
+    };
 
-        // If clicking a design thumbnail or primary image, open lightbox
-        if (target.matches('.group.block img') || target.matches('.w-20.h-20') || target.matches('.w-24.h-24') || target.closest('.design-proof-thumb')) {
-            ev.preventDefault();
-            const src = target.src || target.getAttribute('data-src') || (target.closest('a')?.href || '');
-            if (src) openLightbox(src);
+    const open = (svgContent, backUrl) => {
+        frontSvgContent = svgContent;
+        backImageUrl = backUrl || '';
+        currentView = 0;
+        updateView();
+        updateNavButtons();
+        overlay.style.display = 'flex';
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex');
+    };
+
+    const close = () => {
+        overlay.style.display = 'none';
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
+        displayContainer.innerHTML = '';
+        frontSvgContent = '';
+        backImageUrl = '';
+        currentView = 0;
+    };
+
+    prevBtn.addEventListener('click', () => {
+        if (currentView > 0) {
+            currentView = 0;
+            updateView();
+            updateNavButtons();
         }
     });
 
-    const closeBtn = document.getElementById('designLightboxClose');
-    const lightbox = document.getElementById('designLightbox');
-    if (closeBtn) closeBtn.addEventListener('click', () => { if (lightbox) lightbox.style.display='none'; });
-    if (lightbox) lightbox.addEventListener('click', (ev) => { if (ev.target === lightbox) lightbox.style.display='none'; });
+    nextBtn.addEventListener('click', () => {
+        if (currentView < 1 && backImageUrl) {
+            currentView = 1;
+            updateView();
+            updateNavButtons();
+        }
+    });
+
+    closeBtn.addEventListener('click', close);
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) close();
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (overlay.style.display !== 'none') {
+            if (e.key === 'Escape') close();
+            if (e.key === 'ArrowLeft' && currentView > 0) {
+                currentView = 0;
+                updateView();
+                updateNavButtons();
+            }
+            if (e.key === 'ArrowRight' && currentView < 1 && backImageUrl) {
+                currentView = 1;
+                updateView();
+                updateNavButtons();
+            }
+        }
+    });
+
+    // Attach click handlers to SVG preview triggers
+    const triggers = document.querySelectorAll('.js-svg-preview-trigger');
+    triggers.forEach(trigger => {
+        trigger.addEventListener('click', () => {
+            const svgId = trigger.dataset.svgId;
+            const backUrl = trigger.dataset.backImage || '';
+            if (!svgId) return;
+            const template = document.getElementById(svgId);
+            if (template) {
+                open(template.innerHTML, backUrl);
+            }
+        });
+    });
 });
 </script>
+
+
 @endsection

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import html2canvas from 'html2canvas';
+import { toSvg } from 'html-to-image';
 import { deflate, gzip } from 'pako';
 
 import { useBuilderStore } from '../../state/BuilderStore';
@@ -27,6 +28,8 @@ const PAYLOAD_COMPRESSION_ENCODING = 'gzip-base64';
 const PAYLOAD_VERSION = 1;
 const POST_FAILSAFE_LIMIT = 1_600_000; // conservative ceiling to dodge strict post_max_size limits
 
+const compressor = PAYLOAD_COMPRESSION_ENCODING === 'gzip-base64' ? gzip : deflate;
+
 const waitForNextFrame = () => new Promise((resolve) => setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)))), 100));
 
 async function captureCanvasRaster(canvas, pixelRatio, backgroundColor = '#ffffff') {
@@ -39,7 +42,6 @@ async function captureCanvasRaster(canvas, pixelRatio, backgroundColor = '#fffff
   };
 
   console.error('[InkWise Builder] CAPTURE FUNCTION CALLED - Starting canvas capture for template save');
-  alert('Canvas capture starting... check console for details');
   console.log('[InkWise Builder] Starting canvas capture for template save');
   console.log('[InkWise Builder] Canvas element:', canvas);
   console.log('[InkWise Builder] Canvas exists:', !!canvas);
@@ -352,7 +354,6 @@ async function captureCanvasRaster(canvas, pixelRatio, backgroundColor = '#fffff
 
     if (result) {
       console.error('[InkWise Builder] CAPTURE SUCCESSFUL - Returning data URL, length:', result.length);
-      alert('Canvas capture successful! Length: ' + result.length);
       return { dataUrl: result, diagnostics };
     }
 
@@ -382,7 +383,6 @@ async function captureCanvasRaster(canvas, pixelRatio, backgroundColor = '#fffff
 
     diagnostics.error = diagnostics.error || 'all-html2canvas-failed';
     console.error('[InkWise Builder] CAPTURE COMPLETED - All html2canvas methods failed, returning null');
-    alert('Canvas capture completed - all methods failed due to CORS issues');
     return { dataUrl: null, diagnostics };
   } finally {
     if (surface) {
@@ -404,7 +404,6 @@ try {
   return await Promise.race([capturePromise, timeoutPromise]);
 } catch (error) {
   console.error('[InkWise Builder] Capture failed with timeout or error:', error);
-  alert('Canvas capture failed: ' + error.message);
   return { dataUrl: null, diagnostics: { ...diagnostics, error: error.message } };
 }
 }
@@ -526,7 +525,17 @@ function prepareCompressedJsonPayload(payload, thresholdBytes = MANUAL_SAVE_PAYL
 
   try {
     const compressed = compressor(json, { level: 9 });
-    const compressedBinary = String.fromCharCode(...compressed);
+    
+    // Robust binary to string conversion to avoid stack overflow with large payloads
+    let compressedBinary = '';
+    const len = compressed.byteLength;
+    const chunkShift = 14; 
+    const chunkSize = 1 << chunkShift; // 16384
+    
+    for (let i = 0; i < len; i += chunkSize) {
+      compressedBinary += String.fromCharCode.apply(null, compressed.subarray(i, Math.min(i + chunkSize, len)));
+    }
+
     const compressedBytes = compressedBinary.length;
     const base64Payload = base64EncodeBinaryString(compressedBinary);
     const requestPayload = {
@@ -587,7 +596,7 @@ function prepareManualSaveRequest(basePayload) {
     { id: 'full', options: {} },
     { id: 'no-preview-images', options: { stripPreviewImages: true } },
     { id: 'no-previews', options: { stripPreviewImages: true, stripPrimaryPreview: true } },
-    { id: 'minimal', options: { stripPreviewImages: true, stripPrimaryPreview: true, stripSvgMarkup: true } },
+    // Removed stripSvgMarkup option - SVG is generated server-side now
   ];
 
   let bestAttempt = null;
@@ -964,6 +973,7 @@ export function BuilderShell() {
   }, [state.pages, state.activePageId, state.zoom, state.panX, state.panY, state.template?.name, routes?.autosave, csrfToken]);
 
   const saveTemplateRoute = routes?.saveTemplate ?? routes?.saveCanvas;
+  const saveDesignRoute = routes?.saveDesign ?? null;
 
   const handleSaveTemplate = useCallback(async (options = {}) => {
     if (!saveTemplateRoute) {
@@ -1131,13 +1141,19 @@ export function BuilderShell() {
           primaryPreviewCandidate = compressedImage;
         }
 
+        // Re-enable client-side SVG capture for high fidelity
         if (!svgDataUrl) {
           try {
             console.log('[InkWise Builder] Attempting SVG capture for page', page.id);
             const svgTarget = canvasRef.current.querySelector('.canvas-viewport__stage') || canvasRef.current;
             svgDataUrl = await toSvg(svgTarget, {
               cacheBust: true,
-              filter: (node) => !node.classList?.contains('canvas-layer__resize-handle'),
+              filter: (node) => 
+                !node.classList?.contains('resize-handle') && 
+                !node.classList?.contains('svg-bounding-box') &&
+                !node.classList?.contains('canvas-viewport__grid') &&
+                !node.classList?.contains('canvas-viewport__safe-zone') &&
+                !node.classList?.contains('canvas-viewport__bleed'),
               backgroundColor: '#ffffff',
             });
             console.log('[InkWise Builder] SVG capture succeeded, length:', svgDataUrl?.length);
@@ -1204,19 +1220,14 @@ export function BuilderShell() {
       }
 
       const previewImage = previewImages.front ?? primaryPreviewCandidate ?? null;
+      
       const svgMarkup = extractSvgMarkup(svgDataUrl);
       const svgPayload = encodeSvgMarkup(svgMarkup);
-
-      console.log('[InkWise Builder] SVG capture:', {
-        svgDataUrlLength: svgDataUrl ? svgDataUrl.length : 0,
-        svgMarkupLength: svgMarkup ? svgMarkup.length : 0,
-        svgPayloadLength: svgPayload ? svgPayload.length : 0,
-      });
 
       console.log('[InkWise Builder] === Preview capture results ===');
       console.log('[InkWise Builder] Preview images count:', Object.keys(previewImages).length);
       console.log('[InkWise Builder] Has primary preview:', !!previewImage);
-      console.log('[InkWise Builder] Has SVG:', !!svgPayload);
+      console.log('[InkWise Builder] SVG will be generated server-side from design JSON');
       console.log('[InkWise Builder] Primary preview length:', previewImage ? previewImage.length : 0, 'bytes');
       
       if (Object.keys(previewImages).length === 0) {
@@ -1270,6 +1281,10 @@ export function BuilderShell() {
         payload.preview_image = finalPreviewImage;
       }
 
+      if (svgPayload) {
+        payload.svg_markup = svgPayload;
+      }
+
       if (Object.keys(previewImages).length > 0) {
         payload.preview_images = previewImages;
         payload.preview_images_meta = previewImagesMeta;
@@ -1280,9 +1295,10 @@ export function BuilderShell() {
         payload.preview_images_truncated = true;
       }
 
-      if (svgPayload) {
-        payload.svg_markup = svgPayload;
-      }
+      // Don't include svg_markup - server will generate proper editable SVG from design JSON
+      // if (svgPayload) {
+      //   payload.svg_markup = svgPayload;
+      // }
 
       if (captureDiagnostics.length > 0) {
         payload.capture_diagnostics = captureDiagnostics;
@@ -1294,17 +1310,41 @@ export function BuilderShell() {
         payload.preview_image = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
       }
 
-      // Fallback: if no SVG, use dummy
-      if (!payload.svg_markup) {
-        console.log('[InkWise Builder] No SVG captured, using dummy');
-        payload.svg_markup = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="white"/></svg>');
+      // Don't send dummy SVG - server will generate proper SVG from design JSON
+      // The server's generateSvgFromTemplate() will create editable SVG with text and shapes
+      // if (!payload.svg_markup) {
+      //   console.log('[InkWise Builder] No SVG captured, using dummy');
+      //   payload.svg_markup = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="white"/></svg>');
+      // }
+
+      // Send simplified asset export to save-design endpoint when available
+      if (saveDesignRoute && payload.preview_image) {
+        try {
+          const designJson = JSON.stringify(designSnapshot);
+          await fetch(saveDesignRoute, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+              'X-CSRF-TOKEN': csrfToken,
+            },
+            body: JSON.stringify({
+              png: payload.preview_image,
+              // Don't send svg - server will generate from JSON
+              // svg: payload.svg_markup,
+              json: designJson,
+            }),
+          });
+        } catch (e) {
+          console.warn('[InkWise Builder] saveDesign fallback failed', e);
+        }
       }
 
       console.log('[InkWise Builder] === Final payload validation ===');
       console.log('[InkWise Builder] Design pages:', designSnapshot.pages?.length || 0);
       console.log('[InkWise Builder] Design nodes in page 0:', designSnapshot.pages?.[0]?.nodes?.length || 0);
       console.log('[InkWise Builder] Preview image size:', payload.preview_image?.length || 0, 'bytes');
-      console.log('[InkWise Builder] SVG markup size:', payload.svg_markup?.length || 0, 'bytes');
+      console.log('[InkWise Builder] SVG will be generated server-side from design JSON');
       console.log('[InkWise Builder] Additional preview images:', Object.keys(payload.preview_images || {}).length);
       
       if (!designSnapshot.pages || designSnapshot.pages.length === 0) {
@@ -1392,6 +1432,21 @@ export function BuilderShell() {
       saveInProgressRef.current = false;
     }
   }, [saveTemplateRoute, csrfToken, isSavingTemplate, state, routes, dispatch]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const saveRunner = (options = {}) => handleSaveTemplate(options);
+    window.inkwiseSaveTemplate = saveRunner;
+
+    return () => {
+      if (window.inkwiseSaveTemplate === saveRunner) {
+        delete window.inkwiseSaveTemplate;
+      }
+    };
+  }, [handleSaveTemplate]);
 
   return (
     <BuilderErrorBoundary onReset={handleBoundaryReset} templateId={state.template?.id}>

@@ -150,7 +150,7 @@
                            class="block px-4 py-2 text-gray-700 hover:bg-[#e0f7fa]">
                             My Account
                         </a>
-                        <form id="logout-form" action="{{ route('customer.logout') }}" method="POST">
+                        <form id="customerLogoutForm" action="{{ route('customer.logout') }}" method="POST">
                             @csrf
                             <button type="submit"
                                     class="block w-full text-left px-4 py-2 text-gray-700 hover:bg-[#e0f7fa]">
