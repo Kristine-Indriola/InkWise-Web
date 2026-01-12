@@ -72,7 +72,7 @@
     "isEntry": true
   },
   "resources/js/customer/studio/main.jsx": {
-    "file": "assets/main-GrFFe1Jg.js",
+    "file": "assets/main-CmmAE5Dz.js",
     "name": "main",
     "src": "resources/js/customer/studio/main.jsx",
     "isEntry": true,
@@ -84,13 +84,13 @@
     ]
   },
   "resources/js/customer/studio/svg-template-editor.jsx": {
-    "file": "assets/svg-template-editor-BqTHRGij.js",
+    "file": "assets/svg-template-editor-0-J9mb6i.js",
     "name": "svg-template-editor",
     "src": "resources/js/customer/studio/svg-template-editor.jsx",
     "isEntry": true
   },
   "resources/js/staff/template-editor/main.jsx": {
-    "file": "assets/main-DrrrAtLK.js",
+    "file": "assets/main-CtI4pfWg.js",
     "name": "main",
     "src": "resources/js/staff/template-editor/main.jsx",
     "isEntry": true,
@@ -104,7 +104,7 @@
       "resources/js/staff/template-editor/utils/recentImagesDB.js"
     ],
     "css": [
-      "assets/main-DpPKJWjJ.css"
+      "assets/main-MelzGpxY.css"
     ]
   },
   "resources/js/staff/template-editor/utils/recentImagesDB.js": {

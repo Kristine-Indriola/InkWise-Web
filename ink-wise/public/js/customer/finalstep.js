@@ -120,6 +120,31 @@ document.addEventListener('DOMContentLoaded', () => {
     if (orderTotalEl) orderTotalEl.textContent = formatMoney(total);
     // keep hidden inputs updated
     if (paperStockPriceInput) paperStockPriceInput.value = String(paper || 0);
+    
+    // Auto-save quantity to sessionStorage whenever it changes
+    saveQuantityToStorage();
+  };
+  
+  // Save current quantity to sessionStorage so mycart page can pick it up
+  const saveQuantityToStorage = () => {
+    try {
+      const qty = currentQuantity();
+      // Update existing sessionStorage data if any, or create new
+      const existingData = sessionStorage.getItem('inkwise-finalstep');
+      if (existingData) {
+        const summary = JSON.parse(existingData);
+        summary.quantity = qty;
+        sessionStorage.setItem('inkwise-finalstep', JSON.stringify(summary));
+        sessionStorage.setItem('order_summary_payload', JSON.stringify(summary));
+      } else {
+        // Create a minimal summary with at least the quantity
+        const minSummary = { quantity: qty };
+        sessionStorage.setItem('inkwise-finalstep', JSON.stringify(minSummary));
+        sessionStorage.setItem('order_summary_payload', JSON.stringify(minSummary));
+      }
+    } catch (e) {
+      console.warn('Failed to save quantity to sessionStorage:', e);
+    }
   };
 
   const handleToggle = (face) => {

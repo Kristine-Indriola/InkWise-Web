@@ -319,6 +319,14 @@ class OrderFlowService
         $user = $user ?? Auth::user();
         $userId = $user?->getAuthIdentifier();
         $customerId = $user?->customer?->customer_id;
+        
+        \Log::debug('loadCustomerReview called', [
+            'templateId' => $templateId,
+            'userId' => $userId,
+            'customerId' => $customerId,
+            'orderItemId' => $orderItemId,
+        ]);
+        
         $query = CustomerReview::query();
 
         if ($orderItemId) {
@@ -340,7 +348,17 @@ class OrderFlowService
             $query->whereNull('customer_id');
         }
 
-        return $query->latest('updated_at')->first();
+        $result = $query->latest('updated_at')->first();
+        
+        \Log::debug('loadCustomerReview result', [
+            'found' => $result ? 'YES' : 'NO',
+            'result_id' => $result?->id,
+            'result_template_id' => $result?->template_id,
+            'result_customer_id' => $result?->customer_id,
+            'design_svg_length' => $result ? strlen($result->design_svg ?? '') : 0,
+        ]);
+        
+        return $result;
     }
 
     public function primaryInvitationItem(Order $order): ?OrderItem
@@ -3174,7 +3192,8 @@ class OrderFlowService
 
     public function recalculateOrderTotals(Order $order): void
     {
-        $order->loadMissing(['items.addons', 'items.paperStockSelection']);
+        // Always reload items to ensure we have the latest quantities
+        $order->load(['items.addons', 'items.paperStockSelection']);
 
         $invitationItem = $this->primaryInvitationItem($order);
         if (!$invitationItem) {

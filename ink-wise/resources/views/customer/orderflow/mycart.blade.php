@@ -18,6 +18,8 @@
         body { font-family: 'Poppins', system-ui, -apple-system, sans-serif; }
         .glass-card { backdrop-filter: blur(10px); background: rgba(255, 255, 255, 0.82); }
         .fade-border { border: 1px solid rgba(15, 23, 42, 0.08); box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12); }
+        /* SVG container styling for thumbnails */
+        .svg-container svg { width: 100%; height: 100%; object-fit: cover; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900"
@@ -263,7 +265,7 @@
                         sessionStorage.setItem('order_summary_payload', sessionData);
                     }
                     
-                    // Sync to server
+                    // Always sync to server
                     fetch('{{ route("order.summary.sync") }}', {
                         method: 'POST',
                         headers: {
@@ -275,10 +277,22 @@
                         body: JSON.stringify({ summary: summary })
                     }).then(response => {
                         if (response.ok) {
-                            // Reload page to show synced data
-                            if (!window.location.href.includes('synced=1')) {
-                                window.location.href = window.location.href + (window.location.href.includes('?') ? '&' : '?') + 'synced=1';
-                            }
+                            return response.json().then(data => {
+                                // Check if this is first visit (no synced param) - need to reload
+                                if (!window.location.href.includes('synced=1')) {
+                                    window.location.href = window.location.href + (window.location.href.includes('?') ? '&' : '?') + 'synced=1';
+                                    return;
+                                }
+                                
+                                // Already has synced=1, check if displayed quantity matches what we just synced
+                                // If not, we need to reload to show the updated quantity
+                                const displayedQty = document.querySelector('[data-invitation-qty]')?.dataset?.invitationQty;
+                                const syncedQty = data.summary?.quantity;
+                                if (displayedQty && syncedQty && parseInt(displayedQty) !== parseInt(syncedQty)) {
+                                    // Quantity on page doesn't match what we synced - reload
+                                    window.location.reload();
+                                }
+                            });
                         }
                     }).catch(err => console.warn('Failed to sync session data:', err));
                 }
@@ -477,11 +491,21 @@
                         <article class="glass-card fade-border rounded-3xl p-6">
                             <div class="flex items-start justify-between gap-4">
                                 <div class="flex items-start gap-4">
-                                        <div class="h-24 w-24 overflow-hidden rounded-2xl bg-slate-100 shadow-inner">
-                                        <img src="{{ $invPreview ?: $placeholderImage }}"
-                                             alt="Invitation preview"
-                                             class="h-full w-full object-cover js-preview-trigger"
-                                             data-preview-images='@json($invPreviewGallery->values())'>
+                                        <div class="h-24 w-24 overflow-hidden rounded-2xl bg-slate-100 shadow-inner js-preview-trigger cursor-pointer"
+                                             data-preview-images='@json($invPreviewGallery->values())'
+                                             @if(isset($customerReview) && !empty($customerReview->design_svg))
+                                             data-svg-preview="true"
+                                             @endif>
+                                        @if(isset($customerReview) && !empty($customerReview->design_svg))
+                                            {{-- Embed SVG directly - img src doesn't work with SVGs containing external resources --}}
+                                            <div class="svg-container h-full w-full" style="pointer-events: none;">
+                                                {!! $customerReview->design_svg !!}
+                                            </div>
+                                        @else
+                                            <img src="{{ $invPreview ?: $placeholderImage }}"
+                                                 alt="Invitation preview"
+                                                 class="h-full w-full object-cover">
+                                        @endif
                                         </div>
                                     <div>
                                         <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Invitation</p>
@@ -505,7 +529,8 @@
                                                   pattern="[0-9]*"
                                                   class="js-inv-qty w-20 rounded-lg border border-slate-300 px-2 py-1 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
                                                   data-index="{{ $loop->index }}"
-                                                  data-unit="{{ $invUnitPrice }}">
+                                                  data-unit="{{ $invUnitPrice }}"
+                                                  data-invitation-qty="{{ max(10, $invQty) }}">
                                         </label>
                                         @if($invPaper)
                                             <p class="text-slate-600 text-sm">Paper: {{ $invPaper }} @if($invPaperPrice) ({{ $formatMoney($invPaperPrice) }}) @endif</p>
@@ -824,8 +849,12 @@
                 const frame = document.createElement('div');
                 frame.className = 'relative max-w-3xl w-full max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col';
 
+                const contentContainer = document.createElement('div');
+                contentContainer.className = 'w-full h-full flex-1 bg-slate-50 flex items-center justify-center overflow-auto';
+                contentContainer.style.minHeight = '400px';
+
                 const img = document.createElement('img');
-                img.className = 'w-full h-full object-contain bg-slate-50 flex-1';
+                img.className = 'w-full h-full object-contain';
 
                 const closeBtn = document.createElement('button');
                 closeBtn.type = 'button';
@@ -846,22 +875,52 @@
                 nextBtn.className = 'h-9 w-9 rounded-full bg-white/90 text-slate-800 shadow-md border border-slate-200';
 
                 pager.append(prevBtn, nextBtn);
-                frame.append(closeBtn, img, pager);
+                contentContainer.append(img);
+                frame.append(closeBtn, contentContainer, pager);
                 overlay.append(frame);
                 document.body.appendChild(overlay);
 
                 let gallery = [];
+                let svgContent = null;
                 let index = 0;
 
                 const render = () => {
-                    if (!gallery.length) return;
-                    img.src = gallery[index];
+                    // If we have SVG content and we're showing the first image (front), use SVG
+                    if (svgContent && index === 0) {
+                        img.style.display = 'none';
+                        // Check if SVG container already exists
+                        let svgContainer = contentContainer.querySelector('.svg-modal-content');
+                        if (!svgContainer) {
+                            svgContainer = document.createElement('div');
+                            svgContainer.className = 'svg-modal-content w-full h-full flex items-center justify-center';
+                            contentContainer.appendChild(svgContainer);
+                        }
+                        svgContainer.innerHTML = svgContent;
+                        svgContainer.style.display = 'flex';
+                        // Style the SVG to fit
+                        const svgEl = svgContainer.querySelector('svg');
+                        if (svgEl) {
+                            svgEl.style.maxWidth = '100%';
+                            svgEl.style.maxHeight = '80vh';
+                            svgEl.style.width = 'auto';
+                            svgEl.style.height = 'auto';
+                        }
+                    } else {
+                        // Show image
+                        let svgContainer = contentContainer.querySelector('.svg-modal-content');
+                        if (svgContainer) svgContainer.style.display = 'none';
+                        img.style.display = 'block';
+                        if (gallery.length) {
+                            img.src = gallery[index];
+                        }
+                    }
                 };
 
-                const open = (images) => {
+                const open = (images, svg = null) => {
                     gallery = images.filter(Boolean);
+                    svgContent = svg;
                     index = 0;
-                    if (!gallery.length) return;
+                    if (!gallery.length && !svgContent) return;
                     render();
                     overlay.classList.remove('hidden');
                     overlay.classList.add('flex');
@@ -870,6 +929,9 @@
                 const close = () => {
                     overlay.classList.add('hidden');
                     gallery = [];
+                    svgContent = null;
+                    let svgContainer = contentContainer.querySelector('.svg-modal-content');
+                    if (svgContainer) svgContainer.innerHTML = '';
                 };
 
                 prevBtn.addEventListener('click', () => {
@@ -900,8 +962,16 @@
                     trigger.addEventListener('click', () => {
                         try {
                             const images = JSON.parse(trigger.dataset.previewImages || '[]');
-                            if (Array.isArray(images) && images.length) {
-                                open(images);
+                            // Check if this trigger has SVG content (from embedded SVG)
+                            let svgContent = null;
+                            if (trigger.dataset.svgPreview === 'true') {
+                                const svgContainer = trigger.querySelector('.svg-container');
+                                if (svgContainer) {
+                                    svgContent = svgContainer.innerHTML;
+                                }
+                            }
+                            if (Array.isArray(images) && images.length || svgContent) {
+                                open(images, svgContent);
                             }
                         } catch (err) {
                             console.warn('Unable to open preview modal', err);
@@ -1036,33 +1106,141 @@
                     setCheckoutEnabled(!hasInvalidQty);
                 };
 
+                // Sync quantities to server
+                const syncQuantitiesToServer = async () => {
+                    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+                    
+                    // Collect all quantities
+                    const invQty = qtyInputs.length > 0 ? Number(qtyInputs[0].value) : null;
+                    
+                    const envelopes = [];
+                    envInputs.forEach((input) => {
+                        envelopes.push({
+                            index: Number(input.dataset.index),
+                            qty: Number(input.value)
+                        });
+                    });
+                    
+                    const giveaways = [];
+                    giveInputs.forEach((input) => {
+                        giveaways.push({
+                            index: Number(input.dataset.index),
+                            qty: Number(input.value)
+                        });
+                    });
+                    
+                    const payload = {};
+                    if (invQty !== null && invQty >= 10) {
+                        payload.invitationQty = invQty;
+                    }
+                    if (envelopes.length > 0) {
+                        payload.envelopes = envelopes;
+                    }
+                    if (giveaways.length > 0) {
+                        payload.giveaways = giveaways;
+                    }
+                    
+                    try {
+                        const response = await fetch('{{ route("order.summary.update-quantity") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrf || ''
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify(payload)
+                        });
+                        
+                        if (!response.ok) {
+                            console.warn('Failed to sync quantities:', response.status);
+                            return false;
+                        }
+                        
+                        const result = await response.json();
+                        console.log('Quantities synced successfully:', result);
+                        
+                        // Update session storage with new summary
+                        if (result.summary) {
+                            try {
+                                window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(result.summary));
+                                window.sessionStorage.setItem('order_summary_payload', JSON.stringify(result.summary));
+                            } catch (e) {
+                                console.warn('Failed to update session storage:', e);
+                            }
+                        }
+                        
+                        return true;
+                    } catch (err) {
+                        console.error('Error syncing quantities:', err);
+                        return false;
+                    }
+                };
+
+                // Debounce helper for auto-sync on quantity change
+                let syncTimeout = null;
+                const debouncedSync = () => {
+                    if (syncTimeout) clearTimeout(syncTimeout);
+                    syncTimeout = setTimeout(() => {
+                        if (!checkoutBlocked) {
+                            syncQuantitiesToServer();
+                        }
+                    }, 800); // Sync after 800ms of no changes
+                };
+
                 qtyInputs.forEach((input) => {
-                    input.addEventListener('input', () => recalc(false));
-                    input.addEventListener('change', () => recalc(true));
+                    input.addEventListener('input', () => { recalc(false); debouncedSync(); });
+                    input.addEventListener('change', () => { recalc(true); debouncedSync(); });
                     input.addEventListener('blur', () => recalc(true));
                 });
 
                 envInputs.forEach((input) => {
-                    input.addEventListener('input', () => recalc(false));
-                    input.addEventListener('change', () => recalc(true));
+                    input.addEventListener('input', () => { recalc(false); debouncedSync(); });
+                    input.addEventListener('change', () => { recalc(true); debouncedSync(); });
                     input.addEventListener('blur', () => recalc(true));
                 });
 
                 giveInputs.forEach((input) => {
-                    input.addEventListener('input', () => recalc(false));
-                    input.addEventListener('change', () => recalc(true));
+                    input.addEventListener('input', () => { recalc(false); debouncedSync(); });
+                    input.addEventListener('change', () => { recalc(true); debouncedSync(); });
                     input.addEventListener('blur', () => recalc(true));
                 });
 
                 recalc(true);
 
-                const guardCheckout = (event) => {
-                    if (!checkoutBlocked) return;
+                const guardCheckout = async (event) => {
+                    if (checkoutBlocked) {
+                        event.preventDefault();
+                        setCheckoutEnabled(false);
+                        const warningTarget = qtyWarning || summaryInv;
+                        if (warningTarget) {
+                            warningTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                        return;
+                    }
+                    
+                    // Prevent default navigation, sync first
                     event.preventDefault();
-                    setCheckoutEnabled(false);
-                    const warningTarget = qtyWarning || summaryInv;
-                    if (warningTarget) {
-                        warningTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    
+                    // Show loading state
+                    const btn = event.currentTarget;
+                    const originalText = btn.textContent;
+                    btn.textContent = 'Updating...';
+                    btn.classList.add('pointer-events-none', 'opacity-60');
+                    
+                    // Sync quantities to server
+                    const synced = await syncQuantitiesToServer();
+                    
+                    // Restore button state
+                    btn.textContent = originalText;
+                    btn.classList.remove('pointer-events-none', 'opacity-60');
+                    
+                    if (synced) {
+                        // Navigate to checkout
+                        window.location.href = btn.getAttribute('href');
+                    } else {
+                        // Still navigate even if sync failed - server will use existing data
+                        window.location.href = btn.getAttribute('href');
                     }
                 };
 

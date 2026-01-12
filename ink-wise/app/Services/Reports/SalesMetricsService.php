@@ -137,7 +137,7 @@ class SalesMetricsService
     {
         $query = Order::query()
             ->select(['id', 'total_amount', 'order_date', 'created_at'])
-            ->with(['payments:order_id,amount,status'])
+            ->with(['payments:order_id,amount,status', 'items:id,order_id,product_name,unit_price,quantity,subtotal,line_type'])
             ->whereRaw('COALESCE(order_date, created_at) >= ?', [
                 Carbon::now()->copy()->subYears(5)->startOfYear(),
             ])
@@ -338,9 +338,17 @@ class SalesMetricsService
         });
 
         $orderCount = $filtered->count();
-        $revenue = (float) $fullyPaidOrders->sum('total_amount');
+        $revenue = (float) $fullyPaidOrders->sum(function (Order $order) {
+            return $this->calculateAdjustedTotal($order);
+        });
         $realisedRevenue = (float) $filtered->sum(function (Order $order) {
-            return (float) $order->totalPaid();
+            $adjustedTotal = $this->calculateAdjustedTotal($order);
+            $originalTotal = $order->total_amount;
+            if ($originalTotal > 0) {
+                $ratio = $order->totalPaid() / $originalTotal;
+                return $adjustedTotal * $ratio;
+            }
+            return 0;
         });
         $materialCost = (float) $filtered->sum('material_cost_value');
         $profit = $realisedRevenue - $materialCost;
@@ -350,7 +358,14 @@ class SalesMetricsService
             return $totalPaid > 0 && $order->balanceDue() > 0.01;
         });
         $pendingRevenue = (float) $partiallyPaidOrders->sum(function (Order $order) {
-            return $order->balanceDue();
+            $adjustedTotal = $this->calculateAdjustedTotal($order);
+            $paid = $order->totalPaid();
+            $originalTotal = $order->total_amount;
+            if ($originalTotal > 0) {
+                $ratio = $paid / $originalTotal;
+                return max($adjustedTotal - ($adjustedTotal * $ratio), 0);
+            }
+            return 0;
         });
 
         return [
@@ -362,6 +377,35 @@ class SalesMetricsService
             'averageOrder' => $orderCount > 0 ? round($revenue / $orderCount, 2) : 0.0,
             'profitMargin' => $realisedRevenue > 0 ? round(($profit / $realisedRevenue) * 100, 1) : 0.0,
         ];
+    }
+
+    protected function calculateAdjustedTotal(Order $order): float
+    {
+        $total = 0.0;
+        foreach ($order->items as $item) {
+            $ptype = strtolower((string) ($item->product_type ?? ''));
+            $iname = strtolower((string) ($item->product_name ?? ''));
+            $ltype = strtolower((string) ($item->line_type ?? ''));
+            $isEnvelope = str_contains($ptype, 'envelope') || str_contains($iname, 'envelope');
+            $isGiveaway = $ltype === 'giveaway' || str_contains($ptype, 'giveaway') || str_contains($iname, 'giveaway') || str_contains($iname, 'freebie');
+
+            if (!$isEnvelope && !$isGiveaway) {
+                // For invitations, do not include base price, only paper stock and addons
+                $itemTotal = 0.0;
+                if ($item->paperStockSelection && isset($item->paperStockSelection->price)) {
+                    $itemTotal += (float) $item->paperStockSelection->price;
+                }
+                foreach ($item->addons as $addon) {
+                    if (isset($addon->size_price)) {
+                        $itemTotal += (float) $addon->size_price;
+                    }
+                }
+                $total += $itemTotal;
+            } else {
+                $total += (float) ($item->subtotal ?: ($item->unit_price * $item->quantity));
+            }
+        }
+        return $total;
     }
 
     protected function buildPaymentSummary(Collection $orders): array

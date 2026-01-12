@@ -769,7 +769,14 @@
 				<div class="card-flip">
 					<div class="inner">
 						<div class="card-face front">
-							<img src="{{ $frontImage }}" alt="Front of your design">
+							@if(isset($customerReview) && !empty($customerReview->design_svg))
+								{{-- Embed SVG directly - img src doesn't work with SVGs containing external resources --}}
+								<div class="svg-container" style="width: 100%; height: 100%; pointer-events: none;">
+									{!! $customerReview->design_svg !!}
+								</div>
+							@else
+								<img src="{{ $frontImage }}" alt="Front of your design">
+							@endif
 						</div>
 						<div class="card-face back">
 							<img src="{{ $backImage }}" alt="Back of your design">
