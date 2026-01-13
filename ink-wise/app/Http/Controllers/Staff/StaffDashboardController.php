@@ -23,11 +23,27 @@ class StaffDashboardController extends Controller
         $staffId = $staff->user_id;
 
         // Total Orders (all orders in the system)
-        $totalOrders = Order::count();
+        $totalOrders = Order::where(function ($query) {
+                $query->where('payment_status', '!=', 'pending')
+                      ->orWhereNull('payment_status');
+            })
+            ->where(function ($query) {
+                $query->whereNull('archived')
+                      ->orWhere('archived', false);
+            })
+            ->count();
 
         // Assigned Orders - Orders that are in active statuses (not completed or cancelled)
         // These represent orders that need attention from the staff
         $assignedOrders = Order::whereNotIn('status', ['completed', 'cancelled'])
+            ->where(function ($query) {
+                $query->where('payment_status', '!=', 'pending')
+                      ->orWhereNull('payment_status');
+            })
+            ->where(function ($query) {
+                $query->whereNull('archived')
+                      ->orWhere('archived', false);
+            })
             ->count();
 
         // Total Customers

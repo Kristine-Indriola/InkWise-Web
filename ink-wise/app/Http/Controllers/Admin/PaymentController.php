@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Services\Reports\TransactionReportService;
+use App\Models\Payment;
 use App\Support\Owner\TransactionPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -140,5 +141,33 @@ class PaymentController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    public function archived(Request $request)
+    {
+        $allowed = [10, 20, 25, 50, 100];
+        $default = 20;
+        $perPage = (int) $request->query('per_page', $default);
+        if (!in_array($perPage, $allowed, true)) {
+            $perPage = $default;
+        }
+
+        $query = Payment::query()
+            ->with([
+                'customer.user',
+                'order.customer.user',
+                'order.customerOrder.customer.user',
+            ])
+            ->where('archived', true)
+            ->orderByDesc('recorded_at')
+            ->orderByDesc('created_at');
+
+        $transactions = $query->paginate($perPage)->withQueryString();
+        $transformedRows = $this->transactionReportService->transform($transactions->items());
+
+        return view('admin.payments.archived', [
+            'transactions' => $transactions,
+            'transformedRows' => $transformedRows,
+        ]);
     }
 }

@@ -34,6 +34,11 @@ class TransactionReportService
             'order.customerOrder.customer.user',
         ]);
 
+        // Exclude payments that have been archived themselves
+        $query->where(function ($q) {
+            $q->whereNull('archived')->orWhere('archived', false);
+        });
+
         if ($status !== '' && $status !== 'all') {
             $allowedStatuses = collect($statusGroups[$status] ?? [$status])
                 ->map(fn ($value) => Str::lower($value))
@@ -109,6 +114,18 @@ class TransactionReportService
                 }
             });
         }
+
+        // Exclude payments that belong to orders which are pending payment or already archived.
+        // Keep payments that have no order relationship.
+        $query->where(function ($q) {
+            $q->whereDoesntHave('order')
+                ->orWhereHas('order', function (Builder $orderQ) {
+                    $orderQ->where(DB::raw('LOWER(payment_status)'), '<>', 'pending')
+                        ->where(function (Builder $sub) {
+                            $sub->where('archived', 0)->orWhereNull('archived');
+                        });
+                });
+        });
 
         return $query;
     }

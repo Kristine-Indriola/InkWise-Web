@@ -711,6 +711,10 @@
                         <i class="fas fa-download"></i>
                         Export CSV
                     </a>
+                    <a href="{{ route('admin.payments.archived') }}" class="btn-secondary" title="Show archived payments">
+                        <i class="fas fa-archive"></i>
+                        Archived
+                    </a>
                 </div>
             </div>
         </form>

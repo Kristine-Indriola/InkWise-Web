@@ -34,12 +34,14 @@ class AdminController extends Controller
 
         $currentWeekOrdersQuery = Order::query()
             ->where('status', '!=', 'cancelled')
+            ->where('archived', false)
             ->whereRaw('COALESCE(order_date, created_at) BETWEEN ? AND ?', [$weekStart, $now]);
 
         $previousWeekStart = $weekStart->copy()->subWeek();
         $previousWeekEnd = $weekStart->copy()->subSecond();
         $previousWeekOrdersQuery = Order::query()
             ->where('status', '!=', 'cancelled')
+            ->where('archived', false)
             ->whereRaw('COALESCE(order_date, created_at) BETWEEN ? AND ?', [$previousWeekStart, $previousWeekEnd]);
 
         $ordersThisWeek = (clone $currentWeekOrdersQuery)->count();
@@ -54,10 +56,12 @@ class AdminController extends Controller
 
         $pendingOrders = Order::query()
             ->where('status', 'pending')
+            ->where('archived', false)
             ->count();
 
         $newOrders = Order::query()
             ->where('status', 'draft')
+            ->where('archived', false)
             ->count();
 
         $inventorySummary = $this->summariseInventory($materials);
@@ -118,10 +122,12 @@ class AdminController extends Controller
     {
         $totalOrders = Order::query()
             ->where('status', '!=', 'cancelled')
+            ->where('archived', false)
             ->count();
 
         $totalSales = (float) Order::query()
             ->where('status', '!=', 'cancelled')
+            ->where('archived', false)
             ->sum('total_amount');
 
         $totalCustomers = Customer::query()->count();
@@ -136,6 +142,7 @@ class AdminController extends Controller
 
         $pendingOrders = Order::query()
             ->where('status', 'pending')
+            ->where('archived', false)
             ->count();
 
         return [
@@ -201,6 +208,7 @@ class AdminController extends Controller
         $paymentStatusCounts = Order::query()
             ->select('payment_status', DB::raw('COUNT(*) as total'))
             ->where('archived', false)
+            ->whereRaw("LOWER(COALESCE(payment_status, '')) != ?", ['pending'])
             ->groupBy('payment_status')
             ->pluck('total', 'payment_status')
             ->all();
@@ -253,7 +261,8 @@ class AdminController extends Controller
         $bestSelling = OrderItem::query()
             ->selectRaw('order_items.product_id, COALESCE(order_items.product_name, "Custom Design") as label, SUM(order_items.quantity) as quantity, COUNT(DISTINCT order_items.order_id) as orders_count, SUM(COALESCE(order_items.subtotal, order_items.quantity * order_items.unit_price, 0)) as total_revenue, MAX(products.image) as product_image')
             ->whereHas('order', function ($query) {
-                $query->where('status', '!=', 'cancelled');
+                $query->where('status', '!=', 'cancelled')
+                    ->where('archived', false);
             })
             ->leftJoin('products', 'order_items.product_id', '=', 'products.id')
             ->groupBy('order_items.product_id', 'label')
@@ -295,9 +304,14 @@ class AdminController extends Controller
 
         $recentTransactions = Payment::query()
             ->with([
-                'order:id,order_number,status',
+                'order:id,order_number,status,payment_status,archived',
                 'recordedBy:user_id,name',
             ])
+            ->where('archived', false)
+            ->whereHas('order', function ($q) {
+                $q->where('payment_status', '!=', 'pending')
+                  ->where('archived', false);
+            })
             ->orderByDesc(DB::raw('COALESCE(recorded_at, created_at)'))
             ->limit(6)
             ->get();
@@ -382,6 +396,11 @@ class AdminController extends Controller
             ->selectRaw('COALESCE(method, "Unspecified") as method_label, COUNT(*) as usage_count, SUM(amount) as total_amount_sum')
             ->whereNotNull('amount')
             ->where('amount', '>', 0)
+            ->where('archived', false)
+            ->whereHas('order', function ($q) {
+                $q->where('payment_status', '!=', 'pending')
+                  ->where('archived', false);
+            })
             ->whereRaw("{$timestampExpression} BETWEEN ? AND ?", [$windowStart, $now])
             ->groupBy('method_label')
             ->orderByDesc('total_amount_sum')
@@ -452,6 +471,7 @@ class AdminController extends Controller
         $topCustomers = Order::query()
             ->selectRaw('customer_id, COUNT(*) as order_count, SUM(total_amount) as total_spent')
             ->where('status', '!=', 'cancelled')
+            ->where('archived', false)
             ->whereNotNull('customer_id')
             ->groupBy('customer_id')
             ->orderByDesc('total_spent')
@@ -471,6 +491,7 @@ class AdminController extends Controller
         $recentOrders = Order::query()
             ->select(['customer_id', 'order_date', 'created_at'])
             ->where('status', '!=', 'cancelled')
+            ->where('archived', false)
             ->whereNotNull('customer_id')
             ->whereRaw('COALESCE(order_date, created_at) >= ?', [$recentWindowStart])
             ->get()
@@ -512,6 +533,7 @@ class AdminController extends Controller
                 ELSE "Late Night"
             END as bucket_label, COUNT(*) as total_orders')
             ->where('status', '!=', 'cancelled')
+            ->where('archived', false)
             ->whereRaw('COALESCE(order_date, created_at) >= ?', [$frequencyWindowStart])
             ->groupBy('bucket_label')
             ->get()
@@ -528,6 +550,7 @@ class AdminController extends Controller
         $dayOfWeekRows = Order::query()
             ->selectRaw('DAYOFWEEK(COALESCE(order_date, created_at)) as day_index, COUNT(*) as total_orders')
             ->where('status', '!=', 'cancelled')
+            ->where('archived', false)
             ->whereRaw('COALESCE(order_date, created_at) >= ?', [$frequencyWindowStart])
             ->groupBy('day_index')
             ->get();
@@ -556,6 +579,7 @@ class AdminController extends Controller
         $repeatCustomersCount = Order::query()
             ->selectRaw('customer_id, COUNT(*) as orders_count')
             ->where('status', '!=', 'cancelled')
+            ->where('archived', false)
             ->whereNotNull('customer_id')
             ->groupBy('customer_id')
             ->havingRaw('COUNT(*) >= 2')
@@ -564,7 +588,8 @@ class AdminController extends Controller
         $popularDesigns = OrderItem::query()
             ->selectRaw('product_id, SUM(quantity) as total_selections')
             ->whereHas('order', function ($query) {
-                $query->where('status', '!=', 'cancelled');
+                $query->where('status', '!=', 'cancelled')
+                      ->where('archived', false);
             })
             ->whereNotNull('product_id')
             ->groupBy('product_id')
@@ -598,6 +623,7 @@ class AdminController extends Controller
         $peakOrderDays = Order::query()
             ->selectRaw('DATE(COALESCE(order_date, created_at)) as order_day, COUNT(*) as total_orders')
             ->where('status', '!=', 'cancelled')
+            ->where('archived', false)
             ->groupBy('order_day')
             ->orderByDesc('total_orders')
             ->limit(5)
@@ -773,6 +799,7 @@ class AdminController extends Controller
             ->select(['id', 'order_number', 'date_needed', 'status', 'total_amount'])
             ->whereNotNull('date_needed')
             ->where('status', '!=', 'cancelled')
+            ->where('archived', false)
             ->where('date_needed', '>=', Carbon::now()->startOfDay())
             ->orderBy('date_needed')
             ->get()

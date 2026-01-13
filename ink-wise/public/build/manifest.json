@@ -19,7 +19,7 @@
     "isEntry": true
   },
   "resources/css/app.css": {
-    "file": "assets/app-DVc-eH8c.css",
+    "file": "assets/app-Dlqs9Dnd.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -72,7 +72,7 @@
     "isEntry": true
   },
   "resources/js/customer/studio/main.jsx": {
-    "file": "assets/main-CmmAE5Dz.js",
+    "file": "assets/main-C8xY1shr.js",
     "name": "main",
     "src": "resources/js/customer/studio/main.jsx",
     "isEntry": true,
@@ -80,7 +80,7 @@
       "_client-Cv0X-2PX.js"
     ],
     "css": [
-      "assets/main-6oxhY28X.css"
+      "assets/main-CTswQoHW.css"
     ]
   },
   "resources/js/customer/studio/svg-template-editor.jsx": {

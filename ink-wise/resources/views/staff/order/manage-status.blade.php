@@ -620,8 +620,7 @@
     $statusLabels = $statusOptions;
     $currentStatus = old('status', data_get($order, 'status', 'pending'));
     $flowIndex = array_search($currentStatus, $statusFlow, true);
-    $trackingNumber = old('tracking_number', $metadata['tracking_number'] ?? '');
-    $statusNote = old('internal_note', $metadata['status_note'] ?? '');
+    
     $previousUrl = url()->previous();
     if ($previousUrl === url()->current()) {
         $previousUrl = route('staff.order_list.index');
@@ -869,14 +868,7 @@
                 <dd>{{ $placedDateDisplay ?? 'Not available' }}</dd>
                 <dt>Last updated</dt>
                 <dd>{{ $lastUpdatedDisplay ?? 'Not available' }}</dd>
-                @if($trackingNumber)
-                <dt>Tracking number</dt>
-                <dd>{{ $trackingNumber }}</dd>
-                @endif
-                @if($statusNote)
-                <dt>Internal note</dt>
-                <dd>{{ $statusNote }}</dd>
-                @endif
+                {{-- Tracking number and internal note removed per request --}}
             </dl>
         </article>
     </section>

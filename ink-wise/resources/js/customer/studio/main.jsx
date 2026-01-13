@@ -84,7 +84,17 @@ function StudioStatusBadge({ bootstrap, status }) {
 function CustomerStudioApp() {
   const bootstrap = useMemo(() => readBootstrapPayload(), []);
   const [status, setStatus] = useState('initializing');
-  const [activeElementType, setActiveElementType] = useState('text');
+  const [activeElementType, setActiveElementType] = useState(null);
+
+  // Keep body class in sync so the toolbar is only visible when a text/image is selected
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const show = activeElementType === 'text' || activeElementType === 'image';
+    document.body.classList.toggle('text-toolbar-visible', !!show);
+    return () => {
+      document.body.classList.remove('text-toolbar-visible');
+    };
+  }, [activeElementType]);
 
   useEffect(() => {
     initializeCustomerStudioLegacy();
@@ -180,7 +190,81 @@ function CustomerStudioApp() {
   };
 
   return (
-    <div className="studio-react-widgets">
+    <div className="studio-status-wrapper">
+      <StudioStatusBadge bootstrap={bootstrap} status={status} />
+    </div>
+  );
+}
+
+// A small host that mounts the `TextMiniToolbar` inside the preview area
+function ToolbarHost() {
+  const bootstrap = useMemo(() => readBootstrapPayload(), []);
+  const [activeElementType, setActiveElementType] = useState(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleActiveElement = (event) => {
+      const detail = event?.detail || {};
+      setActiveElementType(detail.type || null);
+    };
+    window.addEventListener('inkwise:active-element', handleActiveElement);
+
+    const bridge = typeof window !== 'undefined' ? window.inkwiseToolbar : null;
+    if (bridge && typeof bridge.getSelection === 'function') {
+      try {
+        const selection = bridge.getSelection();
+        if (selection && selection.type) {
+          setActiveElementType(selection.type);
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    return () => window.removeEventListener('inkwise:active-element', handleActiveElement);
+  }, []);
+
+  // Keep body class in sync so the toolbar is only visible when a text/image is selected
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const show = activeElementType === 'text' || activeElementType === 'image';
+    document.body.classList.toggle('text-toolbar-visible', !!show);
+    return () => document.body.classList.remove('text-toolbar-visible');
+  }, [activeElementType]);
+
+  const handleFontChange = (family) => {
+    const bridge = typeof window !== 'undefined' ? window.inkwiseToolbar : null;
+    if (!bridge || typeof bridge.setFontFamily !== 'function') return;
+    bridge.setFontFamily(family);
+  };
+
+  const handleSizeChange = (size) => {
+    const bridge = typeof window !== 'undefined' ? window.inkwiseToolbar : null;
+    if (!bridge || typeof bridge.setFontSize !== 'function') return;
+    bridge.setFontSize(size);
+  };
+
+  const handleColorChange = (color) => {
+    const bridge = typeof window !== 'undefined' ? window.inkwiseToolbar : null;
+    if (!bridge || typeof bridge.setColor !== 'function') return;
+    bridge.setColor(color);
+  };
+
+  const handleToolbarAction = (action) => {
+    const bridge = typeof window !== 'undefined' ? window.inkwiseToolbar : null;
+    if (!bridge || typeof bridge.dispatch !== 'function') return () => {};
+    const actionsRequiringValue = new Set([
+      'line-spacing', 'letter-spacing', 'effect-style', 'effect-shape', 'opacity', 'rotation', 'layer', 'more',
+    ]);
+    if (actionsRequiringValue.has(action)) {
+      return (value) => bridge.dispatch(action, value);
+    }
+    bridge.dispatch(action);
+    return () => {};
+  };
+
+  return (
+    <div className="studio-react-widgets" aria-hidden={false}>
       <TextMiniToolbar
         onAction={handleToolbarAction}
         onFontChange={handleFontChange}
@@ -205,6 +289,32 @@ function mountReactApp() {
         <CustomerStudioApp />
       </React.StrictMode>,
     );
+
+    // Also mount the mini toolbar inside the preview area so it appears below the template preview
+    try {
+      const preview = document.querySelector('.preview-canvas-wrapper');
+      const existing = document.getElementById('inkwise-mini-toolbar-root');
+      let toolbarHostRoot = existing;
+      if (!toolbarHostRoot && preview) {
+        toolbarHostRoot = document.createElement('div');
+        toolbarHostRoot.id = 'inkwise-mini-toolbar-root';
+        toolbarHostRoot.className = 'studio-react-widgets';
+        // place after the preview so it shows below
+        preview.parentNode.insertBefore(toolbarHostRoot, preview.nextSibling);
+      }
+
+      if (toolbarHostRoot) {
+        const toolbarRoot = createRoot(toolbarHostRoot);
+        toolbarRoot.render(
+          <React.StrictMode>
+            <ToolbarHost />
+          </React.StrictMode>,
+        );
+      }
+    } catch (e) {
+      // non-fatal — ignore
+      console.debug('[InkWise Studio] Failed to mount toolbar in preview area', e);
+    }
   };
 
   if (document.readyState === 'complete' || document.readyState === 'interactive') {

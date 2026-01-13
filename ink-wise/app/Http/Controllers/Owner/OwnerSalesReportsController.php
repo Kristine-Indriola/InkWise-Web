@@ -52,6 +52,15 @@ class OwnerSalesReportsController extends Controller
             default => 'all',
         };
 
+        // If the range is a preset (daily/weekly/monthly/yearly/all), we hide
+        // the order/payment filters in the UI and compute the report without
+        // applying those filters so the page reflects the selected range only.
+        $presetRange = in_array($normalizedRange, ['daily', 'weekly', 'monthly', 'yearly', 'all'], true);
+        if ($presetRange) {
+            $orderStatusFilter = 'all';
+            $paymentStatusFilter = 'all';
+        }
+
         $reportContext = $this->salesMetrics->compute($start, $end, $paymentStatusFilter, $orderStatusFilter);
 
         $salesSummaryTotals = $reportContext['salesSummaryTotals'];
@@ -154,8 +163,8 @@ class OwnerSalesReportsController extends Controller
             'paymentSummary' => $paymentSummary,
             'salesIntervals' => $salesIntervals,
             'rangeReload' => true,
-            'orderStatusFilterEnabled' => true,
-            'paymentStatusFilterEnabled' => true,
+            'orderStatusFilterEnabled' => !$presetRange,
+            'paymentStatusFilterEnabled' => !$presetRange,
             'filters' => [
                 'range' => $normalizedRange,
                 'orderStatus' => $orderStatusFilter,

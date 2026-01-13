@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use App\Models\ArchivedSalesReport;
 
 class ReportsDashboardController extends Controller
 {
@@ -31,6 +32,32 @@ class ReportsDashboardController extends Controller
     {
         [$startDate, $endDate] = $this->resolveDateRange($request);
 
+        // If an interval filter is supplied, compute the date range for that interval
+        // and override explicit start/end so the whole page (cards, chart, table)
+        // uses the requested interval window.
+        $interval = $request->input('interval');
+        if (is_string($interval) && in_array($interval, ['daily', 'weekly', 'monthly', 'yearly'], true)) {
+            $now = Carbon::now();
+            switch ($interval) {
+                case 'daily':
+                    $startDate = $now->copy()->startOfDay();
+                    $endDate = $now->copy()->endOfDay();
+                    break;
+                case 'weekly':
+                    $startDate = $now->copy()->startOfWeek();
+                    $endDate = $now->copy()->endOfWeek();
+                    break;
+                case 'monthly':
+                    $startDate = $now->copy()->startOfMonth();
+                    $endDate = $now->copy()->endOfMonth();
+                    break;
+                case 'yearly':
+                    $startDate = $now->copy()->startOfYear();
+                    $endDate = $now->copy()->endOfYear();
+                    break;
+            }
+        }
+
         $paymentStatusFilter = Str::lower((string) $request->input('payment_status', 'all'));
         $paymentStatusFilter = match ($paymentStatusFilter) {
             'full', 'fully-paid', 'paid' => 'full',
@@ -47,14 +74,72 @@ class ReportsDashboardController extends Controller
         };
 
         $context = $this->buildReportContext($startDate, $endDate, $paymentStatusFilter, $orderStatusFilter);
+
+        // Allow explicit interval selector (daily, weekly, monthly, yearly)
+        $requestedInterval = $request->input('interval');
+        if ($requestedInterval && is_string($requestedInterval) && array_key_exists($requestedInterval, $context['salesIntervals'])) {
+            $context['defaultSalesInterval'] = $requestedInterval;
+        }
+
         $context['filters'] = [
             'startDate' => $startDate?->format('Y-m-d'),
             'endDate' => $endDate?->format('Y-m-d'),
-            'paymentStatus' => $paymentStatusFilter === 'half' ? 'partial' : $paymentStatusFilter,
-            'orderStatus' => $orderStatusFilter,
+            'interval' => $context['defaultSalesInterval'] ?? null,
         ];
 
         return view('admin.reports.sales', $context);
+    }
+
+    public function archive(Request $request)
+    {
+        $data = $request->validate([
+            'period' => ['required', 'string', 'in:daily,weekly,monthly,yearly'],
+        ]);
+
+        $period = $data['period'];
+        $now = Carbon::now();
+
+        switch ($period) {
+            case 'daily':
+                $start = $now->copy()->subDay()->startOfDay();
+                $end = $now->copy()->subDay()->endOfDay();
+                break;
+            case 'weekly':
+                $start = $now->copy()->startOfWeek()->subWeek();
+                $end = $start->copy()->endOfWeek();
+                break;
+            case 'monthly':
+                $start = $now->copy()->startOfMonth()->subMonth();
+                $end = $start->copy()->endOfMonth();
+                break;
+            case 'yearly':
+                $start = $now->copy()->startOfYear()->subYear();
+                $end = $start->copy()->endOfYear();
+                break;
+            default:
+                return back()->with('error', 'Invalid archive period');
+        }
+
+        // Compute snapshot using existing service
+        $snapshot = $this->salesMetrics->compute($start, $end);
+
+        // Persist archive record
+        $archive = ArchivedSalesReport::create([
+            'period' => $period,
+            'start_date' => $start->toDateTimeString(),
+            'end_date' => $end->toDateTimeString(),
+            'payload' => $snapshot,
+            'archived_by' => optional(auth()->user())->id,
+        ]);
+
+        // Mark matching orders as archived so they no longer count in dashboards
+        Order::whereRaw("COALESCE(order_date, created_at) >= ? AND COALESCE(order_date, created_at) <= ?", [
+            $start->toDateTimeString(), $end->toDateTimeString()
+        ])->where(function ($q) {
+            $q->whereNull('archived')->orWhere('archived', false);
+        })->update(['archived' => true]);
+
+        return back()->with('success', 'Sales report archived for ' . ucfirst($period) . '.');
     }
 
     public function inventory(Request $request)

@@ -18,6 +18,7 @@ class Payment extends Model
         'recorded_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'archived' => 'boolean',
     ];
 
     public function order(): BelongsTo

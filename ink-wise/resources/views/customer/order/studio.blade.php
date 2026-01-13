@@ -400,7 +400,7 @@
         </button>
         <button class="sidenav-btn" type="button" data-nav="background">
             <i class="fa-solid fa-brush"></i>
-            <span>Background</span>
+            <span>Colors</span>
         </button>
     </nav>
     <section class="studio-canvas-area">
@@ -519,7 +519,7 @@
             <button class="toolbar-btn" type="button" data-nav="graphics" title="Graphics">
                 <i class="fa-solid fa-images"></i>
             </button>
-            <button class="toolbar-btn" type="button" data-nav="background" title="Background">
+            <button class="toolbar-btn" type="button" data-nav="background" title="Colors">
                 <i class="fa-solid fa-brush"></i>
             </button>
             <button class="toolbar-btn" type="button" data-nav="tables" title="Tables">
@@ -678,7 +678,7 @@
 <div id="background-modal" class="modal" data-section="background" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="background-modal-title">
     <div class="modal-content">
         <div class="modal-header">
-            <h2 id="background-modal-title">Background</h2>
+            <h2 id="background-modal-title">Colors</h2>
             <div class="modal-header-actions">
                 <button type="button" aria-label="Dock panel" disabled aria-disabled="true">
                     <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
@@ -688,7 +688,7 @@
                 </button>
             </div>
         </div>
-        <p class="modal-helper">Swap in textures, colors, or patterns to update the canvas background.</p>
+        <p class="modal-helper">Choose colors, textures, or patterns for your design.</p>
         <div class="color-palette">
             <button class="color-btn" style="background-color: #ff0000;" data-color="#ff0000" title="Red"></button>
             <button class="color-btn" style="background-color: #ff7f00;" data-color="#ff7f00" title="Orange"></button>
