@@ -21,27 +21,81 @@ class StaffOrderController extends Controller
     $orders = collect([]);
 
         $statusFilter = $request->query('status');
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
 
         $ordersQuery = Order::query()
             ->select(['id', 'order_number', 'customer_order_id', 'customer_id', 'total_amount', 'order_date', 'status', 'payment_status', 'created_at'])
             ->where('archived', false)
+            ->where(function ($q) {
+                // Exclude orders with pending or unset payment status
+                $q->whereNotNull('payment_status')->where('payment_status', '<>', 'pending');
+            })
             ->with(['customer'])
             ->latest('order_date')
             ->latest();
+        // Apply date filters to the ordersQuery if provided (use COALESCE(order_date, created_at))
+        if (!empty($startDate)) {
+            try {
+                $start = \Carbon\Carbon::parse($startDate)->startOfDay();
+                $ordersQuery->whereRaw('COALESCE(order_date, created_at) >= ?', [$start->toDateTimeString()]);
+            } catch (\Throwable $e) {
+                // ignore invalid start date
+            }
+        }
 
+        if (!empty($endDate)) {
+            try {
+                $end = \Carbon\Carbon::parse($endDate)->endOfDay();
+                $ordersQuery->whereRaw('COALESCE(order_date, created_at) <= ?', [$end->toDateTimeString()]);
+            } catch (\Throwable $e) {
+                // ignore invalid end date
+            }
+        }
         if ($statusFilter && $statusFilter !== 'all') {
             $ordersQuery->where('status', $statusFilter);
         }
 
         // Calculate status counts from all orders (not just paginated)
-        $allOrdersQuery = Order::query()->select('status')->where('archived', false);
+        // Calculate status counts from the same filtered set so the cards reflect date/status filters
+        $allOrdersQuery = Order::query()->select('status')->where('archived', false)
+            ->where(function ($q) {
+                $q->whereNotNull('payment_status')->where('payment_status', '<>', 'pending');
+            });
         if ($statusFilter && $statusFilter !== 'all') {
             $allOrdersQuery->where('status', $statusFilter);
         }
+        // Apply date filters to counts as well
+        if (!empty($startDate)) {
+            try {
+                $start = \Carbon\Carbon::parse($startDate)->startOfDay();
+                $allOrdersQuery->whereRaw('COALESCE(order_date, created_at) >= ?', [$start->toDateTimeString()]);
+            } catch (\Throwable $e) {
+                // ignore
+            }
+        }
+        if (!empty($endDate)) {
+            try {
+                $end = \Carbon\Carbon::parse($endDate)->endOfDay();
+                $allOrdersQuery->whereRaw('COALESCE(order_date, created_at) <= ?', [$end->toDateTimeString()]);
+            } catch (\Throwable $e) {
+                // ignore
+            }
+        }
+
         $statusCounts = $allOrdersQuery->get()->groupBy('status')->map->count();
 
+        // Also compute overall counts (no date/status filters) so cards can show global totals
+        $overallCountsQuery = Order::query()->select('status')->where('archived', false)
+            ->where(function ($q) {
+                $q->whereNotNull('payment_status')->where('payment_status', '<>', 'pending');
+            });
+        $overallStatusCounts = $overallCountsQuery->get()->groupBy('status')->map->count();
+        $overallTotalOrders = $overallStatusCounts->sum();
+
         // Staff can see all orders, not just orders assigned to them
-        $orders = $ordersQuery->paginate(10)->through(function (Order $order) {
+        // Return all matching orders (no pagination) and decorate each item for the view
+        $orders = $ordersQuery->get()->map(function (Order $order) {
             $order->display_customer_name = $this->formatCustomerName($order->effective_customer);
             $order->display_items_count = $this->calculateItemsCount($order);
             $order->display_total_amount = (float) ($order->total_amount ?? 0);
@@ -53,6 +107,8 @@ class StaffOrderController extends Controller
             'statusFilter' => $statusFilter,
             'statusOptions' => $this->statusOptions(),
             'statusCounts' => $statusCounts,
+            'overallStatusCounts' => $overallStatusCounts,
+            'overallTotalOrders' => $overallTotalOrders,
         ]);
     }
 

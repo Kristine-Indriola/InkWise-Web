@@ -564,6 +564,10 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 10l5-5 5 5M12 5v12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Export CSV
         </a>
+        <a class="btn btn-secondary" href="{{ route('owner.transactions.archived') }}" title="Show archived payments">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 7h18M5 7v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 3h8v4H8z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Archived
+        </a>
       </div>
     </section>
     <div class="table-wrapper">
@@ -578,6 +582,7 @@
             <th>Amount (PHP)</th>
             <th>Remaining Balance</th>
             <th>Status</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -593,6 +598,20 @@
               <td>
                 @if(!empty($transaction['status_label']) && $transaction['status_label'] !== '—')
                   <span class="badge {{ $transaction['status_class'] ?? 'stock-low' }}">{{ $transaction['status_label'] }}</span>
+                @else
+                  —
+                @endif
+              </td>
+              <td>
+                @php
+                  $rawId = data_get($transaction, 'raw.id');
+                @endphp
+                @if(is_numeric($rawId))
+                  <form method="POST" action="{{ route('owner.transactions.archive', ['payment' => $rawId]) }}" onsubmit="return confirm('Archive this transaction?');">
+                    @csrf
+                    @method('PATCH')
+                    <button type="submit" class="btn btn-link">Archive</button>
+                  </form>
                 @else
                   —
                 @endif

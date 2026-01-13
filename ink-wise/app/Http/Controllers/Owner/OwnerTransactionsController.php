@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Owner;
 
 use App\Http\Controllers\Controller;
 use App\Services\Reports\TransactionReportService;
+use App\Models\Payment;
 use App\Support\Owner\TransactionPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -79,5 +80,35 @@ class OwnerTransactionsController extends Controller
         };
 
         return new StreamedResponse($callback, 200, $headers);
+    }
+
+    public function archive(Request $request, Payment $payment)
+    {
+        // Only archive payments that exist; owner middleware controls access.
+        $payment->archived = true;
+        $payment->save();
+
+        return back()->with('success', 'Payment transaction archived.');
+    }
+
+    public function archived(Request $request)
+    {
+        $query = Payment::query()
+            ->with([
+                'customer.user',
+                'order.customer.user',
+                'order.customerOrder.customer.user',
+            ])
+            ->where('archived', true)
+            ->orderByDesc('recorded_at')
+            ->orderByDesc('created_at');
+
+        $transactions = $query->paginate(25)->withQueryString();
+        $transformedRows = $this->transactionReportService->transform($transactions->items());
+
+        return view('owner.transactions-archived', [
+            'transactions' => $transactions,
+            'transformedRows' => $transformedRows,
+        ]);
     }
 }

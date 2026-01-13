@@ -15,10 +15,18 @@ class HomeController extends Controller
     public function index()
     {
         $newOrdersCount = Order::query()
+            ->where(function ($q) {
+                $q->whereNull('archived')->orWhere('archived', false);
+            })
+            ->whereRaw("LOWER(COALESCE(payment_status, '')) != ?", ['pending'])
             ->where('created_at', '>=', now()->subDays(7))
             ->count();
 
         $pendingOrdersCount = Order::query()
+            ->where(function ($q) {
+                $q->whereNull('archived')->orWhere('archived', false);
+            })
+            ->whereRaw("LOWER(COALESCE(payment_status, '')) != ?", ['pending'])
             ->where('status', 'pending')
             ->count();
 
@@ -36,7 +44,11 @@ class HomeController extends Controller
         $topSellingRows = OrderItem::query()
             ->selectRaw('order_items.product_id, order_items.product_name, SUM(order_items.quantity) as total_sold')
             ->whereHas('order', function ($query) {
-                $query->whereIn('status', ['pending', 'confirmed', 'in_production', 'completed']);
+                $query->where(function ($q) {
+                    $q->whereNull('archived')->orWhere('archived', false);
+                })
+                ->whereRaw("LOWER(COALESCE(payment_status, '')) != ?", ['pending'])
+                ->whereIn('status', ['pending', 'confirmed', 'in_production', 'completed']);
             })
             ->groupBy('order_items.product_id', 'order_items.product_name')
             ->orderByDesc('total_sold')
@@ -71,6 +83,10 @@ class HomeController extends Controller
 
         $completedOrders = Order::query()
             ->select(['id', 'total_amount', 'summary_snapshot', 'metadata', 'customer_id', 'customer_order_id', 'created_at'])
+            ->where(function ($q) {
+                $q->whereNull('archived')->orWhere('archived', false);
+            })
+            ->whereRaw("LOWER(COALESCE(payment_status, '')) != ?", ['pending'])
             ->where('status', 'completed')
             ->get();
 
@@ -95,13 +111,21 @@ class HomeController extends Controller
     protected function buildCustomerBehaviorInsights(): array
     {
         $completedOrders = Order::query()
+            ->where(function ($q) {
+                $q->whereNull('archived')->orWhere('archived', false);
+            })
+            ->whereRaw("LOWER(COALESCE(payment_status, '')) != ?", ['pending'])
             ->where('status', 'completed')
             ->get();
 
         $popularDesignRows = OrderItem::query()
             ->selectRaw('order_items.product_id, order_items.product_name, COUNT(DISTINCT order_items.order_id) as order_count, SUM(order_items.quantity) as total_quantity')
             ->whereHas('order', function ($query) {
-                $query->where('status', 'completed');
+                $query->where(function ($q) {
+                    $q->whereNull('archived')->orWhere('archived', false);
+                })
+                ->whereRaw("LOWER(COALESCE(payment_status, '')) != ?", ['pending'])
+                ->where('status', 'completed');
             })
             ->groupBy('order_items.product_id', 'order_items.product_name')
             ->orderByDesc('total_quantity')
@@ -364,6 +388,10 @@ class HomeController extends Controller
         $startOfRange = $endOfCurrentWeek->copy()->startOfWeek()->subWeeks($weeks - 1);
 
         $orders = Order::query()
+            ->where(function ($q) {
+                $q->whereNull('archived')->orWhere('archived', false);
+            })
+            ->whereRaw("LOWER(COALESCE(payment_status, '')) != ?", ['pending'])
             ->where('status', 'completed')
             ->where('created_at', '>=', $startOfRange)
             ->get();

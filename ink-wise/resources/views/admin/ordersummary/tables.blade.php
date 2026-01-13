@@ -335,6 +335,15 @@
               <input id="ordersSearch" type="search" placeholder="Search orders, customer or #" aria-label="Search orders" style="padding:8px 12px; border-radius:8px; border:1px solid #e5e7eb; min-width:240px;">
             </div>
 
+            <form method="get" action="{{ route('admin.orders.index') }}" style="display:flex; gap:8px; align-items:center;">
+              <label style="font-size:13px; color:#6b7280;">From</label>
+              <input name="start_date" type="date" value="{{ request()->query('start_date') }}" aria-label="Start date" style="padding:6px 10px; border-radius:6px; border:1px solid #e5e7eb;">
+              <label style="font-size:13px; color:#6b7280;">To</label>
+              <input name="end_date" type="date" value="{{ request()->query('end_date') }}" aria-label="End date" style="padding:6px 10px; border-radius:6px; border:1px solid #e5e7eb;">
+              <button type="submit" class="btn btn-sm" style="padding:6px 10px; border-radius:6px;">Filter</button>
+              <a href="{{ route('admin.orders.index') }}" class="btn btn-sm" style="padding:6px 10px; border-radius:6px; background:#f3f4f6; margin-left:4px;">Clear</a>
+            </form>
+
             <div class="filters" role="toolbar" aria-label="Order filters" style="display:flex; gap:8px;">
               <button type="button" class="filter-btn" data-filter="all" aria-pressed="true" title="All">All</button>
               <button type="button" class="filter-btn" data-filter="pending" title="Pending">

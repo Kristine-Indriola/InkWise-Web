@@ -2120,6 +2120,23 @@ class OrderFlowService
             'items.addons',
         ]);
 
+        // Do not deduct materials for orders with pending payment
+        if (strtolower($order->payment_status ?? '') === 'pending') {
+            return;
+        }
+
+        // Also check if balance is due by loading payments if not already loaded
+        if (!$order->relationLoaded('payments')) {
+            $order->load('payments');
+        }
+        $paidPayments = $order->payments->filter(fn($p) => strtolower($p->status ?? '') === 'paid');
+        $totalPaid = round($paidPayments->sum('amount'), 2);
+        $grandTotal = (float) ($order->total_amount ?? 0);
+        $balanceDue = max($grandTotal - $totalPaid, 0);
+        if ($balanceDue > 0) {
+            return;
+        }
+
         $materialTotals = [];
         $materialCache = [];
         $paperStockCache = [];
