@@ -22,6 +22,9 @@
 	$frontImage = $finalArtwork['front'] ?? $finalArtworkFront ?? null;
 	$backImage = $finalArtwork['back'] ?? $finalArtworkBack ?? null;
 	$summaryData = $orderSummary ?? [];
+	if (is_array($summaryData) && !isset($summaryData['design'])) {
+		$summaryData['design'] = $summaryData['metadata']['design'] ?? [];
+	}
 
 	// Normalize preview images to handle both camelCase and snake_case keys
 	$summaryPreviewImages = [];
@@ -97,14 +100,52 @@
 	$frontImage = $resolveImage($frontImage);
 	$backImage = $resolveImage($backImage);
 
+	// DEBUG - Start
+	\Log::debug('BLADE DEBUG - customerReview check', [
+		'has_customerReview' => $customerReview ? 'YES' : 'NO',
+		'customerReview_id' => $customerReview?->id ?? 'NULL',
+		'design_svg_length' => $customerReview ? strlen($customerReview->design_svg ?? '') : 0,
+		'frontImage_BEFORE' => substr($frontImage ?? 'NULL', 0, 100),
+	]);
+	// DEBUG - End
+	
 	if ($customerReview && !empty($customerReview->design_svg)) {
 		$frontImage = 'data:image/svg+xml;base64,' . base64_encode($customerReview->design_svg);
+		\Log::debug('BLADE - Using design_svg for frontImage', [
+			'frontImage_length' => strlen($frontImage),
+			'frontImage_starts_with' => substr($frontImage, 0, 50),
+		]);
 	}
+	
+	// Log what frontImage is AFTER the customerReview check
+	\Log::debug('BLADE DEBUG - frontImage AFTER customerReview block', [
+		'frontImage_starts_with' => substr($frontImage ?? 'NULL', 0, 100),
+	]);
 
+	// Validate that customer review preview_image exists and is a valid SVG before using it
 	if ($customerReview && empty($customerReview->design_svg) && !empty($customerReview->preview_image)) {
-		$resolvedPreview = $resolveImage($customerReview->preview_image);
-		if ($resolvedPreview) {
-			$frontImage = $resolvedPreview;
+		$previewPath = $customerReview->preview_image;
+		$isValidPreview = false;
+		$svgContent = null;
+
+		// Check if the file exists in storage and is a valid SVG (starts with < or has proper header)
+		if (Illuminate\Support\Facades\Storage::disk('public')->exists($previewPath)) {
+			try {
+				$contents = Illuminate\Support\Facades\Storage::disk('public')->get($previewPath);
+				// Check if it's a valid SVG (should start with '<' or '<?xml')
+				$trimmed = ltrim($contents);
+				if (str_starts_with($trimmed, '<') || str_starts_with($trimmed, '<?xml')) {
+					$isValidPreview = true;
+					$svgContent = $contents;
+				}
+			} catch (\Throwable $e) {
+				// File read failed, not valid
+			}
+		}
+
+		if ($isValidPreview && $svgContent) {
+			// Convert SVG to base64 data URL to avoid cross-origin issues with external image references
+			$frontImage = 'data:image/svg+xml;base64,' . base64_encode($svgContent);
 		}
 	}
 
@@ -215,10 +256,17 @@
 					<div class="card-flip">
 						<div class="inner">
 							<div class="card-face front">
-								<img src="{{ $frontImage }}" alt="Front of your design">
+								@if($customerReview && !empty($customerReview->design_svg))
+									{{-- Embed SVG directly - img src doesn't work with SVGs containing external resources --}}
+									<div class="svg-container" style="width: 100%; height: 100%; pointer-events: none;">
+										{!! $customerReview->design_svg !!}
+									</div>
+								@else
+									<img src="{{ $frontImage }}" alt="Front of your design" loading="lazy" decoding="async">
+								@endif
 							</div>
 							<div class="card-face back">
-								<img src="{{ $backImage }}" alt="Back of your design">
+								<img src="{{ $backImage }}" alt="Back of your design" loading="lazy" decoding="async">
 							</div>
 						</div>
 					</div>

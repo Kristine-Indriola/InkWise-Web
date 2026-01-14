@@ -224,6 +224,7 @@
                 'saveTemplate' => route('staff.templates.saveTemplate', $template->id),
                 'saveCanvas' => route('staff.templates.saveCanvas', $template->id),
                 'saveSvg' => route('staff.templates.saveSvg', $template->id),
+                'saveDesign' => route('staff.templates.saveDesign', $template->id),
                 'uploadPreview' => route('staff.templates.uploadPreview', $template->id),
                 'saveVersion' => route('staff.templates.saveVersion', $template->id),
                 'loadDesign' => route('staff.templates.loadDesign', $template->id),
@@ -236,7 +237,7 @@
             'flags' => [
                 'betaMockupPreview' => (bool) config('services.inkwise.enable_mockup_preview', false),
                 'enableFilters' => true,
-                // Enable manual "Save template" button in the builder UI
+                // Keep manual save available in the builder UI
                 'disableManualSave' => false,
             ],
             'user' => [
@@ -244,6 +245,65 @@
                 'name' => optional(auth()->user())->name,
             ],
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) !!}
+    </script>
+
+    <button
+        id="inkwiseSaveTemplateButton"
+        type="button"
+        style="position: fixed; right: 18px; top: 18px; z-index: 50; padding: 10px 16px; border-radius: 10px; border: none; background: #2563eb; color: #fff; font-weight: 700; box-shadow: 0 10px 30px rgba(37, 99, 235, 0.35); cursor: pointer;"
+    >
+        Save Template
+    </button>
+
+    <script>
+        (() => {
+            const btn = document.getElementById('inkwiseSaveTemplateButton');
+            if (!btn) return;
+
+            const templateId = Number(document.getElementById('template-builder-app')?.dataset?.templateId || 0);
+            const bootstrapEl = document.getElementById('inkwise-builder-bootstrap');
+            const bootstrapJson = bootstrapEl ? JSON.parse(bootstrapEl.textContent || '{}') : {};
+            const saveUrl = bootstrapJson?.routes?.saveDesign;
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+            const ensureAxios = () => new Promise((resolve, reject) => {
+                if (window.axios) return resolve(window.axios);
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js';
+                script.onload = () => resolve(window.axios);
+                script.onerror = () => reject(new Error('Failed to load axios'));
+                document.head.appendChild(script);
+            });
+
+            const withLoading = (isLoading) => {
+                btn.disabled = isLoading;
+                btn.textContent = isLoading ? 'Saving…' : 'Save Template';
+                btn.style.opacity = isLoading ? '0.7' : '1';
+            };
+
+            btn.addEventListener('click', async () => {
+                if (!saveUrl || !templateId) {
+                    console.error('Save URL or template ID missing');
+                    return;
+                }
+
+                const runner = window.inkwiseSaveTemplate;
+                if (typeof runner !== 'function') {
+                    alert('Canvas not ready yet. Please wait for the editor to finish loading.');
+                    return;
+                }
+
+                withLoading(true);
+                try {
+                    await runner({});
+                } catch (error) {
+                    console.error('Save template request failed', error);
+                    alert('Save failed. Please try again.');
+                } finally {
+                    withLoading(false);
+                }
+            });
+        })();
     </script>
 </body>
 </html>

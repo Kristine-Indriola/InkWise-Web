@@ -10,6 +10,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use App\Support\Admin\OrderSummaryPresenter;
 
 class OwnerOrderWorkflowController extends Controller
 {
@@ -44,6 +45,25 @@ class OwnerOrderWorkflowController extends Controller
         return view('owner.order-archived', [
             'orders' => $orders,
             'filters' => $filters,
+        ]);
+    }
+
+    /**
+     * Show a single order detail for owners.
+     */
+    public function show(Order $order)
+    {
+        // Prepare the same presentation used by the admin order summary
+        $order->loadMissing(['activities' => function ($query) {
+            $query->orderBy('created_at', 'asc');
+        }, 'customer', 'customerOrder', 'items.product', 'payments']);
+
+        $presented = OrderSummaryPresenter::make($order);
+
+        // Render owner-specific details view but reuse the admin presenter data
+        return view('owner.order-details', [
+            'order' => $presented,
+            'orderModel' => $order,
         ]);
     }
 
@@ -97,6 +117,12 @@ class OwnerOrderWorkflowController extends Controller
             } else {
                 $builder->whereNull('archived')->orWhere('archived', false);
             }
+        });
+
+        // Exclude orders with pending payment status
+        $query->where(function (Builder $builder) {
+            $builder->whereNull('payment_status')
+                ->orWhere('payment_status', '!=', 'pending');
         });
 
         if ($filters['status']) {
@@ -182,6 +208,8 @@ class OwnerOrderWorkflowController extends Controller
             'pending' => ['pending', 'processing', 'to_receive'],
             'in_production' => ['in_production'],
             'confirmed' => ['confirmed', 'completed'],
+            'ready_to_pickup' => ['ready_to_pickup'],
+            'new' => ['new'],
             default => [$status],
         };
     }
@@ -193,12 +221,14 @@ class OwnerOrderWorkflowController extends Controller
                 $builder->whereNull('archived')->orWhere('archived', false);
             })
             ->selectRaw(<<<SQL
-            COUNT(*) as total,
+            SUM(CASE WHEN LOWER(COALESCE(payment_status, '')) != 'pending' THEN 1 ELSE 0 END) as total,
             SUM(CASE WHEN LOWER(COALESCE(status, '')) IN ('confirmed', 'completed') THEN 1 ELSE 0 END) as confirmed,
             SUM(CASE WHEN LOWER(COALESCE(status, '')) = 'completed' THEN 1 ELSE 0 END) as completed,
             SUM(CASE WHEN LOWER(COALESCE(status, '')) IN ('pending', 'processing', 'to_receive') THEN 1 ELSE 0 END) as pending,
             SUM(CASE WHEN LOWER(COALESCE(status, '')) = 'in_production' THEN 1 ELSE 0 END) as in_production,
-            SUM(CASE WHEN LOWER(COALESCE(status, '')) = 'cancelled' THEN 1 ELSE 0 END) as cancelled
+            SUM(CASE WHEN LOWER(COALESCE(status, '')) = 'cancelled' THEN 1 ELSE 0 END) as cancelled,
+            SUM(CASE WHEN LOWER(COALESCE(status, '')) = 'ready_to_pickup' THEN 1 ELSE 0 END) as ready_to_pickup,
+            SUM(CASE WHEN LOWER(COALESCE(status, '')) = 'new' THEN 1 ELSE 0 END) as new_orders
 SQL
         )->first();
 
@@ -209,6 +239,8 @@ SQL
             'pending' => (int) ($row->pending ?? 0),
             'in_production' => (int) ($row->in_production ?? 0),
             'cancelled' => (int) ($row->cancelled ?? 0),
+            'ready_to_pickup' => (int) ($row->ready_to_pickup ?? 0),
+            'new_orders' => (int) ($row->new_orders ?? 0),
         ];
     }
 

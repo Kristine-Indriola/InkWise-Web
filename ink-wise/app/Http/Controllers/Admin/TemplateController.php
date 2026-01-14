@@ -455,6 +455,9 @@ public function saveCanvas(Request $request, $id)
             'preview_video' => 'nullable|string',
         ]);
 
+        // Ensure the incoming design is structured (reject flattened/unsupported templates)
+        $validated['design'] = $this->validateDesignStructure($validated['design']);
+
         Log::info('=== saveTemplate validation complete ===', [
             'id' => $id,
             'has_svg_markup' => !empty($validated['svg_markup']),
@@ -635,27 +638,37 @@ public function saveCanvas(Request $request, $id)
             unset($metadata['preview_images_meta']);
         }
 
-        if (!empty($validated['svg_markup'])) {
+        $svgPayload = $validated['svg_markup'] ?? null;
+        if (!$svgPayload) {
+            $svgPayload = $this->extractSvgFromDesign($validated['design']);
+        }
+
+        $savedSvg = false;
+        if ($svgPayload) {
             try {
                 $template->svg_path = $this->persistDataUrl(
-                    $validated['svg_markup'],
+                    $this->normalizeSvgPayload($svgPayload),
                     'templates/svg',
                     'svg',
                     $template->svg_path,
-                    'svg_markup'
+                    'provided_svg'
                 );
-                Log::info('SVG saved', ['path' => $template->svg_path]);
+                $savedSvg = true;
+                Log::info('SVG saved from client payload/design', ['path' => $template->svg_path]);
             } catch (ValidationException $e) {
-                Log::warning('SVG save failed', ['error' => $e->getMessage()]);
+                Log::warning('Provided SVG save failed', ['error' => $e->getMessage()]);
             }
-        } else {
-            // Try to generate SVG from template if available
+        }
+
+        if (!$savedSvg) {
+            // Generate SVG from the design JSON that was just saved
             $generatedSvg = null;
             try {
-                $generatedSvg = $this->generateSvgFromTemplate($template->id);
-                Log::info('SVG generated from template');
+                // Use the design path we just saved to ensure we're using the latest design
+                $generatedSvg = $this->generateSvgFromTemplate($template->id, $designPath, 0);
+                Log::info('SVG generated from design JSON', ['design_path' => $designPath]);
             } catch (\Exception $e) {
-                Log::warning('SVG generation from template failed', ['error' => $e->getMessage()]);
+                Log::warning('SVG generation from design failed', ['error' => $e->getMessage()]);
             }
 
             if ($generatedSvg) {
@@ -667,16 +680,43 @@ public function saveCanvas(Request $request, $id)
                         $template->svg_path,
                         'generated_svg'
                     );
-                    Log::info('Generated SVG saved', ['path' => $template->svg_path]);
+                    $savedSvg = true;
+                    Log::info('Generated SVG saved successfully', ['path' => $template->svg_path]);
                 } catch (ValidationException $e) {
                     Log::warning('Generated SVG save failed', ['error' => $e->getMessage()]);
-                    // Fallback to dummy SVG if generation and saving both fail
-                    $this->saveDummySvg($template);
                 }
-            } else {
-                // Fallback: save dummy SVG if no design data or generation failed
-                $this->saveDummySvg($template);
             }
+        }
+
+        // Generate back SVG if there's a back page in the design
+        $decodedDesign = json_decode($validated['design'], true);
+        $backPageIndex = is_array($decodedDesign) ? $this->findBackPageIndex($decodedDesign) : null;
+        if ($backPageIndex !== null) {
+            try {
+                $generatedBackSvg = $this->generateSvgFromTemplate($template->id, $designPath, $backPageIndex);
+                if ($generatedBackSvg) {
+                    $template->back_svg_path = $this->persistDataUrl(
+                        $generatedBackSvg,
+                        'templates/svg',
+                        'svg',
+                        $template->back_svg_path,
+                        'generated_back_svg'
+                    );
+                    $template->has_back_design = true;
+                    Log::info('Back SVG generated successfully', [
+                        'path' => $template->back_svg_path,
+                        'page_index' => $backPageIndex
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::warning('Back SVG generation failed', ['page_index' => $backPageIndex, 'error' => $e->getMessage()]);
+            }
+        }
+
+        if (!$savedSvg) {
+            // Fallback: save dummy SVG if no design data or generation failed
+            Log::warning('No SVG could be generated, saving dummy SVG');
+            $this->saveDummySvg($template);
         }
 
         // Optional video preview (base64/data URL)
@@ -721,7 +761,227 @@ public function saveCanvas(Request $request, $id)
             'preview_url' => $template->preview ? \App\Support\ImageResolver::url($template->preview) : null,
             'preview_path' => $template->preview,
             'svg_path' => $template->svg_path,
+            'back_svg_path' => $template->back_svg_path,
             'json_path' => $metadata['json_path'] ?? null,
+        ]);
+    }
+
+    /**
+     * Save exported assets (PNG, SVG, JSON) coming from the Konva editor.
+     */
+    public function saveDesign(Request $request, $id)
+    {
+        $this->ensureTemplateStorageDirectories();
+
+        $template = Template::findOrFail($id);
+
+        $validated = $request->validate([
+            'png' => 'nullable|string',
+            'json' => 'required|string',
+            'png_back' => 'nullable|string',
+            'json_back' => 'nullable|string',
+        ]);
+
+        // Decode and validate the structured design JSON (reject flattened/unsupported uploads)
+        $decodedDesign = json_decode($validated['json'], true);
+        if (!is_array($decodedDesign)) {
+            throw ValidationException::withMessages(['json' => 'Invalid design JSON payload.']);
+        }
+        $normalizedDesign = $this->validateDesignStructure($decodedDesign);
+
+        $metadata = $this->normalizeTemplateMetadata($template->metadata ?? []);
+
+        // Persist JSON design file to disk and keep path in metadata
+        $designPath = $this->persistDesignJson(
+            $normalizedDesign,
+            'templates/assets',
+            $metadata['json_path'] ?? null
+        );
+        $metadata['json_path'] = $designPath;
+
+        // Save to DB column only if it fits in standard packets (approx 1MB)
+        $designJson = json_encode($normalizedDesign, JSON_UNESCAPED_UNICODE);
+        if (strlen($designJson) < 900000) {
+            $template->design = $designJson;
+        } else {
+            Log::info('Design payload too large for DB column update, relied on JSON file', [
+                'template_id' => $template->id,
+                'length' => strlen($designJson)
+            ]);
+        }
+
+        // Capture canvas state if present
+        if (isset($normalizedDesign['canvas']) && is_array($normalizedDesign['canvas'])) {
+            $metadata['builder_canvas'] = $normalizedDesign['canvas'];
+        }
+
+        // Persist front preview PNG if provided (optional)
+        if (!empty($validated['png'])) {
+            $frontPngPath = $this->persistDataUrl(
+                $validated['png'],
+                'templates/previews',
+                'png',
+                $template->preview,
+                'png'
+            );
+            $template->preview = $frontPngPath;
+            $template->preview_front = $frontPngPath;
+        }
+
+        // Generate and persist SVG from the validated design to ensure synchronization
+        // This ensures the SVG file matches the JSON logic even if autosave relied on client-side export
+        try {
+            $generatedSvg = $this->generateSvgFromTemplate($template->id, $designPath, 0);
+            if ($generatedSvg) {
+                $template->svg_path = $this->persistDataUrl(
+                    $generatedSvg,
+                    'templates/svg',
+                    'svg',
+                    $template->svg_path,
+                    'generated_svg'
+                );
+                Log::info('SVG regenerated during saveDesign', ['path' => $template->svg_path]);
+            }
+        } catch (\Exception $e) {
+            Log::warning('SVG regeneration failed during saveDesign', ['template_id' => $id, 'error' => $e->getMessage()]);
+        }
+
+        // Generate and persist back SVG if there's a back page in the design
+        $backPageIndex = $this->findBackPageIndex($normalizedDesign);
+        if ($backPageIndex !== null) {
+            try {
+                $generatedBackSvg = $this->generateSvgFromTemplate($template->id, $designPath, $backPageIndex);
+                if ($generatedBackSvg) {
+                    $template->back_svg_path = $this->persistDataUrl(
+                        $generatedBackSvg,
+                        'templates/svg',
+                        'svg',
+                        $template->back_svg_path,
+                        'generated_back_svg'
+                    );
+                    $template->has_back_design = true;
+                    Log::info('Back SVG regenerated during saveDesign', [
+                        'path' => $template->back_svg_path, 
+                        'page_index' => $backPageIndex
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::warning('Back SVG regeneration failed during saveDesign', [
+                    'template_id' => $id, 
+                    'page_index' => $backPageIndex,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
+        // Optional back side support (JSON + preview only)
+        if ($template->has_back_design) {
+            if (!empty($validated['png_back'])) {
+                $template->preview_back = $this->persistDataUrl(
+                    $validated['png_back'],
+                    'templates/previews',
+                    'png',
+                    $template->preview_back,
+                    'png_back'
+                );
+            }
+
+            if (!empty($validated['json_back'])) {
+                $decodedBack = json_decode($validated['json_back'], true);
+                if (!is_array($decodedBack)) {
+                    throw ValidationException::withMessages(['json_back' => 'Invalid back-side design JSON payload.']);
+                }
+                $normalizedBack = $this->validateDesignStructure($decodedBack);
+                $metadata['back_design_json'] = $normalizedBack;
+                $metadata['back_json_path'] = $this->persistDesignJson(
+                    $normalizedBack,
+                    'templates/assets',
+                    $metadata['back_json_path'] ?? null
+                );
+            }
+        }
+
+        $template->metadata = $metadata;
+
+        $template->status = $template->status ?: 'draft';
+        $template->updated_at = now();
+        $template->save();
+
+        return response()->json([
+            'success' => true,
+            'template_id' => $template->id,
+            'preview' => $template->preview,
+            'preview_back' => $template->preview_back,
+            'svg_path' => $template->svg_path,
+            'back_svg_path' => $template->back_svg_path,
+            'json_path' => $metadata['json_path'] ?? null,
+            'back_json_path' => $metadata['back_json_path'] ?? null,
+        ]);
+    }
+
+    /**
+     * Persist raw SVG markup coming from the staff SVG editor.
+     */
+    public function saveSvg(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'svg_content' => 'required|string',
+            'side' => 'nullable|in:front,back',
+        ]);
+
+        $side = $validated['side'] ?? 'front';
+        $template = Template::findOrFail($id);
+
+        $this->ensureTemplateStorageDirectories();
+
+        $relativePath = $side === 'back'
+            ? "templates/svg/template_{$id}_back.svg"
+            : "templates/svg/template_{$id}.svg";
+
+        try {
+            $storedPath = $this->storeSvgPayload($validated['svg_content'], $relativePath, 'svg_content');
+        } catch (ValidationException $e) {
+            Log::warning('saveSvg validation failed', [
+                'template_id' => $id,
+                'side' => $side,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 422);
+        } catch (\Throwable $e) {
+            Log::error('saveSvg unexpected failure', [
+                'template_id' => $id,
+                'side' => $side,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Unable to save SVG. Please try again.',
+            ], 500);
+        }
+
+        if ($side === 'back') {
+            $template->back_svg_path = $storedPath;
+            $template->has_back_design = true;
+        } else {
+            $template->svg_path = $storedPath;
+        }
+
+        $template->status = $template->status ?: 'draft';
+        $this->synchronizeTemplateSideState($template);
+        $template->updated_at = now();
+        $template->save();
+
+        return response()->json([
+            'success' => true,
+            'svg_path' => $template->svg_path,
+            'back_svg_path' => $template->back_svg_path,
+            'side' => $side,
+            'svg_url' => $storedPath ? \App\Support\ImageResolver::url($storedPath) : null,
         ]);
     }
 
@@ -821,6 +1081,7 @@ public function uploadPreview(Request $request, $id)
             'canvas' => 'nullable|array',
             'template_name' => 'nullable|string|max:255',
             'template' => 'nullable|array',
+            'svg_markup' => 'nullable|string',
         ]);
 
         Log::info('Template autosave request received', [
@@ -831,9 +1092,30 @@ public function uploadPreview(Request $request, $id)
                 : null,
         ]);
 
-        $designPayload = $validated['design'];
+        // Validate structure to reject flattened/unsupported autosaves
+        $designPayload = $this->validateDesignStructure($validated['design']);
 
-        $template->design = json_encode($designPayload, JSON_UNESCAPED_UNICODE);
+        // Persist JSON design file to disk reliably
+        $this->ensureTemplateStorageDirectories();
+        $metadata = $this->normalizeTemplateMetadata($template->metadata ?? []);
+        
+        $designPath = $this->persistDesignJson(
+            $designPayload,
+            'templates/assets',
+            $metadata['json_path'] ?? null
+        );
+        $metadata['json_path'] = $designPath;
+
+        // Save to DB only if within packet limits (approx 1MB safely)
+        $designJson = json_encode($designPayload, JSON_UNESCAPED_UNICODE);
+        if (strlen($designJson) < 900000) {
+            $template->design = $designJson;
+        } else {
+            Log::info('Design payload too large for DB column update, relied on JSON file', [
+                'template_id' => $template->id,
+                'length' => strlen($designJson)
+            ]);
+        }
 
         if (!empty($validated['template_name'])) {
             $template->name = $validated['template_name'];
@@ -856,37 +1138,21 @@ public function uploadPreview(Request $request, $id)
         }
 
         if (array_key_exists('canvas', $validated)) {
-            $metadata = $template->metadata ?? [];
             if (!is_array($metadata)) {
                 $metadata = (array) $metadata;
             }
             $metadata['builder_canvas'] = $validated['canvas'];
-            $template->metadata = $metadata;
         }
 
-        // Generate and save SVG from design data during autosave
-        $this->ensureTemplateStorageDirectories();
-        $metadata = $this->normalizeTemplateMetadata($template->metadata ?? []);
+        $savedSvg = false;
 
-        // Persist JSON design file to disk
-        $designPath = $this->persistDesignJson(
-            $validated['design'],
-            'templates/assets',
-            $metadata['json_path'] ?? null
-        );
-        $metadata['json_path'] = $designPath;
-
-        // Try to generate SVG from template
-        $generatedSvg = null;
+        // Strategy: First attempt to generate SVG from the backend (server-side generation)
+        // This ensures structural completeness (all layers, background shapes) which might be missing in client export.
+        // The "regenerated" SVG is considered the source of truth for layer presence.
         try {
+            // Use the freshly saved designPath to ensure synchronization using the latest JSON
             $generatedSvg = $this->generateSvgFromTemplate($template->id, $designPath);
-            Log::info('SVG generated from template during save');
-        } catch (\Exception $e) {
-            Log::warning('SVG generation from template failed during save', ['error' => $e->getMessage()]);
-        }
-
-        if ($generatedSvg) {
-            try {
+            if ($generatedSvg) {
                 $template->svg_path = $this->persistDataUrl(
                     $generatedSvg,
                     'templates/svg',
@@ -894,19 +1160,61 @@ public function uploadPreview(Request $request, $id)
                     $template->svg_path,
                     'generated_svg'
                 );
+                $savedSvg = true;
                 Log::info('Generated SVG saved during autosave', ['path' => $template->svg_path]);
-            } catch (ValidationException $e) {
-                Log::warning('Generated SVG save failed during autosave', ['error' => $e->getMessage()]);
-                // Fallback to dummy SVG if generation and saving both fail
-                $this->saveDummySvg($template);
             }
-        } else {
-            // Fallback: save dummy SVG if no design data or generation failed
+        } catch (\Exception $e) {
+            Log::warning('SVG generation from template failed during autosave', ['error' => $e->getMessage()]);
+        }
+
+        // Fallback: If backend generation failed, try to use client-supplied SVG
+        if (!$savedSvg) {
+            $svgPayload = $validated['svg_markup'] ?? null;
+            if (!$svgPayload) {
+                $svgPayload = $this->extractSvgFromDesign($designPayload);
+            }
+
+            if ($svgPayload) {
+                try {
+                    $template->svg_path = $this->persistDataUrl(
+                        $this->normalizeSvgPayload($svgPayload),
+                        'templates/svg',
+                        'svg',
+                        $template->svg_path,
+                        'provided_svg'
+                    );
+                    $savedSvg = true;
+                    Log::info('Provided SVG saved during autosave (fallback)', ['path' => $template->svg_path]);
+                } catch (ValidationException $e) {
+                    Log::warning('Provided SVG save failed during autosave', ['error' => $e->getMessage()]);
+                }
+            }
+        }
+
+        if (!$savedSvg) {
+            // Fallback: save dummy SVG if no design data or all attempts fail
             $this->saveDummySvg($template);
         }
 
         $template->metadata = $metadata;
-        $template->save();
+        
+        try {
+            $template->save();
+        } catch (\Exception $e) {
+            Log::error('Template autosave DB persistence failed', [
+                'template_id' => $template->id,
+                'error' => $e->getMessage(),
+                'design_length' => strlen($template->design ?? ''),
+            ]);
+            
+            // If the error is likely due to packet size, we still returned success if files were saved?
+            // Actually, we should probably tell the frontend it failed if we couldn't update the record.
+            return response()->json([
+                'success' => false,
+                'error' => 'Database save failed. The design might be too large for the current server configuration.',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
 
         Log::info('Template autosave persisted', [
             'template_id' => $template->id,
@@ -1446,6 +1754,9 @@ public function uploadToProduct(Request $request, $id)
         }
 
         $hasBackPreview = $this->previewCollectionHasBack($previews, $previewMeta);
+        
+        // Also check if design has a back page
+        $hasBackDesignPage = $this->designHasBackPage($template);
 
         if ($hasBackPreview) {
             if (array_key_exists('back', $previews)) {
@@ -1481,6 +1792,7 @@ public function uploadToProduct(Request $request, $id)
         }
 
         $template->has_back_design = $hasBackPreview
+            || $hasBackDesignPage
             || $this->isNonEmptyString($template->back_image)
             || $this->isNonEmptyString($template->back_svg_path);
     }
@@ -1523,6 +1835,80 @@ public function uploadToProduct(Request $request, $id)
         $disk->put($filename, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
         return $filename;
+    }
+
+    /**
+     * Validate that a design payload contains structured pages and layers we can persist.
+     * Rejects flattened uploads (e.g., a single rasterized image) by requiring at least one node with a frame.
+     */
+    protected function validateDesignStructure(array $design): array
+    {
+        if (empty($design['pages']) || !is_array($design['pages'])) {
+            throw ValidationException::withMessages([
+                'design' => 'Template must contain at least one page with layers.',
+            ]);
+        }
+
+        $allowedTypes = ['text', 'image', 'shape'];
+        $hasValidNode = false;
+
+        foreach ($design['pages'] as $pageIndex => $page) {
+            $nodes = $page['nodes'] ?? $page['layers'] ?? null;
+            if (!is_array($nodes) || count($nodes) === 0) {
+                continue;
+            }
+
+            foreach ($nodes as $nodeIndex => $node) {
+                $type = $node['type'] ?? null;
+                if (!in_array($type, $allowedTypes, true)) {
+                    throw ValidationException::withMessages([
+                        'design' => "Unsupported layer type '{$type}' at page {$pageIndex}, node {$nodeIndex}.",
+                    ]);
+                }
+
+                $frame = $node['frame'] ?? null;
+                if (!is_array($frame) || !isset($frame['x'], $frame['y'], $frame['width'], $frame['height'])) {
+                    throw ValidationException::withMessages([
+                        'design' => 'Each layer must include position (x, y) and size (width, height).',
+                    ]);
+                }
+
+                // Reject layers with zero dimensions which indicate flattened or invalid content
+                if (($frame['width'] ?? 0) <= 0 || ($frame['height'] ?? 0) <= 0) {
+                    throw ValidationException::withMessages([
+                        'design' => 'Layer width and height must be greater than zero.',
+                    ]);
+                }
+
+                if ($type === 'text') {
+                    $text = $node['content'] ?? '';
+                    if (!is_string($text) || trim($text) === '') {
+                        throw ValidationException::withMessages([
+                            'design' => 'Text layers must include text content.',
+                        ]);
+                    }
+                }
+
+                if ($type === 'image') {
+                    $src = $node['content'] ?? ($node['src'] ?? null);
+                    if (!$src || !is_string($src)) {
+                        throw ValidationException::withMessages([
+                            'design' => 'Image layers must include an image source.',
+                        ]);
+                    }
+                }
+
+                $hasValidNode = true;
+            }
+        }
+
+        if (!$hasValidNode) {
+            throw ValidationException::withMessages([
+                'design' => 'Template appears flattened or unsupported. No editable layers were detected.',
+            ]);
+        }
+
+        return $design;
     }
 
     protected function normalizeTemplateMetadata($metadata): array
@@ -1673,6 +2059,90 @@ public function uploadToProduct(Request $request, $id)
         }
 
         return false;
+    }
+
+    /**
+     * Check if the template's design JSON contains a back page.
+     */
+    protected function designHasBackPage(Template $template): bool
+    {
+        $design = $template->design;
+        
+        if (is_string($design)) {
+            $design = json_decode($design, true);
+        }
+        
+        if (!is_array($design) || empty($design['pages'])) {
+            return false;
+        }
+        
+        // Check if there are multiple pages (at least 2 implies front + back)
+        if (count($design['pages']) >= 2) {
+            return true;
+        }
+        
+        // Also check if any page has a pageType indicating it's a back page
+        foreach ($design['pages'] as $page) {
+            $pageType = $page['pageType'] ?? null;
+            $metadataPageType = $page['metadata']['pageType'] ?? null;
+            $metadataSide = $page['metadata']['side'] ?? null;
+            
+            if ($this->isBackDescriptor($pageType) 
+                || $this->isBackDescriptor($metadataPageType)
+                || $this->isBackDescriptor($metadataSide)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Find the index of the back page in a design's pages array.
+     * Returns null if no back page found.
+     * 
+     * @param Template|array $designSource Template model or decoded design array
+     * @return int|null Page index for the back page, or null if not found
+     */
+    protected function findBackPageIndex($designSource): ?int
+    {
+        if ($designSource instanceof Template) {
+            $design = $designSource->design;
+            if (is_string($design)) {
+                $design = json_decode($design, true);
+            }
+        } else {
+            $design = $designSource;
+        }
+        
+        if (!is_array($design) || empty($design['pages'])) {
+            return null;
+        }
+        
+        // If exactly 2 pages, assume index 1 is the back page
+        if (count($design['pages']) === 2) {
+            return 1;
+        }
+        
+        // Otherwise, look for a page explicitly marked as back
+        foreach ($design['pages'] as $index => $page) {
+            $pageType = $page['pageType'] ?? null;
+            $metadataPageType = $page['metadata']['pageType'] ?? null;
+            $metadataSide = $page['metadata']['side'] ?? null;
+            
+            if ($this->isBackDescriptor($pageType) 
+                || $this->isBackDescriptor($metadataPageType)
+                || $this->isBackDescriptor($metadataSide)) {
+                return $index;
+            }
+        }
+        
+        // If more than 2 pages but none marked as back, return index 1 as default
+        if (count($design['pages']) > 1) {
+            return 1;
+        }
+        
+        return null;
     }
 
     protected function expandCompressedPayload(Request $request): void
@@ -1882,6 +2352,75 @@ public function uploadToProduct(Request $request, $id)
         return $filename;
     }
 
+    protected function storeDataUrlToPublicPath(string $dataUrl, string $relativePath, string $field): string
+    {
+        try {
+            $contents = $this->decodeDataUrl($dataUrl);
+        } catch (\Throwable $e) {
+            Log::error('storeDataUrlToPublicPath decode failed', ['field' => $field, 'error' => $e->getMessage()]);
+            throw ValidationException::withMessages([
+                $field => 'Invalid data payload provided.',
+            ]);
+        }
+
+        $relativePath = ltrim(str_replace('\\', '/', $relativePath), '/');
+        $directory = trim(pathinfo($relativePath, PATHINFO_DIRNAME), '/');
+        if ($directory !== '') {
+            Storage::disk('public')->makeDirectory($directory);
+        }
+
+        Storage::disk('public')->put($relativePath, $contents);
+
+        return $relativePath;
+    }
+
+    protected function storeSvgPayload(string $payload, string $relativePath, string $field): string
+    {
+        return $this->storeDataUrlToPublicPath($this->normalizeSvgPayload($payload), $relativePath, $field);
+    }
+
+    /**
+     * Pull an SVG string from common design payload shapes (sides/pages/root svg).
+     */
+    protected function extractSvgFromDesign($design): ?string
+    {
+        if (!is_array($design)) {
+            return null;
+        }
+
+        if (!empty($design['svg']) && is_string($design['svg'])) {
+            return $design['svg'];
+        }
+
+        if (!empty($design['sides']) && is_array($design['sides'])) {
+            foreach ($design['sides'] as $side) {
+                if (is_array($side) && !empty($side['svg']) && is_string($side['svg'])) {
+                    return $side['svg'];
+                }
+            }
+        }
+
+        if (!empty($design['pages']) && is_array($design['pages'])) {
+            foreach ($design['pages'] as $page) {
+                if (is_array($page) && !empty($page['svg']) && is_string($page['svg'])) {
+                    return $page['svg'];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    protected function normalizeSvgPayload(string $payload): string
+    {
+        $trimmed = trim($payload);
+        if (Str::startsWith($trimmed, 'data:image/svg+xml')) {
+            return $trimmed;
+        }
+
+        return 'data:image/svg+xml;base64,' . base64_encode($trimmed);
+    }
+
     protected function decodeDataUrl(string $dataUrl): string
     {
         if (!Str::startsWith($dataUrl, 'data:')) {
@@ -1912,9 +2451,10 @@ public function uploadToProduct(Request $request, $id)
      * Generate SVG content from design data
      *
      * @param string|array $designData JSON string or array of design data
+     * @param int $pageIndex Page index to generate SVG for (0 = front, 1 = back)
      * @return string|null Base64 encoded data URL of generated SVG or null if generation fails
      */
-    protected function generateSvgFromTemplate($templateId, $jsonPath = null): ?string
+    protected function generateSvgFromTemplate($templateId, $jsonPath = null, int $pageIndex = 0): ?string
     {
         try {
             $template = Template::findOrFail($templateId);
@@ -1928,7 +2468,7 @@ public function uploadToProduct(Request $request, $id)
                     $decoded = json_decode($contents, true);
                     if (is_array($decoded)) {
                         $designData = $decoded;
-                        Log::info('Loaded design data from asset file for SVG generation', ['template_id' => $templateId, 'json_path' => $jsonPath]);
+                        Log::info('Loaded design data from asset file for SVG generation', ['template_id' => $templateId, 'json_path' => $jsonPath, 'page_index' => $pageIndex]);
                     }
                 } catch (\Throwable $e) {
                     Log::warning('Failed to read design JSON from asset file', ['template_id' => $templateId, 'json_path' => $jsonPath, 'error' => $e->getMessage()]);
@@ -1942,11 +2482,11 @@ public function uploadToProduct(Request $request, $id)
                     $decoded = json_decode($design, true);
                     if (is_array($decoded)) {
                         $designData = $decoded;
-                        Log::info('Loaded design data from database for SVG generation', ['template_id' => $templateId]);
+                        Log::info('Loaded design data from database for SVG generation', ['template_id' => $templateId, 'page_index' => $pageIndex]);
                     }
                 } elseif (is_array($design)) {
                     $designData = $design;
-                    Log::info('Loaded design data from database array for SVG generation', ['template_id' => $templateId]);
+                    Log::info('Loaded design data from database array for SVG generation', ['template_id' => $templateId, 'page_index' => $pageIndex]);
                 }
             }
 
@@ -1955,10 +2495,15 @@ public function uploadToProduct(Request $request, $id)
                 return null;
             }
 
-            // Extract pages and layers
+            // Extract pages and layers - use the specified page index
             $page = null;
             if (isset($designData['pages']) && is_array($designData['pages'])) {
-                $page = $designData['pages'][0] ?? null;
+                $page = $designData['pages'][$pageIndex] ?? null;
+            }
+            
+            if (!$page) {
+                Log::warning('Requested page not found for SVG generation', ['template_id' => $templateId, 'page_index' => $pageIndex, 'available_pages' => count($designData['pages'] ?? [])]);
+                return null;
             }
 
             $layers = [];
@@ -2025,16 +2570,34 @@ public function uploadToProduct(Request $request, $id)
                         'borderRadius' => $layer['borderRadius'] ?? 0,
                     ];
                 } elseif (($layer['type'] ?? null) === 'shape') {
-                    $shapeElements[] = [
-                        'x' => $frameX,
-                        'y' => $frameY,
-                        'width' => $frameWidth ?: 100,
-                        'height' => $frameHeight ?: 100,
-                        'fill' => $layer['fill'] ?? '#cccccc',
-                        'stroke' => $layer['stroke'] ?? null,
-                        'borderRadius' => $layer['borderRadius'] ?? 0,
-                        'variant' => $layer['variant'] ?? 'rectangle',
-                    ];
+                    // Check if this is an image frame shape with image content
+                    $isImageFrame = $layer['metadata']['isImageFrame'] ?? false;
+                    $imageContent = $layer['content'] ?? null;
+
+                    if ($isImageFrame && $imageContent && str_starts_with($imageContent, 'data:image')) {
+                        // Render as image instead of shape since it has image content
+                        $imageElements[] = [
+                            'x' => $frameX,
+                            'y' => $frameY,
+                            'width' => $frameWidth ?: 150,
+                            'height' => $frameHeight ?: 150,
+                            'src' => $imageContent,
+                            'borderRadius' => $layer['borderRadius'] ?? 0,
+                            'objectFit' => $layer['metadata']['objectFit'] ?? 'cover',
+                        ];
+                    } else {
+                        // Regular shape (not an image frame with content)
+                        $shapeElements[] = [
+                            'x' => $frameX,
+                            'y' => $frameY,
+                            'width' => $frameWidth ?: 100,
+                            'height' => $frameHeight ?: 100,
+                            'fill' => $layer['fill'] ?? '#cccccc',
+                            'stroke' => $layer['stroke'] ?? null,
+                            'borderRadius' => $layer['borderRadius'] ?? 0,
+                            'variant' => $layer['variant'] ?? 'rectangle',
+                        ];
+                    }
                 }
             }
 
@@ -2086,6 +2649,13 @@ public function uploadToProduct(Request $request, $id)
                 $gradientCounter++;
                 $gradientId = 'inkwise-grad-' . $gradientCounter;
                 $defs .= $this->buildLinearGradientDef($gradientId, $fill);
+                return 'url(#' . $gradientId . ')';
+            }
+
+            if (stripos($fill, 'radial-gradient') === 0) {
+                $gradientCounter++;
+                $gradientId = 'inkwise-grad-' . $gradientCounter;
+                $defs .= $this->buildRadialGradientDef($gradientId, $fill);
                 return 'url(#' . $gradientId . ')';
             }
 
@@ -2202,6 +2772,32 @@ public function uploadToProduct(Request $request, $id)
             . '<stop offset="0%" stop-color="' . $colorStart . '"/>'
             . '<stop offset="100%" stop-color="' . $colorEnd . '"/>'
             . '</linearGradient>';
+    }
+
+    protected function buildRadialGradientDef(string $id, string $cssGradient): string
+    {
+        // Example inputs: 
+        // radial-gradient(circle at center, #E5D4FF, #FFFFFF)
+        // radial-gradient(circle, #E5D4FF, #FFFFFF)
+        // radial-gradient(#E5D4FF, #FFFFFF)
+        
+        // Match radial-gradient with optional position
+        if (!preg_match('/radial-gradient\([^,]*,\s*([^,]+),\s*([^\)]+)\)/i', $cssGradient, $matches)) {
+            return '';
+        }
+
+        $colorStart = trim($matches[1]);
+        $colorEnd = trim($matches[2]);
+
+        // Default center position (50%, 50%)
+        $cx = 50;
+        $cy = 50;
+        $r = 50; // radius as percentage
+
+        return '<radialGradient id="' . $id . '" cx="' . $cx . '%" cy="' . $cy . '%" r="' . $r . '%">'
+            . '<stop offset="0%" stop-color="' . $colorStart . '"/>'
+            . '<stop offset="100%" stop-color="' . $colorEnd . '"/>'
+            . '</radialGradient>';
     }
 
     protected function guessImageMime(string $raw): ?string

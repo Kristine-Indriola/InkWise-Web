@@ -354,7 +354,8 @@ class OrderFlowController extends Controller
         $summary['metadata'] = is_array($summary['metadata'] ?? null)
             ? $summary['metadata']
             : [];
-        $summary['metadata']['design'] = $designMeta;
+        // Keep session light; store a stripped version while persisting full payload elsewhere
+        $summary['metadata']['design'] = $this->stripHeavyDesignFields($designMeta);
 
         if (!empty($previewImages)) {
             $summary['previewImages'] = $previewImages;
@@ -497,6 +498,25 @@ class OrderFlowController extends Controller
         }
     }
 
+    /**
+     * Upload a design image for the customer studio and return its stored path/URL.
+     * No file size limit enforced (front-end can send large assets); validation only checks mime type.
+     */
+    public function uploadDesignImage(Request $request): JsonResponse
+    {
+        $request->validate([
+            'image' => ['required', 'file', 'mimes:jpeg,jpg,png,gif,svg,webp'],
+        ]);
+
+        $path = $request->file('image')->store('customer/designs/uploads', 'public');
+        $url = Storage::disk('public')->url($path);
+
+        return response()->json([
+            'path' => $path,
+            'url' => $url,
+        ]);
+    }
+
     public function saveReviewDesign(Request $request): JsonResponse
     {
         \Illuminate\Support\Facades\Log::info('saveReviewDesign called', ['request_all' => $request->all()]);
@@ -527,6 +547,11 @@ class OrderFlowController extends Controller
 
         $designJson = $this->stripHeavyDesignFields($designJson);
 
+        $incomingPreview = $validated['preview_image'] ?? null;
+        if (!$incomingPreview) {
+            $incomingPreview = $this->extractPreviewFromDesign($designJson);
+        }
+
         $designSvg = $this->normalizeDesignSvg($validated['design_svg'] ?? '');
 
         if ($designSvg === '') {
@@ -549,11 +574,44 @@ class OrderFlowController extends Controller
 
         $review = CustomerReview::query()->firstOrNew($match ?: ['template_id' => (int) $validated['template_id']]);
 
+        // Save the preview image (PNG/SVG data URL) to file
         try {
-            $previewImage = $this->persistReviewPreview($validated['preview_image'] ?? null, $review->preview_image ?? null);
+            $previewImage = $this->persistReviewPreview($incomingPreview, $review->preview_image ?? null);
         } catch (\Throwable $e) {
             report($e);
             $previewImage = $review->preview_image ?? null;
+        }
+
+        // If we have an SVG design, save it as a file to templates/reviews/ directory
+        $svgFilePath = null;
+        if ($designSvg && trim($designSvg) !== '') {
+            try {
+                // Delete old SVG file if it exists
+                $existingSvgPath = $review->preview_image ?? null;
+                if ($existingSvgPath && str_ends_with($existingSvgPath, '.svg')) {
+                    $normalizedPath = ltrim(str_replace('\\', '/', $existingSvgPath), '/');
+                    $normalizedPath = preg_replace('#^/?storage/#i', '', $normalizedPath) ?? $normalizedPath;
+                    if (Storage::disk('public')->exists($normalizedPath)) {
+                        Storage::disk('public')->delete($normalizedPath);
+                    }
+                }
+
+                // Save new SVG file
+                $directory = 'templates/reviews';
+                Storage::disk('public')->makeDirectory($directory);
+                $svgFilePath = $directory . '/template_' . Str::uuid() . '.svg';
+                Storage::disk('public')->put($svgFilePath, $designSvg);
+                
+                // Use SVG file as preview_image if no other preview was provided
+                if (!$previewImage) {
+                    $previewImage = $svgFilePath;
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('Failed to save SVG file', [
+                    'error' => $e->getMessage(),
+                ]);
+                report($e);
+            }
         }
 
         $review->fill([
@@ -573,7 +631,7 @@ class OrderFlowController extends Controller
             'customer_id' => $customerId,
             'template_id' => $validated['template_id'],
             'order_item_id' => $orderItemId,
-            'design_svg_length' => strlen($designSvg),
+            'design_svg_length' => is_string($designSvg) ? strlen($designSvg) : 0,
             'design_json_size' => is_array($designJson) ? count($designJson) : strlen(json_encode($designJson)),
         ]);
 
@@ -751,6 +809,8 @@ class OrderFlowController extends Controller
 
     public function review(): RedirectResponse|ViewContract
     {
+        \Log::debug('Review method called');
+        
         $order = $this->currentOrder();
 
         // If there's no persisted order, allow rendering the review page from a
@@ -814,7 +874,23 @@ class OrderFlowController extends Controller
             $images = $product ? $this->orderFlow->resolveProductImages($product) : $this->orderFlow->placeholderImages();
             $placeholderItems = collect($summary['placeholders'] ?? []);
 
+            // Debug: Log user info before loading
+            $user = Auth::user();
+            \Log::debug('Review page - User info', [
+                'user_id' => $user?->id,
+                'customer_id' => $user?->customer?->customer_id ?? 'NO CUSTOMER',
+                'template_id' => $product->template_id ?? null,
+            ]);
+
             $customerReview = $this->orderFlow->loadCustomerReview($product->template_id, Auth::user(), $summary['order_item_id'] ?? null);
+
+            // Debug: Log what we're loading
+            \Log::debug('Review page loading', [
+                'template_id' => $product->template_id ?? null,
+                'customerReview_exists' => $customerReview ? 'YES' : 'NO',
+                'customerReview_id' => $customerReview?->id,
+                'design_svg_length' => $customerReview ? strlen($customerReview->design_svg ?? '') : 0,
+            ]);
 
             $summaryPreviewImages = array_values(array_filter($summary['previewImages'] ?? [], fn ($value) => is_string($value) && trim($value) !== ''));
             if (!empty($summaryPreviewImages)) {
@@ -836,6 +912,24 @@ class OrderFlowController extends Controller
 
             $orderPlaceholder = (object) ['items' => collect()];
 
+            $reviewSummary = $summary;
+            $reviewSummary['design'] = $reviewSummary['metadata']['design']
+                ?? $reviewSummary['design']
+                ?? ($storedDraft['design'] ?? []);
+
+            $normalizedPreviewImages = $this->resolvePreviewAssets(
+                $reviewSummary['previewImages']
+                    ?? $reviewSummary['preview_images']
+                    ?? ($images['all'] ?? [])
+            );
+
+            if (!empty($normalizedPreviewImages)) {
+                $reviewSummary['previewImages'] = $normalizedPreviewImages;
+                $reviewSummary['preview_images'] = $normalizedPreviewImages;
+                $reviewSummary['previewImage'] = $reviewSummary['previewImage'] ?? $normalizedPreviewImages[0] ?? null;
+                $reviewSummary['preview_image'] = $reviewSummary['preview_image'] ?? $reviewSummary['previewImage'] ?? $normalizedPreviewImages[0] ?? null;
+            }
+
             return view('customer.orderflow.review', [
                 'order' => $orderPlaceholder,
                 'product' => $product,
@@ -850,7 +944,7 @@ class OrderFlowController extends Controller
                 'placeholderItems' => $placeholderItems,
                 'continueHref' => route('order.finalstep'),
                 'editHref' => $product && $product->template ? route('design.studio', ['template' => $product->template->id]) : route('design.edit'),
-                'orderSummary' => $summary,
+                'orderSummary' => $reviewSummary,
                 'customerReview' => $customerReview,
                 'lastEditedAt' => $storedDraft['last_edited_at'] ?? null,
             ]);
@@ -914,6 +1008,23 @@ class OrderFlowController extends Controller
 
         $customerReview = $product ? $this->orderFlow->loadCustomerReview($product->template_id, Auth::user(), $item?->id) : null;
 
+        $orderSummary = session(static::SESSION_SUMMARY_KEY);
+        $orderSummary = is_array($orderSummary) ? $orderSummary : [];
+        $orderSummary['design'] = $orderSummary['metadata']['design'] ?? $orderSummary['design'] ?? $designMeta ?? [];
+
+        $normalizedPreviewImages = $this->resolvePreviewAssets(
+            $orderSummary['previewImages']
+                ?? $orderSummary['preview_images']
+                ?? ($images['all'] ?? [])
+        );
+
+        if (!empty($normalizedPreviewImages)) {
+            $orderSummary['previewImages'] = $normalizedPreviewImages;
+            $orderSummary['preview_images'] = $normalizedPreviewImages;
+            $orderSummary['previewImage'] = $orderSummary['previewImage'] ?? $normalizedPreviewImages[0] ?? null;
+            $orderSummary['preview_image'] = $orderSummary['preview_image'] ?? $orderSummary['previewImage'] ?? $normalizedPreviewImages[0] ?? null;
+        }
+
         return view('customer.orderflow.review', [
             'order' => $order,
             'product' => $product,
@@ -928,7 +1039,7 @@ class OrderFlowController extends Controller
             'placeholderItems' => $placeholderItems,
             'continueHref' => route('order.finalstep'),
             'editHref' => $product && $product->template ? route('design.studio', ['template' => $product->template->id]) : route('design.edit'),
-            'orderSummary' => session(static::SESSION_SUMMARY_KEY),
+            'orderSummary' => $orderSummary,
             'customerReview' => $customerReview,
             'lastEditedAt' => $storedDraft['last_edited_at'] ?? null,
         ]);
@@ -1172,7 +1283,11 @@ class OrderFlowController extends Controller
             $totals = $this->orderFlow->calculateTotalsFromSummary($summary);
             $summary = array_merge($summary, $totals);
 
+            // Load customer review for SVG display
+            $customerReview = $this->orderFlow->loadCustomerReview($product->template_id, Auth::user(), $summary['order_item_id'] ?? null);
+
             return view('customer.orderflow.finalstep', [
+                'customerReview' => $customerReview,
                 'order' => $orderPlaceholder,
                 'product' => $product,
                 'proof' => null,
@@ -1287,7 +1402,11 @@ class OrderFlowController extends Controller
             $itemTotal = $item?->total_amount ?? 0;
         }
 
+        // Load customer review for SVG display
+        $customerReview = $this->orderFlow->loadCustomerReview($product?->template_id, Auth::user(), $item?->id);
+
         return view('customer.orderflow.finalstep', [
+            'customerReview' => $customerReview,
             'order' => $order,
             'product' => $product,
             'proof' => null,
@@ -2189,9 +2308,15 @@ class OrderFlowController extends Controller
             ]);
         }
 
+        // Load customer review for SVG display
+        $productId = $summary['productId'] ?? null;
+        $product = $productId ? $this->orderFlow->resolveProduct(null, $productId) : null;
+        $customerReview = $product ? $this->orderFlow->loadCustomerReview($product->template_id, Auth::user()) : null;
+
         return view('customer.orderflow.mycart', [
             'order' => $order ?? null,
             'orderSummary' => $summary,
+            'customerReview' => $customerReview,
         ]);
     }
 
@@ -2298,6 +2423,174 @@ class OrderFlowController extends Controller
             'order_id' => $order?->id,
             'order_number' => $order?->order_number,
             'summary' => session(static::SESSION_SUMMARY_KEY),
+        ]);
+    }
+
+    /**
+     * Update quantities for invitation, envelope, and/or giveaway items.
+     * This recalculates totals and syncs them to the database.
+     */
+    public function updateQuantity(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'invitationQty' => ['nullable', 'integer', 'min:10'],
+            'envelopeQty' => ['nullable', 'integer', 'min:0'],
+            'giveawayQty' => ['nullable', 'integer', 'min:0'],
+            'envelopes' => ['nullable', 'array'],
+            'envelopes.*.index' => ['required_with:envelopes', 'integer', 'min:0'],
+            'envelopes.*.qty' => ['required_with:envelopes', 'integer', 'min:10'],
+            'giveaways' => ['nullable', 'array'],
+            'giveaways.*.index' => ['required_with:giveaways', 'integer', 'min:0'],
+            'giveaways.*.qty' => ['required_with:giveaways', 'integer', 'min:10'],
+        ]);
+
+        $summary = session(static::SESSION_SUMMARY_KEY) ?? [];
+        if (empty($summary)) {
+            return response()->json(['error' => 'No order summary found.'], 400);
+        }
+
+        // Update invitation quantity
+        if (isset($data['invitationQty'])) {
+            $summary['quantity'] = max(10, (int) $data['invitationQty']);
+        }
+
+        // Update single envelope quantity (legacy support)
+        if (isset($data['envelopeQty']) && isset($summary['envelope']) && is_array($summary['envelope'])) {
+            $summary['envelope']['qty'] = max(10, (int) $data['envelopeQty']);
+            $summary['envelope']['quantity'] = $summary['envelope']['qty'];
+        }
+
+        // Update multiple envelopes by index
+        if (!empty($data['envelopes'])) {
+            $envelopes = $summary['envelopes'] ?? [];
+            if (empty($envelopes) && isset($summary['envelope'])) {
+                $envelopes = [$summary['envelope']];
+            }
+            foreach ($data['envelopes'] as $update) {
+                $idx = (int) $update['index'];
+                if (isset($envelopes[$idx])) {
+                    $envelopes[$idx]['qty'] = max(10, (int) $update['qty']);
+                    $envelopes[$idx]['quantity'] = $envelopes[$idx]['qty'];
+                    // Recalculate total for this envelope
+                    $unitPrice = (float) ($envelopes[$idx]['unit_price'] ?? $envelopes[$idx]['price'] ?? 0);
+                    $envelopes[$idx]['total'] = round($unitPrice * $envelopes[$idx]['qty'], 2);
+                }
+            }
+            $summary['envelopes'] = $envelopes;
+            // Also update legacy envelope field if single envelope
+            if (count($envelopes) === 1) {
+                $summary['envelope'] = $envelopes[0];
+            }
+        }
+
+        // Update single giveaway quantity (legacy support)
+        if (isset($data['giveawayQty']) && isset($summary['giveaway']) && is_array($summary['giveaway'])) {
+            $summary['giveaway']['qty'] = max(10, (int) $data['giveawayQty']);
+            $summary['giveaway']['quantity'] = $summary['giveaway']['qty'];
+        }
+
+        // Update multiple giveaways by index
+        if (!empty($data['giveaways'])) {
+            $giveaways = $summary['giveaways'] ?? [];
+            if (empty($giveaways) && isset($summary['giveaway'])) {
+                $giveaways = [$summary['giveaway']];
+            }
+            foreach ($data['giveaways'] as $update) {
+                $idx = (int) $update['index'];
+                if (isset($giveaways[$idx])) {
+                    $giveaways[$idx]['qty'] = max(10, (int) $update['qty']);
+                    $giveaways[$idx]['quantity'] = $giveaways[$idx]['qty'];
+                    // Recalculate total for this giveaway
+                    $unitPrice = (float) ($giveaways[$idx]['unit_price'] ?? $giveaways[$idx]['price'] ?? 0);
+                    $giveaways[$idx]['total'] = round($unitPrice * $giveaways[$idx]['qty'], 2);
+                }
+            }
+            $summary['giveaways'] = $giveaways;
+            // Also update legacy giveaway field if single giveaway
+            if (count($giveaways) === 1) {
+                $summary['giveaway'] = $giveaways[0];
+            }
+        }
+
+        // Recalculate totals
+        $totals = $this->orderFlow->calculateTotalsFromSummary($summary);
+        $summary = array_merge($summary, $totals);
+        session()->put(static::SESSION_SUMMARY_KEY, $summary);
+
+        // Update database order if exists
+        $order = $this->currentOrder();
+        if ($order) {
+            DB::transaction(function () use (&$order, $summary) {
+                // Update the primary invitation item quantity
+                if (isset($summary['quantity'])) {
+                    $primaryItem = $this->orderFlow->primaryInvitationItem($order);
+                    if ($primaryItem) {
+                        $unitPrice = (float) ($primaryItem->unit_price ?? 0);
+                        $qty = (int) $summary['quantity'];
+                        $primaryItem->update([
+                            'quantity' => $qty,
+                            'subtotal' => round($unitPrice * $qty, 2),
+                        ]);
+                    }
+                }
+
+                // Update envelope items
+                $envelopeItems = $order->items()->where('line_type', OrderItem::LINE_TYPE_ENVELOPE)->get();
+                $envelopes = $summary['envelopes'] ?? (isset($summary['envelope']) && !empty($summary['envelope']) ? [$summary['envelope']] : []);
+                foreach ($envelopeItems as $idx => $item) {
+                    if (isset($envelopes[$idx])) {
+                        $qty = (int) ($envelopes[$idx]['qty'] ?? $envelopes[$idx]['quantity'] ?? $item->quantity);
+                        $unitPrice = (float) $item->unit_price;
+                        $item->update([
+                            'quantity' => $qty,
+                            'subtotal' => round($unitPrice * $qty, 2),
+                        ]);
+                    }
+                }
+
+                // Update giveaway items
+                $giveawayItems = $order->items()->where('line_type', OrderItem::LINE_TYPE_GIVEAWAY)->get();
+                $giveaways = $summary['giveaways'] ?? (isset($summary['giveaway']) && !empty($summary['giveaway']) ? [$summary['giveaway']] : []);
+                foreach ($giveawayItems as $idx => $item) {
+                    if (isset($giveaways[$idx])) {
+                        $qty = (int) ($giveaways[$idx]['qty'] ?? $giveaways[$idx]['quantity'] ?? $item->quantity);
+                        $unitPrice = (float) $item->unit_price;
+                        $item->update([
+                            'quantity' => $qty,
+                            'subtotal' => round($unitPrice * $qty, 2),
+                        ]);
+                    }
+                }
+
+                // Refresh order items to get updated quantities before recalculating totals
+                $order->load(['items.addons', 'items.paperStockSelection']);
+
+                // Recalculate and update order totals
+                $this->orderFlow->recalculateOrderTotals($order);
+                $order->refresh();
+
+                // Update summary snapshot
+                $primaryItem = $this->orderFlow->primaryInvitationItem($order);
+                if ($primaryItem instanceof OrderItem) {
+                    $order->update([
+                        'summary_snapshot' => $this->orderFlow->buildSummarySnapshot($order, $primaryItem),
+                    ]);
+                }
+
+                $this->updateSessionSummary($order);
+            });
+        }
+
+        // Get updated summary from session
+        $updatedSummary = session(static::SESSION_SUMMARY_KEY);
+
+        return response()->json([
+            'message' => 'Quantities updated successfully.',
+            'order_id' => $order?->id,
+            'totalAmount' => $updatedSummary['totalAmount'] ?? 0,
+            'subtotalAmount' => $updatedSummary['subtotalAmount'] ?? 0,
+            'extras' => $updatedSummary['extras'] ?? [],
+            'summary' => $updatedSummary,
         ]);
     }
 
@@ -3537,6 +3830,26 @@ class OrderFlowController extends Controller
         }
 
         return $trimmed;
+    }
+
+    private function extractPreviewFromDesign(array $design): ?string
+    {
+        $sides = Arr::get($design, 'sides', []);
+        if (!is_array($sides)) {
+            return null;
+        }
+
+        foreach ($sides as $side) {
+            if (!is_array($side)) {
+                continue;
+            }
+            $preview = $side['preview'] ?? null;
+            if (is_string($preview) && trim($preview) !== '') {
+                return $preview;
+            }
+        }
+
+        return null;
     }
 
     private function stripHeavyDesignFields(array $design): array

@@ -100,6 +100,10 @@ body {
   box-shadow: var(--shadow-soft);
 }
 
+.toggle-buttons[data-has-back="false"] {
+  display: none;
+}
+
 .toggle-buttons button {
   padding: 10px 22px;
   border: none;
@@ -110,12 +114,31 @@ body {
   font-weight: 500;
   color: var(--muted-color);
   transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-buttons button svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.toggle-buttons button:hover:not(.active) {
+  background: rgba(166, 183, 255, 0.15);
+  color: var(--text-color);
 }
 
 .toggle-buttons button.active {
   background: var(--accent);
   color: #fff;
   box-shadow: 0 8px 18px rgba(166, 183, 255, 0.35);
+}
+
+.toggle-buttons button.active svg {
+  transform: scale(1.1);
 }
 
 /* RIGHT SIDE */

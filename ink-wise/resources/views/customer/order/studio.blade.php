@@ -400,7 +400,7 @@
         </button>
         <button class="sidenav-btn" type="button" data-nav="background">
             <i class="fa-solid fa-brush"></i>
-            <span>Background</span>
+            <span>Colors</span>
         </button>
     </nav>
     <section class="studio-canvas-area">
@@ -519,7 +519,7 @@
             <button class="toolbar-btn" type="button" data-nav="graphics" title="Graphics">
                 <i class="fa-solid fa-images"></i>
             </button>
-            <button class="toolbar-btn" type="button" data-nav="background" title="Background">
+            <button class="toolbar-btn" type="button" data-nav="background" title="Colors">
                 <i class="fa-solid fa-brush"></i>
             </button>
             <button class="toolbar-btn" type="button" data-nav="tables" title="Tables">
@@ -565,6 +565,28 @@
         <p class="modal-helper">Edit your text below, or click on the field you'd like to edit directly on your design.</p>
         <div class="text-field-list" id="textFieldList">
             <!-- fields are generated dynamically from the SVG (or default placeholders shown only when SVG has no text nodes) -->
+        </div>
+        <div class="text-layout-controls" style="margin-top:12px; display:flex; gap:10px; align-items:center;">
+            <label style="font-weight:600; margin-right:6px">Layout</label>
+            <select id="textLayoutOrientation" aria-label="Text layout orientation">
+                <option value="horizontal">Horizontal rows</option>
+                <option value="vertical">Vertical columns</option>
+            </select>
+            <label for="textLayoutColumns" style="margin-left:6px">Columns</label>
+            <input id="textLayoutColumns" type="number" min="1" value="1" style="width:64px" aria-label="Number of columns">
+            <label for="textLayoutHAlign" style="margin-left:6px">H Align</label>
+            <select id="textLayoutHAlign" aria-label="Horizontal alignment">
+                <option value="left">Left</option>
+                <option value="center" selected>Center</option>
+                <option value="right">Right</option>
+            </select>
+            <label for="textLayoutVAlign" style="margin-left:6px">V Align</label>
+            <select id="textLayoutVAlign" aria-label="Vertical alignment">
+                <option value="top">Top</option>
+                <option value="middle" selected>Middle</option>
+                <option value="bottom">Bottom</option>
+            </select>
+            <button id="applyTextLayoutBtn" class="btn btn-primary" type="button" style="margin-left:8px">Apply</button>
         </div>
         <button class="add-field-btn" type="button" data-add-text-field>New Text Field</button>
     </div>
@@ -678,7 +700,7 @@
 <div id="background-modal" class="modal" data-section="background" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="background-modal-title">
     <div class="modal-content">
         <div class="modal-header">
-            <h2 id="background-modal-title">Background</h2>
+            <h2 id="background-modal-title">Colors</h2>
             <div class="modal-header-actions">
                 <button type="button" aria-label="Dock panel" disabled aria-disabled="true">
                     <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
@@ -688,7 +710,7 @@
                 </button>
             </div>
         </div>
-        <p class="modal-helper">Swap in textures, colors, or patterns to update the canvas background.</p>
+        <p class="modal-helper">Choose colors, textures, or patterns for your design.</p>
         <div class="color-palette">
             <button class="color-btn" style="background-color: #ff0000;" data-color="#ff0000" title="Red"></button>
             <button class="color-btn" style="background-color: #ff7f00;" data-color="#ff7f00" title="Orange"></button>

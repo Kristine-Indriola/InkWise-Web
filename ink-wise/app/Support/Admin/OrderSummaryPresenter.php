@@ -288,6 +288,9 @@ class OrderSummaryPresenter
 
             return [
                 'id' => $item->id,
+                'order_item_id' => $item->id,
+                'product_id' => $item->product_id,
+                'template_id' => $item->product?->template_id ?? null,
                 'name' => $item->product_name ?? $item->product?->name ?? 'Custom product',
                 'sku' => $item->product?->sku,
                 'product_type' => $item->product?->product_type,
@@ -298,6 +301,7 @@ class OrderSummaryPresenter
                 'options' => $options,
                 'breakdown' => static::buildItemBreakdown($item),
                 'preview_images' => Arr::wrap($previewImages),
+                'design_metadata' => $metadata,
             ];
         })->values()->all();
     }

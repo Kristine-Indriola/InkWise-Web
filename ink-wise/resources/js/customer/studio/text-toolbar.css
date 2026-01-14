@@ -14,7 +14,8 @@ body.text-toolbar-visible .studio-react-widgets {
 /* Allow the toolbar to float in the canvas area, centered */
 .studio-react-widgets {
   position: fixed;
-  top: 120px;
+  /* moved further up to sit much closer to the preview; overlap header significantly */
+  top: -48px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 50;
@@ -35,7 +36,8 @@ body.text-toolbar-visible .studio-react-widgets {
 
 .text-mini-toolbar.floating {
   position: absolute;
-  top: 150px;
+  /* lifted much closer so floating state sits nearer the preview */
+  top: -40px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;

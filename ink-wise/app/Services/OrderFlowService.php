@@ -319,6 +319,14 @@ class OrderFlowService
         $user = $user ?? Auth::user();
         $userId = $user?->getAuthIdentifier();
         $customerId = $user?->customer?->customer_id;
+        
+        \Log::debug('loadCustomerReview called', [
+            'templateId' => $templateId,
+            'userId' => $userId,
+            'customerId' => $customerId,
+            'orderItemId' => $orderItemId,
+        ]);
+        
         $query = CustomerReview::query();
 
         if ($orderItemId) {
@@ -340,7 +348,17 @@ class OrderFlowService
             $query->whereNull('customer_id');
         }
 
-        return $query->latest('updated_at')->first();
+        $result = $query->latest('updated_at')->first();
+        
+        \Log::debug('loadCustomerReview result', [
+            'found' => $result ? 'YES' : 'NO',
+            'result_id' => $result?->id,
+            'result_template_id' => $result?->template_id,
+            'result_customer_id' => $result?->customer_id,
+            'design_svg_length' => $result ? strlen($result->design_svg ?? '') : 0,
+        ]);
+        
+        return $result;
     }
 
     public function primaryInvitationItem(Order $order): ?OrderItem
@@ -2102,6 +2120,23 @@ class OrderFlowService
             'items.addons',
         ]);
 
+        // Do not deduct materials for orders with pending payment
+        if (strtolower($order->payment_status ?? '') === 'pending') {
+            return;
+        }
+
+        // Also check if balance is due by loading payments if not already loaded
+        if (!$order->relationLoaded('payments')) {
+            $order->load('payments');
+        }
+        $paidPayments = $order->payments->filter(fn($p) => strtolower($p->status ?? '') === 'paid');
+        $totalPaid = round($paidPayments->sum('amount'), 2);
+        $grandTotal = (float) ($order->total_amount ?? 0);
+        $balanceDue = max($grandTotal - $totalPaid, 0);
+        if ($balanceDue > 0) {
+            return;
+        }
+
         $materialTotals = [];
         $materialCache = [];
         $paperStockCache = [];
@@ -3174,7 +3209,8 @@ class OrderFlowService
 
     public function recalculateOrderTotals(Order $order): void
     {
-        $order->loadMissing(['items.addons', 'items.paperStockSelection']);
+        // Always reload items to ensure we have the latest quantities
+        $order->load(['items.addons', 'items.paperStockSelection']);
 
         $invitationItem = $this->primaryInvitationItem($order);
         if (!$invitationItem) {
@@ -3872,21 +3908,40 @@ class OrderFlowService
         if ($product) {
             $product->loadMissing(['paperStocks', 'addons']);
         }
+
+        // Determine quantity and unit price defensively so we can compute an
+        // invitation total even when the product lookup fails (e.g., session-only
+        // summaries or in test environments).
+        $quantity = max(1, (int) ($summary['quantity'] ?? 1));
+        $unitPrice = (float) ($summary['unitPrice'] ?? ($product ? $this->unitPriceFor($product) : 0));
+        $invitationTotal = round($unitPrice * $quantity, 2);
+
+        // If we couldn't resolve the product, return totals based solely on
+        // the provided unit/quantity (no paper/addons/envelope/giveaway data).
         if (!$product) {
+            $subtotal = $invitationTotal;
+            $total = round($subtotal + 0.0, 2);
+
             return [
-                'subtotalAmount' => 0.0,
-                'totalAmount' => 0.0,
+                'invitationTotal' => $invitationTotal,
+                'subtotalAmount' => $subtotal,
+                'totalAmount' => $total,
                 'taxAmount' => 0.0,
                 'shippingFee' => static::DEFAULT_SHIPPING_FEE,
-                'extras' => [],
+                'extras' => [
+                    'paper' => 0.0,
+                    'addons' => 0.0,
+                    'envelope' => 0.0,
+                    'giveaway' => 0.0,
+                ],
             ];
         }
 
-        $quantity = max(1, (int) ($summary['quantity'] ?? 1));
-        $unitPrice = (float) ($summary['unitPrice'] ?? $this->unitPriceFor($product));
-
-        // Exclude base price of invitation
-        $baseSubtotal = 0; // round($unitPrice * $quantity, 2);
+        // Include base price of the invitation (unit * quantity). Previously this was
+        // omitted which caused server-side totals to undercount the order and made
+        // outstanding balance 0 when only the invitation existed.
+        $invitationTotal = round($unitPrice * $quantity, 2);
+        $baseSubtotal = $invitationTotal;
 
         // Calculate paper stock total
         $paperTotal = 0.0;
@@ -3931,12 +3986,17 @@ class OrderFlowService
             }
         }
 
-        $subtotal = round($paperTotal + $addonsTotal + $envelopeTotal + $giveawayTotal, 2);
+        // Include invitation base into subtotal so session/server totals match
+        // what the client expects (unit * qty + extras).
+        $subtotal = round($baseSubtotal + $paperTotal + $addonsTotal + $envelopeTotal + $giveawayTotal, 2);
         $tax = 0.0;
         $shipping = 0.0; // Always 0 for shipping
         $total = round($subtotal + $shipping, 2);
 
         return [
+            // Provide an explicit invitationTotal to make it easy for consumers
+            // to show per-item totals without re-deriving from unit/qty.
+            'invitationTotal' => $invitationTotal,
             'subtotalAmount' => $subtotal,
             'totalAmount' => $total,
             'taxAmount' => $tax,

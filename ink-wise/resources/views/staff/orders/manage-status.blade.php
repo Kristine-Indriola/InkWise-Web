@@ -620,19 +620,6 @@
             <p class="hint">Update the current status of this order</p>
         </div>
 
-        <div class="form-row is-split">
-            <div class="form-row">
-                <label for="tracking_number">Tracking Number</label>
-                <input type="text" name="tracking_number" id="tracking_number" value="{{ old('tracking_number', $trackingNumber) }}" placeholder="Enter tracking number">
-                <p class="hint">Optional tracking number for shipping</p>
-            </div>
-            <div class="form-row">
-                <label for="internal_note">Internal Note</label>
-                <input type="text" name="internal_note" id="internal_note" value="{{ old('internal_note', $statusNote) }}" placeholder="Internal notes">
-                <p class="hint">Internal notes for staff reference</p>
-            </div>
-        </div>
-
         <div class="form-row">
             <button type="submit">
                 <i class="fi fi-rr-check"></i>

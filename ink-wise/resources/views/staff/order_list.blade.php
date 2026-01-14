@@ -236,14 +236,16 @@
   <section class="orders-controls">
     <div class="summary-cards">
       @php
-        $totalOrders = $orders->total();
-        $draftCount = $statusCounts->get('draft', 0);
-        $pendingCount = $statusCounts->get('pending', 0);
-        $processingCount = $statusCounts->get('processing', 0);
-        $inProductionCount = $statusCounts->get('in_production', 0);
-        $toShipRawCount = $statusCounts->get('to_ship', 0);
-        $confirmedCount = $statusCounts->get('confirmed', 0);
-        $completedCount = $statusCounts->get('completed', 0);
+        // Use overall counts for summary cards when available, otherwise fallback to filtered counts
+        $totalOrders = $overallTotalOrders ?? $orders->total();
+        $countsSource = isset($overallStatusCounts) ? $overallStatusCounts : $statusCounts;
+        $draftCount = $countsSource->get('draft', 0);
+        $pendingCount = $countsSource->get('pending', 0);
+        $processingCount = $countsSource->get('processing', 0);
+        $inProductionCount = $countsSource->get('in_production', 0);
+        $toShipRawCount = $countsSource->get('to_ship', 0);
+        $confirmedCount = $countsSource->get('confirmed', 0);
+        $completedCount = $countsSource->get('completed', 0);
         $inProgressCount = $processingCount + $inProductionCount;
         $toShipCount = $confirmedCount + $toShipRawCount;
       @endphp
@@ -298,7 +300,7 @@
       @if($orders->isEmpty())
         <p>No orders found.</p>
       @else
-        <div class="table-controls" style="display:flex; gap:12px; align-items:center; justify-content:space-between; margin-bottom:10px;">
+          <div class="table-controls" style="display:flex; gap:12px; align-items:center; justify-content:space-between; margin-bottom:10px;">
           <div style="display:flex; gap:8px; align-items:center;">
             <div class="search-wrap">
               <input id="ordersSearch" type="search" placeholder="Search orders, customer or #" aria-label="Search orders" style="padding:8px 12px; border-radius:8px; border:1px solid #e5e7eb; min-width:240px;">
@@ -311,8 +313,27 @@
               </button>
             </div>
           </div>
+          
+          <div style="display:flex; gap:8px; align-items:center;">
+            <form method="GET" action="{{ url()->current() }}" style="display:flex; gap:8px; align-items:center;">
+              @foreach(request()->except(['start_date','end_date','page']) as $k => $v)
+                @if(is_array($v))
+                  @foreach($v as $sub)
+                    <input type="hidden" name="{{ $k }}[]" value="{{ $sub }}">
+                  @endforeach
+                @else
+                  <input type="hidden" name="{{ $k }}" value="{{ $v }}">
+                @endif
+              @endforeach
 
-          <div style="display:flex; gap:8px; align-items:center;">&nbsp;</div>
+              <label for="startDateInput" style="font-size:13px; color:#374151;">From</label>
+              <input id="startDateInput" name="start_date" type="date" value="{{ request()->get('start_date') }}" style="padding:6px 8px; border-radius:6px; border:1px solid #e5e7eb;">
+              <label for="endDateInput" style="font-size:13px; color:#374151;">To</label>
+              <input id="endDateInput" name="end_date" type="date" value="{{ request()->get('end_date') }}" style="padding:6px 8px; border-radius:6px; border:1px solid #e5e7eb;">
+              <button type="submit" class="btn btn-primary" style="padding:6px 10px; border-radius:6px;">Apply</button>
+              <a href="{{ url()->current() . (count(request()->except(['start_date','end_date','page'])) ? ('?' . http_build_query(request()->except(['start_date','end_date','page']))) : '') }}" class="btn btn-outline" style="padding:6px 10px; border-radius:6px;">Clear</a>
+            </form>
+          </div>
         </div>
 
         <div class="table-responsive">
@@ -414,7 +435,7 @@
         </div>
 
         <div class="table-footer" style="display:flex; align-items:center; justify-content:center; margin-top:16px;">
-          <div class="pagination-links">{{ $orders->links() }}</div>
+          <div class="pagination-links">Showing {{ $orders->count() }} orders</div>
         </div>
       @endif
     </div>

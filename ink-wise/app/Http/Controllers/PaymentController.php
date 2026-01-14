@@ -609,6 +609,15 @@ class PaymentController extends Controller
             'metadata' => $summary['metadata'],
         ];
 
+        // Update payment_status based on balance
+        if ($summary['balance'] <= 0.01) {
+            // Fully paid
+            $attributes['payment_status'] = 'paid';
+        } elseif ($summary['total_paid'] > 0) {
+            // Partially paid
+            $attributes['payment_status'] = 'partial';
+        }
+
         $mode = Arr::get($payload, 'mode', 'half');
         if (($summary['balance'] <= 0 || $summary['total_paid'] > 0)
             && in_array($order->status, ['processing'], true)

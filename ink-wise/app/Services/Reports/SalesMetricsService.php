@@ -27,6 +27,17 @@ class SalesMetricsService
         [$summaryStart, $summaryEnd] = $this->resolveSummaryWindow($analyticsOrders, $startDate, $endDate);
         $salesSummaryTotals = $this->buildOrdersSummary($analyticsOrders, $summaryStart, $summaryEnd);
         $salesSummaryTotals['estimatedSales'] = $this->calculateEstimatedSales($startDate, $endDate, $normalizedOrderStatus);
+        // Count non-completed orders in the requested range (not completed or cancelled)
+        $nonCompletedQuery = Order::query()
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->whereRaw("LOWER(COALESCE(payment_status, '')) != ?", ['pending'])
+            ->where(function (Builder $q) {
+                $q->whereNull('archived')->orWhere('archived', false);
+            });
+
+        $nonCompletedQuery = $this->applyOrderDateFilter($nonCompletedQuery, $startDate, $endDate);
+
+        $salesSummaryTotals['nonCompletedCount'] = (int) $nonCompletedQuery->count();
         $salesSummaryLabel = $this->formatRangeLabel($summaryStart, $summaryEnd);
 
         $paymentSummary = $this->buildPaymentSummary($analyticsOrders);
@@ -53,6 +64,14 @@ class SalesMetricsService
                 'payments:order_id,amount,status',
             ])
             ->latest('order_date');
+
+        // Exclude orders with pending payment status and archived orders
+        $query->where(function ($q) {
+            $q->whereRaw("LOWER(COALESCE(payment_status, '')) != ?", ['pending'])
+              ->orWhereNull('payment_status');
+        })->where(function ($q) {
+            $q->whereNull('archived')->orWhere('archived', false);
+        });
 
         $query = $this->applyOrderStatusFilter($query, $orderStatusFilter);
 
@@ -136,11 +155,18 @@ class SalesMetricsService
     protected function buildAnalyticsCollection(?Carbon $startDate, ?Carbon $endDate, string $orderStatusFilter): Collection
     {
         $query = Order::query()
-            ->select(['id', 'total_amount', 'order_date', 'created_at'])
-            ->with(['payments:order_id,amount,status'])
+            ->select(['id', 'total_amount', 'order_date', 'created_at', 'payment_status'])
+            ->with(['payments:order_id,amount,status', 'items:id,order_id,product_name,unit_price,quantity,subtotal,line_type'])
             ->whereRaw('COALESCE(order_date, created_at) >= ?', [
                 Carbon::now()->copy()->subYears(5)->startOfYear(),
             ])
+            ->where(function ($query) {
+                $query->where('payment_status', '!=', 'pending')
+                      ->orWhereNull('payment_status');
+            })
+            ->where(function ($q) {
+                $q->whereNull('archived')->orWhere('archived', false);
+            })
             ->orderByDesc('order_date')
             ->orderByDesc('created_at');
 
@@ -148,7 +174,14 @@ class SalesMetricsService
 
         $query = $this->applyOrderDateFilter($query, $startDate, $endDate);
 
-        return $query->get();
+        return $query->get()->filter(function ($order) {
+            // Double-check: exclude orders with outstanding balance
+            $paidPayments = $order->payments->filter(fn($p) => strtolower($p->status ?? '') === 'paid');
+            $totalPaid = round($paidPayments->sum('amount'), 2);
+            $grandTotal = (float) ($order->total_amount ?? 0);
+            $balanceDue = max($grandTotal - $totalPaid, 0);
+            return $balanceDue <= 0;
+        });
     }
 
     protected function calculateEstimatedSales(?Carbon $startDate, ?Carbon $endDate, string $orderStatusFilter): float
@@ -294,15 +327,16 @@ class SalesMetricsService
         string $keyFormat,
         callable $labelFormatter
     ): array {
-        $groupedTotals = $orders
+        $grouped = $orders
             ->groupBy(function (Order $order) use ($keyFormat) {
                 $moment = $order->order_date ?? $order->created_at;
 
                 return $moment ? $moment->format($keyFormat) : null;
             })
-            ->filter()
-            ->map(fn (Collection $group) => (float) $group->sum('total_amount'))
-            ->all();
+            ->filter();
+
+        $groupedTotals = $grouped->map(fn (Collection $group) => (float) $group->sum('total_amount'))->all();
+        $groupedCounts = $grouped->map(fn (Collection $group) => $group->count())->all();
 
         $period = new CarbonPeriod($start, $step, $end);
         $labels = [];
@@ -312,6 +346,7 @@ class SalesMetricsService
             $key = $datePoint->format($keyFormat);
             $labels[] = $labelFormatter($datePoint->copy());
             $totals[] = round($groupedTotals[$key] ?? 0, 2);
+            $counts[] = (int) ($groupedCounts[$key] ?? 0);
         }
 
         if (empty($labels)) {
@@ -322,6 +357,7 @@ class SalesMetricsService
         return [
             'labels' => array_values($labels),
             'totals' => array_values($totals),
+            'counts' => array_values($counts),
         ];
     }
 
@@ -338,9 +374,17 @@ class SalesMetricsService
         });
 
         $orderCount = $filtered->count();
-        $revenue = (float) $fullyPaidOrders->sum('total_amount');
+        $revenue = (float) $fullyPaidOrders->sum(function (Order $order) {
+            return $this->calculateAdjustedTotal($order);
+        });
         $realisedRevenue = (float) $filtered->sum(function (Order $order) {
-            return (float) $order->totalPaid();
+            $adjustedTotal = $this->calculateAdjustedTotal($order);
+            $originalTotal = $order->total_amount;
+            if ($originalTotal > 0) {
+                $ratio = $order->totalPaid() / $originalTotal;
+                return $adjustedTotal * $ratio;
+            }
+            return 0;
         });
         $materialCost = (float) $filtered->sum('material_cost_value');
         $profit = $realisedRevenue - $materialCost;
@@ -350,7 +394,14 @@ class SalesMetricsService
             return $totalPaid > 0 && $order->balanceDue() > 0.01;
         });
         $pendingRevenue = (float) $partiallyPaidOrders->sum(function (Order $order) {
-            return $order->balanceDue();
+            $adjustedTotal = $this->calculateAdjustedTotal($order);
+            $paid = $order->totalPaid();
+            $originalTotal = $order->total_amount;
+            if ($originalTotal > 0) {
+                $ratio = $paid / $originalTotal;
+                return max($adjustedTotal - ($adjustedTotal * $ratio), 0);
+            }
+            return 0;
         });
 
         return [
@@ -362,6 +413,35 @@ class SalesMetricsService
             'averageOrder' => $orderCount > 0 ? round($revenue / $orderCount, 2) : 0.0,
             'profitMargin' => $realisedRevenue > 0 ? round(($profit / $realisedRevenue) * 100, 1) : 0.0,
         ];
+    }
+
+    protected function calculateAdjustedTotal(Order $order): float
+    {
+        $total = 0.0;
+        foreach ($order->items as $item) {
+            $ptype = strtolower((string) ($item->product_type ?? ''));
+            $iname = strtolower((string) ($item->product_name ?? ''));
+            $ltype = strtolower((string) ($item->line_type ?? ''));
+            $isEnvelope = str_contains($ptype, 'envelope') || str_contains($iname, 'envelope');
+            $isGiveaway = $ltype === 'giveaway' || str_contains($ptype, 'giveaway') || str_contains($iname, 'giveaway') || str_contains($iname, 'freebie');
+
+            if (!$isEnvelope && !$isGiveaway) {
+                // For invitations, do not include base price, only paper stock and addons
+                $itemTotal = 0.0;
+                if ($item->paperStockSelection && isset($item->paperStockSelection->price)) {
+                    $itemTotal += (float) $item->paperStockSelection->price;
+                }
+                foreach ($item->addons as $addon) {
+                    if (isset($addon->size_price)) {
+                        $itemTotal += (float) $addon->size_price;
+                    }
+                }
+                $total += $itemTotal;
+            } else {
+                $total += (float) ($item->subtotal ?: ($item->unit_price * $item->quantity));
+            }
+        }
+        return $total;
     }
 
     protected function buildPaymentSummary(Collection $orders): array
