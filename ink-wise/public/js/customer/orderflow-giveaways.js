@@ -941,8 +941,20 @@ document.addEventListener('DOMContentLoaded', () => {
         // Normalize summary for downstream pages and sync to server before leaving
         const summary = readSummary() ?? {};
         try {
-            // Keep a canonical copy other pages already read
-            window.sessionStorage.setItem('order_summary_payload', JSON.stringify(summary));
+            // Keep a canonical copy other pages already read (store minimal payload)
+            try {
+                const minSummary = {
+                    productId: summary.productId ?? summary.product_id ?? null,
+                    quantity: summary.quantity ?? null,
+                    paymentMode: summary.paymentMode ?? summary.payment_mode ?? null,
+                    totalAmount: summary.totalAmount ?? summary.total_amount ?? null,
+                    shippingFee: summary.shippingFee ?? summary.shipping_fee ?? null,
+                    order_id: summary.order_id ?? summary.orderId ?? null,
+                };
+                window.sessionStorage.setItem('order_summary_payload', JSON.stringify(minSummary));
+            } catch (e) {
+                console.warn('Failed to save minimal order_summary_payload to sessionStorage:', e);
+            }
 
             const csrf = getCsrfToken();
             await fetch('/order/summary/sync', {

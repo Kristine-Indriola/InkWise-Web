@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="csrf-token" content="<?php echo e(csrf_token()); ?>">
     <title>Order Summary — InkWise</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,9 +23,9 @@
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900"
-    data-envelope-total="{{ $envelopeTotalCalc ?? 0 }}"
-    data-giveaway-total="{{ $giveawayTotalCalc ?? 0 }}">
-@php
+    data-envelope-total="<?php echo e($envelopeTotalCalc ?? 0); ?>"
+    data-giveaway-total="<?php echo e($giveawayTotalCalc ?? 0); ?>">
+<?php
     $resolveRoute = static function (string $name, string $fallbackPath) {
         try {
             return route($name);
@@ -235,9 +235,9 @@
     if ($order) {
         $grandTotal = $order->grandTotalAmount();
     }
-@endphp
+?>
 
-    @include('partials.topbar')
+    <?php echo $__env->make('partials.topbar', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
     <script>
         // Sync sessionStorage data (supports legacy and new keys) to server session on page load
@@ -266,7 +266,7 @@
                     }
                     
                     // Always sync to server
-                    fetch('{{ route("order.summary.sync") }}', {
+                    fetch('<?php echo e(route("order.summary.sync")); ?>', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -353,14 +353,14 @@
                 <p class="text-slate-600 mt-1">Review your selections before checkout. You can still edit any item.</p>
             </div>
             <div class="flex gap-3">
-                     <a href="{{ $finalStepUrl }}" class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-300">Edit design</a>
+                     <a href="<?php echo e($finalStepUrl); ?>" class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-300">Edit design</a>
                      <a id="checkout-top"
-                         href="{{ $checkoutPaymentUrl }}"
+                         href="<?php echo e($checkoutPaymentUrl); ?>"
                          class="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 hover:bg-slate-800">Proceed to checkout</a>
             </div>
         </header>
 
-        @if(empty($orderSummary))
+        <?php if(empty($orderSummary)): ?>
             <section class="glass-card fade-border rounded-3xl p-10 text-center">
                 <div class="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-900/90 text-white shadow-lg shadow-slate-900/20">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
@@ -370,16 +370,16 @@
                 <h2 class="text-2xl font-semibold text-slate-900">No order selections found</h2>
                 <p class="mt-2 text-slate-600">Start again from the final step to configure your invitation, envelopes, or giveaways.</p>
                 <div class="mt-6 flex flex-col sm:flex-row sm:justify-center gap-3">
-                    <a href="{{ $finalStepUrl }}" class="rounded-full bg-slate-900 px-5 py-2.5 text-white font-medium shadow-lg shadow-slate-900/15 hover:bg-slate-800">Return to final step</a>
+                    <a href="<?php echo e($finalStepUrl); ?>" class="rounded-full bg-slate-900 px-5 py-2.5 text-white font-medium shadow-lg shadow-slate-900/15 hover:bg-slate-800">Return to final step</a>
                     <a href="http://127.0.0.1:8000/templates/wedding/invitations" class="rounded-full border border-slate-200 px-5 py-2.5 text-slate-800 font-medium hover:border-slate-300">Browse invitation</a>
                 </div>
             </section>
-        @else
+        <?php else: ?>
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <section class="lg:col-span-2 space-y-6">
-                    {{-- Invitations: show each selection as its own card --}}
-                    @forelse($invitationItems as $invitation)
-                        @php
+                    
+                    <?php $__empty_1 = true; $__currentLoopData = $invitationItems; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $invitation): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                        <?php
                             $invName = data_get($invitation, 'name')
                                 ?? data_get($invitation, 'productName')
                                 ?? data_get($invitation, 'product_name')
@@ -487,89 +487,90 @@
                                 ->implode(', ');
                             
                             $invTotal = $computeInvitationTotal($invitation) ?: ($invitationSubtotal + $paperExtras + $addonsExtra);
-                        @endphp
+                        ?>
                         <article class="glass-card fade-border rounded-3xl p-6">
                             <div class="flex items-start justify-between gap-4">
                                 <div class="flex items-start gap-4">
                                         <div class="h-24 w-24 overflow-hidden rounded-2xl bg-slate-100 shadow-inner js-preview-trigger cursor-pointer"
-                                             data-preview-images='@json($invPreviewGallery->values())'
-                                             @if(isset($customerReview) && !empty($customerReview->design_svg))
+                                             data-preview-images='<?php echo json_encode($invPreviewGallery->values(), 15, 512) ?>'
+                                             <?php if(isset($customerReview) && !empty($customerReview->design_svg)): ?>
                                              data-svg-preview="true"
-                                             @endif>
-                                        @if(isset($customerReview) && !empty($customerReview->design_svg))
-                                            {{-- Embed SVG directly - img src doesn't work with SVGs containing external resources --}}
+                                             <?php endif; ?>>
+                                        <?php if(isset($customerReview) && !empty($customerReview->design_svg)): ?>
+                                            
                                             <div class="svg-container h-full w-full" style="pointer-events: none;">
-                                                {!! $customerReview->design_svg !!}
+                                                <?php echo $customerReview->design_svg; ?>
+
                                             </div>
-                                        @else
-                                            <img src="{{ $invPreview ?: $placeholderImage }}"
+                                        <?php else: ?>
+                                            <img src="<?php echo e($invPreview ?: $placeholderImage); ?>"
                                                  alt="Invitation preview"
                                                  class="h-full w-full object-cover">
-                                        @endif
+                                        <?php endif; ?>
                                         </div>
                                     <div>
                                         <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Invitation</p>
-                                        <h2 class="text-lg font-semibold text-slate-900">{{ $invName }}</h2>
-                                        @if($invIsPreorder)
+                                        <h2 class="text-lg font-semibold text-slate-900"><?php echo e($invName); ?></h2>
+                                        <?php if($invIsPreorder): ?>
                                             <p class="mt-1 inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
                                                 Pre-order
-                                                @if($invPickupLabel)
-                                                    <span class="text-amber-700 font-normal">· Est. pickup {{ $invPickupLabel }}</span>
-                                                @endif
+                                                <?php if($invPickupLabel): ?>
+                                                    <span class="text-amber-700 font-normal">· Est. pickup <?php echo e($invPickupLabel); ?></span>
+                                                <?php endif; ?>
                                             </p>
-                                        @elseif($invPickupLabel)
-                                            <p class="mt-1 text-xs text-slate-600">Est. pickup {{ $invPickupLabel }}</p>
-                                        @endif
+                                        <?php elseif($invPickupLabel): ?>
+                                            <p class="mt-1 text-xs text-slate-600">Est. pickup <?php echo e($invPickupLabel); ?></p>
+                                        <?php endif; ?>
                                         <label class="text-slate-600 text-sm flex items-center gap-2">Quantity:
                                               <input type="number"
-                                                  value="{{ max(10, $invQty) }}"
+                                                  value="<?php echo e(max(10, $invQty)); ?>"
                                                   min="10"
                                                   step="1"
                                                   inputmode="numeric"
                                                   pattern="[0-9]*"
                                                   class="js-inv-qty w-20 rounded-lg border border-slate-300 px-2 py-1 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                                                  data-index="{{ $loop->index }}"
-                                                  data-unit="{{ $invUnitPrice }}"
-                                                  data-invitation-qty="{{ max(10, $invQty) }}">
+                                                  data-index="<?php echo e($loop->index); ?>"
+                                                  data-unit="<?php echo e($invUnitPrice); ?>"
+                                                  data-invitation-qty="<?php echo e(max(10, $invQty)); ?>">
                                         </label>
-                                        @if($invPaper)
-                                            <p class="text-slate-600 text-sm">Paper: {{ $invPaper }} @if($invPaperPrice) ({{ $formatMoney($invPaperPrice) }}) @endif</p>
-                                        @endif
-                                        @if($invIsPreorder && ($invPreorderPaper || $invPaper))
-                                            <p class="text-amber-700 text-sm">Pre-order paper: {{ $invPreorderPaper ?? $invPaper }}</p>
-                                        @endif
-                                        @if($invAddons)
-                                            <p class="text-slate-600 text-sm">{{ $invAddons === '5 x 7' ? 'size:' : 'Add-ons:' }} {{ $invAddons }}</p>
-                                        @endif
+                                        <?php if($invPaper): ?>
+                                            <p class="text-slate-600 text-sm">Paper: <?php echo e($invPaper); ?> <?php if($invPaperPrice): ?> (<?php echo e($formatMoney($invPaperPrice)); ?>) <?php endif; ?></p>
+                                        <?php endif; ?>
+                                        <?php if($invIsPreorder && ($invPreorderPaper || $invPaper)): ?>
+                                            <p class="text-amber-700 text-sm">Pre-order paper: <?php echo e($invPreorderPaper ?? $invPaper); ?></p>
+                                        <?php endif; ?>
+                                        <?php if($invAddons): ?>
+                                            <p class="text-slate-600 text-sm"><?php echo e($invAddons === '5 x 7' ? 'size:' : 'Add-ons:'); ?> <?php echo e($invAddons); ?></p>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                                 <div class="text-right">
-                                    <a href="{{ $finalStepUrl }}" class="inline-flex text-sm text-slate-700 hover:text-slate-900">Edit invitation</a>
+                                    <a href="<?php echo e($finalStepUrl); ?>" class="inline-flex text-sm text-slate-700 hover:text-slate-900">Edit invitation</a>
                                     <p class="text-sm text-slate-500">Item total</p>
-                                    <p class="text-xl font-semibold text-slate-900 js-inv-item-total" data-index="{{ $loop->index }}">{{ $formatMoney($invTotal) }}</p>
-                                    <form method="POST" action="{{ $summaryClearUrl }}" class="mt-2">
-                                        @csrf
-                                        @method('DELETE')
+                                    <p class="text-xl font-semibold text-slate-900 js-inv-item-total" data-index="<?php echo e($loop->index); ?>"><?php echo e($formatMoney($invTotal)); ?></p>
+                                    <form method="POST" action="<?php echo e($summaryClearUrl); ?>" class="mt-2">
+                                        <?php echo csrf_field(); ?>
+                                        <?php echo method_field('DELETE'); ?>
                                         <button type="submit" class="text-sm text-rose-600 hover:text-rose-700">Remove invitation(s)</button>
                                     </form>
                                 </div>
                             </div>
                         </article>
-                    @empty
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                         <article class="glass-card fade-border rounded-3xl p-6">
                             <p class="text-slate-700 text-sm">No invitations added yet.</p>
                         </article>
-                    @endforelse
+                    <?php endif; ?>
 
-                    {{-- Envelopes: each selected envelope rendered separately --}}
+                    
                     <article class="glass-card fade-border rounded-3xl p-6">
                         <div class="flex items-start justify-between gap-4">
                             <div>
                                 <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Envelopes</p>
-                                @if($envelopeItems->isNotEmpty())
+                                <?php if($envelopeItems->isNotEmpty()): ?>
                                     <div class="space-y-4">
-                                        @foreach($envelopeItems as $env)
-                                            @php
+                                        <?php $__currentLoopData = $envelopeItems; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $env): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                            <?php
                                                 $envName = data_get($env, 'name', 'Envelope selection');
                                                 $envQty = $extractQty($env);
                                                 $envSize = data_get($env, 'size');
@@ -604,70 +605,70 @@
                                                         }
                                                     }
                                                 }
-                                            @endphp
+                                            ?>
                                             <div class="flex gap-4 rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-sm">
                                                 <div class="h-20 w-20 overflow-hidden rounded-xl bg-slate-100 shadow-inner flex-shrink-0">
-                                                    <img src="{{ $envPreview ?: $placeholderImage }}"
+                                                    <img src="<?php echo e($envPreview ?: $placeholderImage); ?>"
                                                          alt="Envelope preview"
                                                          class="h-full w-full object-cover js-preview-trigger"
-                                                         data-preview-images='@json($envGallery->values())'>
+                                                         data-preview-images='<?php echo json_encode($envGallery->values(), 15, 512) ?>'>
                                                 </div>
                                                 <div class="flex-1">
-                                                    <h3 class="text-base font-semibold text-slate-900">{{ $envName }}</h3>
-                                                    @if($envPickupLabel)
-                                                        <p class="mt-1 text-xs text-slate-600">Est. pickup {{ $envPickupLabel }}</p>
-                                                    @endif
+                                                    <h3 class="text-base font-semibold text-slate-900"><?php echo e($envName); ?></h3>
+                                                    <?php if($envPickupLabel): ?>
+                                                        <p class="mt-1 text-xs text-slate-600">Est. pickup <?php echo e($envPickupLabel); ?></p>
+                                                    <?php endif; ?>
                                                     <label class="text-slate-600 text-sm flex items-center gap-2">Quantity:
                                                         <input type="number"
-                                                            value="{{ max(10, $envQty) }}"
+                                                            value="<?php echo e(max(10, $envQty)); ?>"
                                                             min="10"
                                                             step="1"
                                                             inputmode="numeric"
                                                             pattern="[0-9]*"
                                                             class="js-env-qty w-20 rounded-lg border border-slate-300 px-2 py-1 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                                                            data-index="{{ $loop->index }}"
-                                                            data-unit="{{ (float) $envUnitPrice }}">
+                                                            data-index="<?php echo e($loop->index); ?>"
+                                                            data-unit="<?php echo e((float) $envUnitPrice); ?>">
                                                     </label>
-                                                    @if($envSize)
-                                                        <p class="text-slate-600 text-sm">Size: {{ $envSize }}</p>
-                                                    @endif
-                                                    @if($envColor)
-                                                        <p class="text-slate-600 text-sm">Color: {{ $envColor }}</p>
-                                                    @endif
-                                                    <p class="text-sm font-semibold text-slate-900 mt-2 js-env-item-total" data-index="{{ $loop->index }}">{{ $formatMoney($envTotal ?: $envelopeTotal) }}</p>
-                                                    @if($envId)
-                                                        <form method="POST" action="{{ $envelopeClearUrl }}" class="mt-2">
-                                                            @csrf
-                                                            @method('DELETE')
-                                                            <input type="hidden" name="product_id" value="{{ $envId }}">
+                                                    <?php if($envSize): ?>
+                                                        <p class="text-slate-600 text-sm">Size: <?php echo e($envSize); ?></p>
+                                                    <?php endif; ?>
+                                                    <?php if($envColor): ?>
+                                                        <p class="text-slate-600 text-sm">Color: <?php echo e($envColor); ?></p>
+                                                    <?php endif; ?>
+                                                    <p class="text-sm font-semibold text-slate-900 mt-2 js-env-item-total" data-index="<?php echo e($loop->index); ?>"><?php echo e($formatMoney($envTotal ?: $envelopeTotal)); ?></p>
+                                                    <?php if($envId): ?>
+                                                        <form method="POST" action="<?php echo e($envelopeClearUrl); ?>" class="mt-2">
+                                                            <?php echo csrf_field(); ?>
+                                                            <?php echo method_field('DELETE'); ?>
+                                                            <input type="hidden" name="product_id" value="<?php echo e($envId); ?>">
                                                             <button type="submit" class="text-sm text-rose-600 hover:text-rose-700">Remove envelope</button>
                                                         </form>
-                                                    @endif
+                                                    <?php endif; ?>
                                                 </div>
                                             </div>
-                                        @endforeach
+                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                                     </div>
-                                @else
+                                <?php else: ?>
                                     <p class="text-slate-700 text-sm">No envelope added yet.</p>
-                                @endif
+                                <?php endif; ?>
                             </div>
                             <div class="text-right">
-                                <a href="{{ $envelopeUrl }}" class="text-sm text-slate-700 hover:text-slate-900">Edit envelopes</a>
+                                <a href="<?php echo e($envelopeUrl); ?>" class="text-sm text-slate-700 hover:text-slate-900">Edit envelopes</a>
                                 <p class="mt-3 text-sm text-slate-500">Total</p>
-                                <p class="text-xl font-semibold text-slate-900">{{ $formatMoney($envelopeTotalCalc) }}</p>
+                                <p class="text-xl font-semibold text-slate-900"><?php echo e($formatMoney($envelopeTotalCalc)); ?></p>
                             </div>
                         </div>
                     </article>
 
-                    {{-- Giveaways: each selected giveaway rendered separately --}}
+                    
                     <article class="glass-card fade-border rounded-3xl p-6">
                         <div class="flex items-start justify-between gap-4">
                             <div>
                                 <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Giveaways</p>
-                                @if($giveawayItems->isNotEmpty())
+                                <?php if($giveawayItems->isNotEmpty()): ?>
                                     <div class="space-y-4">
-                                        @foreach($giveawayItems as $give)
-                                            @php
+                                        <?php $__currentLoopData = $giveawayItems; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $give): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                            <?php
                                                 $giveName = data_get($give, 'name', 'Giveaway selection');
                                                 $giveQty = $extractQty($give);
                                                 $giveMaterial = data_get($give, 'material');
@@ -706,77 +707,77 @@
                                                         }
                                                     }
                                                 }
-                                            @endphp
+                                            ?>
                                             <div class="flex gap-4 rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-sm">
                                                 <div class="h-20 w-20 overflow-hidden rounded-xl bg-slate-100 shadow-inner flex-shrink-0">
-                                                    <img src="{{ $givePreview ?: $placeholderImage }}"
+                                                    <img src="<?php echo e($givePreview ?: $placeholderImage); ?>"
                                                          alt="Giveaway preview"
                                                          class="h-full w-full object-cover js-preview-trigger"
-                                                         data-preview-images='@json($giveGallery->values())'>
+                                                         data-preview-images='<?php echo json_encode($giveGallery->values(), 15, 512) ?>'>
                                                 </div>
                                                 <div class="flex-1">
                                                     <div class="flex items-center gap-2 flex-wrap">
-                                                        <h3 class="text-base font-semibold text-slate-900">{{ $giveName }}</h3>
-                                                        @if($giveIsPreorder)
+                                                        <h3 class="text-base font-semibold text-slate-900"><?php echo e($giveName); ?></h3>
+                                                        <?php if($giveIsPreorder): ?>
                                                             <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">Pre-order</span>
-                                                        @endif
+                                                        <?php endif; ?>
                                                     </div>
-                                                    @if($giveIsPreorder)
+                                                    <?php if($giveIsPreorder): ?>
                                                         <div class="mb-2 inline-flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-1.5 ring-1 ring-amber-200">
                                                             <span class="text-amber-800 text-xs font-semibold uppercase tracking-wide">Pre-order</span>
-                                                            @if($givePickupLabel)
-                                                                <span class="text-amber-900 text-xs font-medium">· Est. pickup {{ $givePickupLabel }}</span>
-                                                            @endif
+                                                            <?php if($givePickupLabel): ?>
+                                                                <span class="text-amber-900 text-xs font-medium">· Est. pickup <?php echo e($givePickupLabel); ?></span>
+                                                            <?php endif; ?>
                                                         </div>
-                                                    @endif
+                                                    <?php endif; ?>
                                                     <label class="text-slate-600 text-sm flex items-center gap-2">Quantity:
                                                         <input type="number"
-                                                            value="{{ max(10, $giveQty) }}"
+                                                            value="<?php echo e(max(10, $giveQty)); ?>"
                                                             min="10"
                                                             step="1"
                                                             inputmode="numeric"
                                                             pattern="[0-9]*"
                                                             class="js-give-qty w-20 rounded-lg border border-slate-300 px-2 py-1 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                                                            data-index="{{ $loop->index }}"
-                                                            data-unit="{{ (float) $giveUnitPrice }}">
+                                                            data-index="<?php echo e($loop->index); ?>"
+                                                            data-unit="<?php echo e((float) $giveUnitPrice); ?>">
                                                     </label>
-                                                    @if($giveMaterial)
-                                                        @if($giveIsPreorder)
-                                                            <p class="text-amber-900 text-sm">Pre-order material: {{ $giveMaterial }}</p>
-                                                        @else
-                                                            <p class="text-slate-600 text-sm">Material: {{ $giveMaterial }}</p>
-                                                        @endif
-                                                    @endif
-                                                    <p class="text-sm font-semibold text-slate-900 mt-2 js-give-item-total" data-index="{{ $loop->index }}">{{ $formatMoney($giveTotal ?: $giveawayTotal) }}</p>
-                                                    @if($giveId)
-                                                        <form method="POST" action="{{ $giveawayClearUrl }}" class="mt-2">
-                                                            @csrf
-                                                            @method('DELETE')
-                                                            <input type="hidden" name="product_id" value="{{ $giveId }}">
+                                                    <?php if($giveMaterial): ?>
+                                                        <?php if($giveIsPreorder): ?>
+                                                            <p class="text-amber-900 text-sm">Pre-order material: <?php echo e($giveMaterial); ?></p>
+                                                        <?php else: ?>
+                                                            <p class="text-slate-600 text-sm">Material: <?php echo e($giveMaterial); ?></p>
+                                                        <?php endif; ?>
+                                                    <?php endif; ?>
+                                                    <p class="text-sm font-semibold text-slate-900 mt-2 js-give-item-total" data-index="<?php echo e($loop->index); ?>"><?php echo e($formatMoney($giveTotal ?: $giveawayTotal)); ?></p>
+                                                    <?php if($giveId): ?>
+                                                        <form method="POST" action="<?php echo e($giveawayClearUrl); ?>" class="mt-2">
+                                                            <?php echo csrf_field(); ?>
+                                                            <?php echo method_field('DELETE'); ?>
+                                                            <input type="hidden" name="product_id" value="<?php echo e($giveId); ?>">
                                                             <button type="submit" class="text-sm text-rose-600 hover:text-rose-700">Remove giveaway</button>
                                                         </form>
-                                                    @endif
+                                                    <?php endif; ?>
                                                 </div>
                                             </div>
-                                        @endforeach
+                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                                     </div>
-                                @else
+                                <?php else: ?>
                                     <p class="text-slate-700 text-sm">No giveaway added yet.</p>
-                                @endif
+                                <?php endif; ?>
                             </div>
                             <div class="text-right">
                                 <div class="flex flex-col items-end gap-2">
-                                    <a href="{{ $giveawaysUrl }}" class="text-sm text-slate-700 hover:text-slate-900">Edit giveaways</a>
-                                    @if($hasGiveaway)
-                                        <form method="POST" action="{{ $giveawayClearUrl }}">
-                                            @csrf
-                                            @method('DELETE')
+                                    <a href="<?php echo e($giveawaysUrl); ?>" class="text-sm text-slate-700 hover:text-slate-900">Edit giveaways</a>
+                                    <?php if($hasGiveaway): ?>
+                                        <form method="POST" action="<?php echo e($giveawayClearUrl); ?>">
+                                            <?php echo csrf_field(); ?>
+                                            <?php echo method_field('DELETE'); ?>
                                             <button type="submit" class="text-sm text-rose-600 hover:text-rose-700">Remove giveaways</button>
                                         </form>
-                                    @endif
+                                    <?php endif; ?>
                                 </div>
                                 <p class="mt-3 text-sm text-slate-500">Total</p>
-                                <p class="text-xl font-semibold text-slate-900">{{ $formatMoney($giveawayTotalCalc) }}</p>
+                                <p class="text-xl font-semibold text-slate-900"><?php echo e($formatMoney($giveawayTotalCalc)); ?></p>
                             </div>
                         </div>
                     </article>
@@ -788,29 +789,29 @@
                         <dl class="mt-4 space-y-2 text-sm">
                             <div class="flex items-center justify-between">
                                     <dt class="text-slate-600">Invitation</dt>
-                                    <dd class="font-medium text-slate-900" id="summary-inv-total">{{ $formatMoney($invitationTotalCalc) }}</dd>
+                                    <dd class="font-medium text-slate-900" id="summary-inv-total"><?php echo e($formatMoney($invitationTotalCalc)); ?></dd>
                                 </div>
                             <div class="flex items-center justify-between">
                                 <dt class="text-slate-600">Envelope</dt>
-                                    <dd class="font-medium text-slate-900" id="summary-env-total">{{ $formatMoney($envelopeTotalCalc) }}</dd>
+                                    <dd class="font-medium text-slate-900" id="summary-env-total"><?php echo e($formatMoney($envelopeTotalCalc)); ?></dd>
                             </div>
                             <div class="flex items-center justify-between">
                                 <dt class="text-slate-600">Giveaways</dt>
-                                    <dd class="font-medium text-slate-900" id="summary-give-total">{{ $formatMoney($giveawayTotalCalc) }}</dd>
+                                    <dd class="font-medium text-slate-900" id="summary-give-total"><?php echo e($formatMoney($giveawayTotalCalc)); ?></dd>
                             </div>
-                            @if($addonsExtra > 0)
+                            <?php if($addonsExtra > 0): ?>
                                 <div class="flex items-center justify-between">
                                     <dt class="text-slate-600">Add-ons</dt>
-                                    <dd class="font-medium text-slate-900">{{ $formatMoney($addonsExtra) }}</dd>
+                                    <dd class="font-medium text-slate-900"><?php echo e($formatMoney($addonsExtra)); ?></dd>
                                 </div>
-                            @endif
+                            <?php endif; ?>
                             <div class="mt-4 flex items-center justify-between text-base font-semibold">
                                 <dt class="text-slate-900">Total amount</dt> 
-                                <dd class="text-slate-900" id="summary-grand-total">{{ $formatMoney($grandTotal) }}</dd>
+                                <dd class="text-slate-900" id="summary-grand-total"><?php echo e($formatMoney($grandTotal)); ?></dd>
                             </div>
                         </dl>
                                 <a id="checkout-summary"
-                                    href="{{ $checkoutPaymentUrl }}"
+                                    href="<?php echo e($checkoutPaymentUrl); ?>"
                                     class="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 hover:bg-slate-800">Checkout now</a>
                                 <p id="qty-warning" class="mt-3 text-sm text-rose-600 hidden">Minimum quantity per item is 10.</p>
                     </div>
@@ -818,22 +819,22 @@
                     <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
                         <p class="font-semibold text-slate-900">Need to start over?</p>
                         <p class="mt-1">Clearing your order removes every selection from this summary.</p>
-                        <form method="POST" action="{{ $summaryClearUrl }}" class="mt-3">
-                            @csrf
-                            @method('DELETE')
+                        <form method="POST" action="<?php echo e($summaryClearUrl); ?>" class="mt-3">
+                            <?php echo csrf_field(); ?>
+                            <?php echo method_field('DELETE'); ?>
                             <button type="submit" class="text-rose-600 hover:text-rose-700 font-medium">Clear entire order</button>
                         </form>
                     </div>
                 </aside>
             </div>
-        @endif
+        <?php endif; ?>
     </main>
 
-    @if(!empty($orderSummary))
+    <?php if(!empty($orderSummary)): ?>
         <script>
             // Keep the JSON endpoint usable for other pages; store summary snapshot for reuse.
             try {
-                window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(@json($orderSummary)));
+                window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(<?php echo json_encode($orderSummary, 15, 512) ?>));
             } catch (e) {
                 console.warn('Unable to cache order summary', e);
             }
@@ -1141,7 +1142,7 @@
                     }
                     
                     try {
-                        const response = await fetch('{{ route("order.summary.update-quantity") }}', {
+                        const response = await fetch('<?php echo e(route("order.summary.update-quantity")); ?>', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -1260,6 +1261,7 @@
                 if (checkoutSummary) checkoutSummary.addEventListener('click', guardCheckout);
             })();
         </script>
-    @endif
+    <?php endif; ?>
 </body>
 </html>
+<?php /**PATH C:\Users\leanne\xampp\htdocs\InkWise-Web\ink-wise\resources\views/customer/orderflow/mycart.blade.php ENDPATH**/ ?>

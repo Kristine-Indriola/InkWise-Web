@@ -82,8 +82,27 @@ class PaymentController extends Controller
         ]);
 
         if ($summary['balance'] <= 0) {
+            Log::info('GCash create blocked: order fully paid', [
+                'order_id' => $order->id,
+                'total_paid' => $summary['total_paid'],
+                'balance' => $summary['balance'],
+            ]);
+
             return response()->json([
                 'message' => 'This order is already fully paid.',
+                'order' => [
+                    'id' => $order->id,
+                    'total_amount' => $order->total_amount,
+                    'grand_total' => $order->grandTotalAmount(),
+                    'summary_snapshot_present' => !empty($order->summary_snapshot ?? []),
+                ],
+                'summary' => [
+                    'balance' => $summary['balance'],
+                    'total_paid' => $summary['total_paid'],
+                    'payments' => $summary['payments'],
+                    // include paymongo metadata if present for debugging
+                    'paymongo' => $metadata['paymongo'] ?? null,
+                ],
             ], 409);
         }
 

@@ -999,6 +999,18 @@ Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->group
     Route::get('/customer/cart', [CartController::class, 'index'])->name('customer.cart');
     Route::patch('/order/cart/items/{cartItem}', [CartController::class, 'updateItem'])->name('customer.cart.update');
     Route::delete('/order/cart/items/{cartItem}', [CartController::class, 'removeItem'])->name('customer.cart.remove');
+    // Provide a friendly GET handler so users who accidentally navigate to the create endpoint
+    // (for example via a bad link or direct browser navigation) receive clear guidance
+    // instead of a server error about unsupported methods.
+    Route::get('/payments/gcash', function () {
+        if (request()->expectsJson()) {
+            return response()->json(['message' => 'GCash payments must be started via POST from the checkout flow.'], 405);
+        }
+
+        return redirect()->route('customer.checkout')
+            ->with('error', 'Please start GCash payments using the Place Order button on checkout.');
+    })->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer');
+
     Route::post('/payments/gcash', [PaymentController::class, 'createGCashPayment'])->name('payment.gcash.create');
     Route::get('/payments/gcash/return', [PaymentController::class, 'handleGCashReturn'])->name('payment.gcash.return');
 });
