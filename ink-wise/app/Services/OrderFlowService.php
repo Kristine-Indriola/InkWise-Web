@@ -3908,21 +3908,40 @@ class OrderFlowService
         if ($product) {
             $product->loadMissing(['paperStocks', 'addons']);
         }
+
+        // Determine quantity and unit price defensively so we can compute an
+        // invitation total even when the product lookup fails (e.g., session-only
+        // summaries or in test environments).
+        $quantity = max(1, (int) ($summary['quantity'] ?? 1));
+        $unitPrice = (float) ($summary['unitPrice'] ?? ($product ? $this->unitPriceFor($product) : 0));
+        $invitationTotal = round($unitPrice * $quantity, 2);
+
+        // If we couldn't resolve the product, return totals based solely on
+        // the provided unit/quantity (no paper/addons/envelope/giveaway data).
         if (!$product) {
+            $subtotal = $invitationTotal;
+            $total = round($subtotal + 0.0, 2);
+
             return [
-                'subtotalAmount' => 0.0,
-                'totalAmount' => 0.0,
+                'invitationTotal' => $invitationTotal,
+                'subtotalAmount' => $subtotal,
+                'totalAmount' => $total,
                 'taxAmount' => 0.0,
                 'shippingFee' => static::DEFAULT_SHIPPING_FEE,
-                'extras' => [],
+                'extras' => [
+                    'paper' => 0.0,
+                    'addons' => 0.0,
+                    'envelope' => 0.0,
+                    'giveaway' => 0.0,
+                ],
             ];
         }
 
-        $quantity = max(1, (int) ($summary['quantity'] ?? 1));
-        $unitPrice = (float) ($summary['unitPrice'] ?? $this->unitPriceFor($product));
-
-        // Exclude base price of invitation
-        $baseSubtotal = 0; // round($unitPrice * $quantity, 2);
+        // Include base price of the invitation (unit * quantity). Previously this was
+        // omitted which caused server-side totals to undercount the order and made
+        // outstanding balance 0 when only the invitation existed.
+        $invitationTotal = round($unitPrice * $quantity, 2);
+        $baseSubtotal = $invitationTotal;
 
         // Calculate paper stock total
         $paperTotal = 0.0;
@@ -3967,12 +3986,17 @@ class OrderFlowService
             }
         }
 
-        $subtotal = round($paperTotal + $addonsTotal + $envelopeTotal + $giveawayTotal, 2);
+        // Include invitation base into subtotal so session/server totals match
+        // what the client expects (unit * qty + extras).
+        $subtotal = round($baseSubtotal + $paperTotal + $addonsTotal + $envelopeTotal + $giveawayTotal, 2);
         $tax = 0.0;
         $shipping = 0.0; // Always 0 for shipping
         $total = round($subtotal + $shipping, 2);
 
         return [
+            // Provide an explicit invitationTotal to make it easy for consumers
+            // to show per-item totals without re-deriving from unit/qty.
+            'invitationTotal' => $invitationTotal,
             'subtotalAmount' => $subtotal,
             'totalAmount' => $total,
             'taxAmount' => $tax,

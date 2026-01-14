@@ -2536,7 +2536,7 @@ class OrderFlowController extends Controller
 
                 // Update envelope items
                 $envelopeItems = $order->items()->where('line_type', OrderItem::LINE_TYPE_ENVELOPE)->get();
-                $envelopes = $summary['envelopes'] ?? ($summary['envelope'] ? [$summary['envelope']] : []);
+                $envelopes = $summary['envelopes'] ?? (isset($summary['envelope']) && !empty($summary['envelope']) ? [$summary['envelope']] : []);
                 foreach ($envelopeItems as $idx => $item) {
                     if (isset($envelopes[$idx])) {
                         $qty = (int) ($envelopes[$idx]['qty'] ?? $envelopes[$idx]['quantity'] ?? $item->quantity);
@@ -2550,7 +2550,7 @@ class OrderFlowController extends Controller
 
                 // Update giveaway items
                 $giveawayItems = $order->items()->where('line_type', OrderItem::LINE_TYPE_GIVEAWAY)->get();
-                $giveaways = $summary['giveaways'] ?? ($summary['giveaway'] ? [$summary['giveaway']] : []);
+                $giveaways = $summary['giveaways'] ?? (isset($summary['giveaway']) && !empty($summary['giveaway']) ? [$summary['giveaway']] : []);
                 foreach ($giveawayItems as $idx => $item) {
                     if (isset($giveaways[$idx])) {
                         $qty = (int) ($giveaways[$idx]['qty'] ?? $giveaways[$idx]['quantity'] ?? $item->quantity);

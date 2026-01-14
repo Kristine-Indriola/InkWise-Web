@@ -116,6 +116,10 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::get('/ordersummary/{order}', [OrderSummaryController::class, 'show'])
         ->name('ordersummary.show');
 
+    // Admin action: force material deduction for an order (admin-only)
+    Route::post('/ordersummary/{order}/deduct-materials', [OrderSummaryController::class, 'deductMaterials'])
+        ->name('ordersummary.deduct');
+
     // Admin orders list (table) - simple closure for listing orders in the admin UI
     Route::get('/orders', function (\Illuminate\Http\Request $request) {
         $query = \App\Models\Order::query()
@@ -158,8 +162,8 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
                 $grandTotal = (float) ($order->total_amount ?? 0);
                 $balanceDue = max($grandTotal - $totalPaid, 0);
                 
-                // Only include orders that are fully paid (balance_due <= 0)
-                return $balanceDue <= 0;
+                // Include orders that have any paid payments (for testing and admin visibility)
+                return $totalPaid > 0;
             })
             ->map(function ($order) {
                 // Compute payment totals from payments relationship

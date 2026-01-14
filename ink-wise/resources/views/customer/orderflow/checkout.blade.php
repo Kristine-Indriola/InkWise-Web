@@ -1766,6 +1766,7 @@
                 const contact = collectContactDetails();
 
                 try {
+                    console.debug('Starting GCash payment fetch', { paymentConfig, paymentMethod, amount, mode, contact, recordedPaidAmount });
                     const response = await fetch(paymentConfig.createUrl, {
                         method: 'POST',
                         headers: {
@@ -1786,6 +1787,16 @@
                     const data = await response.json();
 
                     if (!response.ok) {
+                        // Handle conflict when server reports order already paid
+                        if (response.status === 409 && data.message && /already fully paid/i.test(data.message)) {
+                            // Update client-side payment state to reflect fully-paid order
+                            paymentConfig.isFullyPaid = true;
+                            paymentConfig.balance = 0;
+                            try { recalcTotals(); } catch (e) { /* ignore if unavailable */ }
+                            showPaymentMessage('info', data.message);
+                            return { success: false, handledConflict: true, data };
+                        }
+
                         throw new Error(data.message || 'Unable to start the GCash payment.');
                     }
 
@@ -1847,6 +1858,7 @@
 
                     try {
                         if (selectedPaymentMethod.startsWith('gcash')) {
+                            console.debug('Placing order with GCash payment', { selectedPaymentMethod, finalPaymentMethod, paymentAmount, paymentConfig });
                             const result = await persistFinalStepSelections(finalPaymentMethod, { paymentAmount });
                             if (!result?.success || result?.handledRedirect) {
                                 placeOrderBtn.disabled = false;
