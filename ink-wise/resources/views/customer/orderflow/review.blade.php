@@ -149,6 +149,15 @@
 		}
 	}
 
+	// Load back SVG from template if available
+	$backSvg = null;
+	if ($templateRef && !empty($templateRef->back_svg_path)) {
+		$backSvgPath = storage_path('app/public/' . $templateRef->back_svg_path);
+		if (file_exists($backSvgPath)) {
+			$backSvg = file_get_contents($backSvgPath);
+		}
+	}
+
 	if (!$frontImage && $uploads->isNotEmpty()) {
 		$first = $uploads->firstWhere(fn ($upload) => str_starts_with($upload->mime_type ?? '', 'image/'));
 		if ($first) {
@@ -266,7 +275,14 @@
 								@endif
 							</div>
 							<div class="card-face back">
-								<img src="{{ $backImage }}" alt="Back of your design" loading="lazy" decoding="async">
+								@if(!empty($backSvg))
+									{{-- Embed back SVG directly --}}
+									<div class="svg-container" style="width: 100%; height: 100%; pointer-events: none;">
+										{!! $backSvg !!}
+									</div>
+								@else
+									<img src="{{ $backImage }}" alt="Back of your design" loading="lazy" decoding="async">
+								@endif
 							</div>
 						</div>
 					</div>

@@ -4,7 +4,7 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Finalize Order — Inkwise</title>
-	<meta name="csrf-token" content="{{ csrf_token() }}">
+	<meta name="csrf-token" content="<?php echo e(csrf_token()); ?>">
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 	<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -12,10 +12,10 @@
 		@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Seasons&display=swap');
 		@import url('https://fonts.cdnfonts.com/css/edwardian-script-itc');
 	</style>
-	@vite(['resources/css/app.css'])
+	<?php echo app('Illuminate\Foundation\Vite')(['resources/css/app.css']); ?>
 	<link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-bold-rounded/css/uicons-bold-rounded.css">
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-	<link rel="stylesheet" href="{{ asset('css/customer/orderflow-finalstep.css') }}">
+	<link rel="stylesheet" href="<?php echo e(asset('css/customer/orderflow-finalstep.css')); ?>">
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 	<style>
 		.flatpickr-calendar {
@@ -225,11 +225,11 @@
 			}
 		}
 	</style>
-	<script src="{{ asset('js/customer/orderflow-finalstep.js') }}" defer></script>
+	<script src="<?php echo e(asset('js/customer/orderflow-finalstep.js')); ?>" defer></script>
 	<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 </head>
-<body class="finalstep-body bg-white" data-product-id="{{ $product->id ?? '' }}" style="overflow-y: auto; height: auto; padding-top: 0;">
-@php
+<body class="finalstep-body bg-white" data-product-id="<?php echo e($product->id ?? ''); ?>" style="overflow-y: auto; height: auto; padding-top: 0;">
+<?php
 	$req = request();
 	$product = $product ?? null;
 	$proof = $proof ?? null;
@@ -246,8 +246,8 @@
 	$estimatedDeliveryDays = $estimatedDeliveryDays ?? null;
 	$processingDays = $processingDays ?? null;
 	$minQty = $minQty ?? 10;
-@endphp
-@php 
+?>
+<?php 
 	$uploads = $product->uploads ?? collect();
 	$images = $product->product_images ?? $product->images ?? optional($proof)->images ?? null;
 	$templateRef = $product->template ?? ($templateRef ?? optional($proof)->template ?? null);
@@ -423,12 +423,12 @@
 
 	// Define pricing variables
 	$minQty = 10;
-@endphp
-@php
+?>
+<?php
 	$processingDays = $estimatedDeliveryDays ?? ($processingDays ?? null) ?? 7;
-@endphp
+?>
 
-@php
+<?php
     $formatMoney = static fn ($amount) => '₱' . number_format((float) ($amount ?? 0), 2);
     $invitationSubtotal = (float) ($orderSummary['subtotalAmount'] ?? 0);
     $extras = $orderSummary['extras'] ?? [];
@@ -448,11 +448,11 @@
 
     // Calculate giveaway total
     $giveawayTotalCalc = $giveawayTotal;
-@endphp
-<main class="finalstep-shell" data-storage-key="inkwise-finalstep" data-envelope-url="{{ $envelopeUrl }}" data-cart-url="{{ route('order.addtocart') }}" data-save-url="{{ $finalStepSaveUrl }}" data-fallback-samples="false" data-product-id="{{ $product->id ?? '' }}" data-product-name="{{ $resolvedProductName }}" data-processing-days="{{ $processingDays }}">
+?>
+<main class="finalstep-shell" data-storage-key="inkwise-finalstep" data-envelope-url="<?php echo e($envelopeUrl); ?>" data-cart-url="<?php echo e(route('order.addtocart')); ?>" data-save-url="<?php echo e($finalStepSaveUrl); ?>" data-fallback-samples="false" data-product-id="<?php echo e($product->id ?? ''); ?>" data-product-name="<?php echo e($resolvedProductName); ?>" data-processing-days="<?php echo e($processingDays); ?>">
 	<header class="finalstep-header">
 		<div class="finalstep-header__content">
-			<a href="{{ $reviewUrl }}" class="finalstep-header__back" aria-label="Back to review">
+			<a href="<?php echo e($reviewUrl); ?>" class="finalstep-header__back" aria-label="Back to review">
 				<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
 				Back to review
 			</a>
@@ -465,7 +465,7 @@
 
 
 	<div class="finalstep-layout">
-		<section class="finalstep-preview" data-product-name="{{ $resolvedProductName }}">
+		<section class="finalstep-preview" data-product-name="<?php echo e($resolvedProductName); ?>">
 			<div class="finalstep-card preview-card">
 				<header class="preview-card__header">
 					<span class="preview-card__badge">Artwork preview</span>
@@ -477,30 +477,31 @@
 				<div class="card-flip">
 					<div class="inner">
 						<div class="card-face front">
-							@if(isset($customerReview) && !empty($customerReview->design_svg))
-								{{-- Embed SVG directly - img src doesn't work with SVGs containing external resources --}}
+							<?php if(isset($customerReview) && !empty($customerReview->design_svg)): ?>
+								
 								<div class="svg-container" style="width: 100%; height: 100%; pointer-events: none;">
-									{!! $customerReview->design_svg !!}
+									<?php echo $customerReview->design_svg; ?>
+
 								</div>
-							@else
-								<img src="{{ $frontImage }}" alt="Front of your design">
-							@endif
+							<?php else: ?>
+								<img src="<?php echo e($frontImage); ?>" alt="Front of your design">
+							<?php endif; ?>
 						</div>
 						<div class="card-face back">
-							<img src="{{ $backImage }}" alt="Back of your design">
+							<img src="<?php echo e($backImage); ?>" alt="Back of your design">
 						</div>
 					</div>
 				</div>
 			
 				<!-- saved-template container removed; previews will replace artwork images directly -->
 				<ul class="preview-meta">
-					<li><span class="meta-label">Product</span><span class="meta-value">{{ $resolvedProductName }}</span></li>
-					@if(isset($product->size))
-						<li><span class="meta-label">Size</span><span class="meta-value">{{ $product->size }}</span></li>
-					@endif
-					@if(isset($product->paper_stock))
-						<li><span class="meta-label">Paper stock</span><span class="meta-value">{{ $product->paper_stock }}</span></li>
-					@endif
+					<li><span class="meta-label">Product</span><span class="meta-value"><?php echo e($resolvedProductName); ?></span></li>
+					<?php if(isset($product->size)): ?>
+						<li><span class="meta-label">Size</span><span class="meta-value"><?php echo e($product->size); ?></span></li>
+					<?php endif; ?>
+					<?php if(isset($product->paper_stock)): ?>
+						<li><span class="meta-label">Paper stock</span><span class="meta-value"><?php echo e($product->paper_stock); ?></span></li>
+					<?php endif; ?>
 				</ul>
 			</div>
 		</section>
@@ -516,15 +517,15 @@
 						<div class="form-group">
 							<label for="quantityInput">Quantity</label>
 							<div class="quantity-price-row">
-								<input type="number" id="quantityInput" name="quantity" value="{{ $selectedQuantity ?? $minQty }}" min="{{ $minQty }}" {{ $maxQty ? 'max="' . $maxQty . '"' : '' }} required>
+								<input type="number" id="quantityInput" name="quantity" value="<?php echo e($selectedQuantity ?? $minQty); ?>" min="<?php echo e($minQty); ?>" <?php echo e($maxQty ? 'max="' . $maxQty . '"' : ''); ?> required>
 								<div class="price-display">
 									<span class="meta-label">Total:</span>
-									<span id="priceDisplay" class="meta-value">{{ $formatMoney($itemTotal ?? 0) }}</span>
+									<span id="priceDisplay" class="meta-value"><?php echo e($formatMoney($itemTotal ?? 0)); ?></span>
 								</div>
 							</div>
-							<p class="text-slate-600 text-sm">Base price: {{ $formatMoney($basePricePerPiece) }} per piece</p>
-							<div id="quantityError" class="error-message" style="display: none;">Quantity must be at least {{ $minQty }}</div>
-							<p class="bulk-note">{{ $quantityNote }}</p>
+							<p class="text-slate-600 text-sm">Base price: <?php echo e($formatMoney($basePricePerPiece)); ?> per piece</p>
+							<div id="quantityError" class="error-message" style="display: none;">Quantity must be at least <?php echo e($minQty); ?></div>
+							<p class="bulk-note"><?php echo e($quantityNote); ?></p>
 						</div>
 					</div>
 
@@ -535,76 +536,78 @@
 							<!-- Paper availability hidden per UX request -->
 							<div id="stockError" class="error-message" style="display:none; margin-top:6px;"></div>
 							<div class="feature-grid small">
-								@forelse($paperStocks as $stock)
+								<?php $__empty_1 = true; $__currentLoopData = $paperStocks; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $stock): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
 									<button
 										type="button"
 										class="feature-card selectable-card paper-stock-card"
-										data-id="{{ $stock->id }}"
-										data-price="{{ $stock->price ?? 0 }}"
-										data-available="{{ $stock->available ?? $stock->quantity ?? $stock->stock ?? 0 }}"
-										aria-pressed="{{ $stock->selected ? 'true' : 'false' }}"
+										data-id="<?php echo e($stock->id); ?>"
+										data-price="<?php echo e($stock->price ?? 0); ?>"
+										data-available="<?php echo e($stock->available ?? $stock->quantity ?? $stock->stock ?? 0); ?>"
+										aria-pressed="<?php echo e($stock->selected ? 'true' : 'false'); ?>"
 									>
 										<div class="feature-card-media">
-											<img src="{{ $stock->image }}" alt="{{ $stock->name }}">
+											<img src="<?php echo e($stock->image); ?>" alt="<?php echo e($stock->name); ?>">
 										</div>
 										<div class="feature-card-info">
-											<span class="feature-card-title">{{ $stock->name }}</span>
+											<span class="feature-card-title"><?php echo e($stock->name); ?></span>
 											<span class="feature-card-price">
-												@if($stock->price !== null)
-													₱{{ number_format($stock->price, 2) }}
-												@else
+												<?php if($stock->price !== null): ?>
+													₱<?php echo e(number_format($stock->price, 2)); ?>
+
+												<?php else: ?>
 													On request
-												@endif
+												<?php endif; ?>
 											</span>
 										</div>
 									</button>
-								@empty
+								<?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
 									<p class="muted">No paper stocks available for this product.</p>
-								@endforelse
+								<?php endif; ?>
 							</div>
-							<input type="hidden" name="paper_stock_id" id="paperStockId" value="{{ $initialPaperStockId }}">
-							<input type="hidden" name="paper_stock_price" id="paperStockPrice" value="{{ $initialPaperStockPrice ?? 0 }}">
+							<input type="hidden" name="paper_stock_id" id="paperStockId" value="<?php echo e($initialPaperStockId); ?>">
+							<input type="hidden" name="paper_stock_price" id="paperStockPrice" value="<?php echo e($initialPaperStockPrice ?? 0); ?>">
 						</div>
 
 						<div class="form-group addons-group">
-							@forelse($addonGroups as $group)
-								@if(strtolower(trim($group->label ?? '')) === 'size')
-									@continue
-								@endif
-								<div class="addon-section" data-addon-type="{{ $group->type }}">
-									<h4 class="addon-title">{{ trim(str_ireplace('Additional', '', $group->label)) }}</h4>
-									<div class="feature-grid small addon-grid" data-addon-type="{{ $group->type }}">
-										@forelse($group->items as $addon)
+							<?php $__empty_1 = true; $__currentLoopData = $addonGroups; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $group): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+								<?php if(strtolower(trim($group->label ?? '')) === 'size'): ?>
+									<?php continue; ?>
+								<?php endif; ?>
+								<div class="addon-section" data-addon-type="<?php echo e($group->type); ?>">
+									<h4 class="addon-title"><?php echo e(trim(str_ireplace('Additional', '', $group->label))); ?></h4>
+									<div class="feature-grid small addon-grid" data-addon-type="<?php echo e($group->type); ?>">
+										<?php $__empty_2 = true; $__currentLoopData = $group->items; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $addon): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_2 = false; ?>
 											<button
 												type="button"
 												class="feature-card selectable-card addon-card"
-												data-id="{{ $addon->id }}"
-												data-price="{{ $addon->price ?? 0 }}"
-												data-type="{{ $addon->type }}"
-												aria-pressed="{{ $addon->selected ? 'true' : 'false' }}"
+												data-id="<?php echo e($addon->id); ?>"
+												data-price="<?php echo e($addon->price ?? 0); ?>"
+												data-type="<?php echo e($addon->type); ?>"
+												aria-pressed="<?php echo e($addon->selected ? 'true' : 'false'); ?>"
 											>
 												<div class="feature-card-media">
-													<img src="{{ $addon->image }}" alt="{{ $addon->name }}">
+													<img src="<?php echo e($addon->image); ?>" alt="<?php echo e($addon->name); ?>">
 												</div>
 												<div class="feature-card-info">
-													<span class="feature-card-title">{{ $addon->name }}</span>
+													<span class="feature-card-title"><?php echo e($addon->name); ?></span>
 													<span class="feature-card-price">
-														@if($addon->price !== null)
-															₱{{ number_format($addon->price, 2) }}
-														@else
+														<?php if($addon->price !== null): ?>
+															₱<?php echo e(number_format($addon->price, 2)); ?>
+
+														<?php else: ?>
 															On request
-														@endif
+														<?php endif; ?>
 													</span>
 												</div>
 											</button>
-										@empty
+										<?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_2): ?>
 											<p class="muted">No add-ons available for this category.</p>
-										@endforelse
+										<?php endif; ?>
 									</div>
 								</div>
-							@empty
+							<?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
 								<p class="muted">No add-ons available for this product.</p>
-							@endforelse
+							<?php endif; ?>
 						</div>
 					</div>
 
@@ -613,7 +616,7 @@
 							<dl>
 								<div class="mt-4 flex items-center justify-between text-base font-semibold border-t border-slate-200 pt-2">
 									<dt class="text-slate-900">Total due</dt>
-									<dd class="text-slate-900" data-order-total>{{ $formatMoney($grandTotal) }}</dd>
+									<dd class="text-slate-900" data-order-total><?php echo e($formatMoney($grandTotal)); ?></dd>
 								</div>
 							</dl>
 						</div>
@@ -623,7 +626,7 @@
 								<label for="estimatedDate" class="meta-label">Estimated day</label>
 								<div class="delivery-inputs">
 									<div class="delivery-row">
-										<input type="date" id="estimatedDate" name="estimated_date" value="{{ $estimatedDeliveryDateFormatted }}" required>
+										<input type="date" id="estimatedDate" name="estimated_date" value="<?php echo e($estimatedDeliveryDateFormatted); ?>" required>
 										<span id="estimatedDateFinalLabel" class="final-date-label" aria-hidden="true"></span>
 									</div>
 									<p id="estimatedDateHint" class="date-hint">Choose an estimated date at least 10 days from today, up to 1 month ahead. Past dates are not allowed.</p>
@@ -634,8 +637,8 @@
 						</div>
 
 						<div class="action-buttons">
-							<button type="button" id="addToCartBtn" class="primary-action" data-envelope-url="{{ $envelopeUrl }}" data-cart-url="{{ route('order.addtocart') }}">Add to cart</button>
-							<a id="continueToCheckoutBtn" data-continue-checkout href="{{ $envelopeUrl }}" class="btn btn-secondary">Continue to checkout</a>
+							<button type="button" id="addToCartBtn" class="primary-action" data-envelope-url="<?php echo e($envelopeUrl); ?>" data-cart-url="<?php echo e(route('order.addtocart')); ?>">Add to cart</button>
+							<a id="continueToCheckoutBtn" data-continue-checkout href="<?php echo e($envelopeUrl); ?>" class="btn btn-secondary">Continue to checkout</a>
 							<div id="paperSelectError" class="error-message" style="display:none; margin-left:8px;">Please select a paper type to continue.</div>
 						</div>
 					</div>
@@ -646,10 +649,10 @@
 
 	<div id="finalStepToast" class="finalstep-toast" role="status" aria-live="polite" hidden></div>
 </main>
-@if(!empty($orderSummary))
+<?php if(!empty($orderSummary)): ?>
 	<script>
 		document.addEventListener('DOMContentLoaded', () => {
-			const summaryData = {!! \Illuminate\Support\Js::from($orderSummary) !!};
+			const summaryData = <?php echo \Illuminate\Support\Js::from($orderSummary); ?>;
 			try {
 				const minSummary = {
 					productId: summaryData.productId ?? summaryData.product_id ?? null,
@@ -665,7 +668,7 @@
 			}
 		});
 	</script>
-@endif
+<?php endif; ?>
 <script>
 	document.addEventListener('DOMContentLoaded', () => {
 		const dropdownControllers = [];
@@ -1082,3 +1085,4 @@ document.addEventListener('DOMContentLoaded', function () {
 		});
 	});
 	</script>
+<?php /**PATH C:\Users\leanne\xampp\htdocs\InkWise-Web\ink-wise\resources\views/customer/orderflow/finalstep.blade.php ENDPATH**/ ?>

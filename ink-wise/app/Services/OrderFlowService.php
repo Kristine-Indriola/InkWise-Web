@@ -3217,8 +3217,11 @@ class OrderFlowService
             return;
         }
 
-        // Exclude base price of invitation
-        $baseSubtotal = 0; // (float) $invitationItem->unit_price * $invitationItem->quantity;
+        // Include base price of the invitation in the subtotal so the order total reflects
+        // the product's unit price plus any extras (paper, addons, etc.). Previously this
+        // was set to 0 which caused orders with only the base product to end up with a
+        // zero total amount.
+        $baseSubtotal = round((float) ($invitationItem->unit_price ?? 0) * (int) $invitationItem->quantity, 2);
 
         // paperStockSelection->price is stored as a per-unit price; multiply by quantity
         $paperPerUnit = (float) ($invitationItem->paperStockSelection?->price ?? 0);
@@ -3242,7 +3245,8 @@ class OrderFlowService
                 return (float) $subtotal;
             });
 
-        $subtotal = round($extrasTotal + $additionalLineItemsTotal, 2);
+        // Include baseSubtotal so subtotal reflects base product + extras + other line items
+        $subtotal = round($baseSubtotal + $extrasTotal + $additionalLineItemsTotal, 2);
         $tax = 0.0;
         $shipping = 0.0;
         $total = round($subtotal, 2);

@@ -831,6 +831,20 @@
 	$customerCompany = data_get($customer, 'company');
 	$customerTags = collect(data_get($customer, 'tags', []))->filter()->values();
 
+	$currencyCode = data_get($order, 'currency', 'PHP');
+	$currencySymbol = $currencyCode === 'PHP' ? '₱' : ($currencyCode . ' ');
+	$customerLifetimePaid = 0.0;
+	if (!empty($customerId)) {
+		try {
+			$customerLifetimePaid = (float) \App\Models\Payment::query()
+				->where('customer_id', $customerId)
+				->whereRaw("LOWER(COALESCE(status, '')) = 'paid'")
+				->sum('amount');
+		} catch (\Throwable $_e) {
+			$customerLifetimePaid = 0.0;
+		}
+	}
+
 	$shippingAddress = data_get($order, 'shipping.formatted')
 		?? data_get($order, 'shipping.address')
 		?? data_get($order, 'shipping_address');
@@ -1199,7 +1213,17 @@
 	$balanceOverrideRaw = data_get($financialMetadata, 'balance_due_override');
 	$paidOverrideAmount = is_numeric($paidOverrideRaw) ? (float) $paidOverrideRaw : null;
 	$balanceOverrideAmount = is_numeric($balanceOverrideRaw) ? (float) $balanceOverrideRaw : null;
-	$totalPaidAmount = $paidOverrideAmount ?? (float) ($paymentsSummary->get('total_paid') ?? data_get($order, 'total_paid', 0));
+	// Prefer authoritative model-calculated total paid when available
+	if (isset($orderModel) && $orderModel) {
+		try {
+			$calculatedPaid = (float) $orderModel->totalPaid();
+		} catch (\Throwable $_e) {
+			$calculatedPaid = null;
+		}
+	} else {
+		$calculatedPaid = null;
+	}
+	$totalPaidAmount = $paidOverrideAmount ?? ($calculatedPaid !== null ? $calculatedPaid : (float) ($paymentsSummary->get('total_paid') ?? data_get($order, 'total_paid', 0)));
 	$balanceDueAmount = $balanceOverrideAmount ?? (float) ($paymentsSummary->get('balance_due') ?? max($orderGrandTotalAmount - $totalPaidAmount, 0));
 	if ($paymentStatus !== 'paid') {
 		if ($orderGrandTotalAmount > 0 && $balanceDueAmount <= 0.01 && $totalPaidAmount >= max($orderGrandTotalAmount - 0.01, 0)) {
@@ -2276,6 +2300,16 @@
 								@endif
 							</dd>
 						</div>
+						<div>
+							<dt>Total paid (customer lifetime)</dt>
+							<dd>
+								@if(!empty($customerLifetimePaid) && $customerLifetimePaid > 0)
+									{{ $currencySymbol . number_format($customerLifetimePaid, 2) }}
+								@else
+									<span>—</span>
+								@endif
+							</dd>
+						</div>
 					</dl>
 
 					<div class="ordersummary-address-grid">
@@ -2503,13 +2537,17 @@
 						return $currencySymbol . number_format($numeric, 2);
 					};
 					$orderGrandTotal = isset($orderGrandTotalAmount) ? $orderGrandTotalAmount : (float) ($paymentsSummary->get('grand_total') ?? ($grandTotal ?? 0));
-					$totalPaid = isset($totalPaidAmount) ? $totalPaidAmount : (float) ($paymentsSummary->get('total_paid') ?? $payments->reduce(function ($carry, $paymentRow) {
-						$status = strtolower((string) data_get($paymentRow, 'status', 'pending'));
-						if ($status === 'paid') {
-							return $carry + (float) data_get($paymentRow, 'amount', 0);
-						}
-						return $carry;
-					}, 0.0));
+					// Final paid amount decision: prefer earlier computed $totalPaidAmount (which already prefers model),
+					// otherwise fall back to summing payments collection.
+					$totalPaid = isset($totalPaidAmount)
+						? $totalPaidAmount
+						: (float) ($paymentsSummary->get('total_paid') ?? $payments->reduce(function ($carry, $paymentRow) {
+							$status = strtolower((string) data_get($paymentRow, 'status', 'pending'));
+							if ($status === 'paid') {
+								return $carry + (float) data_get($paymentRow, 'amount', 0);
+							}
+							return $carry;
+						}, 0.0));
 					$balanceDue = isset($balanceDueAmount) ? $balanceDueAmount : (float) ($paymentsSummary->get('balance_due') ?? max($orderGrandTotal - $totalPaid, 0));
 					$latestPaymentAtRaw = $paymentsSummary->get('latest_payment_at');
 					$latestPaymentAt = null;

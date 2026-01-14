@@ -5,8 +5,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const frontBtn = document.querySelector('[data-face="front"]');
   const backBtn = document.querySelector('[data-face="back"]');
   const cardFaces = {
-    front: flipContainer?.querySelector('.card-face.front img') || null,
-    back: flipContainer?.querySelector('.card-face.back img') || null
+    front: flipContainer?.querySelector('.card-face.front img') || flipContainer?.querySelector('.card-face.front .svg-container') || null,
+    back: flipContainer?.querySelector('.card-face.back img') || flipContainer?.querySelector('.card-face.back .svg-container') || null
   };
   const approvalCheckbox = document.getElementById('approvalCheckbox');
   const continueBtn = document.getElementById('continueBtn');

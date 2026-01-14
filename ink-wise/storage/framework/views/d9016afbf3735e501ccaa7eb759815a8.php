@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="csrf-token" content="<?php echo e(csrf_token()); ?>">
     <title>Checkout - Inkwise</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="{{ asset('css/customer/customer.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/customer/customertemplate.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/customer/template.css') }}">
-    <script src="{{ asset('js/customer/customer.js') }}" defer></script>
-    <script src="{{ asset('js/customer/template.js') }}" defer></script>
+    <link rel="stylesheet" href="<?php echo e(asset('css/customer/customer.css')); ?>">
+    <link rel="stylesheet" href="<?php echo e(asset('css/customer/customertemplate.css')); ?>">
+    <link rel="stylesheet" href="<?php echo e(asset('css/customer/template.css')); ?>">
+    <script src="<?php echo e(asset('js/customer/customer.js')); ?>" defer></script>
+    <script src="<?php echo e(asset('js/customer/template.js')); ?>" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.10.2/cdn.min.js" defer></script>
-    <link rel="icon" type="image/png" href="{{ asset('adminimage/ink.png') }}">
+    <link rel="icon" type="image/png" href="<?php echo e(asset('adminimage/ink.png')); ?>">
     <style>
         :root {
             --page-gradient: radial-gradient(circle at 20% 20%, rgba(148, 163, 184, 0.12), transparent 35%),
@@ -737,7 +737,7 @@
     </style>
 </head>
 <body>
-@php
+<?php
     // Provide navigation context required by the shared topbar
     $resolvedInvitationType = $invitationType
         ?? (request()->routeIs('templates.corporate.*') ? 'Corporate'
@@ -843,23 +843,24 @@
     $checkoutQuantity = $orderItem?->quantity
         ?? ($orderSummary['quantity'] ?? null)
         ?? null;
-@endphp
+?>
 
-@if(session('status'))
+<?php if(session('status')): ?>
     <div class="status-banner" style="margin:16px auto; max-width:960px; padding:12px 18px; border-radius:16px; background:#ecfdf5; color:#047857; font-weight:600; text-align:center;">
-        {{ session('status') }}
-    </div>
-@endif
+        <?php echo e(session('status')); ?>
 
-@if($order && !$isFullyPaid && in_array($order->status, ['processing', 'in_production', 'confirmed']))
+    </div>
+<?php endif; ?>
+
+<?php if($order && !$isFullyPaid && in_array($order->status, ['processing', 'in_production', 'confirmed'])): ?>
     <div class="status-banner" style="margin:16px auto; max-width:960px; padding:12px 18px; border-radius:16px; background:#fef3c7; color:#92400e; font-weight:600; text-align:center; border: 1px solid #f59e0b;">
         <div style="margin-bottom: 8px;">Your order has been confirmed! Please pay the remaining balance to complete your order.</div>
-        <a href="{{ route('order.pay.remaining.balance', $order) }}" class="inline-block px-6 py-2 bg-[#ee4d2d] text-white rounded-lg hover:bg-[#d73211] transition-colors font-semibold">
-            Pay Remaining Balance (₱{{ number_format($balanceDueDisplay, 2) }})
+        <a href="<?php echo e(route('order.pay.remaining.balance', $order)); ?>" class="inline-block px-6 py-2 bg-[#ee4d2d] text-white rounded-lg hover:bg-[#d73211] transition-colors font-semibold">
+            Pay Remaining Balance (₱<?php echo e(number_format($balanceDueDisplay, 2)); ?>)
         </a>
     </div>
-@endif
-    @include('partials.topbar')
+<?php endif; ?>
+    <?php echo $__env->make('partials.topbar', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
     <div class="page-wrapper">
         <!-- Checkout Steps -->
@@ -890,53 +891,53 @@
 
             <div class="summary-card" style="position: static; top: auto;">
                 <div class="summary-items" id="summaryItems">
-                    @forelse(($order?->items ?? collect()) as $item)
+                    <?php $__empty_1 = true; $__currentLoopData = ($order?->items ?? collect()); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                         <div class="summary-item">
-                            <span>{{ $item->product_name }} × {{ $item->quantity }}</span>
-                            <strong>₱{{ number_format($item->subtotal, 2) }}</strong>
+                            <span><?php echo e($item->product_name); ?> × <?php echo e($item->quantity); ?></span>
+                            <strong>₱<?php echo e(number_format($item->subtotal, 2)); ?></strong>
                         </div>
-                        @foreach($item->addons as $addon)
+                        <?php $__currentLoopData = $item->addons; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $addon): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                             <div class="summary-item" style="padding-left:16px; font-size:0.9rem;">
-                                <span>{{ $addon->addon_name }}</span>
-                                <strong>₱{{ number_format(($addon->addon_price ?? 0) * $item->quantity, 2) }}</strong>
+                                <span><?php echo e($addon->addon_name); ?></span>
+                                <strong>₱<?php echo e(number_format(($addon->addon_price ?? 0) * $item->quantity, 2)); ?></strong>
                             </div>
-                        @endforeach
-                    @empty
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                         <div class="summary-item">
                             <span>No items in this order yet.</span>
                             <strong>—</strong>
                         </div>
-                    @endforelse
+                    <?php endif; ?>
                 </div>
                 <hr class="summary-divider">
                 <div class="summary-item">
                     <span>Subtotal</span>
-                    <strong id="subtotalAmount">₱{{ number_format($subtotal, 2) }}</strong>
+                    <strong id="subtotalAmount">₱<?php echo e(number_format($subtotal, 2)); ?></strong>
                 </div>
                 <div class="summary-item">
                     <span>Shipping</span>
-                    <strong id="shippingAmount">{{ $shippingFee > 0 ? '₱' . number_format($shippingFee, 2) : 'Free' }}</strong>
+                    <strong id="shippingAmount"><?php echo e($shippingFee > 0 ? '₱' . number_format($shippingFee, 2) : 'Free'); ?></strong>
                 </div>
                 <hr class="summary-divider">
                 <div class="summary-item">
                     <span>Total paid via GCash</span>
-                    <strong id="paidAmount">₱{{ number_format($paidAmountDisplay, 2) }}</strong>
+                    <strong id="paidAmount">₱<?php echo e(number_format($paidAmountDisplay, 2)); ?></strong>
                 </div>
-                @if(!$isFullyPaid)
+                <?php if(!$isFullyPaid): ?>
                 <div class="summary-item">
                     <span>Balance remaining</span>
-                    <strong id="balanceAmount">₱{{ number_format($balanceDueDisplay, 2) }}</strong>
+                    <strong id="balanceAmount">₱<?php echo e(number_format($balanceDueDisplay, 2)); ?></strong>
                 </div>
-                @endif
+                <?php endif; ?>
                 <div class="summary-total">
                     <span>Total due</span>
-                    <span id="grandTotal">₱{{ number_format($totalAmount, 2) }}</span>
+                    <span id="grandTotal">₱<?php echo e(number_format($totalAmount, 2)); ?></span>
                 </div>
-                @if($isFullyPaid)
-                <p class="note">Order fully paid. Recorded payments total ₱{{ number_format($paidAmountDisplay, 2) }}.</p>
-                @else
-                <p class="note">Recorded payments total ₱{{ number_format($paidAmountDisplay, 2) }}. Outstanding balance: ₱{{ number_format($balanceDueDisplay, 2) }}.</p>
-                @endif
+                <?php if($isFullyPaid): ?>
+                <p class="note">Order fully paid. Recorded payments total ₱<?php echo e(number_format($paidAmountDisplay, 2)); ?>.</p>
+                <?php else: ?>
+                <p class="note">Recorded payments total ₱<?php echo e(number_format($paidAmountDisplay, 2)); ?>. Outstanding balance: ₱<?php echo e(number_format($balanceDueDisplay, 2)); ?>.</p>
+                <?php endif; ?>
             </hr>
 
             <button type="button" class="btn-continue" id="continueToShipping" style="margin-top: 24px;">
@@ -954,8 +955,8 @@
                 <!-- Saved template preview will be injected here -->
             </div>
 
-            {{-- If user has saved addresses, auto-fill shipping inputs from the first one but keep fields editable --}}
-            @php
+            
+            <?php
                 $savedAddresses = collect();
                 try {
                     if (auth()->check()) {
@@ -971,43 +972,43 @@
                         }
                     }
                 } catch (\Throwable $e) { /* ignore */ }
-            @endphp
+            ?>
 
             <div class="fieldset info-row">
                 <label>Full name
-                    <input type="text" id="fullName" placeholder="Juan Dela Cruz" value="{{ $shippingName }}">
+                    <input type="text" id="fullName" placeholder="Juan Dela Cruz" value="<?php echo e($shippingName); ?>">
                 </label>
                 <label>Email address
-                    <input type="email" id="email" placeholder="juan@email.com" value="{{ $shippingEmail }}">
+                    <input type="email" id="email" placeholder="juan@email.com" value="<?php echo e($shippingEmail); ?>">
                 </label>
             </div>
 
             <div class="fieldset info-row">
                 <label>Contact number
-                    <input type="tel" id="phone" placeholder="09XX XXX XXXX" value="{{ $shippingPhone }}">
+                    <input type="tel" id="phone" placeholder="09XX XXX XXXX" value="<?php echo e($shippingPhone); ?>">
                 </label>
                 <label>Quantity
-                    <input type="number" id="checkoutQuantity" name="quantity" value="{{ $checkoutQuantity }}" min="10" max="200">
+                    <input type="number" id="checkoutQuantity" name="quantity" value="<?php echo e($checkoutQuantity); ?>" min="10" max="200">
                 </label>
             </div>
 
             <label id="addressLabel">Address (optional)
-                <input type="text" id="address" placeholder="House number, street, subdivision, barangay, city, province" value="{{ $shippingAddress }}">
+                <input type="text" id="address" placeholder="House number, street, subdivision, barangay, city, province" value="<?php echo e($shippingAddress); ?>">
             </label>
 
             <div class="fieldset info-row" id="addressFields">
                 <label>City / Municipality
-                    <input type="text" id="city" placeholder="e.g. Quezon City" value="{{ $shippingCity }}">
+                    <input type="text" id="city" placeholder="e.g. Quezon City" value="<?php echo e($shippingCity); ?>">
                 </label>
                 <label>Postal code
-                    <input type="text" id="postalCode" placeholder="1100" value="{{ $shippingPostal }}">
+                    <input type="text" id="postalCode" placeholder="1100" value="<?php echo e($shippingPostal); ?>">
                 </label>
             </div>
 
             <footer class="shipping-footer">
                 <div class="shipping-footer__actions">
-                    <a href="{{ route('customerprofile.addresses') }}" class="shipping-action-button shipping-action-button--primary">Update</a>
-                    <a href="{{ route('customerprofile.addresses') }}" class="shipping-action-button">Add</a>
+                    <a href="<?php echo e(route('customerprofile.addresses')); ?>" class="shipping-action-button shipping-action-button--primary">Update</a>
+                    <a href="<?php echo e(route('customerprofile.addresses')); ?>" class="shipping-action-button">Add</a>
                 </div>
             </footer>
 
@@ -1045,7 +1046,7 @@
                     <input type="radio" name="paymentMethod" value="gcash-deposit-cod">
                     <div class="option-content">
                         <h3>50% GCash Deposit + Pay on Pickup</h3>
-                        <p>Pay ₱{{ number_format($depositAmountDisplay, 2) }} deposit now via GCash, ₱{{ number_format($remainingAmountDisplay, 2) }} cash on delivery.</p>
+                        <p>Pay ₱<?php echo e(number_format($depositAmountDisplay, 2)); ?> deposit now via GCash, ₱<?php echo e(number_format($remainingAmountDisplay, 2)); ?> cash on delivery.</p>
                         <span class="option-tag">Required Deposit</span>
                     </div>
                 </label>
@@ -1055,7 +1056,7 @@
                     <input type="radio" name="paymentMethod" value="gcash-split">
                     <div class="option-content">
                         <h3>50% GCash Deposit + GCash Balance</h3>
-                        <p>Pay ₱{{ number_format($depositAmountDisplay, 2) }} deposit now, ₱{{ number_format($remainingAmountDisplay, 2) }} via GCash after confirmation.</p>
+                        <p>Pay ₱<?php echo e(number_format($depositAmountDisplay, 2)); ?> deposit now, ₱<?php echo e(number_format($remainingAmountDisplay, 2)); ?> via GCash after confirmation.</p>
                         <span class="option-tag">All Digital</span>
                     </div>
                 </label>
@@ -1070,7 +1071,7 @@
                     <input type="radio" name="paymentMethod" value="gcash-full">
                     <div class="option-content">
                         <h3>Full GCash Payment</h3>
-                        <p>Pay ₱{{ number_format($totalAmount, 2) }} in full now via GCash. No remaining balance to pay later.</p>
+                        <p>Pay ₱<?php echo e(number_format($totalAmount, 2)); ?> in full now via GCash. No remaining balance to pay later.</p>
                         <span class="option-tag" style="background: #10b981;">Pay in Full</span>
                     </div>
                 </label>
@@ -1295,7 +1296,7 @@
 
                     const localCsrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 
-                    const res = await fetch('{{ route('order.design.save-template') }}', {
+                    const res = await fetch('<?php echo e(route('order.design.save-template')); ?>', {
                         method: 'POST',
                         credentials: 'same-origin',
                         headers: {
@@ -1452,23 +1453,23 @@
             }
 
             const priceFormatter = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' });
-            const subtotal = @json($subtotal ?? 0);
-            const baseShipping = @json($shippingFee ?? 0);
-            const taxRate = @json($taxRate ?? 0);
-            const orderTotalAmount = @json($totalAmount ?? 0); // Use the order's total amount
-            let recordedPaidAmount = @json($paidAmountDisplay ?? 0);
+            const subtotal = <?php echo json_encode($subtotal ?? 0, 15, 512) ?>;
+            const baseShipping = <?php echo json_encode($shippingFee ?? 0, 15, 512) ?>;
+            const taxRate = <?php echo json_encode($taxRate ?? 0, 15, 512) ?>;
+            const orderTotalAmount = <?php echo json_encode($totalAmount ?? 0, 15, 512) ?>; // Use the order's total amount
+            let recordedPaidAmount = <?php echo json_encode($paidAmountDisplay ?? 0, 15, 512) ?>;
             let currentShippingCost = Number(baseShipping ?? 0);
             let currentTax = Number((subtotal ?? 0) * (taxRate ?? 0));
             let currentTotal = Number(orderTotalAmount); // Use order total instead of calculation
             const paymentConfig = {
-                createUrl: '{{ route('payment.gcash.create') }}',
-                resumeUrl: @json($pendingPaymentUrl ?? null),
-                hasPending: @json($hasPendingPayment ?? false),
-                depositAmount: @json($depositSuggested ?? 0),
-                balance: @json($balanceDueDisplay ?? 0),
-                isFullyPaid: @json($isFullyPaid ?? false),
+                createUrl: '<?php echo e(route('payment.gcash.create')); ?>',
+                resumeUrl: <?php echo json_encode($pendingPaymentUrl ?? null, 15, 512) ?>,
+                hasPending: <?php echo json_encode($hasPendingPayment ?? false, 15, 512) ?>,
+                depositAmount: <?php echo json_encode($depositSuggested ?? 0, 15, 512) ?>,
+                balance: <?php echo json_encode($balanceDueDisplay ?? 0, 15, 512) ?>,
+                isFullyPaid: <?php echo json_encode($isFullyPaid ?? false, 15, 512) ?>,
                 // Ensure we carry the authoritative order id from the server into client flows.
-                orderId: @json($order->id ?? null),
+                orderId: <?php echo json_encode($order->id ?? null, 15, 512) ?>,
             };
 
             const shippingRadios = document.querySelectorAll('input[name="shippingOption"]');
@@ -1758,7 +1759,7 @@
                 };
 
                 try {
-                    const res = await fetch('{{ route('order.finalstep.save') }}', {
+                    const res = await fetch('<?php echo e(route('order.finalstep.save')); ?>', {
                         method: 'POST',
                         credentials: 'same-origin',
                         headers: {
@@ -1809,7 +1810,7 @@
                     }
 
                     if (redirectOnSuccess) {
-                        const redirectUrl = data.admin_redirect ?? (data.order_number ? `{{ url('/admin/ordersummary') }}/${data.order_number}` : null);
+                        const redirectUrl = data.admin_redirect ?? (data.order_number ? `<?php echo e(url('/admin/ordersummary')); ?>/${data.order_number}` : null);
                         if (redirectUrl) {
                             window.location.href = redirectUrl;
                             return { success: true, handledRedirect: true, data };
@@ -2060,10 +2061,10 @@
         });
     </script>
 
-@if(!empty($orderSummary))
+<?php if(!empty($orderSummary)): ?>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const summaryData = {!! \Illuminate\Support\Js::from($orderSummary) !!};
+            const summaryData = <?php echo \Illuminate\Support\Js::from($orderSummary); ?>;
             console.log('OrderSummary from PHP:', summaryData);
 
             // Preserve existing paymentMode from sessionStorage if it exists
@@ -2110,7 +2111,7 @@
             updatePaymentOptions(paymentMode);
         });
     </script>
-@endif
+<?php endif; ?>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -2156,4 +2157,4 @@ function updatePaymentOptions(mode) {
 }
 </script>
 </body>
-</html>
+</html><?php /**PATH C:\Users\leanne\xampp\htdocs\InkWise-Web\ink-wise\resources\views/customer/orderflow/checkout.blade.php ENDPATH**/ ?>
