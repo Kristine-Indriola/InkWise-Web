@@ -36,7 +36,7 @@ class PaymentController extends Controller
     public function createGCashPayment(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'order_id' => ['nullable', 'integer', 'min:1'],
+            'order_id' => ['nullable', 'integer'],
             'name' => ['nullable', 'string', 'max:120'],
             'email' => ['nullable', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:64'],
@@ -50,10 +50,10 @@ class PaymentController extends Controller
             ], 500);
         }
 
-        $orderId = isset($validated['order_id']) && (int) $validated['order_id'] > 0 ? (int) $validated['order_id'] : null;
+        $orderId = $validated['order_id'] ?? null;
         if ($orderId) {
             $order = Order::find($orderId);
-            if (!$order || $order->customer_id !== optional(Auth::user()->customer)->customer_id) {
+            if (!$order || $order->customer_id !== Auth::user()->customer->customer_id) {
                 return response()->json([
                     'message' => 'Order not found or does not belong to you.',
                 ], 404);
@@ -77,27 +77,14 @@ class PaymentController extends Controller
         Log::info('GCash payment request', [
             'mode' => $mode,
             'order_id' => $order->id,
-            'order_total' => $order->grandTotalAmount(),
-            'total_paid' => $summary['total_paid'],
             'balance' => $summary['balance'],
             'deposit_due' => $summary['deposit_due'],
-            'payment_records_count' => $order->payments()->count(),
-            'metadata_payments_count' => count($metadata['payments'] ?? []),
         ]);
 
         if ($summary['balance'] <= 0) {
-            Log::warning('GCash payment blocked - order already fully paid', [
-                'order_id' => $order->id,
-                'order_total' => $order->grandTotalAmount(),
-                'total_paid' => $summary['total_paid'],
-                'balance' => $summary['balance'],
-            ]);
-
-            // Inform the client that the order is already settled without returning an HTTP error
             return response()->json([
                 'message' => 'This order is already fully paid.',
-                'already_paid' => true,
-            ], 200);
+            ], 409);
         }
 
         $amountToCharge = $validated['amount'];
@@ -208,28 +195,6 @@ class PaymentController extends Controller
         $redirectUrl = Arr::get($attachedData, 'data.attributes.next_action.redirect.url');
         $status = Arr::get($attachedData, 'data.attributes.status');
 
-        // For testing in local environment, if no redirect URL is provided, use a mock URL
-        if (app()->environment('local') && !$redirectUrl && in_array($status, ['awaiting_next_action', 'succeeded'])) {
-            $redirectUrl = 'https://pm.link/test_gcash_redirect?mock=true';
-            
-            // For testing, immediately mark the payment as successful
-            $this->applyPaymentToOrder($order, [
-                'payment_id' => $paymentIntentId,
-                'intent_id' => $paymentIntentId,
-                'method' => 'gcash',
-                'mode' => $mode,
-                'amount' => round($amountToCharge, 2),
-                'raw' => ['mock' => true, 'test_payment' => true],
-            ]);
-            
-            // Update order status
-            $order->forceFill([
-                'payment_method' => 'gcash',
-                'payment_status' => 'partial', // or 'paid' depending on amount
-                'status' => 'in_production', // Move to in production
-            ])->save();
-        }
-
         $metadata['paymongo'] = array_merge($metadata['paymongo'] ?? [], [
             'intent_id' => $paymentIntentId,
             'payment_method_id' => $paymentMethodId,
@@ -259,27 +224,7 @@ class PaymentController extends Controller
 
     public function handleGCashReturn(Request $request): RedirectResponse
     {
-        // PayMongo may redirect back with a payment_intent id as 'payment_intent_id' or 'id'.
-        // Some flows (e.g., source authentication) may return a 'source' id instead; handle that too.
         $intentId = $request->query('payment_intent_id') ?? $request->query('id');
-        $sourceId = $request->query('source') ?? $request->query('source_id');
-
-        if (!$intentId && $sourceId) {
-            // Attempt to resolve source -> intent
-            try {
-                $sourceResponse = $this->paymongo()->get("sources/{$sourceId}");
-                if (!$sourceResponse->failed()) {
-                    $sourceData = $sourceResponse->json();
-                    // Try common places for the related intent id
-                    $intentId = Arr::get($sourceData, 'data.attributes.payment_intent_id')
-                        ?? Arr::get($sourceData, 'data.attributes.intent_id')
-                        ?? Arr::get($sourceData, 'data.attributes.client_key');
-                }
-            } catch (\Throwable $e) {
-                Log::warning('Error fetching source from PayMongo during return flow', ['source' => $sourceId, 'error' => $e->getMessage()]);
-            }
-        }
-
         if (!$intentId) {
             return redirect()->route('customer.checkout')->with('status', 'We could not verify the payment status.');
         }
@@ -348,16 +293,11 @@ class PaymentController extends Controller
         }
 
         $payload = $request->all();
-        // Prefer the nested type but fall back to top-level if present
-        $eventType = Arr::get($payload, 'data.attributes.type') ?? Arr::get($payload, 'type');
+        $eventType = Arr::get($payload, 'data.attributes.type');
 
-        // Helper: extract nested resource data if present
-        $resource = Arr::get($payload, 'data.attributes.data', []);
-
-        // Handle explicit payment events (standard case)
-        if ($eventType === 'payment.paid' || $eventType === 'payment.updated') {
-            $paymentData = $resource;
-            $intentId = Arr::get($paymentData, 'attributes.payment_intent_id') ?? Arr::get($paymentData, 'attributes.intent_id');
+        if ($eventType === 'payment.paid') {
+            $paymentData = Arr::get($payload, 'data.attributes.data');
+            $intentId = Arr::get($paymentData, 'attributes.payment_intent_id');
             $order = $this->findOrderByIntentId($intentId);
 
             if ($order) {
@@ -372,16 +312,15 @@ class PaymentController extends Controller
                     'intent_status' => 'succeeded',
                 ]);
             } else {
-                Log::warning('PayMongo webhook could not match payment intent to order (payment event).', [
+                Log::warning('PayMongo webhook could not match payment intent to order.', [
                     'intent_id' => $intentId,
-                    'payload' => $payload,
                 ]);
             }
         }
 
         if ($eventType === 'payment.failed') {
-            $paymentData = $resource;
-            $intentId = Arr::get($paymentData, 'attributes.payment_intent_id') ?? Arr::get($paymentData, 'attributes.intent_id');
+            $paymentData = Arr::get($payload, 'data.attributes.data');
+            $intentId = Arr::get($paymentData, 'attributes.payment_intent_id');
             $order = $this->findOrderByIntentId($intentId);
 
             if ($order) {
@@ -404,102 +343,7 @@ class PaymentController extends Controller
             }
         }
 
-        // Fallback: some PayMongo flows (e.g., source authentication) emit source.* events
-        // or other event types that don't directly include a payment payload. Attempt to
-        // find an associated payment_intent id anywhere in the payload, then fetch the
-        // intent and apply its status if available.
-        $intentIdCandidates = [];
-        // Common locations
-        $intentIdCandidates[] = Arr::get($payload, 'data.attributes.data.attributes.payment_intent_id');
-        $intentIdCandidates[] = Arr::get($payload, 'data.attributes.data.attributes.intent_id');
-        $intentIdCandidates[] = Arr::get($payload, 'data.attributes.data.id');
-        $intentIdCandidates[] = Arr::get($payload, 'data.id');
-
-        $intentId = null;
-        foreach ($intentIdCandidates as $candidate) {
-            if (!empty($candidate) && is_string($candidate)) {
-                $intentId = $candidate;
-                break;
-            }
-        }
-
-        // If we couldn't find an intent id directly, try to search the payload for any key named 'payment_intent_id'
-        if (!$intentId) {
-            $intentId = $this->findKeyInArray($payload, 'payment_intent_id');
-        }
-
-        if ($intentId) {
-            Log::info('Webhook fallback: found intent id, fetching intent from PayMongo', ['intent_id' => $intentId]);
-            $intentResponse = $this->paymongo()->get("payment_intents/{$intentId}");
-
-            if (!$intentResponse->failed()) {
-                $intentData = $intentResponse->json();
-                $status = Arr::get($intentData, 'data.attributes.status');
-                $payments = collect(Arr::get($intentData, 'data.attributes.payments', []));
-                $latestPayment = $payments->sortByDesc(fn ($p) => Arr::get($p, 'attributes.created_at'))->first();
-
-                if ($status === 'succeeded' && $latestPayment) {
-                    $order = $this->findOrderByIntentId($intentId);
-                    if ($order) {
-                        $amount = round(Arr::get($latestPayment, 'attributes.amount', 0) / 100, 2);
-
-                        $this->applyPaymentToOrder($order, [
-                            'payment_id' => Arr::get($latestPayment, 'id'),
-                            'intent_id' => $intentId,
-                            'mode' => Arr::get($order->metadata, 'paymongo.mode', 'half'),
-                            'amount' => $amount,
-                            'raw' => $latestPayment,
-                            'intent_status' => 'succeeded',
-                        ]);
-                    }
-                } elseif ($status === 'failed') {
-                    $order = $this->findOrderByIntentId($intentId);
-                    if ($order) {
-                        $metadata = $order->metadata ?? [];
-                        $metadata['paymongo'] = array_merge($metadata['paymongo'] ?? [], [
-                            'status' => 'failed',
-                            'last_failure' => [
-                                'recorded_at' => now()->toIso8601String(),
-                                'reason' => 'Payment intent failed during webhook fallback',
-                            ],
-                        ]);
-
-                        $order->forceFill([
-                            'status' => 'pending',
-                            'metadata' => $metadata
-                        ])->save();
-                    }
-                }
-            } else {
-                Log::warning('Unable to fetch PayMongo intent during webhook fallback.', ['intent_id' => $intentId, 'status' => $intentResponse->status(), 'body' => $intentResponse->json()]);
-            }
-        } else {
-            Log::info('PayMongo webhook received unhandled event type', ['event_type' => $eventType, 'payload' => $payload]);
-        }
-
         return response()->json(['status' => 'ok']);
-
-    }
-
-    /**
-     * Recursively search an array for the first value with the given key.
-     */
-    private function findKeyInArray(array $haystack, string $needle)
-    {
-        foreach ($haystack as $key => $value) {
-            if ($key === $needle) {
-                return is_scalar($value) ? (string) $value : null;
-            }
-
-            if (is_array($value)) {
-                $found = $this->findKeyInArray($value, $needle);
-                if ($found) {
-                    return $found;
-                }
-            }
-        }
-
-        return null;
     }
 
     private function resolveCurrentOrder(): ?Order
@@ -530,9 +374,6 @@ class PaymentController extends Controller
             $options['verify'] = false;
             Log::warning('Disabling SSL verification for PayMongo API due to missing CA bundle.');
         }
-
-        // For development/testing, always disable SSL verification
-        $options['verify'] = false;
 
         return Http::withOptions($options)->withHeaders([
             'Authorization' => 'Basic ' . base64_encode(($this->secretKey ?? '') . ':'),

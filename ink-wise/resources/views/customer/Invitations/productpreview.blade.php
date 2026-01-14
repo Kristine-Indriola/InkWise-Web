@@ -101,6 +101,19 @@
     }
   }
 
+  // Determine if the template has a back design
+  $hasBackDesign = !empty($backImage) || ($templateRef && ($templateRef->has_back_design ?? false));
+  
+  // If template has back design but no back image, try to get it from svg_path
+  if ($hasBackDesign && !$backImage && $templateRef) {
+    $backSvgPath = $templateRef->back_svg_path ?? null;
+    if ($backSvgPath) {
+      $backImage = preg_match('/^(https?:)?\/\//i', $backSvgPath) || str_starts_with($backSvgPath, '/')
+        ? $backSvgPath
+        : \Illuminate\Support\Facades\Storage::url($backSvgPath);
+    }
+  }
+
   $defaultImage = $frontImage ?? $backImage ?? asset('images/placeholder.png');
   $priceValue = $product->base_price ?? $product->unit_price ?? optional($templateRef)->base_price ?? optional($templateRef)->unit_price;
   $paperStocksRaw = $product->paper_stocks ?? $product->paperStocks ?? collect();
@@ -206,10 +219,32 @@
           </div>
         </div>
       </div>
-      <div class="toggle-buttons">
-        <button id="frontBtn" class="active">Front</button>
-        <button id="backBtn" @if(!$backImage) style="display:none" @endif>Back</button>
+      
+      @if($hasBackDesign)
+      <div class="toggle-buttons" data-has-back="true">
+        <button id="frontBtn" class="active" type="button" aria-label="View front design">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <polyline points="21 15 16 10 5 21"></polyline>
+          </svg>
+          <span>Front</span>
+        </button>
+        <button id="backBtn" type="button" aria-label="View back design">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="9" y1="9" x2="15" y2="15"></line>
+            <line x1="15" y1="9" x2="9" y2="15"></line>
+          </svg>
+          <span>Back</span>
+        </button>
       </div>
+      @else
+      <div class="toggle-buttons" data-has-back="false" style="display: none;">
+        <button id="frontBtn" class="active" type="button">Front</button>
+        <button id="backBtn" type="button" style="display:none">Back</button>
+      </div>
+      @endif
     </div>
 
     <div class="details">

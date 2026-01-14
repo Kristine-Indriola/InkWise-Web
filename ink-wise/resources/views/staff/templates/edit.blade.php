@@ -264,6 +264,20 @@
                 $previewMeta = isset($metadataArray['preview_images_meta']) && is_array($metadataArray['preview_images_meta'])
                     ? $metadataArray['preview_images_meta']
                     : [];
+                
+                // Fallback to preview_front and preview_back columns if metadata previews don't have them
+                if (!isset($storedPreviews['front']) && $template->preview_front) {
+                    $storedPreviews['front'] = $template->preview_front;
+                    if (!isset($previewMeta['front'])) {
+                        $previewMeta['front'] = ['label' => 'Front Side', 'order' => 0];
+                    }
+                }
+                if (!isset($storedPreviews['back']) && $template->preview_back) {
+                    $storedPreviews['back'] = $template->preview_back;
+                    if (!isset($previewMeta['back'])) {
+                        $previewMeta['back'] = ['label' => 'Back Side', 'order' => 1];
+                    }
+                }
 
                 $previewEntries = [];
                 $position = 0;

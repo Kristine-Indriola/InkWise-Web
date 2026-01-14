@@ -665,7 +665,7 @@ public function saveCanvas(Request $request, $id)
             $generatedSvg = null;
             try {
                 // Use the design path we just saved to ensure we're using the latest design
-                $generatedSvg = $this->generateSvgFromTemplate($template->id, $designPath);
+                $generatedSvg = $this->generateSvgFromTemplate($template->id, $designPath, 0);
                 Log::info('SVG generated from design JSON', ['design_path' => $designPath]);
             } catch (\Exception $e) {
                 Log::warning('SVG generation from design failed', ['error' => $e->getMessage()]);
@@ -685,6 +685,31 @@ public function saveCanvas(Request $request, $id)
                 } catch (ValidationException $e) {
                     Log::warning('Generated SVG save failed', ['error' => $e->getMessage()]);
                 }
+            }
+        }
+
+        // Generate back SVG if there's a back page in the design
+        $decodedDesign = json_decode($validated['design'], true);
+        $backPageIndex = is_array($decodedDesign) ? $this->findBackPageIndex($decodedDesign) : null;
+        if ($backPageIndex !== null) {
+            try {
+                $generatedBackSvg = $this->generateSvgFromTemplate($template->id, $designPath, $backPageIndex);
+                if ($generatedBackSvg) {
+                    $template->back_svg_path = $this->persistDataUrl(
+                        $generatedBackSvg,
+                        'templates/svg',
+                        'svg',
+                        $template->back_svg_path,
+                        'generated_back_svg'
+                    );
+                    $template->has_back_design = true;
+                    Log::info('Back SVG generated successfully', [
+                        'path' => $template->back_svg_path,
+                        'page_index' => $backPageIndex
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::warning('Back SVG generation failed', ['page_index' => $backPageIndex, 'error' => $e->getMessage()]);
             }
         }
 
@@ -736,6 +761,7 @@ public function saveCanvas(Request $request, $id)
             'preview_url' => $template->preview ? \App\Support\ImageResolver::url($template->preview) : null,
             'preview_path' => $template->preview,
             'svg_path' => $template->svg_path,
+            'back_svg_path' => $template->back_svg_path,
             'json_path' => $metadata['json_path'] ?? null,
         ]);
     }
@@ -805,7 +831,7 @@ public function saveCanvas(Request $request, $id)
         // Generate and persist SVG from the validated design to ensure synchronization
         // This ensures the SVG file matches the JSON logic even if autosave relied on client-side export
         try {
-            $generatedSvg = $this->generateSvgFromTemplate($template->id, $designPath);
+            $generatedSvg = $this->generateSvgFromTemplate($template->id, $designPath, 0);
             if ($generatedSvg) {
                 $template->svg_path = $this->persistDataUrl(
                     $generatedSvg,
@@ -818,6 +844,34 @@ public function saveCanvas(Request $request, $id)
             }
         } catch (\Exception $e) {
             Log::warning('SVG regeneration failed during saveDesign', ['template_id' => $id, 'error' => $e->getMessage()]);
+        }
+
+        // Generate and persist back SVG if there's a back page in the design
+        $backPageIndex = $this->findBackPageIndex($normalizedDesign);
+        if ($backPageIndex !== null) {
+            try {
+                $generatedBackSvg = $this->generateSvgFromTemplate($template->id, $designPath, $backPageIndex);
+                if ($generatedBackSvg) {
+                    $template->back_svg_path = $this->persistDataUrl(
+                        $generatedBackSvg,
+                        'templates/svg',
+                        'svg',
+                        $template->back_svg_path,
+                        'generated_back_svg'
+                    );
+                    $template->has_back_design = true;
+                    Log::info('Back SVG regenerated during saveDesign', [
+                        'path' => $template->back_svg_path, 
+                        'page_index' => $backPageIndex
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::warning('Back SVG regeneration failed during saveDesign', [
+                    'template_id' => $id, 
+                    'page_index' => $backPageIndex,
+                    'error' => $e->getMessage()
+                ]);
+            }
         }
 
         // Optional back side support (JSON + preview only)
@@ -858,6 +912,8 @@ public function saveCanvas(Request $request, $id)
             'template_id' => $template->id,
             'preview' => $template->preview,
             'preview_back' => $template->preview_back,
+            'svg_path' => $template->svg_path,
+            'back_svg_path' => $template->back_svg_path,
             'json_path' => $metadata['json_path'] ?? null,
             'back_json_path' => $metadata['back_json_path'] ?? null,
         ]);
@@ -1698,6 +1754,9 @@ public function uploadToProduct(Request $request, $id)
         }
 
         $hasBackPreview = $this->previewCollectionHasBack($previews, $previewMeta);
+        
+        // Also check if design has a back page
+        $hasBackDesignPage = $this->designHasBackPage($template);
 
         if ($hasBackPreview) {
             if (array_key_exists('back', $previews)) {
@@ -1733,6 +1792,7 @@ public function uploadToProduct(Request $request, $id)
         }
 
         $template->has_back_design = $hasBackPreview
+            || $hasBackDesignPage
             || $this->isNonEmptyString($template->back_image)
             || $this->isNonEmptyString($template->back_svg_path);
     }
@@ -1999,6 +2059,90 @@ public function uploadToProduct(Request $request, $id)
         }
 
         return false;
+    }
+
+    /**
+     * Check if the template's design JSON contains a back page.
+     */
+    protected function designHasBackPage(Template $template): bool
+    {
+        $design = $template->design;
+        
+        if (is_string($design)) {
+            $design = json_decode($design, true);
+        }
+        
+        if (!is_array($design) || empty($design['pages'])) {
+            return false;
+        }
+        
+        // Check if there are multiple pages (at least 2 implies front + back)
+        if (count($design['pages']) >= 2) {
+            return true;
+        }
+        
+        // Also check if any page has a pageType indicating it's a back page
+        foreach ($design['pages'] as $page) {
+            $pageType = $page['pageType'] ?? null;
+            $metadataPageType = $page['metadata']['pageType'] ?? null;
+            $metadataSide = $page['metadata']['side'] ?? null;
+            
+            if ($this->isBackDescriptor($pageType) 
+                || $this->isBackDescriptor($metadataPageType)
+                || $this->isBackDescriptor($metadataSide)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Find the index of the back page in a design's pages array.
+     * Returns null if no back page found.
+     * 
+     * @param Template|array $designSource Template model or decoded design array
+     * @return int|null Page index for the back page, or null if not found
+     */
+    protected function findBackPageIndex($designSource): ?int
+    {
+        if ($designSource instanceof Template) {
+            $design = $designSource->design;
+            if (is_string($design)) {
+                $design = json_decode($design, true);
+            }
+        } else {
+            $design = $designSource;
+        }
+        
+        if (!is_array($design) || empty($design['pages'])) {
+            return null;
+        }
+        
+        // If exactly 2 pages, assume index 1 is the back page
+        if (count($design['pages']) === 2) {
+            return 1;
+        }
+        
+        // Otherwise, look for a page explicitly marked as back
+        foreach ($design['pages'] as $index => $page) {
+            $pageType = $page['pageType'] ?? null;
+            $metadataPageType = $page['metadata']['pageType'] ?? null;
+            $metadataSide = $page['metadata']['side'] ?? null;
+            
+            if ($this->isBackDescriptor($pageType) 
+                || $this->isBackDescriptor($metadataPageType)
+                || $this->isBackDescriptor($metadataSide)) {
+                return $index;
+            }
+        }
+        
+        // If more than 2 pages but none marked as back, return index 1 as default
+        if (count($design['pages']) > 1) {
+            return 1;
+        }
+        
+        return null;
     }
 
     protected function expandCompressedPayload(Request $request): void
@@ -2307,9 +2451,10 @@ public function uploadToProduct(Request $request, $id)
      * Generate SVG content from design data
      *
      * @param string|array $designData JSON string or array of design data
+     * @param int $pageIndex Page index to generate SVG for (0 = front, 1 = back)
      * @return string|null Base64 encoded data URL of generated SVG or null if generation fails
      */
-    protected function generateSvgFromTemplate($templateId, $jsonPath = null): ?string
+    protected function generateSvgFromTemplate($templateId, $jsonPath = null, int $pageIndex = 0): ?string
     {
         try {
             $template = Template::findOrFail($templateId);
@@ -2323,7 +2468,7 @@ public function uploadToProduct(Request $request, $id)
                     $decoded = json_decode($contents, true);
                     if (is_array($decoded)) {
                         $designData = $decoded;
-                        Log::info('Loaded design data from asset file for SVG generation', ['template_id' => $templateId, 'json_path' => $jsonPath]);
+                        Log::info('Loaded design data from asset file for SVG generation', ['template_id' => $templateId, 'json_path' => $jsonPath, 'page_index' => $pageIndex]);
                     }
                 } catch (\Throwable $e) {
                     Log::warning('Failed to read design JSON from asset file', ['template_id' => $templateId, 'json_path' => $jsonPath, 'error' => $e->getMessage()]);
@@ -2337,11 +2482,11 @@ public function uploadToProduct(Request $request, $id)
                     $decoded = json_decode($design, true);
                     if (is_array($decoded)) {
                         $designData = $decoded;
-                        Log::info('Loaded design data from database for SVG generation', ['template_id' => $templateId]);
+                        Log::info('Loaded design data from database for SVG generation', ['template_id' => $templateId, 'page_index' => $pageIndex]);
                     }
                 } elseif (is_array($design)) {
                     $designData = $design;
-                    Log::info('Loaded design data from database array for SVG generation', ['template_id' => $templateId]);
+                    Log::info('Loaded design data from database array for SVG generation', ['template_id' => $templateId, 'page_index' => $pageIndex]);
                 }
             }
 
@@ -2350,10 +2495,15 @@ public function uploadToProduct(Request $request, $id)
                 return null;
             }
 
-            // Extract pages and layers
+            // Extract pages and layers - use the specified page index
             $page = null;
             if (isset($designData['pages']) && is_array($designData['pages'])) {
-                $page = $designData['pages'][0] ?? null;
+                $page = $designData['pages'][$pageIndex] ?? null;
+            }
+            
+            if (!$page) {
+                Log::warning('Requested page not found for SVG generation', ['template_id' => $templateId, 'page_index' => $pageIndex, 'available_pages' => count($designData['pages'] ?? [])]);
+                return null;
             }
 
             $layers = [];

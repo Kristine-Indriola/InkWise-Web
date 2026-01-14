@@ -238,7 +238,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const data = await response.json();
 
+                // Some server flows return 200 with 'already_paid' to avoid an HTTP error — handle that too
+                if (data && data.already_paid) {
+                    showPaymentMessage('info', data.message || 'This order is already fully paid.');
+                    payButton.disabled = true;
+                    payButton.textContent = 'Paid';
+                    return;
+                }
+
                 if (!response.ok) {
+                    if (response.status === 409) {
+                        // Already fully paid - update UI and avoid further clicks
+                        showPaymentMessage('info', data.message || 'This order is already fully paid.');
+                        payButton.disabled = true;
+                        payButton.textContent = 'Paid';
+                        return;
+                    }
+
                     throw new Error(data.message || 'Unable to start the GCash payment.');
                 }
 
@@ -248,7 +264,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         window.location.href = data.redirect_url;
                     }, 1500);
                 } else {
-                    showPaymentMessage('success', data.message ?? 'GCash payment initialized.');
+                    // Try the Paymongo response structure
+                    const redirectUrl = data?.attributes?.next_action?.redirect?.url;
+                    if (redirectUrl) {
+                        showPaymentMessage('success', 'Redirecting you to GCash to complete the payment...');
+                        setTimeout(() => {
+                            window.location.href = redirectUrl;
+                        }, 1500);
+                    } else {
+                        showPaymentMessage('success', data.message ?? 'GCash payment initialized.');
+                    }
                 }
 
             } catch (err) {

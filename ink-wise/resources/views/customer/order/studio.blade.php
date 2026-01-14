@@ -566,6 +566,28 @@
         <div class="text-field-list" id="textFieldList">
             <!-- fields are generated dynamically from the SVG (or default placeholders shown only when SVG has no text nodes) -->
         </div>
+        <div class="text-layout-controls" style="margin-top:12px; display:flex; gap:10px; align-items:center;">
+            <label style="font-weight:600; margin-right:6px">Layout</label>
+            <select id="textLayoutOrientation" aria-label="Text layout orientation">
+                <option value="horizontal">Horizontal rows</option>
+                <option value="vertical">Vertical columns</option>
+            </select>
+            <label for="textLayoutColumns" style="margin-left:6px">Columns</label>
+            <input id="textLayoutColumns" type="number" min="1" value="1" style="width:64px" aria-label="Number of columns">
+            <label for="textLayoutHAlign" style="margin-left:6px">H Align</label>
+            <select id="textLayoutHAlign" aria-label="Horizontal alignment">
+                <option value="left">Left</option>
+                <option value="center" selected>Center</option>
+                <option value="right">Right</option>
+            </select>
+            <label for="textLayoutVAlign" style="margin-left:6px">V Align</label>
+            <select id="textLayoutVAlign" aria-label="Vertical alignment">
+                <option value="top">Top</option>
+                <option value="middle" selected>Middle</option>
+                <option value="bottom">Bottom</option>
+            </select>
+            <button id="applyTextLayoutBtn" class="btn btn-primary" type="button" style="margin-left:8px">Apply</button>
+        </div>
         <button class="add-field-btn" type="button" data-add-text-field>New Text Field</button>
     </div>
 </div>

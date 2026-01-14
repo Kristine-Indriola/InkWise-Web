@@ -574,6 +574,11 @@
 			color: #1f2937;
 		}
 
+		.material-card--deducted .material-card__type {
+			background: #fee2e2;
+			color: #dc2626;
+		}
+
 		.material-card__title {
 			margin: 0 0 8px;
 			font-size: 18px;
@@ -2405,6 +2410,61 @@
 				@endif
 			</article> 
 
+			@php
+				// Get materials that have been deducted from inventory for this order
+				$deductedMaterials = \App\Models\ProductMaterial::where('order_id', $orderModel->id)
+					->where('source_type', 'custom')
+					->where('quantity_used', '>', 0)
+					->with('material')
+					->get()
+					->map(function ($pm) {
+						return [
+							'material_name' => $pm->material->material_name ?? 'Unknown Material',
+							'quantity_used' => $pm->quantity_used,
+							'unit' => $pm->unit,
+							'material_id' => $pm->material_id,
+						];
+					});
+			@endphp
+
+			@if($deductedMaterials->isNotEmpty())
+				<article class="ordersummary-card">
+					<header class="ordersummary-card__header">
+						<h2>Materials Used & Deducted</h2>
+						<p class="ordersummary-card__meta">{{ $deductedMaterials->count() }} {{ \Illuminate\Support\Str::plural('material', $deductedMaterials->count()) }} deducted from inventory</p>
+						<div class="ordersummary-card__actions">
+							<button type="button" class="btn btn-primary btn-sm" onclick="deductMaterials({{ $orderModel->id }})">
+								<i class="fi fi-rr-minus-circle" aria-hidden="true"></i> Deduct Materials Again
+							</button>
+						</div>
+					</header>
+					<div class="materials-grid">
+						@foreach($deductedMaterials as $material)
+							<div class="material-card material-card--deducted">
+								<span class="material-card__type">Deducted</span>
+								<h3 class="material-card__title">{{ $material['material_name'] }}</h3>
+								<p class="material-card__quantity"><strong>{{ number_format($material['quantity_used'], 2) }}</strong> {{ $material['unit'] }} used</p>
+							</div>
+						@endforeach
+					</div>
+				</article>
+			@else
+				<article class="ordersummary-card">
+					<header class="ordersummary-card__header">
+						<h2>Materials Used & Deducted</h2>
+						<p class="ordersummary-card__meta">No materials have been deducted yet</p>
+						<div class="ordersummary-card__actions">
+							<button type="button" class="btn btn-primary btn-sm" onclick="deductMaterials({{ $orderModel->id }})">
+								<i class="fi fi-rr-minus-circle" aria-hidden="true"></i> Deduct Materials
+							</button>
+						</div>
+					</header>
+					<div style="padding: 20px; text-align: center; color: #6b7280;">
+						<p style="margin: 0; font-size: 16px;">Materials will be deducted from inventory when this order is finalized.</p>
+					</div>
+				</article>
+			@endif
+
 		</section>
 
 		<aside
@@ -3363,5 +3423,47 @@ document.addEventListener('DOMContentLoaded', function () {
 		});
 	});
 })();
+
+// Function to handle material deduction
+function deductMaterials(orderId) {
+	if (!confirm('Are you sure you want to deduct materials from inventory for this order? This action cannot be undone.')) {
+		return;
+	}
+
+	const button = event.target.closest('button');
+	const originalText = button.innerHTML;
+	
+	// Disable button and show loading
+	button.disabled = true;
+	button.innerHTML = '<i class="fi fi-rr-spinner" aria-hidden="true"></i> Processing...';
+
+	fetch(`/ordersummary/${orderId}/deduct-materials`, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+		}
+	})
+	.then(response => response.json())
+	.then(data => {
+		if (data.success) {
+			alert('Materials have been successfully deducted from inventory.');
+			// Reload the page to show updated material usage
+			window.location.reload();
+		} else {
+			alert('Failed to deduct materials: ' + (data.message || 'Unknown error'));
+			// Re-enable button
+			button.disabled = false;
+			button.innerHTML = originalText;
+		}
+	})
+	.catch(error => {
+		console.error('Error:', error);
+		alert('An error occurred while deducting materials. Please try again.');
+		// Re-enable button
+		button.disabled = false;
+		button.innerHTML = originalText;
+	});
+}
 </script>
 @endsection

@@ -3,6 +3,7 @@ export function serializeDesign(state) {
     ? state.pages.map((page) => ({
         id: page.id,
         name: page.name,
+        pageType: page.pageType ?? null,
         width: page.width,
         height: page.height,
         background: page.background,

@@ -1526,8 +1526,7 @@
                 paymentConfig.balance = balance;
                 // Deposit should be computed from the remaining balance (not the full order total)
                 paymentConfig.depositAmount = balance <= 0 ? 0 : Math.min(Math.round(balance * 100 / 2) / 100, balance);
-                // Consider order fully paid only when balance is exactly zero to avoid rounding edge cases
-                paymentConfig.isFullyPaid = paymentConfig.balance <= 0;
+                paymentConfig.isFullyPaid = paymentConfig.balance <= 0.01;
             };
 
             const applyPaymentLocally = (amount, options = {}) => {
@@ -1740,27 +1739,7 @@
                 phone: document.getElementById('phone')?.value?.trim() || undefined,
             });
 
-            const disablePaymentUI = () => {
-                // Disable payment radios and the place order button to prevent further attempts
-                try {
-                    document.querySelectorAll('input[name="paymentMethod"]').forEach((r) => r.disabled = true);
-                } catch (e) { /* ignore */ }
-                if (placeOrderBtn) {
-                    placeOrderBtn.disabled = true;
-                    placeOrderBtn.textContent = 'Paid';
-                }
-                const gcashOptionsEl = document.getElementById('gcashOptions');
-                if (gcashOptionsEl) gcashOptionsEl.style.display = 'none';
-            };
-
             const startGCashPayment = async () => {
-                // If server/state indicates fully paid, avoid attempting any payment
-                if (paymentConfig.isFullyPaid) {
-                    showPaymentMessage('info', 'This order is already fully paid.');
-                    disablePaymentUI();
-                    return { success: false, status: 409 };
-                }
-
                 if (!paymentConfig.createUrl) {
                     showPaymentMessage('error', 'GCash payment endpoint is not configured.');
                     return { success: false };
@@ -1779,18 +1758,15 @@
                 }
 
                 if (!Number.isFinite(amount) || amount <= 0) {
-                    // Nothing to charge — mark as fully paid to prevent further attempts
-                    showPaymentMessage('info', 'This order is already fully paid.');
-                    paymentConfig.isFullyPaid = true;
-                    paymentConfig.balance = 0;
-                    disablePaymentUI();
-                    return { success: false, status: 409 };
+                    showPaymentMessage('error', 'There is no outstanding balance to charge.');
+                    return { success: false };
                 }
 
                 const mode = determineGcashMode();
                 const contact = collectContactDetails();
 
                 try {
+                    console.debug('Starting GCash payment fetch', { paymentConfig, paymentMethod, amount, mode, contact, recordedPaidAmount });
                     const response = await fetch(paymentConfig.createUrl, {
                         method: 'POST',
                         headers: {
@@ -1810,23 +1786,15 @@
 
                     const data = await response.json();
 
-                    // New: some server flows return 200 with an 'already_paid' flag to avoid HTTP errors
-                    if (data && data.already_paid) {
-                        paymentConfig.isFullyPaid = true;
-                        paymentConfig.balance = 0;
-                        disablePaymentUI();
-                        showPaymentMessage('info', data.message || 'This order is already fully paid.');
-                        return { success: false, status: 409, data };
-                    }
-
                     if (!response.ok) {
-                        // Handle fully-paid race condition specifically
-                        if (response.status === 409) {
+                        // Handle conflict when server reports order already paid
+                        if (response.status === 409 && data.message && /already fully paid/i.test(data.message)) {
+                            // Update client-side payment state to reflect fully-paid order
                             paymentConfig.isFullyPaid = true;
                             paymentConfig.balance = 0;
-                            disablePaymentUI();
-                            showPaymentMessage('info', data.message || 'This order is already fully paid.');
-                            return { success: false, status: 409, data };
+                            try { recalcTotals(); } catch (e) { /* ignore if unavailable */ }
+                            showPaymentMessage('info', data.message);
+                            return { success: false, handledConflict: true, data };
                         }
 
                         throw new Error(data.message || 'Unable to start the GCash payment.');
@@ -1890,6 +1858,7 @@
 
                     try {
                         if (selectedPaymentMethod.startsWith('gcash')) {
+                            console.debug('Placing order with GCash payment', { selectedPaymentMethod, finalPaymentMethod, paymentAmount, paymentConfig });
                             const result = await persistFinalStepSelections(finalPaymentMethod, { paymentAmount });
                             if (!result?.success || result?.handledRedirect) {
                                 placeOrderBtn.disabled = false;
@@ -2027,32 +1996,17 @@ function updatePaymentOptions(mode) {
     depositOptions.style.display = 'block';
     fullOptions.style.display = 'block';
 
-    // Helper: select the first enabled radio from a NodeList or selector
-    const selectFirstEnabled = (selector) => {
-        const node = document.querySelector(selector);
-        if (node && !node.disabled) {
-            node.checked = true;
-            return true;
-        }
-        // Try to find any enabled radio in the group fallback
-        const all = document.querySelectorAll('input[name="paymentMethod"]');
-        for (const r of all) {
-            if (!r.disabled) {
-                r.checked = true;
-                console.warn('Preferred payment option unavailable; falling back to', r.value);
-                return true;
-            }
-        }
-        return false;
-    };
-
-    // Pre-select based on mode (but avoid selecting disabled inputs)
+    // Pre-select based on mode
     if (mode === 'full') {
-        const ok = selectFirstEnabled('input[name="paymentMethod"][value="gcash-full"]');
-        if (!ok) selectFirstEnabled('input[name="paymentMethod"][value="gcash-deposit-cod"]');
+        const fullPaymentRadio = document.querySelector('input[name="paymentMethod"][value="gcash-full"]');
+        if (fullPaymentRadio) {
+            fullPaymentRadio.checked = true;
+        }
     } else {
-        const ok = selectFirstEnabled('input[name="paymentMethod"][value="gcash-deposit-cod"]');
-        if (!ok) selectFirstEnabled('input[name="paymentMethod"][value="gcash-full"]');
+        const firstDepositRadio = document.querySelector('input[name="paymentMethod"][value="gcash-deposit-cod"]');
+        if (firstDepositRadio) {
+            firstDepositRadio.checked = true;
+        }
     }
 }
 </script>
