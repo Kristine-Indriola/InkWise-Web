@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import html2canvas from 'html2canvas';
+import { toSvg } from 'html-to-image';
 import { deflate, gzip } from 'pako';
 
 import { useBuilderStore } from '../../state/BuilderStore';
