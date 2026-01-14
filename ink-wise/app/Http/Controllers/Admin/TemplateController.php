@@ -2844,5 +2844,9 @@ public function uploadToProduct(Request $request, $id)
         } catch (ValidationException $e) {
             Log::warning('Dummy SVG save failed', ['error' => $e->getMessage()]);
         }
+);
+        }
+
+        return $decoded;
     }
 }
