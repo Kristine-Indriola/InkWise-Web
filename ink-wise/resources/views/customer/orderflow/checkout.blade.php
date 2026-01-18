@@ -796,14 +796,158 @@
     $subtotal = $order?->subtotal_amount ?? 0;
     $taxAmount = $order?->tax_amount ?? 0;
     $shippingFee = $order?->shipping_fee ?? 0;
-    // Prefer persisted Order values when available (authoritative).
+    $totalAmount = 0;
+    $paidAmountDisplay = 0;
+    $balanceDueDisplay = 0;
+    
+    // Calculate grand total from orderSummary data (same as mycart.blade.php)
+    $grandTotal = 0;
+    if ($orderSummary) {
+        $formatMoney = static fn ($amount) => '₱' . number_format((float) ($amount ?? 0), 2);
+        $invitationSubtotal = (float) data_get($orderSummary, 'subtotalAmount', 0);
+        $extras = (array) data_get($orderSummary, 'extras', []);
+        $envelopeTotal = (float) ($extras['envelope'] ?? 0);
+        $giveawayTotal = (float) ($extras['giveaway'] ?? 0);
+        $paperExtras = (float) ($extras['paper'] ?? 0);
+        $addonsExtra = (float) ($extras['addons'] ?? 0);
+        
+        $extractQty = static function ($line) {
+            return (int) (data_get($line, 'quantity') ?? data_get($line, 'qty') ?? 0);
+        };
+        
+        $extractTotal = static function ($line) {
+            return (float) (
+                data_get($line, 'total')
+                ?? data_get($line, 'totalAmount')
+                ?? data_get($line, 'total_amount')
+                ?? data_get($line, 'total_price')
+                ?? data_get($line, 'price')
+                ?? 0
+            );
+        };
+        
+        $extractPreview = static function ($line) {
+            $candidates = [
+                data_get($line, 'preview'),
+                data_get($line, 'previewImage'),
+                data_get($line, 'invitationImage'),
+                data_get($line, 'previewImages.0'),
+                data_get($line, 'preview_images.0'),
+                data_get($line, 'preview_url'),
+                data_get($line, 'previewUrl'),
+                data_get($line, 'image'),
+                data_get($line, 'image_url'),
+                data_get($line, 'imageUrl'),
+                data_get($line, 'images.0'),
+            ];
+            foreach ($candidates as $c) {
+                if ($c) {
+                    return $c;
+                }
+            }
+            return null;
+        };
+        
+        $invitationItems = collect(data_get($orderSummary, 'items', []))->filter(fn ($item) => is_array($item));
+        if ($invitationItems->isEmpty() && !empty($orderSummary)) {
+            $invitationItems = collect([
+                [
+                    'name' => data_get($orderSummary, 'productName', 'Custom invitation'),
+                    'quantity' => data_get($orderSummary, 'quantity', 0),
+                    'unitPrice' => data_get($orderSummary, 'unitPrice') ?? data_get($orderSummary, 'unit_price') ?? data_get($orderSummary, 'paperStockPrice'),
+                    'paperStockName' => data_get($orderSummary, 'paperStockName') ?? data_get($orderSummary, 'paperStock.name'),
+                    'paperStockPrice' => data_get($orderSummary, 'paperStockPrice') ?? data_get($orderSummary, 'paperStock.price'),
+                    'paperStockId' => data_get($orderSummary, 'paperStockId') ?? data_get($orderSummary, 'paperStock.id'),
+                    'addons' => data_get($orderSummary, 'addons', []),
+                    'addonItems' => data_get($orderSummary, 'addonItems', data_get($orderSummary, 'addons', [])),
+                    'total' => $invitationSubtotal + $paperExtras + $addonsExtra,
+                    'preview' => $extractPreview($orderSummary),
+                    'previewImages' => data_get($orderSummary, 'previewImages', data_get($orderSummary, 'preview_images', [])),
+                    'estimated_date' => data_get($orderSummary, 'estimated_date') ?? data_get($orderSummary, 'dateNeeded'),
+                    'estimated_date_label' => data_get($orderSummary, 'dateNeededLabel') ?? data_get($orderSummary, 'estimated_date_label'),
+                    'is_preorder' => data_get($orderSummary, 'metadata.final_step.is_preorder') ?? false,
+                    'metadata' => data_get($orderSummary, 'metadata', []),
+                ],
+            ]);
+        }
+        
+        $envelopeItems = collect(data_get($orderSummary, 'envelopes', []))->filter(fn ($item) => is_array($item));
+        if ($envelopeItems->isEmpty()) {
+            $rawEnvelope = data_get($orderSummary, 'envelope');
+            if (is_array($rawEnvelope)) {
+                if (function_exists('array_is_list') && array_is_list($rawEnvelope) && !empty($rawEnvelope) && is_array($rawEnvelope[0])) {
+                    $envelopeItems = collect($rawEnvelope)->filter(fn ($item) => is_array($item));
+                } else {
+                    $envelopeItems = collect([$rawEnvelope]);
+                }
+            }
+        }
+        
+        $giveawayItems = collect(data_get($orderSummary, 'giveaways', []))->filter(fn ($item) => is_array($item));
+        if ($giveawayItems->isEmpty()) {
+            $rawGiveaway = data_get($orderSummary, 'giveaway');
+            if (is_array($rawGiveaway)) {
+                if (function_exists('array_is_list') && array_is_list($rawGiveaway) && !empty($rawGiveaway) && is_array($rawGiveaway[0])) {
+                    $giveawayItems = collect($rawGiveaway)->filter(fn ($item) => is_array($item));
+                } else {
+                    $giveawayItems = collect([$rawGiveaway]);
+                }
+            }
+        }
+        
+        $computeInvitationTotal = static function ($item) use ($extractTotal, $extractQty) {
+            $rawTotal = $extractTotal($item);
+            if ($rawTotal > 0) {
+                // Assume rawTotal includes base, subtract it
+                $qty = $extractQty($item);
+                $basePrice = data_get($item, 'unitPrice') ?? 0;
+                return max(0, $rawTotal - ($qty * (float) $basePrice));
+            }
+            
+            $qty = $extractQty($item);
+            $paperPrice = data_get($item, 'paperStockPrice') ?? 0;
+            
+            return max(0, $qty * (float) $paperPrice);
+        };
+        
+        $invitationTotalCalc = $invitationItems->sum(fn ($item) => $computeInvitationTotal($item));
+        if ($invitationTotalCalc <= 0) {
+            $invitationTotalCalc = $paperExtras;
+        }
+        
+        $envelopeTotalCalc = $envelopeItems->sum(fn ($item) => $extractTotal($item));
+        if ($envelopeTotalCalc <= 0) {
+            $envelopeTotalCalc = $envelopeTotal;
+        }
+        
+        $giveawayTotalCalc = $giveawayItems->sum(fn ($item) => $extractTotal($item));
+        if ($giveawayTotalCalc <= 0) {
+            $giveawayTotalCalc = $giveawayTotal;
+        }
+        
+        $grandTotal = $invitationTotalCalc + $envelopeTotalCalc + $giveawayTotalCalc;
+        
+        // Use totalAmount if available (from order summary page)
+        $totalAmountFromSummary = (float) data_get($orderSummary, 'totalAmount', 0);
+        if ($totalAmountFromSummary > 0) {
+            // Exclude the invitation base price
+            $invitationBaseTotal = $invitationItems->sum(fn ($item) => $extractQty($item) * (data_get($item, 'unitPrice') ?? 0));
+            $grandTotal = $totalAmountFromSummary - $invitationBaseTotal;
+        }
+    }
+    
+    // Always use the same calculation as mycart.blade.php for consistency
+    if ($totalAmountFromSummary > 0) {
+        $totalAmount = $grandTotal; // already includes tax and shipping
+    } else {
+        $totalAmount = $grandTotal + $taxAmount + $shippingFee;
+    }
+    
+    // Calculate paid amount consistently
     if ($order) {
-        $totalAmount = (float) ($order->grandTotalAmount() ?? 0);
         // Use model helper to compute total paid (includes applied payments, webhooks, etc.)
         $paidAmountDisplay = round((float) ($order->totalPaid() ?? 0), 2);
     } else {
-        // Fall back to client-provided session summary or inline payment records
-        $totalAmount = (float) (data_get($orderSummary, 'totalAmount') ?? 0);
         $paymentRecordsCollection = collect($paymentRecords ?? []);
         $calculatedPaid = $paidAmount ?? $paymentRecordsCollection
             ->filter(fn ($payment) => ($payment['status'] ?? null) === 'paid')
@@ -815,7 +959,7 @@
     $depositAmountDisplay = round($totalAmount * 0.5, 2);
     $remainingAmountDisplay = round($totalAmount - $depositAmountDisplay, 2);
     $depositSuggested = $depositAmount ?? ($totalAmount ? round($totalAmount / 2, 2) : 0);
-    $balanceDueDisplay = $balanceDue ?? max($totalAmount - $paidAmountDisplay, 0);
+    $balanceDueDisplay = max($totalAmount - $paidAmountDisplay, 0);
     $currentUser = Auth::user();
     $authCustomer = $currentUser?->customer;
     $shippingName = $customerOrder->name ?? trim(($authCustomer?->first_name ?? '') . ' ' . ($authCustomer?->last_name ?? '')) ?: 'Sample Customer';
@@ -930,7 +1074,7 @@
                 @endif
                 <div class="summary-total">
                     <span>Total due</span>
-                    <span id="grandTotal">₱{{ number_format($totalAmount, 2) }}</span>
+                    <span id="grandTotal">₱{{ number_format($balanceDueDisplay, 2) }}</span>
                 </div>
                 @if($isFullyPaid)
                 <p class="note">Order fully paid. Recorded payments total ₱{{ number_format($paidAmountDisplay, 2) }}.</p>
@@ -1045,7 +1189,7 @@
                     <input type="radio" name="paymentMethod" value="gcash-deposit-cod">
                     <div class="option-content">
                         <h3>50% GCash Deposit + Pay on Pickup</h3>
-                        <p>Pay ₱{{ number_format($depositAmountDisplay, 2) }} deposit now via GCash, ₱{{ number_format($remainingAmountDisplay, 2) }} cash on delivery.</p>
+                        <p>Pay ₱{{ number_format($depositAmountDisplay, 2) }} deposit now via GCash, ₱{{ number_format($remainingAmountDisplay, 2) }} cash on Pickup</p>
                         <span class="option-tag">Required Deposit</span>
                     </div>
                 </label>
@@ -1068,9 +1212,9 @@
                 <!-- GCash Full Payment -->
                 <label class="option-card payment-option" data-payment-type="gcash-full">
                     <input type="radio" name="paymentMethod" value="gcash-full">
-                    <div class="option-content">
-                        <h3>Full GCash Payment</h3>
-                        <p>Pay ₱{{ number_format($totalAmount, 2) }} in full now via GCash. No remaining balance to pay later.</p>
+                    <div class="option-content"> 
+                        <h3>Full Payment</h3> 
+                        <p>Pay ₱{{ number_format($balanceDueDisplay, 2) }} now via GCash.</p>
                         <span class="option-tag" style="background: #10b981;">Pay in Full</span>
                     </div>
                 </label>
@@ -1266,11 +1410,17 @@
                     } else if (selectedPayment?.value === 'gcash-split') {
                         const remaining = (paymentConfig.balance ?? Math.max(currentTotal - (recordedPaidAmount ?? 0), 0));
                         const depositAmount = Math.round(remaining * 100 / 2) / 100;
-                        const remainingAmount = Math.max(remaining - depositAmount, 0);
+                        const remainingAmount = Math.max(remaining - depositAmount, 0); 
                         paymentDetails = `
                             <div><strong>50% GCash Deposit + GCash Balance</strong></div>
                             <div>Deposit: ₱${depositAmount.toFixed(2)} (Pay now via GCash)</div>
                             <div>Remaining: ₱${remainingAmount.toFixed(2)} (Pay later via GCash)</div>
+                        `;
+                    } else if (selectedPayment?.value === 'gcash-full') {
+                        const amountToPay = paymentConfig.balance ?? Math.max(currentTotal - (recordedPaidAmount ?? 0), 0);
+                        paymentDetails = `
+                            <div><strong>Full Payment</strong></div>
+                            <div>Amount: ₱${amountToPay.toFixed(2)} (Pay now via GCash)</div>
                         `;
                     }
 
@@ -1660,53 +1810,18 @@
                     }
 
                     case 'gcash-full': {
-                        // Show full breakdown including subtotal, shipping, tax, total, recorded payments and effective additional charge
-                        const subtotalVal = Number(subtotal || 0);
-                        const shippingVal = Number(baseShipping || 0);
-                        const taxVal = Number(currentTax || 0);
-                        const totalOrder = Number(currentTotal || 0);
-                        const alreadyPaid = Number(recordedPaidAmount || 0);
-                        const remaining = Math.max(totalOrder - alreadyPaid, 0);
-                        const chargeNow = Number(totalOrder);
-                        const effectiveExtra = Math.max(chargeNow - alreadyPaid, 0);
+                        // Show simple breakdown for full payment - just the amount being charged
+                        const remaining = Math.max(currentTotal - (recordedPaidAmount ?? 0), 0);
+                        const chargeNow = remaining;
 
                         summaryDiv.style.display = 'block';
                         breakdownHTML = `
                             <div class="payment-breakdown-item">
-                                <span>Subtotal</span>
-                                <span>₱${priceFormatter.format(subtotalVal).replace(/^\D+/, '') ? priceFormatter.format(subtotalVal) : '₱0.00'}</span>
+                                <span>Full Payment Amount</span>
+                                <span class="payment-amount now">₱${chargeNow.toFixed(2)}</span>
                             </div>
                             <div class="payment-breakdown-item">
-                                <span>Shipping</span>
-                                <span>${shippingVal === 0 ? 'Free' : priceFormatter.format(shippingVal)}</span>
-                            </div>
-                            <div class="payment-breakdown-item">
-                                <span>Tax</span>
-                                <span>${priceFormatter.format(taxVal)}</span>
-                            </div>
-                            <div class="payment-breakdown-item">
-                                <span>Total order</span>
-                                <span class="payment-amount">${priceFormatter.format(totalOrder)}</span>
-                            </div>
-                            <div class="payment-breakdown-item">
-                                <span>Recorded payments</span>
-                                <span class="payment-amount later">${priceFormatter.format(alreadyPaid)}</span>
-                            </div>
-                            <div class="payment-breakdown-item">
-                                <span>Remaining balance</span>
-                                <span class="payment-amount later">${priceFormatter.format(remaining)}</span>
-                            </div>
-                            <div class="payment-breakdown-item">
-                                <span>Charge now (Full)</span>
-                                <span class="payment-amount now">${priceFormatter.format(chargeNow)}</span>
-                            </div>
-                            <div class="payment-breakdown-item">
-                                <span class="payment-timing">Effective additional charge</span>
-                                <span>${priceFormatter.format(effectiveExtra)}</span>
-                            </div>
-                            <div class="payment-breakdown-item">
-                                <span class="payment-timing">Note</span>
-                                <span>Selecting Full Payment charges the full order total now. Previously recorded payments will remain recorded; effective additional charge is shown above.</span>
+                                <span class="payment-timing">Pay remaining balance in full</span>
                             </div>
                         `;
                         break;
@@ -1861,8 +1976,8 @@
                 if (paymentMethod === 'gcash-deposit-cod' || paymentMethod === 'gcash-split') {
                     amount = Math.round(remaining * 100 / 2) / 100; // Always 50% of remaining balance
                 } else if (paymentMethod === 'gcash-full') {
-                    // Charge the full order total when user selects Full Payment
-                    amount = Number(currentTotal);
+                    // Charge the remaining balance when user selects Full Payment
+                    amount = remaining;
                 } else {
                     amount = Number(paymentConfig.depositAmount > 0 ? paymentConfig.depositAmount : paymentConfig.balance);
                 }
@@ -1984,6 +2099,9 @@
                     } else if (selectedPaymentMethod === 'gcash-split') {
                         paymentAmount = Math.round(remainingOutstanding * 100 / 2) / 100; // 50% of remaining
                         finalPaymentMethod = 'gcash_split';
+                    } else if (selectedPaymentMethod === 'gcash-full') {
+                        paymentAmount = Math.round(remainingOutstanding * 100) / 100; // Full remaining amount
+                        finalPaymentMethod = 'gcash_full';
                     }
 
                     placeOrderBtn.disabled = true;

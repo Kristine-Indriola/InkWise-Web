@@ -232,7 +232,7 @@
     'draft' => 'New Order',
     'pending' => 'Order Received',
     'processing' => 'Processing',
-    'in_production' => 'In Progress',
+    'in_production' => 'In Production',
     'confirmed' => 'Ready for Pickup',
     'completed' => 'Completed',
     'cancelled' => 'Cancelled',

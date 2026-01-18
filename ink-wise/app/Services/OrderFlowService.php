@@ -1878,6 +1878,7 @@ class OrderFlowService
             'id' => $payload['envelope_id'] ?? $envelopeMeta['id'] ?? null,
             'product_id' => $payload['product_id'] ?? $resolvedEnvelope?->product_id,
             'name' => $envelopeMeta['name'] ?? null,
+            'unit_price' => $unitPrice,
             'price' => $unitPrice,
             'qty' => $quantity,
             'total' => (float) $total,
@@ -1890,7 +1891,28 @@ class OrderFlowService
             'updated_at' => now()->toIso8601String(),
         ], fn ($value) => $value !== null && $value !== '');
 
-        $meta['envelope'] = $envelopeMeta;
+        // Support multiple envelope selections; keep legacy single "envelope" for backward compatibility
+        $envelopes = $meta['envelopes'] ?? [];
+        if (empty($envelopes) && !empty($meta['envelope'])) {
+            $envelopes[] = $meta['envelope'];
+        }
+
+        // Replace existing entry by id or append
+        $existingIndex = null;
+        foreach ($envelopes as $idx => $envelopeRow) {
+            if (($envelopeRow['id'] ?? null) === ($envelopeMeta['id'] ?? null)) {
+                $existingIndex = $idx;
+                break;
+            }
+        }
+        if ($existingIndex !== null) {
+            $envelopes[$existingIndex] = $envelopeMeta;
+        } else {
+            $envelopes[] = $envelopeMeta;
+        }
+
+        $meta['envelopes'] = array_values($envelopes);
+        $meta['envelope'] = $meta['envelopes'][0] ?? $envelopeMeta; // legacy consumers
         $order->update(['metadata' => $meta]);
 
         $this->upsertEnvelopeOrderItem($order, $envelopeMeta);
@@ -2009,7 +2031,7 @@ class OrderFlowService
     public function clearEnvelopeSelection(Order $order): Order
     {
         $meta = $order->metadata ?? [];
-        unset($meta['envelope']);
+        unset($meta['envelope'], $meta['envelopes']);
 
         $order->update(['metadata' => $meta]);
 
@@ -2266,45 +2288,48 @@ class OrderFlowService
         foreach ($order->items as $item) {
             $productMaterialUsageFound = false;
             if ($item->product_id) {
-                $productMaterials = ProductMaterial::query()
-                    ->with(['material.inventory'])
-                    ->where('product_id', $item->product_id)
-                    ->whereNull('order_id')
-                    ->get();
+                // Skip ProductMaterial processing for invitations - they should only use selected paper stock
+                if ($item->line_type !== OrderItem::LINE_TYPE_INVITATION) {
+                    $productMaterials = ProductMaterial::query()
+                        ->with(['material.inventory'])
+                        ->where('product_id', $item->product_id)
+                        ->whereNull('order_id')
+                        ->get();
 
-                foreach ($productMaterials as $productMaterial) {
-                    $perUnitQty = (float) ($productMaterial->qty ?? 0);
-                    if ($perUnitQty <= 0) {
-                        continue;
+                    foreach ($productMaterials as $productMaterial) {
+                        $perUnitQty = (float) ($productMaterial->qty ?? 0);
+                        if ($perUnitQty <= 0) {
+                            continue;
+                        }
+
+                        $linkedMaterial = $productMaterial->material;
+
+                        if (!$linkedMaterial && $productMaterial->material_id) {
+                            $linkedMaterial = $materialCache[$productMaterial->material_id] ??=
+                                Material::query()->with('inventory')->find($productMaterial->material_id);
+                        }
+
+                        if (!$linkedMaterial && $productMaterial->item) {
+                            $linkedMaterial = $resolveMaterialByName($productMaterial->item);
+                        }
+
+                        if (!$linkedMaterial) {
+                            continue;
+                        }
+
+                        $accumulateMaterial($item, $linkedMaterial, $perUnitQty, [
+                            'product_material_id' => $productMaterial->id,
+                            'source' => 'product_material',
+                            'quantity_mode' => match ($productMaterial->quantity_mode) {
+                                'per_order' => 'per_order',
+                                default => 'per_unit',
+                            },
+                            'item' => $productMaterial->item,
+                            'type' => $productMaterial->type,
+                        ]);
+
+                        $productMaterialUsageFound = true;
                     }
-
-                    $linkedMaterial = $productMaterial->material;
-
-                    if (!$linkedMaterial && $productMaterial->material_id) {
-                        $linkedMaterial = $materialCache[$productMaterial->material_id] ??=
-                            Material::query()->with('inventory')->find($productMaterial->material_id);
-                    }
-
-                    if (!$linkedMaterial && $productMaterial->item) {
-                        $linkedMaterial = $resolveMaterialByName($productMaterial->item);
-                    }
-
-                    if (!$linkedMaterial) {
-                        continue;
-                    }
-
-                    $accumulateMaterial($item, $linkedMaterial, $perUnitQty, [
-                        'product_material_id' => $productMaterial->id,
-                        'source' => 'product_material',
-                        'quantity_mode' => match ($productMaterial->quantity_mode) {
-                            'per_order' => 'per_order',
-                            default => 'per_unit',
-                        },
-                        'item' => $productMaterial->item,
-                        'type' => $productMaterial->type,
-                    ]);
-
-                    $productMaterialUsageFound = true;
                 }
             }
 
@@ -2420,10 +2445,25 @@ class OrderFlowService
                     }
 
                     if ($paperMaterial) {
-                        $accumulateMaterial($item, $paperMaterial, 1.0, [
-                        'paper_stock_id' => $paperStock->id,
-                        'source' => 'paper_stock',
-                    ]);
+                        // Check if this material has already been processed through ProductMaterial records
+                        // to avoid double counting when fallback paper stock matches existing product materials
+                        // Skip this check for invitations since they don't use ProductMaterial records
+                        $materialAlreadyProcessed = false;
+                        if ($item->line_type !== OrderItem::LINE_TYPE_INVITATION && $item->product_id) {
+                            $existingProductMaterials = ProductMaterial::query()
+                                ->where('product_id', $item->product_id)
+                                ->whereNull('order_id')
+                                ->where('material_id', $paperMaterial->getKey())
+                                ->exists();
+                            $materialAlreadyProcessed = $existingProductMaterials;
+                        }
+
+                        if (!$materialAlreadyProcessed) {
+                            $accumulateMaterial($item, $paperMaterial, 1.0, [
+                                'paper_stock_id' => $paperStock->id,
+                                'source' => 'paper_stock',
+                            ]);
+                        }
                     }
                 }
             }
@@ -3261,7 +3301,7 @@ class OrderFlowService
 
     public function buildSummary(Order $order): array
     {
-        $order->loadMissing(['items.addons', 'items.paperStockSelection']);
+        $order->loadMissing(['items.addons', 'items.paperStockSelection', 'items.product']);
 
         $invitationItem = $this->primaryInvitationItem($order);
         if (!$invitationItem) {
@@ -3269,9 +3309,13 @@ class OrderFlowService
         }
 
         $summary = [
+            'productId' => $invitationItem->product_id,
+            'productName' => $invitationItem->product_name ?? $invitationItem->product?->name,
             'quantity' => $invitationItem->quantity,
             'unitPrice' => $invitationItem->unit_price,
             'paperStockId' => $invitationItem->paperStockSelection?->paper_stock_id,
+            'paperStockName' => $invitationItem->paperStockSelection?->paper_stock_name,
+            'paperStockPrice' => $invitationItem->paperStockSelection?->price,
             'addonIds' => $invitationItem->addons?->pluck('size_id')->toArray() ?? [],
             'metadata' => $order->metadata ?? [],
             'subtotalAmount' => $order->subtotal_amount,
@@ -3279,6 +3323,16 @@ class OrderFlowService
             'taxAmount' => $order->tax_amount,
             'shippingFee' => 0.0,
         ];
+
+        // Extract envelopes from metadata
+        $metadata = $order->metadata ?? [];
+        $summary['envelopes'] = [];
+        if (!empty($metadata['envelopes']) && is_array($metadata['envelopes'])) {
+            $summary['envelopes'] = $metadata['envelopes'];
+        } elseif (!empty($metadata['envelope']) && is_array($metadata['envelope'])) {
+            $summary['envelopes'] = [$metadata['envelope']];
+        }
+        $summary['envelope'] = $summary['envelopes'][0] ?? null; // legacy consumers
 
         return $summary;
     }

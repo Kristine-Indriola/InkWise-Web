@@ -111,46 +111,6 @@
 			border-top-color: #e2e8f0;
 		}
 
-		/* Base Price Section Styling */
-		.base-price-section {
-			padding: 2rem 0;
-			background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-			border-bottom: 1px solid #e2e8f0;
-		}
-
-		.base-price-card {
-			max-width: 1200px;
-			margin: 0 auto;
-			padding: 0 1rem;
-		}
-
-		.base-price-content {
-			background: rgba(255, 255, 255, 0.95);
-			backdrop-filter: blur(10px);
-			border: 1px solid rgba(15, 23, 42, 0.08);
-			border-radius: 1rem;
-			padding: 2rem;
-			box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
-		}
-
-		.base-price-header {
-			display: flex;
-			align-items: center;
-			justify-content: space-between;
-			margin-bottom: 1.5rem;
-		}
-
-		.base-price-header h2 {
-			font-size: 1.5rem;
-			font-weight: 600;
-			color: #0f172a;
-			margin: 0;
-		}
-
-		.base-price-amount {
-			text-align: right;
-		}
-
 		.price-label {
 			display: block;
 			font-size: 0.875rem;
@@ -163,16 +123,6 @@
 			font-size: 2rem;
 			font-weight: 700;
 			color: #0f172a;
-		}
-
-		.base-price-notice {
-			display: flex;
-			align-items: flex-start;
-			gap: 1rem;
-			padding: 1.5rem;
-			background: #fef3c7;
-			border: 1px solid #f59e0b;
-			border-radius: 0.75rem;
 		}
 
 		.notice-icon {
@@ -200,30 +150,6 @@
 			line-height: 1.5;
 		}
 
-		@media (max-width: 768px) {
-			.base-price-header {
-				flex-direction: column;
-				align-items: flex-start;
-				gap: 1rem;
-			}
-
-			.base-price-amount {
-				text-align: left;
-			}
-
-			.price-value {
-				font-size: 1.75rem;
-			}
-
-			.base-price-notice {
-				flex-direction: column;
-				text-align: center;
-			}
-
-			.notice-icon {
-				align-self: center;
-			}
-		}
 	</style>
 	<script src="<?php echo e(asset('js/customer/orderflow-finalstep.js')); ?>" defer></script>
 	<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
@@ -251,7 +177,6 @@
 	$uploads = $product->uploads ?? collect();
 	$images = $product->product_images ?? $product->images ?? optional($proof)->images ?? null;
 	$templateRef = $product->template ?? ($templateRef ?? optional($proof)->template ?? null);
-	$basePricePerPiece = $templateRef ? ($templateRef->price ?? 5.00) : 5.00;
 
 	$frontImage = $finalArtwork['front'] ?? ($finalArtworkFront ?? null);
 	$backImage = $finalArtwork['back'] ?? ($finalArtworkBack ?? null);
@@ -523,7 +448,6 @@
 									<span id="priceDisplay" class="meta-value"><?php echo e($formatMoney($itemTotal ?? 0)); ?></span>
 								</div>
 							</div>
-							<p class="text-slate-600 text-sm">Base price: <?php echo e($formatMoney($basePricePerPiece)); ?> per piece</p>
 							<div id="quantityError" class="error-message" style="display: none;">Quantity must be at least <?php echo e($minQty); ?></div>
 							<p class="bulk-note"><?php echo e($quantityNote); ?></p>
 						</div>
