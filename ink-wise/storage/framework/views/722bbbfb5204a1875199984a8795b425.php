@@ -225,16 +225,12 @@
 
     $grandTotal = $invitationTotalCalc + $envelopeTotalCalc + $giveawayTotalCalc;
 
-    // Use the totalAmount from session summary if available (should be the authoritative source from database)
-    $sessionTotalAmount = (float) data_get($orderSummary, 'totalAmount', 0);
-    if ($sessionTotalAmount > 0) {
-        $grandTotal = $sessionTotalAmount;
-    }
+    // Always use the calculated total from items for accuracy
+    // Removed overrides with sessionTotalAmount and order->grandTotalAmount() to ensure consistency
 
-    // For persisted orders, use the order's grandTotalAmount to ensure consistency with payment calculations
-    if ($order) {
-        $grandTotal = $order->grandTotalAmount();
-    }
+    // Calculate the amount to be paid (remaining balance)
+    $paidAmount = $order ? round($order->totalPaid(), 2) : 0;
+    $amountToPay = max($grandTotal - $paidAmount, 0);
 ?>
 
     <?php echo $__env->make('partials.topbar', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
@@ -354,9 +350,7 @@
             </div>
             <div class="flex gap-3">
                      <a href="<?php echo e($finalStepUrl); ?>" class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-300">Edit design</a>
-                     <a id="checkout-top"
-                         href="<?php echo e($checkoutPaymentUrl); ?>"
-                         class="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 hover:bg-slate-800">Proceed to checkout</a>
+
             </div>
         </header>
 
@@ -805,25 +799,27 @@
                                     <dd class="font-medium text-slate-900"><?php echo e($formatMoney($addonsExtra)); ?></dd>
                                 </div>
                             <?php endif; ?>
+                            <?php if($paidAmount > 0): ?>
+                                <div class="flex items-center justify-between">
+                                    <dt class="text-slate-600">Amount Paid</dt>
+                                    <dd class="font-medium text-slate-900"><?php echo e($formatMoney($paidAmount)); ?></dd>
+                                </div>
+                            <?php endif; ?>
                             <div class="mt-4 flex items-center justify-between text-base font-semibold">
                                 <dt class="text-slate-900">Total amount</dt> 
-                                <dd class="text-slate-900" id="summary-grand-total"><?php echo e($formatMoney($grandTotal)); ?></dd>
+                                <dd class="text-slate-900" id="summary-grand-total" data-paid-amount="<?php echo e($paidAmount); ?>"><?php echo e($formatMoney($grandTotal)); ?></dd>
                             </div>
+                            <?php if($paidAmount > 0): ?>
+                                <div class="flex items-center justify-between text-sm">
+                                    <dt class="text-slate-600">Amount Due</dt>
+                                    <dd class="font-medium text-slate-900" data-amount-due><?php echo e($formatMoney($amountToPay)); ?></dd>
+                                </div>
+                            <?php endif; ?>
                         </dl>
                                 <a id="checkout-summary"
                                     href="<?php echo e($checkoutPaymentUrl); ?>"
                                     class="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 hover:bg-slate-800">Checkout now</a>
                                 <p id="qty-warning" class="mt-3 text-sm text-rose-600 hidden">Minimum quantity per item is 10.</p>
-                    </div>
-
-                    <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-                        <p class="font-semibold text-slate-900">Need to start over?</p>
-                        <p class="mt-1">Clearing your order removes every selection from this summary.</p>
-                        <form method="POST" action="<?php echo e($summaryClearUrl); ?>" class="mt-3">
-                            <?php echo csrf_field(); ?>
-                            <?php echo method_field('DELETE'); ?>
-                            <button type="submit" class="text-rose-600 hover:text-rose-700 font-medium">Clear entire order</button>
-                        </form>
                     </div>
                 </aside>
             </div>
@@ -1100,8 +1096,16 @@
                     if (summaryGive) summaryGive.textContent = formatMoney(giveawayTotal);
 
                     const grand = invitationTotal + envelopeTotal + giveawayTotal + shipping + tax;
+                    const paidAmount = parseFloat(summaryGrand?.dataset?.paidAmount || 0);
+                    const adjustedGrand = grand - paidAmount;
                     if (summaryGrand) {
-                        summaryGrand.textContent = formatMoney(grand);
+                        summaryGrand.textContent = formatMoney(grand); // Show full total
+                    }
+
+                    // Update Amount Due if it exists
+                    const amountDueEl = document.querySelector('dd[data-amount-due]');
+                    if (amountDueEl) {
+                        amountDueEl.textContent = formatMoney(adjustedGrand);
                     }
 
                     setCheckoutEnabled(!hasInvalidQty);

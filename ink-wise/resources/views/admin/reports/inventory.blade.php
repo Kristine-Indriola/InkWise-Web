@@ -717,6 +717,11 @@
 		$stockOut = $hasMovementData ? abs($movements->whereIn('movement_type', ['usage', 'used', 'issued', 'sold'])->sum('quantity')) : 0;
 		$adjustments = $hasMovementData ? $movements->where('movement_type', 'adjustment')->sum('quantity') : 0;
 
+		// Get last movement date
+		$lastMovementDate = $hasMovementData && $movements->isNotEmpty()
+			? $movements->sortByDesc('created_at')->first()->created_at?->format('M d, Y')
+			: null;
+
 		// Calculate beginning stock (current stock - movements in period)
 		$beginningStock = $hasMovementData
 			? $stockLevel - $stockIn + $stockOut - $adjustments
@@ -792,6 +797,7 @@
 			'ending_stock' => $stockLevel,
 			'movement_category' => $movementCategory,
 			'movement_tracked' => $hasMovementData,
+			'last_movement_date' => $lastMovementDate,
 		];
 	};
 
@@ -1191,6 +1197,7 @@
 							<th scope="col" class="text-center">Ending Stock</th>
 							<th scope="col" class="text-end">Unit Cost</th>
 							<th scope="col" class="text-end">Total Value</th>
+							<th scope="col">Last Movement</th>
 							<th scope="col">Status</th>
 						</tr>
 					</thead>
@@ -1233,11 +1240,12 @@
 							<td class="text-center">{{ $endingDisplay }}</td>
 							<td class="text-end">₱{{ number_format($snapshot['unit_cost'], 2) }}</td>
 							<td class="text-end">₱{{ number_format($snapshot['stock_value'], 2) }}</td>
+							<td class="text-center">{{ $snapshot['last_movement_date'] ?? 'N/A' }}</td>
 							<td><span class="{{ $statusClass }}">{{ $snapshot['status'] }}</span></td>
 						</tr>
 					@empty
 						<tr>
-							<td colspan="11" class="text-center">No inventory items found.</td>
+							<td colspan="12" class="text-center">No inventory items found.</td>
 						</tr>
 					@endforelse
 					</tbody>

@@ -870,12 +870,30 @@
 			return $bcarry;
 		}, 0);
 
+		// Check if this is an invitation (not envelope or giveaway)
+		$ptype = strtolower((string) data_get($it, 'product_type', ''));
+		$iname = strtolower((string) data_get($it, 'name', ''));
+		$ltype = strtolower((string) data_get($it, 'line_type', ''));
+		$isEnvelope = str_contains($ptype, 'envelope') || str_contains($iname, 'envelope');
+		$isGiveaway = $ltype === 'giveaway' || str_contains($ptype, 'giveaway') || str_contains($iname, 'giveaway') || str_contains($iname, 'freebie');
+		$isInvitation = !$isEnvelope && !$isGiveaway;
+
 		if ($breakSum > 0) {
 			// If breakdown provides totals, use that as this item's subtotal
 			return $carry + $breakSum;
 		}
 
-		// fallback to explicit item total or computed quantity * unit price
+		// For invitations, do not include the template price (unit_price)
+		if ($isInvitation) {
+			// Only use explicit item total if present, otherwise 0
+			$itemTotal = data_get($it, 'total');
+			if (is_numeric($itemTotal)) {
+				return $carry + (float) $itemTotal;
+			}
+			return $carry; // Exclude template price
+		}
+
+		// fallback to explicit item total or computed quantity * unit price for non-invitations
 		$itemTotal = data_get($it, 'total');
 		if (is_numeric($itemTotal)) {
 			return $carry + (float) $itemTotal;
@@ -1465,8 +1483,41 @@
 								@foreach($items as $item)
 									@php
 										$quantity = (int) data_get($item, 'quantity', 1);
+										
+										// Check if this is an invitation (not envelope or giveaway)
+										$ptype = strtolower((string) data_get($item, 'product_type', ''));
+										$iname = strtolower((string) data_get($item, 'name', ''));
+										$ltype = strtolower((string) data_get($item, 'line_type', ''));
+										$isEnvelope = str_contains($ptype, 'envelope') || str_contains($iname, 'envelope');
+										$isGiveaway = $ltype === 'giveaway' || str_contains($ptype, 'giveaway') || str_contains($iname, 'giveaway') || str_contains($iname, 'freebie');
+										$isInvitation = !$isEnvelope && !$isGiveaway;
+										
 										$unitPrice = (float) data_get($item, 'unit_price', data_get($item, 'price', 0));
-										$lineTotal = (float) data_get($item, 'total', data_get($item, 'subtotal', $quantity * $unitPrice));
+										
+										// For invitations, exclude template price from unit price
+										if ($isInvitation) {
+											$unitPrice = 0.0;
+										}
+										
+										// Calculate breakdown sum for this item
+										$breakdown = collect(data_get($item, 'breakdown', []));
+										$breakdownSum = $breakdown->reduce(function ($carry, $row) {
+											$rowQty = data_get($row, 'quantity');
+											$rowTotal = data_get($row, 'total', data_get($row, 'unit_price'));
+											if (is_numeric($rowTotal)) {
+												$mult = ($rowQty !== null && is_numeric($rowQty)) ? (int) $rowQty : 1;
+												return $carry + ((float) $rowTotal * $mult);
+											}
+											return $carry;
+										}, 0);
+										
+										// For invitations, exclude template price - only use breakdown sum
+										if ($isInvitation) {
+											$lineTotal = $breakdownSum;
+										} else {
+											$lineTotal = (float) data_get($item, 'total', data_get($item, 'subtotal', $quantity * $unitPrice));
+										}
+										
 										// fallback: some giveaway items store their computed total in design_metadata or item metadata
 										if (empty($lineTotal) || $lineTotal === 0.0) {
 											$lineTotal = (float) data_get($item, 'design_metadata.total', data_get($item, 'metadata.giveaway.total', data_get($item, 'metadata.giveaway.price', data_get($item, 'metadata.total', 0))));
@@ -1728,8 +1779,10 @@
 												
 												if ($customerReview && !empty($customerReview->design_svg)) {
 													$customerReviewSvg = $customerReview->design_svg;
-													// Try to get back image from gallery
-													if (!empty($imagesSource) && count($imagesSource) > 1) {
+													// Try to get back image from saved design_back_svg first, then fallback to gallery
+													if (!empty($customerReview->design_back_svg)) {
+														$customerReviewBackImage = $customerReview->design_back_svg;
+													} elseif (!empty($imagesSource) && count($imagesSource) > 1) {
 														$backImg = $imagesSource[1] ?? null;
 														if (is_array($backImg)) {
 															$customerReviewBackImage = $backImg['src'] ?? $backImg['url'] ?? null;
@@ -1737,6 +1790,24 @@
 															$customerReviewBackImage = $backImg;
 														}
 													}
+												}
+
+												// Get original template for back-to-back comparison
+												$originalTemplate = null;
+												$originalTemplateSvg = null;
+												$originalTemplateBackSvg = null;
+												try {
+													$originalTemplate = \App\Models\Template::find($templateId);
+													if ($originalTemplate) {
+														if ($originalTemplate->svg_path && \Storage::disk('public')->exists($originalTemplate->svg_path)) {
+															$originalTemplateSvg = \Storage::disk('public')->get($originalTemplate->svg_path);
+														}
+														if ($originalTemplate->back_svg_path && \Storage::disk('public')->exists($originalTemplate->back_svg_path)) {
+															$originalTemplateBackSvg = \Storage::disk('public')->get($originalTemplate->back_svg_path);
+														}
+													}
+												} catch (\Throwable $e) {
+													// Ignore errors when loading original template
 												}
 											}
 										} catch (\Throwable $e) {
@@ -2099,25 +2170,52 @@
 														<img src="{{ $primaryImageUrl }}" alt="{{ $primaryImageLabel ? $previewTitle . ' ' . strtolower($primaryImageLabel) : $previewTitle . ' preview' }}" class="item-cell__thumb">
 													</button>
 												@endif
-												@if(!empty($customerReviewSvg))
+												@if(!empty($customerReviewSvg) || !empty($originalTemplateSvg))
 													<div class="mt-2">
-														<div class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Edited Template</div>
-														<button
-															type="button"
-															class="item-cell__svg-button js-admin-svg-preview-trigger"
-															data-svg-content="{{ base64_encode($customerReviewSvg) }}"
-															data-back-image="{{ $customerReviewBackImage ?? '' }}"
-															data-preview-title="{{ $previewTitle }} - Edited Design"
-															aria-label="View edited template design for {{ $previewTitle }}"
-															style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 4px; background: #f8fafc; cursor: pointer; display: inline-block; transition: all 0.2s;"
-															onmouseover="this.style.boxShadow='0 0 0 2px #a6b7ff'"
-															onmouseout="this.style.boxShadow='none'"
-														>
-															<div class="svg-thumb-container" style="width: 60px; height: 60px; overflow: hidden; pointer-events: none;">
-																{!! $customerReviewSvg !!}
-															</div>
-														</button>
-														<div class="text-xs text-gray-400 mt-1">Click to view front & back</div>
+														<div class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Template Comparison</div>
+														<div class="flex gap-2">
+															@if(!empty($originalTemplateSvg))
+																<div class="flex flex-col items-center">
+																	<div class="text-xs text-gray-500 mb-1">Original</div>
+																	<button
+																		type="button"
+																		class="item-cell__svg-button js-admin-svg-preview-trigger"
+																		data-svg-content="{{ base64_encode($originalTemplateSvg) }}"
+																		data-back-image="{{ !empty($originalTemplateBackSvg) ? base64_encode($originalTemplateBackSvg) : '' }}"
+																		data-preview-title="{{ $previewTitle }} - Original Template"
+																		aria-label="View original template design for {{ $previewTitle }}"
+																		style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 4px; background: #f8fafc; cursor: pointer; display: inline-block; transition: all 0.2s;"
+																		onmouseover="this.style.boxShadow='0 0 0 2px #a6b7ff'"
+																		onmouseout="this.style.boxShadow='none'"
+																	>
+																		<div class="svg-thumb-container" style="width: 60px; height: 60px; overflow: hidden; pointer-events: none;">
+																			{!! $originalTemplateSvg !!}
+																		</div>
+																	</button>
+																</div>
+															@endif
+															@if(!empty($customerReviewSvg))
+																<div class="flex flex-col items-center">
+																	<div class="text-xs text-gray-500 mb-1">Edited</div>
+																	<button
+																		type="button"
+																		class="item-cell__svg-button js-admin-svg-preview-trigger"
+																		data-svg-content="{{ base64_encode($customerReviewSvg) }}"
+																		data-back-image="{{ !empty($customerReviewBackImage) && str_contains($customerReviewBackImage, '<svg') ? base64_encode($customerReviewBackImage) : ($customerReviewBackImage ?? '') }}"
+																		data-preview-title="{{ $previewTitle }} - Edited Design"
+																		aria-label="View edited template design for {{ $previewTitle }}"
+																		style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 4px; background: #f8fafc; cursor: pointer; display: inline-block; transition: all 0.2s;"
+																		onmouseover="this.style.boxShadow='0 0 0 2px #a6b7ff'"
+																		onmouseout="this.style.boxShadow='none'"
+																	>
+																		<div class="svg-thumb-container" style="width: 60px; height: 60px; overflow: hidden; pointer-events: none;">
+																			{!! $customerReviewSvg !!}
+																		</div>
+																	</button>
+																</div>
+															@endif
+														</div>
+														<div class="text-xs text-gray-400 mt-1">Click to view front & back designs</div>
 													</div>
 												@endif
 												<div>
