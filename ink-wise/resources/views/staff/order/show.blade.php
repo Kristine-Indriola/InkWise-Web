@@ -1163,6 +1163,7 @@
 	if ($orderGrandTotal <= 0 && $grandTotal > 0) {
 		$orderGrandTotal = (float) $grandTotal;
 	}
+	
 	$metadataRaw = data_get($order, 'metadata');
 	if (is_string($metadataRaw) && $metadataRaw !== '') {
 		$decodedMetadata = json_decode($metadataRaw, true);
@@ -1398,6 +1399,7 @@
 								<tr>
 									<th scope="col">Item</th>
 									<th scope="col">Options</th>
+									<th scope="col">Paper Stock Material</th>
 									<th scope="col" class="text-center">Qty</th>
 									<th scope="col" class="text-end">Unit price</th>
 									<th scope="col" class="text-end">Line total</th>
@@ -1407,8 +1409,36 @@
 								@foreach($items as $item)
 									@php
 										$quantity = (int) data_get($item, 'quantity', 1);
+										
+										// Check if this is an invitation (not envelope or giveaway)
+										$ptype = strtolower((string) data_get($item, 'product_type', ''));
+										$iname = strtolower((string) data_get($item, 'name', ''));
+										$ltype = strtolower((string) data_get($item, 'line_type', ''));
+										$isEnvelope = str_contains($ptype, 'envelope') || str_contains($iname, 'envelope');
+										$isGiveaway = $ltype === 'giveaway' || str_contains($ptype, 'giveaway') || str_contains($iname, 'giveaway') || str_contains($iname, 'freebie');
+										$isInvitation = !$isEnvelope && !$isGiveaway;
+										
+										// Calculate breakdown sum for this item
+										$breakdown = collect(data_get($item, 'breakdown', []));
+										$breakdownSum = $breakdown->reduce(function ($carry, $row) {
+											$rowQty = data_get($row, 'quantity');
+											$rowTotal = data_get($row, 'total', data_get($row, 'unit_price'));
+											if (is_numeric($rowTotal)) {
+												$mult = ($rowQty !== null && is_numeric($rowQty)) ? (int) $rowQty : 1;
+												return $carry + ((float) $rowTotal * $mult);
+											}
+											return $carry;
+										}, 0);
+										
 										$unitPrice = (float) data_get($item, 'unit_price', data_get($item, 'price', 0));
-										$lineTotal = (float) data_get($item, 'total', data_get($item, 'subtotal', $quantity * $unitPrice));
+										
+										// For invitations, line total is breakdown sum
+										if ($isInvitation) {
+											$lineTotal = $breakdownSum;
+										} else {
+											$lineTotal = (float) data_get($item, 'total', data_get($item, 'subtotal', $quantity * $unitPrice));
+										}
+										
 										// fallback: some giveaway items store their computed total in design_metadata or item metadata
 										if (empty($lineTotal) || $lineTotal === 0.0) {
 											$lineTotal = (float) data_get($item, 'design_metadata.total', data_get($item, 'metadata.giveaway.total', data_get($item, 'metadata.giveaway.price', data_get($item, 'metadata.total', 0))));
@@ -1450,6 +1480,12 @@
 										// normalize breakdown and sync quantities for paper stock and addons
 										$rawOptions = data_get($item, 'options', []);
 										$paperStockValue = data_get($rawOptions, 'paper_stock') ?? data_get($rawOptions, 'paper stock') ?? null;
+
+										// For invitations, use paper stock price as unit price
+										if ($isInvitation) {
+											$paperStockPrice = $extractMoney(data_get($rawOptions, 'paper_stock_price'));
+											$unitPrice = is_numeric($paperStockPrice) ? (float) $paperStockPrice : 0.0;
+										}
 										$addonValues = [];
 										foreach ($rawOptions as $optKey => $optVal) {
 											if (str_contains(strtolower((string) $optKey), 'addon')) {
@@ -1593,21 +1629,6 @@
 											return (string) $value;
 										};
 
-										$rawImages = data_get($item, 'preview_images', data_get($item, 'images', []));
-										if ($rawImages instanceof \Illuminate\Support\Collection) {
-											$rawImages = $rawImages->all();
-										}
-										if (is_string($rawImages) && trim($rawImages) !== '') {
-											$decodedGallery = json_decode($rawImages, true);
-											$rawImages = json_last_error() === JSON_ERROR_NONE ? $decodedGallery : [trim($rawImages)];
-										}
-										if (is_object($rawImages)) {
-											if (method_exists($rawImages, 'toArray')) {
-												$rawImages = $rawImages->toArray();
-											} else {
-												$rawImages = (array) $rawImages;
-											}
-										}
 										$options = collect(data_get($item, 'options', []))
 											->filter(function ($value, $key) {
 												$k = strtolower($key);
@@ -1628,12 +1649,99 @@
 											})
 											->unique(fn ($option) => \Illuminate\Support\Str::lower($option))
 											->values();
-										$images = collect($rawImages)->filter(function ($value) {
-											if (is_string($value)) {
-												return trim($value) !== '';
+										// Prefer any customer-saved draft previews (CustomerTemplateCustom)
+										$imagesSource = data_get($item, 'preview_images', data_get($item, 'images', []));
+										$customerReviewSvg = null;
+										$customerReviewBackImage = null;
+										try {
+											$customerDraft = null;
+											// Use the original Eloquent order model when available (`orderModel`)
+											if (isset($orderModel) && ($orderModel->id ?? null) && (data_get($item, 'id') || data_get($item, 'order_item_id'))) {
+												$orderItemId = data_get($item, 'id', data_get($item, 'order_item_id'));
+												$customerDraft = \App\Models\CustomerTemplateCustom::query()
+													->where('order_id', $orderModel->id)
+													->where('order_item_id', $orderItemId)
+													->latest('id')
+													->first();
 											}
-											return $value !== null;
-										});
+
+											if (!$customerDraft && isset($order) && ($order?->customer_id ?? null)) {
+												// Fallback: find by customer/product/template match
+												$customerDraft = \App\Models\CustomerTemplateCustom::query()
+													->where('customer_id', $order->customer_id)
+													->where('product_id', data_get($item, 'product_id'))
+													->latest('id')
+													->first();
+											}
+
+											if ($customerDraft) {
+												$draftImages = data_get($customerDraft, 'preview_images', data_get($customerDraft, 'preview_images', []));
+												if (!empty($draftImages)) {
+													$imagesSource = $draftImages;
+												} elseif (!empty($customerDraft->preview_image ?? null)) {
+													$imagesSource = [$customerDraft->preview_image];
+												}
+											}
+											
+											// Look for CustomerReview with design_svg (saved from design studio)
+											// template_id can come from:
+											// 1. item.template_id (from presenter via product.template_id)
+											// 2. item.metadata.template_id
+											// 3. item.design_metadata.template_id
+											// 4. customerDraft.template_id
+											$templateId = data_get($item, 'template_id') 
+												?? data_get($item, 'metadata.template_id') 
+												?? data_get($item, 'design_metadata.template_id')
+												?? ($customerDraft->template_id ?? null);
+											$customerId = $order?->customer_id ?? ($orderModel->customer_id ?? null);
+											
+											if ($templateId && $customerId) {
+												$customerReview = \App\Models\CustomerReview::query()
+													->where('template_id', $templateId)
+													->where('customer_id', $customerId)
+													->whereNotNull('design_svg')
+													->where('design_svg', '!=', '')
+													->latest('updated_at')
+													->first();
+												
+												if ($customerReview && !empty($customerReview->design_svg)) {
+													$customerReviewSvg = $customerReview->design_svg;
+													// Try to get back image from saved design_back_svg first, then fallback to gallery
+													if (!empty($customerReview->design_back_svg)) {
+														$customerReviewBackImage = $customerReview->design_back_svg;
+													} elseif (!empty($imagesSource) && count($imagesSource) > 1) {
+														$backImg = $imagesSource[1] ?? null;
+														if (is_array($backImg)) {
+															$customerReviewBackImage = $backImg['src'] ?? $backImg['url'] ?? null;
+														} else {
+															$customerReviewBackImage = $backImg;
+														}
+													}
+												}
+
+												// Get original template for back-to-back comparison
+												$originalTemplate = null;
+												$originalTemplateSvg = null;
+												$originalTemplateBackSvg = null;
+												try {
+													$originalTemplate = \App\Models\Template::find($templateId);
+													if ($originalTemplate) {
+														if ($originalTemplate->svg_path && \Storage::disk('public')->exists($originalTemplate->svg_path)) {
+															$originalTemplateSvg = \Storage::disk('public')->get($originalTemplate->svg_path);
+														}
+														if ($originalTemplate->back_svg_path && \Storage::disk('public')->exists($originalTemplate->back_svg_path)) {
+															$originalTemplateBackSvg = \Storage::disk('public')->get($originalTemplate->back_svg_path);
+														}
+													}
+												} catch (\Throwable $e) {
+													// Ignore errors when loading original template
+												}
+											}
+										} catch (\Throwable $e) {
+											// ignore and fall back to item images
+										}
+
+										$images = collect($imagesSource)->filter();
 										$itemMaterialBuckets = [
 											'paper' => [],
 											'addon' => [],
@@ -1687,9 +1795,10 @@
 										}
 
 										// accumulate grouping sums: invitations (main line only, breakdowns are separate)
-										if (!$isEnvelope && !$isGiveaway) {
-											$groupSums['invitations'] += $lineTotal;
-										}
+										// DO NOT CALCULATE THE BASE PRICE OF THE INVITATION
+										// if (!$isEnvelope && !$isGiveaway) {
+										//     $groupSums['invitations'] += $lineTotal;
+										// }
 
 										if ($isEnvelope) {
 											$groupSums['envelopes'] += $lineTotal;
@@ -1818,107 +1927,6 @@
 														};
 													};
 
-													// Look for CustomerReview with design_svg (saved from design studio)
-													// template_id can come from:
-													// 1. item.template_id (from presenter via product.template_id)
-													// 2. item.metadata.template_id
-													// 3. item.design_metadata.template_id
-													// 4. customerDraft.template_id
-													$templateId = data_get($item, 'template_id') 
-														?? data_get($item, 'metadata.template_id') 
-														?? data_get($item, 'design_metadata.template_id');
-													$customerId = $order?->customer_id ?? null;
-													
-													$customerReviewSvg = null;
-													$customerReviewBackImage = null;
-													try {
-														$customerDraft = null;
-														// Use the original Eloquent order model when available (`orderModel`)
-														if (isset($orderModel) && ($orderModel->id ?? null) && (data_get($item, 'id') || data_get($item, 'order_item_id'))) {
-															$orderItemId = data_get($item, 'id', data_get($item, 'order_item_id'));
-															$customerDraft = \App\Models\CustomerTemplateCustom::query()
-																->where('order_id', $orderModel->id)
-																->where('order_item_id', $orderItemId)
-																->latest('id')
-																->first();
-														}
-
-														if (!$customerDraft && isset($order) && ($order?->customer_id ?? null)) {
-															// Fallback: find by customer/product/template match
-															$customerDraft = \App\Models\CustomerTemplateCustom::query()
-																->where('customer_id', $order->customer_id)
-																->where('product_id', data_get($item, 'product_id'))
-																->latest('id')
-																->first();
-														}
-
-														if ($customerDraft) {
-															$draftImages = data_get($customerDraft, 'preview_images', data_get($customerDraft, 'preview_images', []));
-															if (!empty($draftImages)) {
-																$images = collect($draftImages);
-															} elseif (!empty($customerDraft->preview_image ?? null)) {
-																$images = collect([$customerDraft->preview_image]);
-															}
-														}
-														
-														// Look for CustomerReview with design_svg (saved from design studio)
-														// template_id can come from:
-														// 1. item.template_id (from presenter via product.template_id)
-														// 2. item.metadata.template_id
-														// 3. item.design_metadata.template_id
-														// 4. customerDraft.template_id
-														$templateId = data_get($item, 'template_id') 
-															?? data_get($item, 'metadata.template_id') 
-															?? data_get($item, 'design_metadata.template_id')
-															?? ($customerDraft->template_id ?? null);
-														$customerId = $order?->customer_id ?? ($orderModel->customer_id ?? null);
-														
-														if ($templateId && $customerId) {
-															$customerReview = \App\Models\CustomerReview::query()
-																->where('template_id', $templateId)
-																->where('customer_id', $customerId)
-																->whereNotNull('design_svg')
-																->where('design_svg', '!=', '')
-																->latest('updated_at')
-																->first();
-															
-															if ($customerReview && !empty($customerReview->design_svg)) {
-																$customerReviewSvg = $customerReview->design_svg;
-																// Try to get back image from saved design_back_svg first, then fallback to gallery
-																if (!empty($customerReview->design_back_svg)) {
-																	$customerReviewBackImage = $customerReview->design_back_svg;
-																} elseif (!empty($images) && $images->count() > 1) {
-																	$backImg = $images[1] ?? null;
-																	if (is_array($backImg)) {
-																		$customerReviewBackImage = $backImg['src'] ?? $backImg['url'] ?? null;
-																	} else {
-																		$customerReviewBackImage = $backImg;
-																	}
-																}
-															}
-
-															// Get original template for back-to-back comparison
-															$originalTemplate = null;
-															$originalTemplateSvg = null;
-															$originalTemplateBackSvg = null;
-															try {
-																$originalTemplate = \App\Models\Template::find($templateId);
-																if ($originalTemplate) {
-																	if ($originalTemplate->svg_path && \Storage::disk('public')->exists($originalTemplate->svg_path)) {
-																		$originalTemplateSvg = \Storage::disk('public')->get($originalTemplate->svg_path);
-																	}
-																	if ($originalTemplate->back_svg_path && \Storage::disk('public')->exists($originalTemplate->back_svg_path)) {
-																		$originalTemplateBackSvg = \Storage::disk('public')->get($originalTemplate->back_svg_path);
-																	}
-																}
-															} catch (\Throwable $e) {
-																// Ignore errors when loading original template
-															}
-														}
-													} catch (\Throwable $e) {
-														// ignore and fall back to item images
-													}
-
 													$galleryEntries = collect();
 													$gallerySources = [];
 
@@ -1947,78 +1955,59 @@
 														$gallerySources[] = $src;
 													};
 
-													$processImageEntry = null;
-													$processImageEntry = function ($entry, $imageKey = null) use (&$processImageEntry, $detectOrientation, $pushGalleryImage) {
-														if ($entry instanceof \Illuminate\Support\Collection) {
-															$entry = $entry->all();
-														}
+													$images->each(function ($img, $imageKey) use ($detectOrientation, $pushGalleryImage) {
+														$keyOrientation = $detectOrientation($imageKey);
 
-														if ($entry instanceof \Illuminate\Contracts\Support\Arrayable) {
-															$entry = $entry->toArray();
-														}
-
-														if (is_object($entry)) {
-															if (method_exists($entry, 'toArray')) {
-																$entry = $entry->toArray();
-															} elseif ($entry instanceof \JsonSerializable) {
-																$entry = $entry->jsonSerialize();
-															} else {
-																$entry = (array) $entry;
-															}
-														}
-
-														if (is_string($entry)) {
-															$trimmed = trim($entry);
-															if ($trimmed === '') {
-																return;
-															}
-
-															$firstChar = substr($trimmed, 0, 1);
-															$lastChar = substr($trimmed, -1);
-															if (($firstChar === '{' && $lastChar === '}') || ($firstChar === '[' && $lastChar === ']')) {
-																$decoded = json_decode($trimmed, true);
-																if (json_last_error() === JSON_ERROR_NONE) {
-																	if (is_array($decoded)) {
-																		if (!\Illuminate\Support\Arr::isAssoc($decoded)) {
-																			foreach ($decoded as $decodedKey => $decodedValue) {
-																				$processImageEntry($decodedValue, is_string($decodedKey) ? $decodedKey : $imageKey);
-																			}
-																			return;
-																		}
-
-																		$entry = $decoded;
-																	} elseif (is_string($decoded)) {
-																		$trimmed = trim($decoded);
-																	}
-																}
-															}
-
-															if (!is_array($entry)) {
-																$pushGalleryImage($trimmed ?? $entry, $detectOrientation($imageKey));
-																return;
-															}
-														}
-
-														if (!is_array($entry)) {
+														if (is_string($img)) {
+															$pushGalleryImage($img, $keyOrientation);
 															return;
 														}
 
-														$primarySrc = $entry['url'] ?? $entry['src'] ?? $entry['preview'] ?? $entry['thumb'] ?? $entry['path'] ?? null;
-														$primaryOrientation = $detectOrientation($entry['orientation'] ?? $entry['side'] ?? $entry['page'] ?? $entry['label'] ?? null) ?? $detectOrientation($imageKey);
-														$primaryLabel = $entry['label'] ?? $entry['title'] ?? $entry['description'] ?? null;
+														if (is_object($img)) {
+															if (method_exists($img, 'toArray')) {
+																$img = $img->toArray();
+															} elseif (method_exists($img, '__toString')) {
+																$pushGalleryImage((string) $img, $keyOrientation);
+																return;
+															} else {
+																$img = (array) $img;
+															}
+														}
+
+														if (!is_array($img)) {
+															return;
+														}
+
+														$primarySrc = $img['url'] ?? $img['src'] ?? $img['preview'] ?? null;
+														$primaryOrientation = $detectOrientation($img['orientation'] ?? $img['side'] ?? $img['page'] ?? $img['label'] ?? null) ?? $keyOrientation;
+														$primaryLabel = $img['label'] ?? $img['title'] ?? $img['description'] ?? null;
 														$pushGalleryImage($primarySrc, $primaryOrientation, $primaryLabel);
 
-														foreach ($entry as $nestedKey => $nestedValue) {
-															if (in_array($nestedKey, ['url', 'src', 'preview', 'thumb', 'path', 'label', 'title', 'description', 'orientation', 'side', 'page'], true)) {
+														foreach ($img as $nestedKey => $nestedValue) {
+															if (in_array($nestedKey, ['url', 'src', 'preview', 'label', 'title', 'description', 'orientation', 'side', 'page'], true)) {
 																continue;
 															}
 
-															$processImageEntry($nestedValue, is_string($nestedKey) ? $nestedKey : $imageKey);
-														}
-													};
+															if (is_string($nestedValue)) {
+																$pushGalleryImage($nestedValue, $detectOrientation($nestedKey));
+																continue;
+															}
 
-													$images->each(function ($img, $imageKey) use ($processImageEntry) {
-														$processImageEntry($img, $imageKey);
+															if (is_object($nestedValue)) {
+																if (method_exists($nestedValue, 'toArray')) {
+																	$nestedValue = $nestedValue->toArray();
+																} else {
+																	$nestedValue = (array) $nestedValue;
+																}
+															}
+
+															if (is_array($nestedValue)) {
+																$nestedSrc = $nestedValue['url'] ?? $nestedValue['src'] ?? $nestedValue['preview'] ?? null;
+																$nestedOrientation = $detectOrientation($nestedValue['orientation'] ?? $nestedKey) ?? $detectOrientation($nestedKey);
+																$nestedLabel = $nestedValue['label'] ?? $nestedValue['title'] ?? null;
+																$pushGalleryImage($nestedSrc, $nestedOrientation, $nestedLabel);
+															}
+														}
 													});
 
 													if ($galleryEntries->isEmpty()) {
@@ -2029,6 +2018,31 @@
 													}
 
 													$gallery = $galleryEntries->values();
+													// Prepare a client-friendly gallery with normalized URLs so the
+													// preview JS doesn't request relative paths that 404.
+													$galleryForClient = $gallery->map(function ($entry) {
+														$src = is_array($entry) ? ($entry['src'] ?? '') : (is_string($entry) ? $entry : '');
+														$src = trim((string) $src);
+														if ($src === '') {
+															return null;
+														}
+
+														if (preg_match('/^https?:\/\//i', $src)) {
+															$url = $src;
+														} elseif (preg_match('/^\/?storage\//i', $src)) {
+															$url = asset(ltrim($src, '/'));
+														} elseif (str_starts_with($src, '/')) {
+															$url = url($src);
+														} else {
+															$url = asset('storage/' . ltrim($src, '/'));
+														}
+
+														return array_filter([
+															'src' => $url,
+															'orientation' => $entry['orientation'] ?? null,
+															'label' => $entry['label'] ?? null,
+														], function ($v) { return $v !== null && $v !== ''; });
+													})->filter()->values();
 													$itemMaterialsList = collect($itemMaterialBuckets)
 														->flatMap(function ($rows, $type) {
 															return collect($rows)->map(function ($row) use ($type) {
@@ -2049,35 +2063,26 @@
 													$primaryImageEntry = $gallery->first();
 													$primaryImage = is_array($primaryImageEntry) ? ($primaryImageEntry['src'] ?? null) : (is_string($primaryImageEntry) ? $primaryImageEntry : null);
 													$primaryImageLabel = is_array($primaryImageEntry) ? ($primaryImageEntry['label'] ?? null) : null;
-													if (!$primaryImage) {
-														$primaryImage = collect($rawImages)
-															->map(function ($img) {
-																if (is_string($img)) {
-																	return trim($img);
-																}
-																if (is_array($img)) {
-																	return $img['url'] ?? $img['src'] ?? $img['preview'] ?? null;
-																}
-																if ($img instanceof \Illuminate\Contracts\Support\Arrayable) {
-																	$img = $img->toArray();
-																	return $img['url'] ?? $img['src'] ?? $img['preview'] ?? null;
-																}
-																if (is_object($img)) {
-																	$img = (array) $img;
-																	return $img['url'] ?? $img['src'] ?? $img['preview'] ?? null;
-																}
-																return null;
-															})
-															->filter(function ($value) {
-																return is_string($value) && $value !== '';
-															})
-															->first();
-													}
-													if (!$primaryImage) {
-														$maybeImage = data_get($item, 'image');
-														$primaryImage = is_string($maybeImage) && trim($maybeImage) !== '' ? trim($maybeImage) : null;
-													}
 													$previewTitle = data_get($item, 'name', 'Custom product');
+
+													// Normalize image URL for browser consumption. Accept absolute URLs, storage paths,
+													// and relative paths. Fallback to placeholder when missing.
+													$primaryImageUrl = null;
+													if (!empty($primaryImage)) {
+														$trimmed = trim((string) $primaryImage);
+														if (preg_match('/^https?:\/\//i', $trimmed)) {
+															$primaryImageUrl = $trimmed;
+														} elseif (preg_match('/^\/?storage\//i', $trimmed)) {
+															$primaryImageUrl = asset(ltrim($trimmed, '/'));
+														} elseif (str_starts_with($trimmed, '/')) {
+															$primaryImageUrl = url($trimmed);
+														} else {
+															// Common case: stored in storage/app/public or relative path like "customerimages/..."
+															$primaryImageUrl = asset('storage/' . ltrim($trimmed, '/'));
+														}
+													} else {
+														$primaryImageUrl = asset('images/placeholder.png');
+													}
 												@endphp
 												@if($gallery->isNotEmpty())
 													<button
@@ -2085,23 +2090,13 @@
 														class="item-cell__thumb-button"
 														data-preview-trigger
 														data-preview-title="{{ $previewTitle }}"
-														data-preview-gallery='@json($gallery)'
+														data-preview-gallery='@json($galleryForClient)'
 														data-preview-materials='@json($itemMaterialsList)'
 														aria-label="View artwork preview for {{ $previewTitle }}"
 													>
-														<img src="{{ $primaryImage }}" alt="{{ $primaryImageLabel ? $previewTitle . ' ' . strtolower($primaryImageLabel) : $previewTitle . ' preview' }}" class="item-cell__thumb">
+														<img src="{{ $primaryImageUrl }}" alt="{{ $primaryImageLabel ? $previewTitle . ' ' . strtolower($primaryImageLabel) : $previewTitle . ' preview' }}" class="item-cell__thumb">
 													</button>
-												@elseif($primaryImage)
-													<div class="item-cell__thumb-fallback">
-														<img src="{{ $primaryImage }}" alt="{{ $previewTitle }} preview" class="item-cell__thumb">
-													</div>
 												@endif
-												<div>
-													<strong>{{ data_get($item, 'name', 'Custom product') }}</strong>
-													@if(filled(data_get($item, 'sku')))
-														<span class="item-cell__sku">SKU · {{ data_get($item, 'sku') }}</span>
-													@endif
-												</div>
 												@if(!empty($customerReviewSvg) || !empty($originalTemplateSvg))
 													<div class="mt-2">
 														<div class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Template Comparison</div>
@@ -2150,6 +2145,12 @@
 														<div class="text-xs text-gray-400 mt-1">Click to view front & back designs</div>
 													</div>
 												@endif
+												<div>
+													<strong>{{ data_get($item, 'name', 'Custom product') }}</strong>
+													@if(filled(data_get($item, 'sku')))
+														<span class="item-cell__sku">SKU · {{ data_get($item, 'sku') }}</span>
+													@endif
+												</div>
 											</div>
 										</td>
 										<td>
@@ -2161,6 +2162,13 @@
 														<li>{{ $option }}</li>
 													@endforeach
 												</ul>
+											@endif
+										</td>
+										<td>
+											@if($paperStockValue)
+												{{ $paperStockValue }}
+											@else
+												<span class="item-option">—</span>
 											@endif
 										</td>
 										<td class="text-center">{{ $quantity }}</td>
@@ -2544,10 +2552,6 @@
 					</span>
 				</div>
 				<div class="payment-summary-grid">
-					<div class="payment-summary-grid__item">
-						<span class="payment-summary-grid__label">Total invoiced</span>
-						<span class="payment-summary-grid__value">{{ $formatCurrencyAmount($orderGrandTotal) }}</span>
-					</div>
 					<div class="payment-summary-grid__item">
 						<span class="payment-summary-grid__label">Total paid</span>
 						<span class="payment-summary-grid__value">{{ $formatCurrencyAmount($totalPaid) }}</span>

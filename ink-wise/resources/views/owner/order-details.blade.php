@@ -1430,6 +1430,7 @@
 								<tr>
 									<th scope="col">Item</th>
 									<th scope="col">Options</th>
+									<th scope="col">Paper Stock Material</th>
 									<th scope="col" class="text-center">Qty</th>
 									<th scope="col" class="text-end">Unit price</th>
 									<th scope="col" class="text-end">Line total</th>
@@ -1767,6 +1768,19 @@
 												$btotal = is_numeric($bunit) ? ((float) $bunit * (int) $bqty) : 0;
 											}
 											$breakdownSum += (float) $btotal;
+										}
+
+										$isInvitation = !$isEnvelope && !$isGiveaway;
+										
+										// For invitations, use paper stock price as unit price
+										if ($isInvitation) {
+											$paperStockPrice = $extractMoney(data_get($rawOptions, 'paper_stock_price'));
+											$unitPrice = is_numeric($paperStockPrice) ? (float) $paperStockPrice : 0.0;
+										}
+										
+										// For invitations, line total is breakdown sum
+										if ($isInvitation) {
+											$lineTotal = $breakdownSum;
 										}
 
 										// accumulate grouping sums: invitations (main line only, breakdowns are separate)
@@ -2113,6 +2127,13 @@
 												</ul>
 											@endif
 										</td>
+										<td>
+											@if($paperStockValue)
+												{{ $paperStockValue }}
+											@else
+												<span class="item-option">—</span>
+											@endif
+										</td>
 										<td class="text-center">{{ $quantity }}</td>
 										<td class="text-end" data-money>{{ number_format($unitPrice, 2) }}</td>
 										<td class="text-end" data-money>{{ number_format($lineTotal, 2) }}</td>
@@ -2445,6 +2466,7 @@
 						return $currencySymbol . number_format($numeric, 2);
 					};
 					$orderGrandTotal = isset($orderGrandTotalAmount) ? $orderGrandTotalAmount : (float) ($paymentsSummary->get('grand_total') ?? ($grandTotal ?? 0));
+					
 					$totalPaid = isset($totalPaidAmount) ? $totalPaidAmount : (float) ($paymentsSummary->get('total_paid') ?? $payments->reduce(function ($carry, $paymentRow) {
 						$status = strtolower((string) data_get($paymentRow, 'status', 'pending'));
 						if ($status === 'paid') {
@@ -2467,10 +2489,6 @@
 					$primaryProvider = $payments->isNotEmpty() ? data_get($payments->first(), 'provider') : null;
 				@endphp
 				<div class="payment-summary-grid">
-					<div class="payment-summary-grid__item">
-						<span class="payment-summary-grid__label">Total invoiced</span>
-						<span class="payment-summary-grid__value" data-payment-total="grand">{{ $formatCurrency($orderGrandTotal) }}</span>
-					</div>
 					<div class="payment-summary-grid__item">
 						<span class="payment-summary-grid__label">Total paid</span>
 						<span class="payment-summary-grid__value" data-payment-total="paid">{{ $formatCurrency($totalPaid) }}</span>

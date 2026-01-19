@@ -1474,6 +1474,7 @@
 								<tr>
 									<th scope="col">Item</th>
 									<th scope="col">Options</th>
+									<th scope="col">Paper Stock Material</th>
 									<th scope="col" class="text-center">Qty</th>
 									<th scope="col" class="text-end">Unit price</th>
 									<th scope="col" class="text-end">Line total</th>
@@ -1492,13 +1493,6 @@
 										$isGiveaway = $ltype === 'giveaway' || str_contains($ptype, 'giveaway') || str_contains($iname, 'giveaway') || str_contains($iname, 'freebie');
 										$isInvitation = !$isEnvelope && !$isGiveaway;
 										
-										$unitPrice = (float) data_get($item, 'unit_price', data_get($item, 'price', 0));
-										
-										// For invitations, exclude template price from unit price
-										if ($isInvitation) {
-											$unitPrice = 0.0;
-										}
-										
 										// Calculate breakdown sum for this item
 										$breakdown = collect(data_get($item, 'breakdown', []));
 										$breakdownSum = $breakdown->reduce(function ($carry, $row) {
@@ -1511,7 +1505,9 @@
 											return $carry;
 										}, 0);
 										
-										// For invitations, exclude template price - only use breakdown sum
+										$unitPrice = (float) data_get($item, 'unit_price', data_get($item, 'price', 0));
+										
+										// For invitations, line total is breakdown sum
 										if ($isInvitation) {
 											$lineTotal = $breakdownSum;
 										} else {
@@ -1559,6 +1555,12 @@
 										// normalize breakdown and sync quantities for paper stock and addons
 										$rawOptions = data_get($item, 'options', []);
 										$paperStockValue = data_get($rawOptions, 'paper_stock') ?? data_get($rawOptions, 'paper stock') ?? null;
+
+										// For invitations, use paper stock price as unit price
+										if ($isInvitation) {
+											$paperStockPrice = $extractMoney(data_get($rawOptions, 'paper_stock_price'));
+											$unitPrice = is_numeric($paperStockPrice) ? (float) $paperStockPrice : 0.0;
+										}
 										$addonValues = [];
 										foreach ($rawOptions as $optKey => $optVal) {
 											if (str_contains(strtolower((string) $optKey), 'addon')) {
@@ -2237,6 +2239,13 @@
 												</ul>
 											@endif
 										</td>
+										<td>
+											@if($paperStockValue)
+												{{ $paperStockValue }}
+											@else
+												<span class="item-option">—</span>
+											@endif
+										</td>
 										<td class="text-center">{{ $quantity }}</td>
 										<td class="text-end" data-money>{{ number_format($unitPrice, 2) }}</td>
 										<td class="text-end" data-money>{{ number_format($lineTotal, 2) }}</td>
@@ -2412,17 +2421,10 @@
 
 					<div class="ordersummary-address-grid">
 						<div>
-							<span class="ordersummary-address-label">Shipping address</span>
+							<span class="ordersummary-address-label">Address</span>
 							<p>{{ $shippingAddress ?? '—' }}</p>
 							@if($shippingAddress)
 								<button type="button" class="chip-action" data-copy="{{ $shippingAddress }}">Copy</button>
-							@endif
-						</div>
-						<div>
-							<span class="ordersummary-address-label">Billing address</span>
-							<p>{{ $billingAddress ?? '—' }}</p>
-							@if($billingAddress)
-								<button type="button" class="chip-action" data-copy="{{ $billingAddress }}">Copy</button>
 							@endif
 						</div>
 					</div>
@@ -2552,6 +2554,7 @@
 					->map(function ($pm) {
 						return [
 							'material_name' => $pm->material->material_name ?? 'Unknown Material',
+							'material_type' => $pm->material->material_type ?? 'Unknown',
 							'quantity_used' => $pm->quantity_used,
 							'unit' => $pm->unit,
 							'material_id' => $pm->material_id,
@@ -2564,17 +2567,13 @@
 					<header class="ordersummary-card__header">
 						<h2>Materials Used & Deducted</h2>
 						<p class="ordersummary-card__meta">{{ $deductedMaterials->count() }} {{ \Illuminate\Support\Str::plural('material', $deductedMaterials->count()) }} deducted from inventory</p>
-						<div class="ordersummary-card__actions">
-							<button type="button" class="btn btn-primary btn-sm" onclick="deductMaterials({{ $orderModel->id }})">
-								<i class="fi fi-rr-minus-circle" aria-hidden="true"></i> Deduct Materials Again
-							</button>
-						</div>
 					</header>
 					<div class="materials-grid">
 						@foreach($deductedMaterials as $material)
 							<div class="material-card material-card--deducted">
 								<span class="material-card__type">Deducted</span>
 								<h3 class="material-card__title">{{ $material['material_name'] }}</h3>
+								<h3 class="material-card__title">{{ $material['material_type'] }}</h3>
 								<p class="material-card__quantity"><strong>{{ number_format($material['quantity_used'], 2) }}</strong> {{ $material['unit'] }} used</p>
 							</div>
 						@endforeach
@@ -2635,6 +2634,7 @@
 						return $currencySymbol . number_format($numeric, 2);
 					};
 					$orderGrandTotal = isset($orderGrandTotalAmount) ? $orderGrandTotalAmount : (float) ($paymentsSummary->get('grand_total') ?? ($grandTotal ?? 0));
+					
 					// Final paid amount decision: prefer earlier computed $totalPaidAmount (which already prefers model),
 					// otherwise fall back to summing payments collection.
 					$totalPaid = isset($totalPaidAmount)
@@ -2661,10 +2661,6 @@
 					$primaryProvider = $payments->isNotEmpty() ? data_get($payments->first(), 'provider') : null;
 				@endphp
 				<div class="payment-summary-grid">
-					<div class="payment-summary-grid__item">
-						<span class="payment-summary-grid__label">Total invoiced</span>
-						<span class="payment-summary-grid__value" data-payment-total="grand">{{ $formatCurrency($orderGrandTotal) }}</span>
-					</div>
 					<div class="payment-summary-grid__item">
 						<span class="payment-summary-grid__label">Total paid</span>
 						<span class="payment-summary-grid__value" data-payment-total="paid">{{ $formatCurrency($totalPaid) }}</span>

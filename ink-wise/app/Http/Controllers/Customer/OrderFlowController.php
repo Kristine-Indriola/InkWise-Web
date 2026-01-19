@@ -333,6 +333,7 @@ class OrderFlowController extends Controller
             'placeholders.*' => ['nullable', 'string'],
             'product_id' => ['nullable', 'integer', 'exists:products,id'],
             'template_id' => ['nullable', 'integer'],
+            'side' => ['nullable', 'string', 'in:front,back'],
         ]);
 
         $placeholders = collect(Arr::get($payload, 'placeholders', []))
@@ -481,6 +482,39 @@ class OrderFlowController extends Controller
             }
         }
 
+        // Save to side-specific autosave folders
+        $side = Arr::get($payload, 'side', 'front');
+        $autosaveBasePath = "templates/studio/autosave/{$side}";
+        Storage::disk('public')->makeDirectory($autosaveBasePath);
+
+        // Save SVG
+        if ($designSvg) {
+            try {
+                Storage::disk('public')->put("{$autosaveBasePath}/design.svg", $designSvg);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to save SVG to autosave', ['side' => $side, 'error' => $e->getMessage()]);
+            }
+        }
+
+        // Save PNG preview
+        if ($primaryPreview && str_starts_with($primaryPreview, 'data:image/png;base64,')) {
+            try {
+                $pngData = base64_decode(str_replace('data:image/png;base64,', '', $primaryPreview));
+                Storage::disk('public')->put("{$autosaveBasePath}/preview.png", $pngData);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to save PNG to autosave', ['side' => $side, 'error' => $e->getMessage()]);
+            }
+        }
+
+        // Save JSON design
+        if ($designJsonEncoded) {
+            try {
+                Storage::disk('public')->put("{$autosaveBasePath}/design.json", $designJsonEncoded);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to save JSON to autosave', ['side' => $side, 'error' => $e->getMessage()]);
+            }
+        }
+
         return response()->json([
             'message' => 'Design saved.',
             'saved_at' => $designMeta['updated_at'] ?? Carbon::now()->toIso8601String(),
@@ -496,6 +530,99 @@ class OrderFlowController extends Controller
                 'review_url' => route('order.review'),
             ], 200);
         }
+    }
+
+    /**
+     * Load autosaved design data for a specific side
+     */
+    public function loadAutosave(Request $request): JsonResponse
+    {
+        $request->validate([
+            'side' => ['required', 'string', 'in:front,back'],
+        ]);
+
+        $side = $request->input('side');
+        $autosaveBasePath = "templates/studio/autosave/{$side}";
+
+        $data = [
+            'side' => $side,
+            'svg' => null,
+            'png' => null,
+            'json' => null,
+        ];
+
+        // Load SVG
+        if (Storage::disk('public')->exists("{$autosaveBasePath}/design.svg")) {
+            $data['svg'] = Storage::disk('public')->get("{$autosaveBasePath}/design.svg");
+        }
+
+        // Load PNG
+        if (Storage::disk('public')->exists("{$autosaveBasePath}/preview.png")) {
+            $pngData = Storage::disk('public')->get("{$autosaveBasePath}/preview.png");
+            $data['png'] = 'data:image/png;base64,' . base64_encode($pngData);
+        }
+
+        // Load JSON
+        if (Storage::disk('public')->exists("{$autosaveBasePath}/design.json")) {
+            $jsonContent = Storage::disk('public')->get("{$autosaveBasePath}/design.json");
+            $data['json'] = json_decode($jsonContent, true);
+        }
+
+        return response()->json($data);
+    }
+
+    /**
+     * Save back design to REVIEW2 folder for review page
+     */
+    public function saveToReview(Request $request): JsonResponse
+    {
+        $request->validate([
+            'design_svg' => ['nullable', 'string'],
+            'design_json' => ['nullable'],
+            'preview_image' => ['nullable', 'string'],
+            'preview_images' => ['nullable', 'array'],
+            'canvas_width' => ['nullable', 'integer'],
+            'canvas_height' => ['nullable', 'integer'],
+            'background_color' => ['nullable', 'string'],
+        ]);
+
+        $reviewPath = "templates/REVIEW2";
+        Storage::disk('public')->makeDirectory($reviewPath);
+
+        $designSvg = $request->input('design_svg');
+        $designJson = $request->input('design_json');
+        $previewImage = $request->input('preview_image');
+
+        // Save SVG
+        if ($designSvg) {
+            try {
+                Storage::disk('public')->put("{$reviewPath}/design.svg", $designSvg);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to save SVG to REVIEW2', ['error' => $e->getMessage()]);
+            }
+        }
+
+        // Save PNG preview
+        if ($previewImage && str_starts_with($previewImage, 'data:image/png;base64,')) {
+            try {
+                $pngData = base64_decode(str_replace('data:image/png;base64,', '', $previewImage));
+                Storage::disk('public')->put("{$reviewPath}/preview.png", $pngData);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to save PNG to REVIEW2', ['error' => $e->getMessage()]);
+            }
+        }
+
+        // Save JSON design
+        if ($designJson) {
+            try {
+                $jsonContent = is_string($designJson) ? $designJson : json_encode($designJson);
+                Storage::disk('public')->put("{$reviewPath}/design.json", $jsonContent);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to save JSON to REVIEW2', ['error' => $e->getMessage()]);
+            }
+        }
+
+        return response()->json(['message' => 'Saved to REVIEW2']);
     }
 
     /**
@@ -531,6 +658,8 @@ class OrderFlowController extends Controller
             'background_color' => ['nullable', 'string', 'max:20'],
             'order_item_id' => ['nullable', 'integer'],
         ]);
+
+        \Illuminate\Support\Facades\Log::info('saveReviewDesign validated', ['validated' => $validated]);
 
         $designJson = $validated['design_json'];
         if (is_string($designJson)) {

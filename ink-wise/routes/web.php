@@ -940,6 +940,12 @@ Route::post('/order/cart/items', [OrderFlowController::class, 'storeDesignSelect
 Route::any('/design/autosave', [OrderFlowController::class, 'autosaveDesign'])
     // ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('order.design.autosave');
+Route::get('/design/load-autosave', [OrderFlowController::class, 'loadAutosave'])
+    // ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.design.load-autosave');
+Route::post('/design/save-to-review', [OrderFlowController::class, 'saveToReview'])
+    // ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.design.save-to-review');
 Route::post('/design/upload-image', [OrderFlowController::class, 'uploadDesignImage'])
     ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('order.design.upload-image');

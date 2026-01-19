@@ -19,6 +19,24 @@ export function createAutosaveController(options = {}) {
     let lastSavedAt = null;
 
     const applyStatus = (state, meta = {}) => {
+        // Find the parent status container
+        const statusContainer = (statusDot instanceof HTMLElement && statusDot.parentElement) ||
+                               (statusLabel instanceof HTMLElement && statusLabel.parentElement);
+
+        if (statusContainer instanceof HTMLElement) {
+            // Remove all status classes
+            statusContainer.classList.remove('topbar-status--saving', 'topbar-status--error', 'topbar-status--dirty');
+            
+            // Add the appropriate class
+            if (state === 'saving') {
+                statusContainer.classList.add('topbar-status--saving');
+            } else if (state === 'error') {
+                statusContainer.classList.add('topbar-status--error');
+            } else if (state === 'dirty') {
+                statusContainer.classList.add('topbar-status--dirty');
+            }
+        }
+
         if (statusDot instanceof HTMLElement) {
             statusDot.setAttribute('data-state', state);
         }

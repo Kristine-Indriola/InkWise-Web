@@ -740,14 +740,69 @@ export function initializeCustomerStudioLegacy() {
       console.log('[InkWise Studio] All image conversions completed');
     };
 
-    const collectDesignSnapshot = async () => {
+    const collectDesignSnapshot = async (reason, side = null) => {
       if (!cardBg) {
         return null;
       }
 
       const timestamp = new Date();
-      const activeSide = currentSide || 'front';
-      const svgNode = currentSvgRoot;
+      const activeSide = side || currentSide || 'front';
+      let svgNode = currentSvgRoot;
+
+      // If collecting for a different side than current, load that side's SVG
+      if (side && side !== currentSide) {
+        const sideSvgCandidate = cardBg.dataset[`${side}Svg`] || '';
+        if (sideSvgCandidate && isSvgSource(sideSvgCandidate)) {
+          try {
+            // Parse the SVG without displaying it
+            let svgText = '';
+            if (sideSvgCandidate.startsWith('data:image/svg+xml')) {
+              const commaIndex = sideSvgCandidate.indexOf(',');
+              const meta = commaIndex >= 0 ? sideSvgCandidate.slice(0, commaIndex) : sideSvgCandidate;
+              const dataPart = commaIndex >= 0 ? sideSvgCandidate.slice(commaIndex + 1) : '';
+              const isBase64 = /;base64/i.test(meta);
+
+              if (isBase64) {
+                try {
+                  const normalized = dataPart.replace(/\s+/g, '');
+                  svgText = typeof window !== 'undefined' && typeof window.atob === 'function'
+                    ? window.atob(normalized)
+                    : atob(normalized);
+                } catch (base64Error) {
+                  try {
+                    svgText = decodeURIComponent(dataPart);
+                  } catch (decodeError) {
+                    console.warn('[InkWise Studio] Failed to decode inline SVG data URI.', base64Error, decodeError);
+                    svgText = '';
+                  }
+                }
+              } else {
+                try {
+                  svgText = decodeURIComponent(dataPart);
+                } catch (decodeError) {
+                  svgText = dataPart;
+                }
+              }
+            } else {
+              const res = await fetch(sideSvgCandidate, { cache: 'no-store' });
+              if (res.ok) {
+                svgText = await res.text();
+              }
+            }
+
+            if (svgText) {
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(svgText, 'image/svg+xml');
+              const parsedSvg = doc.documentElement;
+              if (parsedSvg && parsedSvg.tagName === 'svg') {
+                svgNode = parsedSvg;
+              }
+            }
+          } catch (loadError) {
+            console.warn('[InkWise Studio] Failed to load SVG for side:', side, loadError);
+          }
+        }
+      }
 
       let serializedSvg = null;
       if (svgNode) {
@@ -909,10 +964,32 @@ export function initializeCustomerStudioLegacy() {
       } catch (e) { /* ignore */ }
     };
 
-    const collectSnapshotWithPersist = async (...args) => {
-      const snap = await collectDesignSnapshot(...args);
-      try { persistPreviewToSession({}, snap); } catch (_) { /* ignore */ }
-      return snap;
+    const loadAutosave = async (side) => {
+      try {
+        const response = await fetch('/design/load-autosave?side=' + encodeURIComponent(side), {
+          method: 'GET',
+          headers: {
+            'X-CSRF-TOKEN': csrfToken,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (!response.ok) {
+          throw new Error('Failed to load autosave data');
+        }
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        console.warn('[InkWise Studio] Failed to load autosave data for side:', side, error);
+        return null;
+      }
+    };
+
+    const scheduleAutosave = (reason) => {
+      if (autosave) {
+        autosave.schedule(reason);
+      } else if (typeof window !== 'undefined' && window.inkwiseAutosaveController) {
+        window.inkwiseAutosaveController.schedule(reason);
+      }
     };
 
     try {
@@ -927,6 +1004,10 @@ export function initializeCustomerStudioLegacy() {
           try { persistPreviewToSession(result, snapshot); } catch (e) { /* non-fatal */ }
         },
       });
+      // Make autosave available globally for text inputs that were initialized before autosave
+      if (typeof window !== 'undefined') {
+        window.inkwiseAutosaveController = autosave;
+      }
       console.log('[InkWise Studio] Autosave initialized', autosave);
 
       const flushAutosave = (reason) => {
@@ -981,6 +1062,10 @@ export function initializeCustomerStudioLegacy() {
     }
 
     const buildReviewSavePayload = async () => {
+      console.log('[InkWise Studio] Building review save payload...');
+      console.log('[InkWise Studio] Bootstrap payload:', bootstrapPayload);
+      console.log('[InkWise Studio] Template in bootstrap:', bootstrapPayload?.template);
+
       const snapshot = await collectDesignSnapshot('proceed-review');
 
       const design = snapshot?.design || {};
@@ -1016,7 +1101,7 @@ export function initializeCustomerStudioLegacy() {
         }
       })();
 
-      return {
+      const payload = {
         design_svg: svgMarkup, // Include the SVG for proper preview rendering
         design_json: safeDesignJson,
         preview_image: previewImage,
@@ -1029,6 +1114,55 @@ export function initializeCustomerStudioLegacy() {
           ?? bootstrapPayload?.orderSummary?.orderItemId
           ?? bootstrapPayload?.orderSummary?.item_id
           ?? null,
+      };
+
+      console.log('[InkWise Studio] Built payload:', payload);
+      console.log('[InkWise Studio] Template ID:', payload.template_id);
+
+      return payload;
+    };
+
+    const buildReviewSavePayloadForSide = async (snapshot, side) => {
+      const design = snapshot?.design || {};
+      const sides = design.sides || {};
+      const sideData = sides[side] || null;
+
+      const safeDesignJson = JSON.parse(JSON.stringify(design || {}));
+
+      // Get the SVG markup from the snapshot
+      const svgMarkup = sideData?.svg || snapshot?.svg_markup || null;
+
+      const previewImage = sideData?.preview
+        || snapshot?.preview?.image
+        || extractBackgroundUrl(side)
+        || null;
+      const previewImages = (Array.isArray(snapshot?.preview?.images) ? snapshot.preview.images : [])
+        .filter((val) => typeof val === 'string' && val.trim() !== '');
+      if (previewImage && !previewImages.length) {
+        previewImages.push(previewImage);
+      }
+
+      const canvasMeta = safeDesignJson.canvas || {};
+      const canvasWidth = canvasMeta.width ?? (cardBg ? parseNullableNumber(cardBg.dataset.canvasWidth) : null);
+      const canvasHeight = canvasMeta.height ?? (cardBg ? parseNullableNumber(cardBg.dataset.canvasHeight) : null);
+      const backgroundColor = (() => {
+        try {
+          if (!cardBg) return null;
+          const cs = window.getComputedStyle(cardBg);
+          return cs?.backgroundColor || cardBg.dataset?.backgroundColor || cardBg.style?.backgroundColor || null;
+        } catch (_) {
+          return null;
+        }
+      })();
+
+      return {
+        design_svg: svgMarkup,
+        design_json: safeDesignJson,
+        preview_image: previewImage,
+        preview_images: previewImages,
+        canvas_width: canvasWidth,
+        canvas_height: canvasHeight,
+        background_color: backgroundColor,
       };
     };
 
@@ -1060,12 +1194,15 @@ export function initializeCustomerStudioLegacy() {
         };
 
         try {
+          console.log('[InkWise Studio] Proceeding to review...');
           if (autosave) {
             await autosave.flush('navigate');
           }
 
           const payload = await buildReviewSavePayload();
+          console.log('[InkWise Studio] Payload built:', payload);
           if (!payload.template_id) {
+            console.error('[InkWise Studio] Missing template_id in payload:', payload);
             throw new Error('Missing template identifier.');
           }
           if (!reviewSaveUrl) {
@@ -1091,6 +1228,23 @@ export function initializeCustomerStudioLegacy() {
           if (!response.ok) {
             const text = await response.text().catch(() => '');
             throw new Error(`Save failed (${response.status}): ${text}`);
+          }
+
+          // Save back design to REVIEW2 folder
+          try {
+            const backSnapshot = await collectDesignSnapshot('proceed-review', 'back');
+            if (backSnapshot) {
+              const backPayload = await buildReviewSavePayloadForSide(backSnapshot, 'back');
+              await fetch('/design/save-to-review', {
+                method: 'POST',
+                headers,
+                credentials: 'same-origin',
+                body: JSON.stringify(backPayload),
+              });
+            }
+          } catch (reviewSaveError) {
+            console.warn('[InkWise Studio] Failed to save to REVIEW2', reviewSaveError);
+            // Don't block navigation for this
           }
 
           navigate();
@@ -1128,18 +1282,32 @@ export function initializeCustomerStudioLegacy() {
             await autosave.flush('save-template');
           }
 
-          // Collect current design snapshot
-          const snapshot = await collectDesignSnapshot('save-template');
-          const designPayload = Object.assign({}, snapshot && snapshot.design ? snapshot.design : {});
-          const snapshotPlaceholders = snapshot && Array.isArray(snapshot.placeholders) ? snapshot.placeholders : [];
+          // Collect current design snapshot first
+          const currentSnapshot = await collectDesignSnapshot('save-template');
+          const designPayload = Object.assign({}, currentSnapshot && currentSnapshot.design ? currentSnapshot.design : {});
+          
+          // Check if template has back side and collect the other side if needed
+          const hasBackSide = cardBg && cardBg.dataset.hasBack === 'true';
+          const currentSide = currentSide || 'front';
+          const otherSide = currentSide === 'front' ? 'back' : 'front';
+          
+          if (hasBackSide && !designPayload.sides[otherSide]) {
+            const otherSnapshot = await collectDesignSnapshot('save-template', otherSide);
+            if (otherSnapshot && otherSnapshot.design && otherSnapshot.design.sides && otherSnapshot.design.sides[otherSide]) {
+              designPayload.sides = designPayload.sides || {};
+              designPayload.sides[otherSide] = otherSnapshot.design.sides[otherSide];
+            }
+          }
+          
+          const snapshotPlaceholders = currentSnapshot && Array.isArray(currentSnapshot.placeholders) ? currentSnapshot.placeholders : [];
           designPayload.placeholders = snapshotPlaceholders;
-          if (snapshot && snapshot.product_id) {
-            designPayload.product_id = snapshot.product_id;
+          if (currentSnapshot && currentSnapshot.product_id) {
+            designPayload.product_id = currentSnapshot.product_id;
           }
 
-          const previewImage = snapshot && snapshot.preview ? snapshot.preview.image || null : null;
-          const previewImages = snapshot && snapshot.preview && Array.isArray(snapshot.preview.images)
-            ? snapshot.preview.images.filter(Boolean)
+          const previewImage = currentSnapshot && currentSnapshot.preview ? currentSnapshot.preview.image || null : null;
+          const previewImages = currentSnapshot && currentSnapshot.preview && Array.isArray(currentSnapshot.preview.images)
+            ? currentSnapshot.preview.images.filter(Boolean)
             : [];
           const requestBody = {
             template_name: templateName.trim(),
@@ -1147,7 +1315,7 @@ export function initializeCustomerStudioLegacy() {
             preview_image: previewImage,
             preview_images: previewImages,
             placeholders: snapshotPlaceholders,
-            svg_markup: snapshot.svg_markup,
+            svg_markup: currentSnapshot.svg_markup,
           };
 
           const headers = {
@@ -1206,7 +1374,7 @@ export function initializeCustomerStudioLegacy() {
           const updated = applyImageSourceToNode(targetNode, dataUrl);
           if (updated) {
             scheduleOverlaySync();
-            autosave?.schedule('image-replace');
+            scheduleAutosave('image-replace');
           }
         };
         reader.readAsDataURL(file);
@@ -1545,7 +1713,7 @@ export function initializeCustomerStudioLegacy() {
           requestImageReplacement(interaction.node);
         }
       } else {
-        autosave?.schedule('element-transform');
+        scheduleAutosave('element-transform');
       }
     };
 
@@ -4473,7 +4641,7 @@ export function initializeCustomerStudioLegacy() {
 
       input.addEventListener('input', () => {
         applyValue();
-        autosave?.schedule('text-change');
+        scheduleAutosave('text-change');
       });
       applyValue();
     };
@@ -4523,7 +4691,7 @@ export function initializeCustomerStudioLegacy() {
 
       initInput(input);
       attachDeleteHandler(wrapper);
-      autosave?.schedule('add-text-field');
+      scheduleAutosave('add-text-field');
       return input;
     };
 
@@ -5139,26 +5307,50 @@ export function initializeCustomerStudioLegacy() {
       if (!sideIsAvailable(side)) {
         return;
       }
+
+      // Flush autosave for current side before switching
+      if (autosave && currentSide !== side) {
+        try {
+          await autosave.flush('side-switch');
+        } catch (flushError) {
+          console.debug('[InkWise Studio] Autosave flush failed during side switch.', flushError);
+        }
+      }
+
       currentSide = side;
       if (!cardBg) {
         return;
+      }
+
+      // Load autosaved data for this side if available
+      let autosaveData = null;
+      try {
+        autosaveData = await loadAutosave(side);
+      } catch (loadError) {
+        console.debug('[InkWise Studio] No autosave data for side:', side);
       }
 
       let image = '';
       let svgCandidate = '';
       let isUploaded = false;
 
-      if (side === 'front' && uploadedFrontImage) {
-        image = uploadedFrontImage;
-        svgCandidate = uploadedFrontImage;
-        isUploaded = true;
-      } else if (side === 'back' && uploadedBackImage) {
-        image = uploadedBackImage;
-        svgCandidate = uploadedBackImage;
+      if (autosaveData?.png) {
+        image = autosaveData.png;
+        svgCandidate = autosaveData.svg || '';
         isUploaded = true;
       } else {
-        svgCandidate = cardBg.dataset[`${side}Svg`] || '';
-        image = cardBg.dataset[`${side}Image`] || '';
+        if (side === 'front' && uploadedFrontImage) {
+          image = uploadedFrontImage;
+          svgCandidate = uploadedFrontImage;
+          isUploaded = true;
+        } else if (side === 'back' && uploadedBackImage) {
+          image = uploadedBackImage;
+          svgCandidate = uploadedBackImage;
+          isUploaded = true;
+        } else {
+          svgCandidate = cardBg.dataset[`${side}Svg`] || '';
+          image = cardBg.dataset[`${side}Image`] || '';
+        }
       }
 
       let usingSvg = false;
@@ -5217,11 +5409,11 @@ export function initializeCustomerStudioLegacy() {
         .catch(() => {})
         .then(() => {
           settleOverlaySync(6);
-          autosave?.schedule('initial-load');
+          scheduleAutosave('initial-load');
         });
     } else {
       settleOverlaySync(6);
-      autosave?.schedule('initial-load');
+      scheduleAutosave('initial-load');
     }
 
     // Delegate clicks inside the preview area: clicking any element with

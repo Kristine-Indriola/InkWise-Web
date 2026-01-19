@@ -360,8 +360,8 @@
                 @endphp
                 <tr data-order-id="{{ $order->id }}" data-status="{{ $rowStatus }}" data-order-url="{{ route('staff.orders.summary', ['id' => $order->id]) }}" style="cursor: pointer;">
                   <td>{{ $order->order_number ?? ('#' . $order->id) }}</td>
-                  <td>{{ optional($order->customer)->name ?? 'Guest' }}</td>
-                  <td class="text-center">{{ (int) data_get($order, 'items_count', 0) }}</td>
+                  <td>{{ $order->display_customer_name ?? 'Guest' }}</td>
+                  <td class="text-center">{{ $order->display_items_count ?? 0 }}</td>
                   <td class="text-end">{{ number_format((float) data_get($order, 'total_amount', 0), 2) }}</td>
                   <td>
                     @php

@@ -34,6 +34,11 @@
         $ordersSource = $orders ?? optional(auth()->user())->customer->orders ?? [];
         $ordersList = collect($ordersSource)->filter(function ($order) {
             $status = data_get($order, 'status', 'pending');
+            $paymentMode = data_get($order, 'payment_mode') ?: data_get($order, 'metadata.payment_mode', null);
+            // Do not display orders where full payment method was chosen
+            if ($paymentMode === 'full') {
+                return false;
+            }
             return $status === 'pending';
         })->values();
         $placeholderImage = asset('images/placeholder.png');
