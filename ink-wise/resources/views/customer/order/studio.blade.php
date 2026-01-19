@@ -962,19 +962,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Floating toolbar functionality
-    const floatingToolbar = document.getElementById('floating-toolbar');
-    if (floatingToolbar) {
-        floatingToolbar.addEventListener('click', function(e) {
-            if (e.target.classList.contains('toolbar-btn') || e.target.closest('.toolbar-btn')) {
-                const btn = e.target.classList.contains('toolbar-btn') ? e.target : e.target.closest('.toolbar-btn');
-                const nav = btn.dataset.nav;
-                const modal = document.getElementById(nav + '-modal');
-                if (modal) {
-                    modal.style.display = 'flex';
-                    modal.setAttribute('aria-hidden', 'false');
-                }
-            }
+    // Floating toolbar removed
+
+    // Rotate canvas functionality (rotate entire preview canvas by 90° per click)
+    const rotateBtn = document.querySelector('.canvas-control-btn[data-zoom-reset]');
+    if (rotateBtn) {
+        rotateBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            // Rotate the whole canvas wrapper so the card, SVG and guides rotate together
+            const previewWrapper = document.querySelector('.preview-canvas-wrapper');
+            if (!previewWrapper) return;
+
+            const current = parseInt(previewWrapper.dataset.rotation || '0', 10) || 0;
+            const next = (current + 90) % 360;
+            previewWrapper.dataset.rotation = String(next);
+            previewWrapper.style.transition = 'transform 0.25s ease';
+            previewWrapper.style.transformOrigin = 'center center';
+            previewWrapper.style.transform = `rotate(${next}deg)`;
         });
     }
 
@@ -1064,7 +1068,71 @@ document.addEventListener('DOMContentLoaded', function() {
     updateDisplay();
     updateButtons();
 });
+// Preview button functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const previewBtn = document.getElementById('preview-btn');
+    const previewModal = document.getElementById('studio-preview-modal');
+    const previewContent = document.getElementById('studio-preview-content');
+    const previewClose = document.getElementById('studio-preview-close');
+
+    function openPreview() {
+        const wrapper = document.querySelector('.preview-canvas-wrapper');
+        if (!wrapper || !previewModal) return;
+
+        // Clear previous
+        previewContent.innerHTML = '';
+
+        // Clone the wrapper (deep) and scale it to fit
+        const clone = wrapper.cloneNode(true);
+        clone.style.transform = 'none';
+        clone.style.maxWidth = '100%';
+        clone.style.maxHeight = '80vh';
+        clone.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
+
+        // Remove any interactive attributes that might interfere
+        clone.querySelectorAll('[data-modal-close],[data-action],[id]').forEach(el => el.removeAttribute('id'));
+
+        previewContent.appendChild(clone);
+        previewModal.style.display = 'flex';
+        previewModal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closePreview() {
+        if (!previewModal) return;
+        previewModal.style.display = 'none';
+        previewModal.setAttribute('aria-hidden', 'true');
+        previewContent.innerHTML = '';
+    }
+
+    previewBtn?.addEventListener('click', function(e) {
+        e.preventDefault();
+        openPreview();
+    });
+
+    previewClose?.addEventListener('click', function(e) {
+        e.preventDefault();
+        closePreview();
+    });
+
+    previewModal?.addEventListener('click', function(e) {
+        if (e.target === previewModal) {
+            closePreview();
+        }
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closePreview();
+    });
+});
 </script>
+
+<!-- Preview modal markup -->
+<div id="studio-preview-modal" class="studio-preview-modal" aria-hidden="true" style="display:none;position:fixed;inset:0;z-index:20000;align-items:center;justify-content:center;background:rgba(0,0,0,0.8)">
+    <div class="studio-preview-inner" style="background:#fff;padding:18px;border-radius:10px;max-width:90vw;max-height:90vh;overflow:auto;position:relative;">
+        <button id="studio-preview-close" aria-label="Close preview" style="position:absolute;top:8px;right:8px;border:none;background:transparent;font-size:20px;cursor:pointer">&times;</button>
+        <div id="studio-preview-content" style="display:flex;align-items:center;justify-content:center;padding:8px"></div>
+    </div>
+</div>
 
 </body>
 </html>

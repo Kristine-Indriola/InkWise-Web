@@ -294,10 +294,13 @@ return new class extends Migration
 
         // Drop legacy cart_id column if present (after data migration)
         if (Schema::hasColumn($this->newItemsTable, 'cart_id')) {
-            $this->dropForeignIfExistsByColumn($this->newItemsTable, 'cart_id');
-            Schema::table($this->newItemsTable, function (Blueprint $table) {
-                $table->dropColumn('cart_id');
-            });
+            // For SQLite, we can't drop columns easily, so we'll leave it for now
+            if (DB::getDriverName() !== 'sqlite') {
+                $this->dropForeignIfExistsByColumn($this->newItemsTable, 'cart_id');
+                Schema::table($this->newItemsTable, function (Blueprint $table) {
+                    $table->dropColumn('cart_id');
+                });
+            }
         }
 
         // Populate session_id and status defaults for migrated rows
@@ -336,6 +339,12 @@ return new class extends Migration
         }
 
         try {
+            if (DB::getDriverName() === 'sqlite') {
+                // SQLite doesn't support dropping foreign keys by name easily
+                // We'll skip this for SQLite as foreign keys are not enforced anyway
+                return;
+            }
+
             $dbName = DB::getDatabaseName();
             $constraints = DB::select(
                 'SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL',

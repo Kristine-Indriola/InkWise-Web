@@ -151,6 +151,7 @@
 		}
 
 	</style>
+	<script src="https://cdn.tailwindcss.com"></script>
 	<script src="{{ asset('js/customer/orderflow-finalstep.js') }}" defer></script>
 	<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 </head>
@@ -374,7 +375,7 @@
     // Calculate giveaway total
     $giveawayTotalCalc = $giveawayTotal;
 @endphp
-<main class="finalstep-shell" data-storage-key="inkwise-finalstep" data-envelope-url="{{ $envelopeUrl }}" data-cart-url="{{ route('order.addtocart') }}" data-save-url="{{ $finalStepSaveUrl }}" data-fallback-samples="false" data-product-id="{{ $product->id ?? '' }}" data-product-name="{{ $resolvedProductName }}" data-processing-days="{{ $processingDays }}">
+<main class="finalstep-shell" style="padding-top: 4rem;" data-storage-key="inkwise-finalstep" data-envelope-url="{{ $envelopeUrl }}" data-cart-url="{{ route('order.addtocart') }}" data-save-url="{{ $finalStepSaveUrl }}" data-fallback-samples="false" data-product-id="{{ $product->id ?? '' }}" data-product-name="{{ $resolvedProductName }}" data-processing-days="{{ $processingDays }}">
 	<header class="finalstep-header">
 		<div class="finalstep-header__content">
 			<a href="{{ $reviewUrl }}" class="finalstep-header__back" aria-label="Back to review">
@@ -802,15 +803,12 @@
 	</div>
 </div>
 
-</body>
-</html>
+	<script>
+	document.addEventListener('DOMContentLoaded', function () {
+		// no DOM container required; we will replace the artwork images directly
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-	// no DOM container required; we will replace the artwork images directly
-
-	let saved = null;
-	try {
+		let saved = null;
+		try {
 		// Prefer explicit saved-template key
 		saved = JSON.parse(window.sessionStorage.getItem('inkwise-saved-template') || 'null');
 	} catch (err) {
@@ -1005,4 +1003,77 @@ document.addEventListener('DOMContentLoaded', function () {
 			});
 		});
 	});
+
+	// Navigation dropdown functionality
+	document.addEventListener('DOMContentLoaded', () => {
+		const dropdownControllers = [];
+		const navToggle = document.getElementById('navToggle');
+		const mobilePanel = document.getElementById('mobileNavPanel');
+
+		const registerDropdown = ({ triggerId, menuId }) => {
+			const trigger = document.getElementById(triggerId);
+			const menu = document.getElementById(menuId);
+			if (!trigger || !menu) return null;
+
+			const indicator = trigger.querySelector('svg');
+
+			const open = () => {
+				menu.classList.remove('hidden');
+				trigger.setAttribute('aria-expanded', 'true');
+				indicator?.classList.add('rotate-180');
+			};
+
+			const close = () => {
+				menu.classList.add('hidden');
+				trigger.setAttribute('aria-expanded', 'false');
+				indicator?.classList.remove('rotate-180');
+			};
+
+			trigger.addEventListener('click', (event) => {
+				event.stopPropagation();
+				const willOpen = menu.classList.contains('hidden');
+				closeAllDropdowns();
+				if (willOpen) open();
+			});
+
+			return { trigger, menu, close };
+		};
+
+		const closeAllDropdowns = () => dropdownControllers.forEach((controller) => controller.close());
+
+		[
+			{ triggerId: 'categoryToggle', menuId: 'categoryMenu' },
+			{ triggerId: 'mobileCategoryToggle', menuId: 'mobileCategoryMenu' },
+			{ triggerId: 'userDropdownBtn', menuId: 'userDropdownMenu' },
+		].forEach((config) => {
+			const controller = registerDropdown(config);
+			if (controller) dropdownControllers.push(controller);
+		});
+
+		document.addEventListener('click', (event) => {
+			dropdownControllers.forEach((controller) => {
+				if (controller.menu.classList.contains('hidden')) return;
+				if (controller.menu.contains(event.target) || controller.trigger.contains(event.target)) return;
+				controller.close();
+			});
+		});
+
+		document.addEventListener('keydown', (event) => {
+			if (event.key !== 'Escape') return;
+			closeAllDropdowns();
+			if (mobilePanel && !mobilePanel.classList.contains('hidden')) {
+				mobilePanel.classList.add('hidden');
+				navToggle?.setAttribute('aria-expanded', 'false');
+			}
+		});
+
+		navToggle?.addEventListener('click', () => {
+			const isOpen = navToggle.getAttribute('aria-expanded') === 'true';
+			navToggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+			mobilePanel?.classList.toggle('hidden', isOpen);
+			if (!isOpen) closeAllDropdowns();
+		});
+	});
 	</script>
+</body>
+</html>
