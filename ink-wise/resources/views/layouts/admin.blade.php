@@ -32,7 +32,7 @@
   <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css">
   <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-solid-rounded/css/uicons-solid-rounded.css">
   <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-solid-straight/css/uicons-solid-straight.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="{{ asset('assets/fontawesome/css/all.min.css') }}" onerror="console.warn('Font Awesome local failed to load')">
   <link rel="icon" type="image/png" href="{{ asset('adminimage/inkwise.png') }}">
   <style>
     * {
@@ -857,7 +857,33 @@ body.dark-mode .btn-warning {
         <a href="{{ route('admin.products.index') }}"><i class="fi fi-rr-boxes"></i> <span class="label">Products</span></a>
       </li>
       <li class="{{ (request()->routeIs('admin.ordersummary.*') || request()->routeIs('admin.orders.index')) ? 'active' : '' }}">
-        <a href="{{ route('admin.orders.index') }}"><i class="fi fi-rr-list-check"></i> <span class="label">Order Summaries</span></a>
+        <a href="{{ route('admin.orders.index') }}">
+          <i class="fi fi-rr-list-check"></i>
+          <span class="label">Order Summaries</span>
+          @php
+              $newOrdersCount = \App\Models\Order::query()
+                  ->select(['id', 'total_amount', 'payment_status', 'created_at'])
+                  ->where('archived', false)
+                  ->where('created_at', '>=', now()->subDays(1)) // Only orders from the last 24 hours
+                  ->where(function ($query) {
+                      $query->where('payment_status', '!=', 'pending')
+                            ->orWhereNull('payment_status');
+                  })
+                  ->with(['payments:order_id,amount,status'])
+                  ->get()
+                  ->filter(function ($order) {
+                      $paidPayments = $order->payments->filter(fn($p) => strtolower($p->status ?? '') === 'paid');
+                      $totalPaid = round($paidPayments->sum('amount'), 2);
+                      $grandTotal = (float) ($order->total_amount ?? 0);
+                      $balanceDue = max($grandTotal - $totalPaid, 0);
+                      return $balanceDue <= 0;
+                  })
+                  ->count();
+          @endphp
+          @if($newOrdersCount > 0)
+              <span class="notif-badge">{{ $newOrdersCount }}</span>
+          @endif
+        </a>
       </li>
       <li class="{{ request()->routeIs('admin.reviews.*') ? 'active' : '' }}">
         <a href="{{ route('admin.reviews.index') }}">
@@ -1205,5 +1231,6 @@ body.dark-mode .btn-warning {
       });
     })();
   </script>
+  @vite(['resources/css/app.css'])
 </body>
 </html>

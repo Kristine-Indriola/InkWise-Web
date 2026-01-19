@@ -193,7 +193,7 @@ function normalizeFrame(frame, page, type, index = 0) {
   };
 }
 
-export function createPage(page, fallbackIndex = 0, totalPages = 1) {
+export function createPage(page, fallbackIndex = 0, totalPages = 1, template = null) {
   const id = page?.id ?? `page-${pageIncrement === 0 ? fallbackIndex : pageIncrement}`;
   pageIncrement += 1;
 
@@ -232,11 +232,14 @@ export function createPage(page, fallbackIndex = 0, totalPages = 1) {
   metadata.sideLabel = metadata.sideLabel ?? derivedLabel;
   metadata.generatedName = generatedName;
 
+  const defaultWidth = template?.width_inch ? Math.round(template.width_inch * 96) : 400;
+  const defaultHeight = template?.height_inch ? Math.round(template.height_inch * 96) : 400;
+
   return {
     id,
     name: resolvePageName(page?.name, generatedName, fallbackIndex),
-    width: page?.width ?? 400,
-    height: page?.height ?? 400,
+    width: page?.width ?? defaultWidth,
+    height: page?.height ?? defaultHeight,
     background: page?.background ?? '#ffffff',
     safeZone: page?.safeZone ?? null,
     bleed: page?.bleed ?? null,

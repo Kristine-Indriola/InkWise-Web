@@ -1,8 +1,43 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 
 import { useBuilderStore } from '../../state/BuilderStore';
 import { getShapeVisualStyles } from '../../utils/pageShapes';
+
+// Helper functions to calculate fold panels
+function calculateFoldPanels(foldType, widthInch, heightInch, dpi = 96) {
+  if (!foldType || !widthInch || !heightInch) {
+    return [{ width: widthInch * dpi, height: heightInch * dpi }];
+  }
+
+  const widthPx = widthInch * dpi;
+  const heightPx = heightInch * dpi;
+
+  switch (foldType) {
+    case 'bifold':
+      // Two panels side by side
+      return [
+        { width: widthPx, height: heightPx },
+        { width: widthPx, height: heightPx },
+      ];
+    case 'gatefold':
+      // Left and right panels half width, center full width
+      return [
+        { width: widthPx / 2, height: heightPx },
+        { width: widthPx, height: heightPx },
+        { width: widthPx / 2, height: heightPx },
+      ];
+    case 'zfold':
+      // Three equal panels
+      return [
+        { width: widthPx, height: heightPx },
+        { width: widthPx, height: heightPx },
+        { width: widthPx, height: heightPx },
+      ];
+    default:
+      return [{ width: widthPx, height: heightPx }];
+  }
+}
 
 // Helper functions to constrain layers within safe zone
 function resolveInsets(zone) {
@@ -147,18 +182,47 @@ export function CanvasViewport({ page, canvasRef }) {
   const dragStateRef = useRef(null);
   const panStateRef = useRef(null);
   const resizeStateRef = useRef(null);
+  const viewportRef = useRef(null);
   const [draggingLayerId, setDraggingLayerId] = useState(null);
   const [resizingLayerId, setResizingLayerId] = useState(null);
   const [hoveredLayerId, setHoveredLayerId] = useState(null);
-
-  if (!page) {
-    return null;
-  }
+  const [viewportScale, setViewportScale] = useState(1);
 
   const zoom = state.zoom ?? 1;
   const panX = state.panX ?? 0;
   const panY = state.panY ?? 0;
   const selectedLayerId = state.selectedLayerId;
+
+  const foldType = state.template?.fold_type;
+  const widthInch = state.template?.width_inch || 5;
+  const heightInch = state.template?.height_inch || 7;
+  const panels = useMemo(() => calculateFoldPanels(foldType, widthInch, heightInch), [foldType, widthInch, heightInch]);
+
+  // Calculate total canvas width for scaling
+  const totalCanvasWidth = panels.reduce((sum, panel) => sum + panel.width, 0);
+  const canvasHeight = panels[0]?.height || 400;
+
+  useEffect(() => {
+    const updateScale = () => {
+      if (viewportRef.current) {
+        const rect = viewportRef.current.getBoundingClientRect();
+        const availableWidth = rect.width - 40; // padding
+        const availableHeight = rect.height - 40;
+        const scaleX = availableWidth / totalCanvasWidth;
+        const scaleY = availableHeight / canvasHeight;
+        const newScale = Math.min(scaleX, scaleY, 1); // don't scale up
+        setViewportScale(newScale);
+      }
+    };
+
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    return () => window.removeEventListener('resize', updateScale);
+  }, [totalCanvasWidth, canvasHeight]);
+
+  if (!page) {
+    return null;
+  }
 
   const handleSelectLayer = (layerId) => {
     dispatch({ type: 'SELECT_LAYER', layerId });
@@ -382,6 +446,30 @@ export function CanvasViewport({ page, canvasRef }) {
 
     if (event.type !== 'pointercancel') {
       attachImageLayerToShape(dragState.layerId);
+
+      // Ensure final frame is stored (commit final position)
+      try {
+        const activePage = state.pages.find((p) => p.id === page.id) ?? page;
+        const updatedLayer = activePage.nodes.find((n) => n.id === dragState.layerId);
+        const finalFrame = updatedLayer?.frame ?? dragState.startFrame;
+
+        // If position changed, write a final update (this will persist coordinates)
+        const moved = finalFrame && (
+          finalFrame.x !== (dragState.startFrame.x) || finalFrame.y !== (dragState.startFrame.y)
+        );
+
+        if (moved) {
+          dispatch({
+            type: 'UPDATE_LAYER_FRAME',
+            pageId: activePage.id,
+            layerId: dragState.layerId,
+            frame: finalFrame,
+            // allow history to track the final commit
+          });
+        }
+      } catch (err) {
+        // ignore commit errors
+      }
     }
 
     dragStateRef.current = null;
@@ -560,7 +648,7 @@ export function CanvasViewport({ page, canvasRef }) {
 
 
   return (
-    <section className="canvas-viewport" aria-label="Template canvas">
+    <section className="canvas-viewport" id="canvas-viewport" aria-label="Template canvas" ref={viewportRef}>
       <div
         className="canvas-viewport__surface"
         role="img"
@@ -572,557 +660,580 @@ export function CanvasViewport({ page, canvasRef }) {
       >
         <div
           className="canvas-viewport__stage"
-          style={buildStageStyle(zoom, page, panX, panY)}
+          style={buildStageStyle(zoom, { width: totalCanvasWidth, height: canvasHeight }, panX, panY, viewportScale)}
         >
-          <div
-            className="canvas-viewport__page"
-            style={{
-              width: page.width,
-              height: page.height,
-              background: page.background || '#ffffff',
-              // Apply page-level mask/shape if present using the new styling function
-              ...pageShapeStyles,
-            }}
-            onClick={() => handleSelectLayer(null)}
-            data-zoom={zoom}
-            ref={canvasRef ?? null}
-          >
-            <div className="canvas-viewport__grid" aria-hidden="true" />
-            <div
-              className="canvas-viewport__bleed"
-              style={buildInsetStyle(bleedInsets)}
-              aria-hidden="true"
-            />
-            <div
-              className="canvas-viewport__safe-zone"
-              style={buildInsetStyle(safeInsets)}
-              aria-hidden="true"
-            />
-
-            {visibleLayers.length === 0 && (
-              <div className="canvas-viewport__empty-state">
-                <h2>Canvas ready</h2>
-                <p>
-                  Start by selecting a tool on the left. You can add live text, image placeholders, or vector shapes.
-                </p>
-              </div>
-            )}
-
-            {visibleLayers.map(({ layer, originalIndex, explicitStackIndex }, renderIndex) => {
-              const frame = resolveFrame(layer, originalIndex, page);
-              const isSelected = layer.id === selectedLayerId;
-              const isHidden = layer.visible === false;
-              const isLocked = layer.locked === true;
-              const isText = layer.type === 'text';
-              const isImage = layer.type === 'image';
-              const isShape = layer.type === 'shape';
-              const isDragging = layer.id === draggingLayerId;
-              const metadata = layer?.metadata ?? {};
-              const objectFitMode = typeof metadata.objectFit === 'string' ? metadata.objectFit : 'cover';
-              const rawScale = Number(metadata.imageScale);
-              const imageScale = Number.isFinite(rawScale) ? clampNumber(rawScale, 0.25, 4) : 1;
-              const rawOffsetX = Number(metadata.imageOffsetX);
-              const rawOffsetY = Number(metadata.imageOffsetY);
-              const imageOffsetX = Number.isFinite(rawOffsetX) ? clampNumber(rawOffsetX, -500, 500) : 0;
-              const imageOffsetY = Number.isFinite(rawOffsetY) ? clampNumber(rawOffsetY, -500, 500) : 0;
-              const flipHorizontal = Boolean(metadata.flipHorizontal);
-              const flipVertical = Boolean(metadata.flipVertical);
-              const scaleX = flipHorizontal ? -imageScale : imageScale;
-              const scaleY = flipVertical ? -imageScale : imageScale;
-
-              const isResizing = layer.id === resizingLayerId;
-
-              const shapeMaskKey = metadata.maskVariant ?? layer.shape?.id ?? layer.variant;
-              const isShapeImageFrame = isShape && Boolean(metadata.isImageFrame);
-              const rawImageContent = isImage
-                ? layer.content
-                : isShapeImageFrame
-                  ? (layer.content || metadata.backgroundImage || '')
-                  : '';
-              const trimmedImageContent = typeof rawImageContent === 'string' ? rawImageContent.trim() : '';
-              const hasImageSource = Boolean(
-                trimmedImageContent &&
-                (trimmedImageContent.startsWith('data:') ||
-                  trimmedImageContent.startsWith('blob:') ||
-                  /^https?:/i.test(trimmedImageContent)),
-              );
-              const imageSource = hasImageSource ? trimmedImageContent : null;
-              const isImageLike = isImage || isShapeImageFrame;
-              const shapeDescriptor = isShape
-                ? layer.shape ?? {
-                    id: shapeMaskKey,
-                    variant: layer.variant,
-                    borderRadius: layer.borderRadius,
-                  }
-                : null;
-              const shapeVisualStyles = isShape ? getShapeVisualStyles(shapeDescriptor) : null;
-
-              if (shapeDescriptor && shapeDescriptor.id === 'arch-shape' && shapeVisualStyles) {
-                const width = Math.max(frame.width, 1);
-                const height = Math.max(frame.height, 1);
-                const rx = width / 2;
-                const ry = Math.max(1, Math.min(height, rx));
-                const arcY = ry;
-                const bottomY = height;
-                const archPath = `path("M0 ${bottomY} L0 ${arcY} A ${rx} ${ry} 0 0 1 ${width} ${arcY} L ${width} ${bottomY} Z")`;
-                shapeVisualStyles.clipPath = archPath;
-                shapeVisualStyles.WebkitClipPath = archPath;
-              }
-
-              const stackHint = Number.isFinite(explicitStackIndex)
-                ? explicitStackIndex
-                : renderIndex;
-              const computedZIndex = Math.max(2, Math.round(10 + stackHint));
-
-              const isBackgroundLayer = resolveLayerPriority(layer) === 0;
-
-              const style = buildLayerStyle(layer, frame, {
-                hidden: isHidden,
-                opacity: layer.opacity,
-                isSelected,
-                zIndex: isBackgroundLayer ? 0 : computedZIndex,
-              });
-
-              const layerStyle = {
-                ...style,
-                pointerEvents: isBackgroundLayer ? 'none' : style.pointerEvents,
-              };
-
-              const withinSafeZone =
-                frame.x >= safeBounds.left &&
-                frame.y >= safeBounds.top &&
-                frame.x + frame.width <= safeBounds.right &&
-                frame.y + frame.height <= safeBounds.bottom;
-
-              const isOutsideSafe = !withinSafeZone;
-              const isHovered = hoveredLayerId === layer.id;
-              const showMetaBadge = isHovered || isSelected;
-
-              const textMetaParts = [];
-              if (isText) {
-                if (layer.fontFamily) {
-                  textMetaParts.push(layer.fontFamily.split(',')[0]);
-                }
-                if (layer.fontSize) {
-                  textMetaParts.push(`${Math.round(layer.fontSize)}px`);
-                }
-                if (layer.textAlign) {
-                  textMetaParts.push(layer.textAlign);
-                }
-              }
-
-              const imageMetaParts = [];
-              if (isImageLike && hasImageSource) {
-                const meta = layer.metadata || {};
-                const nativeWidth = meta.naturalWidth || meta.originalWidth;
-                const nativeHeight = meta.naturalHeight || meta.originalHeight;
-                if (Number.isFinite(nativeWidth) && Number.isFinite(nativeHeight)) {
-                  imageMetaParts.push(`${nativeWidth}×${nativeHeight}px`);
-                }
-                if (Number.isFinite(meta.dpi)) {
-                  imageMetaParts.push(`${Math.round(meta.dpi)} dpi`);
-                }
-                imageMetaParts.push(objectFitMode);
-              }
-
-              const previewKey = layer.metadata?.previewKey ?? layer.id;
-              const previewLabel = (
-                (typeof layer.metadata?.previewLabel === 'string' && layer.metadata.previewLabel.trim()) ||
-                (typeof layer.name === 'string' && layer.name.trim()) ||
-                'Layer'
-              );
-
-              const layerClasses = [
-                'canvas-layer',
-                isSelected ? 'is-selected' : '',
-                isHidden ? 'is-hidden' : '',
-                isLocked ? 'is-locked' : '',
-                isText ? 'is-text' : '',
-                isImageLike ? 'is-image' : '',
-                isDragging ? 'is-dragging' : '',
-                isResizing ? 'is-resizing' : '',
-                isHovered ? 'is-hovered' : '',
-                isOutsideSafe ? 'is-outside-safe' : '',
-              ]
-                .filter(Boolean)
-                .join(' ');
-
-              return (
+        <div
+          className="fold-container"
+          style={{
+            display: 'flex',
+            width: totalCanvasWidth,
+            height: canvasHeight,
+            background: page.background || '#ffffff',
+            transform: viewportScale < 1 ? `scale(${viewportScale})` : undefined,
+            transformOrigin: 'top left',
+          }}
+          onClick={() => handleSelectLayer(null)}
+          data-zoom={zoom}
+          ref={canvasRef ?? null}
+        >
+            {panels.map((panel, index) => (
+              <div
+                key={index}
+                className="panel"
+                style={{
+                  width: panel.width,
+                  height: panel.height,
+                  borderRight: index < panels.length - 1 ? '2px dashed #94a3b8' : 'none',
+                  position: 'relative',
+                }}
+              >
+                <div className="canvas-viewport__grid" aria-hidden="true" />
                 <div
-                  key={layer.id}
-                  className={`${layerClasses}${isBackgroundLayer ? ' is-background' : ''}`}
-                  style={layerStyle}
-                  role={isBackgroundLayer ? undefined : 'button'}
-                  tabIndex={isBackgroundLayer ? -1 : 0}
-                  aria-hidden={isBackgroundLayer || undefined}
-                  onClick={(event) => {
-                    if (isBackgroundLayer) {
-                      return;
+                  className="canvas-viewport__bleed"
+                  style={buildInsetStyle(bleedInsets)}
+                  aria-hidden="true"
+                />
+                <div
+                  className="canvas-viewport__safe-zone"
+                  style={buildInsetStyle(safeInsets)}
+                  aria-hidden="true"
+                />
+
+                {visibleLayers.length === 0 && index === 0 && (
+                  <div className="canvas-viewport__empty-state">
+                    <h2>Canvas ready</h2>
+                    <p>
+                      Start by selecting a tool on the left. You can add live text, image placeholders, or vector shapes.
+                    </p>
+                  </div>
+                )}
+
+                {visibleLayers.map(({ layer, originalIndex, explicitStackIndex }, renderIndex) => {
+                  const frame = resolveFrame(layer, originalIndex, page);
+                  const isSelected = layer.id === selectedLayerId;
+                  const isHidden = layer.visible === false;
+                  const isLocked = layer.locked === true;
+                  const isText = layer.type === 'text';
+                  const isImage = layer.type === 'image';
+                  const isShape = layer.type === 'shape';
+                  const isDragging = layer.id === draggingLayerId;
+                  const metadata = layer?.metadata ?? {};
+                  const objectFitMode = typeof metadata.objectFit === 'string' ? metadata.objectFit : 'cover';
+                  const rawScale = Number(metadata.imageScale);
+                  const imageScale = Number.isFinite(rawScale) ? clampNumber(rawScale, 0.25, 4) : 1;
+                  const rawOffsetX = Number(metadata.imageOffsetX);
+                  const rawOffsetY = Number(metadata.imageOffsetY);
+                  const imageOffsetX = Number.isFinite(rawOffsetX) ? clampNumber(rawOffsetX, -500, 500) : 0;
+                  const imageOffsetY = Number.isFinite(rawOffsetY) ? clampNumber(rawOffsetY, -500, 500) : 0;
+                  const flipHorizontal = Boolean(metadata.flipHorizontal);
+                  const flipVertical = Boolean(metadata.flipVertical);
+                  const scaleX = flipHorizontal ? -imageScale : imageScale;
+                  const scaleY = flipVertical ? -imageScale : imageScale;
+
+                  const isResizing = layer.id === resizingLayerId;
+
+                  const shapeMaskKey = metadata.maskVariant ?? layer.shape?.id ?? layer.variant;
+                  const isShapeImageFrame = isShape && Boolean(metadata.isImageFrame);
+                  const rawImageContent = isImage
+                    ? layer.content
+                    : isShapeImageFrame
+                      ? (layer.content || metadata.backgroundImage || '')
+                      : '';
+                  const trimmedImageContent = typeof rawImageContent === 'string' ? rawImageContent.trim() : '';
+                  const hasImageContent = Boolean(
+                    trimmedImageContent &&
+                    (trimmedImageContent.startsWith('data:') ||
+                      trimmedImageContent.startsWith('blob:') ||
+                      /^https?:/i.test(trimmedImageContent)),
+                  );
+                  const imageSource = hasImageContent ? trimmedImageContent : null;
+                  const isImageLike = isImage || isShapeImageFrame;
+                  const shapeDescriptor = isShape
+                    ? layer.shape ?? {
+                        id: shapeMaskKey,
+                        variant: layer.variant,
+                        borderRadius: layer.borderRadius,
+                      }
+                    : null;
+                  const shapeVisualStyles = isShape ? getShapeVisualStyles(shapeDescriptor) : null;
+
+                  if (shapeDescriptor && shapeDescriptor.id === 'arch-shape' && shapeVisualStyles) {
+                    const width = Math.max(frame.width, 1);
+                    const height = Math.max(frame.height, 1);
+                    const rx = width / 2;
+                    const ry = Math.max(1, Math.min(height, rx));
+                    const arcY = ry;
+                    const bottomY = height;
+                    const archPath = `path("M0 ${bottomY} L0 ${arcY} A ${rx} ${ry} 0 0 1 ${width} ${arcY} L ${width} ${bottomY} Z")`;
+                    shapeVisualStyles.clipPath = archPath;
+                    shapeVisualStyles.WebkitClipPath = archPath;
+                  }
+
+                  const stackHint = Number.isFinite(explicitStackIndex)
+                    ? explicitStackIndex
+                    : renderIndex;
+                  const computedZIndex = Math.max(2, Math.round(10 + stackHint));
+
+                  const isBackgroundLayer = resolveLayerPriority(layer) === 0;
+
+                  const style = buildLayerStyle(layer, frame, {
+                    hidden: isHidden,
+                    opacity: layer.opacity,
+                    isSelected,
+                    zIndex: isBackgroundLayer ? 0 : computedZIndex,
+                  });
+
+                  const layerStyle = {
+                    ...style,
+                    pointerEvents: isBackgroundLayer ? 'none' : style.pointerEvents,
+                  };
+
+                  const withinSafeZone =
+                    frame.x >= safeBounds.left &&
+                    frame.y >= safeBounds.top &&
+                    frame.x + frame.width <= safeBounds.right &&
+                    frame.y + frame.height <= safeBounds.bottom;
+
+                  const isOutsideSafe = !withinSafeZone;
+                  const isHovered = hoveredLayerId === layer.id;
+                  const showMetaBadge = isHovered || isSelected;
+
+                  const textMetaParts = [];
+                  if (isText) {
+                    if (layer.fontFamily) {
+                      textMetaParts.push(layer.fontFamily.split(',')[0]);
                     }
-                    event.stopPropagation();
-                    handleSelectLayer(layer.id);
-                  }}
-                  onPointerDown={(event) => {
-                    if (isBackgroundLayer) {
-                      return;
+                    if (layer.fontSize) {
+                      textMetaParts.push(`${Math.round(layer.fontSize)}px`);
                     }
-                    // Don't start dragging if clicking on a resize handle
-                    if (event.target.classList.contains('canvas-layer__resize-handle') ||
-                        event.target.closest('.canvas-layer__resize-handle')) {
-                      return;
+                    if (layer.textAlign) {
+                      textMetaParts.push(layer.textAlign);
                     }
-                    handleSelectLayer(layer.id);
-                    beginLayerDrag(event, layer, frame);
-                  }}
-                  onPointerMove={handlePointerMove}
-                  onPointerUp={(event) => {
-                    endLayerResize(event);
-                    endLayerDrag(event);
-                  }}
-                  onPointerCancel={(event) => {
-                    endLayerResize(event);
-                    endLayerDrag(event);
-                  }}
-                  onPointerEnter={() => setHoveredLayerId(layer.id)}
-                  onPointerLeave={() => {
-                    setHoveredLayerId((current) => (current === layer.id ? null : current));
-                  }}
-                  onKeyDown={(event) => {
-                    if (isBackgroundLayer) {
-                      return;
+                  }
+
+                  const imageMetaParts = [];
+                  if (isImageLike && hasImageContent) {
+                    const meta = layer.metadata || {};
+                    const nativeWidth = meta.naturalWidth || meta.originalWidth;
+                    const nativeHeight = meta.naturalHeight || meta.originalHeight;
+                    if (Number.isFinite(nativeWidth) && Number.isFinite(nativeHeight)) {
+                      imageMetaParts.push(`${nativeWidth}×${nativeHeight}px`);
                     }
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      handleSelectLayer(layer.id);
+                    if (Number.isFinite(meta.dpi)) {
+                      imageMetaParts.push(`${Math.round(meta.dpi)} dpi`);
                     }
-                  }}
-                  aria-label={`${layer.name} layer`}
-                  aria-pressed={isSelected}
-                  data-layer-id={layer.id}
-                  data-preview-node={layer.id}
-                  data-preview-key={previewKey}
-                  data-preview-label={previewLabel}
-                  data-changeable={isImageLike ? 'image' : undefined}
-                  data-safe-state={isOutsideSafe ? 'warning' : 'ok'}
-                >
-                  {isText && (
+                    imageMetaParts.push(objectFitMode);
+                  }
+
+                  const previewKey = layer.metadata?.previewKey ?? layer.id;
+                  const previewLabel = (
+                    (typeof layer.metadata?.previewLabel === 'string' && layer.metadata.previewLabel.trim()) ||
+                    (typeof layer.name === 'string' && layer.name.trim()) ||
+                    'Layer'
+                  );
+
+                  const layerClasses = [
+                    'canvas-layer',
+                    isSelected ? 'is-selected' : '',
+                    isHidden ? 'is-hidden' : '',
+                    isLocked ? 'is-locked' : '',
+                    isText ? 'is-text' : '',
+                    isImageLike ? 'is-image' : '',
+                    isDragging ? 'is-dragging' : '',
+                    isResizing ? 'is-resizing' : '',
+                    isHovered ? 'is-hovered' : '',
+                    isOutsideSafe ? 'is-outside-safe' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ');
+
+                  return (
                     <div
-                      className="canvas-layer__text"
+                      key={layer.id}
+                      className={`${layerClasses}${isBackgroundLayer ? ' is-background' : ''}`}
+                      style={layerStyle}
+                      role={isBackgroundLayer ? undefined : 'button'}
+                      tabIndex={isBackgroundLayer ? -1 : 0}
+                      aria-hidden={isBackgroundLayer || undefined}
+                      onClick={(event) => {
+                        if (isBackgroundLayer) {
+                          return;
+                        }
+                        event.stopPropagation();
+                        handleSelectLayer(layer.id);
+                      }}
+                      onPointerDown={(event) => {
+                        if (isBackgroundLayer) {
+                          return;
+                        }
+
+                        // Prevent the canvas pan from starting when interacting with a layer
+                        try { event.stopPropagation(); } catch (err) { /* ignore */ }
+
+                        // Don't start dragging if clicking on a resize handle
+                        if (event.target.classList.contains('canvas-layer__resize-handle') ||
+                            event.target.closest('.canvas-layer__resize-handle')) {
+                          return;
+                        }
+
+                        handleSelectLayer(layer.id);
+                        beginLayerDrag(event, layer, frame);
+                      }}
+                      onPointerMove={handlePointerMove}
+                      onPointerUp={(event) => {
+                        endLayerResize(event);
+                        endLayerDrag(event);
+                      }}
+                      onPointerCancel={(event) => {
+                        endLayerResize(event);
+                        endLayerDrag(event);
+                      }}
+                      onPointerEnter={() => setHoveredLayerId(layer.id)}
+                      onPointerLeave={() => {
+                        setHoveredLayerId((current) => (current === layer.id ? null : current));
+                      }}
+                      onKeyDown={(event) => {
+                        if (isBackgroundLayer) {
+                          return;
+                        }
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          handleSelectLayer(layer.id);
+                        }
+                      }}
+                      aria-label={`${layer.name} layer`}
+                      aria-pressed={isSelected}
+                      data-layer-id={layer.id}
                       data-preview-node={layer.id}
                       data-preview-key={previewKey}
                       data-preview-label={previewLabel}
-                      style={{
-                        color: layer.fill || '#0f172a',
-                        fontSize: layer.fontSize ? `${layer.fontSize}px` : undefined,
-                        fontFamily: layer.fontFamily,
-                        fontWeight: layer.fontWeight ?? undefined,
-                        textAlign: layer.textAlign ?? 'center',
-                      }}
+                      data-changeable={isImageLike ? 'image' : undefined}
+                      data-safe-state={isOutsideSafe ? 'warning' : 'ok'}
                     >
-                      {layer.content || 'Add your text'}
-                    </div>
-                  )}
-                  {isImageLike && (
-                    <div
-                      className={isShapeImageFrame ? `canvas-shape-frame${hasImageSource ? '' : ' is-empty'}` : undefined}
-                      data-preview-key={previewKey}
-                      data-preview-label={previewLabel}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        position: 'relative',
-                        overflow: 'hidden',
-                        background: isShapeImageFrame && !hasImageSource
-                          ? layer.fill || 'rgba(148, 163, 184, 0.18)'
-                          : 'transparent',
-                        ...(isShapeImageFrame && shapeVisualStyles ? shapeVisualStyles : {}),
-                      }}
-                    >
-                      {hasImageSource ? (
-                        <>
-                          <img
-                            src={imageSource}
-                            alt={layer.name || 'Shape image'}
-                            className="canvas-layer__image"
-                            data-preview-node={layer.id}
-                            data-preview-key={previewKey}
-                            data-preview-label={previewLabel}
-                            data-changeable="image"
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              objectFit: objectFitMode,
-                              borderRadius: isShapeImageFrame ? 0 : layer.borderRadius ?? 0,
-                              display: 'block',
-                              transform: `translate(${imageOffsetX}px, ${imageOffsetY}px) scale(${scaleX}, ${scaleY})`,
-                              transformOrigin: 'center',
-                            }}
-                            onError={(e) => {
-                              console.error('Failed to load image:', imageSource?.substring(0, 100) + '...');
-                              e.target.style.display = 'none';
-                              const errorDiv = e.target.parentElement?.querySelector('.image-error');
-                              if (errorDiv) {
-                                errorDiv.style.display = 'flex';
-                              }
-                            }}
-                            onLoad={(e) => {
-                              console.log('Image loaded successfully:', layer.name);
-                              e.target.style.display = 'block';
-                              const errorDiv = e.target.parentElement?.querySelector('.image-error');
-                              if (errorDiv) {
-                                errorDiv.style.display = 'none';
-                              }
-                            }}
-                          />
-                          {isSelected && (
-                            <div className={`canvas-layer__crop-overlay${isResizing ? ' is-active' : ''}`} aria-hidden="true" />
+                      {isText && (
+                        <div
+                          className="canvas-layer__text"
+                          data-preview-node={layer.id}
+                          data-preview-key={previewKey}
+                          data-preview-label={previewLabel}
+                          style={{
+                            color: layer.fill || '#0f172a',
+                            fontSize: layer.fontSize ? `${layer.fontSize}px` : undefined,
+                            fontFamily: `${layer.fontFamily}, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif`,
+                            fontWeight: layer.fontWeight ?? undefined,
+                            textAlign: layer.textAlign ?? 'center',
+                          }}
+                        >
+                          {layer.content || 'Add your text'}
+                        </div>
+                      )}
+                      {isImageLike && (
+                        <div
+                          className={isShapeImageFrame ? `canvas-shape-frame${hasImageContent ? '' : ' is-empty'}` : undefined}
+                          data-preview-key={previewKey}
+                          data-preview-label={previewLabel}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            background: isShapeImageFrame && !hasImageContent
+                              ? layer.fill || 'rgba(148, 163, 184, 0.18)'
+                              : 'transparent',
+                            ...(isShapeImageFrame && shapeVisualStyles ? shapeVisualStyles : {}),
+                          }}
+                        >
+                          {hasImageContent ? (
+                            <>
+                              <img
+                                src={imageSource}
+                                alt={layer.name || 'Shape image'}
+                                className="canvas-layer__image"
+                                data-preview-node={layer.id}
+                                data-preview-key={previewKey}
+                                data-preview-label={previewLabel}
+                                data-changeable="image"
+                                draggable={false}
+                                onDragStart={(e) => e.preventDefault()}
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: objectFitMode,
+                                  borderRadius: isShapeImageFrame ? 0 : layer.borderRadius ?? 0,
+                                  display: 'block',
+                                  transform: `translate(${imageOffsetX}px, ${imageOffsetY}px) scale(${scaleX}, ${scaleY})`,
+                                  transformOrigin: 'center',
+                                  boxShadow: isDragging ? '0 8px 24px rgba(59,130,246,0.18)' : undefined,
+                                  outline: isDragging ? '2px solid rgba(59,130,246,0.28)' : undefined,
+                                }}
+                                onError={(e) => {
+                                  console.error('Failed to load image:', imageSource?.substring(0, 100) + '...');
+                                  e.target.style.display = 'none';
+                                  const errorDiv = e.target.parentElement?.querySelector('.image-error');
+                                  if (errorDiv) {
+                                    errorDiv.style.display = 'flex';
+                                  }
+                                }}
+                                onLoad={(e) => {
+                                  console.log('Image loaded successfully:', layer.name);
+                                  e.target.style.display = 'block';
+                                  const errorDiv = e.target.parentElement?.querySelector('.image-error');
+                                  if (errorDiv) {
+                                    errorDiv.style.display = 'none';
+                                  }
+                                }}
+                              />
+                              {isSelected && (
+                                <div className={`canvas-layer__crop-overlay${isResizing ? ' is-active' : ''}`} aria-hidden="true" />
+                              )}
+                              <div
+                                className="image-error"
+                                style={{
+                                  display: 'none',
+                                  position: 'absolute',
+                                  top: '50%',
+                                  left: '50%',
+                                  transform: 'translate(-50%, -50%)',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '0.4rem',
+                                  fontSize: '0.8rem',
+                                  color: 'rgba(239, 68, 68, 0.8)',
+                                  textAlign: 'center',
+                                  padding: '0.5rem',
+                                  background: 'rgba(255, 255, 255, 0.9)',
+                                  borderRadius: '4px',
+                                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                                }}
+                              >
+                                <span>⚠️</span>
+                                <p>Failed to load image</p>
+                              </div>
+                            </>
+                          ) : (
+                            isShapeImageFrame && (
+                              <div className="canvas-shape-frame__placeholder">
+                                <i className="fa-solid fa-image" aria-hidden="true"></i>
+                                <span>Add image</span>
+                              </div>
+                            )
                           )}
+                        </div>
+                      )}
+                      {isShape && !isShapeImageFrame && (
+                        <div
+                          className="canvas-shape-frame"
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            background: layer.fill || 'rgba(37, 99, 235, 0.12)',
+                            ...(shapeVisualStyles ?? {}),
+                          }}
+                        />
+                      )}
+
+                      {/* Resize handles for selected images, text, and shapes */}
+                      {isSelected && ((isImageLike && hasImageContent) || isText || isShape) && (
+                        <>
+                          {/* Northwest corner */}
                           <div
-                            className="image-error"
+                            className="canvas-layer__resize-handle canvas-layer__resize-handle--nw"
+                            onPointerDown={(e) => {
+                              e.stopPropagation();
+                              beginLayerResize(e, layer, frame, 'nw');
+                            }}
+                            onClick={(e) => e.stopPropagation()}
                             style={{
-                              display: 'none',
                               position: 'absolute',
-                              top: '50%',
-                              left: '50%',
-                              transform: 'translate(-50%, -50%)',
-                              flexDirection: 'column',
+                              top: '-8px',
+                              left: '-8px',
+                              width: '16px',
+                              height: '16px',
+                              backgroundColor: '#3b82f6',
+                              border: '2px solid #ffffff',
+                              borderRadius: '3px',
+                              cursor: 'nw-resize',
+                              zIndex: 1000,
+                              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
+                              transition: 'all 0.1s ease',
+                              pointerEvents: 'auto',
+                              display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              gap: '0.4rem',
-                              fontSize: '0.8rem',
-                              color: 'rgba(239, 68, 68, 0.8)',
-                              textAlign: 'center',
-                              padding: '0.5rem',
-                              background: 'rgba(255, 255, 255, 0.9)',
-                              borderRadius: '4px',
-                              border: '1px solid rgba(239, 68, 68, 0.3)',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'scale(1.2)';
+                              e.currentTarget.style.backgroundColor = '#1d4ed8';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'scale(1)';
+                              e.currentTarget.style.backgroundColor = '#3b82f6';
                             }}
                           >
-                            <span>⚠️</span>
-                            <p>Failed to load image</p>
+                            <div style={{
+                              width: '4px',
+                              height: '4px',
+                              backgroundColor: '#ffffff',
+                              borderRadius: '1px',
+                              opacity: 0.8,
+                              pointerEvents: 'none',
+                            }} />
+                          </div>
+                          {/* Northeast corner */}
+                          <div
+                            className="canvas-layer__resize-handle canvas-layer__resize-handle--ne"
+                            onPointerDown={(e) => {
+                              e.stopPropagation();
+                              beginLayerResize(e, layer, frame, 'ne');
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              position: 'absolute',
+                              top: '-8px',
+                              right: '-8px',
+                              width: '16px',
+                              height: '16px',
+                              backgroundColor: '#3b82f6',
+                              border: '2px solid #ffffff',
+                              borderRadius: '3px',
+                              cursor: 'ne-resize',
+                              zIndex: 1000,
+                              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
+                              transition: 'all 0.1s ease',
+                              pointerEvents: 'auto',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'scale(1.2)';
+                              e.currentTarget.style.backgroundColor = '#1d4ed8';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'scale(1)';
+                              e.currentTarget.style.backgroundColor = '#3b82f6';
+                            }}
+                          >
+                            <div style={{
+                              width: '4px',
+                              height: '4px',
+                              backgroundColor: '#ffffff',
+                              borderRadius: '1px',
+                              opacity: 0.8,
+                              pointerEvents: 'none',
+                            }} />
+                          </div>
+                          {/* Southwest corner */}
+                          <div
+                            className="canvas-layer__resize-handle canvas-layer__resize-handle--sw"
+                            onPointerDown={(e) => {
+                              e.stopPropagation();
+                              beginLayerResize(e, layer, frame, 'sw');
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              position: 'absolute',
+                              bottom: '-8px',
+                              left: '-8px',
+                              width: '16px',
+                              height: '16px',
+                              backgroundColor: '#3b82f6',
+                              border: '2px solid #ffffff',
+                              borderRadius: '3px',
+                              cursor: 'sw-resize',
+                              zIndex: 1000,
+                              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
+                              transition: 'all 0.1s ease',
+                              pointerEvents: 'auto',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'scale(1.2)';
+                              e.currentTarget.style.backgroundColor = '#1d4ed8';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'scale(1)';
+                              e.currentTarget.style.backgroundColor = '#3b82f6';
+                            }}
+                          >
+                            <div style={{
+                              width: '4px',
+                              height: '4px',
+                              backgroundColor: '#ffffff',
+                              borderRadius: '1px',
+                              opacity: 0.8,
+                              pointerEvents: 'none',
+                            }} />
+                          </div>
+                          {/* Southeast corner */}
+                          <div
+                            className="canvas-layer__resize-handle canvas-layer__resize-handle--se"
+                            onPointerDown={(e) => {
+                              e.stopPropagation();
+                              beginLayerResize(e, layer, frame, 'se');
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              position: 'absolute',
+                              bottom: '-8px',
+                              right: '-8px',
+                              width: '16px',
+                              height: '16px',
+                              backgroundColor: '#3b82f6',
+                              border: '2px solid #ffffff',
+                              borderRadius: '3px',
+                              cursor: 'se-resize',
+                              zIndex: 1000,
+                              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
+                              transition: 'all 0.1s ease',
+                              pointerEvents: 'auto',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'scale(1.2)';
+                              e.currentTarget.style.backgroundColor = '#1d4ed8';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'scale(1)';
+                              e.currentTarget.style.backgroundColor = '#3b82f6';
+                            }}
+                          >
+                            <div style={{
+                              width: '4px',
+                              height: '4px',
+                              backgroundColor: '#ffffff',
+                              borderRadius: '1px',
+                              opacity: 0.8,
+                              pointerEvents: 'none',
+                            }} />
                           </div>
                         </>
-                      ) : (
-                        isShapeImageFrame && (
-                          <div className="canvas-shape-frame__placeholder">
-                            <i className="fa-solid fa-image" aria-hidden="true"></i>
-                            <span>Add image</span>
-                          </div>
-                        )
                       )}
-                    </div>
-                  )}
-                  {isShape && !isShapeImageFrame && (
-                    <div
-                      className="canvas-shape-frame"
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        background: layer.fill || 'rgba(37, 99, 235, 0.12)',
-                        ...(shapeVisualStyles ?? {}),
-                      }}
-                    />
-                  )}
 
-                  {/* Resize handles for selected images, text, and shapes */}
-                  {isSelected && ((isImageLike && hasImageSource) || isText || isShape) && (
-                    <>
-                      {/* Northwest corner */}
-                      <div
-                        className="canvas-layer__resize-handle canvas-layer__resize-handle--nw"
-                        onPointerDown={(e) => {
-                          e.stopPropagation();
-                          beginLayerResize(e, layer, frame, 'nw');
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          position: 'absolute',
-                          top: '-8px',
-                          left: '-8px',
-                          width: '16px',
-                          height: '16px',
-                          backgroundColor: '#3b82f6',
-                          border: '2px solid #ffffff',
-                          borderRadius: '3px',
-                          cursor: 'nw-resize',
-                          zIndex: 1000,
-                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
-                          transition: 'all 0.1s ease',
-                          pointerEvents: 'auto',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'scale(1.2)';
-                          e.currentTarget.style.backgroundColor = '#1d4ed8';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = 'scale(1)';
-                          e.currentTarget.style.backgroundColor = '#3b82f6';
-                        }}
-                      >
-                        <div style={{
-                          width: '4px',
-                          height: '4px',
-                          backgroundColor: '#ffffff',
-                          borderRadius: '1px',
-                          opacity: 0.8,
-                          pointerEvents: 'none',
-                        }} />
-                      </div>
-                      {/* Northeast corner */}
-                      <div
-                        className="canvas-layer__resize-handle canvas-layer__resize-handle--ne"
-                        onPointerDown={(e) => {
-                          e.stopPropagation();
-                          beginLayerResize(e, layer, frame, 'ne');
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          position: 'absolute',
-                          top: '-8px',
-                          right: '-8px',
-                          width: '16px',
-                          height: '16px',
-                          backgroundColor: '#3b82f6',
-                          border: '2px solid #ffffff',
-                          borderRadius: '3px',
-                          cursor: 'ne-resize',
-                          zIndex: 1000,
-                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
-                          transition: 'all 0.1s ease',
-                          pointerEvents: 'auto',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'scale(1.2)';
-                          e.currentTarget.style.backgroundColor = '#1d4ed8';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = 'scale(1)';
-                          e.currentTarget.style.backgroundColor = '#3b82f6';
-                        }}
-                      >
-                        <div style={{
-                          width: '4px',
-                          height: '4px',
-                          backgroundColor: '#ffffff',
-                          borderRadius: '1px',
-                          opacity: 0.8,
-                          pointerEvents: 'none',
-                        }} />
-                      </div>
-                      {/* Southwest corner */}
-                      <div
-                        className="canvas-layer__resize-handle canvas-layer__resize-handle--sw"
-                        onPointerDown={(e) => {
-                          e.stopPropagation();
-                          beginLayerResize(e, layer, frame, 'sw');
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          position: 'absolute',
-                          bottom: '-8px',
-                          left: '-8px',
-                          width: '16px',
-                          height: '16px',
-                          backgroundColor: '#3b82f6',
-                          border: '2px solid #ffffff',
-                          borderRadius: '3px',
-                          cursor: 'sw-resize',
-                          zIndex: 1000,
-                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
-                          transition: 'all 0.1s ease',
-                          pointerEvents: 'auto',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'scale(1.2)';
-                          e.currentTarget.style.backgroundColor = '#1d4ed8';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = 'scale(1)';
-                          e.currentTarget.style.backgroundColor = '#3b82f6';
-                        }}
-                      >
-                        <div style={{
-                          width: '4px',
-                          height: '4px',
-                          backgroundColor: '#ffffff',
-                          borderRadius: '1px',
-                          opacity: 0.8,
-                          pointerEvents: 'none',
-                        }} />
-                      </div>
-                      {/* Southeast corner */}
-                      <div
-                        className="canvas-layer__resize-handle canvas-layer__resize-handle--se"
-                        onPointerDown={(e) => {
-                          e.stopPropagation();
-                          beginLayerResize(e, layer, frame, 'se');
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          position: 'absolute',
-                          bottom: '-8px',
-                          right: '-8px',
-                          width: '16px',
-                          height: '16px',
-                          backgroundColor: '#3b82f6',
-                          border: '2px solid #ffffff',
-                          borderRadius: '3px',
-                          cursor: 'se-resize',
-                          zIndex: 1000,
-                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
-                          transition: 'all 0.1s ease',
-                          pointerEvents: 'auto',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'scale(1.2)';
-                          e.currentTarget.style.backgroundColor = '#1d4ed8';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = 'scale(1)';
-                          e.currentTarget.style.backgroundColor = '#3b82f6';
-                        }}
-                      >
-                        <div style={{
-                          width: '4px',
-                          height: '4px',
-                          backgroundColor: '#ffffff',
-                          borderRadius: '1px',
-                          opacity: 0.8,
-                          pointerEvents: 'none',
-                        }} />
-                      </div>
-                    </>
-                  )}
-
-                  {showMetaBadge && (isText || isImageLike) && (
-                    <div
-                      className={`canvas-layer__meta${isOutsideSafe ? ' has-warning' : ''}`}
-                      aria-hidden="true"
-                    >
-                      <span className="canvas-layer__meta-primary">
-                        {isText ? textMetaParts.filter(Boolean).join(' • ') || 'Text layer' : imageMetaParts.filter(Boolean).join(' • ') || 'Image layer'}
-                      </span>
-                      {isOutsideSafe && (
-                        <span className="canvas-layer__meta-warning">Outside safe zone</span>
+                      {showMetaBadge && (isText || isImageLike) && (
+                        <div
+                          className={`canvas-layer__meta${isOutsideSafe ? ' has-warning' : ''}`}
+                          aria-hidden="true"
+                        >
+                          <span className="canvas-layer__meta-primary">
+                            {isText ? textMetaParts.filter(Boolean).join(' • ') || 'Text layer' : imageMetaParts.filter(Boolean).join(' • ') || 'Image layer'}
+                          </span>
+                          {isOutsideSafe && (
+                            <span className="canvas-layer__meta-warning">Outside safe zone</span>
+                          )}
+                        </div>
                       )}
-                    </div>
-                  )}
 
-                </div>
-              );
-            })}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -1145,12 +1256,12 @@ CanvasViewport.defaultProps = {
   canvasRef: null,
 };
 
-function buildStageStyle(zoom, page, panX, panY) {
+function buildStageStyle(zoom, dimensions, panX, panY, viewportScale) {
   return {
     transform: `translate(${panX}px, ${panY}px) scale(${zoom})`,
     transformOrigin: 'top left',
-    width: page.width,
-    height: page.height,
+    width: dimensions.width,
+    height: dimensions.height,
   };
 }
 

@@ -543,3 +543,16 @@ label {
     margin-top: 12px;
 }
 
+/* Hide the dropdown arrow for Size Number input and select */
+.addon-name-input,
+.addon-name-select {
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    background-image: none !important;
+}
+.addon-name-input::-webkit-list-button,
+.addon-name-select::-webkit-list-button {
+    display: none !important;
+}
+

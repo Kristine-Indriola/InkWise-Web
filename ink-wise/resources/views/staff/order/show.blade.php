@@ -829,6 +829,82 @@
 		body.ordersummary-modal-open {
 			overflow: hidden;
 		}
+
+		/* SVG Preview Modal Styles */
+		.ordersummary-svg-preview-modal {
+			position: fixed;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			z-index: 1000;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+
+		.svg-preview-container {
+			display: flex;
+			gap: 20px;
+			max-width: 1200px;
+			width: 100%;
+			justify-content: center;
+		}
+
+		.svg-preview-front,
+		.svg-preview-back {
+			flex: 1;
+			max-width: 500px;
+		}
+
+		.svg-preview-front h4,
+		.svg-preview-back h4 {
+			margin: 0 0 12px 0;
+			font-size: 16px;
+			font-weight: 600;
+			color: #374151;
+			text-align: center;
+		}
+
+		.svg-preview-content {
+			background: white;
+			border: 1px solid #e5e7eb;
+			border-radius: 8px;
+			padding: 16px;
+			min-height: 400px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+		}
+
+		.svg-preview-content svg {
+			max-width: 100%;
+			max-height: 350px;
+			display: block;
+		}
+
+		.svg-preview-content:empty::before {
+			content: "No design available";
+			color: #9ca3af;
+			font-style: italic;
+		}
+
+		@media (max-width: 768px) {
+			.svg-preview-container {
+				flex-direction: column;
+				gap: 16px;
+			}
+
+			.svg-preview-front,
+			.svg-preview-back {
+				max-width: 100%;
+			}
+
+			.svg-preview-content {
+				min-height: 300px;
+			}
+		}
 	</style>
 @endpush
 
@@ -1182,6 +1258,34 @@
 			</span>
 		</div>
 	</section>
+
+	@php
+		$savedTemplate = data_get($order, 'metadata.template') ?? null;
+		$savedGallery = [];
+		if ($savedTemplate) {
+			if (!empty($savedTemplate['preview_images']) && is_array($savedTemplate['preview_images'])) {
+				$savedGallery = $savedTemplate['preview_images'];
+			} elseif (!empty($savedTemplate['preview_image'])) {
+				$savedGallery = [$savedTemplate['preview_image']];
+			}
+		}
+	@endphp
+
+	@if($savedTemplate && !empty($savedGallery))
+		<section class="status-info-card" style="margin-top:12px;">
+			<h3 style="margin:0 0 8px 0;">Saved Template</h3>
+			<div style="display:flex;gap:12px;align-items:center;">
+				<img src="{{ $savedTemplate['preview_image'] ?? ($savedGallery[0] ?? '') }}" alt="Saved template preview" style="max-width:220px;max-height:160px;object-fit:contain;border:1px solid #e6eef9;border-radius:8px;">
+				<div>
+					<div style="font-weight:600;margin-bottom:6px;">{{ $savedTemplate['template_name'] ?? 'Saved template' }}</div>
+					<div style="color:#475569;font-size:0.95rem;margin-bottom:8px;">This template was saved by the customer.</div>
+					<button type="button" class="btn btn-primary" data-preview-trigger data-preview-title="{{ $savedTemplate['template_name'] ?? 'Saved template' }}" data-preview-gallery='@json($savedGallery)' data-preview-materials='[]'>
+						<i class="fi fi-rr-download" aria-hidden="true"></i> Preview / Download
+					</button>
+				</div>
+			</div>
+		</section>
+	@endif
 
 	<section class="status-progress-card" data-status-card>
 		<header class="status-progress-card__header">
@@ -1714,6 +1818,107 @@
 														};
 													};
 
+													// Look for CustomerReview with design_svg (saved from design studio)
+													// template_id can come from:
+													// 1. item.template_id (from presenter via product.template_id)
+													// 2. item.metadata.template_id
+													// 3. item.design_metadata.template_id
+													// 4. customerDraft.template_id
+													$templateId = data_get($item, 'template_id') 
+														?? data_get($item, 'metadata.template_id') 
+														?? data_get($item, 'design_metadata.template_id');
+													$customerId = $order?->customer_id ?? null;
+													
+													$customerReviewSvg = null;
+													$customerReviewBackImage = null;
+													try {
+														$customerDraft = null;
+														// Use the original Eloquent order model when available (`orderModel`)
+														if (isset($orderModel) && ($orderModel->id ?? null) && (data_get($item, 'id') || data_get($item, 'order_item_id'))) {
+															$orderItemId = data_get($item, 'id', data_get($item, 'order_item_id'));
+															$customerDraft = \App\Models\CustomerTemplateCustom::query()
+																->where('order_id', $orderModel->id)
+																->where('order_item_id', $orderItemId)
+																->latest('id')
+																->first();
+														}
+
+														if (!$customerDraft && isset($order) && ($order?->customer_id ?? null)) {
+															// Fallback: find by customer/product/template match
+															$customerDraft = \App\Models\CustomerTemplateCustom::query()
+																->where('customer_id', $order->customer_id)
+																->where('product_id', data_get($item, 'product_id'))
+																->latest('id')
+																->first();
+														}
+
+														if ($customerDraft) {
+															$draftImages = data_get($customerDraft, 'preview_images', data_get($customerDraft, 'preview_images', []));
+															if (!empty($draftImages)) {
+																$images = collect($draftImages);
+															} elseif (!empty($customerDraft->preview_image ?? null)) {
+																$images = collect([$customerDraft->preview_image]);
+															}
+														}
+														
+														// Look for CustomerReview with design_svg (saved from design studio)
+														// template_id can come from:
+														// 1. item.template_id (from presenter via product.template_id)
+														// 2. item.metadata.template_id
+														// 3. item.design_metadata.template_id
+														// 4. customerDraft.template_id
+														$templateId = data_get($item, 'template_id') 
+															?? data_get($item, 'metadata.template_id') 
+															?? data_get($item, 'design_metadata.template_id')
+															?? ($customerDraft->template_id ?? null);
+														$customerId = $order?->customer_id ?? ($orderModel->customer_id ?? null);
+														
+														if ($templateId && $customerId) {
+															$customerReview = \App\Models\CustomerReview::query()
+																->where('template_id', $templateId)
+																->where('customer_id', $customerId)
+																->whereNotNull('design_svg')
+																->where('design_svg', '!=', '')
+																->latest('updated_at')
+																->first();
+															
+															if ($customerReview && !empty($customerReview->design_svg)) {
+																$customerReviewSvg = $customerReview->design_svg;
+																// Try to get back image from saved design_back_svg first, then fallback to gallery
+																if (!empty($customerReview->design_back_svg)) {
+																	$customerReviewBackImage = $customerReview->design_back_svg;
+																} elseif (!empty($images) && $images->count() > 1) {
+																	$backImg = $images[1] ?? null;
+																	if (is_array($backImg)) {
+																		$customerReviewBackImage = $backImg['src'] ?? $backImg['url'] ?? null;
+																	} else {
+																		$customerReviewBackImage = $backImg;
+																	}
+																}
+															}
+
+															// Get original template for back-to-back comparison
+															$originalTemplate = null;
+															$originalTemplateSvg = null;
+															$originalTemplateBackSvg = null;
+															try {
+																$originalTemplate = \App\Models\Template::find($templateId);
+																if ($originalTemplate) {
+																	if ($originalTemplate->svg_path && \Storage::disk('public')->exists($originalTemplate->svg_path)) {
+																		$originalTemplateSvg = \Storage::disk('public')->get($originalTemplate->svg_path);
+																	}
+																	if ($originalTemplate->back_svg_path && \Storage::disk('public')->exists($originalTemplate->back_svg_path)) {
+																		$originalTemplateBackSvg = \Storage::disk('public')->get($originalTemplate->back_svg_path);
+																	}
+																}
+															} catch (\Throwable $e) {
+																// Ignore errors when loading original template
+															}
+														}
+													} catch (\Throwable $e) {
+														// ignore and fall back to item images
+													}
+
 													$galleryEntries = collect();
 													$gallerySources = [];
 
@@ -1897,6 +2102,54 @@
 														<span class="item-cell__sku">SKU · {{ data_get($item, 'sku') }}</span>
 													@endif
 												</div>
+												@if(!empty($customerReviewSvg) || !empty($originalTemplateSvg))
+													<div class="mt-2">
+														<div class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Template Comparison</div>
+														<div class="flex gap-2">
+															@if(!empty($originalTemplateSvg))
+																<div class="flex flex-col items-center">
+																	<div class="text-xs text-gray-500 mb-1">Original</div>
+																	<button
+																		type="button"
+																		class="item-cell__svg-button js-admin-svg-preview-trigger"
+																		data-svg-content="{{ base64_encode($originalTemplateSvg) }}"
+																		data-back-image="{{ !empty($originalTemplateBackSvg) ? base64_encode($originalTemplateBackSvg) : '' }}"
+																		data-preview-title="{{ $previewTitle }} - Original Template"
+																		aria-label="View original template design for {{ $previewTitle }}"
+																		style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 4px; background: #f8fafc; cursor: pointer; display: inline-block; transition: all 0.2s;"
+																		onmouseover="this.style.boxShadow='0 0 0 2px #a6b7ff'"
+																		onmouseout="this.style.boxShadow='none'"
+																	>
+																		<div class="svg-thumb-container" style="width: 60px; height: 60px; overflow: hidden; pointer-events: none;">
+																			{!! $originalTemplateSvg !!}
+																		</div>
+																	</button>
+																</div>
+															@endif
+															@if(!empty($customerReviewSvg))
+																<div class="flex flex-col items-center">
+																	<div class="text-xs text-gray-500 mb-1">Edited</div>
+																	<button
+																		type="button"
+																		class="item-cell__svg-button js-admin-svg-preview-trigger"
+																		data-svg-content="{{ base64_encode($customerReviewSvg) }}"
+																		data-back-image="{{ !empty($customerReviewBackImage) && str_contains($customerReviewBackImage, '<svg') ? base64_encode($customerReviewBackImage) : ($customerReviewBackImage ?? '') }}"
+																		data-preview-title="{{ $previewTitle }} - Edited Design"
+																		aria-label="View edited template design for {{ $previewTitle }}"
+																		style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 4px; background: #f8fafc; cursor: pointer; display: inline-block; transition: all 0.2s;"
+																		onmouseover="this.style.boxShadow='0 0 0 2px #a6b7ff'"
+																		onmouseout="this.style.boxShadow='none'"
+																	>
+																		<div class="svg-thumb-container" style="width: 60px; height: 60px; overflow: hidden; pointer-events: none;">
+																			{!! $customerReviewSvg !!}
+																		</div>
+																	</button>
+																</div>
+															@endif
+														</div>
+														<div class="text-xs text-gray-400 mt-1">Click to view front & back designs</div>
+													</div>
+												@endif
 											</div>
 										</td>
 										<td>
@@ -2449,6 +2702,39 @@
 	</div>
 </div>
 
+<!-- SVG Preview Modal -->
+<div class="ordersummary-svg-preview-modal" data-svg-preview-modal style="display: none;" aria-hidden="true" tabindex="-1">
+	<div class="ordersummary-preview-backdrop" data-svg-preview-close></div>
+	<div class="ordersummary-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="ordersummarySvgPreviewTitle">
+		<header class="ordersummary-preview-header">
+			<div>
+				<h2 id="ordersummarySvgPreviewTitle">Template Design Preview</h2>
+				<p class="ordersummary-preview-meta"><span data-svg-preview-title></span></p>
+			</div>
+			<button type="button" class="ordersummary-preview-close" data-svg-preview-close aria-label="Close preview">
+				<span aria-hidden="true">&times;</span>
+			</button>
+		</header>
+		<div class="ordersummary-preview-body">
+			<div class="svg-preview-container">
+				<div class="svg-preview-front">
+					<h4>Front Design</h4>
+					<div class="svg-preview-content" data-svg-preview-front></div>
+				</div>
+				<div class="svg-preview-back" data-svg-preview-back-container>
+					<h4>Back Design</h4>
+					<div class="svg-preview-content" data-svg-preview-back></div>
+				</div>
+			</div>
+		</div>
+		<div class="ordersummary-preview-actions">
+			<button type="button" class="btn btn-secondary" data-svg-preview-close>
+				Close
+			</button>
+		</div>
+	</div>
+</div>
+
 <div class="ordersummary-toast" data-toast role="status" aria-live="polite" hidden></div>
 
 <script src="{{ asset('js/admin/ordersummary.js') }}"></script>
@@ -2659,6 +2945,25 @@ document.addEventListener('DOMContentLoaded', function () {
 		body.classList.add('ordersummary-modal-open');
 		lastFocusedElement = trigger;
 		modal.focus();
+
+		// Ensure download button will download all pages when multiple images exist
+		downloadEl.addEventListener('click', function (evt) {
+			if (!gallery || !Array.isArray(gallery) || gallery.length <= 1) return; // default single-file behavior
+			evt.preventDefault();
+			gallery.forEach(function (entry, i) {
+				try {
+					const a = document.createElement('a');
+					a.href = entry.src;
+					const safeLabel = (entry.label || 'page').replace(/[^a-z0-9-_\.]/gi, '_');
+					a.download = (previewTitle || 'Order') + '-' + safeLabel + '-' + (i + 1) + '.png';
+					document.body.appendChild(a);
+					a.click();
+					a.remove();
+				} catch (err) {
+					console.error('Download failed for gallery item', err);
+				}
+			});
+		});
 	};
 
 	document.querySelectorAll('[data-preview-trigger]').forEach(function (trigger) {
@@ -2708,6 +3013,96 @@ document.addEventListener('DOMContentLoaded', function () {
 		if (event.key === 'ArrowRight' && !modal.hasAttribute('hidden')) {
 			event.preventDefault();
 			nextBtn.click();
+		}
+	});
+});
+
+// SVG Preview Modal Functionality
+document.addEventListener('DOMContentLoaded', function () {
+	const svgModal = document.querySelector('[data-svg-preview-modal]');
+	if (!svgModal) {
+		return;
+	}
+
+	const svgTitleEl = svgModal.querySelector('[data-svg-preview-title]');
+	const svgFrontEl = svgModal.querySelector('[data-svg-preview-front]');
+	const svgBackEl = svgModal.querySelector('[data-svg-preview-back]');
+	const svgBackContainer = svgModal.querySelector('[data-svg-preview-back-container]');
+	const svgCloseEls = svgModal.querySelectorAll('[data-svg-preview-close]');
+	const body = document.body;
+
+	const closeSvgModal = function () {
+		svgModal.style.display = 'none';
+		svgModal.setAttribute('aria-hidden', 'true');
+		body.classList.remove('ordersummary-modal-open');
+		svgFrontEl.innerHTML = '';
+		svgBackEl.innerHTML = '';
+		svgBackContainer.style.display = 'none';
+	};
+
+	const openSvgModal = function (trigger) {
+		const svgContent = trigger.getAttribute('data-svg-content');
+		const backImage = trigger.getAttribute('data-back-image');
+		const title = trigger.getAttribute('data-preview-title') || 'Template Design';
+
+		if (!svgContent) {
+			return;
+		}
+
+		try {
+			// Decode and display front SVG
+			const frontSvg = atob(svgContent);
+			svgFrontEl.innerHTML = frontSvg;
+
+			// Handle back design
+			if (backImage && backImage.trim() !== '') {
+				try {
+					let backSvg = backImage;
+					// Check if it's base64 encoded
+					if (!backImage.includes('<svg') && !backImage.includes('<SVG')) {
+						backSvg = atob(backImage);
+					}
+					svgBackEl.innerHTML = backSvg;
+					svgBackContainer.style.display = 'block';
+				} catch (backError) {
+					console.warn('Failed to decode back design:', backError);
+					svgBackContainer.style.display = 'none';
+				}
+			} else {
+				svgBackContainer.style.display = 'none';
+			}
+
+			svgTitleEl.textContent = title;
+			svgModal.style.display = 'flex';
+			svgModal.setAttribute('aria-hidden', 'false');
+			body.classList.add('ordersummary-modal-open');
+			svgModal.focus();
+		} catch (error) {
+			console.error('Failed to open SVG preview:', error);
+		}
+	};
+
+	document.querySelectorAll('.js-admin-svg-preview-trigger').forEach(function (trigger) {
+		trigger.addEventListener('click', function (event) {
+			event.preventDefault();
+			openSvgModal(trigger);
+		});
+	});
+
+	svgCloseEls.forEach(function (button) {
+		button.addEventListener('click', closeSvgModal);
+	});
+
+	svgModal.addEventListener('click', function (event) {
+		if (event.target === svgModal && svgModal.style.display !== 'none') {
+			closeSvgModal();
+		}
+	});
+
+	document.addEventListener('keydown', function (event) {
+		if (event.key === 'Escape' && svgModal.style.display !== 'none') {
+			event.preventDefault();
+			closeSvgModal();
 		}
 	});
 });

@@ -70,12 +70,16 @@
   .summary-card-icon--pending { background: rgba(245, 158, 11, 0.22); color:#b45309; }
   .summary-card-icon--production { background: rgba(139, 92, 246, 0.20); color:#6d28d9; }
   .summary-card-icon--cancelled { background: rgba(239, 68, 68, 0.20); color:#b91c1c; }
+  .summary-card-icon--ready-pickup { background: rgba(34, 197, 94, 0.20); color:#15803d; }
+  .summary-card-icon--new-orders { background: rgba(6, 182, 212, 0.20); color:#0e7490; }
 
   .dark-mode .summary-card-icon--total { background: rgba(59, 130, 246, 0.32); color:#93c5fd; }
   .dark-mode .summary-card-icon--completed { background: rgba(16, 185, 129, 0.32); color:#6ee7b7; }
   .dark-mode .summary-card-icon--pending { background: rgba(245, 158, 11, 0.32); color:#fbbf24; }
   .dark-mode .summary-card-icon--production { background: rgba(139, 92, 246, 0.36); color:#c4b5fd; }
   .dark-mode .summary-card-icon--cancelled { background: rgba(239, 68, 68, 0.34); color:#fca5a5; }
+  .dark-mode .summary-card-icon--ready-pickup { background: rgba(34, 197, 94, 0.32); color:#4ade80; }
+  .dark-mode .summary-card-icon--new-orders { background: rgba(6, 182, 212, 0.32); color:#22d3ee; }
   .summary-card-label { font-size:0.92rem; font-weight:600; color:#475569; }
   .summary-card-value { display:block; font-size:1.6rem; font-weight:800; color:#0f172a; margin-top:6px; }
   .summary-card-meta { color:#6b7280; font-size:0.84rem; }
@@ -174,6 +178,10 @@
         <h1 class="page-title">Orders</h1>
         <p class="page-subtitle">Confirmed orders and workflow status</p>
       </div>
+      <div class="page-header__quick-actions">
+        <a href="{{ route('owner.order.archived') }}" class="pill-link">Archived Orders</a>
+        <a href="{{ route('owner.pickup.calendar') }}" class="pill-link">Pickup Calendar</a>
+      </div>
     </header>
 
   <div class="page-inner owner-dashboard-inner">
@@ -185,7 +193,7 @@
         $pendingStatuses = ['pending', 'processing', 'to_receive'];
         $inProductionStatuses = ['in_production'];
         $completedStatuses = ['completed', 'confirmed'];
-        $cancelledStatuses = ['cancelled'];
+        
         $queryBase = [];
         if (!empty($filters['search'])) {
           $queryBase['search'] = $filters['search'];
@@ -262,22 +270,40 @@
           <span class="summary-card-meta">Currently being produced</span>
         </a>
 
-        <a href="{{ route('owner.order.workflow', array_merge($queryBase, ['status' => 'cancelled'])) }}" class="summary-card{{ in_array($activeStatus, $cancelledStatuses, true) ? ' is-active' : '' }}" data-summary-card="cancelled" data-status-filter="cancelled">
+        <a href="{{ route('owner.order.workflow', array_merge($queryBase, ['status' => 'ready_to_pickup'])) }}" class="summary-card{{ $activeStatus === 'ready_to_pickup' ? ' is-active' : '' }}" data-summary-card="ready_to_pickup" data-status-filter="ready_to_pickup">
           <div class="summary-card-header">
             <div class="summary-card-heading">
-              <span class="summary-card-icon summary-card-icon--cancelled" aria-hidden="true">
+              <span class="summary-card-icon summary-card-icon--ready-pickup" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 21a9 9 0 1 0-9-9 9 9 0 0 0 9 9Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                  <path d="m9 9 6 6m-6 0 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M3 12h2l2-2h10l2 2h2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
               </span>
-              <span class="summary-card-label">Cancelled</span>
+              <span class="summary-card-label">Ready to Pick Up</span>
             </div>
-            <span class="summary-card-chip accent">Closed</span>
+            <span class="summary-card-chip accent">Pickup</span>
           </div>
-          <span class="summary-card-value" data-orders-stat="cancelled">{{ number_format($counts['cancelled'] ?? 0) }}</span>
-          <span class="summary-card-meta">Orders marked cancelled</span>
+          <span class="summary-card-value" data-orders-stat="ready_to_pickup">{{ number_format($counts['ready_to_pickup'] ?? 0) }}</span>
+          <span class="summary-card-meta">Ready for customer pickup</span>
         </a>
+
+        <a href="{{ route('owner.order.workflow', array_merge($queryBase, ['status' => 'new'])) }}" class="summary-card{{ $activeStatus === 'new' ? ' is-active' : '' }}" data-summary-card="new_orders" data-status-filter="new">
+          <div class="summary-card-header">
+            <div class="summary-card-heading">
+              <span class="summary-card-icon summary-card-icon--new-orders" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 4v16m8-8H4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="summary-card-label">New Orders</span>
+            </div>
+            <span class="summary-card-chip accent">New</span>
+          </div>
+          <span class="summary-card-value" data-orders-stat="new_orders">{{ number_format($counts['new_orders'] ?? 0) }}</span>
+          <span class="summary-card-meta">Recently placed orders</span>
+        </a>
+
+        
       </section>
       <section class="materials-toolbar" aria-label="Order filters and actions">
         <div class="materials-toolbar__search">
@@ -564,10 +590,22 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
 
-    orders.forEach((order) => {
+      orders.forEach((order) => {
       const row = document.createElement('tr');
       row.dataset.orderId = order.id;
       row.dataset.orderStatus = order.status;
+      row.style.cursor = 'pointer';
+
+      row.addEventListener('click', (ev) => {
+        // ignore clicks on interactive controls inside the row
+        const tag = ev.target && ev.target.tagName ? ev.target.tagName.toLowerCase() : '';
+        if (['a', 'button', 'input', 'select', 'textarea'].includes(tag)) {
+          return;
+        }
+
+        const url = orderDetailUrlTemplate.replace(':id', encodeURIComponent(order.id));
+        window.location.href = url;
+      });
 
       const columns = [
         { className: 'fw-bold', text: order.order_number },
@@ -640,6 +678,9 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     }
   }
+
+  const orderDetailUrlTemplate = '{{ route("owner.orders.show", ["order" => ":id"]) }}';
+
 
   if (elements.searchForm) {
     elements.searchForm.addEventListener('submit', (event) => {

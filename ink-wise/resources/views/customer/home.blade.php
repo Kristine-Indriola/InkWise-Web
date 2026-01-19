@@ -663,12 +663,11 @@
     <!-- Custom CSS -->
 
     <link rel="stylesheet" href="{{ asset('css/customer/customer.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/customer/customertemplates.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/customer/customertemplate.css') }}">
     <link rel="stylesheet" href="{{ asset('css/customer/template.css') }}">
 
     <!-- Custom JS -->
     <script src="{{ asset('js/customer/customer.js') }}" defer></script>
-    <script src="{{ asset('js/customer/customertemplate.js') }}" defer></script>
     <script src="{{ asset('js/customer/template.js') }}" defer></script>
 
     <!-- Alpine.js for interactivity -->

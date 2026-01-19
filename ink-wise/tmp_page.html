@@ -1,0 +1,2184 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inkwise Dashboard</title>
+    <script type="module" src="http://[::1]:5173/@vite/client"></script><link rel="stylesheet" href="http://[::1]:5173/resources/css/app.css" /><script type="module" src="http://[::1]:5173/resources/js/app.js"></script>
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+   <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Seasons&family=Montserrat:wght@400;500;700&display=swap');
+        @import url('https://fonts.cdnfonts.com/css/edwardian-script-itc');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;700&display=swap');
+        @import url('https://fonts.cdnfonts.com/css/bugaki');
+        @import url('https://fonts.cdnfonts.com/css/garet');
+        @import url('https://fonts.googleapis.com/css2?family=Forum&display=swap');
+        <!-- Ensure Cormorant loads early -->
+        <link rel="preload" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;700&display=swap" as="style">
+
+        :root {
+            --color-primary: #06b6d4;
+            --color-primary-dark: #0891b2;
+            --shadow-elevated: 0 16px 48px rgba(4, 29, 66, 0.18);
+            --font-display: 'Playfair Display', serif;
+            --font-accent: 'Seasons', serif;
+            --font-script: 'Edwardian Script ITC', cursive;
+            --font-body: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
+            --font-montserrat: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
+            --font-garet: 'Garet', 'Garet Display', sans-serif;
+            --font-bugaki: 'Bugaki', cursive;
+            --font-cormorant: 'Cormorant Garamond', 'Cormorant', serif;
+        }
+
+        .layout-container {
+            width: min(1200px, 100%);
+            margin-inline: auto;
+            padding-inline: clamp(24px, 5vw, 32px);
+        }
+
+        /* Topbar and hero base */
+        .topbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 60;
+            background: rgba(248, 246, 235, 0.92);
+            backdrop-filter: blur(18px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.65);
+        }
+
+        .topbar-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: min(1200px, 100%);
+            margin: 0 auto;
+            padding-inline: clamp(20px, 4vw, 32px);
+            padding-block: 0.7rem;
+            gap: 1.5rem;
+        }
+
+        .topbar-brand {
+            display: flex;
+            align-items: baseline;
+            gap: 0.25rem;
+            font-family: var(--font-bugaki);
+            text-transform: uppercase;
+            font-size: 1.25rem;
+            /* entire wordmark: no extra letter spacing */
+            letter-spacing: 0;
+            /* balanced vertical alignment for the wordmark */
+            line-height: 1.2;
+            color: #0b0b0b;
+            margin-left: -15rem; /* move logo further to the left */
+        }
+
+        /* Logo: the initial 'I' */
+        .logo-i {
+            /* Use Bugaki for the capital I as requested */
+            font-family: var(--font-bugaki) !important;
+            color: #000000 !important;
+            /* very bold Roman-numeral appearance */
+            font-weight: 1000 !important; /* may fallback to heaviest available */
+            font-size: 2.6rem !important; /* slightly reduced size */
+            display: inline-block;
+            /* ensure it's fully static */
+            animation: none !important;
+            -webkit-animation: none !important;
+            transition: none !important;
+            line-height: 1.2; /* match the wordmark */
+            letter-spacing: 0;
+            /* Stronger stroke and layered shadows for thickness */
+            -webkit-text-stroke: 3px #000; /* thicker WebKit stroke */
+            text-stroke: 3px #000; /* fallback */
+            text-shadow:
+                0 1px 0 rgba(0,0,0,0.18),
+                1px 0 0 rgba(0,0,0,0.16),
+               -1px 0 0 rgba(0,0,0,0.16),
+                0 2px 0 rgba(0,0,0,0.08),
+                0 3px 0 rgba(0,0,0,0.04);
+        }
+
+        /* Ensure any script-specific rules don't override the Times styling */
+        .logo-i.logo-script {
+            font-family: 'Times New Roman', Times, serif !important;
+            font-style: normal !important;
+            font-weight: 700 !important;
+        }
+
+        .topbar-brand .logo-serif {
+            font-family: var(--font-garet);
+            font-size: 1rem;
+            letter-spacing: 0; /* characters sit tightly together */
+            line-height: 1.2; /* balanced vertical alignment */
+            text-transform: uppercase; /* caps lock */
+            color: inherit;
+            font-weight: 400; /* not bold */
+        }
+
+        .topbar-nav {
+            display: flex;
+            gap: clamp(0.75rem, 2vw, 1.5rem);
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            /* push nav links further toward the right side of the topbar (overlap slightly) */
+            margin-left: auto;
+            margin-right: -8rem;
+            font-family: var(--font-garet);
+            font-size: clamp(0.9rem, 1vw, 1.05rem);
+            text-transform: uppercase;
+        }
+
+        #mainNav a {
+            color: #1f2937;
+            padding: 0.4rem 0.85rem;
+            border-radius: 999px;
+            transition: color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+        }
+
+        #mainNav a:hover {
+            color: #0f172a;
+            background: rgba(255, 255, 255, 0.6);
+            transform: translateY(-1px);
+        }
+
+        #mainNav .topbar-signup {
+            background: #0f172a;
+            color: #fff;
+            padding: 0.55rem 1.35rem;
+            font-weight: 600;
+            border-radius: 999px;
+        }
+
+        #mainNav .topbar-signup:hover {
+            background: #1f2937;
+        }
+
+        #mainNav.mobile-open {
+            display: flex !important;
+            flex-direction: column;
+            gap: 0.35rem;
+            margin-top: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            box-shadow: 0 18px 36px rgba(15, 23, 42, 0.14);
+        }
+
+        /* Hero section styling */
+        .hero-section {
+            position: relative;
+            /* reduce top gap so the hero content sits higher on the page */
+            padding-top: clamp(60px, 8vw, 90px);
+            padding-bottom: clamp(120px, 12vw, 160px);
+            /* keep a tall hero but allow the visual to start nearer the top */
+            min-height: calc(110vh - 80px);
+            background-color: #f8f6eb;
+            background-image: url(http://127.0.0.1:8000/customerVideo/Video/wed.jpg);
+            background-size: cover;
+            /* anchor the background higher so image content moves up */
+            background-position: center top;
+            background-repeat: no-repeat;
+            overflow: hidden;
+        }
+
+        .hero-section::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(248, 246, 235, 0.7), rgba(248, 246, 235, 0));
+            z-index: 1;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            max-width: min(780px, 100%);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            text-align: left;
+            /* shift the text content to the right */
+            margin-left: 7rem;
+        }
+
+        /* Two-column hero layout: visual (left) + content (right) */
+        .hero-inner {
+            display: flex;
+            align-items: center;
+            gap: clamp(1rem, 4vw, 3rem);
+            max-width: 1200px;
+            margin: 0 auto;
+            padding-inline: clamp(20px, 4vw, 32px);
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-visual {
+            flex: 0 0 clamp(320px, 45%, 520px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* move the visual down */
+            margin-top: 2rem;
+            /* move a little to the left */
+            margin-left: -9rem;
+        }
+
+        .hero-frame {
+            width: 100%;
+            aspect-ratio: 3/4;
+            overflow: hidden;
+            display: block;
+            position: relative;
+        }
+
+        .hero-frame-img,
+        .hero-frame-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            -webkit-mask-image: url('http://127.0.0.1:8000/customerVideo/Video/shape.gif');
+            -webkit-mask-repeat: no-repeat;
+            -webkit-mask-position: center;
+            -webkit-mask-size: cover;
+            mask-image: url('http://127.0.0.1:8000/customerVideo/Video/shape.gif');
+            mask-repeat: no-repeat;
+            mask-position: center;
+            mask-size: cover;
+        }
+
+        @media (max-width: 900px) {
+            .hero-inner { flex-direction: column-reverse; text-align: center; }
+            .hero-visual { margin-bottom: 1rem; }
+            .hero-content { max-width: 100%; }
+        }
+
+        .hero-title {
+            display: flex;
+            flex-direction: row; /* place the two words side-by-side */
+            gap: 0.75rem;
+            align-items: flex-end;
+            font-size: clamp(2.7rem, 6vw, 4.5rem);
+            line-height: 1.05;
+            text-transform: uppercase;
+            font-weight: 800;
+        }
+
+        /* Render the two words vertically (letters stacked top->bottom).
+           Use vertical writing mode with upright text orientation so letters remain readable.
+           Also enforce non-bold weight and 15px size as requested. */
+        .hero-title-invitation,
+        .hero-title-maker {
+            display: inline-block;
+            writing-mode: horizontal-tb;
+            text-orientation: mixed;
+            font-weight: 400; /* not bold */
+            line-height: 1;
+            -webkit-font-smoothing: antialiased;
+            text-transform: uppercase;
+            margin: 0;
+        }
+
+        .hero-title-invitation { font-family: var(--font-montserrat); font-size: 80px; letter-spacing: 10px; line-height: 1.2; }
+        .hero-title-maker {
+            font-family: 'Times New Roman MT Condensed', 'Times New Roman', serif;
+            color: #545454;
+            letter-spacing: 0.12em;
+            font-size: 60px;
+            font-style: italic;
+            line-height: 1.2;
+        }
+
+        .hero-tagline {
+            font-family: var(--font-cormorant);
+            font-size: clamp(1.15rem, 2vw, 1.5rem);
+            color: #1f2937;
+            max-width: 600px;
+            line-height: 1.4;
+            text-align: center;
+        }
+
+        .hero-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+
+        .hero-btn {
+            font-family: var(--font-cormorant);
+            padding: 0.95rem 1.9rem;
+            border-radius: 999px;
+            font-size: 1rem;
+            transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 160px;
+            text-align: center;
+        }
+
+        .hero-btn--primary {
+            background: #111111;
+            color: #ffffff;
+            border: 2px solid #111111;
+        }
+
+        .hero-btn--ghost {
+            background: rgba(255, 255, 255, 0.85);
+            color: #111111;
+            border: 2px solid rgba(0, 0, 0, 0.1);
+            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+        }
+
+        .hero-btn:hover {
+            transform: translateY(-2px) scale(1.01);
+        }
+
+        .hero-btn--ghost:hover {
+            background: #ffffff;
+            border-color: #111111;
+        }
+
+        @media (max-width: 768px) {
+            .topbar-inner {
+                flex-wrap: wrap;
+            }
+
+            .hero-title {
+                letter-spacing: 0.15em;
+            }
+
+            #mainNav {
+                display: none;
+            }
+
+            #mainNav.mobile-open {
+                margin-top: 0.6rem;
+            }
+        }
+
+        /* Full-page background video (behind main content) */
+        .page-bg-video {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.85;
+            filter: saturate(1.05) contrast(1.02);
+        }
+
+        /* Categories section background video */
+        .categories-section { position: relative; overflow: hidden; }
+        .section-with-media {
+            position: relative;
+            overflow: hidden;
+            background-color: #f8f6eb;
+        }
+        .section-base {
+            position: relative;
+            background-color: #f8f6eb;
+        }
+        .section-bg-media {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+            pointer-events: none;
+            filter: brightness(0.86);
+        }
+        .categories-content { position: relative; z-index: 10; }
+
+        /* Generic section background video styles (usable by about/contact/categories) */
+        .section-bg-video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.45;
+            transform: scale(1.06);
+            filter: brightness(0.9) saturate(0.95);
+        }
+        .section-content { position: relative; z-index: 10; }
+        .section-bg-overlay { position: absolute; inset: 0; z-index: 5; background: linear-gradient(rgba(255,255,255,0.18), rgba(255,255,255,0.22)); pointer-events: none; }
+
+        /* Hide heavy background video on small screens */
+        @media (max-width: 767px) {
+            .categories-bg-video, .section-bg-video { display: none; }
+        }
+
+        /* Make card images appear transparent and sharp */
+        .transparent-card-img {
+            background: transparent !important;
+            padding: 0 !important;
+            object-fit: contain !important;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            -webkit-backface-visibility: hidden;
+        }
+
+        /* Ensure dashboard hero sits above the dashboard background video */
+        body#dashboard main {
+            position: relative;
+            overflow: visible;
+        }
+        body#dashboard main > .section-bg-video {
+            z-index: 0;
+            opacity: 0.32; /* slightly dim for readability */
+        }
+        /* Coco Gothic labels for category headings */
+        .coco-gothic {
+            font-family: 'Coco Gothic', 'CocoGothic', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+            letter-spacing: 0.02em;
+            font-weight: 700 !important;
+        }
+        /* Uppercase only the main Categories title */
+        .categories-title { text-transform: uppercase; }
+
+        /* Cormorant Garamond for descriptive text */
+        .cormorant {
+            font-family: 'Cormorant Garamond', serif !important;
+            font-weight: 400 !important;
+            color: #475569 !important; /* slightly muted slate for readability */
+        }
+
+        .layout-stack {
+            display: flex;
+            flex-direction: column;
+            gap: clamp(40px, 6vw, 72px);
+        }
+
+        body {
+            font-family: var(--font-body);
+            color: #1f2937;
+            background-color: #f8f6eb;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: var(--font-display);
+        }
+
+        a {
+            transition: color .2s ease, transform .2s ease;
+        }
+
+        /* About section redesign */
+        .about-section {
+            position: relative;
+        }
+
+        .about-elevated {
+            display: grid;
+            grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.2fr);
+            gap: clamp(2rem, 6vw, 4rem);
+            align-items: center;
+        }
+
+        .about-left {
+            position: relative;
+        }
+
+        .about-image-wrapper {
+            position: relative;
+            display: grid;
+            place-items: center;
+            padding: clamp(1.5rem, 5vw, 3rem);
+            background: radial-gradient(circle at top, rgba(255, 192, 203, 0.45), rgba(252, 157, 155, 0.25));
+            border-radius: 32px;
+        }
+
+        .about-invite-badge {
+            position: absolute;
+            top: clamp(-18px, -4vw, -24px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #fdf1f3;
+            border: 1px solid rgba(255, 182, 193, 0.6);
+            color: #cc527a;
+            font-family: var(--font-garet);
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            font-size: 0.7rem;
+            padding: 0.55rem 1.4rem;
+            border-radius: 999px;
+            box-shadow: 0 12px 24px rgba(204, 82, 122, 0.12);
+        }
+
+        .about-image-arch {
+            width: clamp(220px, 80%, 320px);
+            aspect-ratio: 3 / 4;
+            border-radius: 160px 160px 60px 60px;
+            overflow: hidden;
+            position: relative;
+            box-shadow:
+                0 20px 45px rgba(204, 82, 122, 0.22),
+                0 20px 40px rgba(0, 0, 0, 0.08);
+        }
+
+        .about-image-arch img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .about-title-overlay {
+            position: absolute;
+            bottom: 1.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 0.6rem 1.5rem;
+            border-radius: 999px;
+            font-family: var(--font-cormorant);
+            font-size: clamp(1rem, 2vw, 1.25rem);
+            color: #8d3c65;
+            letter-spacing: 0.08em;
+            box-shadow: 0 14px 28px rgba(141, 60, 101, 0.18);
+        }
+
+        .about-line-accent {
+            position: absolute;
+            bottom: -30px;
+            right: clamp(12px, 4vw, 32px);
+            width: clamp(80px, 20vw, 130px);
+            height: 2px;
+            background: linear-gradient(90deg, rgba(255, 192, 203, 0), rgba(204, 82, 122, 0.65));
+        }
+
+        .about-circle-accent {
+            position: absolute;
+            bottom: -50px;
+            left: clamp(15px, 3vw, 42px);
+            width: clamp(50px, 15vw, 70px);
+            height: clamp(50px, 15vw, 70px);
+            border-radius: 50%;
+            background: radial-gradient(circle at center, rgba(255, 192, 203, 0.6), rgba(252, 157, 155, 0.35));
+            opacity: 0.85;
+        }
+
+        .about-right {
+            position: relative;
+            background: #fefcf5;
+            border-radius: 36px;
+            padding: clamp(2rem, 5vw, 3.5rem);
+            box-shadow: 0 25px 60px rgba(69, 56, 32, 0.12);
+        }
+
+        .about-content {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            text-align: left;
+        }
+
+        .about-heading {
+            font-family: 'Forum', serif;
+            font-size: clamp(2.2rem, 4vw, 3rem);
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: #000000; /* changed to black */
+            display: flex;
+            flex-direction: row; /* show "About" and "Us" side-by-side */
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .about-heading span {
+            font-size: clamp(1.5rem, 3vw, 2rem);
+            letter-spacing: 0.35em;
+            color: #000000; /* changed to black */
+            margin-right: 0.25rem;
+        }
+
+        .about-subheading {
+            font-family: var(--font-garet);
+            text-transform: uppercase;
+            letter-spacing: 0.45em;
+            font-size: 0.85rem;
+            color: rgba(47, 42, 38, 0.7);
+        }
+
+        .about-body {
+            font-family: var(--font-montserrat);
+            font-size: clamp(1rem, 2vw, 1.05rem);
+            line-height: 1.8;
+            color: rgba(47, 42, 38, 0.78);
+        }
+
+        @media (max-width: 900px) {
+            .about-elevated {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+
+            .about-left {
+                order: -1;
+                display: grid;
+                place-items: center;
+            }
+
+            .about-right {
+                margin-top: clamp(1rem, 4vw, 2rem);
+            }
+
+            .about-content {
+                text-align: center;
+                align-items: center;
+            }
+
+            .about-heading {
+                align-items: center;
+            }
+        }
+
+        .logo-i {
+            line-height: 1;
+            font-family: var(--font-bugaki) !important;
+            color: #000000 !important;
+            animation: none !important;
+            transform: none !important;
+        }
+
+        .logo-script {
+            font-family: var(--font-script);
+            color: var(--color-primary);
+        }
+
+        .logo-serif {
+            font-family: var(--font-garet);
+            color: var(--color-primary-dark);
+            letter-spacing: 0;
+            text-transform: uppercase;
+            line-height: 0.9;
+        }
+
+        .page-title {
+            font-size: 1.1rem;
+        }
+
+        .btn-primary {
+            background: var(--color-primary);
+            color: #ffffff;
+            font-family: var(--font-display);
+        }
+
+        .btn-outline {
+            border: 2px solid transparent;
+            background-origin: border-box;
+            background-clip: padding-box, border-box;
+            background-image: linear-gradient(#ffffff, #ffffff), linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+            color: #1f2937;
+            font-family: var(--font-display);
+        }
+
+        .btn-outline:hover {
+            color: var(--color-primary-dark);
+        }
+
+        .focus-ring:focus {
+            outline: 3px solid rgba(6, 182, 212, 0.25);
+            outline-offset: 2px;
+        }
+
+        .template-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .space-y-6 {
+            gap: .75rem;
+        }
+
+        .text-5xl {
+            font-size: 2.25rem;
+        }
+
+        .text-lg {
+            font-size: 0.95rem;
+        }
+
+        .chat-widget {
+            position: fixed;
+            right: 1.25rem;
+            bottom: 1.25rem;
+            z-index: 60;
+        }
+
+        .chat-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            padding: 6px;
+            background: linear-gradient(90deg, #5de0e6, #004aad);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 26px rgba(4, 29, 66, 0.14);
+            cursor: pointer;
+            transition: transform .15s ease, box-shadow .15s ease;
+        }
+
+        .chat-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 14px 30px rgba(4, 29, 66, 0.18);
+        }
+
+        .chat-btn:active {
+            transform: scale(.98);
+        }
+
+        .chat-inner {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .chat-inner img {
+            width: 45px;
+            height: 45px;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+
+        .chat-panel {
+            width: 560px;
+            max-width: calc(100vw - 3rem);
+            position: absolute;
+            right: 0;
+            bottom: 100px;
+            background: #ffffff;
+            border-radius: 14px;
+            box-shadow: var(--shadow-elevated);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(0, 0, 0, 0.04);
+        }
+
+        /* icon placement for header */
+        .nav-icon-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.35rem;
+            height: 1.35rem;
+            border-radius: 9999px;
+            border: none;
+            background: transparent;
+            color: #f472b6;
+            transition: transform 0.2s ease, color 0.2s ease;
+            box-shadow: none;
+            position: relative;
+        }
+
+        .nav-icon-button:hover {
+            transform: translateY(-1px);
+            color: #e11d48;
+        }
+
+        .nav-icon-button i {
+            font-size: 0.75rem;
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -3px;
+            right: -3px;
+            background: #ef4444;
+            color: white;
+            border-radius: 9999px;
+            padding: 1px 4px;
+            font-size: 9px;
+            font-weight: 700;
+            min-width: 16px;
+            text-align: center;
+        }
+
+        .chat-header {
+            padding: 16px 18px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+        }
+
+        .chat-header h4 {
+            margin: 0;
+            font-weight: 800;
+            font-size: 16px;
+            color: #044e86;
+        }
+
+        .chat-body {
+            padding: 16px 16px 18px;
+            max-height: 520px;
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            scroll-behavior: smooth;
+            background: linear-gradient(180deg, rgba(6, 182, 212, 0.02), transparent);
+        }
+
+        .chat-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            overflow: hidden;
+        }
+
+        .chat-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+
+        .chat-body::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        .chat-body::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .chat-body::-webkit-scrollbar-thumb {
+            background: rgba(4, 29, 66, 0.1);
+            border-radius: 9999px;
+        }
+
+        .chat-input {
+            display: flex;
+            gap: 12px;
+            padding: 14px;
+            border-top: 1px solid rgba(0, 0, 0, 0.04);
+        }
+
+        .chat-input input[type="text"] {
+                    /* Ensure template images scale nicely */
+                .template-image { width: 100%; height: 100%; object-fit: cover; }
+            position: relative;
+            max-width: 86%;
+            padding: 12px 14px;
+            border-radius: 16px;
+            font-size: 15px;
+            line-height: 1.4;
+            word-break: break-word;
+            box-shadow: 0 8px 22px rgba(4, 29, 66, 0.05);
+        }
+
+        .msg .avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 9999px;
+            overflow: hidden;
+            flex-shrink: 0;
+            box-shadow: 0 3px 8px rgba(4, 29, 66, 0.06);
+        }
+
+        .msg .bubble {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 48px;
+        }
+
+        .msg .text {
+            white-space: pre-wrap;
+        }
+
+        .msg .time {
+            font-size: 12px;
+            color: #6b7280;
+            align-self: flex-end;
+            margin-top: 6px;
+        }
+
+        .msg.user {
+            background: linear-gradient(180deg, #e6f7fb, #c9f0f5);
+            margin-left: auto;
+            align-self: flex-end;
+            color: #022a37;
+            border-bottom-right-radius: 6px;
+        }
+
+        .msg.bot {
+            background: linear-gradient(180deg, #f4f8ff, #eaf3ff);
+            align-self: flex-start;
+            color: #03305a;
+            border-bottom-left-radius: 6px;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .msg.bot::after,
+        .msg.user::after {
+            content: "";
+            position: absolute;
+            top: 16px;
+            width: 14px;
+            height: 14px;
+            transform: rotate(45deg);
+            box-shadow: 0 8px 14px rgba(4, 29, 66, 0.03);
+            border-radius: 2px;
+            z-index: 0;
+            background: inherit;
+        }
+
+        .msg.bot::after {
+            left: -7px;
+        }
+
+        .msg.user::after {
+            right: -7px;
+        }
+
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            right: 0;
+            margin-top: 0.5rem;
+            width: 12rem;
+            background: #ffffff;
+            border-radius: 0.75rem;
+            box-shadow: 0 16px 32px rgba(2, 6, 23, 0.16);
+            border: 1px solid rgba(0, 0, 0, 0.04);
+            overflow: hidden;
+            transform: translateY(0.5rem);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            z-index: 50;
+        }
+
+        .dropdown-menu.is-open {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .dropdown-menu a,
+        .dropdown-menu button,
+        .dropdown-menu div {
+            display: block;
+            width: 100%;
+            padding: 0.5rem 1rem;
+            font-size: 0.95rem;
+            color: #374151;
+            background: transparent;
+            text-align: left;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+
+        .dropdown-menu a:hover,
+        .dropdown-menu button:hover,
+        .dropdown-menu div:hover {
+            background: #e0f7fa;
+            color: #065f73;
+        }
+
+        #bgCanvas {
+            display: block;
+            background: linear-gradient(180deg, #ffffff, #fbfdff);
+        }
+
+        #mainNav.mobile-open {
+            display: flex !important;
+        }
+
+        #mainNav {
+            z-index: 40;
+            position: relative;
+        }
+
+        @media (max-width: 767px) {
+            #mainNav {
+                display: none;
+                position: relative;
+                width: 100%;
+            }
+
+            .chat-btn {
+                width: 70px;
+                height: 70px;
+            }
+
+            .chat-inner img,
+            .chat-avatar {
+                width: 38px;
+                height: 38px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+   </style>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Icon fonts used by invitations/header -->
+    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-bold-rounded/css/uicons-bold-rounded.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+    <meta name="csrf-token" content="Hjz7OOO4ONfSJm2U0pX4QyYa5gGvn9axbLHlE4hA">
+
+            <script>
+            window.__OPEN_MODAL__ = 'login';
+        </script>
+    
+    <!-- Custom CSS -->
+
+    <link rel="stylesheet" href="http://127.0.0.1:8000/css/customer/customer.css">
+    <link rel="stylesheet" href="http://127.0.0.1:8000/css/customer/customertemplate.css">
+    <link rel="stylesheet" href="http://127.0.0.1:8000/css/customer/template.css">
+
+    <!-- Custom JS -->
+    <script src="http://127.0.0.1:8000/js/customer/customer.js" defer></script>
+    <script src="http://127.0.0.1:8000/js/customer/customertemplate.js" defer></script>
+    <script src="http://127.0.0.1:8000/js/customer/template.js" defer></script>
+
+    <!-- Alpine.js for interactivity -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.10.2/cdn.min.js" defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script&display=swap" rel="stylesheet">
+      <link rel="icon" type="image/png" href="http://127.0.0.1:8000/adminimage/ink.png">
+    <!-- Chat widget styles -->
+    <style>
+        /* Responsive tweaks for dashboard */
+        .logo-i { line-height: 1; }
+        .page-title { font-size: 1.1rem; }
+
+        /* Ensure template images scale nicely */
+        .template-image { width: 100%; height: 100%; object-fit: cover; }
+
+    /* Hero spacing tweaks */
+    .space-y-6 { gap: .75rem; }
+    .text-5xl { font-size: 2.25rem; }
+    .text-lg { font-size: 0.95rem; }
+
+        /* Accessible focus styles */
+        .focus-ring:focus { outline: 3px solid rgba(6,182,212,0.25); outline-offset: 2px; }
+
+        /* Chat widget container (fixed bottom-right) */
+        .chat-widget { position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 60; }
+
+        /* Circular button with 90deg linear-gradient stroke (enlarged) */
+       .chat-btn {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    padding: 6px;
+    background: linear-gradient(90deg, #5de0e6, #004aad);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 26px rgba(4, 29, 66, 0.14);
+    cursor: pointer;
+    transition: transform .15s ease;
+}
+        .chat-btn:active { transform: scale(.98); }
+
+        /* inner circle that holds the image */
+       .chat-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+       .chat-inner img {
+    width: 45px;   /* fixed size */
+    height: 45px;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+        /* chat panel (enlarged for readability) */
+      .chat-panel {
+    width: 560px;
+    max-width: calc(100vw - 3rem);
+    position: absolute;
+    right: 0;
+    bottom: 100px;
+    background: #ffffff;
+    border-radius: 14px;
+    box-shadow: 0 16px 48px rgba(4,29,66,0.18);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid rgba(0,0,0,0.04);
+}
+        .chat-header { padding: 16px 18px; display:flex; gap:12px; align-items:center; border-bottom: 1px solid rgba(0,0,0,0.04); }
+        .chat-header h4 { margin:0; font-weight:800; font-size:16px; color:#044e86; }
+        .chat-body {
+            padding:16px;
+            padding-bottom: 18px;
+            max-height:520px;
+            overflow:auto;
+            display:flex;
+            flex-direction:column;
+            gap:14px;
+            scroll-behavior:smooth;
+            background: linear-gradient(180deg, rgba(6,182,212,0.02), transparent);
+        }
+
+        .chat-avatar {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    overflow: hidden;
+}
+.chat-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+
+
+
+
+        /* custom thin scrollbar */
+        .chat-body::-webkit-scrollbar { width: 10px; }
+        .chat-body::-webkit-scrollbar-track { background: transparent; }
+        .chat-body::-webkit-scrollbar-thumb { background: rgba(4,29,66,0.10); border-radius: 9999px; }
+
+        .chat-input { display:flex; gap:12px; padding:14px; border-top:1px solid rgba(0,0,0,0.04); }
+        .chat-input input[type="text"]{ flex:1; border-radius:999px; padding:12px 18px; border:1px solid rgba(0,0,0,0.08); outline:none; background:#fbfeff; font-size:15px; }
+        .chat-input button{ background:#06b6d4; color:#fff; border-radius:999px; padding:10px 16px; border:0; cursor:pointer; font-weight:700; }
+
+        /* message bubbles (larger) */
+        .msg { display:inline-flex; position:relative; max-width:86%; padding:12px 14px; border-radius:16px; font-size:15px; line-height:1.4; word-break:break-word; box-shadow: 0 8px 22px rgba(4,29,66,0.05); }
+        .msg .avatar { width:44px; height:44px; border-radius:9999px; overflow:hidden; flex-shrink:0; box-shadow:0 3px 8px rgba(4,29,66,0.06); }
+        .msg .bubble { display:flex; flex-direction:column; gap:8px; min-width:48px; }
+        .msg .text { white-space:pre-wrap; }
+        .msg .time { font-size:12px; color:#6b7280; align-self:flex-end; margin-top:6px; }
+
+        .msg.user {
+            background: linear-gradient(180deg,#e6f7fb,#c9f0f5);
+            margin-left:auto;
+            align-self:flex-end;
+            color:#022a37;
+            border-bottom-right-radius:6px;
+        }
+        .msg.bot {
+            background: linear-gradient(180deg,#f4f8ff,#eaf3ff);
+            align-self:flex-start;
+            color:#03305a;
+            border-bottom-left-radius:6px;
+            gap:12px;
+            align-items:flex-start;
+        }
+
+        /* little "tail" on bubbles */
+        .msg.bot::after, .msg.user::after {
+            content: "";
+            position: absolute;
+            top: 16px;
+            width: 14px;
+            height: 14px;
+            transform: rotate(45deg);
+            box-shadow: 0 8px 14px rgba(4,29,66,0.03);
+            border-radius: 2px;
+            z-index: 0;
+            background: inherit;
+        }
+        .msg.bot::after { left: -7px; }
+        .msg.user::after { right: -7px; }
+
+        /* responsive tweaks */
+
+       @media (max-width: 720px) {
+    .chat-panel { width: 92vw; right: 4%; bottom: 88px; }
+    .chat-btn { width: 70px; height: 70px; }
+    .chat-inner img, .chat-avatar { width: 38px; height: 38px; }
+}
+
+        @media (max-width: 720px) {
+            .chat-panel { width: 92vw; right: 4%; bottom: 88px; }
+            .chat-btn { width: 80px; height: 80px; }
+        }
+
+        /* Floating centered topbar with rounded corners */
+        .topbar {
+            position: fixed;
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            /* slightly wider floating bar (tiny bump) */
+            width: calc(100% - 8px);
+            max-width: 1800px;
+            z-index: 80;
+            border-radius: 30px;
+            background: rgba(218, 218, 218, 0.6);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            box-shadow: 0 12px 40px rgba(2,6,23,0.12);
+            border: 1px solid rgba(255,255,255,0.6);
+        }
+
+        @media (max-width: 768px) {
+            .topbar { width: calc(100% - 24px); top: 12px; }
+        }
+
+        /* Reduce top padding since topbar is now floating */
+        body { padding-top: 32px; }
+
+    </style>
+</head>
+<body id="dashboard" class="antialiased">
+
+    
+   <!-- Top Navigation Bar -->
+<header class="shadow animate-fade-in-down topbar">
+    <div class="topbar-inner">
+        <div class="topbar-brand">
+            <span class="text-3xl font-bold logo-i logo-script">I</span>
+            <span class="text-lg font-bold logo-serif">nkwise</span>
+        </div>
+
+        <nav id="mainNav" class="hidden md:flex topbar-nav" role="navigation">
+            <a href="#dashboard" class="topbar-link">Home</a>
+            <a href="#categories" class="topbar-link">Categories</a>
+            <a href="#templates" class="topbar-link">Template</a>
+            <a href="#about" class="topbar-link">About</a>
+            <a href="#contact" class="topbar-link">Contact</a>
+        </nav>
+
+        <div class="hidden md:flex items-center gap-3 ml-auto">
+            <form action="http://127.0.0.1:8000/search" method="GET" class="flex items-center gap-2">
+                <div class="relative">
+                    <input type="text" name="query" placeholder="Search..."
+                           class="w-44 border border-gray-300 rounded-full px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#06b6d4] focus:border-transparent transition-all pr-8" />
+                    <button type="submit" class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/>
+                        </svg>
+                    </button>
+                </div>
+            </form>
+
+                            <a href="http://127.0.0.1:8000/landingpage?modal=login" id="openLogin"
+                   class="px-4 py-1.5 text-xs font-semibold text-white rounded-full hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[#a6b7ff]"
+                   style="background: linear-gradient(90deg, #000000, #737373);">
+                    Sign in
+                </a>
+            
+                    </div>
+
+        <div class="flex items-center gap-2 md:hidden">
+            <button id="mobileSearchBtn" class="p-1.5 rounded-md focus-ring" aria-label="Toggle search" title="Search">
+                <svg class="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
+            </button>
+            <button id="mobileNavBtn" class="p-1.5 rounded-md focus-ring" aria-label="Toggle navigation" aria-controls="mainNav" aria-expanded="false">
+                <svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+        </div>
+    </div>
+
+    <div id="mobileSearch" class="hidden md:hidden w-full px-4 mt-2">
+        <form action="http://127.0.0.1:8000/search" method="GET" class="relative">
+            <input type="text" name="query" placeholder="Search..." class="w-full border rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring focus:ring-[#06b6d4]" />
+            <button type="submit" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/>
+                </svg>
+            </button>
+        </form>
+    </div>
+</header>
+        
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // inject icons into header right-side (only on desktop)
+    try {
+        const headerRight = document.querySelector('header .hidden.md\\:flex.items-center.gap-3');
+        // check if icons already present anywhere
+        if (!document.querySelector('.nav-icon-button')) {
+            const notifications = document.createElement('a');
+            notifications.className = 'nav-icon-button';
+            notifications.setAttribute('href', 'http://127.0.0.1:8000/customer/notifications');
+            notifications.setAttribute('aria-label', 'Notifications');
+            notifications.setAttribute('title', 'Notifications');
+            notifications.innerHTML = '<i class="fa-regular fa-bell" style="color: black;" aria-hidden="true"></i>';
+
+            // Add notification badge if there are unread notifications
+            
+            const fav = document.createElement('a');
+            fav.className = 'nav-icon-button';
+            fav.setAttribute('href', 'http://127.0.0.1:8000/customer/favorites');
+            fav.setAttribute('aria-label', 'My favorites');
+            fav.setAttribute('title', 'My favorites');
+            fav.innerHTML = '<i class="fa-regular fa-heart" style="color: black;" aria-hidden="true"></i>';
+
+            const cart = document.createElement('a');
+            cart.className = 'nav-icon-button';
+            cart.setAttribute('href', '/order/addtocart');
+            cart.setAttribute('aria-label', 'My cart');
+            cart.setAttribute('title', 'My cart');
+            cart.innerHTML = '<i class="fa-solid fa-bag-shopping" style="color: black;" aria-hidden="true"></i>';
+
+            if (headerRight) {
+                // Find the search form
+                const searchForm = headerRight.querySelector('form');
+                if (searchForm) {
+                    const iconsWrap = document.createElement('div');
+                    iconsWrap.className = 'flex items-center gap-2';
+                    iconsWrap.appendChild(notifications);
+                    iconsWrap.appendChild(fav);
+                    iconsWrap.appendChild(cart);
+                    // insert after the search form
+                    searchForm.insertAdjacentElement('afterend', iconsWrap);
+                } else {
+                    const container = document.createElement('div');
+                    container.className = 'flex items-center gap-2';
+                    container.appendChild(notifications);
+                    container.appendChild(fav);
+                    container.appendChild(cart);
+                    headerRight.insertBefore(container, headerRight.firstChild);
+                }
+            }
+        }
+    } catch (e) { console.error('Icon injection error:', e); }
+
+    // Attach behavior: check server order, create from sessionStorage if missing, then redirect to /order/addtocart
+    const storageKey = 'inkwise-finalstep';
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    const icons = Array.from(document.querySelectorAll('.nav-icon-button'));
+    if (!icons.length) return;
+
+    const serverHasOrder = async () => {
+        try {
+            const res = await fetch('/order/summary.json', { method: 'GET', headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
+            return res.ok;
+        } catch (e) { return false; }
+    };
+
+    const createOrderFromSummary = async (summary) => {
+        if (!summary) return false;
+        const pid = summary.productId ?? summary.product_id ?? null;
+        const quantity = Number(summary.quantity ?? 10);
+        if (!pid) return false;
+        try {
+            const res = await fetch('/order/cart/items', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {})
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ product_id: Number(pid), quantity: Number(quantity) })
+            });
+            return res.ok;
+        } catch (e) { return false; }
+    };
+
+    icons.forEach((icon) => {
+        try {
+            if (icon.getAttribute && icon.getAttribute('aria-disabled') === 'true') {
+                icon.setAttribute('data-was-aria-disabled', 'true');
+                icon.removeAttribute('aria-disabled');
+                try { icon.style.pointerEvents = 'auto'; } catch (e) {}
+                try { icon.setAttribute('tabindex', '0'); } catch (e) {}
+                try { icon.setAttribute('role', 'button'); } catch (e) {}
+                icon.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); icon.click(); } });
+            }
+        } catch (e) { /* ignore */ }
+
+        icon.addEventListener('click', async (e) => {
+            // Skip order logic for notification bell icon
+            if (icon.querySelector('i.fi-br-bell')) {
+                return; // Let it go to the notifications page
+            }
+
+            try {
+                e.preventDefault();
+                if (await serverHasOrder()) { window.location.href = '/order/addtocart'; return; }
+                let raw = null; try { raw = window.sessionStorage.getItem(storageKey); } catch (err) { raw = null; }
+                let summary = null; try { summary = raw ? JSON.parse(raw) : null; } catch (err) { summary = null; }
+                if (summary && (summary.productId || summary.product_id)) {
+                    const created = await createOrderFromSummary(summary);
+                    if (created) { window.location.href = '/order/addtocart'; return; }
+                }
+                const href = icon.getAttribute('href');
+                if (href && href !== '#') { window.location.href = href; return; }
+                window.location.href = '/order/addtocart';
+            } catch (err) { window.location.href = '/order/summary'; }
+        });
+    });
+});
+</script>
+
+
+<div class="py-2 px-4">
+            </div>
+
+    <!-- Main Content -->
+    <main class="hero-section" style="padding-top: 36px !important; background-position: center top !important; min-height: calc(100vh - 40px) !important;">
+        <div class="hero-inner">
+            <div class="hero-visual">
+                <div class="hero-frame">
+                    <!-- Masked video preview: wedding.mp4 (muted, autoplay, loop) with wed.jpg as poster -->
+                    <video class="hero-frame-video" autoplay muted loop playsinline poster="http://127.0.0.1:8000/customerVideo/Video/wed.jpg" aria-hidden="true">
+                        <source src="http://127.0.0.1:8000/customerVideo/Video/wedding.mp4" type="video/mp4">
+                        <!-- Fallback image for browsers without video support -->
+                        <img src="http://127.0.0.1:8000/customerVideo/Video/wed.jpg" alt="Wedding preview" class="hero-frame-img">
+                    </video>
+                </div>
+            </div>
+
+            <div class="hero-content layout-container">
+                <h1 class="hero-title">
+                    <span class="hero-title-invitation">INVITATION</span>
+                    <span class="hero-title-maker">MAKER</span>
+                </h1>
+
+                <p class="hero-tagline">Custom Invitations &amp; Giveaways Crafted with Care.</p>
+
+                <div class="hero-actions">
+                                            <a href="http://127.0.0.1:8000/landingpage?modal=login" class="hero-btn hero-btn--primary focus-ring">Order Now</a>
+                                        <a href="#categories" class="hero-btn hero-btn--ghost focus-ring">View Design</a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+
+<div id="loginModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 px-2 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative transform transition-all scale-95 hover:scale-100 duration-300">
+
+        <!-- Close button -->
+        <button id="closeLogin" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition text-base font-bold">
+            ✖
+        </button>
+
+        <!-- Modal Header -->
+        <div class="text-center mb-5">
+            <h2 class="text-xl font-bold bg-gradient-to-r from-indigo-600 to-blue-400 bg-clip-text text-transparent">
+                Sign In
+            </h2>
+            <p class="text-gray-500 text-sm mt-1">Welcome back! Please enter your details.</p>
+        </div>
+
+        <!-- Login Form -->
+        <form method="POST" action="http://127.0.0.1:8000/customer/login" class="space-y-4">
+            <input type="hidden" name="_token" value="Hjz7OOO4ONfSJm2U0pX4QyYa5gGvn9axbLHlE4hA" autocomplete="off">
+            
+            
+            <!-- Email -->
+            <div>
+                <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+                <input id="email" type="email" name="email" value="" required autofocus
+                       class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 px-3 py-2 text-base">
+                            </div>
+
+            <!-- Password -->
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                <input id="password" type="password" name="password" required
+                       class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 px-3 py-2 text-base">
+                            </div>
+
+            <!-- Forgot Password -->
+            <div class="text-right">
+                <a href="http://127.0.0.1:8000/customer/forgot-password" class="text-sm text-indigo-600 hover:underline">Forgot Password?</a>
+            </div>
+
+            <!-- Remember Me -->
+            <div class="flex items-center">
+                <input type="checkbox" id="remember" name="remember" class="rounded border-gray-300 text-indigo-600">
+                <label for="remember" class="ml-2 text-sm text-gray-600">Remember me</label>
+            </div>
+
+            <!-- Submit -->
+            <button type="submit"
+                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50">
+                Sign In
+            </button>
+        </form> 
+
+        
+
+        <!-- Switch to Register -->
+        <p class="text-center text-sm text-gray-600 mt-4">
+            Don’t have an account? 
+            <a href="http://127.0.0.1:8000/customer/register" id="openRegisterFromLogin" class="text-indigo-600 hover:underline">Register</a>
+        </p>
+    </div>
+</div>
+
+
+<div class="layout-stack">
+    
+    <style>
+  /* Templates section scoped styles */
+  #templates { padding-top: 3rem; padding-bottom: 3rem; }
+  .section-divider { width: 64px; height: 3px; background: linear-gradient(90deg,#06b6d4,#0891b2); margin: 0 auto 1.5rem; border: 0; }
+  .gradient-pink { background: linear-gradient(135deg,#fff6fb 0%, #fff0f6 50%, #fffaf9 100%); }
+  .gradient-yellow { background: linear-gradient(135deg,#fffaf0 0%, #fff6e0 50%, #fffdf9 100%); }
+  .gradient-orange { background: linear-gradient(135deg,#fff8f2 0%, #fff4ee 50%, #fffdf9 100%); }
+  .gradient-skyblue { background: linear-gradient(135deg,#f5fbff 0%, #f0faff 50%, #fbfdff 100%); }
+
+  #templates .relative { width: min(1100px, 95%); }
+  #templates .rounded-3xl { border-radius: 1rem; }
+  #templates a.block { display: block; }
+
+  /* Card visuals */
+  #templates .shadow-xl { box-shadow: 0 10px 30px rgba(2,6,23,0.06); }
+  #templates .border-4 { border-width: 4px; }
+  #templates h3 { font-family: 'Seasons', serif; margin-top: 0.5rem; }
+  #templates p { margin-top: 0.25rem; }
+
+  /* Responsive - stack cards on small screens */
+  @media (max-width: 860px) {
+    #templates .flex { flex-direction: column; gap: 1rem; }
+    #templates .flex-row-reverse { flex-direction: column-reverse; }
+    #templates a.block { width: 100%; transform: none !important; }
+    #templates img.absolute { display: none; }
+  }
+
+  /* Interactive hover improvements */
+  #templates a.block:hover { transform: translateY(-6px) scale(1.03); box-shadow: 0 18px 40px rgba(2,6,23,0.08); }
+
+</style>
+
+<section id="templates" class="py-12 relative overflow-hidden section-base">
+  <!-- animated themed background canvas (wedding, baptism, birthday) -->
+  <canvas id="templatesCanvas" class="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true"></canvas>
+
+  <div class="layout-container relative z-10">
+    <h2 class="text-center text-3xl font-bold text-indigo-700 mb-10" style="font-family: 'Seasons', serif;">
+      Find your perfect match
+    </h2>
+
+    <div class="flex flex-col gap-12 items-center">
+
+    <!-- Birthday (Image left) -->
+    <div class="relative flex items-center gap-8 gradient-pink p-6 rounded-3xl">
+      <img src="http://127.0.0.1:8000/Customerimages/image/Star.png" class="absolute -top-6 -left-8 w-12 h-12 rotate-12" alt="">
+      <img src="http://127.0.0.1:8000/Customerimages/image/Gift.png" class="absolute -bottom-6 right-10 w-12 h-12" alt="">
+
+      
+      <a href="http://127.0.0.1:8000/templates/birthday/invitations" class="block w-80 -rotate-3 rounded-3xl shadow-xl overflow-hidden border-4 border-pink-300 cursor-pointer hover:scale-105 transition-transform">
+        <img src="http://127.0.0.1:8000/Customerimages/image/birthday.png" alt="Birthday" class="w-full h-40 object-cover">
+      </a>
+
+      <div class="max-w-sm">
+        <h3 class="text-pink-600 text-2xl text-center font-extrabold">Birthday</h3>
+        <p class="text-pink-500 text-sm text-center">
+          Choose from Unique Birthday Invitation and Giveaways Designs
+        </p>
+      </div>
+    </div>
+
+    <!-- Wedding (Image right) -->
+    <div class="relative flex items-center gap-8 gradient-yellow p-6 rounded-3xl flex-row-reverse">
+      <img src="http://127.0.0.1:8000/Customerimages/image/Ring.png" class="absolute -top-6 -right-8 w-20 h-20 rotate-12 z-20" alt="">
+      <img src="http://127.0.0.1:8000/Customerimages/image/Ribbon.png" class="absolute -bottom-6 left-10 w-12 h-12 rotate-12" alt="">
+
+      <a href="http://127.0.0.1:8000/templates/wedding/invitations" class="block w-80 rotate-3 rounded-3xl shadow-xl overflow-hidden border-4 border-yellow-400 cursor-pointer hover:scale-105 transition-transform">
+        <img src="http://127.0.0.1:8000/Customerimages/image/wedding.png" alt="Wedding" class="w-full h-40 object-cover">
+      </a>
+
+      <div class="max-w-sm">
+        <h3 class="text-yellow-700 text-center text-2xl font-extrabold">Wedding</h3>
+        <p class="text-yellow-600 text-sm text-center">
+          Choose from Unique Wedding Invitation and Giveaways Designs
+        </p>
+      </div>
+    </div>
+
+    <!-- Corporate (Image left) -->
+    <div class="relative flex items-center gap-8 gradient-orange p-6 rounded-3xl">
+      <img src="http://127.0.0.1:8000/Customerimages/image/Glass.png" class="absolute -top-6 -left-8 w-20 h-20 rotate-12 z-20" alt="">
+      <img src="http://127.0.0.1:8000/Customerimages/image/Paperclip.png" class="absolute -bottom-6 left-44 w-12 h-12 rotate-12 z-20" alt="">
+
+      <a href="http://127.0.0.1:8000/templates/corporate/invitations" class="block w-80 -rotate-2 rounded-3xl shadow-xl overflow-hidden border-4 border-orange-400 cursor-pointer hover:scale-105 transition-transform">
+        <img src="http://127.0.0.1:8000/Customerimages/image/corporate.png" alt="Corporate" class="w-full h-40 object-cover">
+      </a>
+
+      <div class="max-w-sm">
+        <h3 class="text-orange-600 text-center text-2xl font-extrabold">Corporate</h3>
+        <p class="text-black-500 text-center">
+          Choose from Unique Corporate Invitation and Giveaways Designs
+        </p>
+      </div>
+    </div>
+
+    <!-- Baptism (Image right) -->
+    <div class="relative flex items-center gap-8 gradient-skyblue p-6 rounded-3xl flex-row-reverse">
+      <img src="http://127.0.0.1:8000/Customerimages/image/footprint.png" class="absolute -top-6 -right-8 w-20 h-20 rotate-12 z-20" alt="">
+      <img src="http://127.0.0.1:8000/Customerimages/image/Cloud.png" class="absolute -bottom-8 left-32 w-12 h-12 rotate-12" alt="">
+
+      <a href="http://127.0.0.1:8000/templates/baptism/invitations" class="block w-80 rotate-3 rounded-3xl shadow-xl overflow-hidden border-4 border-blue-400 cursor-pointer hover:scale-105 transition-transform">
+        <img src="http://127.0.0.1:8000/Customerimages/image/baptism.png" alt="Baptism" class="w-full h-40 object-cover">
+      </a>
+
+      <div class="max-w-sm">
+        <h3 class="text-blue-600 text-2xl font-extrabold text-center">Baptism</h3>
+        <p class="text-orange-500 text-sm text-center">
+          Choose from Unique Baptism Invitation and Giveaways Designs
+        </p>
+      </div>
+    </div>
+
+    </div>
+  </div>
+</section>
+<script>
+// Themed animated background for Templates (wedding, baptism, birthday)
+(function () {
+  const canvas = document.getElementById('templatesCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let W = 0, H = 0, DPR = window.devicePixelRatio || 1;
+
+  function resize() {
+    DPR = window.devicePixelRatio || 1;
+    W = canvas.clientWidth || window.innerWidth;
+    H = canvas.clientHeight || 600;
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+
+  // shape factories
+  function makeConfetti(x,y,z){
+    return {type:'confetti', x,y,z, w: (6 + Math.random()*10)*(1+z*0.6), h: (8+Math.random()*8)*(1+z*0.6), hue: 330+Math.random()*120, rot: Math.random()*Math.PI};
+  }
+  function makeBalloon(x,y,z){ return {type:'balloon', x,y,z, r: 10+Math.random()*18, hue: 170+Math.random()*40, float: Math.random()*0.3+0.1}; }
+  function makeRing(x,y,z){ return {type:'ring', x,y,z, R: 12+Math.random()*14, line: 3+Math.random()*3, rot: Math.random()*Math.PI}; }
+  function makeCake(x,y,z){ return {type:'cake', x,y,z, w: 24+Math.random()*16, h: 14+Math.random()*10, hue: 30+Math.random()*30}; }
+  function makeHat(x,y,z){ return {type:'hat', x,y,z, w: 18+Math.random()*14, h: 12+Math.random()*10, hue: 10+Math.random()*50}; }
+  function makeFoot(x,y,z){ return {type:'foot', x,y,z, s: 10+Math.random()*8}; }
+
+  let items = [];
+  function initItems(){
+    items = [];
+    for(let i=0;i<40;i++){
+      const z = Math.random();
+      const x = Math.random()*W; const y = Math.random()*H;
+      const t = Math.random();
+      if (t < 0.45) items.push(makeConfetti(x,y,z));
+      else if (t < 0.65) items.push(makeBalloon(x,y,z));
+      else if (t < 0.78) items.push(makeRing(x,y,z));
+      else if (t < 0.88) items.push(makeCake(x,y,z));
+      else if (t < 0.96) items.push(makeHat(x,y,z));
+      else items.push(makeFoot(x,y,z));
+    }
+  }
+
+  let mouse = {x: W/2, y: H/2};
+  window.addEventListener('mousemove', function(e){
+    const r = canvas.getBoundingClientRect(); mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top;
+  }, {passive:true});
+
+  function drawItem(p, t){
+    const depth = 0.3 + p.z*0.9;
+    const ox = (mouse.x - W/2) * (0.02 + p.z*0.06);
+    const oy = (mouse.y - H/2) * (0.02 + p.z*0.03);
+    const x = p.x + Math.sin(t*0.5 + p.z*10)*6 + ox;
+    const y = p.y + Math.cos(t*0.3 + p.z*5)*8 + oy;
+
+    ctx.save();
+    if (p.type === 'confetti'){
+      ctx.translate(x,y); ctx.rotate(p.rot + t*0.02*(1+p.z));
+      ctx.fillStyle = `hsl(${p.hue},70%,60%)`;
+      roundRect(ctx, -p.w/2, -p.h/2, p.w, p.h, 2); ctx.fill();
+    } else if (p.type === 'balloon'){
+      ctx.beginPath(); ctx.fillStyle = `hsl(${p.hue},70%,60%)`; ctx.ellipse(x,y, p.r*(1+0.15*p.z), p.r*1.15, 0, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.07)'; ctx.lineWidth = 0.8; ctx.stroke();
+      // string
+      ctx.beginPath(); ctx.moveTo(x, y + p.r*1.15); ctx.lineTo(x + 1*p.z, y + p.r*1.15 + 18); ctx.strokeStyle='rgba(0,0,0,0.12)'; ctx.stroke();
+    } else if (p.type === 'ring'){
+      ctx.beginPath(); ctx.strokeStyle = `hsl(45,60%,60%)`; ctx.lineWidth = p.line*(1+p.z*0.4); ctx.ellipse(x, y, p.R*(1+p.z*0.1), p.R*(1+p.z*0.08), p.rot + t*0.002, 0, Math.PI*2); ctx.stroke();
+      // small glint
+      ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(x+p.R*0.6, y-p.R*0.05, 2, 2);
+    } else if (p.type === 'cake'){
+      ctx.fillStyle = `hsl(${p.hue},70%,62%)`; roundRect(ctx, x - p.w/2, y - p.h, p.w, p.h, 3); ctx.fill();
+      ctx.fillStyle = '#fff'; roundRect(ctx, x - p.w/3, y - p.h + 4, p.w/1.5, p.h/3, 2); ctx.fill();
+    } else if (p.type === 'hat'){
+      ctx.fillStyle = `hsl(${p.hue},70%,50%)`; ctx.beginPath(); ctx.moveTo(x, y - p.h/2); ctx.lineTo(x + p.w/2, y + p.h/2); ctx.lineTo(x - p.w/2, y + p.h/2); ctx.closePath(); ctx.fill();
+    } else if (p.type === 'foot'){
+      ctx.fillStyle = '#d3e9ff'; roundRect(ctx, x-p.s/2, y-p.s/2, p.s, p.s*0.6, p.s*0.3); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+  }
+
+  let running = true;
+  let last = 0;
+  function animate(ts){
+    if (!running) return;
+    const t = ts*0.001;
+    ctx.clearRect(0,0,W,H);
+    // soft background wash
+    const g = ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'rgba(250,250,255,0.4)'); g.addColorStop(1,'rgba(255,255,255,0.8)'); ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+    items.forEach((p,i)=>{ drawItem(p,t); p.y += 0.2 + p.z*0.6; if (p.y - 60 > H) p.y = -40 - Math.random()*50; });
+    requestAnimationFrame(animate);
+  }
+
+  // pause when out of view
+  const obs = new IntersectionObserver(entries=>{
+    entries.forEach(e=>{ running = e.isIntersecting; if (running) requestAnimationFrame(animate); });
+  }, {threshold: 0.1});
+  obs.observe(canvas);
+
+  window.addEventListener('resize', function(){ resize(); initItems(); });
+  resize(); initItems(); requestAnimationFrame(animate);
+})();
+</script>
+
+    
+    <!-- Categories Section -->
+<section id="categories" class="categories-section py-16 section-with-media">
+    <img src="http://127.0.0.1:8000/customerVideo/Video/wed.jpg" class="section-bg-media" alt="Categories background" loading="lazy">
+    <div class="layout-container section-content text-center">
+        
+        <h2 class="text-3xl font-bold mb-6 coco-gothic categories-title" style="font-family: 'Cormorant Garamond', 'Coco Gothic', serif !important;">Categories</h2>
+                <p class="text-lg text-gray-600 text-center mx-auto max-w-2xl cormorant">
+    See what's hot! Browse our most popular invitation and giveaways categories to find the perfect design for your event. Discover trendy themes and create invitations everyone will love.
+</p>  
+    
+        <!-- Grid for categories -->
+        <div class="mt-12 grid grid-cols-1 sm:grid-cols-2 gap-12 justify-center">
+            
+            <!-- Invitations -->
+            <div>
+                <h3 class="text-xl font-semibold text-gray-800 mb-4 coco-gothic" style="font-family: 'Cormorant Garamond', 'Coco Gothic', serif !important;">Invitations</h3>
+                <div class="accordion-gallery flex space-x-2 overflow-hidden rounded-xl">
+                    
+                    <!-- Wedding -->
+                    <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
+                        <a href="http://127.0.0.1:8000/templates/wedding/invitations">
+                               <img src="http://127.0.0.1:8000/Customerimages/image/invite1.png" 
+                                   alt="Wedding Invitation" 
+                                   class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 transparent-card-img">
+                        </a>
+                    </div>
+                    
+                    <!-- Baptism -->
+                    <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
+                        <a href="http://127.0.0.1:8000/templates/baptism/invitations">
+                               <img src="http://127.0.0.1:8000/Customerimages/image/invite2.png" 
+                                   alt="Baptism Invitation" 
+                                   class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 transparent-card-img">
+                        </a>
+                    </div>
+                    
+                    <!-- Birthday -->
+                    <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
+                        <a href="http://127.0.0.1:8000/templates/birthday/invitations">
+                               <img src="http://127.0.0.1:8000/Customerimages/image/invite3.png" 
+                                   alt="Birthday Invitation" 
+                                   class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 transparent-card-img">
+                        </a>
+                    </div>
+                    
+                    <!-- Corporate -->
+                    <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
+                        <a href="http://127.0.0.1:8000/templates/corporate/invitations">
+                               <img src="http://127.0.0.1:8000/Customerimages/image/invite4.png" 
+                                   alt="Corporate Invitation" 
+                                   class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 transparent-card-img">
+                        </a>
+                    </div>
+                </div>
+                <p class="text-sm text-gray-600 mt-4 cormorant">Elegant invitations with various themes.</p>
+            </div>
+
+            <!-- Giveaways -->
+            <div>
+                <h3 class="text-xl font-semibold text-gray-800 mb-4 coco-gothic" style="font-family: 'Cormorant Garamond', 'Coco Gothic', serif !important;">Giveaways</h3>
+                <div class="accordion-gallery flex space-x-2 overflow-hidden rounded-xl">
+                    
+                    <!-- Wedding -->
+                    <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
+                        <a href="http://127.0.0.1:8000/templates/wedding/giveaways">
+                               <img src="http://127.0.0.1:8000/Customerimages/image/weddinggive.png" 
+                                   alt="Wedding Giveaway" 
+                                   class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 transparent-card-img">
+                        </a>
+                    </div>
+                    
+                    <!-- Baptism -->
+                    <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
+                        <a href="http://127.0.0.1:8000/templates/baptism/giveaways">
+                               <img src="http://127.0.0.1:8000/Customerimages/image/baptismgive.png" 
+                                   alt="Baptism Giveaway" 
+                                   class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 transparent-card-img">
+                        </a>
+                    </div>
+                    
+                    <!-- Birthday -->
+                    <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
+                        <a href="http://127.0.0.1:8000/templates/birthday/giveaways">
+                               <img src="http://127.0.0.1:8000/Customerimages/image/birthdaygive.png" 
+                                   alt="Birthday Giveaway" 
+                                   class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 transparent-card-img">
+                        </a>
+                    </div>
+                    
+                    <!-- Corporate -->
+                    <div class="accordion-item flex-1 overflow-hidden transition-all duration-500 ease-in-out hover:flex-[4]">
+                        <a href="http://127.0.0.1:8000/templates/corporate/giveaways">
+                               <img src="http://127.0.0.1:8000/Customerimages/image/corporategive.png" 
+                                   alt="Corporate Giveaway" 
+                                   class="w-full h-64 object-contain transition-transform duration-500 hover:scale-105 transparent-card-img">
+                        </a>
+                    </div>
+                </div>
+                <p class="text-sm text-gray-600 mt-4 cormorant">Creative giveaways for every occasion.</p>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+    
+    <section id="about" class="py-20 section-base animate-fade-in about-section" style="background: none !important; animation: none !important;">
+  <div class="layout-container">
+    <div class="about-elevated">
+      <div class="about-left">
+        <div class="about-image-wrapper">
+          <span class="about-invite-badge">You&rsquo;re Invited</span>
+          <div class="about-image-arch">
+            <img src="http://127.0.0.1:8000/customerVideo/Video/A.png" alt="InkWise invitation sample" loading="lazy" />
+          </div>
+          <span class="about-line-accent"></span>
+          <span class="about-circle-accent"></span>
+        </div>
+      </div>
+      <div class="about-right">
+                                        <div class="about-content">
+          <h2 class="about-heading">
+            <span>About</span>
+                          Us
+                      </h2>
+          <p class="about-subheading">Design For Everybody</p>
+          <p class="about-body">InkWise is your trusted partner in creating elegant and personalized invitations and giveaways. Our mission is to bring your special moments to life with creativity and style.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+    
+    <section id="contact" class="py-16 section-base">
+  
+
+  <div class="layout-container section-content">
+                                    
+    <h2 class="text-3xl font-bold text-center mb-6 text-gray-800">Contact Us</h2>
+
+    <p class="text-center text-gray-600 mb-10">
+      Have questions or want to place a custom order? Reach out to us anytime!
+    </p>
+
+    <div class="grid md:grid-cols-2 gap-10">
+      <div class="text-black">
+        <h3 class="text-xl font-semibold mb-4" style="font-family: 'Playfair Display', serif;">Merwen Printing Services – InkWise</h3>
+
+        <p class="mb-3"><strong>📍 Address:</strong> 123 Rue de Paris, 75001 Paris, France</p>
+
+        <p class="mb-3"><strong>📞 Phone:</strong> +33 1 23 45 67 89</p>
+
+        <p class="mb-3"><strong>✉️ Email:</strong> InkwiseSystem@gmail.com</p>
+
+        <p><strong>🕒 Business Hours:</strong><br>Monday – Saturday: 9:00 AM – 7:00 PM</p>
+      </div>
+
+        <!-- Contact Form -->
+        <div>
+                  <div class="space-y-4 bg-white p-6 rounded-2xl shadow-lg text-center">
+            <p class="text-gray-700">
+              Please create an Inkwise account or sign in to send us a message.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-3 justify-center">
+              <a href="http://127.0.0.1:8000/customer/register" class="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">Register</a>
+              <a href="http://127.0.0.1:8000/landingpage?modal=login" class="px-6 py-3 border border-blue-500 text-blue-500 rounded-lg hover:bg-blue-50 transition">Log In</a>
+            </div>
+          </div>
+                </div>
+    </div>
+  </div>
+</section>
+
+
+<style>
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+.animate-shake {
+  animation: shake 0.4s;
+}
+</style>
+
+</div>
+
+<!-- Chat bot AI assistance widget -->
+<!-- Chat bot AI assistance widget -->
+<div class="chat-widget" x-data="chatBot" x-init="loadQAs()" @keydown.window.escape="open=false">
+  <!-- Toggle button -->
+  <div class="chat-btn" @click="open = !open; if(open) loadQAs()" aria-label="Open chat">
+    <div class="chat-inner"><i class="bi bi-question-circle-fill text-3xl text-cyan-500"></i></div>
+  </div>
+
+  <!-- Chat panel -->
+  <div x-show="open" x-cloak x-transition class="chat-panel" @click.away="open = false">
+    <div class="chat-header">
+      <div class="chat-avatar"><i class="bi bi-question-circle-fill text-2xl text-cyan-500"></i></div>
+      <div><h4>InkWise Assistant</h4><div class="chat-subtitle">FAQ help for templates & orders</div></div>
+    </div>
+
+    <!-- Fixed Question List -->
+    <div class="faq-list p-3 border-b bg-gray-50" x-show="qas.length > 0">
+      <p class="faq-title mb-2">Select a question:</p>
+      <div class="flex flex-col gap-2">
+        <template x-for="qa in qas" :key="qa.id">
+          <button type="button" class="faq-btn text-left px-3 py-2 rounded border shadow-sm transition"
+                  @click="askQuestion(qa)">
+            <span x-text="qa.question"></span>
+          </button>
+        </template>
+      </div>
+    </div>
+
+    <!-- Chat body (messages are direct children here) -->
+    <div class="chat-body" x-ref="body">
+      <template x-for="(m, idx) in messages" :key="idx">
+        <!-- single element per message; class bound by sender -->
+        <div :class="m.from === 'user' ? 'msg user' : 'msg bot'">
+          <template x-if="m.from !== 'user'">
+            <div class="avatar"><i class="bi bi-question-circle-fill text-xl text-cyan-500"></i></div>
+          </template>
+          <div class="bubble">
+            <div class="text" x-text="m.text" x-show="m.text"></div>
+            <template x-if="m.image">
+              <img :src="m.image" alt="Answer image" class="bubble-image" loading="lazy">
+            </template>
+            <div class="time" x-text="m.time ? m.time : ''"></div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <div class="chat-input-note px-4 py-3 text-sm text-gray-600 bg-gray-50 border-t">Select a question above to view the answer.</div>
+  </div>
+</div>
+
+<style>
+  /* FAQ Styles */
+  .faq-title { font-size: .95rem; font-weight: 600; color: #374151; }
+  .faq-btn { background:#f9fafb; border:1px solid #e5e7eb; font-size:.9rem; cursor:pointer; }
+  .faq-btn:hover { background:#2563eb; color:#fff; border-color:#2563eb; }
+  .faq-list { max-height: 180px; overflow-y: auto; }
+
+  .chat-subtitle { font-size: 0.85rem; color: #6b7280; font-weight: 400; }
+
+  .chat-body {
+    padding:16px;
+    overflow-y:auto;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    scroll-behavior:smooth;
+    background: linear-gradient(180deg, rgba(6,182,212,0.02), transparent);
+    flex: 1;
+    min-height: 0;
+  }
+
+  .msg { display:inline-flex; position:relative; max-width:78%; padding:12px 14px; border-radius:16px; font-size:15px; line-height:1.4; word-break:break-word; box-shadow:0 4px 12px rgba(4,29,66,0.08); align-items:flex-start; gap:10px; }
+  .msg .avatar { width:32px; height:32px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .msg .bubble { display:flex; flex-direction:column; gap:6px; }
+
+  .msg.bot { background: linear-gradient(180deg,#f4f8ff,#eaf3ff); align-self:flex-start; color:#03305a; border-bottom-left-radius:6px; }
+  .msg.user { background: linear-gradient(180deg,#e6f7fb,#c9f0f5); align-self:flex-end; color:#022a37; border-bottom-right-radius:6px; justify-content:flex-end; }
+
+  .msg.bot::after, .msg.user::after { content:""; position:absolute; top:16px; width:14px; height:14px; transform:rotate(45deg); box-shadow:0 8px 14px rgba(4,29,66,0.03); border-radius:2px; z-index:0; background:inherit; }
+  .msg.bot::after { left:-7px; } .msg.user::after { right:-7px; }
+
+  /* ensure user bubble text aligns right */
+  .msg.user .bubble { text-align: right; }
+</style>
+
+<script>
+  document.addEventListener("alpine:init", () => {
+    Alpine.data("chatBot", () => ({
+      open: false,
+      messages: [
+        { from: 'bot', text: "Hi! I'm InkWise Assistant. Choose a question below to see the answer.", time: '' }
+      ],
+      qas: [],
+
+      async loadQAs() {
+        try {
+          const res = await fetch("http://127.0.0.1:8000/chatbot/qas", { headers: { 'Accept': 'application/json' }});
+          if (!res.ok) throw new Error('Network error');
+          const payload = await res.json();
+          this.qas = Array.isArray(payload) ? payload.map(qa => ({
+            id: qa.id,
+            question: qa.question,
+            answer: qa.answer,
+            image: qa.answer_image_url || null,
+          })) : [];
+        } catch (err) {
+          console.error("Failed to load QAs:", err);
+        }
+      },
+
+      askQuestion(qa) {
+        this.messages.push({ from: "user", text: qa.question, time: new Date().toLocaleTimeString() });
+        this.scrollToBottom();
+        setTimeout(() => {
+          this.messages.push({ from: "bot", text: qa.answer, image: qa.image, time: new Date().toLocaleTimeString() });
+          this.scrollToBottom();
+        }, 150);
+      },
+
+      scrollToBottom() {
+        this.$nextTick(() => { this.$refs.body.scrollTop = this.$refs.body.scrollHeight; });
+      }
+    }))
+  })
+</script>
+<!-- Optional: If you want to replace the placeholder bot replies with a real AI API call,
+     replace the setTimeout block above with a fetch() to your server endpoint that proxies to OpenAI or another model. -->
+
+
+<script>
+    // Mobile nav & search toggle
+    (function () {
+        var btn = document.getElementById('mobileNavBtn');
+        var nav = document.getElementById('mainNav');
+        var searchBtn = document.getElementById('mobileSearchBtn');
+        var searchPanel = document.getElementById('mobileSearch');
+
+        function openNav() {
+            nav.classList.remove('hidden');
+            nav.classList.add('mobile-open');
+            btn.setAttribute('aria-expanded', 'true');
+        }
+
+        function closeNav() {
+            nav.classList.add('hidden');
+            nav.classList.remove('mobile-open');
+            btn.setAttribute('aria-expanded', 'false');
+        }
+
+        if (btn && nav) {
+            btn.addEventListener('click', function () {
+                if (nav.classList.contains('hidden')) {
+                    openNav();
+                } else {
+                    closeNav();
+                }
+            });
+        }
+
+        if (searchBtn && searchPanel) {
+            searchBtn.addEventListener('click', function () {
+                if (searchPanel.classList.contains('hidden')) {
+                    searchPanel.classList.remove('hidden');
+                    searchPanel.classList.add('block');
+                } else {
+                    searchPanel.classList.remove('block');
+                    searchPanel.classList.add('hidden');
+                }
+            });
+        }
+
+        // Close nav when resizing to desktop
+        window.addEventListener('resize', function () {
+            if (window.innerWidth >= 768) {
+                nav.classList.remove('hidden');
+                nav.classList.remove('mobile-open');
+                btn.setAttribute('aria-expanded', 'false');
+                if (searchPanel) {
+                    searchPanel.classList.add('hidden');
+                }
+            } else {
+                nav.classList.add('hidden');
+            }
+        });
+    })();
+
+    // Add keyboard-visible focus ring for better accessibility
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Tab') {
+            document.body.classList.add('user-is-tabbing');
+        }
+    });
+    document.addEventListener('mousedown', function () {
+        document.body.classList.remove('user-is-tabbing');
+    });
+
+    // Optional: close mobile nav when clicking a link (improves UX)
+    (function () {
+        var nav = document.getElementById('mainNav');
+        if (!nav) return;
+        nav.addEventListener('click', function (e) {
+            var target = e.target.closest('a');
+            if (!target) return;
+            if (window.innerWidth < 768) {
+                nav.classList.remove('block');
+                nav.classList.add('hidden');
+            }
+        });
+    })();
+
+    // Show login modal if password was just reset, login requested, or login failed
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var loginModal = document.getElementById('loginModal');
+            if (loginModal) {
+                loginModal.classList.remove('hidden');
+                loginModal.classList.add('flex');
+            }
+        });
+    </script>
+    </script>
+
+</body>
+</html>

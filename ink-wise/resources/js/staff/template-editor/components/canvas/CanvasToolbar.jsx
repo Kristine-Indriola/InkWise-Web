@@ -5,6 +5,26 @@ import { useBuilderStore } from '../../state/BuilderStore';
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 3;
 const STEP = 0.1;
+const DPI = 96;
+
+const TEMPLATE_SIZES = [
+  { label: 'A10 invitation (5.88" × 9.25")', width: 5.88, height: 9.25 },
+  { label: 'A9 invitation (5.63" × 8.63")', width: 5.63, height: 8.63 },
+  { label: 'A8 invitation (5.38" × 7.88")', width: 5.38, height: 7.88 },
+  { label: 'A7 invitation (5.13" × 7")', width: 5.13, height: 7 },
+  { label: 'A6 invitation (4.5" × 6.25")', width: 4.5, height: 6.25 },
+  { label: 'A2 invitation (4.25" × 5.5")', width: 4.25, height: 5.5 },
+  { label: 'A1 invitation (3.5" × 4.88")', width: 3.5, height: 4.88 },
+  { label: 'Square Large invitation (6.75" × 6.75")', width: 6.75, height: 6.75 },
+  { label: 'A10 Envelope (9.5" × 6.5")', width: 9.5, height: 6.5 },
+  { label: 'A9 Envelope (9" × 6")', width: 9, height: 6 },
+  { label: 'A8 Envelope (8" × 5.5")', width: 8, height: 5.5 },
+  { label: 'A7 Envelope (7.25" × 5.25")', width: 7.25, height: 5.25 },
+  { label: 'A6 Envelope (6.5" × 4.75")', width: 6.5, height: 4.75 },
+  { label: 'A2 Envelope (5.75" × 4.375")', width: 5.75, height: 4.375 },
+  { label: 'A1 Envelope (5" × 3.625")', width: 5, height: 3.625 },
+  { label: 'Square Large Envelope (7" × 7")', width: 7, height: 7 },
+];
 
 export function CanvasToolbar() {
   const { state, dispatch } = useBuilderStore();
@@ -34,6 +54,22 @@ export function CanvasToolbar() {
     }
   };
 
+  const handleSizeChange = (event) => {
+    const index = parseInt(event.target.value, 10);
+    if (!isNaN(index) && TEMPLATE_SIZES[index] && activePage) {
+      const size = TEMPLATE_SIZES[index];
+      const widthPx = Math.round(size.width * DPI);
+      const heightPx = Math.round(size.height * DPI);
+      dispatch({ type: 'UPDATE_PAGE_PROPS', pageId: activePage.id, props: { width: widthPx, height: heightPx } });
+      // Update template dimensions and sizes
+      dispatch({ type: 'UPDATE_TEMPLATE_PROPS', props: { 
+        width_inch: size.width, 
+        height_inch: size.height,
+        sizes: [size] // Store the selected size in the sizes array
+      } });
+    }
+  };
+
   const alignSelection = (mode) => {
     if (!hasSelection) {
       return;
@@ -45,29 +81,15 @@ export function CanvasToolbar() {
     <div className="canvas-toolbar" role="toolbar" aria-label="Canvas controls">
       <div className="canvas-toolbar__group">
         <div className="canvas-toolbar__page-size">
-          <label className="canvas-toolbar__label">Page</label>
-          <div className="canvas-toolbar__dimensions">
-            <input
-              type="number"
-              className="canvas-toolbar__input"
-              value={activePage?.width ?? 400}
-              onChange={handleWidthChange}
-              min="1"
-              max="5000"
-              aria-label="Page width"
-            />
-            <span className="canvas-toolbar__separator">×</span>
-            <input
-              type="number"
-              className="canvas-toolbar__input"
-              value={activePage?.height ?? 400}
-              onChange={handleHeightChange}
-              min="1"
-              max="5000"
-              aria-label="Page height"
-            />
-            <span className="canvas-toolbar__unit">px</span>
-          </div>
+          <label className="canvas-toolbar__label">Size</label>
+          <select className="canvas-toolbar__select" onChange={handleSizeChange} aria-label="Template size">
+            <option value="">Select size</option>
+            {TEMPLATE_SIZES.map((size, index) => (
+              <option key={index} value={index}>
+                {size.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
       <div className="canvas-toolbar__group">

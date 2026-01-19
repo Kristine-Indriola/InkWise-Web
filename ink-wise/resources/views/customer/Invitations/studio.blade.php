@@ -1,27 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ $product->name ?? optional($template)->name ?? 'InkWise Studio' }} &mdash; InkWise</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css">
-    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-solid-rounded/css/uicons-solid-rounded.css">
-    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-solid-straight/css/uicons-solid-straight.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@flaticon/flaticon-uicons/css/all/all.css">
-    @if(app()->environment('local'))
-        @viteReactRefresh
-    @endif
-    @vite([
-        'resources/css/customer/studio.css',
-        'resources/js/customer/studio/main.jsx',
-    ])
-</head>
-<body>
+@include('customer.studio._head')
 @php
     $defaultFront = asset('Customerimages/invite/wedding2.png');
     $defaultBack = asset('Customerimages/invite/wedding3.jpg');
@@ -46,7 +23,7 @@
             if ($serialized instanceof \Illuminate\Contracts\Support\Arrayable) {
                 return $serialized->toArray();
             }
-
+-
             return (array) $serialized;
         }
 
@@ -372,8 +349,49 @@
         'slug' => $product->slug ?? null,
         'event_type' => $product->event_type ?? null,
         'product_type' => $product->product_type ?? null,
+        'size' => $product->size ?? null,
     ] : null;
+
+    $selectedSize = request()->query('size')
+        ?? $product?->size
+        ?? (is_array($product?->sizes ?? null) ? ($product->sizes[0] ?? null) : null)
+        ?? (($templateModel?->width_inch && $templateModel?->height_inch) ? ($templateModel->width_inch . 'x' . $templateModel->height_inch) : null)
+        ?? config('invitations.default_size', '5x7');
+
+    $bootstrapPayload = [
+        'csrfToken' => csrf_token(),
+        'product' => $productBootstrap,
+        'template' => $templateBootstrap,
+        'assets' => [
+            'front_image' => $frontImage,
+            'back_image' => $hasBackSide ? $backImage : null,
+            'default_front' => $defaultFront,
+            'default_back' => $defaultBack,
+            'brand_logo' => asset('images/logo.png'),
+            'preview_images' => [
+                'front' => $templateBootstrap['preview_front'] ?? null,
+                'back' => $templateBootstrap['preview_back'] ?? null,
+            ],
+        ],
+        'svg' => [
+            'front' => $frontSvg,
+            'back' => $backSvg,
+        ],
+        'selection' => [
+            'size' => $selectedSize ?? null,
+        ],
+        'flags' => [
+            'has_back' => $hasBackSide,
+        ],
+        'routes' => [
+            'autosave' => route('order.design.autosave'),
+            'saveTemplate' => route('order.design.save-template'),
+            'review' => route('order.review'),
+            'change_template' => route('templates.wedding.invitations'),
+        ],
+    ];
 @endphp
+<body class="studio-page">
 <header class="studio-topbar">
     <div class="topbar-left">
         <img src="{{ asset('images/logo.png') }}" alt="InkWise" class="topbar-logo">
@@ -385,17 +403,16 @@
     </div>
     <div class="topbar-center">
         <span class="topbar-status-dot" aria-hidden="true"></span>
-        <span class="topbar-status-label">Saved</span>
+        <span class="topbar-status-label">Preview</span>
         <div class="topbar-history-controls" role="group" aria-label="History controls">
             <button type="button" class="topbar-icon-btn" aria-label="View history"><i class="fa-regular fa-clock"></i></button>
-            <button type="button" class="topbar-icon-btn" aria-label="Undo"><i class="fa-solid fa-rotate-left"></i></button>
-            <button type="button" class="topbar-icon-btn" aria-label="Redo"><i class="fa-solid fa-rotate-right"></i></button>
         </div>
         <div id="inkwise-customer-studio-root" class="studio-react-root" aria-live="polite"></div>
     </div>
     <div class="topbar-actions">
         <button class="topbar-action-btn" type="button" onclick="window.location.href='{{ route('templates.wedding.invitations') }}'">Change Template</button>
         <button class="topbar-action-btn" type="button">Preview</button>
+        <button class="topbar-action-btn" type="button" id="save-template-btn" data-action="save-template">Save Template</button>
         <button
             class="topbar-action-btn primary"
             type="button"
@@ -416,25 +433,8 @@
                         Fit all essential elements, like text and logos, inside this area to ensure content prints completely.
                     </div>
                 </div>
-                <div class="pill-with-tooltip">
-                    <button type="button" class="canvas-pill bleed" id="bleed-pill" aria-describedby="bleed-tooltip" aria-expanded="false">
-                        Bleed
-                    </button>
-                    <div id="bleed-tooltip" class="tooltip" role="tooltip" aria-hidden="true">
-                        Extend background to this edge to
-                        ensure full coverage and avoid blank
-                        borders during printing.
-                    </div>
-                </div>
             </div>
-            <div class="canvas-stage">
-                <div class="canvas-measure canvas-measure-vertical" aria-hidden="true">
-                    <span class="measure-cap"></span>
-                    <span class="measure-line"></span>
-                    <span class="measure-value">5.59in</span>
-                    <span class="measure-line"></span>
-                    <span class="measure-cap"></span>
-                </div>
+            <div class="canvas-container">
                 <div
                     class="preview-canvas-wrapper preview-guides"
                     @if($canvasWidthAttr !== null) data-canvas-width="{{ $canvasWidthAttr }}" @endif
@@ -456,6 +456,10 @@
                         data-back-svg="{{ $backSvg }}"
                         @endif
                         style="background-image: url('{{ $frontImage }}');"
+                        @if($canvasWidthAttr !== null) data-canvas-width="{{ $canvasWidthAttr }}" @endif
+                        @if($canvasHeightAttr !== null) data-canvas-height="{{ $canvasHeightAttr }}" @endif
+                        @if($canvasShapeAttr) data-canvas-shape="{{ $canvasShapeAttr }}" @endif
+                        @if($canvasUnitAttr) data-canvas-unit="{{ $canvasUnitAttr }}" @endif
                     >
                         <svg
                             id="preview-svg"
@@ -470,6 +474,12 @@
                         ></svg>
                     </div>
                 </div>
+                <div id="mini-toolbar" class="mini-toolbar" style="display: none;">
+                    <button class="toolbar-btn" data-action="edit" title="Edit"><i class="fa-solid fa-edit"></i></button>
+                    <button class="toolbar-btn" data-action="delete" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                    <button class="toolbar-btn" data-action="duplicate" title="Duplicate"><i class="fa-solid fa-copy"></i></button>
+                    <button class="toolbar-btn" data-action="move" title="Move"><i class="fa-solid fa-arrows-alt"></i></button>
+                </div>
                 <div class="canvas-measure canvas-measure-horizontal" aria-hidden="true">
                     <span class="measure-cap"></span>
                     <span class="measure-line"></span>
@@ -483,193 +493,21 @@
                 <span class="canvas-zoom-value" id="canvas-zoom-display">100%</span>
                 <button type="button" class="canvas-control-btn icon" data-zoom-step="up" aria-label="Zoom in"><i class="fa-solid fa-plus"></i></button>
                 <button type="button" class="canvas-control-btn icon" data-zoom-reset aria-label="Reset zoom to 100%"><i class="fa-solid fa-rotate-right"></i></button>
-                <button type="button" class="canvas-control-btn icon" aria-label="Canvas settings"><i class="fa-solid fa-gear"></i></button>
                 <select class="canvas-zoom-select" id="canvas-zoom-select" aria-label="Zoom level">
-                    <option value="3">300%</option>
-                    <option value="2">200%</option>
-                    <option value="1.5">150%</option>
-                    <option value="1" selected>100%</option>
-                    <option value="0.75">75%</option>
-                    <option value="0.5">50%</option>
                     <option value="0.25">25%</option>
+                    <option value="0.5">50%</option>
+                    <option value="0.75">75%</option>
+                    <option value="1" selected>100%</option>
+                    <option value="1.25">125%</option>
+                    <option value="1.5">150%</option>
+                    <option value="2">200%</option>
                 </select>
             </div>
-        </div>
-        <div class="preview-thumbs" role="tablist" aria-label="Card sides">
-            <button type="button" class="preview-thumb active" data-card-thumb="front" aria-pressed="true">
-                <div class="thumb-preview" @if($frontImage) style="background-image: url('{{ $frontImage }}');" @endif>
-                    <span class="thumb-placeholder">Front</span>
-                </div>
-                <span class="thumb-label">Front</span>
-            </button>
-            @if($hasBackSide)
-            <button type="button" class="preview-thumb" data-card-thumb="back" aria-pressed="false">
-                <div class="thumb-preview" @if($backImage) style="background-image: url('{{ $backImage }}');" @endif>
-                    <span class="thumb-placeholder">Back</span>
-                </div>
-                <span class="thumb-label">Back</span>
-            </button>
-            @endif
         </div>
     </section>
 </main>
 
-<!-- Modals -->
-<div id="text-modal" class="modal" data-section="text" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="text-modal-title">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2 id="text-modal-title">Text</h2>
-            <div class="modal-header-actions">
-                <button type="button" aria-label="Dock panel" disabled aria-disabled="true">
-                    <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
-                </button>
-                <button type="button" class="modal-close" data-modal-close aria-label="Close panel">
-                    <i class="fa-solid fa-xmark modal-close-icon"></i>
-                </button>
-            </div>
-        </div>
-        <p class="modal-helper">Edit your text below, or click on the field you'd like to edit directly on your design.</p>
-        <div class="text-field-list" id="textFieldList">
-            <!-- fields are generated dynamically from the SVG (or default placeholders shown only when SVG has no text nodes) -->
-        </div>
-        <button class="add-field-btn" type="button" data-add-text-field>New Text Field</button>
-    </div>
-</div>
-
-<div id="uploads-modal" class="modal" data-section="uploads" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="uploads-modal-title">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2 id="uploads-modal-title">Uploads</h2>
-            <div class="modal-header-actions">
-                <button type="button" aria-label="Dock panel" disabled aria-disabled="true">
-                    <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
-                </button>
-                <button type="button" class="modal-close" data-modal-close aria-label="Close panel">
-                    <i class="fa-solid fa-xmark modal-close-icon"></i>
-                </button>
-            </div>
-        </div>
-        <p class="modal-helper">Upload photos and illustrations to personalize your invitation.</p>
-        <div class="upload-section">
-            <button type="button" id="upload-button" class="upload-button">
-                <i class="fa-solid fa-cloud-arrow-up"></i>
-                Upload Image
-            </button>
-            <input type="file" id="image-upload" accept="image/*" class="upload-input" style="display: none;">
-        </div>
-        <div class="recently-uploaded-section">
-            <h3 class="section-title">Recently Uploaded</h3>
-            <div class="recent-uploads-grid" id="recentUploadsGrid">
-                <!-- Recently uploaded images will be populated here -->
-                <div class="no-recent-uploads">
-                    <p>No recent uploads found. Upload some images above to see them here.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div id="graphics-modal" class="modal" data-section="graphics" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="graphics-modal-title">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2 id="graphics-modal-title">Graphics</h2>
-            <div class="modal-header-actions">
-                <button type="button" aria-label="Dock panel" disabled aria-disabled="true">
-                    <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
-                </button>
-                <button type="button" class="modal-close" data-modal-close aria-label="Close panel">
-                    <i class="fa-solid fa-xmark modal-close-icon"></i>
-                </button>
-            </div>
-        </div>
-        <p class="modal-helper">Decorate your card with curated illustrations and icons.</p>
-        <div class="graphics-panel">
-            <div class="graphics-categories-labels">
-                <div class="category-row" data-category-row="shapes">
-                    <span class="category-label">Shapes</span>
-                    <button type="button" class="graphics-category-button" data-category="shapes" aria-expanded="false"><i class="fi fi-br-angle-small-right"></i></button>
-                </div>
-                <div class="category-row" data-category-row="image">
-                    <span class="category-label">Image</span>
-                    <button type="button" class="graphics-category-button" data-category="image" aria-expanded="false"><i class="fi fi-br-angle-small-right"></i></button>
-                </div>
-                <div class="category-row" data-category-row="icons">
-                    <span class="category-label">Icons</span>
-                    <button type="button" class="graphics-category-button" data-category="icons" aria-expanded="false"><i class="fi fi-br-angle-small-right"></i></button>
-                </div>
-                <div class="category-row" data-category-row="illustrations">
-                    <span class="category-label">Illustrations</span>
-                    <button type="button" class="graphics-category-button" data-category="illustrations" aria-expanded="false"><i class="fi fi-br-angle-small-right"></i></button>
-                </div>
-                <div class="category-row" data-category-row="patterns">
-                    <span class="category-label">Patterns</span>
-                    <button type="button" class="graphics-category-button" data-category="patterns" aria-expanded="false"><i class="fi fi-br-angle-small-right"></i></button>
-                </div>
-            </div>
-            <div class="graphics-browser" id="graphics-browser">
-                <form class="graphics-search is-hidden" id="graphics-search-form" role="search">
-                    <label for="graphics-search-input" class="visually-hidden">Search graphics</label>
-                    <div class="graphics-search-field">
-                        <i class="fi fi-rr-search graphics-search-icon" aria-hidden="true"></i>
-                        <input type="search" id="graphics-search-input" name="graphics-search" autocomplete="off" placeholder="Search graphics" />
-                    </div>
-                    <button type="submit" id="graphics-search-submit">Search</button>
-                </form>
-                <div class="graphics-samples" id="graphics-browser-samples" aria-live="polite"></div>
-            </div>
-        </div>
-    </div>
-</div>
-<div id="background-modal" class="modal" data-section="background" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="background-modal-title">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2 id="background-modal-title">Background</h2>
-            <div class="modal-header-actions">
-                <button type="button" aria-label="Dock panel" disabled aria-disabled="true">
-                    <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
-                </button>
-                <button type="button" class="modal-close" data-modal-close aria-label="Close panel">
-                    <i class="fa-solid fa-xmark modal-close-icon"></i>
-                </button>
-            </div>
-        </div>
-        <p class="modal-helper">Swap in textures, colors, or patterns to update the canvas background.</p>
-        <div class="modal-placeholder">
-            <p>Background presets will appear here.</p>
-        </div>
-    </div>
-</div>
-
-<div id="tables-modal" class="modal" data-section="tables" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="tables-modal-title">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2 id="tables-modal-title">Tables</h2>
-            <div class="modal-header-actions">
-                <button type="button" aria-label="Dock panel" disabled aria-disabled="true">
-                    <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
-                </button>
-                <button type="button" class="modal-close" data-modal-close aria-label="Close panel">
-                    <i class="fa-solid fa-xmark modal-close-icon"></i>
-                </button>
-            </div>
-        </div>
-        <p class="modal-helper">Manage seating charts, table numbers, and place cards.</p>
-        <div class="modal-placeholder">
-            <p>Table planning tools will show here soon.</p>
-        </div>
-    </div>
-</div>
-
-<script type="application/json" id="inkwise-customer-studio-bootstrap">
-    {!! json_encode([
-        'product' => $productBootstrap,
-        'template' => $templateBootstrap,
-        'routes' => [
-            'autosave' => route('order.design.autosave'),
-            'review' => route('order.review'),
-        ],
-    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) !!}
-</script>
+@include('customer.studio._bootstrap')
 
 </body>
 </html>

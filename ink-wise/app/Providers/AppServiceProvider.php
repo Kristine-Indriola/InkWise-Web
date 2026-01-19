@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use App\Models\SiteSetting;
@@ -27,6 +29,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->boostPayloadLimits();
+
         // Blade helper to resolve image URLs: @imageUrl($path)
         Blade::directive('imageUrl', function ($expression) {
             return "<?php echo \App\\Support\\ImageResolver::url({$expression}); ?>";
@@ -60,5 +64,32 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Payment::observe(PaymentObserver::class);
+    }
+
+    private function boostPayloadLimits(): void
+    {
+        // Increase PHP limits for heavy design JSON payloads
+        $limits = [
+            'post_max_size' => '64M',
+            'upload_max_filesize' => '64M',
+            'memory_limit' => '512M',
+        ];
+
+        foreach ($limits as $key => $value) {
+            try {
+                ini_set($key, $value);
+            } catch (\Throwable $e) {
+                Log::debug('Unable to apply ini limit', ['key' => $key, 'error' => $e->getMessage()]);
+            }
+        }
+
+        try {
+            $connection = DB::connection();
+            if ($connection->getDriverName() === 'mysql') {
+                $connection->statement('SET SESSION max_allowed_packet=67108864');
+            }
+        } catch (\Throwable $e) {
+            Log::debug('Unable to raise max_allowed_packet', ['error' => $e->getMessage()]);
+        }
     }
 }

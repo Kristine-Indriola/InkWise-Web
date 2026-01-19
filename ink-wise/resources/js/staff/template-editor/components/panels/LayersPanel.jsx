@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 
 import { useBuilderStore } from '../../state/BuilderStore';
 
@@ -50,7 +50,16 @@ const categorizeLayerType = (layer) => {
 
 export function LayersPanel() {
   const { state, dispatch } = useBuilderStore();
-  const activePage = state.pages.find((page) => page.id === state.activePageId) ?? state.pages[0];
+  const activePage = state.pages?.find((page) => page.id === state.activePageId) ?? state.pages?.[0];
+
+  const handleBackgroundChange = useCallback((value) => {
+    if (!activePage) return;
+    dispatch({
+      type: 'UPDATE_PAGE_PROPS',
+      pageId: activePage.id,
+      props: { background: value },
+    });
+  }, [activePage, dispatch]);
 
   if (!activePage) {
     return null;
@@ -58,7 +67,19 @@ export function LayersPanel() {
   const [collapsedGroups, setCollapsedGroups] = useState({ frame: false, text: false, image: false, shape: false });
 
   const nodes = activePage.nodes || [];
-  const layers = useMemo(() => [...nodes].reverse(), [nodes]);
+
+  const backgroundLayer = useMemo(() => ({
+    id: 'canvas-background',
+    name: 'Canvas Background',
+    type: 'background',
+    background: activePage.background ?? '#ffffff',
+    metadata: { isCanvasBackground: true, isCanvasFrame: true },
+  }), [activePage.background]);
+
+  const layers = useMemo(() => {
+    const base = [...nodes].reverse();
+    return [backgroundLayer, ...base];
+  }, [nodes, backgroundLayer]);
 
   const groupedLayers = useMemo(() => {
     const buckets = { frame: [], text: [], image: [], shape: [] };
@@ -126,6 +147,7 @@ export function LayersPanel() {
       return `Shape Layer ${indexInGroup + 1}`;
     }
     if (key === 'frame') {
+      if (layer?.metadata?.isCanvasBackground) return 'Canvas Background';
       return indexInGroup === 0 ? 'Canvas Frame' : `Frame Layer ${indexInGroup + 1}`;
     }
     return layer.name || `Layer ${indexInGroup + 1}`;
@@ -142,6 +164,7 @@ export function LayersPanel() {
     const orderNumber = getLayerOrderLabel(layer.id);
     const layerNumber = getLayerNumber(layer.id);
     const typeLabel = getTypeLabel(layer);
+    const isBackground = layer?.metadata?.isCanvasBackground;
 
     return (
       <div
@@ -149,10 +172,14 @@ export function LayersPanel() {
         className={`layers-panel__item layers-panel__item--modern layers-panel__item--${groupKey} ${isSelected ? 'is-active' : ''}`}
         role="button"
         tabIndex={0}
-        onClick={() => handleSelect(layer.id)}
+        onClick={() => {
+          if (isBackground) return;
+          handleSelect(layer.id);
+        }}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
+            if (isBackground) return;
             handleSelect(layer.id);
           }
         }}
@@ -162,47 +189,87 @@ export function LayersPanel() {
             <span className="layers-panel__badge">{typeLabel}</span>
             <span className="layers-panel__label-text" title={displayName}>{displayName}</span>
           </div>
-          <div className="layers-panel__actions-simple" aria-hidden="true">
-            <button
-              type="button"
-              className="layers-panel__action-ghost"
-              onClick={(event) => {
-                event.stopPropagation();
-                handleSelect(layer.id);
-              }}
-              title="Edit layer"
-            >
-              ✏️
-            </button>
-            <button
-              type="button"
-              className="layers-panel__action-ghost"
-              onClick={(event) => {
-                event.stopPropagation();
-                handleDuplicate(layer.id);
-              }}
-              title="Duplicate layer"
-            >
-              ⧉
-            </button>
-            <button
-              type="button"
-              className="layers-panel__action-ghost is-danger"
-              onClick={(event) => {
-                event.stopPropagation();
-                handleDelete(layer.id);
-              }}
-              title="Delete layer"
-            >
-              🗑️
-            </button>
+          {!isBackground && (
+            <div className="layers-panel__actions-simple" aria-hidden="true">
+              <button
+                type="button"
+                className="layers-panel__action-ghost"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleSelect(layer.id);
+                }}
+                title="Edit layer"
+              >
+                ✏️
+              </button>
+              <button
+                type="button"
+                className="layers-panel__action-ghost"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleDuplicate(layer.id);
+                }}
+                title="Duplicate layer"
+              >
+                ⧉
+              </button>
+              <button
+                type="button"
+                className="layers-panel__action-ghost is-danger"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleDelete(layer.id);
+                }}
+                title="Delete layer"
+              >
+                🗑️
+              </button>
+            </div>
+          )}
+        </div>
+        {isBackground ? (
+          <div className="layers-panel__meta-row layers-panel__meta-row--background">
+            <div className="layers-panel__pill" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span>Color</span>
+              {typeof layer.background === 'string' && layer.background.includes('gradient') ? (
+                <span
+                  className="layers-panel__gradient-chip"
+                  aria-label="Canvas background gradient preview"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: '9999px',
+                    border: '1px solid rgba(148,163,184,0.5)',
+                    background: layer.background,
+                    color: '#0f172a',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    minWidth: 96,
+                    justifyContent: 'center',
+                  }}
+                  title="Background gradient preview"
+                >
+                  Gradient
+                </span>
+              ) : (
+                <input
+                  type="color"
+                  value={layer.background ?? '#ffffff'}
+                  onChange={(e) => handleBackgroundChange(e.target.value)}
+                  aria-label="Canvas background color"
+                  style={{ width: 32, height: 20, border: '1px solid rgba(148,163,184,0.5)', borderRadius: 6, cursor: 'pointer' }}
+                />
+              )}
+            </div>
           </div>
-        </div>
-        <div className="layers-panel__meta-row" aria-hidden="true">
-          <span className="layers-panel__pill">Order #{orderNumber ?? '—'}</span>
-          <span className="layers-panel__pill">Layer #{layerNumber ?? '—'}</span>
-          <span className="layers-panel__pill layers-panel__pill--soft">{typeLabel}</span>
-        </div>
+        ) : (
+          <div className="layers-panel__meta-row" aria-hidden="true">
+            <span className="layers-panel__pill">Order #{orderNumber ?? '—'}</span>
+            <span className="layers-panel__pill">Layer #{layerNumber ?? '—'}</span>
+            <span className="layers-panel__pill layers-panel__pill--soft">{typeLabel}</span>
+          </div>
+        )}
       </div>
     );
   };

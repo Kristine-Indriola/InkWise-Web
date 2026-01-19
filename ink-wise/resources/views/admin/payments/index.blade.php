@@ -5,7 +5,7 @@
 @push('styles')
 <style>
     .payments-shell {
-        max-width: 1200px;
+        max-width: 1600px;
         margin: 0 auto;
         padding: 32px 16px 72px;
     }
@@ -42,9 +42,217 @@
         color: #111827;
     }
 
+    .filter-actions {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .filter-actions-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    @media (max-width: 640px) {
+        .filter-actions {
+            align-items: stretch;
+            gap: 16px;
+        }
+
+        .filter-actions-row {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+        }
+
+        .filter-actions-row .btn-export {
+            justify-content: center;
+        }
+    }
+
+    .btn-export {
+        background: linear-gradient(135deg, #059669, #047857);
+        color: white;
+        border: none;
+        padding: 10px 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        text-decoration: none;
+    }
+
+    .btn-export:hover {
+        background: linear-gradient(135deg, #047857, #065f46);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+        transform: translateY(-1px);
+    }
+
+    .btn-export i {
+        font-size: 14px;
+    }
+
+    .payments-filters-section {
+        margin-bottom: 24px;
+        padding: 24px;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .payments-filters {
+        display: flex;
+        align-items: flex-start;
+        gap: 24px;
+        flex-wrap: wrap;
+    }
+
+    @media (max-width: 1024px) {
+        .payments-filters {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 16px;
+        }
+    }
+
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex: 1;
+    }
+
+    .filter-group label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #374151;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .filter-group label i {
+        color: #6b7280;
+        font-size: 14px;
+    }
+
+    .filter-input {
+        padding: 10px 12px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 14px;
+        color: #374151;
+        background: white;
+        transition: all 0.2s ease;
+    }
+
+    .filter-input:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .filter-input::placeholder {
+        color: #9ca3af;
+    }
+
+    .date-range-group {
+        display: flex;
+        gap: 8px;
+        align-items: flex-end;
+    }
+
+    @media (max-width: 640px) {
+        .date-range-group {
+            flex-direction: column;
+            gap: 12px;
+        }
+    }
+
+    .date-input-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex: 1;
+    }
+
+    .date-input-wrapper label {
+        font-size: 12px;
+        font-weight: 500;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .filter-actions {
+        display: flex;
+        align-items: flex-end;
+        gap: 8px;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn-primary:hover {
+        background: linear-gradient(135deg, #2563eb, #1e40af);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+        transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+        background: white;
+        color: #374151;
+        border: 2px solid #e5e7eb;
+        padding: 10px 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-secondary:hover {
+        background: #f9fafb;
+        border-color: #d1d5db;
+    }
+
+    .btn-icon-only {
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
     .payments-stats {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
         gap: 16px;
         margin-bottom: 24px;
     }
@@ -268,8 +476,11 @@
 
     .pagination {
         display: flex;
-        gap: 4px;
+        gap: 2px;
         align-items: center;
+        list-style: none;
+        margin: 0;
+        padding: 0;
     }
 
     .pagination a,
@@ -277,16 +488,22 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 36px;
-        height: 36px;
+        width: 28px;
+        height: 28px;
         border-radius: 6px;
-        font-size: 14px;
+        font-size: 12px;
         font-weight: 500;
         text-decoration: none;
         border: 1px solid #d1d5db;
         background: white;
         color: #374151;
         transition: all 0.2s ease;
+    }
+
+    .pagination a svg,
+    .pagination span svg {
+        width: 12px;
+        height: 12px;
     }
 
     .pagination .active {
@@ -298,6 +515,18 @@
     .pagination a:hover:not(.active) {
         background: #f3f4f6;
         border-color: #9ca3af;
+    }
+
+    .pagination-disabled {
+        opacity: 0.4;
+        pointer-events: none;
+    }
+
+    .pagination-ellipsis {
+        border: none;
+        background: transparent;
+        color: #9ca3af;
+        cursor: default;
     }
 
     .empty-state {
@@ -347,16 +576,21 @@
 
 @section('content')
 @php
-    // Use statistics from controller
-    $totalOrders = $statistics->total_orders ?? 0;
-    $paidOrders = $statistics->paid_orders ?? 0;
-    $pendingOrders = $statistics->pending_orders ?? 0;
-    $failedOrders = $statistics->failed_orders ?? 0;
-    $partialOrders = $partialPayments ?? 0;
-    $totalAmount = $statistics->total_amount ?? 0;
-    $paidAmount = $statistics->paid_amount ?? 0;
-    $pendingAmount = $statistics->pending_amount ?? 0;
-    $currentFilter = $filter ?? null;
+    $totalTransactions = $summary['total_transactions'] ?? 0;
+    $totalAmount = $summary['total_amount'] ?? 0;
+    $paidTransactions = $summary['paid_count'] ?? 0;
+    $paidAmount = $summary['paid_amount'] ?? 0;
+    $pendingTransactions = $summary['pending_count'] ?? 0;
+    $pendingAmount = $summary['pending_amount'] ?? 0;
+    $partialTransactions = $summary['partial_count'] ?? 0;
+    $partialAmount = $summary['partial_amount'] ?? 0;
+    $failedTransactions = $summary['failed_count'] ?? 0;
+    $failedAmount = $summary['failed_amount'] ?? 0;
+    $currentFilter = $filter !== 'all' ? $filter : null;
+    $baseQuery = request()->except(['page', 'filter']);
+    $searchQuery = request('search', '');
+    $dateFrom = request('date_from', '');
+    $dateTo = request('date_to', '');
 @endphp
 
 <main class="payments-shell">
@@ -365,119 +599,205 @@
     </header>
 
     <section class="payments-stats">
-        <a href="{{ route('admin.payments.index') }}" class="stat-card {{ !$currentFilter ? 'active' : '' }}">
+        <a href="{{ route('admin.payments.index', $baseQuery) }}" class="stat-card {{ !$currentFilter ? 'active' : '' }}">
             <div class="stat-card__icon stat-card__icon--total">
                 <i class="fas fa-shopping-cart"></i>
             </div>
             <div class="stat-card__content">
-                <h3>{{ number_format($totalOrders) }}</h3>
-                <p>Total Orders</p>
+                <h3>{{ number_format($totalTransactions) }}</h3>
+                <p>Total Transactions · ₱{{ number_format($totalAmount, 2) }}</p>
             </div>
         </a>
 
-        <a href="{{ route('admin.payments.index', ['filter' => 'paid']) }}" class="stat-card {{ $currentFilter === 'paid' ? 'active' : '' }}">
+        <a href="{{ route('admin.payments.index', array_merge($baseQuery, ['filter' => 'paid'])) }}" class="stat-card {{ $currentFilter === 'paid' ? 'active' : '' }}">
             <div class="stat-card__icon stat-card__icon--paid">
                 <i class="fas fa-check-circle"></i>
             </div>
             <div class="stat-card__content">
-                <h3>{{ number_format($paidOrders) }}</h3>
-                <p>Paid Orders</p>
+                <h3>{{ number_format($paidTransactions) }}</h3>
+                <p>Paid Transactions · ₱{{ number_format($paidAmount, 2) }}</p>
             </div>
         </a>
 
-        <a href="{{ route('admin.payments.index', ['filter' => 'pending']) }}" class="stat-card {{ $currentFilter === 'pending' ? 'active' : '' }}">
+        <a href="{{ route('admin.payments.index', array_merge($baseQuery, ['filter' => 'pending'])) }}" class="stat-card {{ $currentFilter === 'pending' ? 'active' : '' }}">
             <div class="stat-card__icon stat-card__icon--pending">
                 <i class="fas fa-clock"></i>
             </div>
             <div class="stat-card__content">
-                <h3>{{ number_format($pendingOrders) }}</h3>
-                <p>Pending Payments</p>
+                <h3>{{ number_format($pendingTransactions) }}</h3>
+                <p>Pending Transactions · ₱{{ number_format($pendingAmount, 2) }}</p>
             </div>
         </a>
 
-        <a href="{{ route('admin.payments.index', ['filter' => 'partial']) }}" class="stat-card {{ $currentFilter === 'partial' ? 'active' : '' }}">
+        <a href="{{ route('admin.payments.index', array_merge($baseQuery, ['filter' => 'partial'])) }}" class="stat-card {{ $currentFilter === 'partial' ? 'active' : '' }}">
             <div class="stat-card__icon stat-card__icon--partial">
                 <i class="fas fa-coins"></i>
             </div>
             <div class="stat-card__content">
-                <h3>{{ number_format($partialOrders) }}</h3>
-                <p>Partial Payments</p>
+                <h3>{{ number_format($partialTransactions) }}</h3>
+                <p>Partial Transactions · ₱{{ number_format($partialAmount, 2) }}</p>
             </div>
         </a>
 
-        <a href="{{ route('admin.payments.index', ['filter' => 'failed']) }}" class="stat-card {{ $currentFilter === 'failed' ? 'active' : '' }}">
+        <a href="{{ route('admin.payments.index', array_merge($baseQuery, ['filter' => 'failed'])) }}" class="stat-card {{ $currentFilter === 'failed' ? 'active' : '' }}">
             <div class="stat-card__icon stat-card__icon--overdue">
                 <i class="fas fa-exclamation-triangle"></i>
             </div>
             <div class="stat-card__content">
-                <h3>{{ number_format($failedOrders) }}</h3>
-                <p>Failed Payments</p>
+                <h3>{{ number_format($failedTransactions) }}</h3>
+                <p>Failed Transactions · ₱{{ number_format($failedAmount, 2) }}</p>
             </div>
         </a>
     </section>
 
+    <section class="payments-filters-section">
+        <form method="GET" class="payments-filters" action="{{ route('admin.payments.index') }}">
+            @if($currentFilter)
+                <input type="hidden" name="filter" value="{{ $currentFilter }}">
+            @endif
+
+            <div class="filter-group">
+                <label for="search">
+                    <i class="fas fa-search"></i>
+                    Search Transactions
+                </label>
+                <input
+                    type="text"
+                    id="search"
+                    name="search"
+                    value="{{ $searchQuery }}"
+                    placeholder="Order #, Transaction ID, or Customer name..."
+                    class="filter-input"
+                >
+            </div>
+
+            <div class="date-range-group">
+                <div class="date-input-wrapper">
+                    <label for="date_from">From Date</label>
+                    <input
+                        type="date"
+                        id="date_from"
+                        name="date_from"
+                        value="{{ $dateFrom }}"
+                        class="filter-input"
+                    >
+                </div>
+                <div class="date-input-wrapper">
+                    <label for="date_to">To Date</label>
+                    <input
+                        type="date"
+                        id="date_to"
+                        name="date_to"
+                        value="{{ $dateTo }}"
+                        class="filter-input"
+                    >
+                </div>
+            </div>
+
+            <div class="filter-actions">
+                <div class="filter-actions-row">
+                    <button type="submit" class="btn-primary">
+                        <i class="fas fa-filter"></i>
+                        Apply Filters
+                    </button>
+                    @if($searchQuery || $dateFrom || $dateTo)
+                        <a href="{{ route('admin.payments.index', $currentFilter ? ['filter' => $currentFilter] : []) }}" class="btn-secondary btn-icon-only" title="Clear Filters">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    @endif
+                </div>
+                <div class="filter-actions-row">
+                    <a href="{{ route('admin.payments.export', request()->query()) }}" class="btn-export" title="Export to CSV">
+                        <i class="fas fa-download"></i>
+                        Export CSV
+                    </a>
+                    <a href="{{ route('admin.payments.archived') }}" class="btn-secondary" title="Show archived payments">
+                        <i class="fas fa-archive"></i>
+                        Archived
+                    </a>
+                </div>
+            </div>
+        </form>
+    </section>
+
     <section class="payments-table-container">
-        @if($orders->count() > 0)
+        @if($transactions->count() > 0)
             <table class="payments-table">
                 <thead>
                     <tr>
+                        <th>Transaction</th>
                         <th>Order #</th>
                         <th>Customer</th>
-                        <th>Order Date</th>
-                        <th>Total Amount</th>
-                        <th>Paid Amount</th>
+                        <th>Method</th>
+                        <th>Date</th>
+                        <th>Amount</th>
                         <th>Balance</th>
                         <th>Payment Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach($orders as $order)
+                    @foreach($transformedRows as $row)
                         @php
-                            $paidAmount = $order->totalPaid();
-                            $balanceDue = $order->balanceDue();
-                            
-                            // Compute payment status based on actual payments
-                            if ($paidAmount == 0) {
-                                $computedPaymentStatus = 'pending';
-                            } elseif ($balanceDue <= 0.01) {
-                                $computedPaymentStatus = 'paid';
+                            $payment = $row['raw'];
+                            $order = $payment?->order;
+                            $transactionIdDisplay = $row['transaction_id'] ?? '—';
+                            $orderDisplay = $order?->order_number ?? $row['order_id'] ?? '—';
+                            $customerName = $row['customer_name'] ?? '—';
+                            $method = $row['payment_method'] ?? '—';
+                            $dateDisplay = $row['display_date'] ?? '—';
+                            $amountDisplay = $row['amount_display'] ?? '—';
+                            $balanceDisplay = $row['remaining_balance_display'] ?? '—';
+                            $statusLabel = $row['status_label'] ?? '—';
+                            $statusClass = $row['status_class'] ?? '';
+                            $statusRaw = $row['status_raw'] ?? '';
+
+                            if ($statusClass === 'stock-ok') {
+                                $badgeClass = 'payment-status--paid';
+                            } elseif ($statusClass === 'stock-critical') {
+                                $badgeClass = 'payment-status--failed';
+                            } elseif (\Illuminate\Support\Str::contains($statusRaw, 'partial')) {
+                                $badgeClass = 'payment-status--partial';
                             } else {
-                                $computedPaymentStatus = 'partial';
+                                $badgeClass = 'payment-status--pending';
                             }
-                            
-                            $paymentStatusClass = 'payment-status--' . $computedPaymentStatus;
-                            $displayPaymentStatus = ucfirst($computedPaymentStatus);
                         @endphp
                         <tr>
                             <td>
-                                <a href="{{ route('admin.ordersummary.show', ['order' => $order->id]) }}" class="order-number">
-                                    #{{ $order->order_number }}
-                                </a>
+                                <span class="order-number">{{ $transactionIdDisplay }}</span>
                             </td>
                             <td>
-                                <span class="customer-name">
-                                    {{ $order->effectiveCustomer?->name ?? $order->effectiveCustomer?->full_name ?? 'N/A' }}
-                                </span>
-                            </td>
-                            <td>{{ $order->order_date?->format('M j, Y') ?? 'N/A' }}</td>
-                            <td class="payment-amount">PHP {{ number_format($order->total_amount, 2) }}</td>
-                            <td class="payment-amount">PHP {{ number_format($paidAmount, 2) }}</td>
-                            <td class="payment-amount {{ $balanceDue > 0 ? 'text-red-600' : 'text-green-600' }}">
-                                PHP {{ number_format($balanceDue, 2) }}
+                                @if($order)
+                                    <a href="{{ route('admin.ordersummary.show', ['order' => $order->id]) }}" class="order-number">
+                                        #{{ $order->order_number }}
+                                    </a>
+                                @else
+                                    <span class="order-number">{{ $orderDisplay }}</span>
+                                @endif
                             </td>
                             <td>
-                                <span class="payment-status {{ $paymentStatusClass }}">
-                                    {{ $displayPaymentStatus }}
+                                <span class="customer-name">{{ $customerName }}</span>
+                            </td>
+                            <td>{{ $method }}</td>
+                            <td>{{ $dateDisplay }}</td>
+                            <td class="payment-amount">{{ $amountDisplay }}</td>
+                            <td class="payment-amount">{{ $balanceDisplay }}</td>
+                            <td>
+                                <span class="payment-status {{ $badgeClass }}">
+                                    {{ $statusLabel }}
                                 </span>
                             </td>
                             <td class="actions-cell">
-                                <a href="{{ route('admin.ordersummary.show', ['order' => $order->id]) }}" class="btn btn-outline btn-sm" title="View Order">
-                                    <i class="fas fa-eye"></i>
-                                </a>
-                                <a href="{{ route('admin.orders.payment.edit', ['order' => $order->id]) }}" class="btn btn-outline btn-sm" title="Manage Payment">
-                                    <i class="fas fa-credit-card"></i>
-                                </a>
+                                @if($order)
+                                    <a href="{{ route('admin.ordersummary.show', ['order' => $order->id]) }}" class="btn btn-outline btn-sm" title="View Order">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{{ route('admin.orders.payment.edit', ['order' => $order->id]) }}" class="btn btn-outline btn-sm" title="Manage Payment">
+                                        <i class="fas fa-credit-card"></i>
+                                    </a>
+                                @else
+                                    <span class="text-gray-400">—</span>
+                                @endif
                             </td>
                         </tr>
                     @endforeach
@@ -486,14 +806,14 @@
         @else
             <div class="empty-state">
                 <h3>No payment transactions found</h3>
-                <p>There are no orders with payment information to display.</p>
+                <p>Try adjusting your filters to find a different set of transactions.</p>
             </div>
         @endif
     </section>
 
-    @if($orders->hasPages())
+    @if($transactions->hasPages())
         <div class="pagination-container">
-            {{ $orders->appends(request()->query())->links() }}
+            {{ $transactions->appends(request()->query())->links('admin.payments.pagination') }}
         </div>
     @endif
 </main>
@@ -501,9 +821,85 @@
 
 @push('scripts')
 <script>
-    // Add any interactive functionality here if needed
     document.addEventListener('DOMContentLoaded', function() {
-        // Payment status updates or other interactions can be added here
+        // Auto-submit form when status filter is clicked (for stat cards)
+        const statCards = document.querySelectorAll('.stat-card');
+        statCards.forEach(card => {
+            card.addEventListener('click', function(e) {
+                // Allow normal link behavior
+            });
+        });
+
+        // Enhanced search functionality
+        const searchInput = document.getElementById('search');
+        const dateFromInput = document.getElementById('date_from');
+        const dateToInput = document.getElementById('date_to');
+        const filterForm = document.querySelector('.payments-filters');
+
+        // Auto-submit on Enter key in search
+        if (searchInput) {
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    filterForm.submit();
+                }
+            });
+        }
+
+        // Date validation
+        function validateDates() {
+            const fromDate = dateFromInput?.value;
+            const toDate = dateToInput?.value;
+
+            if (fromDate && toDate && fromDate > toDate) {
+                alert('From date cannot be later than To date');
+                dateToInput.value = '';
+                return false;
+            }
+            return true;
+        }
+
+        if (dateFromInput && dateToInput) {
+            dateFromInput.addEventListener('change', validateDates);
+            dateToInput.addEventListener('change', validateDates);
+        }
+
+        // Clear filters functionality
+        const clearFiltersBtn = document.querySelector('.btn-secondary[title="Clear Filters"]');
+        if (clearFiltersBtn) {
+            clearFiltersBtn.addEventListener('click', function(e) {
+                // Clear form inputs
+                if (searchInput) searchInput.value = '';
+                if (dateFromInput) dateFromInput.value = '';
+                if (dateToInput) dateToInput.value = '';
+            });
+        }
+
+        // Add loading state to filter button
+        const filterBtn = document.querySelector('.btn-primary');
+        if (filterBtn && filterForm) {
+            filterForm.addEventListener('submit', function() {
+                filterBtn.disabled = true;
+                filterBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Filtering...';
+            });
+        }
+
+        // Quick date range buttons (optional enhancement)
+        function setDateRange(days) {
+            const today = new Date();
+            const fromDate = new Date(today);
+            fromDate.setDate(today.getDate() - days);
+
+            if (dateFromInput) {
+                dateFromInput.value = fromDate.toISOString().split('T')[0];
+            }
+            if (dateToInput) {
+                dateToInput.value = today.toISOString().split('T')[0];
+            }
+        }
+
+        // You can add quick date buttons in the future if needed
+        // Example: Last 7 days, Last 30 days, etc.
     });
 </script>
 @endpush

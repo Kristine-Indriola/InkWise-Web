@@ -26,6 +26,7 @@
         'product_type' => old('productType', $product->product_type ?? $selectedTemplate->product_type ?? ($requestedType ?: 'Invitation')),
         'theme_style' => old('themeStyle', $product->theme_style ?? $selectedTemplate->theme_style ?? ''),
         'description' => old('description', $product->description ?? $selectedTemplate->description ?? ''),
+        'size' => old('invitation_size', $product->size ?? $selectedTemplate->size ?? ''),
         'base_price' => old('base_price', $product->base_price ?? ''),
         'lead_time' => old('lead_time', $product->lead_time ?? ''),
         'date_available' => old('date_available', isset($product) && !empty($product->date_available)
@@ -163,6 +164,26 @@
 
                 <div class="responsive-grid grid-2-cols">
                     <div class="field">
+                        <label for="invitationSize">Size</label>
+                        <input type="text" id="invitationSize" name="invitation_size" list="invitation-sizes" placeholder="e.g. 5x7, 4x6, A5" aria-describedby="invitationSize-error" value="{{ $defaults['size'] }}">
+                        <datalist id="invitation-sizes">
+                            <option value="5x7">5x7</option>
+                            <option value="4x6">4x6</option>
+                            <option value="A5">A5</option>
+                            <option value="A6">A6</option>
+                            <option value="6x8">6x8</option>
+                            <option value="Square">Square</option>
+                        </datalist>
+                        <span id="invitationSize-error" class="error-message"></span>
+                        @error('invitation_size') <span class="error-message">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="field">
+                        <!-- reserved for future -->
+                    </div>
+                </div>
+
+                <div class="responsive-grid grid-2-cols">
+                    <div class="field">
                         <label for="basePrice">Base Price</label>
                         <input type="number" step="0.01" id="basePrice" name="base_price" placeholder="Base Price (e.g. 100.00)" aria-describedby="basePrice-error" value="{{ $defaults['base_price'] }}">
                         <span id="basePrice-error" class="error-message"></span>
@@ -263,11 +284,7 @@
                     <div class="addon-row" data-row-index="{{ $i }}">
                         <input type="hidden" name="addons[{{ $i }}][id]" value="{{ $addon['id'] ?? '' }}">
                         <div class="input-row">
-                            <div class="field">
-                                <label>Size Type</label>
-                                <input type="text" value="Size" readonly style="background: #f7f9ff; cursor: not-allowed; opacity: 0.8;">
-                                <input type="hidden" name="addons[{{ $i }}][addon_type]" value="size">
-                            </div>
+                            <input type="hidden" name="addons[{{ $i }}][addon_type]" value="size">
                             <div class="field addon-name-field">
                                 <label for="addons_{{ $i }}_name">Size Number</label>
                                 <select class="addon-name-select" data-placeholder="Select addon material..." name="addons[{{ $i }}][material_select]" aria-label="Select addon material">
@@ -363,6 +380,9 @@
                         <div id="preview-back-img" class="preview-placeholder">No back image available</div>
                     </div>
 
+                </div>
+                <div class="preview-size-display" style="text-align:center;margin-top:10px;font-weight:600;">
+                    Selected size: <span id="preview-size">{{ $defaults['size'] ? $defaults['size'] : '—' }}</span>
                 </div>
             </div>
 
@@ -532,6 +552,34 @@
                 backContainer.parentNode.replaceChild(div, backContainer);
             }
         }
+        // Ensure size display updates to reflect current input or template
+        if (typeof updateSizeDisplay === 'function') {
+            updateSizeDisplay();
+        }
+    }
+
+    // Update the preview size label and adjust preview thumbnail classes
+    function updateSizeDisplay() {
+        var sizeInput = document.getElementById('invitationSize');
+        var sizeText = sizeInput && sizeInput.value ? String(sizeInput.value).trim() : '';
+        var displayEl = document.getElementById('preview-size');
+        if (displayEl) {
+            displayEl.textContent = sizeText || '—';
+        }
+
+        // Apply simple ratio classes to preview images for visual cue
+        var ratios = ['ratio-5x7','ratio-4x6','ratio-a5','ratio-square'];
+        ['preview-front-img','preview-back-img'].forEach(function(id){
+            var el = document.getElementById(id);
+            if (!el) return;
+            ratios.forEach(function(r){ el.classList.remove(r); });
+            if (!sizeText) return;
+            var s = sizeText.toLowerCase();
+            if (s.indexOf('5x7') !== -1) el.classList.add('ratio-5x7');
+            else if (s.indexOf('4x6') !== -1 || s.indexOf('6x4') !== -1) el.classList.add('ratio-4x6');
+            else if (s.indexOf('a5') !== -1) el.classList.add('ratio-a5');
+            else if (s.indexOf('square') !== -1 || /\d+x\d+/.test(s) && (s.split('x')[0] === s.split('x')[1])) el.classList.add('ratio-square');
+        });
     }
 
     (function(){
@@ -579,6 +627,15 @@
                 updateDateAvailableFromLead();
             }
 
+            // Size input: update preview label live
+            var sizeEl = document.getElementById('invitationSize');
+            if (sizeEl) {
+                sizeEl.addEventListener('input', updateSizeDisplay);
+                sizeEl.addEventListener('change', updateSizeDisplay);
+                // initialize display
+                updateSizeDisplay();
+            }
+
             // Sync description editor to textarea on form submit
             var form = document.getElementById('invitation-form');
             if (form) {
@@ -593,6 +650,45 @@
         });
     })();
 </script>
+<style>
+    /* Simple preview ratio cues */
+    #preview-front-img.ratio-5x7, #preview-back-img.ratio-5x7 { max-width: 140px; height: auto; }
+    #preview-front-img.ratio-4x6, #preview-back-img.ratio-4x6 { max-width: 120px; height: auto; }
+    #preview-front-img.ratio-a5, #preview-back-img.ratio-a5 { max-width: 150px; height: auto; }
+    #preview-front-img.ratio-square, #preview-back-img.ratio-square { max-width: 130px; height: auto; }
+    .preview-size-display { color: #1f2937; }
+    /* Remove native dropdown/arrow for the size input across browsers */
+    #invitationSize {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        background-image: none;
+    }
+    /* Edge/IE clear & expand */
+    #invitationSize::-ms-clear,
+    #invitationSize::-ms-expand {
+        display: none;
+    }
+    /* WebKit specific */
+    #invitationSize::-webkit-search-decoration,
+    #invitationSize::-webkit-search-cancel-button,
+    #invitationSize::-webkit-search-results-button,
+    #invitationSize::-webkit-search-results-decoration,
+    #invitationSize::-webkit-credentials-auto-fill-button,
+    #invitationSize::-webkit-calendar-picker-indicator {
+        display: none !important;
+        -webkit-appearance: none;
+    }
+    /* Hide number input spinners within the invitation form (scoped) */
+    #invitation-form input[type="number"]::-webkit-outer-spin-button,
+    #invitation-form input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    #invitation-form input[type="number"] {
+        -moz-appearance: textfield;
+    }
+</style>
 
 @endsection
 @section('scripts')

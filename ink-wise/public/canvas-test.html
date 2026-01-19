@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Canvas Capture Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-canvas {
+            width: 400px;
+            height: 300px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            position: relative;
+        }
+        .test-text {
+            position: absolute;
+            top: 50px;
+            left: 50px;
+            font-size: 24px;
+            color: #333;
+            font-family: Arial, sans-serif;
+        }
+        .test-image {
+            position: absolute;
+            top: 100px;
+            left: 100px;
+            width: 100px;
+            height: 100px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Canvas Capture Test</h1>
+    <div class="test-canvas" id="test-canvas">
+        <div class="test-text" data-preview-node="text1">Test Text Content</div>
+        <img class="test-image" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjNDM3N2JmIi8+Cjwvc3ZnPgo=" alt="test" data-preview-node="image1">
+    </div>
+    <br>
+    <button onclick="testCapture()">Test Canvas Capture</button>
+    <br><br>
+    <div id="result"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
+    <script>
+        async function testCapture() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing canvas capture...';
+
+            try {
+                const canvas = document.getElementById('test-canvas');
+                console.log('Canvas element:', canvas);
+                console.log('Canvas children:', canvas.children.length);
+
+                const layers = canvas.querySelectorAll('[data-preview-node]');
+                console.log('Found layers:', layers.length);
+                layers.forEach((layer, i) => {
+                    console.log(`Layer ${i}:`, layer.textContent || 'image', layer.tagName);
+                });
+
+                const dataUrl = await htmlToImage.toPng(canvas, {
+                    backgroundColor: '#ffffff',
+                    width: canvas.scrollWidth,
+                    height: canvas.scrollHeight,
+                });
+
+                console.log('Capture successful! Data URL length:', dataUrl.length);
+
+                // Display the result
+                resultDiv.innerHTML = `
+                    <h3>Capture Result:</h3>
+                    <img src="${dataUrl}" style="border: 1px solid #ccc; max-width: 400px;">
+                    <br>
+                    <p>Data URL length: ${dataUrl.length} characters</p>
+                    <p>Canvas size: ${canvas.scrollWidth} x ${canvas.scrollHeight}</p>
+                    <p>Layers found: ${layers.length}</p>
+                `;
+
+            } catch (error) {
+                console.error('Capture failed:', error);
+                resultDiv.innerHTML = `<p style="color: red;">Capture failed: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

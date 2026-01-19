@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\Payment;
+use App\Services\OrderFlowService;
 use Illuminate\Support\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Client\PendingRequest;
@@ -41,6 +42,7 @@ class PaymentController extends Controller
             'email' => ['nullable', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:64'],
             'mode' => ['nullable', 'in:half,full,balance_payment'],
+            'amount' => ['required', 'numeric', 'min:0.01'],
         ]);
 
         if (empty($this->secretKey)) {
@@ -81,15 +83,36 @@ class PaymentController extends Controller
         ]);
 
         if ($summary['balance'] <= 0) {
+            Log::info('GCash create blocked: order fully paid', [
+                'order_id' => $order->id,
+                'total_paid' => $summary['total_paid'],
+                'balance' => $summary['balance'],
+            ]);
+
             return response()->json([
                 'message' => 'This order is already fully paid.',
+                'order' => [
+                    'id' => $order->id,
+                    'total_amount' => $order->total_amount,
+                    'grand_total' => $order->grandTotalAmount(),
+                    'summary_snapshot_present' => !empty($order->summary_snapshot ?? []),
+                ],
+                'summary' => [
+                    'balance' => $summary['balance'],
+                    'total_paid' => $summary['total_paid'],
+                    'payments' => $summary['payments'],
+                    // include paymongo metadata if present for debugging
+                    'paymongo' => $metadata['paymongo'] ?? null,
+                ],
             ], 409);
         }
 
-        $amountToCharge = ($mode === 'full' || $mode === 'balance_payment') ? $summary['balance'] : $summary['deposit_due'];
+        $amountToCharge = $validated['amount'];
 
         Log::info('GCash amount to charge', [
             'amount_to_charge' => $amountToCharge,
+            'requested_amount' => $validated['amount'],
+            'balance' => $summary['balance'],
             'mode' => $mode,
         ]);
 
@@ -517,10 +540,10 @@ class PaymentController extends Controller
 
         $successful = $payments->filter(fn ($payment) => Arr::get($payment, 'status') === 'paid');
         $totalPaid = round($successful->sum(fn ($payment) => (float) Arr::get($payment, 'amount', 0)), 2);
-        $balance = round(max(($order->total_amount ?? 0) - $totalPaid, 0), 2);
+        $balance = round(max(($order->grandTotalAmount() ?? 0) - $totalPaid, 0), 2);
         $depositDue = $balance <= 0
             ? 0
-            : min(round(max($order->total_amount / 2, 0), 2), $balance);
+            : min(round(max($order->grandTotalAmount() / 2, 0), 2), $balance);
 
         return [
             'metadata' => $metadata,
@@ -606,14 +629,30 @@ class PaymentController extends Controller
             'metadata' => $summary['metadata'],
         ];
 
+        // Update payment_status based on balance
+        if ($summary['balance'] <= 0.01) {
+            // Fully paid
+            $attributes['payment_status'] = 'paid';
+        } elseif ($summary['total_paid'] > 0) {
+            // Partially paid
+            $attributes['payment_status'] = 'partial';
+        }
+
         $mode = Arr::get($payload, 'mode', 'half');
         if (($summary['balance'] <= 0 || $summary['total_paid'] > 0)
             && in_array($order->status, ['processing'], true)
-            && $mode !== 'balance_payment') {
+            && $mode !== 'balance_payment'
+            && $order->status !== 'draft') {
             $attributes['status'] = 'in_production';
         }
 
         $order->forceFill($attributes)->save();
+
+        // Deduct inventory if order is now fully paid
+        if ($summary['balance'] <= 0.01) {
+            $orderFlowService = app(\App\Services\OrderFlowService::class);
+            $orderFlowService->syncMaterialUsage($order->fresh());
+        }
 
         return $order->fresh(['payments']);
     }

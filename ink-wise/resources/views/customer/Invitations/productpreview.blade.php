@@ -8,7 +8,46 @@
   <link rel="stylesheet" href="{{ asset('css/customer/preview.css') }}">
   <script src="{{ asset('js/customer/preview.js') }}" defer></script>
 </head>
-<body data-product-id="{{ $product->id ?? '' }}" data-product-name="{{ $product->name ?? '' }}">
+@php
+  // Resolve selected size early so body attribute can use it
+  $selectedSize = trim((string) (request()->query('size') ?? request('size') ?? ''));
+  $formatInch = function ($val) {
+    if ($val === null || $val === '') return null;
+    if (!is_numeric($val)) return (string) $val;
+    $n = (float) $val;
+    $s = rtrim(rtrim(number_format($n, 2, '.', ''), '0'), '.');
+    return $s;
+  };
+
+  if (empty($selectedSize)) {
+    if (!empty($product->sizes) && is_array($product->sizes) && count($product->sizes)) {
+      $selectedSize = trim((string) ($product->sizes[0] ?? ''));
+    }
+  }
+
+  if (empty($selectedSize) && ($product->template ?? null)) {
+    $tRef = $product->template;
+    $w = $tRef->width_inch ?? null;
+    $h = $tRef->height_inch ?? null;
+    if ($w || $h) {
+      $fw = $formatInch($w) ?? '';
+      $fh = $formatInch($h) ?? '';
+      if ($fw !== '' && $fh !== '') {
+        $selectedSize = $fw . 'x' . $fh;
+      } elseif ($fw !== '') {
+        $selectedSize = $fw . 'x';
+      } elseif ($fh !== '') {
+        $selectedSize = 'x' . $fh;
+      }
+    }
+  }
+
+  if (empty($selectedSize)) {
+    $selectedSize = config('invitations.default_size', '5x7');
+  }
+@endphp
+
+<body data-product-id="{{ $product->id ?? '' }}" data-product-name="{{ $product->name ?? '' }}" data-selected-size="{{ $selectedSize }}">
 @php
   $uploads = $product->uploads ?? collect();
   $images = $product->product_images ?? $product->images ?? null;
@@ -59,6 +98,19 @@
           ? $tBack
           : \Illuminate\Support\Facades\Storage::url($tBack);
       }
+    }
+  }
+
+  // Determine if the template has a back design
+  $hasBackDesign = !empty($backImage) || ($templateRef && ($templateRef->has_back_design ?? false));
+  
+  // If template has back design but no back image, try to get it from svg_path
+  if ($hasBackDesign && !$backImage && $templateRef) {
+    $backSvgPath = $templateRef->back_svg_path ?? null;
+    if ($backSvgPath) {
+      $backImage = preg_match('/^(https?:)?\/\//i', $backSvgPath) || str_starts_with($backSvgPath, '/')
+        ? $backSvgPath
+        : \Illuminate\Support\Facades\Storage::url($backSvgPath);
     }
   }
 
@@ -129,6 +181,7 @@
     'embossed_powder' => 'Embossed Powder',
     'orientation' => 'Orientation',
     'size' => 'Size',
+    'additional' => 'Size',
   ];
 
   foreach ($addonsByType->keys() as $key) {
@@ -152,6 +205,8 @@
   }
 @endphp
 
+
+
   <div class="container">
     <div class="preview">
       <div class="flip-container" id="flipContainer">
@@ -164,15 +219,38 @@
           </div>
         </div>
       </div>
-      <div class="toggle-buttons">
-        <button id="frontBtn" class="active">Front</button>
-        <button id="backBtn" @if(!$backImage) style="display:none" @endif>Back</button>
+      
+      @if($hasBackDesign)
+      <div class="toggle-buttons" data-has-back="true">
+        <button id="frontBtn" class="active" type="button" aria-label="View front design">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <polyline points="21 15 16 10 5 21"></polyline>
+          </svg>
+          <span>Front</span>
+        </button>
+        <button id="backBtn" type="button" aria-label="View back design">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="9" y1="9" x2="15" y2="15"></line>
+            <line x1="15" y1="9" x2="9" y2="15"></line>
+          </svg>
+          <span>Back</span>
+        </button>
       </div>
+      @else
+      <div class="toggle-buttons" data-has-back="false" style="display: none;">
+        <button id="frontBtn" class="active" type="button">Front</button>
+        <button id="backBtn" type="button" style="display:none">Back</button>
+      </div>
+      @endif
     </div>
 
     <div class="details">
       <div class="details-header">
         <h2>{{ $product->name }}</h2>
+        <p class="size-label">Template + Size: <strong id="selectedSizeLabel">{{ $selectedSize }}</strong></p>
         <p class="price">
           @if(!is_null($priceValue))
             As low as <span class="new-price">₱{{ number_format($priceValue, 2) }}</span> per piece
@@ -232,8 +310,7 @@
 
         @if($orderedAddonGroups->count())
           <section class="option-block">
-            <h3>Add-ons</h3>
-            <p class="selection-hint">Pick one per category to personalize (optional).</p>
+            <h3>Size</h3>
             @foreach($orderedAddonGroups as $group)
               <div class="addon-group addon-{{ $group['key'] }}">
                 <h4>{{ $group['label'] }}</h4>
@@ -259,7 +336,9 @@
                           @if(isset($addon->price))
                             ₱{{ number_format($addon->price, 2) }}
                           @else
-                            On request
+                            @if($group['key'] !== 'additional')
+                              On request
+                            @endif
                           @endif
                         </span>
                       </div>
@@ -273,12 +352,14 @@
       </div>
   @php
       $templateId = $product->template_id ?? optional($product->template)->id;
-      $editDesignUrl = $templateId
+      $editDesignBase = $templateId
           ? route('design.studio', ['template' => $templateId, 'product' => $product->id])
           : null;
+      // initial edit URL includes the selected size so page loads with size
+      $editDesignUrl = $editDesignBase ? ($editDesignBase . (str_contains($editDesignBase, '?') ? '&' : '?') . 'size=' . urlencode($selectedSize)) : null;
   @endphp
   @if($editDesignUrl)
-    <a href="{{ $editDesignUrl }}" class="edit-btn" data-edit-link target="_top" rel="noopener">
+    <a href="{{ $editDesignUrl }}" data-base-href="{{ $editDesignBase }}" class="edit-btn" data-edit-link target="_top" rel="noopener">
       <span>Edit my design</span>
       <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M17 7L7 17"></path>

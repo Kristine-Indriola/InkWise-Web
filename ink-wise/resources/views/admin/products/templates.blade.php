@@ -114,7 +114,7 @@
                                             data-template-preview="{{ $template->preview ? \App\Support\ImageResolver::url($template->preview) : '' }}"
                                             data-front-url="{{ ($template->front_image ?? $template->preview) ? \App\Support\ImageResolver::url($template->front_image ?? $template->preview) : '' }}"
                                         >Use template</button>
-                                        <button type="button" class="btn delete-btn template-reback-btn" data-reback-url="{{ route('admin.templates.reback', $template->id) }}" data-template-name="{{ $template->name }}">Reback</button>
+                                        <button type="button" class="btn delete-btn template-reback-btn" data-reback-url="{{ route('admin.templates.reback', $template->id) }}" data-template-name="{{ $template->name }}">Return</button>
                                         @if(!empty($template->front_image) || !empty($template->preview))
                                             <button type="button" class="btn view-front-btn" data-front-url="{{ ($template->front_image ?? $template->preview) ? \App\Support\ImageResolver::url($template->front_image ?? $template->preview) : '' }}">View Front</button>
                                         @endif
@@ -181,7 +181,7 @@
                                             data-template-preview="{{ $template->preview ? \App\Support\ImageResolver::url($template->preview) : '' }}"
                                             data-front-url="{{ ($template->front_image ?? $template->preview) ? \App\Support\ImageResolver::url($template->front_image ?? $template->preview) : '' }}"
                                         >Use template</button>
-                                        <button type="button" class="btn delete-btn template-reback-btn" data-reback-url="{{ route('admin.templates.reback', $template->id) }}" data-template-name="{{ $template->name }}">Reback</button>
+                                        <button type="button" class="btn delete-btn template-reback-btn" data-reback-url="{{ route('admin.templates.reback', $template->id) }}" data-template-name="{{ $template->name }}">Return</button>
                                         @if(!empty($template->front_image) || !empty($template->preview))
                                             <button type="button" class="btn view-front-btn" data-front-url="{{ ($template->front_image ?? $template->preview) ? \App\Support\ImageResolver::url($template->front_image ?? $template->preview) : '' }}">View Front</button>
                                         @endif
@@ -244,7 +244,7 @@
                                             data-template-preview="{{ $template->preview ? \App\Support\ImageResolver::url($template->preview) : '' }}"
                                             data-front-url="{{ ($template->front_image ?? $template->preview) ? \App\Support\ImageResolver::url($template->front_image ?? $template->preview) : '' }}"
                                         >Use template</button>
-                                        <button type="button" class="btn delete-btn template-reback-btn" data-reback-url="{{ route('admin.templates.reback', $template->id) }}" data-template-name="{{ $template->name }}">Reback</button>
+                                        <button type="button" class="btn delete-btn template-reback-btn" data-reback-url="{{ route('admin.templates.reback', $template->id) }}" data-template-name="{{ $template->name }}">Return</button>
                                         @if(!empty($template->front_image) || !empty($template->preview))
                                             <button type="button" class="btn view-front-btn" data-front-url="{{ ($template->front_image ?? $template->preview) ? \App\Support\ImageResolver::url($template->front_image ?? $template->preview) : '' }}">View Front</button>
                                         @endif
@@ -307,7 +307,7 @@
                                             data-template-preview="{{ $template->preview ? \App\Support\ImageResolver::url($template->preview) : '' }}"
                                             data-front-url="{{ ($template->front_image ?? $template->preview) ? \App\Support\ImageResolver::url($template->front_image ?? $template->preview) : '' }}"
                                         >Use template</button>
-                                        <button type="button" class="btn delete-btn template-reback-btn" data-reback-url="{{ route('admin.templates.reback', $template->id) }}" data-template-name="{{ $template->name }}">Reback</button>
+                                        <button type="button" class="btn delete-btn template-reback-btn" data-reback-url="{{ route('admin.templates.reback', $template->id) }}" data-template-name="{{ $template->name }}">Return</button>
                                         @if(!empty($template->front_image) || !empty($template->preview))
                                             <button type="button" class="btn view-front-btn" data-front-url="{{ ($template->front_image ?? $template->preview) ? \App\Support\ImageResolver::url($template->front_image ?? $template->preview) : '' }}">View Front</button>
                                         @endif
@@ -332,7 +332,7 @@
     <img id="modalImage" src="" alt="Template Preview" class="modal-image">
 </div>
 
-{{-- Reback Confirmation Modal --}}
+{{-- reback Confirmation Modal --}}
 <div id="rebackModal" class="reback-modal">
     <div class="reback-modal-content">
         <h3 id="rebackModalTitle">Send template back to staff for revisions?</h3>
@@ -385,7 +385,7 @@
     document.querySelectorAll('.view-front-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             const url = btn.dataset.frontUrl;
-            if (!url) return alert('No front image available');
+            if (!url) { alert('No front image available'); return; }
             document.getElementById('modalImage').src = url;
             document.getElementById('imageModal').style.display = 'flex';
         });
@@ -394,7 +394,7 @@
     document.querySelectorAll('.view-back-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             const url = btn.dataset.backUrl;
-            if (!url) return alert('No back image available');
+            if (!url) { alert('No back image available'); return; }
             document.getElementById('modalImage').src = url;
             document.getElementById('imageModal').style.display = 'flex';
         });
@@ -414,11 +414,11 @@
         return hidden ? hidden.value : '';
     }
 
-    // Reback modal variables
-    let currentRebackBtn = null;
-    let currentRebackUrl = null;
-    let currentRebackCsrfToken = null;
-    let currentRebackOriginalLabel = null;
+    // reback modal variables
+    let currentrebackBtn = null;
+    let currentrebackUrl = null;
+    let currentrebackCsrfToken = null;
+    let currentrebackOriginalLabel = null;
 
     // Set up reback modal handlers once
     document.getElementById('rebackCancel').onclick = function() {
@@ -436,16 +436,16 @@
         document.getElementById('rebackModal').style.display = 'none';
 
         // Disable button
-        if (currentRebackBtn) {
-            currentRebackBtn.disabled = true;
-            currentRebackBtn.textContent = 'Sending...';
+        if (currentrebackBtn) {
+            currentrebackBtn.disabled = true;
+            currentrebackBtn.textContent = 'Sending...';
         }
 
         const payload = new URLSearchParams();
-        payload.append('_token', currentRebackCsrfToken);
+        payload.append('_token', currentrebackCsrfToken);
         payload.append('note', note);
 
-        fetch(currentRebackUrl, {
+        fetch(currentrebackUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -455,22 +455,22 @@
             body: payload.toString()
         }).then(res => {
             if (res.ok) {
-                const card = currentRebackBtn ? currentRebackBtn.closest('.template-card') : null;
+                const card = currentrebackBtn ? currentrebackBtn.closest('.template-card') : null;
                 if (card) card.remove();
-                alert('Template returned to staff.');
+                alert('Template rebacked to staff.');
                 return;
             }
             return res.json().then(data => {
-                throw new Error(data?.message || 'Reback failed.');
+                throw new Error(data?.message || 'reback failed.');
             }).catch(() => {
-                throw new Error('Reback failed.');
+                throw new Error('reback failed.');
             });
         }).catch(err => {
-            alert(err && err.message ? err.message : 'Reback failed.');
+            alert(err && err.message ? err.message : 'reback failed.');
         }).finally(() => {
-            if (currentRebackBtn) {
-                currentRebackBtn.disabled = false;
-                currentRebackBtn.textContent = currentRebackOriginalLabel;
+            if (currentrebackBtn) {
+                currentrebackBtn.disabled = false;
+                currentrebackBtn.textContent = currentrebackOriginalLabel;
             }
         });
     };
@@ -484,10 +484,10 @@
                 const originalLabel = btn.textContent;
 
                 // Store current context
-                currentRebackBtn = btn;
-                currentRebackUrl = url;
-                currentRebackCsrfToken = csrfToken;
-                currentRebackOriginalLabel = originalLabel;
+                currentrebackBtn = btn;
+                currentrebackUrl = url;
+                currentrebackCsrfToken = csrfToken;
+                currentrebackOriginalLabel = originalLabel;
 
                 // Set modal title
                 document.getElementById('rebackModalTitle').textContent = 'Send "' + name + '" back to staff for revisions?';
@@ -499,8 +499,8 @@
                 document.getElementById('rebackModal').style.display = 'flex';
 
             } catch (err) {
-                console.error('Reback handler failed', err);
-                alert('Reback failed: ' + (err && err.message ? err.message : 'unknown error'));
+                console.error('reback handler failed', err);
+                alert('reback failed: ' + (err && err.message ? err.message : 'unknown error'));
             }
         });
     });
@@ -549,6 +549,17 @@
             invitationNameField.value = data.name;
         }
 
+        // Populate size if provided by template metadata
+        const invitationSizeField = document.getElementById('invitationSize');
+        var sizeCandidates = [data.size, data.dimensions, data.template_size, data.metadata && data.metadata.size, data.metadata && data.metadata.dimensions];
+        for (var i=0;i<sizeCandidates.length;i++) {
+            var val = sizeCandidates[i];
+            if (val) {
+                try { if (invitationSizeField) invitationSizeField.value = val; } catch(e){}
+                break;
+            }
+        }
+
         const eventTypeField = document.getElementById('eventType');
         if (eventTypeField && data.event_type) {
             eventTypeField.value = data.event_type;
@@ -590,6 +601,10 @@
         // Navigate to next page (Basic Info)
         if (typeof Navigation !== 'undefined' && Navigation.showPage) {
             Navigation.showPage(1);
+            if (typeof updateSizeDisplay === 'function') {
+                // ensure size display updates immediately when template is selected
+                updateSizeDisplay();
+            }
         }
     }
 
@@ -977,7 +992,7 @@
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     }
 
-    /* Reback Modal Styles */
+    /* reback Modal Styles */
     .reback-modal {
         display: none;
         position: fixed;

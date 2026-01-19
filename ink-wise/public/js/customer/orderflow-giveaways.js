@@ -412,7 +412,7 @@ document.addEventListener('DOMContentLoaded', () => {
             card.classList.toggle('is-selected', isSelected);
             const button = card.querySelector('.envelope-item__select');
             if (button) {
-                button.textContent = isSelected ? 'Unselect giveaways' : 'Select giveaway';
+                button.textContent = isSelected ? 'Unselect giveaway' : 'Select giveaway';
                 button.disabled = state.isSaving;
             }
         });
@@ -653,7 +653,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             // Instant toggle
-            selectBtn.textContent = isCurrentlySelected ? 'Select giveaway' : 'Unselect giveaway';
+            selectBtn.textContent = isCurrentlySelected ? 'Unselect giveaway' : 'Select giveaway';
 
             if (isCurrentlySelected) {
                 removeLocalSelection();
@@ -684,6 +684,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 cardElement: card,
                 triggerButton: selectBtn,
             }).catch(() => {
+                state.isSaving = false;
+                highlightSelectedCard();
                 /* ignore errors; local state already applied */
             });
         });
@@ -717,25 +719,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return card;
     };
 
-    const renderCards = (items) => {
-        if (!giveawayGrid) return;
-        giveawayGrid.innerHTML = '';
-
-        if (!items.length) {
-            if (emptyState) emptyState.hidden = false;
-            return;
-        }
-
-        if (emptyState) emptyState.hidden = true;
-
-        items.forEach((item) => {
-            const card = createCard(item);
-            giveawayGrid.appendChild(card);
-        });
-
-        highlightSelectedCard();
-    };
-
     const selectGiveaway = async (item, quantity, total, options = {}) => {
         // Check stock availability
         const stockQty = item.stock_qty ?? null;
@@ -751,6 +734,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Clear any pending pre-order selection
         pendingPreOrderSelection = null;
+
+        // Set saving state
+        state.isSaving = true;
+        highlightSelectedCard();
 
         // Immediate UI update — no loading state
         const normalizedImages = normalizeImageArray(item.images);
@@ -842,6 +829,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!options.silent) {
                 showToast(`${item.name} added — ${quantity} pcs for ${formatMoney(total)}`);
             }
+            state.isSaving = false;
+            highlightSelectedCard();
             return;
         }
 
@@ -850,6 +839,8 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast('That giveaway is no longer available. Refreshing options…');
             await loadGiveaways();
             await fetchSummaryFromServer();
+            state.isSaving = false;
+            highlightSelectedCard();
             return;
         }
 
@@ -857,7 +848,30 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!options.silent) {
             showToast(`${item.name} selected — ${quantity} pcs for ${formatMoney(total)}`);
         }
+        state.isSaving = false;
+        highlightSelectedCard();
     };
+
+    const renderCards = (items) => {
+        if (!giveawayGrid) return;
+        giveawayGrid.innerHTML = '';
+
+        if (!items.length) {
+            if (emptyState) emptyState.hidden = false;
+            return;
+        }
+
+        if (emptyState) emptyState.hidden = true;
+
+        items.forEach((item) => {
+            const card = createCard(item);
+            giveawayGrid.appendChild(card);
+        });
+
+        highlightSelectedCard();
+    };
+
+
 
     const loadGiveaways = async ({ useSkeleton = true } = {}) => {
         if (useSkeleton) {
@@ -941,8 +955,20 @@ document.addEventListener('DOMContentLoaded', () => {
         // Normalize summary for downstream pages and sync to server before leaving
         const summary = readSummary() ?? {};
         try {
-            // Keep a canonical copy other pages already read
-            window.sessionStorage.setItem('order_summary_payload', JSON.stringify(summary));
+            // Keep a canonical copy other pages already read (store minimal payload)
+            try {
+                const minSummary = {
+                    productId: summary.productId ?? summary.product_id ?? null,
+                    quantity: summary.quantity ?? null,
+                    paymentMode: summary.paymentMode ?? summary.payment_mode ?? null,
+                    totalAmount: summary.totalAmount ?? summary.total_amount ?? null,
+                    shippingFee: summary.shippingFee ?? summary.shipping_fee ?? null,
+                    order_id: summary.order_id ?? summary.orderId ?? null,
+                };
+                window.sessionStorage.setItem('order_summary_payload', JSON.stringify(minSummary));
+            } catch (e) {
+                console.warn('Failed to save minimal order_summary_payload to sessionStorage:', e);
+            }
 
             const csrf = getCsrfToken();
             await fetch('/order/summary/sync', {

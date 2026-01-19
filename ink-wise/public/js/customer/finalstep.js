@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const paperStockPriceInput = document.getElementById('paperStockPrice');
   const paperGrid = document.querySelector('.feature-grid.small');
 
-  // helper to create sample paper-stock cards client-side when server hasn't provided any
+  // Helper to create sample paper-stock cards client-side when server hasn't provided any
   const ensureSamplePaperStocks = () => {
     const existing = document.querySelectorAll('.paper-stock-card');
     if (existing.length) return; // server provided cards
@@ -26,12 +26,13 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.setAttribute('data-id', s.id);
       btn.setAttribute('data-price', String(s.price));
       btn.setAttribute('aria-pressed', 'false');
+      btn.setAttribute('aria-label', `Select ${s.name} paper stock for ₱${s.price}`);
 
       const media = document.createElement('div');
       media.className = 'feature-card-media';
       const img = document.createElement('img');
       img.src = s.image;
-      img.alt = s.name;
+      img.alt = `${s.name} paper sample`;
       media.appendChild(img);
 
       const info = document.createElement('div');
@@ -50,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
       paperGrid.appendChild(btn);
     });
   };
+
   const addonCheckboxes = Array.from(form?.querySelectorAll('input[name="addons[]"]') ?? []);
   const orderTotalEl = document.querySelector('[data-order-total]');
   const addToCartBtn = document.getElementById('addToCartBtn');
@@ -79,9 +81,10 @@ document.addEventListener('DOMContentLoaded', () => {
     return Number.isFinite(parsed) ? parsed : 0;
   };
 
-  const showToast = (message) => {
+  const showToast = (message, type = 'success') => {
     if (!toast) return;
     toast.textContent = message;
+    toast.className = `finalstep-toast ${type}`;
     toast.hidden = false;
     toast.classList.add('visible');
     if (toastTimeout) window.clearTimeout(toastTimeout);
@@ -90,7 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
       toastTimeout = window.setTimeout(() => {
         toast.hidden = true;
       }, 300);
-    }, 2600);
+    }, 3000);
   };
 
   const currentQuantity = () => {
@@ -101,25 +104,67 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const updateTotals = () => {
-    const base = Number(quantitySelect?.selectedOptions?.[0]?.dataset?.price ?? 0);
-    const paper = Number(paperStockPriceInput?.value ?? 0);
+    try {
+      const base = Number(quantitySelect?.selectedOptions?.[0]?.dataset?.price ?? 0);
+      const paper = Number(paperStockPriceInput?.value ?? 0);
 
-    // addons may come from server-side checkboxes or client-side addon-cards
-    const addonsFromInputs = addonCheckboxes
-      .filter((checkbox) => checkbox.checked)
-      .reduce((sum, checkbox) => sum + Number(checkbox.dataset.price ?? 0), 0);
+      // addons may come from server-side checkboxes or client-side addon-cards
+      const addonsFromInputs = addonCheckboxes
+        .filter((checkbox) => checkbox.checked)
+        .reduce((sum, checkbox) => sum + Number(checkbox.dataset.price ?? 0), 0);
 
-    const selectedAddonCards = Array.from(document.querySelectorAll('.addon-card[aria-pressed="true"]'));
-    const addonsFromCards = selectedAddonCards.reduce((sum, card) => sum + Number(card.dataset.price ?? 0), 0);
+      const selectedAddonCards = Array.from(document.querySelectorAll('.addon-card[aria-pressed="true"]'));
+      const addonsFromCards = selectedAddonCards.reduce((sum, card) => sum + Number(card.dataset.price ?? 0), 0);
 
-    const addons = addonsFromInputs + addonsFromCards;
+      const addons = addonsFromInputs + addonsFromCards;
 
-    const total = base + paper + addons;
+      const total = base + paper + addons;
 
-    // Only show the total in the UI; keep other calculated values for storage if needed
-    if (orderTotalEl) orderTotalEl.textContent = formatMoney(total);
-    // keep hidden inputs updated
-    if (paperStockPriceInput) paperStockPriceInput.value = String(paper || 0);
+      // Only show the total in the UI; keep other calculated values for storage if needed
+      if (orderTotalEl) orderTotalEl.textContent = formatMoney(total);
+      // keep hidden inputs updated
+      if (paperStockPriceInput) paperStockPriceInput.value = String(paper || 0);
+
+      // Auto-save quantity to sessionStorage whenever it changes
+      saveQuantityToStorage();
+    } catch (error) {
+      console.error('Error updating totals:', error);
+    }
+  };
+
+  // Save current quantity to sessionStorage so mycart page can pick it up
+  const saveQuantityToStorage = () => {
+    try {
+      const qty = currentQuantity();
+      // Update existing sessionStorage data if any, or create new
+      const existingData = sessionStorage.getItem('inkwise-finalstep');
+      if (existingData) {
+        const summary = JSON.parse(existingData);
+        summary.quantity = qty;
+        try {
+          const minSummary = {
+            productId: summary.productId ?? summary.product_id ?? null,
+            quantity: summary.quantity ?? null,
+            paymentMode: summary.paymentMode ?? summary.payment_mode ?? null,
+            totalAmount: summary.totalAmount ?? summary.total_amount ?? null,
+            shippingFee: summary.shippingFee ?? summary.shipping_fee ?? null,
+            // Include order id if present so other flows can reference it
+            order_id: summary.order_id ?? summary.orderId ?? null,
+          };
+          sessionStorage.setItem('inkwise-finalstep', JSON.stringify(minSummary));
+          sessionStorage.setItem('order_summary_payload', JSON.stringify(minSummary));
+        } catch (e) {
+          console.warn('Failed to save minimal order_summary_payload to sessionStorage:', e);
+        }
+      } else {
+        // Create a minimal summary with at least the quantity
+        const minSummary = { quantity: qty };
+        sessionStorage.setItem('inkwise-finalstep', JSON.stringify(minSummary));
+        sessionStorage.setItem('order_summary_payload', JSON.stringify(minSummary));
+      }
+    } catch (e) {
+      console.warn('Failed to save quantity to sessionStorage:', e);
+    }
   };
 
   const handleToggle = (face) => {
@@ -160,9 +205,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const id = card.dataset.id;
       const price = Number(card.dataset.price ?? 0);
       const currentlySelected = card.getAttribute('aria-pressed') === 'true';
-      paperStockCards.forEach((c) => c.setAttribute('aria-pressed', 'false'));
+      paperStockCards.forEach((c) => {
+        c.setAttribute('aria-pressed', 'false');
+        c.setAttribute('aria-label', c.getAttribute('aria-label').replace(' selected', ''));
+      });
       if (!currentlySelected) {
         card.setAttribute('aria-pressed', 'true');
+        card.setAttribute('aria-label', card.getAttribute('aria-label') + ' selected');
         paperStockIdInput.value = id;
         paperStockPriceInput.value = price;
       } else {
@@ -170,6 +219,14 @@ document.addEventListener('DOMContentLoaded', () => {
         paperStockPriceInput.value = 0;
       }
       updateTotals();
+    });
+
+    // Keyboard support
+    card.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        card.click();
+      }
     });
   });
 
@@ -201,17 +258,28 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.setAttribute('data-price', String(s.price));
         btn.setAttribute('data-type', type);
         btn.setAttribute('aria-pressed', 'false');
+        btn.setAttribute('aria-label', `Select ${s.name} addon for ₱${s.price}`);
 
         const media = document.createElement('div');
         media.className = 'feature-card-media';
-        const img = document.createElement('img'); img.src = s.image; img.alt = s.name; media.appendChild(img);
+        const img = document.createElement('img');
+        img.src = s.image;
+        img.alt = `${s.name} sample`;
+        media.appendChild(img);
 
-        const info = document.createElement('div'); info.className = 'feature-card-info';
-        const title = document.createElement('span'); title.className = 'feature-card-title'; title.textContent = s.name;
-        const price = document.createElement('span'); price.className = 'feature-card-price'; price.textContent = s.price ? `₱${Number(s.price).toFixed(2)}` : 'On request';
-        info.appendChild(title); info.appendChild(price);
+        const info = document.createElement('div');
+        info.className = 'feature-card-info';
+        const title = document.createElement('span');
+        title.className = 'feature-card-title';
+        title.textContent = s.name;
+        const price = document.createElement('span');
+        price.className = 'feature-card-price';
+        price.textContent = s.price ? `₱${Number(s.price).toFixed(2)}` : 'On request';
+        info.appendChild(title);
+        info.appendChild(price);
 
-        btn.appendChild(media); btn.appendChild(info);
+        btn.appendChild(media);
+        btn.appendChild(info);
         grid.appendChild(btn);
       });
     };
@@ -228,20 +296,51 @@ document.addEventListener('DOMContentLoaded', () => {
     card.addEventListener('click', () => {
       const type = card.dataset.type;
       // deselect other cards of same type
-      document.querySelectorAll(`.addon-card[data-type="${type}"]`).forEach((c) => c.setAttribute('aria-pressed', 'false'));
+      document.querySelectorAll(`.addon-card[data-type="${type}"]`).forEach((c) => {
+        c.setAttribute('aria-pressed', 'false');
+        c.setAttribute('aria-label', c.getAttribute('aria-label').replace(' selected', ''));
+      });
       const selected = card.getAttribute('aria-pressed') === 'true';
-      if (!selected) card.setAttribute('aria-pressed', 'true');
-      else card.setAttribute('aria-pressed', 'false');
+      if (!selected) {
+        card.setAttribute('aria-pressed', 'true');
+        card.setAttribute('aria-label', card.getAttribute('aria-label') + ' selected');
+      } else {
+        card.setAttribute('aria-pressed', 'false');
+      }
       // update addon total (just sum all pressed addon-card prices)
       updateTotals();
     });
+
+    // Keyboard support
+    card.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        card.click();
+      }
+    });
   });
+
   addonCheckboxes.forEach((checkbox) => {
     checkbox.addEventListener('change', updateTotals);
   });
 
   addToCartBtn?.addEventListener('click', (event) => {
-    event.preventDefault(); // Prevent any form submission
+    event.preventDefault();
+
+    // Basic validation
+    const quantity = currentQuantity();
+    if (quantity < 10) {
+      showToast('Please select a quantity of at least 10.', 'error');
+      quantityInput?.focus();
+      return;
+    }
+
+    const selectedPaper = document.querySelector('.paper-stock-card[aria-pressed="true"]');
+    if (!selectedPaper) {
+      showToast('Please select a paper stock.', 'error');
+      document.querySelector('.paper-stocks-group')?.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
 
     // Store the summary
     const selectedAddonCards = Array.from(document.querySelectorAll('.addon-card[aria-pressed="true"]'));
@@ -331,7 +430,20 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     summary.giveawaysImages = [previewPlaceholder];
 
-    window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(summary));
+    try {
+      const minSummary = {
+        productId: summary.productId ?? summary.product_id ?? null,
+        quantity: summary.quantity ?? null,
+        paymentMode: summary.paymentMode ?? summary.payment_mode ?? null,
+        totalAmount: summary.totalAmount ?? summary.total_amount ?? null,
+        shippingFee: summary.shippingFee ?? summary.shipping_fee ?? null,
+        order_id: summary.order_id ?? summary.orderId ?? null,
+      };
+      window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(minSummary));
+    } catch (e) {
+      console.warn('Failed to save minimal inkwise-finalstep to sessionStorage:', e);
+    }
+
     showToast('Added to cart — redirecting to envelope options...');
 
     // Redirect immediately to the customer envelope flow

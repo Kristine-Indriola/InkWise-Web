@@ -531,16 +531,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const downloadButton = document.getElementById('download-svg-btn');
     if (downloadButton) {
         downloadButton.addEventListener('click', function() {
-            const currentEditor = getCurrentEditor();
-            if (!currentEditor) {
+            const svgElement = state.currentSide === 'front' ? frontSvgElement : backSvgElement;
+            if (!svgElement) {
                 showNotification('No SVG available to download for ' + state.currentSide + ' side', 'error');
                 return;
             }
 
             const sideText = state.currentSide.charAt(0).toUpperCase() + state.currentSide.slice(1);
-            const svgData = currentEditor.getSvgDataUrl();
+            const svgString = new XMLSerializer().serializeToString(svgElement);
+            const dataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
             const link = document.createElement('a');
-            link.href = svgData;
+            link.href = dataUrl;
             link.download = '{{ $template->name ?? "template" }} - ' + sideText + '.svg';
             document.body.appendChild(link);
             link.click();

@@ -386,7 +386,7 @@ class OrderController extends Controller
         $order->loadMissing([
             'items.product.materials.material.inventory',
             'items.paperStockSelection.paperStock.material.inventory',
-            'items.addons.productAddon.material.inventory'
+            'items.addons.productSize.material.inventory'
         ]);
 
         $shortages = [];
@@ -439,8 +439,8 @@ class OrderController extends Controller
             // Check addon materials
             if ($item->addons) {
                 foreach ($item->addons as $addon) {
-                    if ($addon->productAddon && $addon->productAddon->material) {
-                        $material = $addon->productAddon->material;
+                    if ($addon->productSize && $addon->productSize->material) {
+                        $material = $addon->productSize->material;
                         $addonQuantity = $addon->quantity ?? 1;
                         $required = $addonQuantity * $quantity;
                         $available = $material->inventory?->stock_level ?? 0;

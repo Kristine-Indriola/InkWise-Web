@@ -101,20 +101,29 @@ class Order extends Model
 
 	public function grandTotalAmount(): float
 	{
+		// Prioritize the pricing total as the main total amount
 		$summary = $this->summary_snapshot ?? [];
-		$grandTotal = Arr::get($summary, 'totals.grand_total');
+		$grandTotal = Arr::get($summary, 'pricing.total');
+
+		if (!is_numeric($grandTotal) || (float) $grandTotal <= 0.0) {
+			$grandTotal = $this->total_amount ?? $this->grand_total ?? 0;
+		}
+
+		if (!is_numeric($grandTotal) || (float) $grandTotal <= 0.0) {
+			$grandTotal = Arr::get($summary, 'totals.grand_total');
+		}
 
 		if (!is_numeric($grandTotal) || (float) $grandTotal <= 0.0) {
 			$grandTotal = Arr::get($summary, 'totals.total', Arr::get($summary, 'grand_total'));
 		}
 
 		if (!is_numeric($grandTotal) || (float) $grandTotal <= 0.0) {
-			$metadata = $this->metadata ?? [];
-			$grandTotal = Arr::get($metadata, 'financial.grand_total', Arr::get($metadata, 'grand_total'));
+			$grandTotal = Arr::get($summary, 'pricing.subtotal');
 		}
 
 		if (!is_numeric($grandTotal) || (float) $grandTotal <= 0.0) {
-			$grandTotal = $this->total_amount ?? $this->grand_total ?? 0;
+			$metadata = $this->metadata ?? [];
+			$grandTotal = Arr::get($metadata, 'financial.grand_total', Arr::get($metadata, 'grand_total'));
 		}
 
 		return (float) ($grandTotal ?? 0);

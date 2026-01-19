@@ -499,6 +499,127 @@ export function initializeCustomerStudioLegacy() {
     let backgroundSelected = false;
     let activeCropSession = null;
 
+    // History management for undo/redo
+    const historyStack = [];
+    const redoStack = [];
+    const MAX_HISTORY_SIZE = 50;
+    let historyEnabled = true;
+
+    const saveHistoryState = () => {
+      if (!historyEnabled || !currentSvgRoot) return;
+      
+      const serializer = new XMLSerializer();
+      const svgContent = serializer.serializeToString(currentSvgRoot);
+      
+      // Don't save if it's the same as the last state
+      if (historyStack.length > 0 && historyStack[historyStack.length - 1] === svgContent) {
+        return;
+      }
+      
+      historyStack.push(svgContent);
+      redoStack.length = 0; // Clear redo stack when new action is performed
+      
+      // Limit history size
+      if (historyStack.length > MAX_HISTORY_SIZE) {
+        historyStack.shift();
+      }
+      
+      updateUndoRedoButtons();
+    };
+
+    const undo = () => {
+      if (historyStack.length < 2) return; // Need at least one previous state
+      
+      // Current state goes to redo stack
+      const serializer = new XMLSerializer();
+      const currentState = serializer.serializeToString(currentSvgRoot);
+      redoStack.push(currentState);
+      
+      // Restore previous state
+      const previousState = historyStack.pop();
+      restoreSvgState(previousState);
+      
+      updateUndoRedoButtons();
+    };
+
+    const redo = () => {
+      if (redoStack.length === 0) return;
+      
+      // Current state goes to history stack
+      const serializer = new XMLSerializer();
+      const currentState = serializer.serializeToString(currentSvgRoot);
+      historyStack.push(currentState);
+      
+      // Restore next state
+      const nextState = redoStack.pop();
+      restoreSvgState(nextState);
+      
+      updateUndoRedoButtons();
+    };
+
+    const restoreSvgState = (svgContent) => {
+      if (!currentSvgRoot || !svgContent) return;
+      
+      const wasHistoryEnabled = historyEnabled;
+      historyEnabled = false; // Disable history during restore
+      
+      try {
+        const parser = new DOMParser();
+        const newSvg = parser.parseFromString(svgContent, 'image/svg+xml').documentElement;
+        
+        // Replace the current SVG content
+        while (currentSvgRoot.firstChild) {
+          currentSvgRoot.removeChild(currentSvgRoot.firstChild);
+        }
+        
+        while (newSvg.firstChild) {
+          currentSvgRoot.appendChild(newSvg.firstChild.cloneNode(true));
+        }
+        
+        // Copy attributes
+        for (let attr of newSvg.attributes) {
+          currentSvgRoot.setAttribute(attr.name, attr.value);
+        }
+        
+        // Reinitialize the SVG template editor
+        if (currentSvgRoot.__inkwiseSvgTemplateEditor) {
+          currentSvgRoot.__inkwiseSvgTemplateEditor = null;
+        }
+        currentSvgRoot.setAttribute('data-svg-editor', 'true');
+        currentSvgRoot.__inkwiseSvgTemplateEditor = new SvgTemplateEditor(currentSvgRoot, {
+          onTextChange: (element, oldText, newText) => {
+            saveHistoryState();
+            if (autosave) autosave.schedule('text-change');
+          },
+          onImageChange: (element, imageUrl, file) => {
+            saveHistoryState();
+            if (autosave) autosave.schedule('image-change');
+          }
+        });
+        svgTemplateEditorInstance = currentSvgRoot.__inkwiseSvgTemplateEditor;
+        
+        // Update preview
+        updatePreview();
+        
+      } catch (error) {
+        console.error('Failed to restore SVG state:', error);
+      } finally {
+        historyEnabled = wasHistoryEnabled; // Restore history state
+      }
+    };
+
+    const updateUndoRedoButtons = () => {
+      const undoBtn = document.querySelector('button[aria-label="Undo"]');
+      const redoBtn = document.querySelector('button[aria-label="Redo"]');
+      
+      if (undoBtn) {
+        undoBtn.disabled = historyStack.length < 2;
+      }
+      if (redoBtn) {
+        redoBtn.disabled = redoStack.length === 0;
+      }
+    };
+
     const SNAP_SIZE = 8;
     const SNAP_THRESHOLD = 4;
 
@@ -539,7 +660,208 @@ export function initializeCustomerStudioLegacy() {
       return Boolean(dataset.backImage || dataset.backSvg);
     };
 
-    const collectDesignSnapshot = () => {
+    /**
+     * Convert an image URL to a base64 data URL using canvas
+     * @param {string} url - The image URL to convert
+     * @returns {Promise<string|null>} - The base64 data URL or null on failure
+     */
+    const imageUrlToBase64 = async (url) => {
+      if (!url || typeof url !== 'string') {
+        return null;
+      }
+      // Already a data URL
+      if (url.startsWith('data:')) {
+        return url;
+      }
+
+      // Try canvas approach first (works for already-loaded images)
+      try {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+
+        const loaded = await new Promise((resolve) => {
+          img.onload = () => resolve(true);
+          img.onerror = () => resolve(false);
+          // Add cache-busting to force reload with CORS headers
+          const separator = url.includes('?') ? '&' : '?';
+          img.src = url + separator + '_t=' + Date.now();
+        });
+
+        if (loaded && img.naturalWidth > 0 && img.naturalHeight > 0) {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          try {
+            const dataUrl = canvas.toDataURL('image/png');
+            if (dataUrl && dataUrl !== 'data:,') {
+              return dataUrl;
+            }
+          } catch (canvasError) {
+            console.warn('[InkWise Studio] Canvas tainted, trying fetch approach:', url);
+          }
+        }
+      } catch (canvasAttemptError) {
+        console.warn('[InkWise Studio] Canvas approach failed:', url, canvasAttemptError);
+      }
+
+      // Fallback to fetch approach
+      try {
+        const response = await fetch(url, { credentials: 'include', mode: 'cors' });
+        if (!response.ok) {
+          console.warn('[InkWise Studio] Failed to fetch image for base64 conversion:', url, response.status);
+          return null;
+        }
+        const blob = await response.blob();
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(blob);
+        });
+      } catch (fetchError) {
+        console.warn('[InkWise Studio] Fetch approach also failed:', url, fetchError);
+      }
+
+      // Last resort: try without CORS
+      try {
+        const response = await fetch(url, { mode: 'no-cors' });
+        const blob = await response.blob();
+        if (blob.size > 0) {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+          });
+        }
+      } catch (noCorsError) {
+        console.warn('[InkWise Studio] No-cors fetch also failed:', url, noCorsError);
+      }
+
+      return null;
+    };
+
+    /**
+     * Clean up SVG clone for export by removing UI elements and embedding images
+     * @param {SVGElement} clone - The cloned SVG element to clean
+     * @returns {Promise<void>}
+     */
+    const cleanSvgForExport = async (clone) => {
+      // Remove UI elements: bounding boxes, resize handles, selection indicators
+      const uiSelectors = [
+        '.svg-bounding-box',
+        '.resize-handle',
+        '.selection-indicator',
+        '.inkwise-selection',
+        '.inkwise-overlay',
+        '[data-ui-element="true"]',
+        '[data-temp-element="true"]',
+        'g.svg-bounding-box',
+      ];
+      uiSelectors.forEach((selector) => {
+        clone.querySelectorAll(selector).forEach((el) => el.remove());
+      });
+
+      // Remove contenteditable and cursor styles from text elements
+      clone.querySelectorAll('text').forEach((textEl) => {
+        textEl.removeAttribute('contenteditable');
+        textEl.style.cursor = '';
+        textEl.style.userSelect = '';
+      });
+
+      // Remove cursor and pointer-events styles from images
+      clone.querySelectorAll('image').forEach((imgEl) => {
+        imgEl.style.cursor = '';
+        imgEl.style.pointerEvents = '';
+      });
+
+      /**
+       * Normalize URL to use current origin and correct path structure
+       * Fixes: localhost vs 127.0.0.1 mismatch
+       * Fixes: /InkWise-Web/ink-wise/public/storage/ -> /storage/
+       */
+      const normalizeUrlToCurrentOrigin = (url) => {
+        if (!url || url.startsWith('data:')) {
+          return url;
+        }
+        try {
+          const parsed = new URL(url, window.location.origin);
+          
+          // Fix incorrect path structure: /InkWise-Web/ink-wise/public/storage/ -> /storage/
+          // This handles URLs like: http://localhost/InkWise-Web/ink-wise/public/storage/customer/...
+          const pathPatterns = [
+            /\/InkWise-Web\/ink-wise\/public\/storage\//gi,
+            /\/ink-wise\/public\/storage\//gi,
+            /\/public\/storage\//gi,
+          ];
+          let pathname = parsed.pathname;
+          for (const pattern of pathPatterns) {
+            if (pattern.test(pathname)) {
+              pathname = pathname.replace(pattern, '/storage/');
+              break;
+            }
+          }
+          parsed.pathname = pathname;
+          
+          // If URL is from localhost or 127.0.0.1, normalize to current origin
+          if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+            parsed.hostname = window.location.hostname;
+            parsed.port = window.location.port;
+            parsed.protocol = window.location.protocol;
+          }
+          return parsed.href;
+        } catch (e) {
+          return url;
+        }
+      };
+
+      // Convert external image URLs to base64 data URLs
+      const imageElements = clone.querySelectorAll('image');
+      console.log('[InkWise Studio] Found', imageElements.length, 'image elements to convert');
+      const conversionPromises = Array.from(imageElements).map(async (imgEl) => {
+        let href = imgEl.getAttribute('href')
+          || imgEl.getAttribute('xlink:href')
+          || imgEl.getAttributeNS('http://www.w3.org/1999/xlink', 'href');
+
+        console.log('[InkWise Studio] Processing image with href:', href);
+
+        if (!href || href.startsWith('data:')) {
+          console.log('[InkWise Studio] Image already embedded or no href, skipping');
+          return; // Already embedded or no href
+        }
+
+        // Normalize the URL to use current origin
+        const normalizedHref = normalizeUrlToCurrentOrigin(href);
+        console.log('[InkWise Studio] Normalized URL:', normalizedHref);
+
+        const base64 = await imageUrlToBase64(normalizedHref);
+        if (base64) {
+          console.log('[InkWise Studio] Successfully converted image to base64, length:', base64.length);
+          
+          // Remove ALL existing href-related attributes first to ensure clean state
+          imgEl.removeAttribute('href');
+          imgEl.removeAttribute('xlink:href');
+          imgEl.removeAttributeNS('http://www.w3.org/1999/xlink', 'href');
+          imgEl.removeAttribute('data-src');
+          
+          // Now set all href attributes to base64 to ensure complete coverage
+          imgEl.setAttribute('href', base64);
+          imgEl.setAttribute('xlink:href', base64);  // Direct attribute for serialization
+          imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'href', base64);  // Namespace-aware
+          
+          console.log('[InkWise Studio] Image href attributes updated to base64');
+        } else {
+          console.warn('[InkWise Studio] Failed to embed image, keeping original URL:', normalizedHref);
+        }
+      });
+
+      await Promise.all(conversionPromises);
+      console.log('[InkWise Studio] All image conversions completed');
+    };
+
+    const collectDesignSnapshot = async () => {
       if (!cardBg) {
         return null;
       }
@@ -551,8 +873,37 @@ export function initializeCustomerStudioLegacy() {
       let serializedSvg = null;
       if (svgNode) {
         try {
+          // Clone the SVG to manipulate it before serialization without affecting the UI
+          const clone = svgNode.cloneNode(true);
+
+          // Restore intrinsic dimensions if available from data attributes
+          const canvasWidth = cardBg?.dataset?.canvasWidth;
+          const canvasHeight = cardBg?.dataset?.canvasHeight;
+          if (canvasWidth && canvasHeight) {
+            clone.setAttribute('width', canvasWidth);
+            clone.setAttribute('height', canvasHeight);
+            clone.style.width = canvasWidth + 'px';
+            clone.style.height = canvasHeight + 'px';
+          }
+          clone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+          // Clean up the SVG for export: remove UI elements and embed images as base64
+          await cleanSvgForExport(clone);
+
+          // Inject font styles and basic SVG resets to ensure fidelity outside the studio
+          let styleEl = clone.querySelector('style#inkwise-export-styles');
+          if (!styleEl) {
+            styleEl = document.createElementNS(SVG_NS, 'style');
+            styleEl.id = 'inkwise-export-styles';
+            clone.insertBefore(styleEl, clone.firstChild);
+          }
+          styleEl.textContent = `
+            @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+            text { white-space: pre; }
+          `;
+
           const serializer = new XMLSerializer();
-          serializedSvg = serializer.serializeToString(svgNode);
+          serializedSvg = serializer.serializeToString(clone);
           if (serializedSvg && !/xmlns=/i.test(serializedSvg)) {
             serializedSvg = serializedSvg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
           }
@@ -635,19 +986,67 @@ export function initializeCustomerStudioLegacy() {
           image: previewImage,
           images: previewImages,
         },
+        svg_markup: serializedSvg,
         placeholders: placeholderLabels,
-        product_id: bootstrap.product?.id,
+        product_id: bootstrapPayload?.product?.id ?? null,
       };
+    };
+
+    const persistPreviewToSession = (result = {}, snapshot = {}) => {
+      const summary = (result && result.summary) ? result.summary : {};
+      const fromSummary = Array.isArray(summary.previewImages)
+        ? summary.previewImages.filter(Boolean)
+        : (Array.isArray(summary.preview_images) ? summary.preview_images.filter(Boolean) : []);
+      const fromSnapshot = Array.isArray(snapshot?.preview?.images)
+        ? snapshot.preview.images.filter(Boolean)
+        : [];
+
+      const previewImages = fromSummary.length ? fromSummary : fromSnapshot;
+      const primary = summary.previewImage
+        || summary.preview_image
+        || summary.preview
+        || snapshot?.preview?.image
+        || previewImages[0]
+        || null;
+
+      if (!primary && !previewImages.length) {
+        return; // nothing useful to persist
+      }
+
+      const payload = {
+        templateName: summary.productName || summary.templateName || document.title || 'Saved template',
+        previewImage: primary || '',
+        previewImages: previewImages.length ? previewImages : (primary ? [primary] : []),
+        metadata: {
+          template: { name: summary.productName || summary.templateName || 'Saved template' },
+        },
+      };
+
+      try { window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(payload)); } catch (e) { /* ignore */ }
+      try {
+        const short = { id: null, name: payload.templateName, preview: payload.previewImage };
+        window.sessionStorage.setItem('inkwise-saved-template', JSON.stringify(short));
+        window.savedCustomerTemplate = short;
+      } catch (e) { /* ignore */ }
+    };
+
+    const collectSnapshotWithPersist = async (...args) => {
+      const snap = await collectDesignSnapshot(...args);
+      try { persistPreviewToSession({}, snap); } catch (_) { /* ignore */ }
+      return snap;
     };
 
     try {
       autosave = createAutosaveController({
-        collectSnapshot: collectDesignSnapshot,
+        collectSnapshot: collectSnapshotWithPersist,
         routes,
         csrfToken,
         statusLabel: statusLabelEl,
         statusDot: statusDotEl,
         debounce: 0, // Save immediately on change
+        onAfterSave: (result, snapshot) => {
+          try { persistPreviewToSession(result, snapshot); } catch (e) { /* non-fatal */ }
+        },
       });
       console.log('[InkWise Studio] Autosave initialized', autosave);
 
@@ -702,12 +1101,66 @@ export function initializeCustomerStudioLegacy() {
       autosave = null;
     }
 
+    const buildReviewSavePayload = async () => {
+      const snapshot = await collectDesignSnapshot('proceed-review');
+
+      const design = snapshot?.design || {};
+      const sides = design.sides || {};
+      const firstSideKey = Object.keys(sides)[0];
+      const sideData = firstSideKey ? sides[firstSideKey] : null;
+
+      const safeDesignJson = JSON.parse(JSON.stringify(design || {}));
+
+      // Get the SVG markup from the snapshot
+      const svgMarkup = sideData?.svg || snapshot?.svg_markup || null;
+
+      const previewImage = sideData?.preview
+        || snapshot?.preview?.image
+        || extractBackgroundUrl(firstSideKey || 'front')
+        || null;
+      const previewImages = (Array.isArray(snapshot?.preview?.images) ? snapshot.preview.images : [])
+        .filter((val) => typeof val === 'string' && val.trim() !== '');
+      if (previewImage && !previewImages.length) {
+        previewImages.push(previewImage);
+      }
+
+      const canvasMeta = safeDesignJson.canvas || {};
+      const canvasWidth = canvasMeta.width ?? (cardBg ? parseNullableNumber(cardBg.dataset.canvasWidth) : null);
+      const canvasHeight = canvasMeta.height ?? (cardBg ? parseNullableNumber(cardBg.dataset.canvasHeight) : null);
+      const backgroundColor = (() => {
+        try {
+          if (!cardBg) return null;
+          const cs = window.getComputedStyle(cardBg);
+          return cs?.backgroundColor || cardBg.dataset?.backgroundColor || cardBg.style?.backgroundColor || null;
+        } catch (_) {
+          return null;
+        }
+      })();
+
+      return {
+        design_svg: svgMarkup, // Include the SVG for proper preview rendering
+        design_json: safeDesignJson,
+        preview_image: previewImage,
+        preview_images: previewImages,
+        canvas_width: canvasWidth,
+        canvas_height: canvasHeight,
+        background_color: backgroundColor,
+        template_id: bootstrapPayload?.template?.id ?? bootstrapPayload?.template_id ?? null,
+        order_item_id: bootstrapPayload?.orderSummary?.order_item_id
+          ?? bootstrapPayload?.orderSummary?.orderItemId
+          ?? bootstrapPayload?.orderSummary?.item_id
+          ?? null,
+      };
+    };
+
     const proceedButton = document.querySelector('[data-action="proceed-review"]');
     if (proceedButton) {
       const destination = proceedButton.dataset.destination
         || routes.review
         || proceedButton.getAttribute('href')
         || window.location.href;
+
+      const reviewSaveUrl = routes.saveReview || routes.reviewSave || routes.review_design || routes.reviewDesign || null;
 
       proceedButton.addEventListener('click', async (event) => {
         event.preventDefault();
@@ -722,66 +1175,23 @@ export function initializeCustomerStudioLegacy() {
           window.location.href = destination;
         };
 
-        if (!autosave) {
-          navigate();
-          return;
-        }
-
-        try {
-          await autosave.flush('navigate');
-          navigate();
-        } catch (navigationError) {
-          console.error('[InkWise Studio] Unable to save before navigating.', navigationError);
-          autosave.notifyError();
+        const revertState = () => {
           proceedButton.disabled = false;
           proceedButton.dataset.navigating = '0';
-        }
-      });
-    }
-
-    const saveTemplateButton = document.getElementById('save-template-btn');
-    if (saveTemplateButton) {
-      saveTemplateButton.addEventListener('click', async (event) => {
-        event.preventDefault();
-        if (saveTemplateButton.disabled) {
-          return;
-        }
-
-        // Prompt for template name
-        const templateName = prompt('Enter a name for your template:');
-        if (!templateName || templateName.trim() === '') {
-          return;
-        }
-
-        saveTemplateButton.disabled = true;
-        saveTemplateButton.textContent = 'Saving…';
+        };
 
         try {
-          // Flush any pending autosave
           if (autosave) {
-            await autosave.flush('save-template');
+            await autosave.flush('navigate');
           }
 
-          // Collect current design snapshot
-          const snapshot = await collectDesignSnapshot('save-template');
-          const designPayload = Object.assign({}, snapshot && snapshot.design ? snapshot.design : {});
-          const snapshotPlaceholders = snapshot && Array.isArray(snapshot.placeholders) ? snapshot.placeholders : [];
-          designPayload.placeholders = snapshotPlaceholders;
-          if (snapshot && snapshot.product_id) {
-            designPayload.product_id = snapshot.product_id;
+          const payload = await buildReviewSavePayload();
+          if (!payload.template_id) {
+            throw new Error('Missing template identifier.');
           }
-
-          const previewImage = snapshot && snapshot.preview ? snapshot.preview.image || null : null;
-          const previewImages = snapshot && snapshot.preview && Array.isArray(snapshot.preview.images)
-            ? snapshot.preview.images.filter(Boolean)
-            : [];
-          const requestBody = {
-            template_name: templateName.trim(),
-            design: designPayload,
-            preview_image: previewImage,
-            preview_images: previewImages,
-            placeholders: snapshotPlaceholders,
-          };
+          if (!reviewSaveUrl) {
+            throw new Error('Save endpoint unavailable.');
+          }
 
           const headers = {
             'Content-Type': 'application/json',
@@ -792,27 +1202,26 @@ export function initializeCustomerStudioLegacy() {
             headers['X-CSRF-TOKEN'] = csrfToken;
           }
 
-          // Send to server
-          const response = await fetch(routes.saveTemplate, {
+          const response = await fetch(reviewSaveUrl, {
             method: 'POST',
             headers,
             credentials: 'same-origin',
-            body: JSON.stringify(requestBody),
+            body: JSON.stringify(payload),
           });
 
           if (!response.ok) {
-            throw new Error(`Server responded with ${response.status}`);
+            const text = await response.text().catch(() => '');
+            throw new Error(`Save failed (${response.status}): ${text}`);
           }
 
-          const result = await response.json();
-          alert(`Template "${result.template_name}" saved successfully!`);
-
-        } catch (error) {
-          console.error('[InkWise Studio] Failed to save template.', error);
-          alert('Failed to save template. Please try again.');
-        } finally {
-          saveTemplateButton.disabled = false;
-          saveTemplateButton.textContent = 'Save Template';
+          navigate();
+        } catch (navigationError) {
+          console.error('[InkWise Studio] Unable to save before navigating.', navigationError);
+          if (autosave) {
+            autosave.notifyError();
+          }
+          alert('We could not save your latest design. Please try again before continuing.');
+          revertState();
         }
       });
     }
@@ -1710,6 +2119,21 @@ export function initializeCustomerStudioLegacy() {
       });
     }
 
+    // Setup undo/redo button event listeners
+    const undoBtn = document.querySelector('button[aria-label="Undo"]');
+    const redoBtn = document.querySelector('button[aria-label="Redo"]');
+    
+    if (undoBtn) {
+      undoBtn.addEventListener('click', undo);
+    }
+    
+    if (redoBtn) {
+      redoBtn.addEventListener('click', redo);
+    }
+
+    // Initialize undo/redo button states
+    updateUndoRedoButtons();
+
     closeButtons.forEach((btn) => {
       btn.addEventListener('click', () => {
         const modal = btn.closest('.modal');
@@ -1731,6 +2155,149 @@ export function initializeCustomerStudioLegacy() {
         }
       }
     });
+
+    // Insert graphic into template function
+    async function insertGraphicIntoTemplate(item) {
+      if (!item || !item.fullUrl) {
+        console.error('[InkWise Studio] Invalid graphic item:', item);
+        return;
+      }
+
+      // Check if background modal is open and background is selected
+      const backgroundModal = document.getElementById('background-modal');
+      const isBackgroundMode = backgroundModal && backgroundModal.classList.contains('is-open') && backgroundSelected;
+
+      if (isBackgroundMode) {
+        // Apply graphic as background image
+        try {
+          const response = await fetch(item.fullUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch background image: ${response.status}`);
+          }
+          const blob = await response.blob();
+          const dataUrl = await blobToDataUrl(blob);
+
+          // Apply as background image
+          applyBackgroundImage(dataUrl);
+
+          console.log('[InkWise Studio] Applied graphic as background image');
+        } catch (error) {
+          console.error('[InkWise Studio] Failed to apply background graphic:', error);
+          alert('Failed to apply background image. Please try again.');
+        }
+        return;
+      }
+
+      const svgRoot = getSvgRoot(currentSide);
+      if (!svgRoot) {
+        console.error('[InkWise Studio] No SVG root found for side:', currentSide);
+        return;
+      }
+
+      try {
+        // Generate unique ID for the graphic element
+        const graphicId = `graphic-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const dataPreviewNode = `graphic-${graphicId}`;
+
+        // Determine if this is an SVG graphic (from Iconify) or raster image
+        const isSvgGraphic = item.fullUrl.includes('.svg') || item.id.startsWith('iconify-');
+
+        if (isSvgGraphic) {
+          // For SVG graphics (icons), fetch and inline the SVG content
+          const response = await fetch(item.fullUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch SVG: ${response.status}`);
+          }
+          const svgText = await response.text();
+
+          // Create a group element to contain the SVG graphic
+          const graphicGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          graphicGroup.setAttribute('data-preview-node', dataPreviewNode);
+          graphicGroup.setAttribute('data-preview-label', item.alt || 'Graphic');
+          graphicGroup.setAttribute('class', 'inserted-graphic');
+          graphicGroup.setAttribute('data-editable-image', 'true'); // Mark as editable image
+          graphicGroup.setAttribute('transform', 'translate(100, 100) scale(0.5)'); // Default position and size
+
+          // Parse and insert SVG content
+          const parser = new DOMParser();
+          const svgDoc = parser.parseFromString(svgText, 'image/svg+xml');
+          const svgElement = svgDoc.documentElement;
+
+          // Copy all child elements from the fetched SVG
+          while (svgElement.firstChild) {
+            graphicGroup.appendChild(svgElement.firstChild);
+          }
+
+          // Add the graphic to the SVG
+          svgRoot.appendChild(graphicGroup);
+
+          // Create overlay for editing
+          const overlayData = createOverlayForNode(graphicGroup);
+          if (overlayData) {
+            // Make the graphic editable by adding click handler for crop/resize
+            graphicGroup.style.cursor = 'pointer';
+            graphicGroup.addEventListener('click', (e) => {
+              e.stopPropagation();
+              // Trigger crop mode for the graphic
+              teardownActiveCropSession();
+              const session = createCropSession(overlayData.overlay, graphicGroup);
+              if (session) {
+                activeCropSession = session;
+              }
+            });
+          }
+
+          console.log('[InkWise Studio] Inserted SVG graphic:', dataPreviewNode);
+        } else {
+          // For raster images, create an image element
+          const imageElement = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+          imageElement.setAttribute('data-preview-node', dataPreviewNode);
+          imageElement.setAttribute('data-preview-label', item.alt || 'Graphic');
+          imageElement.setAttribute('class', 'inserted-graphic');
+          imageElement.setAttribute('data-editable-image', 'true'); // Mark as editable image
+          imageElement.setAttribute('x', '100');
+          imageElement.setAttribute('y', '100');
+          imageElement.setAttribute('width', '200');
+          imageElement.setAttribute('height', '200');
+          imageElement.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+          imageElement.setAttributeNS('http://www.w3.org/1999/xlink', 'href', item.fullUrl);
+
+          // Add the image to the SVG
+          svgRoot.appendChild(imageElement);
+
+          // Create overlay for editing
+          const overlayData = createOverlayForNode(imageElement);
+          if (overlayData) {
+            // Make the graphic editable by adding click handler for crop/resize
+            imageElement.style.cursor = 'pointer';
+            imageElement.addEventListener('click', (e) => {
+              e.stopPropagation();
+              // Trigger crop mode for the graphic
+              teardownActiveCropSession();
+              const session = createCropSession(overlayData.overlay, imageElement);
+              if (session) {
+                activeCropSession = session;
+              }
+            });
+          }
+
+          console.log('[InkWise Studio] Inserted raster graphic:', dataPreviewNode);
+        }
+
+        // Trigger preview update
+        updatePreview(currentSide);
+
+        // Trigger autosave after change
+        flushAutosave('graphic-inserted');
+
+        // Show success message
+        console.log('[InkWise Studio] Graphic inserted successfully');
+
+      } catch (error) {
+        console.error('[InkWise Studio] Failed to insert graphic:', error);
+        alert('Failed to insert graphic. Please try again.');
+      }
+    }
 
     // Graphics panel functionality
     const graphicsCategoriesContainer = document.querySelector('.graphics-categories-labels');
@@ -1966,9 +2533,13 @@ export function initializeCustomerStudioLegacy() {
           label.textContent = item.label;
           wrapper.appendChild(label);
         }
-        wrapper.addEventListener('click', () => {
+        wrapper.addEventListener('click', async () => {
           console.log('Selected asset', item);
-          // Future enhancement: insert onto canvas or open inspector
+          try {
+            await insertGraphicIntoTemplate(item);
+          } catch (error) {
+            console.error('[InkWise Studio] Failed to insert graphic:', error);
+          }
         });
         fragment.appendChild(wrapper);
       });
@@ -2302,11 +2873,6 @@ export function initializeCustomerStudioLegacy() {
         }
       });
     }
-
-    hideAllModals();
-    showModal('text');
-    const defaultButton = document.querySelector('.sidenav-btn[data-nav="text"]');
-    defaultButton?.classList.add('active');
 
     const getPreviewInputForKey = (key) => {
       if (!key || !textFieldList) {
@@ -3765,13 +4331,26 @@ export function initializeCustomerStudioLegacy() {
         return [];
       }
       const selector = `[data-preview-node="${activeImageKey}"]`;
-      const collected = new Set();
+      let collected = new Set();
+
+      // First try the specified root
       root.querySelectorAll(selector).forEach((candidate) => {
         const target = resolveImageLikeNode(candidate);
         if (target) {
           collected.add(target);
         }
       });
+
+      // If nothing found in root, try the entire document
+      if (collected.size === 0 && root !== document) {
+        document.querySelectorAll(selector).forEach((candidate) => {
+          const target = resolveImageLikeNode(candidate);
+          if (target) {
+            collected.add(target);
+          }
+        });
+      }
+
       return Array.from(collected);
     };
 
@@ -4185,6 +4764,13 @@ export function initializeCustomerStudioLegacy() {
 
         previewSvg.innerHTML = svgText;
         previewSvg.style.display = 'block';
+        
+        // Hide loading state
+        const loadingEl = document.getElementById('canvas-loading');
+        if (loadingEl) {
+            loadingEl.style.display = 'none';
+        }
+        
         previewSvg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
         previewSvg.setAttribute('width', '100%');
         previewSvg.setAttribute('height', '100%');
@@ -4215,9 +4801,21 @@ export function initializeCustomerStudioLegacy() {
         if (currentSvgRoot) {
           currentSvgRoot.setAttribute('data-svg-editor', 'true');
           if (!currentSvgRoot.__inkwiseSvgTemplateEditor) {
-            currentSvgRoot.__inkwiseSvgTemplateEditor = new SvgTemplateEditor(currentSvgRoot);
+            currentSvgRoot.__inkwiseSvgTemplateEditor = new SvgTemplateEditor(currentSvgRoot, {
+              onTextChange: (element, oldText, newText) => {
+                saveHistoryState();
+                if (autosave) autosave.schedule('text-change');
+              },
+              onImageChange: (element, imageUrl, file) => {
+                saveHistoryState();
+                if (autosave) autosave.schedule('image-change');
+              }
+            });
           }
           svgTemplateEditorInstance = currentSvgRoot.__inkwiseSvgTemplateEditor;
+          
+          // Save initial history state after SVG is loaded
+          setTimeout(() => saveHistoryState(), 100);
         }
 
         // Parse viewBox to adjust canvas size
@@ -4671,6 +5269,9 @@ export function initializeCustomerStudioLegacy() {
         thumb.classList.toggle('active', isActiveThumb);
         thumb.setAttribute('aria-pressed', isActiveThumb ? 'true' : 'false');
       });
+
+      // Save any pending changes when switching sides
+      flushAutosave('side-switch');
     };
 
     viewButtons.forEach((btn) => {
@@ -4700,7 +5301,7 @@ export function initializeCustomerStudioLegacy() {
 
     // Delegate clicks inside the preview area: clicking any element with
     // data-preview-node will open the Text modal and focus the corresponding field.
-    const previewArea = document.querySelector('.preview-overlay');
+    const previewArea = document.querySelector('.preview-overlay') || document.querySelector('.preview-canvas-wrapper');
     if (previewArea) {
       previewArea.addEventListener('click', (ev) => {
         const node = ev.target.closest('[data-preview-node]');
@@ -4913,8 +5514,100 @@ export function initializeCustomerStudioLegacy() {
         return;
       }
 
+      // Always save to recent uploads
       saveRecentUpload(dataUrl, filename || `upload-${Date.now()}`, side);
 
+      // If an image element is currently selected, update only that element
+      if (activeImageKey) {
+        const success = applyToActiveImageNodes((node) => {
+          node.setAttribute('href', dataUrl);
+          node.setAttributeNS('http://www.w3.org/1999/xlink', 'href', dataUrl);
+        }, { autosaveReason: 'image-upload' });
+
+        if (success) {
+          // Image replaced in selected element, done
+          return;
+        }
+      }
+
+      // No image element selected - try to replace a placeholder image first
+      if (currentSvgRoot) {
+        const svgEl = currentSvgRoot.tagName?.toLowerCase() === 'svg'
+          ? currentSvgRoot
+          : currentSvgRoot.closest('svg');
+
+        if (svgEl) {
+          // Look for changeable image placeholders
+          const changeableImages = svgEl.querySelectorAll('image[data-changeable="image"], image.changeable-image, image.svg-changeable-image, [data-editable-image]');
+          if (changeableImages.length > 0) {
+            // Replace the first changeable image
+            const targetImage = changeableImages[0];
+            targetImage.setAttribute('href', dataUrl);
+            targetImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', dataUrl);
+            targetImage.setAttribute('data-replaced-image', 'true');
+            
+            // Update the thumb preview immediately
+            const thumb = document.querySelector(`[data-card-thumb="${side}"] .thumb-preview`);
+            if (thumb) {
+              thumb.style.backgroundImage = `url('${dataUrl}')`;
+            }
+            
+            // Trigger autosave
+            flushAutosave('image-upload-replace');
+            updatePreview(currentSide);
+            return;
+          }
+        }
+      }
+
+      // No changeable image found - add as a new image element to the canvas
+      if (currentSvgRoot) {
+        const svgEl = currentSvgRoot.tagName?.toLowerCase() === 'svg'
+          ? currentSvgRoot
+          : currentSvgRoot.closest('svg');
+
+        if (svgEl) {
+          const viewBox = svgEl.getAttribute('viewBox');
+          let centerX = 200;
+          let centerY = 200;
+          let defaultSize = 150;
+
+          if (viewBox) {
+            const parts = viewBox.split(/[\s,]+/).map(Number);
+            if (parts.length === 4 && parts.every(Number.isFinite)) {
+              centerX = parts[0] + parts[2] / 2;
+              centerY = parts[1] + parts[3] / 2;
+              defaultSize = Math.min(parts[2], parts[3]) * 0.3;
+            }
+          }
+
+          const newImageKey = `uploaded_${Date.now()}`;
+          const imageEl = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+          imageEl.setAttribute('id', newImageKey);
+          imageEl.setAttribute('data-preview-node', newImageKey);
+          imageEl.setAttribute('href', dataUrl);
+          imageEl.setAttributeNS('http://www.w3.org/1999/xlink', 'href', dataUrl);
+          imageEl.setAttribute('x', String(centerX - defaultSize / 2));
+          imageEl.setAttribute('y', String(centerY - defaultSize / 2));
+          imageEl.setAttribute('width', String(defaultSize));
+          imageEl.setAttribute('height', String(defaultSize));
+          imageEl.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+          svgEl.appendChild(imageEl);
+
+          // Create overlay so the image is draggable and resizable
+          const overlayData = createOverlayForNode(imageEl);
+          if (overlayData) {
+            syncOverlayForNode(imageEl);
+          }
+
+          setActiveImageKey(newImageKey);
+          autosave?.schedule('image-upload');
+          return;
+        }
+      }
+
+      // Fallback: legacy behavior for raster-only previews
       if (side === 'front') {
         uploadedFrontImage = dataUrl;
       } else if (side === 'back') {
@@ -4958,14 +5651,84 @@ export function initializeCustomerStudioLegacy() {
       uploadItemsElements.forEach((item) => {
         item.addEventListener('click', () => {
           const imageUrl = item.dataset.imageUrl;
-          const side = item.dataset.side;
 
           // Remove selected class from all items
           uploadItemsElements.forEach((el) => el.classList.remove('selected'));
           // Add selected class to clicked item
           item.classList.add('selected');
 
-          // Apply the image to the appropriate side
+          // If an image element is selected, update only that element
+          if (activeImageKey) {
+            const success = applyToActiveImageNodes((node) => {
+              node.setAttribute('href', imageUrl);
+              node.setAttributeNS('http://www.w3.org/1999/xlink', 'href', imageUrl);
+            }, { autosaveReason: 'image-select' });
+
+            if (success) {
+              // Show a brief success indication
+              item.style.transform = 'scale(0.95)';
+              setTimeout(() => {
+                item.style.transform = '';
+              }, 150);
+              return;
+            }
+          }
+
+          // No image element selected - add as a new image element to the canvas
+          if (currentSvgRoot) {
+            const svgEl = currentSvgRoot.tagName?.toLowerCase() === 'svg'
+              ? currentSvgRoot
+              : currentSvgRoot.closest('svg');
+
+            if (svgEl) {
+              const viewBox = svgEl.getAttribute('viewBox');
+              let centerX = 200;
+              let centerY = 200;
+              let defaultSize = 150;
+
+              if (viewBox) {
+                const parts = viewBox.split(/[\s,]+/).map(Number);
+                if (parts.length === 4 && parts.every(Number.isFinite)) {
+                  centerX = parts[0] + parts[2] / 2;
+                  centerY = parts[1] + parts[3] / 2;
+                  defaultSize = Math.min(parts[2], parts[3]) * 0.3;
+                }
+              }
+
+              const newImageKey = `uploaded_${Date.now()}`;
+              const imageEl = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+              imageEl.setAttribute('id', newImageKey);
+              imageEl.setAttribute('data-preview-node', newImageKey);
+              imageEl.setAttribute('href', imageUrl);
+              imageEl.setAttributeNS('http://www.w3.org/1999/xlink', 'href', imageUrl);
+              imageEl.setAttribute('x', String(centerX - defaultSize / 2));
+              imageEl.setAttribute('y', String(centerY - defaultSize / 2));
+              imageEl.setAttribute('width', String(defaultSize));
+              imageEl.setAttribute('height', String(defaultSize));
+              imageEl.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+              svgEl.appendChild(imageEl);
+
+              // Create overlay so the image is draggable and resizable
+              const overlayData = createOverlayForNode(imageEl);
+              if (overlayData) {
+                syncOverlayForNode(imageEl);
+              }
+
+              setActiveImageKey(newImageKey);
+              autosave?.schedule('image-select');
+
+              // Show a brief success indication
+              item.style.transform = 'scale(0.95)';
+              setTimeout(() => {
+                item.style.transform = '';
+              }, 150);
+              return;
+            }
+          }
+
+          // Fallback: legacy behavior for raster-only previews
+          const side = item.dataset.side;
           if (side === 'front') {
             uploadedFrontImage = imageUrl;
           } else {
@@ -5011,14 +5774,84 @@ export function initializeCustomerStudioLegacy() {
       quickUploadItemsElements.forEach((item) => {
         item.addEventListener('click', () => {
           const imageUrl = item.dataset.imageUrl;
-          const side = item.dataset.side;
 
           // Remove selected class from all items
           quickUploadItemsElements.forEach((el) => el.classList.remove('selected'));
           // Add selected class to clicked item
           item.classList.add('selected');
 
-          // Apply the image to the appropriate side
+          // If an image element is selected, update only that element
+          if (activeImageKey) {
+            const success = applyToActiveImageNodes((node) => {
+              node.setAttribute('href', imageUrl);
+              node.setAttributeNS('http://www.w3.org/1999/xlink', 'href', imageUrl);
+            }, { autosaveReason: 'image-select' });
+
+            if (success) {
+              // Show a brief success indication
+              item.style.transform = 'scale(0.9)';
+              setTimeout(() => {
+                item.style.transform = '';
+              }, 150);
+              return;
+            }
+          }
+
+          // No image element selected - add as a new image element to the canvas
+          if (currentSvgRoot) {
+            const svgEl = currentSvgRoot.tagName?.toLowerCase() === 'svg'
+              ? currentSvgRoot
+              : currentSvgRoot.closest('svg');
+
+            if (svgEl) {
+              const viewBox = svgEl.getAttribute('viewBox');
+              let centerX = 200;
+              let centerY = 200;
+              let defaultSize = 150;
+
+              if (viewBox) {
+                const parts = viewBox.split(/[\s,]+/).map(Number);
+                if (parts.length === 4 && parts.every(Number.isFinite)) {
+                  centerX = parts[0] + parts[2] / 2;
+                  centerY = parts[1] + parts[3] / 2;
+                  defaultSize = Math.min(parts[2], parts[3]) * 0.3;
+                }
+              }
+
+              const newImageKey = `uploaded_${Date.now()}`;
+              const imageEl = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+              imageEl.setAttribute('id', newImageKey);
+              imageEl.setAttribute('data-preview-node', newImageKey);
+              imageEl.setAttribute('href', imageUrl);
+              imageEl.setAttributeNS('http://www.w3.org/1999/xlink', 'href', imageUrl);
+              imageEl.setAttribute('x', String(centerX - defaultSize / 2));
+              imageEl.setAttribute('y', String(centerY - defaultSize / 2));
+              imageEl.setAttribute('width', String(defaultSize));
+              imageEl.setAttribute('height', String(defaultSize));
+              imageEl.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+              svgEl.appendChild(imageEl);
+
+              // Create overlay so the image is draggable and resizable
+              const overlayData = createOverlayForNode(imageEl);
+              if (overlayData) {
+                syncOverlayForNode(imageEl);
+              }
+
+              setActiveImageKey(newImageKey);
+              autosave?.schedule('image-select');
+
+              // Show a brief success indication
+              item.style.transform = 'scale(0.9)';
+              setTimeout(() => {
+                item.style.transform = '';
+              }, 150);
+              return;
+            }
+          }
+
+          // Fallback: legacy behavior for raster-only previews
+          const side = item.dataset.side;
           if (side === 'front') {
             uploadedFrontImage = imageUrl;
           } else {
@@ -5047,7 +5880,7 @@ export function initializeCustomerStudioLegacy() {
       const reader = new FileReader();
       reader.onload = (e) => {
         const dataUrl = e.target.result;
-        applyUploadedImage(dataUrl, file.name, 'front');
+        applyUploadedImage(dataUrl, file.name, currentSide);
       };
       reader.readAsDataURL(file);
     };
@@ -5284,6 +6117,35 @@ export function initializeCustomerStudioLegacy() {
         console.warn('[InkWise Studio] Failed to apply background color', e);
         return false;
       }
+    };
+
+    const applyBackgroundImage = (imageUrl) => {
+      if (!imageUrl) {
+        return false;
+      }
+      if (!cardBg) return false;
+      try {
+        cardBg.style.backgroundImage = `url(${imageUrl})`;
+        cardBg.style.backgroundSize = 'cover';
+        cardBg.style.backgroundPosition = 'center';
+        cardBg.style.backgroundRepeat = 'no-repeat';
+        // Record background image for autosave/export
+        cardBg.dataset.backgroundImage = imageUrl;
+        autosave?.schedule('background-image');
+        return true;
+      } catch (e) {
+        console.warn('[InkWise Studio] Failed to apply background image', e);
+        return false;
+      }
+    };
+
+    const blobToDataUrl = (blob) => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
     };
 
     const applyImageTint = (color) => {

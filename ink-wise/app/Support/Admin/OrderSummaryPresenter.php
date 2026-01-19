@@ -220,12 +220,77 @@ class OrderSummaryPresenter
                 $options = static::deriveOptionsFromRelations($item);
             }
 
-            $previewImages = Arr::get($metadata, 'preview_images')
-                ?? Arr::get($metadata, 'images')
-                ?? Arr::get($summary, 'preview_images');
+                $previewImages = Arr::get($metadata, 'preview_images')
+                    ?? Arr::get($metadata, 'images')
+                    ?? Arr::get($summary, 'preview_images');
+
+                // If no preview images found in metadata/summary, fall back to related product/template images
+                if (empty($previewImages)) {
+                    $prod = $item->product ?? null;
+                    $collected = [];
+
+                    // Helper to normalize a candidate image
+                    $resolveCandidate = function ($candidate) use (&$collected, $prod) {
+                        if (!$candidate) return;
+                        if (is_string($candidate) && trim($candidate) !== '') {
+                            $collected[] = $candidate;
+                            return;
+                        }
+
+                        if (is_array($candidate)) {
+                            $src = $candidate['url'] ?? $candidate['src'] ?? $candidate['preview'] ?? null;
+                            if ($src) $collected[] = $src;
+                            return;
+                        }
+
+                        if (is_object($candidate)) {
+                            // common ORM relations may expose url or filename
+                            $src = $candidate->url ?? $candidate->src ?? $candidate->preview ?? null;
+                            if ($src) {
+                                $collected[] = $src;
+                                return;
+                            }
+                            if (property_exists($candidate, 'filename') && $prod) {
+                                try {
+                                    $collected[] = asset('storage/uploads/products/' . ($prod->id ?? 'generic') . '/' . ($candidate->filename ?? ''));
+                                } catch (\Throwable $_e) {
+                                    // ignore
+                                }
+                            }
+                        }
+                    };
+
+                    // Template attached to product
+                    if ($prod && isset($prod->template)) {
+                        $tpl = $prod->template;
+                        $resolveCandidate($tpl->preview_front ?? $tpl->front_image ?? $tpl->preview ?? $tpl->image ?? null);
+                        $resolveCandidate($tpl->preview_back ?? $tpl->back_image ?? null);
+                    }
+
+                    // Product images relation
+                    if ($prod && ($prod->product_images ?? null)) {
+                        foreach ($prod->product_images as $pi) {
+                            $resolveCandidate($pi);
+                        }
+                    }
+
+                    // Product uploads fallback
+                    if ($prod && ($prod->uploads ?? null)) {
+                        foreach ($prod->uploads as $up) {
+                            $resolveCandidate($up);
+                        }
+                    }
+
+                    if (!empty($collected)) {
+                        $previewImages = $collected;
+                    }
+                }
 
             return [
                 'id' => $item->id,
+                'order_item_id' => $item->id,
+                'product_id' => $item->product_id,
+                'template_id' => $item->product?->template_id ?? null,
                 'name' => $item->product_name ?? $item->product?->name ?? 'Custom product',
                 'sku' => $item->product?->sku,
                 'product_type' => $item->product?->product_type,
@@ -236,6 +301,7 @@ class OrderSummaryPresenter
                 'options' => $options,
                 'breakdown' => static::buildItemBreakdown($item),
                 'preview_images' => Arr::wrap($previewImages),
+                'design_metadata' => $metadata,
             ];
         })->values()->all();
     }
@@ -260,9 +326,9 @@ class OrderSummaryPresenter
 
         if ($item->addons->isNotEmpty()) {
             foreach ($item->addons as $addon) {
-                $addonName = $addon->productAddon?->name ?? $addon->addon_name ?? 'Add-on';
-                $addonType = $addon->addon_type ? Str::headline(str_replace('_', ' ', $addon->addon_type)) : null;
-                $addonPrice = static::toFloat($addon->addon_price);
+                $addonName = $addon->productSize?->size ?? $addon->size ?? 'Size';
+                $addonType = $addon->size_type ? Str::headline(str_replace('_', ' ', $addon->size_type)) : null;
+                $addonPrice = static::toFloat($addon->size_price);
 
                 $label = $addonType
                     ? sprintf('%s (%s)', $addonName, $addonType)
@@ -296,9 +362,9 @@ class OrderSummaryPresenter
         if ($item->addons->isNotEmpty()) {
             $options['addons'] = $item->addons->map(function ($addon) {
                 return [
-                    'name' => $addon->productAddon?->name ?? $addon->addon_name,
-                    'type' => $addon->addon_type,
-                    'price' => static::toFloat($addon->addon_price),
+                    'name' => $addon->productSize?->size ?? $addon->size,
+                    'type' => $addon->size_type,
+                    'price' => static::toFloat($addon->size_price),
                 ];
             })->toArray();
         }

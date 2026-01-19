@@ -574,6 +574,11 @@
 			color: #1f2937;
 		}
 
+		.material-card--deducted .material-card__type {
+			background: #fee2e2;
+			color: #dc2626;
+		}
+
 		.material-card__title {
 			margin: 0 0 8px;
 			font-size: 18px;
@@ -826,6 +831,20 @@
 	$customerCompany = data_get($customer, 'company');
 	$customerTags = collect(data_get($customer, 'tags', []))->filter()->values();
 
+	$currencyCode = data_get($order, 'currency', 'PHP');
+	$currencySymbol = $currencyCode === 'PHP' ? '₱' : ($currencyCode . ' ');
+	$customerLifetimePaid = 0.0;
+	if (!empty($customerId)) {
+		try {
+			$customerLifetimePaid = (float) \App\Models\Payment::query()
+				->where('customer_id', $customerId)
+				->whereRaw("LOWER(COALESCE(status, '')) = 'paid'")
+				->sum('amount');
+		} catch (\Throwable $_e) {
+			$customerLifetimePaid = 0.0;
+		}
+	}
+
 	$shippingAddress = data_get($order, 'shipping.formatted')
 		?? data_get($order, 'shipping.address')
 		?? data_get($order, 'shipping_address');
@@ -851,12 +870,30 @@
 			return $bcarry;
 		}, 0);
 
+		// Check if this is an invitation (not envelope or giveaway)
+		$ptype = strtolower((string) data_get($it, 'product_type', ''));
+		$iname = strtolower((string) data_get($it, 'name', ''));
+		$ltype = strtolower((string) data_get($it, 'line_type', ''));
+		$isEnvelope = str_contains($ptype, 'envelope') || str_contains($iname, 'envelope');
+		$isGiveaway = $ltype === 'giveaway' || str_contains($ptype, 'giveaway') || str_contains($iname, 'giveaway') || str_contains($iname, 'freebie');
+		$isInvitation = !$isEnvelope && !$isGiveaway;
+
 		if ($breakSum > 0) {
 			// If breakdown provides totals, use that as this item's subtotal
 			return $carry + $breakSum;
 		}
 
-		// fallback to explicit item total or computed quantity * unit price
+		// For invitations, do not include the template price (unit_price)
+		if ($isInvitation) {
+			// Only use explicit item total if present, otherwise 0
+			$itemTotal = data_get($it, 'total');
+			if (is_numeric($itemTotal)) {
+				return $carry + (float) $itemTotal;
+			}
+			return $carry; // Exclude template price
+		}
+
+		// fallback to explicit item total or computed quantity * unit price for non-invitations
 		$itemTotal = data_get($it, 'total');
 		if (is_numeric($itemTotal)) {
 			return $carry + (float) $itemTotal;
@@ -1194,7 +1231,17 @@
 	$balanceOverrideRaw = data_get($financialMetadata, 'balance_due_override');
 	$paidOverrideAmount = is_numeric($paidOverrideRaw) ? (float) $paidOverrideRaw : null;
 	$balanceOverrideAmount = is_numeric($balanceOverrideRaw) ? (float) $balanceOverrideRaw : null;
-	$totalPaidAmount = $paidOverrideAmount ?? (float) ($paymentsSummary->get('total_paid') ?? data_get($order, 'total_paid', 0));
+	// Prefer authoritative model-calculated total paid when available
+	if (isset($orderModel) && $orderModel) {
+		try {
+			$calculatedPaid = (float) $orderModel->totalPaid();
+		} catch (\Throwable $_e) {
+			$calculatedPaid = null;
+		}
+	} else {
+		$calculatedPaid = null;
+	}
+	$totalPaidAmount = $paidOverrideAmount ?? ($calculatedPaid !== null ? $calculatedPaid : (float) ($paymentsSummary->get('total_paid') ?? data_get($order, 'total_paid', 0)));
 	$balanceDueAmount = $balanceOverrideAmount ?? (float) ($paymentsSummary->get('balance_due') ?? max($orderGrandTotalAmount - $totalPaidAmount, 0));
 	if ($paymentStatus !== 'paid') {
 		if ($orderGrandTotalAmount > 0 && $balanceDueAmount <= 0.01 && $totalPaidAmount >= max($orderGrandTotalAmount - 0.01, 0)) {
@@ -1436,8 +1483,41 @@
 								@foreach($items as $item)
 									@php
 										$quantity = (int) data_get($item, 'quantity', 1);
+										
+										// Check if this is an invitation (not envelope or giveaway)
+										$ptype = strtolower((string) data_get($item, 'product_type', ''));
+										$iname = strtolower((string) data_get($item, 'name', ''));
+										$ltype = strtolower((string) data_get($item, 'line_type', ''));
+										$isEnvelope = str_contains($ptype, 'envelope') || str_contains($iname, 'envelope');
+										$isGiveaway = $ltype === 'giveaway' || str_contains($ptype, 'giveaway') || str_contains($iname, 'giveaway') || str_contains($iname, 'freebie');
+										$isInvitation = !$isEnvelope && !$isGiveaway;
+										
 										$unitPrice = (float) data_get($item, 'unit_price', data_get($item, 'price', 0));
-										$lineTotal = (float) data_get($item, 'total', data_get($item, 'subtotal', $quantity * $unitPrice));
+										
+										// For invitations, exclude template price from unit price
+										if ($isInvitation) {
+											$unitPrice = 0.0;
+										}
+										
+										// Calculate breakdown sum for this item
+										$breakdown = collect(data_get($item, 'breakdown', []));
+										$breakdownSum = $breakdown->reduce(function ($carry, $row) {
+											$rowQty = data_get($row, 'quantity');
+											$rowTotal = data_get($row, 'total', data_get($row, 'unit_price'));
+											if (is_numeric($rowTotal)) {
+												$mult = ($rowQty !== null && is_numeric($rowQty)) ? (int) $rowQty : 1;
+												return $carry + ((float) $rowTotal * $mult);
+											}
+											return $carry;
+										}, 0);
+										
+										// For invitations, exclude template price - only use breakdown sum
+										if ($isInvitation) {
+											$lineTotal = $breakdownSum;
+										} else {
+											$lineTotal = (float) data_get($item, 'total', data_get($item, 'subtotal', $quantity * $unitPrice));
+										}
+										
 										// fallback: some giveaway items store their computed total in design_metadata or item metadata
 										if (empty($lineTotal) || $lineTotal === 0.0) {
 											$lineTotal = (float) data_get($item, 'design_metadata.total', data_get($item, 'metadata.giveaway.total', data_get($item, 'metadata.giveaway.price', data_get($item, 'metadata.total', 0))));
@@ -1642,7 +1722,99 @@
 											})
 											->unique(fn ($option) => \Illuminate\Support\Str::lower($option))
 											->values();
-										$images = collect(data_get($item, 'preview_images', data_get($item, 'images', [])))->filter();
+										// Prefer any customer-saved draft previews (CustomerTemplateCustom)
+										$imagesSource = data_get($item, 'preview_images', data_get($item, 'images', []));
+										$customerReviewSvg = null;
+										$customerReviewBackImage = null;
+										try {
+											$customerDraft = null;
+											// Use the original Eloquent order model when available (`orderModel`)
+											if (isset($orderModel) && ($orderModel->id ?? null) && (data_get($item, 'id') || data_get($item, 'order_item_id'))) {
+												$orderItemId = data_get($item, 'id', data_get($item, 'order_item_id'));
+												$customerDraft = \App\Models\CustomerTemplateCustom::query()
+													->where('order_id', $orderModel->id)
+													->where('order_item_id', $orderItemId)
+													->latest('id')
+													->first();
+											}
+
+											if (!$customerDraft && isset($order) && ($order?->customer_id ?? null)) {
+												// Fallback: find by customer/product/template match
+												$customerDraft = \App\Models\CustomerTemplateCustom::query()
+													->where('customer_id', $order->customer_id)
+													->where('product_id', data_get($item, 'product_id'))
+													->latest('id')
+													->first();
+											}
+
+											if ($customerDraft) {
+												$draftImages = data_get($customerDraft, 'preview_images', data_get($customerDraft, 'preview_images', []));
+												if (!empty($draftImages)) {
+													$imagesSource = $draftImages;
+												} elseif (!empty($customerDraft->preview_image ?? null)) {
+													$imagesSource = [$customerDraft->preview_image];
+												}
+											}
+											
+											// Look for CustomerReview with design_svg (saved from design studio)
+											// template_id can come from:
+											// 1. item.template_id (from presenter via product.template_id)
+											// 2. item.metadata.template_id
+											// 3. item.design_metadata.template_id
+											// 4. customerDraft.template_id
+											$templateId = data_get($item, 'template_id') 
+												?? data_get($item, 'metadata.template_id') 
+												?? data_get($item, 'design_metadata.template_id')
+												?? ($customerDraft->template_id ?? null);
+											$customerId = $order?->customer_id ?? ($orderModel->customer_id ?? null);
+											
+											if ($templateId && $customerId) {
+												$customerReview = \App\Models\CustomerReview::query()
+													->where('template_id', $templateId)
+													->where('customer_id', $customerId)
+													->whereNotNull('design_svg')
+													->where('design_svg', '!=', '')
+													->latest('updated_at')
+													->first();
+												
+												if ($customerReview && !empty($customerReview->design_svg)) {
+													$customerReviewSvg = $customerReview->design_svg;
+													// Try to get back image from saved design_back_svg first, then fallback to gallery
+													if (!empty($customerReview->design_back_svg)) {
+														$customerReviewBackImage = $customerReview->design_back_svg;
+													} elseif (!empty($imagesSource) && count($imagesSource) > 1) {
+														$backImg = $imagesSource[1] ?? null;
+														if (is_array($backImg)) {
+															$customerReviewBackImage = $backImg['src'] ?? $backImg['url'] ?? null;
+														} else {
+															$customerReviewBackImage = $backImg;
+														}
+													}
+												}
+
+												// Get original template for back-to-back comparison
+												$originalTemplate = null;
+												$originalTemplateSvg = null;
+												$originalTemplateBackSvg = null;
+												try {
+													$originalTemplate = \App\Models\Template::find($templateId);
+													if ($originalTemplate) {
+														if ($originalTemplate->svg_path && \Storage::disk('public')->exists($originalTemplate->svg_path)) {
+															$originalTemplateSvg = \Storage::disk('public')->get($originalTemplate->svg_path);
+														}
+														if ($originalTemplate->back_svg_path && \Storage::disk('public')->exists($originalTemplate->back_svg_path)) {
+															$originalTemplateBackSvg = \Storage::disk('public')->get($originalTemplate->back_svg_path);
+														}
+													}
+												} catch (\Throwable $e) {
+													// Ignore errors when loading original template
+												}
+											}
+										} catch (\Throwable $e) {
+											// ignore and fall back to item images
+										}
+
+										$images = collect($imagesSource)->filter();
 										$itemMaterialBuckets = [
 											'paper' => [],
 											'addon' => [],
@@ -1696,9 +1868,10 @@
 										}
 
 										// accumulate grouping sums: invitations (main line only, breakdowns are separate)
-										if (!$isEnvelope && !$isGiveaway) {
-											$groupSums['invitations'] += $lineTotal;
-										}
+										// DO NOT CALCULATE THE BASE PRICE OF THE INVITATION
+										// if (!$isEnvelope && !$isGiveaway) {
+										//     $groupSums['invitations'] += $lineTotal;
+										// }
 
 										if ($isEnvelope) {
 											$groupSums['envelopes'] += $lineTotal;
@@ -1918,6 +2091,31 @@
 													}
 
 													$gallery = $galleryEntries->values();
+													// Prepare a client-friendly gallery with normalized URLs so the
+													// preview JS doesn't request relative paths that 404.
+													$galleryForClient = $gallery->map(function ($entry) {
+														$src = is_array($entry) ? ($entry['src'] ?? '') : (is_string($entry) ? $entry : '');
+														$src = trim((string) $src);
+														if ($src === '') {
+															return null;
+														}
+
+														if (preg_match('/^https?:\/\//i', $src)) {
+															$url = $src;
+														} elseif (preg_match('/^\/?storage\//i', $src)) {
+															$url = asset(ltrim($src, '/'));
+														} elseif (str_starts_with($src, '/')) {
+															$url = url($src);
+														} else {
+															$url = asset('storage/' . ltrim($src, '/'));
+														}
+
+														return array_filter([
+															'src' => $url,
+															'orientation' => $entry['orientation'] ?? null,
+															'label' => $entry['label'] ?? null,
+														], function ($v) { return $v !== null && $v !== ''; });
+													})->filter()->values();
 													$itemMaterialsList = collect($itemMaterialBuckets)
 														->flatMap(function ($rows, $type) {
 															return collect($rows)->map(function ($row) use ($type) {
@@ -1939,6 +2137,25 @@
 													$primaryImage = is_array($primaryImageEntry) ? ($primaryImageEntry['src'] ?? null) : (is_string($primaryImageEntry) ? $primaryImageEntry : null);
 													$primaryImageLabel = is_array($primaryImageEntry) ? ($primaryImageEntry['label'] ?? null) : null;
 													$previewTitle = data_get($item, 'name', 'Custom product');
+
+													// Normalize image URL for browser consumption. Accept absolute URLs, storage paths,
+													// and relative paths. Fallback to placeholder when missing.
+													$primaryImageUrl = null;
+													if (!empty($primaryImage)) {
+														$trimmed = trim((string) $primaryImage);
+														if (preg_match('/^https?:\/\//i', $trimmed)) {
+															$primaryImageUrl = $trimmed;
+														} elseif (preg_match('/^\/?storage\//i', $trimmed)) {
+															$primaryImageUrl = asset(ltrim($trimmed, '/'));
+														} elseif (str_starts_with($trimmed, '/')) {
+															$primaryImageUrl = url($trimmed);
+														} else {
+															// Common case: stored in storage/app/public or relative path like "customerimages/..."
+															$primaryImageUrl = asset('storage/' . ltrim($trimmed, '/'));
+														}
+													} else {
+														$primaryImageUrl = asset('images/placeholder.png');
+													}
 												@endphp
 												@if($gallery->isNotEmpty())
 													<button
@@ -1946,12 +2163,60 @@
 														class="item-cell__thumb-button"
 														data-preview-trigger
 														data-preview-title="{{ $previewTitle }}"
-														data-preview-gallery='@json($gallery)'
+														data-preview-gallery='@json($galleryForClient)'
 														data-preview-materials='@json($itemMaterialsList)'
 														aria-label="View artwork preview for {{ $previewTitle }}"
 													>
-														<img src="{{ $primaryImage }}" alt="{{ $primaryImageLabel ? $previewTitle . ' ' . strtolower($primaryImageLabel) : $previewTitle . ' preview' }}" class="item-cell__thumb">
+														<img src="{{ $primaryImageUrl }}" alt="{{ $primaryImageLabel ? $previewTitle . ' ' . strtolower($primaryImageLabel) : $previewTitle . ' preview' }}" class="item-cell__thumb">
 													</button>
+												@endif
+												@if(!empty($customerReviewSvg) || !empty($originalTemplateSvg))
+													<div class="mt-2">
+														<div class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Template Comparison</div>
+														<div class="flex gap-2">
+															@if(!empty($originalTemplateSvg))
+																<div class="flex flex-col items-center">
+																	<div class="text-xs text-gray-500 mb-1">Original</div>
+																	<button
+																		type="button"
+																		class="item-cell__svg-button js-admin-svg-preview-trigger"
+																		data-svg-content="{{ base64_encode($originalTemplateSvg) }}"
+																		data-back-image="{{ !empty($originalTemplateBackSvg) ? base64_encode($originalTemplateBackSvg) : '' }}"
+																		data-preview-title="{{ $previewTitle }} - Original Template"
+																		aria-label="View original template design for {{ $previewTitle }}"
+																		style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 4px; background: #f8fafc; cursor: pointer; display: inline-block; transition: all 0.2s;"
+																		onmouseover="this.style.boxShadow='0 0 0 2px #a6b7ff'"
+																		onmouseout="this.style.boxShadow='none'"
+																	>
+																		<div class="svg-thumb-container" style="width: 60px; height: 60px; overflow: hidden; pointer-events: none;">
+																			{!! $originalTemplateSvg !!}
+																		</div>
+																	</button>
+																</div>
+															@endif
+															@if(!empty($customerReviewSvg))
+																<div class="flex flex-col items-center">
+																	<div class="text-xs text-gray-500 mb-1">Edited</div>
+																	<button
+																		type="button"
+																		class="item-cell__svg-button js-admin-svg-preview-trigger"
+																		data-svg-content="{{ base64_encode($customerReviewSvg) }}"
+																		data-back-image="{{ !empty($customerReviewBackImage) && str_contains($customerReviewBackImage, '<svg') ? base64_encode($customerReviewBackImage) : ($customerReviewBackImage ?? '') }}"
+																		data-preview-title="{{ $previewTitle }} - Edited Design"
+																		aria-label="View edited template design for {{ $previewTitle }}"
+																		style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 4px; background: #f8fafc; cursor: pointer; display: inline-block; transition: all 0.2s;"
+																		onmouseover="this.style.boxShadow='0 0 0 2px #a6b7ff'"
+																		onmouseout="this.style.boxShadow='none'"
+																	>
+																		<div class="svg-thumb-container" style="width: 60px; height: 60px; overflow: hidden; pointer-events: none;">
+																			{!! $customerReviewSvg !!}
+																		</div>
+																	</button>
+																</div>
+															@endif
+														</div>
+														<div class="text-xs text-gray-400 mt-1">Click to view front & back designs</div>
+													</div>
 												@endif
 												<div>
 													<strong>{{ data_get($item, 'name', 'Custom product') }}</strong>
@@ -2133,6 +2398,16 @@
 								@endif
 							</dd>
 						</div>
+						<div>
+							<dt>Total paid (customer lifetime)</dt>
+							<dd>
+								@if(!empty($customerLifetimePaid) && $customerLifetimePaid > 0)
+									{{ $currencySymbol . number_format($customerLifetimePaid, 2) }}
+								@else
+									<span>—</span>
+								@endif
+							</dd>
+						</div>
 					</dl>
 
 					<div class="ordersummary-address-grid">
@@ -2267,6 +2542,61 @@
 				@endif
 			</article> 
 
+			@php
+				// Get materials that have been deducted from inventory for this order
+				$deductedMaterials = \App\Models\ProductMaterial::where('order_id', $orderModel->id)
+					->where('source_type', 'custom')
+					->where('quantity_used', '>', 0)
+					->with('material')
+					->get()
+					->map(function ($pm) {
+						return [
+							'material_name' => $pm->material->material_name ?? 'Unknown Material',
+							'quantity_used' => $pm->quantity_used,
+							'unit' => $pm->unit,
+							'material_id' => $pm->material_id,
+						];
+					});
+			@endphp
+
+			@if($deductedMaterials->isNotEmpty())
+				<article class="ordersummary-card">
+					<header class="ordersummary-card__header">
+						<h2>Materials Used & Deducted</h2>
+						<p class="ordersummary-card__meta">{{ $deductedMaterials->count() }} {{ \Illuminate\Support\Str::plural('material', $deductedMaterials->count()) }} deducted from inventory</p>
+						<div class="ordersummary-card__actions">
+							<button type="button" class="btn btn-primary btn-sm" onclick="deductMaterials({{ $orderModel->id }})">
+								<i class="fi fi-rr-minus-circle" aria-hidden="true"></i> Deduct Materials Again
+							</button>
+						</div>
+					</header>
+					<div class="materials-grid">
+						@foreach($deductedMaterials as $material)
+							<div class="material-card material-card--deducted">
+								<span class="material-card__type">Deducted</span>
+								<h3 class="material-card__title">{{ $material['material_name'] }}</h3>
+								<p class="material-card__quantity"><strong>{{ number_format($material['quantity_used'], 2) }}</strong> {{ $material['unit'] }} used</p>
+							</div>
+						@endforeach
+					</div>
+				</article>
+			@else
+				<article class="ordersummary-card">
+					<header class="ordersummary-card__header">
+						<h2>Materials Used & Deducted</h2>
+						<p class="ordersummary-card__meta">No materials have been deducted yet</p>
+						<div class="ordersummary-card__actions">
+							<button type="button" class="btn btn-primary btn-sm" onclick="deductMaterials({{ $orderModel->id }})">
+								<i class="fi fi-rr-minus-circle" aria-hidden="true"></i> Deduct Materials
+							</button>
+						</div>
+					</header>
+					<div style="padding: 20px; text-align: center; color: #6b7280;">
+						<p style="margin: 0; font-size: 16px;">Materials will be deducted from inventory when this order is finalized.</p>
+					</div>
+				</article>
+			@endif
+
 		</section>
 
 		<aside
@@ -2305,13 +2635,17 @@
 						return $currencySymbol . number_format($numeric, 2);
 					};
 					$orderGrandTotal = isset($orderGrandTotalAmount) ? $orderGrandTotalAmount : (float) ($paymentsSummary->get('grand_total') ?? ($grandTotal ?? 0));
-					$totalPaid = isset($totalPaidAmount) ? $totalPaidAmount : (float) ($paymentsSummary->get('total_paid') ?? $payments->reduce(function ($carry, $paymentRow) {
-						$status = strtolower((string) data_get($paymentRow, 'status', 'pending'));
-						if ($status === 'paid') {
-							return $carry + (float) data_get($paymentRow, 'amount', 0);
-						}
-						return $carry;
-					}, 0.0));
+					// Final paid amount decision: prefer earlier computed $totalPaidAmount (which already prefers model),
+					// otherwise fall back to summing payments collection.
+					$totalPaid = isset($totalPaidAmount)
+						? $totalPaidAmount
+						: (float) ($paymentsSummary->get('total_paid') ?? $payments->reduce(function ($carry, $paymentRow) {
+							$status = strtolower((string) data_get($paymentRow, 'status', 'pending'));
+							if ($status === 'paid') {
+								return $carry + (float) data_get($paymentRow, 'amount', 0);
+							}
+							return $carry;
+						}, 0.0));
 					$balanceDue = isset($balanceDueAmount) ? $balanceDueAmount : (float) ($paymentsSummary->get('balance_due') ?? max($orderGrandTotal - $totalPaid, 0));
 					$latestPaymentAtRaw = $paymentsSummary->get('latest_payment_at');
 					$latestPaymentAt = null;
@@ -2914,5 +3248,358 @@ document.addEventListener('DOMContentLoaded', function () {
 		}
 	});
 });
+</script>
+
+<style>
+/* SVG Thumbnail Styles */
+.svg-thumb-container svg {
+	width: 100%;
+	height: 100%;
+	max-width: 60px;
+	max-height: 60px;
+	object-fit: contain;
+}
+
+.item-cell__svg-button:hover {
+	border-color: #a6b7ff !important;
+}
+
+/* Admin SVG Preview Modal */
+.admin-svg-modal {
+	position: fixed;
+	inset: 0;
+	z-index: 9999;
+	display: none;
+	align-items: center;
+	justify-content: center;
+	background: rgba(0, 0, 0, 0.8);
+	padding: 1rem;
+}
+
+.admin-svg-modal.active {
+	display: flex;
+}
+
+.admin-svg-modal__frame {
+	position: relative;
+	max-width: 900px;
+	width: 100%;
+	max-height: 90vh;
+	background: #fff;
+	border-radius: 16px;
+	box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+}
+
+.admin-svg-modal__header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 1rem 1.5rem;
+	border-bottom: 1px solid #e5e7eb;
+}
+
+.admin-svg-modal__header h3 {
+	margin: 0;
+	font-size: 1.125rem;
+	font-weight: 600;
+	color: #111827;
+}
+
+.admin-svg-modal__view-label {
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: #7c3aed;
+	background: #ede9fe;
+	padding: 0.25rem 0.75rem;
+	border-radius: 9999px;
+	margin-left: 0.75rem;
+}
+
+.admin-svg-modal__close {
+	width: 2.5rem;
+	height: 2.5rem;
+	border-radius: 50%;
+	background: #f3f4f6;
+	border: none;
+	cursor: pointer;
+	font-size: 1.5rem;
+	line-height: 1;
+	color: #6b7280;
+	transition: all 0.2s;
+}
+
+.admin-svg-modal__close:hover {
+	background: #e5e7eb;
+	color: #111827;
+}
+
+.admin-svg-modal__body {
+	flex: 1;
+	overflow: auto;
+	padding: 1.5rem;
+	background: #f8fafc;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	position: relative;
+	min-height: 400px;
+}
+
+.admin-svg-modal__content {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.admin-svg-modal__content svg {
+	max-width: 100%;
+	max-height: 70vh;
+	width: auto;
+	height: auto;
+}
+
+.admin-svg-modal__content img {
+	max-width: 100%;
+	max-height: 70vh;
+	width: auto;
+	height: auto;
+	object-fit: contain;
+	border-radius: 8px;
+}
+
+.admin-svg-modal__nav {
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 2.5rem;
+	height: 2.5rem;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, 0.9);
+	border: none;
+	cursor: pointer;
+	box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: #374151;
+	transition: all 0.2s;
+	z-index: 10;
+}
+
+.admin-svg-modal__nav:hover {
+	background: #fff;
+	box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.admin-svg-modal__nav--prev {
+	left: 0.5rem;
+}
+
+.admin-svg-modal__nav--next {
+	right: 0.5rem;
+}
+
+.admin-svg-modal__nav.hidden {
+	display: none;
+}
+</style>
+
+<script>
+// Admin SVG Preview Modal for edited templates
+(function() {
+	// Create modal structure
+	const modal = document.createElement('div');
+	modal.className = 'admin-svg-modal';
+	modal.id = 'admin-svg-preview-modal';
+	
+	modal.innerHTML = `
+		<div class="admin-svg-modal__frame">
+			<div class="admin-svg-modal__header">
+				<div style="display: flex; align-items: center;">
+					<h3 id="admin-svg-modal-title">Edited Design</h3>
+					<span class="admin-svg-modal__view-label" id="admin-svg-view-label">Front</span>
+				</div>
+				<button type="button" class="admin-svg-modal__close" id="admin-svg-modal-close">&times;</button>
+			</div>
+			<div class="admin-svg-modal__body">
+				<button type="button" class="admin-svg-modal__nav admin-svg-modal__nav--prev hidden" id="admin-svg-prev">
+					<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+					</svg>
+				</button>
+				<div class="admin-svg-modal__content" id="admin-svg-content"></div>
+				<button type="button" class="admin-svg-modal__nav admin-svg-modal__nav--next hidden" id="admin-svg-next">
+					<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+					</svg>
+				</button>
+			</div>
+		</div>
+	`;
+	
+	document.body.appendChild(modal);
+	
+	const contentEl = document.getElementById('admin-svg-content');
+	const titleEl = document.getElementById('admin-svg-modal-title');
+	const viewLabelEl = document.getElementById('admin-svg-view-label');
+	const closeBtn = document.getElementById('admin-svg-modal-close');
+	const prevBtn = document.getElementById('admin-svg-prev');
+	const nextBtn = document.getElementById('admin-svg-next');
+	
+	let state = {
+		currentView: 0, // 0 = front (SVG), 1 = back (image)
+		svgContent: '',
+		backImageUrl: ''
+	};
+	
+	function updateView() {
+		if (state.currentView === 0) {
+			contentEl.innerHTML = state.svgContent;
+			viewLabelEl.textContent = 'Front';
+		} else {
+			if (state.backImageUrl) {
+				contentEl.innerHTML = `<img src="${state.backImageUrl}" alt="Back view" />`;
+			} else {
+				contentEl.innerHTML = '<div style="color: #9ca3af; text-align: center; padding: 2rem;">Back view not available</div>';
+			}
+			viewLabelEl.textContent = 'Back';
+		}
+		updateNavButtons();
+	}
+	
+	function updateNavButtons() {
+		const hasBack = !!state.backImageUrl;
+		prevBtn.classList.toggle('hidden', state.currentView === 0);
+		nextBtn.classList.toggle('hidden', state.currentView === 1 || !hasBack);
+	}
+	
+	function openModal(svgContent, backUrl, title) {
+		state.svgContent = svgContent;
+		state.backImageUrl = backUrl || '';
+		state.currentView = 0;
+		
+		if (title) {
+			titleEl.textContent = title;
+		}
+		
+		updateView();
+		modal.classList.add('active');
+		document.body.style.overflow = 'hidden';
+	}
+	
+	function closeModal() {
+		modal.classList.remove('active');
+		document.body.style.overflow = '';
+		contentEl.innerHTML = '';
+		state.svgContent = '';
+		state.backImageUrl = '';
+		state.currentView = 0;
+	}
+	
+	// Event listeners
+	closeBtn.addEventListener('click', closeModal);
+	
+	modal.addEventListener('click', function(e) {
+		if (e.target === modal) {
+			closeModal();
+		}
+	});
+	
+	prevBtn.addEventListener('click', function() {
+		if (state.currentView > 0) {
+			state.currentView = 0;
+			updateView();
+		}
+	});
+	
+	nextBtn.addEventListener('click', function() {
+		if (state.currentView < 1 && state.backImageUrl) {
+			state.currentView = 1;
+			updateView();
+		}
+	});
+	
+	document.addEventListener('keydown', function(e) {
+		if (!modal.classList.contains('active')) return;
+		
+		if (e.key === 'Escape') {
+			closeModal();
+			return;
+		}
+		
+		if (e.key === 'ArrowLeft' && state.currentView > 0) {
+			state.currentView = 0;
+			updateView();
+		}
+		
+		if (e.key === 'ArrowRight' && state.currentView < 1 && state.backImageUrl) {
+			state.currentView = 1;
+			updateView();
+		}
+	});
+	
+	// Attach click handlers to SVG preview triggers
+	document.querySelectorAll('.js-admin-svg-preview-trigger').forEach(function(trigger) {
+		trigger.addEventListener('click', function() {
+			const svgBase64 = trigger.getAttribute('data-svg-content');
+			const backUrl = trigger.getAttribute('data-back-image') || '';
+			const title = trigger.getAttribute('data-preview-title') || 'Edited Design';
+			
+			if (!svgBase64) return;
+			
+			try {
+				const svgContent = atob(svgBase64);
+				openModal(svgContent, backUrl, title);
+			} catch (err) {
+				console.error('Failed to decode SVG content', err);
+			}
+		});
+	});
+})();
+
+// Function to handle material deduction
+function deductMaterials(orderId) {
+	if (!confirm('Are you sure you want to deduct materials from inventory for this order? This action cannot be undone.')) {
+		return;
+	}
+
+	const button = event.target.closest('button');
+	const originalText = button.innerHTML;
+	
+	// Disable button and show loading
+	button.disabled = true;
+	button.innerHTML = '<i class="fi fi-rr-spinner" aria-hidden="true"></i> Processing...';
+
+	fetch(`/ordersummary/${orderId}/deduct-materials`, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+		}
+	})
+	.then(response => response.json())
+	.then(data => {
+		if (data.success) {
+			alert('Materials have been successfully deducted from inventory.');
+			// Reload the page to show updated material usage
+			window.location.reload();
+		} else {
+			alert('Failed to deduct materials: ' + (data.message || 'Unknown error'));
+			// Re-enable button
+			button.disabled = false;
+			button.innerHTML = originalText;
+		}
+	})
+	.catch(error => {
+		console.error('Error:', error);
+		alert('An error occurred while deducting materials. Please try again.');
+		// Re-enable button
+		button.disabled = false;
+		button.innerHTML = originalText;
+	});
+}
 </script>
 @endsection

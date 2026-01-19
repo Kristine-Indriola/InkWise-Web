@@ -22,14 +22,16 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap" onerror="console.warn('Google Fonts failed to load')">
 
-    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css">
-    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-solid-rounded/css/uicons-solid-rounded.css">
-    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-solid-straight/css/uicons-solid-straight.css">
-    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-brands/css/uicons-brands.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <script src="https://kit.fontawesome.com/eb0420111f.js" crossorigin="anonymous"></script>
+    {{-- Flaticon icons - with error handling --}}
+    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css" onerror="this.onerror=null; console.warn('Flaticon regular-rounded failed to load')">
+    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-solid-rounded/css/uicons-solid-rounded.css" onerror="this.onerror=null; console.warn('Flaticon solid-rounded failed to load')">
+    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-solid-straight/css/uicons-solid-straight.css" onerror="this.onerror=null; console.warn('Flaticon solid-straight failed to load')">
+    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-brands/css/uicons-brands.css" onerror="this.onerror=null; console.warn('Flaticon brands failed to load')">
+    
+    {{-- Font Awesome - local installation --}}
+    <link rel="stylesheet" href="{{ asset('assets/fontawesome/css/all.min.css') }}" onerror="console.warn('Font Awesome local failed to load')">
 
     <style>
         :root {
@@ -37,10 +39,56 @@
         }
 
         body {
-            margin: 0;3
+            margin: 0;
             font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
             background: #f8fafc;
             color: #0f172a;
+        }
+
+        /* Polished builder shell */
+        #template-builder-app {
+            background: radial-gradient(circle at 10% 10%, #e0f2fe 0, #f8fafc 28%, #f8fafc 100%);
+        }
+
+        .builder-topbar {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+            box-shadow: 0 12px 35px rgba(15, 23, 42, 0.08);
+            padding: 12px 18px;
+        }
+
+        .builder-workspace {
+            gap: 18px;
+            padding: 18px;
+        }
+
+        .builder-canvas-column {
+            background: #ffffff;
+            border-radius: 18px;
+            box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+            border: 1px solid #e2e8f0;
+            padding: 18px;
+        }
+
+        .builder-right-column {
+            background: #ffffff;
+            border-radius: 18px;
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+            border: 1px solid #e2e8f0;
+            padding: 16px;
+        }
+
+        .builder-btn {
+            border-radius: 12px !important;
+            font-weight: 600;
+        }
+
+        .builder-btn--primary {
+            box-shadow: 0 12px 28px rgba(59, 130, 246, 0.22);
         }
 
         .builder-loading-shell {
@@ -96,6 +144,36 @@
     @endif
 
     @vite(['resources/js/staff/template-editor/main.jsx'])
+
+    {{-- Detect stylesheet loading failures --}}
+    <script>
+        window.addEventListener('error', function(e) {
+            if (e.target.tagName === 'LINK' && e.target.rel === 'stylesheet') {
+                console.error('❌ Failed to load stylesheet:', e.target.href);
+                console.error('This may affect icon display or styling');
+            }
+        }, true);
+        
+        // Log successful stylesheet loads in dev mode
+        @if (app()->environment('local'))
+        document.addEventListener('DOMContentLoaded', function() {
+            const stylesheets = document.querySelectorAll('link[rel="stylesheet"]');
+            let loaded = 0;
+            let failed = 0;
+            
+            stylesheets.forEach(function(link) {
+                if (link.sheet) {
+                    loaded++;
+                } else {
+                    failed++;
+                    console.warn('⚠️  Stylesheet may not have loaded:', link.href);
+                }
+            });
+            
+            console.log('Stylesheets loaded: ' + loaded + '/' + (loaded + failed));
+        });
+        @endif
+    </script>
 </head>
 <body class="h-full bg-slate-100 text-slate-900 antialiased">
     <div
@@ -131,6 +209,12 @@
                 'design' => $designPayload,
                 'status' => $template->status ?? null,
                 'slug' => $template->slug ?? null,
+                'width_inch' => $template->width_inch,
+                'height_inch' => $template->height_inch,
+                'fold_type' => $template->fold_type,
+                'preview_front' => $template->preview_front ? \App\Support\ImageResolver::url($template->preview_front) : null,
+                'preview_back' => $template->preview_back ? \App\Support\ImageResolver::url($template->preview_back) : null,
+                'svg_path' => $template->svg_path ? \App\Support\ImageResolver::url($template->svg_path) : null,
                 'updated_at' => optional($template->updated_at)->toIso8601String(),
             ],
             'routes' => [
@@ -140,6 +224,7 @@
                 'saveTemplate' => route('staff.templates.saveTemplate', $template->id),
                 'saveCanvas' => route('staff.templates.saveCanvas', $template->id),
                 'saveSvg' => route('staff.templates.saveSvg', $template->id),
+                'saveDesign' => route('staff.templates.saveDesign', $template->id),
                 'uploadPreview' => route('staff.templates.uploadPreview', $template->id),
                 'saveVersion' => route('staff.templates.saveVersion', $template->id),
                 'loadDesign' => route('staff.templates.loadDesign', $template->id),
@@ -152,12 +237,73 @@
             'flags' => [
                 'betaMockupPreview' => (bool) config('services.inkwise.enable_mockup_preview', false),
                 'enableFilters' => true,
+                // Keep manual save available in the builder UI
+                'disableManualSave' => false,
             ],
             'user' => [
                 'id' => auth()->id(),
                 'name' => optional(auth()->user())->name,
             ],
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) !!}
+    </script>
+
+    <button
+        id="inkwiseSaveTemplateButton"
+        type="button"
+        style="position: fixed; right: 18px; top: 18px; z-index: 50; padding: 10px 16px; border-radius: 10px; border: none; background: #2563eb; color: #fff; font-weight: 700; box-shadow: 0 10px 30px rgba(37, 99, 235, 0.35); cursor: pointer;"
+    >
+        Save Template
+    </button>
+
+    <script>
+        (() => {
+            const btn = document.getElementById('inkwiseSaveTemplateButton');
+            if (!btn) return;
+
+            const templateId = Number(document.getElementById('template-builder-app')?.dataset?.templateId || 0);
+            const bootstrapEl = document.getElementById('inkwise-builder-bootstrap');
+            const bootstrapJson = bootstrapEl ? JSON.parse(bootstrapEl.textContent || '{}') : {};
+            const saveUrl = bootstrapJson?.routes?.saveDesign;
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+            const ensureAxios = () => new Promise((resolve, reject) => {
+                if (window.axios) return resolve(window.axios);
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js';
+                script.onload = () => resolve(window.axios);
+                script.onerror = () => reject(new Error('Failed to load axios'));
+                document.head.appendChild(script);
+            });
+
+            const withLoading = (isLoading) => {
+                btn.disabled = isLoading;
+                btn.textContent = isLoading ? 'Saving…' : 'Save Template';
+                btn.style.opacity = isLoading ? '0.7' : '1';
+            };
+
+            btn.addEventListener('click', async () => {
+                if (!saveUrl || !templateId) {
+                    console.error('Save URL or template ID missing');
+                    return;
+                }
+
+                const runner = window.inkwiseSaveTemplate;
+                if (typeof runner !== 'function') {
+                    alert('Canvas not ready yet. Please wait for the editor to finish loading.');
+                    return;
+                }
+
+                withLoading(true);
+                try {
+                    await runner({});
+                } catch (error) {
+                    console.error('Save template request failed', error);
+                    alert('Save failed. Please try again.');
+                } finally {
+                    withLoading(false);
+                }
+            });
+        })();
     </script>
 </body>
 </html>

@@ -51,7 +51,7 @@ export function PreviewModal({ isOpen, onClose }) {
 		return null;
 	}
 
-	const activePage = pages.find((page) => page.id === state.activePageId) ?? pages[0];
+	const activePage = pages?.find((page) => page.id === state.activePageId) ?? pages?.[0];
 	const safeZone = resolveInsets(activePage.safeZone);
 	const bleed = resolveInsets(activePage.bleed);
 	const hasSafeZone = Object.values(safeZone).some((value) => value > 0);

@@ -663,7 +663,7 @@
     <!-- Custom CSS -->
 
     <link rel="stylesheet" href="{{ asset('css/customer/customer.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/customer/customertemplates.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/customer/customertemplate.css') }}">
     <link rel="stylesheet" href="{{ asset('css/customer/template.css') }}">
 
     <!-- Custom JS -->

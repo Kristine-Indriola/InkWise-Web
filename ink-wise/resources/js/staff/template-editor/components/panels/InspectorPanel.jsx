@@ -229,13 +229,20 @@ const DEFAULT_FONT_OPTIONS = [
 
 const DEFAULT_FONT_MAP = new Map(DEFAULT_FONT_OPTIONS.map((font) => [font.family, font]));
 
+const FOLD_TYPES = [
+  { value: 'bifold', label: 'Bi-Fold' },
+  { value: 'gatefold', label: 'Gate-Fold' },
+  { value: 'zfold', label: 'Z-Fold' },
+];
+
 export function InspectorPanel() {
   const { state, dispatch } = useBuilderStore();
-  const activePage = state.pages.find((page) => page.id === state.activePageId) ?? state.pages[0];
+  const activePage = state.pages?.find((page) => page.id === state.activePageId) ?? state.pages?.[0];
+  const hidePageSection = String(state.template?.id) === '112';
   const safeInsets = useMemo(() => resolveInsets(activePage?.safeZone), [activePage?.safeZone]);
   const selectedLayer = useMemo(() => {
     if (!activePage) return null;
-    return activePage.nodes.find((node) => node.id === state.selectedLayerId) ?? null;
+    return activePage.nodes?.find((node) => node.id === state.selectedLayerId) ?? null;
   }, [activePage, state.selectedLayerId]);
   const selectedLayerSide = selectedLayer?.side ?? 'front';
 
@@ -796,6 +803,11 @@ export function InspectorPanel() {
       setEditingPageName('');
     }
   };
+
+  const handleFoldTypeChange = (event) => {
+    const foldType = event.target.value;
+    dispatch({ type: 'UPDATE_TEMPLATE_PROPS', props: { fold_type: foldType } });
+  };
   const handleLayerChange = (props) => {
     if (!selectedLayer) {
       return;
@@ -949,8 +961,52 @@ export function InspectorPanel() {
     handleLayerChange({ borderRadius: Math.max(0, nextValue) });
   };
 
+  const textAreaRef = useRef(null);
+
+  const updateTextContentWithResize = (contentValue) => {
+    if (!selectedLayer || !activePage) return;
+
+    const fontSize = Number(selectedLayer.fontSize) || 48;
+    const lineHeightPx = fontSize * 1.2;
+    const lineCount = Math.max(1, contentValue.split('\n').length);
+    const paddingY = 16; // matches ~0.5rem top/bottom padding on canvas text
+    const nextHeight = Math.max(
+      Math.round(lineCount * lineHeightPx + paddingY),
+      Math.round(lineHeightPx + paddingY)
+    );
+
+    const nextFrame = selectedLayer.frame
+      ? { ...selectedLayer.frame, height: nextHeight }
+      : null;
+
+    handleLayerChange({
+      content: contentValue,
+      ...(nextFrame ? { frame: nextFrame } : {}),
+    });
+  };
+
   const handleTextContentChange = (event) => {
-    handleLayerChange({ content: event.target.value });
+    updateTextContentWithResize(event.target.value);
+  };
+
+  const handleTextNext = () => {
+    if (!selectedLayer || !activePage) return;
+
+    const currentContent = selectedLayer.content ?? '';
+    const nextContent = currentContent.endsWith('\n')
+      ? currentContent
+      : `${currentContent}\n`;
+
+    updateTextContentWithResize(nextContent);
+
+    // keep typing on a new line in the same textbox
+    requestAnimationFrame(() => {
+      const el = textAreaRef.current;
+      if (!el) return;
+      const cursorPos = nextContent.length;
+      el.focus();
+      el.setSelectionRange(cursorPos, cursorPos);
+    });
   };
 
   const handleFontSizeChange = (event) => {
@@ -1234,10 +1290,6 @@ export function InspectorPanel() {
       return;
     }
 
-    const confirmed = window.confirm(`Delete "${selectedLayer.name}"? You can undo this action if needed.`);
-    if (!confirmed) {
-      return;
-    }
     dispatch({ type: 'REMOVE_LAYER', pageId: activePage.id, layerId: selectedLayer.id });
   };
 
@@ -1328,35 +1380,70 @@ export function InspectorPanel() {
     </div>
   );
 
-  const renderPageSection = () => (
-    <div className="inspector-panel__group">
-      <div className="inspector-section__header">
-        <h3>Page</h3>
-        <span className="inspector-section__meta">{activePage.width} × {activePage.height}px</span>
+  const renderPageSection = () => {
+    if (hidePageSection) return null;
+    return (
+      <div className="inspector-panel__group">
+        <div className="inspector-section__header">
+          <h3>Page</h3>
+          <span className="inspector-section__meta">{activePage.width} × {activePage.height}px</span>
+        </div>
+        <div className="inspector-field" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <label className="inspector-field" style={{ margin: 0 }}>
+            <span className="inspector-field__label">Background</span>
+            <input
+              type="color"
+              className="inspector-field__control inspector-field__control--color"
+              value={normalizeColorInput(activePage.background, '#ffffff')}
+              onChange={handlePageBackgroundChange}
+              aria-label="Page background color"
+            />
+          </label>
+          {typeof activePage.background === 'string' && activePage.background.includes('gradient') && (
+            <div className="inspector-field" style={{ margin: 0 }}>
+              <span className="inspector-field__label">Gradient preview</span>
+              <div
+                aria-label="Canvas background gradient preview"
+                style={{
+                  borderRadius: '0.75rem',
+                  border: '1px solid #e2e8f0',
+                  background: activePage.background,
+                  minHeight: 64,
+                  width: '100%',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.6)',
+                }}
+              />
+            </div>
+          )}
+          <label className="inspector-field" style={{ margin: 0 }}>
+            <span className="inspector-field__label">Fold Type</span>
+            <select
+              className="inspector-field__control"
+              value={state.template?.fold_type || ''}
+              onChange={handleFoldTypeChange}
+              aria-label="Fold type"
+            >
+              <option value="">No Fold</option>
+              {FOLD_TYPES.map((fold) => (
+                <option key={fold.value} value={fold.value}>
+                  {fold.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="builder-btn inspector-btn"
+            onClick={handleToggleShapePalette}
+            ref={shapeButtonRef}
+            style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem', height: 'auto', alignSelf: 'flex-start' }}
+          >
+            SHAPES
+          </button>
+        </div>
       </div>
-      <div className="inspector-field" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        <label className="inspector-field" style={{ margin: 0 }}>
-          <span className="inspector-field__label">Background</span>
-          <input
-            type="color"
-            className="inspector-field__control inspector-field__control--color"
-            value={normalizeColorInput(activePage.background, '#ffffff')}
-            onChange={handlePageBackgroundChange}
-            aria-label="Page background color"
-          />
-        </label>
-        <button
-          type="button"
-          className="builder-btn inspector-btn"
-          onClick={handleToggleShapePalette}
-          ref={shapeButtonRef}
-          style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem', height: 'auto', alignSelf: 'flex-start' }}
-        >
-          SHAPES
-        </button>
-      </div>
-    </div>
-  );
+    );
+  };
 
 
   const renderPositionSection = () => {
@@ -1602,12 +1689,25 @@ export function InspectorPanel() {
           <div className="inspector-section__content">
             <label className="inspector-field">
               <span className="inspector-field__label">Content</span>
-              <textarea
-                className="inspector-field__control inspector-field__control--textarea"
-                value={selectedLayer.content ?? ''}
-                onChange={handleTextContentChange}
-                rows={3}
-              />
+              <div className="inspector-field__textarea-group">
+                <textarea
+                  ref={textAreaRef}
+                  className="inspector-field__control inspector-field__control--textarea"
+                  value={selectedLayer.content ?? ''}
+                  onChange={handleTextContentChange}
+                  rows={3}
+                  placeholder="Enter your text here..."
+                />
+                <button
+                  type="button"
+                  className="inspector-field__next-btn"
+                  onClick={handleTextNext}
+                  title="Save current row and move to next"
+                  aria-label="Add next text row"
+                >
+                  Next
+                </button>
+              </div>
             </label>
             <label className="inspector-field">
               <span className="inspector-field__label">Font</span>
@@ -1890,6 +1990,48 @@ export function InspectorPanel() {
                 <span className="inspector-field__value">{saturation}%</span>
               </label>
             </div>
+
+            <div className="inspector-field">
+              <span className="inspector-field__label">Image History</span>
+              <div className="inspector-segmented inspector-segmented--compact" role="group" aria-label="Navigate image history">
+                <button
+                  type="button"
+                  className="inspector-segmented__option"
+                  onClick={() => dispatch({ type: 'NAVIGATE_IMAGE_HISTORY', layerId: selectedLayer.id, direction: 'BACK' })}
+                  title="Move to previous image state"
+                >
+                  <i className="fa-solid fa-backward" aria-hidden="true"></i>
+                  <span>Back</span>
+                </button>
+                <button
+                  type="button"
+                  className="inspector-segmented__option"
+                  onClick={() => dispatch({ type: 'NAVIGATE_IMAGE_HISTORY', layerId: selectedLayer.id, direction: 'BACKWARD' })}
+                  title="Move one step back in history"
+                >
+                  <i className="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                  <span>Backward</span>
+                </button>
+                <button
+                  type="button"
+                  className="inspector-segmented__option"
+                  onClick={() => dispatch({ type: 'NAVIGATE_IMAGE_HISTORY', layerId: selectedLayer.id, direction: 'FORWARD' })}
+                  title="Move one step forward in history"
+                >
+                  <i className="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                  <span>Forward</span>
+                </button>
+                <button
+                  type="button"
+                  className="inspector-segmented__option"
+                  onClick={() => dispatch({ type: 'NAVIGATE_IMAGE_HISTORY', layerId: selectedLayer.id, direction: 'FRONT' })}
+                  title="Move to latest image state"
+                >
+                  <i className="fa-solid fa-forward" aria-hidden="true"></i>
+                  <span>Front</span>
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -1991,7 +2133,6 @@ export function InspectorPanel() {
 
         <div className="inspector-panel__body inspector-panel__body--unified">
           {renderPagesSection()}
-          {renderPageSection()}
           {selectedLayer ? (
             <>
               {renderPositionSection()}

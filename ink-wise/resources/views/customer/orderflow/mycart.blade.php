@@ -18,13 +18,13 @@
         body { font-family: 'Poppins', system-ui, -apple-system, sans-serif; }
         .glass-card { backdrop-filter: blur(10px); background: rgba(255, 255, 255, 0.82); }
         .fade-border { border: 1px solid rgba(15, 23, 42, 0.08); box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12); }
+        /* SVG container styling for thumbnails */
+        .svg-container svg { width: 100%; height: 100%; object-fit: cover; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900"
     data-envelope-total="{{ $envelopeTotalCalc ?? 0 }}"
-    data-giveaway-total="{{ $giveawayTotalCalc ?? 0 }}"
-    data-shipping="{{ $shipping ?? 0 }}"
-    data-tax="{{ $tax ?? 0 }}">
+    data-giveaway-total="{{ $giveawayTotalCalc ?? 0 }}">
 @php
     $resolveRoute = static function (string $name, string $fallbackPath) {
         try {
@@ -162,7 +162,7 @@
                 'addonItems' => data_get($orderSummary, 'addonItems', data_get($orderSummary, 'addons', [])),
                 'total' => $invitationSubtotal + $paperExtras + $addonsExtra,
                 'preview' => $extractPreview($orderSummary),
-                'previewImages' => data_get($orderSummary, 'previewImages', []),
+                'previewImages' => data_get($orderSummary, 'previewImages', data_get($orderSummary, 'preview_images', [])),
                 'estimated_date' => data_get($orderSummary, 'estimated_date') ?? data_get($orderSummary, 'dateNeeded'),
                 'estimated_date_label' => data_get($orderSummary, 'dateNeededLabel') ?? data_get($orderSummary, 'estimated_date_label'),
                 'is_preorder' => data_get($orderSummary, 'metadata.final_step.is_preorder') ?? false,
@@ -202,19 +202,15 @@
         }
 
         $qty = $extractQty($item);
-        $unit = data_get($item, 'unitPrice')
-            ?? data_get($item, 'unit_price')
-            ?? data_get($item, 'price')
-            ?? data_get($item, 'paperStockPrice')
-            ?? data_get($item, 'paper_stock_price')
-            ?? 0;
+        $basePrice = data_get($item, 'basePricePerPiece') ?? 0;
+        $paperPrice = data_get($item, 'paperStockPrice') ?? 0;
 
-        return max(0, $qty * (float) $unit);
+        return max(0, $qty * ((float) $basePrice + (float) $paperPrice));
     };
 
     $invitationTotalCalc = $invitationItems->sum(fn ($item) => $computeInvitationTotal($item));
     if ($invitationTotalCalc <= 0) {
-        $invitationTotalCalc = $invitationSubtotal + $paperExtras + $addonsExtra;
+        $invitationTotalCalc = $paperExtras;
     }
 
     $envelopeTotalCalc = $envelopeItems->sum(fn ($item) => $extractTotal($item));
@@ -227,7 +223,14 @@
         $giveawayTotalCalc = $giveawayTotal;
     }
 
-    $grandTotal = $invitationTotalCalc + $envelopeTotalCalc + $giveawayTotalCalc + $shipping + $tax;
+    $grandTotal = $invitationTotalCalc + $envelopeTotalCalc + $giveawayTotalCalc;
+
+    // Always use the calculated total from items for accuracy
+    // Removed overrides with sessionTotalAmount and order->grandTotalAmount() to ensure consistency
+
+    // Calculate the amount to be paid (remaining balance)
+    $paidAmount = $order ? round($order->totalPaid(), 2) : 0;
+    $amountToPay = max($grandTotal - $paidAmount, 0);
 @endphp
 
     @include('partials.topbar')
@@ -258,7 +261,7 @@
                         sessionStorage.setItem('order_summary_payload', sessionData);
                     }
                     
-                    // Sync to server
+                    // Always sync to server
                     fetch('{{ route("order.summary.sync") }}', {
                         method: 'POST',
                         headers: {
@@ -270,15 +273,70 @@
                         body: JSON.stringify({ summary: summary })
                     }).then(response => {
                         if (response.ok) {
-                            // Reload page to show synced data
-                            if (!window.location.href.includes('synced=1')) {
-                                window.location.href = window.location.href + (window.location.href.includes('?') ? '&' : '?') + 'synced=1';
-                            }
+                            return response.json().then(data => {
+                                // Check if this is first visit (no synced param) - need to reload
+                                if (!window.location.href.includes('synced=1')) {
+                                    window.location.href = window.location.href + (window.location.href.includes('?') ? '&' : '?') + 'synced=1';
+                                    return;
+                                }
+                                
+                                // Already has synced=1, check if displayed quantity matches what we just synced
+                                // If not, we need to reload to show the updated quantity
+                                const displayedQty = document.querySelector('[data-invitation-qty]')?.dataset?.invitationQty;
+                                const syncedQty = data.summary?.quantity;
+                                if (displayedQty && syncedQty && parseInt(displayedQty) !== parseInt(syncedQty)) {
+                                    // Quantity on page doesn't match what we synced - reload
+                                    window.location.reload();
+                                }
+                            });
                         }
                     }).catch(err => console.warn('Failed to sync session data:', err));
                 }
             } catch (err) {
                 console.warn('Error syncing session data:', err);
+            }
+        })();
+    </script>
+
+    <script>
+        // If the browser has a saved edited template, apply its preview to the order cards
+        (function () {
+            try {
+                const raw = window.sessionStorage.getItem('inkwise-saved-template') || window.sessionStorage.getItem('inkwise-finalstep');
+                if (!raw) return;
+                const parsed = JSON.parse(raw);
+                // inkwise-finalstep may contain a nested saved template under metadata.template or template
+                let candidate = parsed && parsed.preview ? parsed.preview : null;
+                if (!candidate && parsed && parsed.template) {
+                    candidate = parsed.template.preview || parsed.template.preview_image || parsed.template.previewImage || parsed.template.preview_images && parsed.template.preview_images[0];
+                }
+                if (!candidate && parsed && parsed.metadata && parsed.metadata.template) {
+                    const t = parsed.metadata.template;
+                    candidate = t.preview || t.preview_image || (Array.isArray(t.preview_images) ? t.preview_images[0] : null) || t.previewImage;
+                }
+                if (!candidate && parsed && parsed.previewImage) {
+                    candidate = parsed.previewImage;
+                }
+                if (!candidate && parsed && parsed.preview_images && parsed.preview_images.length) {
+                    candidate = parsed.preview_images[0];
+                }
+                if (!candidate) return;
+
+                // Find order card images and replace with candidate preview
+                const cards = document.querySelectorAll('.bg-white.border.rounded-xl img, .glass-card img');
+                if (!cards || cards.length === 0) return;
+
+                const resolved = candidate;
+                cards.forEach((img) => {
+                    try {
+                        img.src = resolved;
+                        img.closest('a')?.setAttribute('href', resolved);
+                    } catch (e) {
+                        // ignore
+                    }
+                });
+            } catch (e) {
+                console.warn('Apply saved template preview failed', e);
             }
         })();
     </script>
@@ -292,9 +350,7 @@
             </div>
             <div class="flex gap-3">
                      <a href="{{ $finalStepUrl }}" class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-300">Edit design</a>
-                     <a id="checkout-top"
-                         href="{{ $checkoutPaymentUrl }}"
-                         class="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 hover:bg-slate-800">Proceed to checkout</a>
+
             </div>
         </header>
 
@@ -340,13 +396,13 @@
                                 $invPreviewGallery = collect([$invPreview]);
                             }
                             $invUnitPrice = (float) (
-                                data_get($invitation, 'unitPrice')
+                                data_get($invitation, 'paperStockPrice')
+                                ?? data_get($invitation, 'paper_stock_price')
+                                ?? data_get($orderSummary, 'paperStockPrice')
+                                ?? data_get($invitation, 'unitPrice')
                                 ?? data_get($invitation, 'unit_price')
                                 ?? data_get($invitation, 'price')
-                                ?? data_get($invitation, 'paperStockPrice')
-                                ?? data_get($invitation, 'paper_stock_price')
                                 ?? data_get($orderSummary, 'unitPrice')
-                                ?? data_get($orderSummary, 'paperStockPrice')
                                 ?? 0
                             );
                             $invMeta = (array) data_get($invitation, 'metadata', []);
@@ -429,11 +485,21 @@
                         <article class="glass-card fade-border rounded-3xl p-6">
                             <div class="flex items-start justify-between gap-4">
                                 <div class="flex items-start gap-4">
-                                        <div class="h-24 w-24 overflow-hidden rounded-2xl bg-slate-100 shadow-inner">
-                                        <img src="{{ $invPreview ?: $placeholderImage }}"
-                                             alt="Invitation preview"
-                                             class="h-full w-full object-cover js-preview-trigger"
-                                             data-preview-images='@json($invPreviewGallery->values())'>
+                                        <div class="h-24 w-24 overflow-hidden rounded-2xl bg-slate-100 shadow-inner js-preview-trigger cursor-pointer"
+                                             data-preview-images='@json($invPreviewGallery->values())'
+                                             @if(isset($customerReview) && !empty($customerReview->design_svg))
+                                             data-svg-preview="true"
+                                             @endif>
+                                        @if(isset($customerReview) && !empty($customerReview->design_svg))
+                                            {{-- Embed SVG directly - img src doesn't work with SVGs containing external resources --}}
+                                            <div class="svg-container h-full w-full" style="pointer-events: none;">
+                                                {!! $customerReview->design_svg !!}
+                                            </div>
+                                        @else
+                                            <img src="{{ $invPreview ?: $placeholderImage }}"
+                                                 alt="Invitation preview"
+                                                 class="h-full w-full object-cover">
+                                        @endif
                                         </div>
                                     <div>
                                         <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Invitation</p>
@@ -457,7 +523,8 @@
                                                   pattern="[0-9]*"
                                                   class="js-inv-qty w-20 rounded-lg border border-slate-300 px-2 py-1 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
                                                   data-index="{{ $loop->index }}"
-                                                  data-unit="{{ $invUnitPrice }}">
+                                                  data-unit="{{ $invUnitPrice }}"
+                                                  data-invitation-qty="{{ max(10, $invQty) }}">
                                         </label>
                                         @if($invPaper)
                                             <p class="text-slate-600 text-sm">Paper: {{ $invPaper }} @if($invPaperPrice) ({{ $formatMoney($invPaperPrice) }}) @endif</p>
@@ -725,45 +792,33 @@
                                 <dt class="text-slate-600">Giveaways</dt>
                                     <dd class="font-medium text-slate-900" id="summary-give-total">{{ $formatMoney($giveawayTotalCalc) }}</dd>
                             </div>
-                            @if($paperExtras > 0)
-                                <div class="flex items-center justify-between">
-                                    <dt class="text-slate-600">Paper options</dt>
-                                    <dd class="font-medium text-slate-900">{{ $formatMoney($paperExtras) }}</dd>
-                                </div>
-                            @endif
                             @if($addonsExtra > 0)
                                 <div class="flex items-center justify-between">
                                     <dt class="text-slate-600">Add-ons</dt>
                                     <dd class="font-medium text-slate-900">{{ $formatMoney($addonsExtra) }}</dd>
                                 </div>
                             @endif
-                            <div class="flex items-center justify-between">
-                                <dt class="text-slate-600">Shipping</dt>
-                                <dd class="font-medium text-slate-900">{{ $formatMoney($shipping) }}</dd>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <dt class="text-slate-600">Tax</dt>
-                                <dd class="font-medium text-slate-900">{{ $formatMoney($tax) }}</dd>
-                            </div>
+                            @if($paidAmount > 0)
+                                <div class="flex items-center justify-between">
+                                    <dt class="text-slate-600">Amount Paid</dt>
+                                    <dd class="font-medium text-slate-900">{{ $formatMoney($paidAmount) }}</dd>
+                                </div>
+                            @endif
                             <div class="mt-4 flex items-center justify-between text-base font-semibold">
-                                <dt class="text-slate-900">Total due</dt>
-                                <dd class="text-slate-900" id="summary-grand-total">{{ $formatMoney($grandTotal) }}</dd>
+                                <dt class="text-slate-900">Total amount</dt> 
+                                <dd class="text-slate-900" id="summary-grand-total" data-paid-amount="{{ $paidAmount }}">{{ $formatMoney($grandTotal) }}</dd>
                             </div>
+                            @if($paidAmount > 0)
+                                <div class="flex items-center justify-between text-sm">
+                                    <dt class="text-slate-600">Amount Due</dt>
+                                    <dd class="font-medium text-slate-900" data-amount-due>{{ $formatMoney($amountToPay) }}</dd>
+                                </div>
+                            @endif
                         </dl>
                                 <a id="checkout-summary"
                                     href="{{ $checkoutPaymentUrl }}"
                                     class="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 hover:bg-slate-800">Checkout now</a>
                                 <p id="qty-warning" class="mt-3 text-sm text-rose-600 hidden">Minimum quantity per item is 10.</p>
-                    </div>
-
-                    <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-                        <p class="font-semibold text-slate-900">Need to start over?</p>
-                        <p class="mt-1">Clearing your order removes every selection from this summary.</p>
-                        <form method="POST" action="{{ $summaryClearUrl }}" class="mt-3">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="text-rose-600 hover:text-rose-700 font-medium">Clear entire order</button>
-                        </form>
                     </div>
                 </aside>
             </div>
@@ -790,8 +845,12 @@
                 const frame = document.createElement('div');
                 frame.className = 'relative max-w-3xl w-full max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col';
 
+                const contentContainer = document.createElement('div');
+                contentContainer.className = 'w-full h-full flex-1 bg-slate-50 flex items-center justify-center overflow-auto';
+                contentContainer.style.minHeight = '400px';
+
                 const img = document.createElement('img');
-                img.className = 'w-full h-full object-contain bg-slate-50 flex-1';
+                img.className = 'w-full h-full object-contain';
 
                 const closeBtn = document.createElement('button');
                 closeBtn.type = 'button';
@@ -812,22 +871,52 @@
                 nextBtn.className = 'h-9 w-9 rounded-full bg-white/90 text-slate-800 shadow-md border border-slate-200';
 
                 pager.append(prevBtn, nextBtn);
-                frame.append(closeBtn, img, pager);
+                contentContainer.append(img);
+                frame.append(closeBtn, contentContainer, pager);
                 overlay.append(frame);
                 document.body.appendChild(overlay);
 
                 let gallery = [];
+                let svgContent = null;
                 let index = 0;
 
                 const render = () => {
-                    if (!gallery.length) return;
-                    img.src = gallery[index];
+                    // If we have SVG content and we're showing the first image (front), use SVG
+                    if (svgContent && index === 0) {
+                        img.style.display = 'none';
+                        // Check if SVG container already exists
+                        let svgContainer = contentContainer.querySelector('.svg-modal-content');
+                        if (!svgContainer) {
+                            svgContainer = document.createElement('div');
+                            svgContainer.className = 'svg-modal-content w-full h-full flex items-center justify-center';
+                            contentContainer.appendChild(svgContainer);
+                        }
+                        svgContainer.innerHTML = svgContent;
+                        svgContainer.style.display = 'flex';
+                        // Style the SVG to fit
+                        const svgEl = svgContainer.querySelector('svg');
+                        if (svgEl) {
+                            svgEl.style.maxWidth = '100%';
+                            svgEl.style.maxHeight = '80vh';
+                            svgEl.style.width = 'auto';
+                            svgEl.style.height = 'auto';
+                        }
+                    } else {
+                        // Show image
+                        let svgContainer = contentContainer.querySelector('.svg-modal-content');
+                        if (svgContainer) svgContainer.style.display = 'none';
+                        img.style.display = 'block';
+                        if (gallery.length) {
+                            img.src = gallery[index];
+                        }
+                    }
                 };
 
-                const open = (images) => {
+                const open = (images, svg = null) => {
                     gallery = images.filter(Boolean);
+                    svgContent = svg;
                     index = 0;
-                    if (!gallery.length) return;
+                    if (!gallery.length && !svgContent) return;
                     render();
                     overlay.classList.remove('hidden');
                     overlay.classList.add('flex');
@@ -836,6 +925,9 @@
                 const close = () => {
                     overlay.classList.add('hidden');
                     gallery = [];
+                    svgContent = null;
+                    let svgContainer = contentContainer.querySelector('.svg-modal-content');
+                    if (svgContainer) svgContainer.innerHTML = '';
                 };
 
                 prevBtn.addEventListener('click', () => {
@@ -866,8 +958,16 @@
                     trigger.addEventListener('click', () => {
                         try {
                             const images = JSON.parse(trigger.dataset.previewImages || '[]');
-                            if (Array.isArray(images) && images.length) {
-                                open(images);
+                            // Check if this trigger has SVG content (from embedded SVG)
+                            let svgContent = null;
+                            if (trigger.dataset.svgPreview === 'true') {
+                                const svgContainer = trigger.querySelector('.svg-container');
+                                if (svgContainer) {
+                                    svgContent = svgContainer.innerHTML;
+                                }
+                            }
+                            if (Array.isArray(images) && images.length || svgContent) {
+                                open(images, svgContent);
                             }
                         } catch (err) {
                             console.warn('Unable to open preview modal', err);
@@ -995,40 +1095,168 @@
                     if (summaryGive) summaryGive.textContent = formatMoney(giveawayTotal);
 
                     const grand = invitationTotal + envelopeTotal + giveawayTotal + shipping + tax;
+                    const paidAmount = parseFloat(summaryGrand?.dataset?.paidAmount || 0);
+                    const adjustedGrand = grand - paidAmount;
                     if (summaryGrand) {
-                        summaryGrand.textContent = formatMoney(grand);
+                        summaryGrand.textContent = formatMoney(grand); // Show full total
+                    }
+
+                    // Update Amount Due if it exists
+                    const amountDueEl = document.querySelector('dd[data-amount-due]');
+                    if (amountDueEl) {
+                        amountDueEl.textContent = formatMoney(adjustedGrand);
                     }
 
                     setCheckoutEnabled(!hasInvalidQty);
                 };
 
+                // Sync quantities to server
+                const syncQuantitiesToServer = async () => {
+                    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+                    
+                    // Collect all quantities
+                    const invQty = qtyInputs.length > 0 ? Number(qtyInputs[0].value) : null;
+                    
+                    const envelopes = [];
+                    envInputs.forEach((input) => {
+                        envelopes.push({
+                            index: Number(input.dataset.index),
+                            qty: Number(input.value)
+                        });
+                    });
+                    
+                    const giveaways = [];
+                    giveInputs.forEach((input) => {
+                        giveaways.push({
+                            index: Number(input.dataset.index),
+                            qty: Number(input.value)
+                        });
+                    });
+                    
+                    const payload = {};
+                    if (invQty !== null && invQty >= 10) {
+                        payload.invitationQty = invQty;
+                    }
+                    if (envelopes.length > 0) {
+                        payload.envelopes = envelopes;
+                    }
+                    if (giveaways.length > 0) {
+                        payload.giveaways = giveaways;
+                    }
+                    
+                    try {
+                        const response = await fetch('{{ route("order.summary.update-quantity") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrf || ''
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify(payload)
+                        });
+                        
+                        if (!response.ok) {
+                            console.warn('Failed to sync quantities:', response.status);
+                            return false;
+                        }
+                        
+                        const result = await response.json();
+                        console.log('Quantities synced successfully:', result);
+                        
+                        // Update session storage with new summary
+                        if (result.summary) {
+                            try {
+                                try {
+                                    const minSummary = {
+                                        productId: result.summary.productId ?? result.summary.product_id ?? null,
+                                        quantity: result.summary.quantity ?? null,
+                                        paymentMode: result.summary.paymentMode ?? result.summary.payment_mode ?? null,
+                                        totalAmount: result.summary.totalAmount ?? result.summary.total_amount ?? null,
+                                        shippingFee: result.summary.shippingFee ?? result.summary.shipping_fee ?? null,
+                                        order_id: result.summary.order_id ?? result.summary.orderId ?? null,
+                                    };
+                                    window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(minSummary));
+                                    window.sessionStorage.setItem('order_summary_payload', JSON.stringify(minSummary));
+                                } catch (e) {
+                                    console.warn('Failed to update session storage:', e);
+                                }
+                            } catch (e) {
+                                console.warn('Failed to update session storage:', e);
+                            }
+                        }
+                        
+                        return true;
+                    } catch (err) {
+                        console.error('Error syncing quantities:', err);
+                        return false;
+                    }
+                };
+
+                // Debounce helper for auto-sync on quantity change
+                let syncTimeout = null;
+                const debouncedSync = () => {
+                    if (syncTimeout) clearTimeout(syncTimeout);
+                    syncTimeout = setTimeout(() => {
+                        if (!checkoutBlocked) {
+                            syncQuantitiesToServer();
+                        }
+                    }, 800); // Sync after 800ms of no changes
+                };
+
                 qtyInputs.forEach((input) => {
-                    input.addEventListener('input', () => recalc(false));
-                    input.addEventListener('change', () => recalc(true));
+                    input.addEventListener('input', () => { recalc(false); debouncedSync(); });
+                    input.addEventListener('change', () => { recalc(true); debouncedSync(); });
                     input.addEventListener('blur', () => recalc(true));
                 });
 
                 envInputs.forEach((input) => {
-                    input.addEventListener('input', () => recalc(false));
-                    input.addEventListener('change', () => recalc(true));
+                    input.addEventListener('input', () => { recalc(false); debouncedSync(); });
+                    input.addEventListener('change', () => { recalc(true); debouncedSync(); });
                     input.addEventListener('blur', () => recalc(true));
                 });
 
                 giveInputs.forEach((input) => {
-                    input.addEventListener('input', () => recalc(false));
-                    input.addEventListener('change', () => recalc(true));
+                    input.addEventListener('input', () => { recalc(false); debouncedSync(); });
+                    input.addEventListener('change', () => { recalc(true); debouncedSync(); });
                     input.addEventListener('blur', () => recalc(true));
                 });
 
                 recalc(true);
 
-                const guardCheckout = (event) => {
-                    if (!checkoutBlocked) return;
+                const guardCheckout = async (event) => {
+                    if (checkoutBlocked) {
+                        event.preventDefault();
+                        setCheckoutEnabled(false);
+                        const warningTarget = qtyWarning || summaryInv;
+                        if (warningTarget) {
+                            warningTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                        return;
+                    }
+                    
+                    // Prevent default navigation, sync first
                     event.preventDefault();
-                    setCheckoutEnabled(false);
-                    const warningTarget = qtyWarning || summaryInv;
-                    if (warningTarget) {
-                        warningTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    
+                    // Show loading state
+                    const btn = event.currentTarget;
+                    const originalText = btn.textContent;
+                    btn.textContent = 'Updating...';
+                    btn.classList.add('pointer-events-none', 'opacity-60');
+                    
+                    // Sync quantities to server
+                    const synced = await syncQuantitiesToServer();
+                    
+                    // Restore button state
+                    btn.textContent = originalText;
+                    btn.classList.remove('pointer-events-none', 'opacity-60');
+                    
+                    if (synced) {
+                        // Navigate to checkout
+                        window.location.href = btn.getAttribute('href');
+                    } else {
+                        // Still navigate even if sync failed - server will use existing data
+                        window.location.href = btn.getAttribute('href');
                     }
                 };
 

@@ -1,26 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ $product->name ?? optional($template)->name ?? 'InkWise Studio' }} &mdash; InkWise</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css">
-    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-solid-rounded/css/uicons-solid-rounded.css">
-    <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-solid-straight/css/uicons-solid-straight.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@flaticon/flaticon-uicons/css/all/all.css">
-    @if(app()->environment('local'))
-        @viteReactRefresh
-    @endif
-    @vite([
-        'resources/css/customer/studio.css',
-        'resources/js/customer/studio/main.jsx',
-    ])
-</head>
+@include('customer.studio._head')
 <body>
 @php
     $defaultFront = asset('Customerimages/invite/wedding2.png');
@@ -114,6 +92,21 @@
     $canvasShapeAttr = $templateCanvas && $templateCanvas['shape'] ? $templateCanvas['shape'] : null;
     $canvasUnitAttr = $templateCanvas ? ($templateCanvas['unit'] ?? 'px') : null;
 
+    // Parse size parameter (e.g., "4.5x6.25") and override canvas dimensions
+    $selectedSize = request()->query('size');
+    $parsedSize = null;
+    if ($selectedSize && preg_match('/^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)$/', $selectedSize, $matches)) {
+        $parsedSize = [
+            'width' => (float) $matches[1],
+            'height' => (float) $matches[2],
+            'unit' => 'in'
+        ];
+        // Convert inches to pixels (assuming 96 DPI)
+        $canvasWidthAttr = (string) round($parsedSize['width'] * 96);
+        $canvasHeightAttr = (string) round($parsedSize['height'] * 96);
+        $canvasUnitAttr = 'px';
+    }
+
     $resolveImage = static function ($path, $fallback) {
         if (!$path) {
             return $fallback;
@@ -126,6 +119,134 @@
         }
     };
 
+    $readSvgFile = static function ($candidate) {
+        if (!is_string($candidate) || trim($candidate) === '') {
+            return null;
+        }
+
+        $pathPart = $candidate;
+        $urlComponents = @parse_url($candidate);
+        if (is_array($urlComponents) && !empty($urlComponents['path'])) {
+            $pathPart = $urlComponents['path'];
+        }
+
+        $pathPart = urldecode((string) $pathPart);
+        if (trim($pathPart) === '') {
+            return null;
+        }
+
+        $variants = [];
+        $normalized = str_replace('\\', '/', ltrim($pathPart, '/'));
+        $variants[] = $normalized;
+        $variants[] = preg_replace('#^storage/#i', '', $normalized) ?? $normalized;
+        $variants[] = preg_replace('#^public/#i', '', $normalized) ?? $normalized;
+        $variants[] = preg_replace('#^public/storage/#i', '', $normalized) ?? $normalized;
+        $variants = array_values(array_unique(array_filter($variants, static fn ($value) => is_string($value) && $value !== '')));
+
+        $disks = array_values(array_unique(array_filter([
+            'invitation_templates',
+            'public',
+            config('filesystems.default'),
+        ], static fn ($disk) => is_string($disk) && $disk !== '')));
+
+        foreach ($variants as $variant) {
+            $trimmed = ltrim($variant, '/');
+
+            foreach ($disks as $disk) {
+                if (!config("filesystems.disks.{$disk}")) {
+                    continue;
+                }
+
+                try {
+                    if (\Illuminate\Support\Facades\Storage::disk($disk)->exists($trimmed)) {
+                        $contents = \Illuminate\Support\Facades\Storage::disk($disk)->get($trimmed);
+                        if (is_string($contents) && $contents !== '') {
+                            return $contents;
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // continue to other disks
+                }
+            }
+
+            $fileCandidates = [
+                public_path($trimmed),
+                public_path('storage/' . $trimmed),
+                storage_path('app/public/' . $trimmed),
+            ];
+
+            foreach ($fileCandidates as $filePath) {
+                if (!$filePath || !is_string($filePath)) {
+                    continue;
+                }
+
+                if (is_file($filePath)) {
+                    $contents = @file_get_contents($filePath);
+                    if (is_string($contents) && $contents !== '') {
+                        return $contents;
+                    }
+                }
+            }
+        }
+
+        return null;
+    };
+
+    $resolveSvgDataUri = static function ($value) use ($resolveImage, $readSvgFile) {
+        if (empty($value)) {
+            return null;
+        }
+
+        $candidates = [];
+        if (is_array($value)) {
+            foreach (['data', 'data_uri', 'inline', 'path', 'url', 0] as $key) {
+                if (!isset($value[$key])) {
+                    continue;
+                }
+                $candidate = $value[$key];
+                if (is_string($candidate) && $candidate !== '') {
+                    $candidates[] = $candidate;
+                }
+            }
+        } elseif (is_string($value)) {
+            $candidates[] = $value;
+        }
+
+        $candidates = array_values(array_unique(array_filter($candidates, static fn ($candidate) => is_string($candidate) && trim($candidate) !== '')));
+
+        foreach ($candidates as $candidate) {
+            if (str_starts_with($candidate, 'data:image/svg+xml')) {
+                return $candidate;
+            }
+        }
+
+        foreach ($candidates as $candidate) {
+            $resolved = $resolveImage($candidate, null);
+            if ($resolved && $resolved !== $candidate) {
+                $candidates[] = $resolved;
+            }
+        }
+
+        $candidates = array_values(array_unique(array_filter($candidates, static fn ($candidate) => is_string($candidate) && trim($candidate) !== '')));
+
+        foreach ($candidates as $candidate) {
+            if (!str_contains($candidate, '.svg') && !str_starts_with($candidate, 'data:image/svg+xml')) {
+                continue;
+            }
+
+            if (str_starts_with($candidate, 'data:image/svg+xml')) {
+                return $candidate;
+            }
+
+            $contents = $readSvgFile($candidate);
+            if (is_string($contents) && $contents !== '') {
+                return 'data:image/svg+xml;base64,' . base64_encode($contents);
+            }
+        }
+
+        return null;
+    };
+
     $templateFront = $templateModel?->preview_front
         ?? $templateModel?->front_image
         ?? $templateModel?->preview
@@ -134,8 +255,8 @@
     $templateBack = $templateModel?->preview_back
         ?? $templateModel?->back_image;
 
-    $frontSvg = $resolveImage($templateModel?->svg_path ?? null, null);
-    $backSvg = $resolveImage($templateModel?->back_svg_path ?? null, null);
+    $frontSvg = $resolveSvgDataUri($templateModel?->svg_path ?? null);
+    $backSvg = $resolveSvgDataUri($templateModel?->back_svg_path ?? null);
 
     $hasBackSide = false;
     if ($templateModel) {
@@ -240,8 +361,10 @@
         </div>
     </div>
     <div class="topbar-center">
-        <span class="topbar-status-dot" aria-hidden="true"></span>
-        <span class="topbar-status-label">Saved</span>
+        <div class="topbar-status">
+            <span class="topbar-status-dot" aria-hidden="true"></span>
+            <span class="topbar-status-label">Saved</span>
+        </div>
         <div class="topbar-history-controls" role="group" aria-label="History controls">
             <button type="button" class="topbar-icon-btn" aria-label="View history"><i class="fa-regular fa-clock"></i></button>
             <button type="button" class="topbar-icon-btn" aria-label="Undo"><i class="fa-solid fa-rotate-left"></i></button>
@@ -251,8 +374,7 @@
     </div>
     <div class="topbar-actions">
         <button class="topbar-action-btn" type="button" onclick="window.location.href='{{ route('templates.wedding.invitations') }}'">Change Template</button>
-        <button class="topbar-action-btn" type="button">Preview</button>
-        <button class="topbar-action-btn" type="button" id="save-template-btn" data-action="save-template">Save Template</button>
+        <button class="topbar-action-btn" type="button" id="preview-btn">Preview</button>
         <button
             class="topbar-action-btn primary"
             type="button"
@@ -277,7 +399,7 @@
         </button>
         <button class="sidenav-btn" type="button" data-nav="background">
             <i class="fa-solid fa-brush"></i>
-            <span>Background</span>
+            <span>Colors</span>
         </button>
     </nav>
     <section class="studio-canvas-area">
@@ -303,6 +425,11 @@
                 </div>
             </div>
             <div class="canvas-stage">
+                <!-- Loading state -->
+                <div id="canvas-loading" class="canvas-loading">
+                    <div class="loading-spinner"></div>
+                    <p>Loading template...</p>
+                </div>
                 <div class="canvas-measure canvas-measure-vertical" aria-hidden="true">
                     <span class="measure-cap"></span>
                     <span class="measure-line"></span>
@@ -368,7 +495,6 @@
                 <span class="canvas-zoom-value" id="canvas-zoom-display">100%</span>
                 <button type="button" class="canvas-control-btn icon" data-zoom-step="up" aria-label="Zoom in"><i class="fa-solid fa-plus"></i></button>
                 <button type="button" class="canvas-control-btn icon" data-zoom-reset aria-label="Reset zoom to 100%"><i class="fa-solid fa-rotate-right"></i></button>
-                <button type="button" class="canvas-control-btn icon" aria-label="Canvas settings"><i class="fa-solid fa-gear"></i></button>
                 <select class="canvas-zoom-select" id="canvas-zoom-select" aria-label="Zoom level">
                     <option value="3">300%</option>
                     <option value="2">200%</option>
@@ -380,27 +506,7 @@
                 </select>
             </div>
         </div>
-        <!-- Floating Toolbar -->
-        <div class="floating-toolbar" id="floating-toolbar">
-            <button class="toolbar-btn" type="button" data-nav="text" title="Text">
-                <span class="toolbar-icon-text">T</span>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="uploads" title="Uploads">
-                <i class="fa-solid fa-cloud-arrow-up"></i>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="graphics" title="Graphics">
-                <i class="fa-solid fa-images"></i>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="background" title="Background">
-                <i class="fa-solid fa-brush"></i>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="tables" title="Tables">
-                <i class="fa-solid fa-table"></i>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="colors" title="Colors">
-                <i class="fa-solid fa-palette"></i>
-            </button>
-        </div>
+        <!-- Floating toolbar removed -->
         <div class="preview-thumbs" role="tablist" aria-label="Card sides">
             <button type="button" class="preview-thumb active" data-card-thumb="front" aria-pressed="true">
                 <div class="thumb-preview" @if($frontImage) style="background-image: url('{{ $frontImage }}');" @endif>
@@ -550,7 +656,7 @@
 <div id="background-modal" class="modal" data-section="background" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="background-modal-title">
     <div class="modal-content">
         <div class="modal-header">
-            <h2 id="background-modal-title">Background</h2>
+            <h2 id="background-modal-title">Colors</h2>
             <div class="modal-header-actions">
                 <button type="button" aria-label="Dock panel" disabled aria-disabled="true">
                     <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
@@ -560,7 +666,7 @@
                 </button>
             </div>
         </div>
-        <p class="modal-helper">Swap in textures, colors, or patterns to update the canvas background.</p>
+        <p class="modal-helper">Choose colors, textures, or patterns for your design.</p>
         <div class="color-palette">
             <button class="color-btn" style="background-color: #ff0000;" data-color="#ff0000" title="Red"></button>
             <button class="color-btn" style="background-color: #ff7f00;" data-color="#ff7f00" title="Orange"></button>
@@ -711,18 +817,50 @@
     </div>
 </div>
 
-<script type="application/json" id="inkwise-customer-studio-bootstrap">
-    {!! json_encode([
+@php
+    $selectedSize = request()->query('size')
+        ?? $product?->size
+        ?? (is_array($product?->sizes ?? null) ? ($product->sizes[0] ?? null) : null)
+        ?? (($templateModel?->width_inch && $templateModel?->height_inch) ? ($templateModel->width_inch . 'x' . $templateModel->height_inch) : null)
+        ?? config('invitations.default_size', '5x7');
+
+    $bootstrapPayload = [
+        'csrfToken' => csrf_token(),
         'product' => $productBootstrap,
         'template' => $templateBootstrap,
-        'orderSummary' => $orderSummary,
+        'assets' => [
+            'front_image' => $frontImage,
+            'back_image' => $hasBackSide ? $backImage : null,
+            'default_front' => $defaultFront,
+            'default_back' => $defaultBack,
+            'brand_logo' => asset('images/logo.png'),
+            'preview_images' => [
+                'front' => $templateBootstrap['preview_front'] ?? null,
+                'back' => $templateBootstrap['preview_back'] ?? null,
+            ],
+        ],
+        'svg' => [
+            'front' => $frontSvg,
+            'back' => $backSvg,
+        ],
+        'selection' => [
+            'size' => $selectedSize ?? null,
+        ],
+        'flags' => [
+            'has_back' => $hasBackSide,
+        ],
         'routes' => [
             'autosave' => route('order.design.autosave'),
-            'review' => route('order.review'),
             'saveTemplate' => route('order.design.save-template'),
+            'review' => route('order.review'),
+            'saveReview' => route('order.review.design'),
+            'change_template' => route('templates.wedding.invitations'),
         ],
-    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) !!}
-</script>
+        'orderSummary' => $orderSummary ?? null,
+    ];
+@endphp
+
+@include('customer.studio._bootstrap')
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -815,19 +953,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Floating toolbar functionality
-    const floatingToolbar = document.getElementById('floating-toolbar');
-    if (floatingToolbar) {
-        floatingToolbar.addEventListener('click', function(e) {
-            if (e.target.classList.contains('toolbar-btn') || e.target.closest('.toolbar-btn')) {
-                const btn = e.target.classList.contains('toolbar-btn') ? e.target : e.target.closest('.toolbar-btn');
-                const nav = btn.dataset.nav;
-                const modal = document.getElementById(nav + '-modal');
-                if (modal) {
-                    modal.style.display = 'flex';
-                    modal.setAttribute('aria-hidden', 'false');
-                }
-            }
+    // Floating toolbar removed
+
+    // Rotate canvas functionality (rotate entire preview canvas by 90° per click)
+    const rotateBtn = document.querySelector('.canvas-control-btn[data-zoom-reset]');
+    if (rotateBtn) {
+        rotateBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            // Rotate the whole canvas wrapper so the card, SVG and guides rotate together
+            const previewWrapper = document.querySelector('.preview-canvas-wrapper');
+            if (!previewWrapper) return;
+
+            const current = parseInt(previewWrapper.dataset.rotation || '0', 10) || 0;
+            const next = (current + 90) % 360;
+            previewWrapper.dataset.rotation = String(next);
+            previewWrapper.style.transition = 'transform 0.25s ease';
+            previewWrapper.style.transformOrigin = 'center center';
+            previewWrapper.style.transform = `rotate(${next}deg)`;
         });
     }
 
@@ -846,7 +988,71 @@ document.addEventListener('DOMContentLoaded', function() {
     updateDisplay();
     updateButtons();
 });
+// Preview button functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const previewBtn = document.getElementById('preview-btn');
+    const previewModal = document.getElementById('studio-preview-modal');
+    const previewContent = document.getElementById('studio-preview-content');
+    const previewClose = document.getElementById('studio-preview-close');
+
+    function openPreview() {
+        const wrapper = document.querySelector('.preview-canvas-wrapper');
+        if (!wrapper || !previewModal) return;
+
+        // Clear previous
+        previewContent.innerHTML = '';
+
+        // Clone the wrapper (deep) and scale it to fit
+        const clone = wrapper.cloneNode(true);
+        clone.style.transform = 'none';
+        clone.style.maxWidth = '100%';
+        clone.style.maxHeight = '80vh';
+        clone.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
+
+        // Remove any interactive attributes that might interfere
+        clone.querySelectorAll('[data-modal-close],[data-action],[id]').forEach(el => el.removeAttribute('id'));
+
+        previewContent.appendChild(clone);
+        previewModal.style.display = 'flex';
+        previewModal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closePreview() {
+        if (!previewModal) return;
+        previewModal.style.display = 'none';
+        previewModal.setAttribute('aria-hidden', 'true');
+        previewContent.innerHTML = '';
+    }
+
+    previewBtn?.addEventListener('click', function(e) {
+        e.preventDefault();
+        openPreview();
+    });
+
+    previewClose?.addEventListener('click', function(e) {
+        e.preventDefault();
+        closePreview();
+    });
+
+    previewModal?.addEventListener('click', function(e) {
+        if (e.target === previewModal) {
+            closePreview();
+        }
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closePreview();
+    });
+});
 </script>
+
+<!-- Preview modal markup -->
+<div id="studio-preview-modal" class="studio-preview-modal" aria-hidden="true" style="display:none;position:fixed;inset:0;z-index:20000;align-items:center;justify-content:center;background:rgba(0,0,0,0.8)">
+    <div class="studio-preview-inner" style="background:#fff;padding:18px;border-radius:10px;max-width:90vw;max-height:90vh;overflow:auto;position:relative;">
+        <button id="studio-preview-close" aria-label="Close preview" style="position:absolute;top:8px;right:8px;border:none;background:transparent;font-size:20px;cursor:pointer">&times;</button>
+        <div id="studio-preview-content" style="display:flex;align-items:center;justify-content:center;padding:8px"></div>
+    </div>
+</div>
 
 </body>
 </html>

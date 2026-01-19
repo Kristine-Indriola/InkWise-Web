@@ -27,9 +27,9 @@ export function BuilderHotkeys() {
         }
       }
 
-      const activePage = state.pages.find((page) => page.id === state.activePageId) ?? state.pages[0];
+      const activePage = state.pages?.find((page) => page.id === state.activePageId) ?? state.pages?.[0];
       const selectedLayerId = state.selectedLayerId;
-      const selectedLayer = activePage?.nodes.find((node) => node.id === selectedLayerId);
+      const selectedLayer = activePage?.nodes?.find((node) => node.id === selectedLayerId);
 
       const isModifierPressed = event.ctrlKey || event.metaKey;
 

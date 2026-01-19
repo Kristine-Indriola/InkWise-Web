@@ -11,7 +11,7 @@ use App\Models\Inventory;
 use App\Models\CustomerOrder;
 use App\Services\OrderFlowService;
 use Illuminate\Support\Str;
-use App\Models\ProductAddon;
+use App\Models\ProductSize;
 use App\Models\ProductBulkOrder;
 use App\Models\ProductColor;
 use App\Models\ProductEnvelope;
@@ -49,7 +49,7 @@ class OrderFlowPersistenceTest extends TestCase
             'price' => 150,
         ]);
 
-        $addon = ProductAddon::create([
+        $addon = ProductSize::create([
             'product_id' => $product->id,
             'addon_type' => 'trim',
             'name' => 'Gold Foil',
@@ -122,7 +122,7 @@ class OrderFlowPersistenceTest extends TestCase
         $this->assertEquals($paperStock->id, $item->paperStockSelection->paper_stock_id);
         $this->assertEqualsWithDelta(150.0, $item->paperStockSelection->price, 0.001);
         $this->assertCount(1, $item->addons);
-        $this->assertEquals($addon->id, $item->addons->first()->addon_id);
+        $this->assertEquals($addon->id, $item->addons->first()->size_id);
         $this->assertCount(1, $item->bulkSelections);
         $this->assertEquals(120, $item->bulkSelections->first()->qty_selected);
         $this->assertEqualsWithDelta(25.0, $item->bulkSelections->first()->price_per_unit, 0.001);
@@ -299,7 +299,7 @@ class OrderFlowPersistenceTest extends TestCase
         ]);
         $item->load(['addons', 'colors']);
         $this->assertCount(1, $item->addons);
-        $this->assertEquals($addon->id, $item->addons->first()->addon_id);
+        $this->assertEquals($addon->id, $item->addons->first()->size_id);
         $this->assertCount(1, $item->colors);
         $this->assertEquals($color->id, $item->colors->first()->color_id);
     }
@@ -771,7 +771,7 @@ class OrderFlowPersistenceTest extends TestCase
             'price' => 5.0,
         ]);
 
-        $envelopeAddon = ProductAddon::create([
+        $envelopeAddon = ProductSize::create([
             'product_id' => $envelopeProduct->id,
             'addon_type' => 'liner',
             'name' => 'Luxury Liner',

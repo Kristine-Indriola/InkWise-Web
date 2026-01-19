@@ -10,7 +10,7 @@ use App\Models\Material;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
-use App\Models\ProductAddon;
+use App\Models\ProductSize;
 use App\Models\ProductBulkOrder;
 use App\Models\ProductColor;
 use App\Models\ProductMaterial;
@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class OrderFlowService
@@ -314,18 +315,32 @@ class OrderFlowService
         ];
     }
 
-    public function loadCustomerReview(?int $templateId, ?Authenticatable $user = null): ?CustomerReview
+    public function loadCustomerReview(?int $templateId, ?Authenticatable $user = null, ?int $orderItemId = null): ?CustomerReview
     {
-        if (!$templateId) {
-            return null;
-        }
-
         $user = $user ?? Auth::user();
         $userId = $user?->getAuthIdentifier();
         $customerId = $user?->customer?->customer_id;
+        
+        Log::debug('loadCustomerReview called', [
+            'templateId' => $templateId,
+            'userId' => $userId,
+            'customerId' => $customerId,
+            'orderItemId' => $orderItemId,
+        ]);
+        
+        $query = CustomerReview::query();
 
-        $query = CustomerReview::query()
-            ->where('template_id', $templateId);
+        if ($orderItemId) {
+            $query->where('order_item_id', $orderItemId);
+        } elseif ($templateId) {
+            $query->where('template_id', $templateId);
+        } else {
+            return null;
+        }
+
+        if ($templateId && $orderItemId) {
+            $query->where('template_id', $templateId);
+        }
 
         if ($customerId) {
             $query->where('customer_id', $customerId);
@@ -334,7 +349,17 @@ class OrderFlowService
             $query->whereNull('customer_id');
         }
 
-        return $query->latest('updated_at')->first();
+        $result = $query->latest('updated_at')->first();
+        
+        Log::debug('loadCustomerReview result', [
+            'found' => $result ? 'YES' : 'NO',
+            'result_id' => $result?->id,
+            'result_template_id' => $result?->template_id,
+            'result_customer_id' => $result?->customer_id,
+            'design_svg_length' => $result ? strlen($result->design_svg ?? '') : 0,
+        ]);
+        
+        return $result;
     }
 
     public function primaryInvitationItem(Order $order): ?OrderItem
@@ -474,15 +499,15 @@ class OrderFlowService
         }
 
         if (empty($addons) && !empty($addonIds)) {
-            $addons = ProductAddon::query()
+            $addons = ProductSize::query()
                 ->whereIn('id', collect($addonIds)->filter()->map(fn ($id) => (int) $id)->all())
                 ->get()
-                ->map(function (ProductAddon $addon) {
+                ->map(function (ProductSize $addon) {
                     return [
                         'id' => $addon->id,
-                        'name' => $addon->name ?? 'Add-on',
+                        'name' => $addon->size ?? 'Size',
                         'price' => $addon->price ?? 0,
-                        'type' => $addon->addon_type,
+                        'type' => $addon->size_type,
                     ];
                 })
                 ->values()
@@ -635,10 +660,10 @@ class OrderFlowService
             $pricingMode = $addon['pricing_mode'] ?? null;
 
             $orderItem->addons()->create([
-                'addon_id' => $addon['id'] ?? null,
-                'addon_type' => $addon['type'] ?? null,
-                'addon_name' => $addon['name'] ?? 'Add-on',
-                'addon_price' => isset($addon['price']) ? (float) $addon['price'] : 0,
+                'size_id' => $addon['id'] ?? null,
+                'size_type' => $addon['type'] ?? null,
+                'size' => $addon['name'] ?? 'Add-on',
+                'size_price' => isset($addon['price']) ? (float) $addon['price'] : 0,
                 'quantity' => $addonQuantity,
                 'pricing_mode' => $pricingMode,
                 'pricing_metadata' => $pricingMetadata,
@@ -908,6 +933,16 @@ class OrderFlowService
         $previewImages = Arr::get($payload, 'preview_images', []);
         $updatedAt = Arr::get($designMeta, 'updated_at') ?? now()->toIso8601String();
 
+        $firstSideKey = array_key_first($designMeta['sides'] ?? []) ?? 'front';
+        $firstSide = $designMeta['sides'][$firstSideKey] ?? [];
+        $designSvg = is_string($firstSide['svg'] ?? null) ? $firstSide['svg'] : null;
+        $designJsonEncoded = $designMeta ? json_encode($designMeta) : null;
+        $canvasWidth = Arr::get($designMeta, 'canvas.width');
+        $canvasHeight = Arr::get($designMeta, 'canvas.height');
+        $backgroundColor = Arr::get($designMeta, 'canvas.background')
+            ?? Arr::get($designMeta, 'canvas.background_color')
+            ?? Arr::get($designMeta, 'background_color');
+
         $metadata = $order->metadata;
         if (is_string($metadata)) {
             $decoded = json_decode($metadata, true);
@@ -954,6 +989,26 @@ class OrderFlowService
             $designData['updated_at'] = $updatedAt;
 
             $invitationItem->design_metadata = $designData;
+
+            // Persist into dedicated columns when present
+            if (\Illuminate\Support\Facades\Schema::hasColumn($invitationItem->getTable(), 'design_svg') && $designSvg) {
+                $invitationItem->design_svg = $designSvg;
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn($invitationItem->getTable(), 'design_json') && $designJsonEncoded) {
+                $invitationItem->design_json = $designJsonEncoded;
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn($invitationItem->getTable(), 'canvas_width') && $canvasWidth !== null) {
+                $invitationItem->canvas_width = $canvasWidth;
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn($invitationItem->getTable(), 'canvas_height') && $canvasHeight !== null) {
+                $invitationItem->canvas_height = $canvasHeight;
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn($invitationItem->getTable(), 'background_color') && $backgroundColor) {
+                $invitationItem->background_color = $backgroundColor;
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn($invitationItem->getTable(), 'preview_image') && $previewImage) {
+                $invitationItem->preview_image = $previewImage;
+            }
             $invitationItem->save();
         }
 
@@ -1050,6 +1105,9 @@ class OrderFlowService
 
         $designMeta = $summary['metadata']['design'] ?? $summary['design'] ?? [];
         $previewImages = $summary['previewImages'] ?? [];
+        $previewImage = $summary['previewImage']
+            ?? Arr::get($previewImages, 0)
+            ?? Arr::get($summary, 'invitationImage');
 
         $size = $summary['size']
             ?? $summary['invitation_size']
@@ -1066,7 +1124,8 @@ class OrderFlowService
         $estimatedDate = $summary['estimated_date']
             ?? data_get($summary, 'metadata.final_step.estimated_date')
             ?? data_get($summary, 'metadata.final_step.pickup_date');
-        $preOrderStatus = $summary['paperStockPreorder'] ? 'pre_order' : ($summary['paperStockStatus'] ?? 'none');
+        $paperPreorder = $summary['paperStockPreorder'] ?? null;
+        $preOrderStatus = $paperPreorder ? 'pre_order' : ($summary['paperStockStatus'] ?? 'none');
 
         return $this->persistCustomerOrderItem($order, [
             'customer_id' => $customerId,
@@ -1083,7 +1142,31 @@ class OrderFlowService
             'product_type' => $summary['product_type'] ?? 'invitation',
             'pre_order_status' => $preOrderStatus,
             'pre_order_date' => $summary['paperStockAvailabilityDate'] ?? null,
+            'preview_image' => $previewImage,
         ]);
+    }
+
+    public function findFinalizedSelection(?Order $order, ?Product $product = null, ?int $customerId = null): ?CustomerFinalized
+    {
+        $customerId = $customerId ?? Auth::user()?->customer?->customer_id;
+
+        $query = CustomerFinalized::query();
+
+        if ($order?->customer_order_id) {
+            $query->where('order_id', $order->customer_order_id);
+        } elseif ($order?->id) {
+            $query->where('order_id', $order->id);
+        }
+
+        if ($customerId) {
+            $query->where('customer_id', $customerId);
+        }
+
+        if ($product?->id) {
+            $query->where('product_id', $product->id);
+        }
+
+        return $query->latest()->first();
     }
 
     protected function normalizePreOrderStatus($value): string
@@ -1133,6 +1216,18 @@ class OrderFlowService
             $previewImages = array_filter([$previewImages]);
         }
 
+        $firstSideKey = array_key_first($design['sides'] ?? []) ?? 'front';
+        $firstSide = $design['sides'][$firstSideKey] ?? [];
+        $designSvg = $attributes['design_svg'] ?? (is_string($firstSide['svg'] ?? null) ? $firstSide['svg'] : null);
+        $designJsonEncoded = $attributes['design_json'] ?? (!empty($design) ? json_encode($design) : null);
+        $canvasWidth = Arr::get($attributes, 'canvas_width', Arr::get($design, 'canvas.width'));
+        $canvasHeight = Arr::get($attributes, 'canvas_height', Arr::get($design, 'canvas.height'));
+        $backgroundColor = Arr::get($attributes, 'background_color')
+            ?? Arr::get($design, 'canvas.background')
+            ?? Arr::get($design, 'canvas.background_color')
+            ?? Arr::get($design, 'background_color');
+        $previewImage = $attributes['preview_image'] ?? ($previewImages[0] ?? null);
+
         $paperStock = $attributes['paper_stock'] ?? null;
         if ($paperStock !== null && !is_array($paperStock)) {
             $paperStock = ['value' => $paperStock];
@@ -1164,6 +1259,25 @@ class OrderFlowService
             'pre_order_status' => $preOrderStatus,
             'pre_order_date' => $attributes['pre_order_date'] ?? null,
         ]);
+
+        if (Schema::hasColumn($record->getTable(), 'design_svg')) {
+            $record->design_svg = $designSvg;
+        }
+        if (Schema::hasColumn($record->getTable(), 'design_json')) {
+            $record->design_json = $designJsonEncoded;
+        }
+        if (Schema::hasColumn($record->getTable(), 'canvas_width')) {
+            $record->canvas_width = $canvasWidth;
+        }
+        if (Schema::hasColumn($record->getTable(), 'canvas_height')) {
+            $record->canvas_height = $canvasHeight;
+        }
+        if (Schema::hasColumn($record->getTable(), 'background_color')) {
+            $record->background_color = $backgroundColor;
+        }
+        if (Schema::hasColumn($record->getTable(), 'preview_image')) {
+            $record->preview_image = $previewImage;
+        }
 
         $record->save();
 
@@ -1572,12 +1686,12 @@ class OrderFlowService
             $item->paperStockSelection()->delete();
         }
 
-        $existingAddonRecords = $item->addons->keyBy('addon_id');
+        $existingAddonRecords = $item->addons->keyBy('size_id');
 
-        $item->addons()->whereNotIn('addon_id', $addonIds->all())->delete();
+        $item->addons()->whereNotIn('size_id', $addonIds->all())->delete();
 
         if ($addonIds->isNotEmpty()) {
-            $addons = ProductAddon::query()->whereIn('id', $addonIds)->get();
+            $addons = ProductSize::query()->whereIn('id', $addonIds)->get();
             foreach ($addons as $addon) {
                 $requestedQuantity = max(1, (int) ($addonQuantitiesPayload->get($addon->id, $quantity)));
 
@@ -1588,11 +1702,11 @@ class OrderFlowService
                 $metadata['quantity'] = $requestedQuantity;
 
                 $item->addons()->updateOrCreate(
-                    ['addon_id' => $addon->id],
+                    ['size_id' => $addon->id],
                     [
-                        'addon_type' => $addon->addon_type,
-                        'addon_name' => $addon->name ?? 'Add-on',
-                        'addon_price' => $addon->price ?? 0,
+                        'size_type' => $addon->addon_type,
+                        'size' => $addon->name ?? 'Add-on',
+                        'size_price' => $addon->price ?? 0,
                         'quantity' => $requestedQuantity,
                         'pricing_metadata' => $metadata,
                     ]
@@ -1616,10 +1730,10 @@ class OrderFlowService
             'paper_stock_id' => $item->paperStockSelection?->paper_stock_id,
             'paper_stock_name' => $item->paperStockSelection?->paper_stock_name,
             'paper_stock_price' => $item->paperStockSelection?->price,
-            'addon_ids' => $item->addons->pluck('addon_id')->filter()->values()->all(),
+            'addon_ids' => $item->addons->pluck('size_id')->filter()->values()->all(),
             'addon_quantities' => $item->addons
-                ->filter(fn ($addon) => $addon->addon_id !== null)
-                ->mapWithKeys(fn ($addon) => [$addon->addon_id => max(1, (int) ($addon->quantity ?? 1))])
+                ->filter(fn ($addon) => $addon->size_id !== null)
+                ->mapWithKeys(fn ($addon) => [$addon->size_id => max(1, (int) ($addon->quantity ?? 1))])
                 ->all(),
             'estimated_date' => $pickupDate ? $pickupDate->toDateString() : Arr::get($previousFinalStep, 'estimated_date'),
             'estimated_date_label' => $pickupDateLabel ?? Arr::get($previousFinalStep, 'estimated_date_label'),
@@ -1765,6 +1879,7 @@ class OrderFlowService
             'id' => $payload['envelope_id'] ?? $envelopeMeta['id'] ?? null,
             'product_id' => $payload['product_id'] ?? $resolvedEnvelope?->product_id,
             'name' => $envelopeMeta['name'] ?? null,
+            'unit_price' => $unitPrice,
             'price' => $unitPrice,
             'qty' => $quantity,
             'total' => (float) $total,
@@ -1777,7 +1892,28 @@ class OrderFlowService
             'updated_at' => now()->toIso8601String(),
         ], fn ($value) => $value !== null && $value !== '');
 
-        $meta['envelope'] = $envelopeMeta;
+        // Support multiple envelope selections; keep legacy single "envelope" for backward compatibility
+        $envelopes = $meta['envelopes'] ?? [];
+        if (empty($envelopes) && !empty($meta['envelope'])) {
+            $envelopes[] = $meta['envelope'];
+        }
+
+        // Replace existing entry by id or append
+        $existingIndex = null;
+        foreach ($envelopes as $idx => $envelopeRow) {
+            if (($envelopeRow['id'] ?? null) === ($envelopeMeta['id'] ?? null)) {
+                $existingIndex = $idx;
+                break;
+            }
+        }
+        if ($existingIndex !== null) {
+            $envelopes[$existingIndex] = $envelopeMeta;
+        } else {
+            $envelopes[] = $envelopeMeta;
+        }
+
+        $meta['envelopes'] = array_values($envelopes);
+        $meta['envelope'] = $meta['envelopes'][0] ?? $envelopeMeta; // legacy consumers
         $order->update(['metadata' => $meta]);
 
         $this->upsertEnvelopeOrderItem($order, $envelopeMeta);
@@ -1786,6 +1922,12 @@ class OrderFlowService
         $this->recalculateOrderTotals($order);
 
         $order->refresh();
+        $primaryItem = $this->primaryInvitationItem($order);
+        if ($primaryItem) {
+            $order->update([
+                'summary_snapshot' => $this->buildSummarySnapshot($order, $primaryItem),
+            ]);
+        }
         $this->syncMaterialUsage($order);
 
         $this->persistEnvelopeRecord($order, $envelopeMeta);
@@ -1870,6 +2012,12 @@ class OrderFlowService
         $this->recalculateOrderTotals($order);
 
         $order->refresh();
+        $primaryItem = $this->primaryInvitationItem($order);
+        if ($primaryItem) {
+            $order->update([
+                'summary_snapshot' => $this->buildSummarySnapshot($order, $primaryItem),
+            ]);
+        }
         $this->syncMaterialUsage($order);
 
         $this->persistGiveawayRecord($order, $giveawayMeta);
@@ -1884,7 +2032,7 @@ class OrderFlowService
     public function clearEnvelopeSelection(Order $order): Order
     {
         $meta = $order->metadata ?? [];
-        unset($meta['envelope']);
+        unset($meta['envelope'], $meta['envelopes']);
 
         $order->update(['metadata' => $meta]);
 
@@ -1895,6 +2043,12 @@ class OrderFlowService
         $this->recalculateOrderTotals($order);
 
         $order->refresh();
+        $primaryItem = $this->primaryInvitationItem($order);
+        if ($primaryItem) {
+            $order->update([
+                'summary_snapshot' => $this->buildSummarySnapshot($order, $primaryItem),
+            ]);
+        }
         $this->syncMaterialUsage($order);
 
         $this->deleteCustomerOrderItems($order, 'envelope');
@@ -1940,6 +2094,12 @@ class OrderFlowService
         $this->recalculateOrderTotals($order);
 
         $order->refresh();
+        $primaryItem = $this->primaryInvitationItem($order);
+        if ($primaryItem) {
+            $order->update([
+                'summary_snapshot' => $this->buildSummarySnapshot($order, $primaryItem),
+            ]);
+        }
         $this->syncMaterialUsage($order);
 
         if ($productId) {
@@ -1982,6 +2142,23 @@ class OrderFlowService
             'items.paperStockSelection',
             'items.addons',
         ]);
+
+        // Do not deduct materials for orders with pending payment
+        if (strtolower($order->payment_status ?? '') === 'pending') {
+            return;
+        }
+
+        // Also check if balance is due by loading payments if not already loaded
+        if (!$order->relationLoaded('payments')) {
+            $order->load('payments');
+        }
+        $paidPayments = $order->payments->filter(fn($p) => strtolower($p->status ?? '') === 'paid');
+        $totalPaid = round($paidPayments->sum('amount'), 2);
+        $grandTotal = (float) ($order->total_amount ?? 0);
+        $balanceDue = max($grandTotal - $totalPaid, 0);
+        if ($balanceDue > 0) {
+            return;
+        }
 
         $materialTotals = [];
         $materialCache = [];
@@ -2112,45 +2289,48 @@ class OrderFlowService
         foreach ($order->items as $item) {
             $productMaterialUsageFound = false;
             if ($item->product_id) {
-                $productMaterials = ProductMaterial::query()
-                    ->with(['material.inventory'])
-                    ->where('product_id', $item->product_id)
-                    ->whereNull('order_id')
-                    ->get();
+                // Skip ProductMaterial processing for invitations - they should only use selected paper stock
+                if ($item->line_type !== OrderItem::LINE_TYPE_INVITATION) {
+                    $productMaterials = ProductMaterial::query()
+                        ->with(['material.inventory'])
+                        ->where('product_id', $item->product_id)
+                        ->whereNull('order_id')
+                        ->get();
 
-                foreach ($productMaterials as $productMaterial) {
-                    $perUnitQty = (float) ($productMaterial->qty ?? 0);
-                    if ($perUnitQty <= 0) {
-                        continue;
+                    foreach ($productMaterials as $productMaterial) {
+                        $perUnitQty = (float) ($productMaterial->qty ?? 0);
+                        if ($perUnitQty <= 0) {
+                            continue;
+                        }
+
+                        $linkedMaterial = $productMaterial->material;
+
+                        if (!$linkedMaterial && $productMaterial->material_id) {
+                            $linkedMaterial = $materialCache[$productMaterial->material_id] ??=
+                                Material::query()->with('inventory')->find($productMaterial->material_id);
+                        }
+
+                        if (!$linkedMaterial && $productMaterial->item) {
+                            $linkedMaterial = $resolveMaterialByName($productMaterial->item);
+                        }
+
+                        if (!$linkedMaterial) {
+                            continue;
+                        }
+
+                        $accumulateMaterial($item, $linkedMaterial, $perUnitQty, [
+                            'product_material_id' => $productMaterial->id,
+                            'source' => 'product_material',
+                            'quantity_mode' => match ($productMaterial->quantity_mode) {
+                                'per_order' => 'per_order',
+                                default => 'per_unit',
+                            },
+                            'item' => $productMaterial->item,
+                            'type' => $productMaterial->type,
+                        ]);
+
+                        $productMaterialUsageFound = true;
                     }
-
-                    $linkedMaterial = $productMaterial->material;
-
-                    if (!$linkedMaterial && $productMaterial->material_id) {
-                        $linkedMaterial = $materialCache[$productMaterial->material_id] ??=
-                            Material::query()->with('inventory')->find($productMaterial->material_id);
-                    }
-
-                    if (!$linkedMaterial && $productMaterial->item) {
-                        $linkedMaterial = $resolveMaterialByName($productMaterial->item);
-                    }
-
-                    if (!$linkedMaterial) {
-                        continue;
-                    }
-
-                    $accumulateMaterial($item, $linkedMaterial, $perUnitQty, [
-                        'product_material_id' => $productMaterial->id,
-                        'source' => 'product_material',
-                        'quantity_mode' => match ($productMaterial->quantity_mode) {
-                            'per_order' => 'per_order',
-                            default => 'per_unit',
-                        },
-                        'item' => $productMaterial->item,
-                        'type' => $productMaterial->type,
-                    ]);
-
-                    $productMaterialUsageFound = true;
                 }
             }
 
@@ -2266,10 +2446,25 @@ class OrderFlowService
                     }
 
                     if ($paperMaterial) {
-                        $accumulateMaterial($item, $paperMaterial, 1.0, [
-                        'paper_stock_id' => $paperStock->id,
-                        'source' => 'paper_stock',
-                    ]);
+                        // Check if this material has already been processed through ProductMaterial records
+                        // to avoid double counting when fallback paper stock matches existing product materials
+                        // Skip this check for invitations since they don't use ProductMaterial records
+                        $materialAlreadyProcessed = false;
+                        if ($item->line_type !== OrderItem::LINE_TYPE_INVITATION && $item->product_id) {
+                            $existingProductMaterials = ProductMaterial::query()
+                                ->where('product_id', $item->product_id)
+                                ->whereNull('order_id')
+                                ->where('material_id', $paperMaterial->getKey())
+                                ->exists();
+                            $materialAlreadyProcessed = $existingProductMaterials;
+                        }
+
+                        if (!$materialAlreadyProcessed) {
+                            $accumulateMaterial($item, $paperMaterial, 1.0, [
+                                'paper_stock_id' => $paperStock->id,
+                                'source' => 'paper_stock',
+                            ]);
+                        }
                     }
                 }
             }
@@ -2327,14 +2522,14 @@ class OrderFlowService
             if ($item->addons && $item->addons->isNotEmpty()) {
                 foreach ($item->addons as $addonSelection) {
                     $addon = null;
-                    if ($addonSelection->addon_id) {
-                        $addon = $addonCache[$addonSelection->addon_id] ??=
-                            ProductAddon::query()
+                    if ($addonSelection->size_id) {
+                        $addon = $addonCache[$addonSelection->size_id] ??=
+                            ProductSize::query()
                                 ->with(['material.inventory'])
-                                ->find($addonSelection->addon_id);
+                                ->find($addonSelection->size_id);
                     }
 
-                    $addonName = $addon?->name ?? $addonSelection->addon_name ?? null;
+                    $addonName = $addon?->name ?? $addonSelection->size ?? null;
 
                     $material = null;
                     if ($addon && $addon->material) {
@@ -2355,7 +2550,7 @@ class OrderFlowService
                     $addonQuantity = max(1, (int) ($addonSelection->quantity ?? data_get($addonSelection->pricing_metadata, 'quantity', 1)));
 
                     $accumulateMaterial($item, $material, (float) $addonQuantity, [
-                        'addon_id' => $addonSelection->addon_id,
+                        'addon_id' => $addonSelection->size_id,
                         'addon_name' => $addonName,
                         'addon_quantity' => $addonQuantity,
                         'source' => 'addon',
@@ -2889,7 +3084,7 @@ class OrderFlowService
             // Check addons
             $addonIds = $summary['addonIds'] ?? [];
             if (!empty($addonIds)) {
-                $addons = ProductAddon::query()
+                $addons = ProductSize::query()
                     ->with(['material.inventory'])
                     ->whereIn('id', $addonIds)
                     ->get();
@@ -3055,14 +3250,19 @@ class OrderFlowService
 
     public function recalculateOrderTotals(Order $order): void
     {
-        $order->loadMissing(['items.addons', 'items.paperStockSelection']);
+        // Always reload items to ensure we have the latest quantities
+        $order->load(['items.addons', 'items.paperStockSelection']);
 
         $invitationItem = $this->primaryInvitationItem($order);
         if (!$invitationItem) {
             return;
         }
 
-        $baseSubtotal = (float) $invitationItem->unit_price * $invitationItem->quantity;
+        // Include base price of the invitation in the subtotal so the order total reflects
+        // the product's unit price plus any extras (paper, addons, etc.). Previously this
+        // was set to 0 which caused orders with only the base product to end up with a
+        // zero total amount.
+        $baseSubtotal = round((float) ($invitationItem->unit_price ?? 0) * (int) $invitationItem->quantity, 2);
 
         // paperStockSelection->price is stored as a per-unit price; multiply by quantity
         $paperPerUnit = (float) ($invitationItem->paperStockSelection?->price ?? 0);
@@ -3086,10 +3286,11 @@ class OrderFlowService
                 return (float) $subtotal;
             });
 
+        // Include baseSubtotal so subtotal reflects base product + extras + other line items
         $subtotal = round($baseSubtotal + $extrasTotal + $additionalLineItemsTotal, 2);
         $tax = 0.0;
-        $shipping = $order->shipping_fee !== null ? (float) $order->shipping_fee : static::DEFAULT_SHIPPING_FEE;
-        $total = round($subtotal + $shipping, 2);
+        $shipping = 0.0;
+        $total = round($subtotal, 2);
 
         $order->update([
             'subtotal_amount' => $subtotal,
@@ -3101,7 +3302,7 @@ class OrderFlowService
 
     public function buildSummary(Order $order): array
     {
-        $order->loadMissing(['items.addons', 'items.paperStockSelection']);
+        $order->loadMissing(['items.addons', 'items.paperStockSelection', 'items.product']);
 
         $invitationItem = $this->primaryInvitationItem($order);
         if (!$invitationItem) {
@@ -3109,12 +3310,30 @@ class OrderFlowService
         }
 
         $summary = [
+            'productId' => $invitationItem->product_id,
+            'productName' => $invitationItem->product_name ?? $invitationItem->product?->name,
             'quantity' => $invitationItem->quantity,
             'unitPrice' => $invitationItem->unit_price,
             'paperStockId' => $invitationItem->paperStockSelection?->paper_stock_id,
-            'addonIds' => $invitationItem->addons?->pluck('addon_id')->toArray() ?? [],
+            'paperStockName' => $invitationItem->paperStockSelection?->paper_stock_name,
+            'paperStockPrice' => $invitationItem->paperStockSelection?->price,
+            'addonIds' => $invitationItem->addons?->pluck('size_id')->toArray() ?? [],
             'metadata' => $order->metadata ?? [],
+            'subtotalAmount' => $order->subtotal_amount,
+            'totalAmount' => $order->total_amount,
+            'taxAmount' => $order->tax_amount,
+            'shippingFee' => 0.0,
         ];
+
+        // Extract envelopes from metadata
+        $metadata = $order->metadata ?? [];
+        $summary['envelopes'] = [];
+        if (!empty($metadata['envelopes']) && is_array($metadata['envelopes'])) {
+            $summary['envelopes'] = $metadata['envelopes'];
+        } elseif (!empty($metadata['envelope']) && is_array($metadata['envelope'])) {
+            $summary['envelopes'] = [$metadata['envelope']];
+        }
+        $summary['envelope'] = $summary['envelopes'][0] ?? null; // legacy consumers
 
         return $summary;
     }
@@ -3740,5 +3959,113 @@ class OrderFlowService
         }
 
         return $filename;
+    }
+
+    public function calculateTotalsFromSummary(array $summary): array
+    {
+        $product = $this->resolveProduct(null, $summary['productId'] ?? null);
+        if ($product) {
+            $product->loadMissing(['paperStocks', 'addons']);
+        }
+
+        // Determine quantity and unit price defensively so we can compute an
+        // invitation total even when the product lookup fails (e.g., session-only
+        // summaries or in test environments).
+        $quantity = max(1, (int) ($summary['quantity'] ?? 1));
+        $unitPrice = (float) ($summary['unitPrice'] ?? ($product ? $this->unitPriceFor($product) : 0));
+        $invitationTotal = round($unitPrice * $quantity, 2);
+
+        // If we couldn't resolve the product, return totals based solely on
+        // the provided unit/quantity (no paper/addons/envelope/giveaway data).
+        if (!$product) {
+            $subtotal = $invitationTotal;
+            $total = round($subtotal + 0.0, 2);
+
+            return [
+                'invitationTotal' => $invitationTotal,
+                'subtotalAmount' => $subtotal,
+                'totalAmount' => $total,
+                'taxAmount' => 0.0,
+                'shippingFee' => static::DEFAULT_SHIPPING_FEE,
+                'extras' => [
+                    'paper' => 0.0,
+                    'addons' => 0.0,
+                    'envelope' => 0.0,
+                    'giveaway' => 0.0,
+                ],
+            ];
+        }
+
+        // Include base price of the invitation (unit * quantity). Previously this was
+        // omitted which caused server-side totals to undercount the order and made
+        // outstanding balance 0 when only the invitation existed.
+        $invitationTotal = round($unitPrice * $quantity, 2);
+        $baseSubtotal = $invitationTotal;
+
+        // Calculate paper stock total
+        $paperTotal = 0.0;
+        $paperStockId = $summary['paperStockId'] ?? null;
+        if ($paperStockId) {
+            $paperStock = $product->paperStocks()->find($paperStockId);
+            if ($paperStock && $paperStock->price) {
+                $paperTotal = round((float) $paperStock->price * $quantity, 2);
+            }
+        }
+
+        // Calculate addons total
+        $addonsTotal = 0.0;
+        $addonIds = $summary['addonIds'] ?? [];
+        if (!empty($addonIds)) {
+            $addons = $product->addons()->whereIn('id', $addonIds)->get();
+            foreach ($addons as $addon) {
+                $addonsTotal += round((float) $addon->price * $quantity, 2);
+            }
+        }
+
+        // Calculate envelope total
+        $envelopeTotal = 0.0;
+        if (!empty($summary['envelope']) && is_array($summary['envelope'])) {
+            $envelopeData = $summary['envelope'];
+            $envelopeQty = max(1, (int) ($envelopeData['qty'] ?? $envelopeData['quantity'] ?? 1));
+            $envelopePrice = (float) ($envelopeData['price'] ?? $envelopeData['unit_price'] ?? 0);
+            $envelopeTotal = round($envelopePrice * $envelopeQty, 2);
+        }
+
+        // Calculate giveaway total
+        $giveawayTotal = 0.0;
+        $giveaways = $summary['giveaways'] ?? [];
+        if (empty($giveaways) && !empty($summary['giveaway'])) {
+            $giveaways = [$summary['giveaway']];
+        }
+        foreach ($giveaways as $giveaway) {
+            if (!empty($giveaway) && is_array($giveaway)) {
+                $giveawayQty = max(1, (int) ($giveaway['qty'] ?? $giveaway['quantity'] ?? 1));
+                $giveawayPrice = (float) ($giveaway['price'] ?? $giveaway['unit_price'] ?? 0);
+                $giveawayTotal += round($giveawayPrice * $giveawayQty, 2);
+            }
+        }
+
+        // Include invitation base into subtotal so session/server totals match
+        // what the client expects (unit * qty + extras).
+        $subtotal = round($baseSubtotal + $paperTotal + $addonsTotal + $envelopeTotal + $giveawayTotal, 2);
+        $tax = 0.0;
+        $shipping = 0.0; // Always 0 for shipping
+        $total = round($subtotal + $shipping, 2);
+
+        return [
+            // Provide an explicit invitationTotal to make it easy for consumers
+            // to show per-item totals without re-deriving from unit/qty.
+            'invitationTotal' => $invitationTotal,
+            'subtotalAmount' => $subtotal,
+            'totalAmount' => $total,
+            'taxAmount' => $tax,
+            'shippingFee' => 0.0,
+            'extras' => [
+                'paper' => $paperTotal,
+                'addons' => $addonsTotal,
+                'envelope' => $envelopeTotal,
+                'giveaway' => $giveawayTotal,
+            ],
+        ];
     }
 }

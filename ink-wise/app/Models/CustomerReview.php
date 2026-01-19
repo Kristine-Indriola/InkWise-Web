@@ -16,6 +16,9 @@ class CustomerReview extends Model
 
     protected $casts = [
         'rating' => 'integer',
+        'design_json' => 'array',
+        'canvas_width' => 'integer',
+        'canvas_height' => 'integer',
     ];
 
     public function customer()

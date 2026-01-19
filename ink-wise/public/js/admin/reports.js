@@ -5,6 +5,7 @@
     currency: 'PHP',
     maximumFractionDigits: 2
   });
+  const percentFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
   const CDN_CHART_SRC = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js';
 
   const resolveChartSrc = () => {
@@ -139,17 +140,21 @@
 
     const summaryNodes = {
       orders: shell.querySelector('[data-metric="orders-count"]'),
-      revenue: shell.querySelector('[data-metric="revenue-total"]'),
+      revenue: shell.querySelector('[data-metric="revenue-paid"]'),
+      materialCost: shell.querySelector('[data-metric="material-cost"]'),
       pending: shell.querySelector('[data-metric="pending-revenue"]'),
       profit: shell.querySelector('[data-metric="profit-total"]'),
+      profitMargin: shell.querySelector('[data-metric="profit-margin"]'),
       average: shell.querySelector('[data-metric="average-order"]')
     };
 
     const applySummary = (summary = {}) => {
       if (summaryNodes.orders) summaryNodes.orders.textContent = numberFormat.format(summary.orders || 0);
       if (summaryNodes.revenue) summaryNodes.revenue.textContent = moneyFormat.format(summary.revenue || 0);
+      if (summaryNodes.materialCost) summaryNodes.materialCost.textContent = moneyFormat.format(summary.materialCost || 0);
       if (summaryNodes.pending) summaryNodes.pending.textContent = moneyFormat.format(summary.pendingRevenue || 0);
       if (summaryNodes.profit) summaryNodes.profit.textContent = moneyFormat.format(summary.profit || 0);
+      if (summaryNodes.profitMargin) summaryNodes.profitMargin.textContent = `${percentFormat.format(summary.profitMargin || 0)}% margin`;
       if (summaryNodes.average) summaryNodes.average.textContent = moneyFormat.format(summary.averageOrder || 0);
     };
 

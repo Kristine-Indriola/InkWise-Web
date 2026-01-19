@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Socialite\Facades\Socialite;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AddressController;
@@ -115,31 +116,106 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::get('/ordersummary/{order}', [OrderSummaryController::class, 'show'])
         ->name('ordersummary.show');
 
+    // Admin action: force material deduction for an order (admin-only)
+    Route::post('/ordersummary/{order}/deduct-materials', [OrderSummaryController::class, 'deductMaterials'])
+        ->name('ordersummary.deduct');
+
     // Admin orders list (table) - simple closure for listing orders in the admin UI
-    Route::get('/orders', function () {
-        $orders = \App\Models\Order::query()
-            ->select(['id', 'order_number', 'customer_id', 'total_amount', 'order_date', 'status', 'payment_status'])
+    Route::get('/orders', function (\Illuminate\Http\Request $request) {
+        $query = \App\Models\Order::query()
+            ->select(['id', 'order_number', 'customer_id', 'total_amount', 'order_date', 'status', 'payment_status', 'metadata', 'created_at'])
             ->where('archived', false)
+            ->where(function ($q) {
+                $q->where('payment_status', '!=', 'pending')
+                  ->orWhereNull('payment_status');
+            });
+
+        // Date filters (apply to order_date, fallback to created_at via COALESCE)
+        if ($request->filled('start_date')) {
+            try {
+                $start = \Carbon\Carbon::parse($request->query('start_date'))->startOfDay();
+                $query->whereRaw('COALESCE(order_date, created_at) >= ?', [$start->toDateTimeString()]);
+            } catch (\Throwable $e) {
+                // ignore invalid date
+            }
+        }
+
+        if ($request->filled('end_date')) {
+            try {
+                $end = \Carbon\Carbon::parse($request->query('end_date'))->endOfDay();
+                $query->whereRaw('COALESCE(order_date, created_at) <= ?', [$end->toDateTimeString()]);
+            } catch (\Throwable $e) {
+                // ignore invalid date
+            }
+        }
+
+        $orders = $query
             ->with(['customer', 'payments'])
+            ->withCount('items')
             ->latest('order_date')
             ->latest()
-            ->get();
+            ->get()
+            ->filter(function ($order) {
+                // Compute payment totals from payments relationship
+                $paidPayments = $order->payments->filter(fn($p) => strtolower($p->status ?? '') === 'paid');
+                $totalPaid = round($paidPayments->sum('amount'), 2);
+                $grandTotal = (float) ($order->total_amount ?? 0);
+                $balanceDue = max($grandTotal - $totalPaid, 0);
+                
+                // Include orders that have any paid payments (for testing and admin visibility)
+                return $totalPaid > 0;
+            })
+            ->map(function ($order) {
+                // Compute payment totals from payments relationship
+                $paidPayments = $order->payments->filter(fn($p) => strtolower($p->status ?? '') === 'paid');
+                $totalPaid = round($paidPayments->sum('amount'), 2);
+                $grandTotal = (float) ($order->total_amount ?? 0);
+                $balanceDue = max($grandTotal - $totalPaid, 0);
+                
+                // Append computed payment summary for the view
+                $order->payments_summary = collect([
+                    'grand_total' => $grandTotal,
+                    'total_paid' => $totalPaid,
+                    'balance_due' => $balanceDue,
+                ]);
+                $order->total_paid = $totalPaid;
+                
+                return $order;
+            });
 
         // Render the table view inside the ordersummary folder
-        return view('admin.ordersummary.tables', compact('orders'));
+        return view('admin.ordersummary.tables', ['orders' => $orders]);
     })->name('orders.index');
 
     // Archived orders
     Route::get('/orders/archived', function () {
         $orders = \App\Models\Order::query()
-            ->select(['id', 'order_number', 'customer_id', 'total_amount', 'order_date', 'status', 'payment_status'])
+            ->select(['id', 'order_number', 'customer_id', 'total_amount', 'order_date', 'status', 'payment_status', 'metadata'])
             ->where('archived', true)
             ->with(['customer', 'payments', 'activities' => function ($query) {
                 $query->latest()->limit(1); // Get the most recent activity
             }])
+            ->withCount('items')
             ->latest('order_date')
             ->latest()
-            ->get();
+            ->get()
+            ->map(function ($order) {
+                // Compute payment totals from payments relationship
+                $paidPayments = $order->payments->filter(fn($p) => strtolower($p->status ?? '') === 'paid');
+                $totalPaid = round($paidPayments->sum('amount'), 2);
+                $grandTotal = (float) ($order->total_amount ?? 0);
+                $balanceDue = max($grandTotal - $totalPaid, 0);
+                
+                // Append computed payment summary for the view
+                $order->payments_summary = collect([
+                    'grand_total' => $grandTotal,
+                    'total_paid' => $totalPaid,
+                    'balance_due' => $balanceDue,
+                ]);
+                $order->total_paid = $totalPaid;
+                
+                return $order;
+            });
 
         // Render the archived table view
         return view('admin.ordersummary.archived', compact('orders'));
@@ -161,6 +237,10 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     // Payments
     Route::get('/payments', [\App\Http\Controllers\Admin\PaymentController::class, 'index'])
         ->name('payments.index');
+    Route::get('/payments/export', [\App\Http\Controllers\Admin\PaymentController::class, 'export'])
+        ->name('payments.export');
+    Route::get('/payments/archived', [\App\Http\Controllers\Admin\PaymentController::class, 'archived'])
+        ->name('payments.archived');
 
 
     // Templates 
@@ -176,7 +256,9 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         Route::delete('/{id}', [AdminTemplateController::class, 'destroy'])->name('destroy');
         // Move these two lines inside this group and fix the path:
         Route::post('{id}/save-canvas', [AdminTemplateController::class, 'saveCanvas'])->name('saveCanvas');
+        Route::post('{id}/save-design', [AdminTemplateController::class, 'saveDesign'])->name('saveDesign');
         Route::post('{id}/save-template', [AdminTemplateController::class, 'saveTemplate'])->name('saveTemplate');
+        Route::post('{id}/test-save', [AdminTemplateController::class, 'testSave'])->name('testSave');
         Route::post('{id}/upload-preview', [AdminTemplateController::class, 'uploadPreview'])->name('uploadPreview');
         Route::post('{id}/autosave', [AdminTemplateController::class, 'autosave'])->name('autosave');
         // Add new API routes
@@ -306,6 +388,9 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
 
         Route::get('/sales/export/{type}', [ReportsDashboardController::class, 'exportSales'])
             ->name('sales.export');
+
+        Route::post('/sales/archive', [ReportsDashboardController::class, 'archive'])
+            ->name('sales.archive');
 
         Route::get('/inventory/export/{type}', [ReportsDashboardController::class, 'exportInventory'])
             ->name('inventory.export');
@@ -495,12 +580,92 @@ Route::get('/customer/notifications/{id}/read', function ($id) {
 // My Purchases
 Route::get('/customer/my-orders', fn () => view('customer.profile.my_purchase'))->name('customer.my_purchase');
 // To Pay tab (lists orders pending payment)
-Route::get('/customer/my-orders/topay', fn () => view('customer.profile.purchase.topay'))->name('customer.my_purchase.topay');
-Route::get('/customer/my-orders/inproduction', fn () => view('customer.profile.purchase.inproduction'))->name('customer.my_purchase.inproduction');
+Route::get('/customer/my-orders/topay', function () {
+    $user = Auth::user();
+    $orders = collect();
+    
+    if ($user && $user->customer) {
+        $orders = \App\Models\Order::query()
+            ->where('customer_id', $user->customer->customer_id)
+            ->with(['items.product', 'items.paperStockSelection', 'payments'])
+            ->latest()
+            ->get()
+            ->map(function ($order) {
+                // Compute payment totals from payments relationship
+                $paidPayments = $order->payments->filter(fn($p) => strtolower($p->status ?? '') === 'paid');
+                $totalPaid = round($paidPayments->sum('amount'), 2);
+                $grandTotal = (float) ($order->total_amount ?? 0);
+                $balanceDue = max($grandTotal - $totalPaid, 0);
+                
+                // Store computed values for easy access in view
+                $order->computed_total_paid = $totalPaid;
+                $order->computed_balance_due = $balanceDue;
+                
+                return $order;
+            });
+    }
+    
+    return view('customer.profile.purchase.topay', compact('orders'));
+})->name('customer.my_purchase.topay');
+Route::get('/customer/my-orders/inproduction', function () {
+    $user = Auth::user();
+    $orders = collect();
+    
+    if ($user && $user->customer) {
+        $orders = \App\Models\Order::query()
+            ->where('customer_id', $user->customer->customer_id)
+            ->with(['items.product', 'items.paperStockSelection', 'payments'])
+            ->latest()
+            ->paginate(20);
+        
+        $orders->getCollection()->transform(function ($order) {
+            // Compute payment totals from payments relationship
+            $paidPayments = $order->payments->filter(fn($p) => strtolower($p->status ?? '') === 'paid');
+            $totalPaid = round($paidPayments->sum('amount'), 2);
+            $grandTotal = (float) ($order->total_amount ?? 0);
+            $balanceDue = max($grandTotal - $totalPaid, 0);
+            
+            // Store computed values for easy access in view
+            $order->computed_total_paid = $totalPaid;
+            $order->computed_balance_due = $balanceDue;
+            
+            return $order;
+        });
+    }
+    
+    return view('customer.profile.purchase.inproduction', compact('orders'));
+})->name('customer.my_purchase.inproduction');
 Route::get('/customer/my-orders/toship', fn () => view('customer.profile.purchase.toship'))->name('customer.my_purchase.toship');
 Route::get('/customer/my-orders/toreceive', fn () => view('customer.profile.purchase.toreceive'))->name('customer.my_purchase.toreceive');
 Route::get('/customer/my-orders/topickup', fn () => view('customer.profile.purchase.topickup'))->name('customer.my_purchase.topickup');
-Route::get('/customer/my-orders/completed', fn () => view('customer.profile.purchase.completed'))->name('customer.my_purchase.completed');
+Route::get('/customer/my-orders/completed', function () {
+    $user = Auth::user();
+    $orders = collect();
+    
+    if ($user && $user->customer) {
+        $orders = \App\Models\Order::query()
+            ->where('customer_id', $user->customer->customer_id)
+            ->where('status', 'completed')
+            ->with(['items.product', 'items.paperStockSelection', 'payments'])
+            ->latest()
+            ->get()
+            ->map(function ($order) {
+                // Compute payment totals from payments relationship
+                $paidPayments = $order->payments->filter(fn($p) => strtolower($p->status ?? '') === 'paid');
+                $totalPaid = round($paidPayments->sum('amount'), 2);
+                $grandTotal = (float) ($order->total_amount ?? 0);
+                $balanceDue = max($grandTotal - $totalPaid, 0);
+                
+                // Store computed values for easy access in view
+                $order->computed_total_paid = $totalPaid;
+                $order->computed_balance_due = $balanceDue;
+                
+                return $order;
+            });
+    }
+    
+    return view('customer.profile.purchase.completed', compact('orders'));
+})->name('customer.my_purchase.completed');
 Route::get('/customer/my-orders/rate', [CustomerProfileController::class, 'rate'])->middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->name('customer.my_purchase.rate');
 Route::get('/customer/pay-remaining-balance/{order}', function (\App\Models\Order $order) {
     // Ensure the order belongs to the authenticated user
@@ -772,9 +937,12 @@ Route::get('/design/edit/{product?}', [OrderFlowController::class, 'edit'])
 Route::post('/order/cart/items', [OrderFlowController::class, 'storeDesignSelection'])
     ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('order.cart.add');
-Route::post('/design/autosave', [OrderFlowController::class, 'autosaveDesign'])
+Route::any('/design/autosave', [OrderFlowController::class, 'autosaveDesign'])
     // ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('order.design.autosave');
+Route::post('/design/upload-image', [OrderFlowController::class, 'uploadDesignImage'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.design.upload-image');
 Route::post('/design/save-template', [OrderFlowController::class, 'saveAsTemplate'])
     ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer,staff')
     ->name('order.design.save-template');
@@ -783,6 +951,12 @@ Route::post('/design/save-template', [OrderFlowController::class, 'saveAsTemplat
 Route::get('/order/review', [OrderFlowController::class, 'review'])
     ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('order.review');
+Route::post('/order/review/design', [OrderFlowController::class, 'saveReviewDesign'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.review.design');
+Route::post('/order/review/continue', [OrderFlowController::class, 'continueReview'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.review.continue');
 Route::get('/order/finalstep', [OrderFlowController::class, 'finalStep'])
     ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('order.finalstep');
@@ -810,6 +984,9 @@ Route::get('/order/summary.json', [OrderFlowController::class, 'summaryJson'])
 Route::post('/order/summary/sync', [OrderFlowController::class, 'syncSummary'])
     ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('order.summary.sync');
+Route::post('/order/summary/update-quantity', [OrderFlowController::class, 'updateQuantity'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.summary.update-quantity');
 Route::delete('/order/summary', [OrderFlowController::class, 'clearSummary'])
     ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('order.summary.clear');
@@ -835,6 +1012,9 @@ Route::get('/debug/giveaways-images', [OrderFlowController::class, 'debugGiveawa
     ->name('debug.giveaways.images');
 Route::get('/order/birthday', fn () => view('customer.templates.birthday'))->name('order.birthday');
 
+use App\Http\Controllers\Customer\CheckoutController;
+use App\Http\Controllers\Customer\PaymentController as CustomerPaymentController;
+
 Route::get('/checkout', [OrderFlowController::class, 'checkout'])
     ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('customer.checkout');
@@ -850,10 +1030,21 @@ Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->group
     Route::get('/customer/cart', [CartController::class, 'index'])->name('customer.cart');
     Route::patch('/order/cart/items/{cartItem}', [CartController::class, 'updateItem'])->name('customer.cart.update');
     Route::delete('/order/cart/items/{cartItem}', [CartController::class, 'removeItem'])->name('customer.cart.remove');
+    // Provide a friendly GET handler so users who accidentally navigate to the create endpoint
+    // (for example via a bad link or direct browser navigation) receive clear guidance
+    // instead of a server error about unsupported methods.
+    Route::get('/payments/gcash', function () {
+        if (request()->expectsJson()) {
+            return response()->json(['message' => 'GCash payments must be started via POST from the checkout flow.'], 405);
+        }
+
+        return redirect()->route('customer.checkout')
+            ->with('error', 'Please start GCash payments using the Place Order button on checkout.');
+    })->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer');
+
     Route::post('/payments/gcash', [PaymentController::class, 'createGCashPayment'])->name('payment.gcash.create');
     Route::get('/payments/gcash/return', [PaymentController::class, 'handleGCashReturn'])->name('payment.gcash.return');
 });
-Route::post('/payments/gcash/webhook', [PaymentController::class, 'webhook'])->name('payment.gcash.webhook');
 
 /**Customer Upload Route*/
 Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->post('/customer/upload/design', [CustomerAuthController::class, 'uploadDesign'])->name('customer.upload.design');
@@ -872,7 +1063,7 @@ Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->post(
 // login of all roles
 Route::get('/login', [RoleLoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [RoleLoginController::class, 'login'])->name('login.submit');
-Route::post('/logout', [RoleLoginController::class, 'logout'])->name('logout');
+Route::match(['GET', 'POST'], '/logout', [RoleLoginController::class, 'logout'])->name('logout');
 
 
 /*
@@ -911,12 +1102,17 @@ Route::middleware('auth')->prefix('owner')->name('owner.')->group(function () {
     // Other pagesgut
     Route::get('/order/workflow', [OwnerOrderWorkflowController::class, 'index'])->name('order.workflow');
     Route::get('/order/workflow/data', [OwnerOrderWorkflowController::class, 'data'])->name('order.workflow.data');
+    Route::get('/order/archived', [OwnerOrderWorkflowController::class, 'archived'])->name('order.archived');
+    Route::get('/orders/{order}', [OwnerOrderWorkflowController::class, 'show'])->name('orders.show');
+    Route::get('/pickup/calendar', [OwnerOrderWorkflowController::class, 'pickupCalendar'])->name('pickup.calendar');
     Route::get('/inventory', [OwnerInventoryController::class, 'index'])->name('inventory.index');
     Route::get('/inventory/track', [OwnerInventoryController::class, 'track'])->name('inventory-track');
     Route::get('/products', [OwnerProductsController::class, 'index'])->name('products.index');
     Route::get('/products/{product}', [OwnerProductsController::class, 'show'])->name('products.show');
     Route::get('/transactions/view', [OwnerTransactionsController::class, 'index'])->name('transactions-view');
     Route::get('/transactions/export', [OwnerTransactionsController::class, 'export'])->name('transactions-export');
+    Route::get('/transactions/archived', [OwnerTransactionsController::class, 'archived'])->name('transactions.archived');
+    Route::patch('/transactions/{payment}/archive', [OwnerTransactionsController::class, 'archive'])->name('transactions.archive');
     Route::get('/ratings', [OwnerRatingsController::class, 'index'])->name('ratings.index');
 
     Route::prefix('settings')->name('settings.')->group(function () {
@@ -1023,7 +1219,9 @@ Route::prefix('staff')->name('staff.')->middleware(\App\Http\Middleware\RoleMidd
         Route::delete('/{id}', [App\Http\Controllers\Admin\TemplateController::class, 'destroy'])->name('destroy');
         // Move these two lines inside this group and fix the path:
         Route::post('{id}/save-canvas', [App\Http\Controllers\Admin\TemplateController::class, 'saveCanvas'])->name('saveCanvas');
+        Route::post('{id}/save-design', [App\Http\Controllers\Admin\TemplateController::class, 'saveDesign'])->name('saveDesign');
         Route::post('{id}/save-template', [App\Http\Controllers\Admin\TemplateController::class, 'saveTemplate'])->name('saveTemplate');
+        Route::post('{id}/test-save', [App\Http\Controllers\Admin\TemplateController::class, 'testSave'])->name('testSave');
         Route::post('{id}/upload-preview', [App\Http\Controllers\Admin\TemplateController::class, 'uploadPreview'])->name('uploadPreview');
         Route::post('{id}/autosave', [App\Http\Controllers\Admin\TemplateController::class, 'autosave'])->name('autosave');
         // Add new API routes
@@ -1094,6 +1292,19 @@ require __DIR__.'/auth.php';
 // Graphics proxy routes (search endpoints used by client-side graphics panel)
 Route::get('/graphics/svgrepo', [GraphicsProxyController::class, 'svgrepo'])->name('graphics.svgrepo');
 Route::get('/graphics/unsplash', [GraphicsProxyController::class, 'unsplash'])->name('graphics.unsplash');
+
+if (app()->environment('local')) {
+    Route::get('/storage/{path}', function (string $path) {
+        $relativePath = ltrim($path, '/');
+        $disk = Storage::disk('public');
+
+        if (!$disk->exists($relativePath)) {
+            abort(404);
+        }
+
+        return $disk->response($relativePath);
+    })->where('path', '.*');
+}
 
 
 

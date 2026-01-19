@@ -6,15 +6,23 @@ use App\Http\Controllers\Controller;
 use App\Models\Material;
 use App\Models\Ink;
 use App\Models\Order;
+use App\Services\Reports\SalesMetricsService;
 use Carbon\Carbon;
-use Carbon\CarbonInterval;
-use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use App\Models\ArchivedSalesReport;
 
 class ReportsDashboardController extends Controller
 {
+    protected SalesMetricsService $salesMetrics;
+
+    public function __construct(SalesMetricsService $salesMetrics)
+    {
+        $this->salesMetrics = $salesMetrics;
+    }
+
     public function index(Request $request)
     {
         return $this->sales($request);
@@ -23,16 +31,115 @@ class ReportsDashboardController extends Controller
     public function sales(Request $request)
     {
         [$startDate, $endDate] = $this->resolveDateRange($request);
-        $paymentStatusFilter = $request->input('payment_status', 'all'); // all, full, half, unpaid
 
-        $context = $this->buildReportContext($startDate, $endDate, $paymentStatusFilter);
+        // If an interval filter is supplied, compute the date range for that interval
+        // and override explicit start/end so the whole page (cards, chart, table)
+        // uses the requested interval window.
+        $interval = $request->input('interval');
+        if (is_string($interval) && in_array($interval, ['daily', 'weekly', 'monthly', 'yearly'], true)) {
+            $now = Carbon::now();
+            switch ($interval) {
+                case 'daily':
+                    $startDate = $now->copy()->startOfDay();
+                    $endDate = $now->copy()->endOfDay();
+                    break;
+                case 'weekly':
+                    $startDate = $now->copy()->startOfWeek();
+                    $endDate = $now->copy()->endOfWeek();
+                    break;
+                case 'monthly':
+                    $startDate = $now->copy()->startOfMonth();
+                    $endDate = $now->copy()->endOfMonth();
+                    break;
+                case 'yearly':
+                    $startDate = $now->copy()->startOfYear();
+                    $endDate = $now->copy()->endOfYear();
+                    break;
+            }
+        }
+
+        $paymentStatusFilter = Str::lower((string) $request->input('payment_status', 'all'));
+        $paymentStatusFilter = match ($paymentStatusFilter) {
+            'full', 'fully-paid', 'paid' => 'full',
+            'half', 'partial', 'partially-paid', 'partially_paid' => 'half',
+            'unpaid', 'none' => 'unpaid',
+            default => 'all',
+        };
+
+        $orderStatusFilter = Str::lower((string) $request->input('order_status', 'completed'));
+        $orderStatusFilter = match ($orderStatusFilter) {
+            'all' => 'all',
+            'not_completed', 'incomplete', 'pending' => 'not_completed',
+            default => 'completed',
+        };
+
+        $context = $this->buildReportContext($startDate, $endDate, $paymentStatusFilter, $orderStatusFilter);
+
+        // Allow explicit interval selector (daily, weekly, monthly, yearly)
+        $requestedInterval = $request->input('interval');
+        if ($requestedInterval && is_string($requestedInterval) && array_key_exists($requestedInterval, $context['salesIntervals'])) {
+            $context['defaultSalesInterval'] = $requestedInterval;
+        }
+
         $context['filters'] = [
             'startDate' => $startDate?->format('Y-m-d'),
             'endDate' => $endDate?->format('Y-m-d'),
-            'paymentStatus' => $paymentStatusFilter,
+            'interval' => $context['defaultSalesInterval'] ?? null,
         ];
 
         return view('admin.reports.sales', $context);
+    }
+
+    public function archive(Request $request)
+    {
+        $data = $request->validate([
+            'period' => ['required', 'string', 'in:daily,weekly,monthly,yearly'],
+        ]);
+
+        $period = $data['period'];
+        $now = Carbon::now();
+
+        switch ($period) {
+            case 'daily':
+                $start = $now->copy()->subDay()->startOfDay();
+                $end = $now->copy()->subDay()->endOfDay();
+                break;
+            case 'weekly':
+                $start = $now->copy()->startOfWeek()->subWeek();
+                $end = $start->copy()->endOfWeek();
+                break;
+            case 'monthly':
+                $start = $now->copy()->startOfMonth()->subMonth();
+                $end = $start->copy()->endOfMonth();
+                break;
+            case 'yearly':
+                $start = $now->copy()->startOfYear()->subYear();
+                $end = $start->copy()->endOfYear();
+                break;
+            default:
+                return back()->with('error', 'Invalid archive period');
+        }
+
+        // Compute snapshot using existing service
+        $snapshot = $this->salesMetrics->compute($start, $end);
+
+        // Persist archive record
+        $archive = ArchivedSalesReport::create([
+            'period' => $period,
+            'start_date' => $start->toDateTimeString(),
+            'end_date' => $end->toDateTimeString(),
+            'payload' => $snapshot,
+            'archived_by' => optional(auth()->user())->id,
+        ]);
+
+        // Mark matching orders as archived so they no longer count in dashboards
+        Order::whereRaw("COALESCE(order_date, created_at) >= ? AND COALESCE(order_date, created_at) <= ?", [
+            $start->toDateTimeString(), $end->toDateTimeString()
+        ])->where(function ($q) {
+            $q->whereNull('archived')->orWhere('archived', false);
+        })->update(['archived' => true]);
+
+        return back()->with('success', 'Sales report archived for ' . ucfirst($period) . '.');
     }
 
     public function inventory(Request $request)
@@ -50,7 +157,7 @@ class ReportsDashboardController extends Controller
 
     public function pickupCalendar(Request $request)
     {
-        $period = $request->input('period', 'week'); // day, week, month, year
+        $period = $request->input('period', 'week'); // day, week, current_month, month, year
 
         $now = Carbon::now();
 
@@ -62,6 +169,10 @@ class ReportsDashboardController extends Controller
             case 'week':
                 $start = $now->copy()->startOfWeek();
                 $end = $now->copy()->endOfWeek();
+                break;
+            case 'current_month':
+                $start = $now->copy()->startOfMonth();
+                $end = $now->copy()->endOfMonth();
                 break;
             case 'month':
                 $nextMonth = $now->copy()->addMonth();
@@ -172,7 +283,12 @@ class ReportsDashboardController extends Controller
         return view($view, compact('calendarData', 'period', 'start', 'end'));
     }
 
-    private function buildReportContext(?Carbon $startDate = null, ?Carbon $endDate = null, string $paymentStatusFilter = 'all'): array
+    private function buildReportContext(
+        ?Carbon $startDate = null,
+        ?Carbon $endDate = null,
+        string $paymentStatusFilter = 'all',
+        string $orderStatusFilter = 'completed'
+    ): array
     {
         $materials = Material::with('inventory')
             ->where(function ($query) {
@@ -231,129 +347,14 @@ class ReportsDashboardController extends Controller
         $materialReorderLevels = $allInventoryItems->map(fn ($item) => $this->resolveReorderLevel($item));
         $inventoryStats = $this->buildInventorySummary($allInventoryItems);
 
-        $salesQuery = Order::query()
-            ->with([
-                'customer:customer_id,first_name,last_name',
-                'customerOrder:id,name',
-                'items:id,order_id,product_name,quantity',
-                'items.paperStockSelection.paperStock.material:material_id,unit_cost',
-                'items.addons.productAddon.material:material_id,unit_cost',
-                'payments:order_id,amount,status',
-            ])
-            ->where('status', 'completed')
-            ->latest('order_date');
+        $salesReport = $this->salesMetrics->compute($startDate, $endDate, $paymentStatusFilter, $orderStatusFilter);
 
-        $salesQuery = $this->applyOrderDateFilter($salesQuery, $startDate, $endDate);
-
-        $sales = $salesQuery
-            ->take(100)
-            ->get()
-            ->map(function (Order $order) use ($paymentStatusFilter) {
-                $customer = $order->customer;
-                $fallbackName = optional($order->customerOrder)->name;
-
-                $customerName = collect([
-                    optional($customer)->first_name,
-                    optional($customer)->last_name,
-                ])->filter()->implode(' ');
-
-                if (trim($customerName) === '' && $fallbackName) {
-                    $customerName = $fallbackName;
-                }
-
-                $itemsList = $order->items
-                    ->pluck('product_name')
-                    ->filter()
-                    ->values();
-
-                // Calculate material costs
-                $materialCost = 0;
-                foreach ($order->items as $item) {
-                    // Cost from paper stock
-                    if ($item->paperStockSelection && $item->paperStockSelection->paperStock) {
-                        $paperStockCost = ($item->paperStockSelection->paperStock->material->unit_cost ?? 0) * $item->quantity;
-                        $materialCost += $paperStockCost;
-                    }
-
-                    // Cost from addons
-                    foreach ($item->addons as $addon) {
-                        if ($addon->productAddon && $addon->productAddon->material) {
-                            $addonCost = ($addon->productAddon->material->unit_cost ?? 0) * ($addon->quantity ?? 1);
-                            $materialCost += $addonCost;
-                        }
-                    }
-                }
-
-                $order->customer_name = $customerName !== '' ? $customerName : '-';
-                $order->items_list = $itemsList->implode(', ');
-                $order->items_quantity = (int) $order->items->sum('quantity');
-                $order->total_amount_value = (float) $order->total_amount;
-                $order->material_cost_value = round($materialCost, 2);
-                $order->order_date_value = $order->order_date ?? $order->created_at;
-
-                // Determine cash realised for the order and net profit
-                $totalPaid = (float) $order->totalPaid();
-                $order->total_paid_value = $totalPaid;
-                $order->profit_value = round($totalPaid - $order->material_cost_value, 2);
-
-                // Determine payment status
-                $balanceDue = (float) $order->balanceDue();
-                if ($balanceDue <= 0.01) {
-                    $order->payment_status = 'Full Payment';
-                } elseif ($totalPaid > 0.0) {
-                    $order->payment_status = 'Half Payment';
-                } else {
-                    $order->payment_status = 'Unpaid';
-                }
-
-                return $order;
-            })
-            ->filter(function (Order $order) use ($paymentStatusFilter) {
-                if ($paymentStatusFilter === 'all') {
-                    return true;
-                }
-                return match ($paymentStatusFilter) {
-                    'full' => $order->payment_status === 'Full Payment',
-                    'half' => $order->payment_status === 'Half Payment',
-                    'unpaid' => $order->payment_status === 'Unpaid',
-                    default => true,
-                };
-            })
-            ->take(100); // Limit after filtering
-
-        $analyticsQuery = Order::query()
-            ->select(['id', 'total_amount', 'order_date', 'created_at'])
-            ->with(['payments:order_id,amount,status'])
-            ->where('status', 'completed')
-            ->whereRaw("COALESCE(order_date, created_at) >= ?", [
-                Carbon::now()->copy()->subYears(5)->startOfYear(),
-            ]);
-
-    $analyticsQuery = $this->applyOrderDateFilter($analyticsQuery, $startDate, $endDate);
-
-        $analyticsOrders = $analyticsQuery->get();
-
-        $salesIntervals = $this->buildSalesIntervals($analyticsOrders, $startDate, $endDate);
-
-        $defaultSalesInterval = array_key_exists('weekly', $salesIntervals)
-            ? 'weekly'
-            : (array_key_first($salesIntervals) ?? 'daily');
-
-        [$summaryStart, $summaryEnd] = $this->resolveSummaryWindow($analyticsOrders, $startDate, $endDate);
-        $salesSummaryTotals = $this->buildOrdersSummary($analyticsOrders, $summaryStart, $summaryEnd);
-        $salesSummaryLabel = $this->formatRangeLabel($summaryStart, $summaryEnd);
-
-        // Calculate estimated sales from incomplete orders (all non-completed orders)
-        $estimatedSalesQuery = Order::query()
-            ->where('status', '!=', 'completed')
-            ->where('status', '!=', 'cancelled');
-        
-        $estimatedSalesQuery = $this->applyOrderDateFilter($estimatedSalesQuery, $startDate, $endDate);
-        $estimatedSales = (float) $estimatedSalesQuery->sum('total_amount');
-        
-        $salesSummaryTotals['estimatedSales'] = round($estimatedSales, 2);
-
-        $paymentSummary = $this->buildPaymentSummary($analyticsOrders);
+        $sales = $salesReport['sales'];
+        $salesIntervals = $salesReport['salesIntervals'];
+        $defaultSalesInterval = $salesReport['defaultSalesInterval'];
+        $salesSummaryTotals = $salesReport['salesSummaryTotals'];
+        $salesSummaryLabel = $salesReport['salesSummaryLabel'];
+        $paymentSummary = $salesReport['paymentSummary'];
 
         return compact(
             'materials',
@@ -470,266 +471,4 @@ class ReportsDashboardController extends Controller
         ];
     }
 
-    private function buildSalesIntervals(Collection $orders, ?Carbon $rangeStart = null, ?Carbon $rangeEnd = null): array
-    {
-        $now = Carbon::now();
-
-        $start = $rangeStart?->copy();
-        $end = $rangeEnd?->copy();
-
-        if ($start || $end) {
-            $start ??= ($end?->copy()->subYears(5)->startOfYear()) ?? $now->copy()->subYears(5)->startOfYear();
-            $end ??= $now->copy()->endOfDay();
-
-            $configs = [
-                'daily' => [
-                    'start' => $start->copy()->startOfDay(),
-                    'end' => $end->copy()->endOfDay(),
-                    'step' => CarbonInterval::day(),
-                    'format' => 'Y-m-d',
-                    'label' => static fn (Carbon $date) => $date->format('M d'),
-                ],
-                'weekly' => [
-                    'start' => $start->copy()->startOfWeek(),
-                    'end' => $end->copy()->endOfWeek(),
-                    'step' => CarbonInterval::week(),
-                    'format' => 'o-W',
-                    'label' => static fn (Carbon $date) => 'Wk ' . str_pad((string) $date->isoWeek(), 2, '0', STR_PAD_LEFT) . ' ' . $date->format('Y'),
-                ],
-                'monthly' => [
-                    'start' => $start->copy()->startOfMonth(),
-                    'end' => $end->copy()->endOfMonth(),
-                    'step' => CarbonInterval::month(),
-                    'format' => 'Y-m',
-                    'label' => static fn (Carbon $date) => $date->format('M Y'),
-                ],
-                'yearly' => [
-                    'start' => $start->copy()->startOfYear(),
-                    'end' => $end->copy()->endOfYear(),
-                    'step' => CarbonInterval::year(),
-                    'format' => 'Y',
-                    'label' => static fn (Carbon $date) => $date->format('Y'),
-                ],
-            ];
-        } else {
-            $configs = [
-                'daily' => [
-                    'start' => $now->copy()->subDays(13)->startOfDay(),
-                    'end' => $now->copy()->endOfDay(),
-                    'step' => CarbonInterval::day(),
-                    'format' => 'Y-m-d',
-                    'label' => static fn (Carbon $date) => $date->format('M d'),
-                ],
-                'weekly' => [
-                    'start' => $now->copy()->subWeeks(11)->startOfWeek(),
-                    'end' => $now->copy()->endOfWeek(),
-                    'step' => CarbonInterval::week(),
-                    'format' => 'o-W',
-                    'label' => static fn (Carbon $date) => 'Wk ' . str_pad((string) $date->isoWeek(), 2, '0', STR_PAD_LEFT) . ' ' . $date->format('Y'),
-                ],
-                'monthly' => [
-                    'start' => $now->copy()->subMonths(11)->startOfMonth(),
-                    'end' => $now->copy()->endOfMonth(),
-                    'step' => CarbonInterval::month(),
-                    'format' => 'Y-m',
-                    'label' => static fn (Carbon $date) => $date->format('M Y'),
-                ],
-                'yearly' => [
-                    'start' => $now->copy()->subYears(4)->startOfYear(),
-                    'end' => $now->copy()->endOfYear(),
-                    'step' => CarbonInterval::year(),
-                    'format' => 'Y',
-                    'label' => static fn (Carbon $date) => $date->format('Y'),
-                ],
-            ];
-        }
-
-        $intervals = [];
-
-        foreach ($configs as $key => $config) {
-            $intervals[$key] = $this->buildIntervalPayload(
-                $orders,
-                $config['start']->copy(),
-                $config['end']->copy(),
-                $config['step'],
-                $config['format'],
-                $config['label']
-            );
-        }
-
-        return $intervals;
-    }
-
-    private function buildIntervalPayload(
-        Collection $orders,
-        Carbon $start,
-        Carbon $end,
-        CarbonInterval $step,
-        string $format,
-        callable $labelFormatter
-    ): array {
-        $series = $this->buildIntervalSeries($orders, $start->copy(), $end->copy(), $step, $format, $labelFormatter);
-        $summary = $this->buildOrdersSummary($orders, $start->copy(), $end->copy());
-
-        return array_merge($series, [
-            'summary' => $summary,
-            'range_label' => $this->formatRangeLabel($start, $end),
-        ]);
-    }
-
-    private function buildIntervalSeries(
-        Collection $orders,
-        Carbon $start,
-        Carbon $end,
-        CarbonInterval $step,
-        string $keyFormat,
-        callable $labelFormatter
-    ): array {
-        $groupedTotals = $orders
-            ->groupBy(function (Order $order) use ($keyFormat) {
-                $moment = $order->order_date ?? $order->created_at;
-
-                return $moment ? $moment->format($keyFormat) : null;
-            })
-            ->filter()
-            ->map(fn (Collection $group) => (float) $group->sum('total_amount'))
-            ->all();
-
-        $period = new CarbonPeriod($start, $step, $end);
-        $labels = [];
-        $totals = [];
-
-        foreach ($period as $datePoint) {
-            $key = $datePoint->format($keyFormat);
-            $labels[] = $labelFormatter($datePoint->copy());
-            $totals[] = round($groupedTotals[$key] ?? 0, 2);
-        }
-
-        if (empty($labels)) {
-            $labels[] = $labelFormatter($start->copy());
-            $totals[] = 0.0;
-        }
-
-        return [
-            'labels' => array_values($labels),
-            'totals' => array_values($totals),
-        ];
-    }
-
-    private function buildOrdersSummary(Collection $orders, Carbon $start, Carbon $end): array
-    {
-        $filtered = $orders->filter(function (Order $order) use ($start, $end) {
-            $moment = $order->order_date ?? $order->created_at;
-
-            return $moment ? $moment->betweenIncluded($start, $end) : false;
-        });
-
-        // Only count fully paid orders for revenue
-        $fullyPaidOrders = $filtered->filter(function (Order $order) {
-            return $order->balanceDue() == 0;
-        });
-
-        $orderCount = $filtered->count();
-        $revenue = (float) $fullyPaidOrders->sum('total_amount');
-        $realisedRevenue = (float) $filtered->sum(function (Order $order) {
-            return $order->total_paid_value ?? (float) $order->totalPaid();
-        });
-        $materialCost = (float) $filtered->sum('material_cost_value');
-        $profit = $realisedRevenue - $materialCost;
-
-        // Calculate pending revenue from partially paid orders
-        $partiallyPaidOrders = $filtered->filter(function (Order $order) {
-            $totalPaid = $order->totalPaid();
-            return $totalPaid > 0 && $order->balanceDue() > 0;
-        });
-        $pendingRevenue = (float) $partiallyPaidOrders->sum(function (Order $order) {
-            return $order->balanceDue();
-        });
-
-        return [
-            'orders' => $orderCount,
-            'revenue' => round($revenue, 2),
-            'pendingRevenue' => round($pendingRevenue, 2),
-            'materialCost' => round($materialCost, 2),
-            'profit' => round($profit, 2),
-            'averageOrder' => $orderCount > 0 ? round($revenue / $orderCount, 2) : 0.0,
-            'profitMargin' => $realisedRevenue > 0 ? round(($profit / $realisedRevenue) * 100, 1) : 0.0,
-        ];
-    }
-
-    private function formatRangeLabel(Carbon $start, Carbon $end): string
-    {
-        if ($start->isSameDay($end)) {
-            return $start->format('M j, Y');
-        }
-
-        return sprintf('%s - %s', $start->format('M j, Y'), $end->format('M j, Y'));
-    }
-
-    private function resolveSummaryWindow(Collection $orders, ?Carbon $startDate, ?Carbon $endDate): array
-    {
-        $start = $startDate?->copy()->startOfDay();
-        $end = $endDate?->copy()->endOfDay();
-
-        $moments = $orders
-            ->map(function (Order $order) {
-                return $order->order_date ?? $order->created_at;
-            })
-            ->filter();
-
-        if (!$start) {
-            $firstMoment = $moments->min();
-            $start = $firstMoment ? $firstMoment->copy()->startOfDay() : Carbon::now()->copy()->subDays(13)->startOfDay();
-        }
-
-        if (!$end) {
-            $lastMoment = $moments->max();
-            $end = $lastMoment ? $lastMoment->copy()->endOfDay() : Carbon::now()->copy()->endOfDay();
-        }
-
-        if ($end->lessThan($start)) {
-            [$start, $end] = [$end->copy(), $start->copy()];
-        }
-
-        return [$start, $end];
-    }
-
-    private function buildPaymentSummary(Collection $orders): array
-    {
-        $summary = [
-            'totalPaid' => 0.0,
-            'full' => ['count' => 0, 'amount' => 0.0],
-            'half' => ['count' => 0, 'amount' => 0.0, 'balance' => 0.0],
-        ];
-
-        foreach ($orders as $order) {
-            $paidAmount = (float) $order->totalPaid();
-            $balanceDue = (float) $order->balanceDue();
-
-            $summary['totalPaid'] += $paidAmount;
-
-            if ($paidAmount <= 0 && $balanceDue <= 0) {
-                continue;
-            }
-
-            if ($balanceDue <= 0 && $paidAmount > 0) {
-                $summary['full']['count']++;
-                $summary['full']['amount'] += $paidAmount;
-                continue;
-            }
-
-            if ($paidAmount > 0 && $balanceDue > 0) {
-                $summary['half']['count']++;
-                $summary['half']['amount'] += $paidAmount;
-                $summary['half']['balance'] += $balanceDue;
-            }
-        }
-
-        $summary['totalPaid'] = round($summary['totalPaid'], 2);
-        $summary['full']['amount'] = round($summary['full']['amount'], 2);
-        $summary['half']['amount'] = round($summary['half']['amount'], 2);
-        $summary['half']['balance'] = round($summary['half']['balance'], 2);
-
-        return $summary;
-    }
 }

@@ -473,6 +473,52 @@ function cleanSvgContent($svgContent) {
         .template-card__top {
             position: relative;
         }
+
+        /* Modernized page shell */
+        .page { background: linear-gradient(180deg, #f8fbff, #f2f6ff); }
+        .templates-grid { gap: 28px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+
+        /* Elevated template cards */
+        .template-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 18px;
+            background: #ffffff;
+            box-shadow: 0 14px 40px rgba(15, 23, 42, 0.08);
+            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+        }
+
+        .template-card:hover {
+            transform: translateY(-4px);
+            border-color: #cbd5e1;
+            box-shadow: 0 20px 55px rgba(15, 23, 42, 0.12);
+        }
+
+        /* Preview frame improvements */
+        .template-preview {
+            border-radius: 14px;
+            background: radial-gradient(circle at 20% 20%, #eef2ff, #e2e8f0 45%, #ffffff 75%);
+            border: 1px solid #e5e7eb;
+            overflow: hidden;
+        }
+
+        .preview-placeholder, .back-placeholder {
+            background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+            border: 1px dashed #cbd5e1;
+        }
+
+        /* Tag styling */
+        .badge { font-weight: 700; letter-spacing: 0.4px; }
+        .badge-primary { background: rgba(59,130,246,0.15); color: #1d4ed8; }
+
+        /* Action buttons */
+        .btn-action {
+            border-radius: 10px;
+            box-shadow: 0 8px 16px rgba(59,130,246,0.08);
+        }
+
+        .btn-danger {
+            box-shadow: 0 8px 16px rgba(239,68,68,0.08);
+        }
     </style>
 @endpush
 

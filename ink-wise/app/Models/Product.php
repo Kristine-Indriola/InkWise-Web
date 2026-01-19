@@ -28,10 +28,12 @@ class Product extends Model
         'date_available',
         'published_at',
         'unpublished_reason',
+        'sizes',
     ];
 
     protected $casts = [
         'published_at' => 'datetime',
+        'sizes' => 'array',
     ];
 
     public function scopePublished($query)
@@ -85,11 +87,19 @@ class Product extends Model
     }
 
     /**
-     * Relationship: addons
+     * Relationship: sizes
+     */
+    public function sizes()
+    {
+        return $this->hasMany(ProductSize::class);
+    }
+
+    /**
+     * Relationship: addons (legacy)
      */
     public function addons()
     {
-        return $this->hasMany(ProductAddon::class);
+        return $this->hasMany(ProductSize::class);
     }
 
     /**
