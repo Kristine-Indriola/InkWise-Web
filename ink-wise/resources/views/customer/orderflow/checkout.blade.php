@@ -1054,7 +1054,7 @@
             </div>
 
             <!-- Full Payment Options (100%) -->
-            <div class="fieldset" id="fullPaymentOptions" style="display: none;">
+            <div class="fieldset" id="fullPaymentOptions">
                 <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--text-strong);">Full Payment (100%)</h3>
 
                 <!-- GCash Full Payment -->
@@ -1066,6 +1066,7 @@
                         <span class="option-tag" style="background: #10b981;">Pay in Full</span>
                     </div>
                 </label>
+
             </div>
 
             <!-- Payment Summary -->
@@ -1087,6 +1088,7 @@
 
             <div class="fieldset">
                 <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--text-strong);">Payment Method</h3>
+                <h3>Gcash</h3>
                 <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
                     <div id="reviewPaymentInfo" style="font-size: 14px; color: var(--text-default);">
                         <!-- Payment info will be populated by JavaScript -->
@@ -1430,17 +1432,17 @@
             const subtotal = @json($subtotal ?? 0);
             const baseShipping = @json($shippingFee ?? 0);
             const taxRate = @json($taxRate ?? 0);
-            const orderTotalAmount = @json($totalAmount ?? 0); // Use the order's total amount
-            let recordedPaidAmount = @json($paidAmountDisplay ?? 0);
+            const orderTotalAmount = Math.round(@json($order->grandTotalAmount() ?? 0) * 100) / 100; // Use the order's total amount
+            let recordedPaidAmount = Math.round(@json($paidAmount ?? 0) * 100) / 100;
             let currentShippingCost = Number(baseShipping ?? 0);
             let currentTax = Number((subtotal ?? 0) * (taxRate ?? 0));
             let currentTotal = Number(orderTotalAmount); // Use order total instead of calculation
             const paymentConfig = {
-                createUrl: '{{ route('payment.gcash.create') }}',
+                createUrl: '{{ route("payment.gcash.create") }}',
                 resumeUrl: @json($pendingPaymentUrl ?? null),
                 hasPending: @json($hasPendingPayment ?? false),
                 depositAmount: @json($depositSuggested ?? 0),
-                balance: @json($balanceDueDisplay ?? 0),
+                balance: @json($balanceDue ?? 0),
                 isFullyPaid: @json($isFullyPaid ?? false),
             };
 
@@ -1512,7 +1514,7 @@
                 // Always base totals on the server-provided order total to avoid client-side drift.
                 // `orderTotalAmount` is injected from the server and represents the authoritative total due.
                 const total = Number(orderTotalAmount || 0);
-                const balance = Math.max(total - (recordedPaidAmount ?? 0), 0);
+                const balance = Math.round(Math.max(total - (recordedPaidAmount ?? 0), 0) * 100) / 100;
 
                 currentShippingCost = Number(baseShipping ?? 0);
                 currentTax = 0; // No tax
@@ -1762,11 +1764,15 @@
                     return { success: false };
                 }
 
+                // Ensure amount is rounded down to 2 decimal places to match server expectations
+                amount = Math.floor(amount * 100) / 100;
+
                 const mode = determineGcashMode();
                 const contact = collectContactDetails();
 
                 try {
                     console.debug('Starting GCash payment fetch', { paymentConfig, paymentMethod, amount, mode, contact, recordedPaidAmount });
+                console.log('Sending amount:', amount, 'remaining:', remaining, 'paymentConfig.balance:', paymentConfig.balance);
                     const response = await fetch(paymentConfig.createUrl, {
                         method: 'POST',
                         headers: {

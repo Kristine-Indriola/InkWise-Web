@@ -508,27 +508,7 @@
                 </select>
             </div>
         </div>
-        <!-- Floating Toolbar -->
-        <div class="floating-toolbar" id="floating-toolbar">
-            <button class="toolbar-btn" type="button" data-nav="text" title="Text">
-                <span class="toolbar-icon-text">T</span>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="uploads" title="Uploads">
-                <i class="fa-solid fa-cloud-arrow-up"></i>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="graphics" title="Graphics">
-                <i class="fa-solid fa-images"></i>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="background" title="Colors">
-                <i class="fa-solid fa-brush"></i>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="tables" title="Tables">
-                <i class="fa-solid fa-table"></i>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="colors" title="Colors">
-                <i class="fa-solid fa-palette"></i>
-            </button>
-        </div>
+        <!-- Floating Toolbar removed (right-side small sidebar buttons) -->
         <div class="preview-thumbs" role="tablist" aria-label="Card sides">
             <button type="button" class="preview-thumb active" data-card-thumb="front" aria-pressed="true">
                 <div class="thumb-preview" @if($frontImage) style="background-image: url('{{ $frontImage }}');" @endif>
@@ -566,7 +546,8 @@
         <div class="text-field-list" id="textFieldList">
             <!-- fields are generated dynamically from the SVG (or default placeholders shown only when SVG has no text nodes) -->
         </div>
-        <div class="text-layout-controls" style="margin-top:12px; display:flex; gap:10px; align-items:center;">
+        {{-- Removed text layout controls as requested --}}
+        {{-- <div class="text-layout-controls" style="margin-top:12px; display:flex; gap:10px; align-items:center;">
             <label style="font-weight:600; margin-right:6px">Layout</label>
             <select id="textLayoutOrientation" aria-label="Text layout orientation">
                 <option value="horizontal">Horizontal rows</option>
@@ -587,7 +568,7 @@
                 <option value="bottom">Bottom</option>
             </select>
             <button id="applyTextLayoutBtn" class="btn btn-primary" type="button" style="margin-left:8px">Apply</button>
-        </div>
+        </div> --}}
         <button class="add-field-btn" type="button" data-add-text-field>New Text Field</button>
     </div>
 </div>

@@ -984,6 +984,9 @@ Route::get('/debug/giveaways-images', [OrderFlowController::class, 'debugGiveawa
     ->name('debug.giveaways.images');
 Route::get('/order/birthday', fn () => view('customer.templates.birthday'))->name('order.birthday');
 
+use App\Http\Controllers\Customer\CheckoutController;
+use App\Http\Controllers\Customer\PaymentController as CustomerPaymentController;
+
 Route::get('/checkout', [OrderFlowController::class, 'checkout'])
     ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('customer.checkout');
@@ -993,16 +996,27 @@ Route::post('/checkout/complete', [OrderFlowController::class, 'completeCheckout
 Route::post('/checkout/cancel', [OrderFlowController::class, 'cancelCheckout'])
     ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('checkout.cancel');
-Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/order/{order}/pay-remaining-balance', [OrderFlowController::class, 'payRemainingBalance'])->name('order.pay.remaining.balance');
 
-Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->group(function () {
-    Route::get('/customer/cart', [CartController::class, 'index'])->name('customer.cart');
-    Route::patch('/order/cart/items/{cartItem}', [CartController::class, 'updateItem'])->name('customer.cart.update');
-    Route::delete('/order/cart/items/{cartItem}', [CartController::class, 'removeItem'])->name('customer.cart.remove');
-    Route::post('/payments/gcash', [PaymentController::class, 'createGCashPayment'])->name('payment.gcash.create');
-    Route::get('/payments/gcash/return', [PaymentController::class, 'handleGCashReturn'])->name('payment.gcash.return');
+// Payment Routes
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')->group(function () {
+    Route::post('/payment/gcash/create', [CustomerPaymentController::class, 'createGCashPayment'])->name('payment.gcash.create');
+    Route::get('/payment/gcash/{orderId}', [CustomerPaymentController::class, 'initiateGCashPayment'])->name('customer.checkout.payment.gcash');
+    Route::get('/payment/gcash/process/{paymentId}', [CustomerPaymentController::class, 'processGCashPayment'])->name('customer.checkout.payment.gcash.process');
+    Route::get('/payment/bank-transfer/{orderId}', [CustomerPaymentController::class, 'initiateBankTransfer'])->name('customer.checkout.payment.bank');
+    Route::get('/payment/cod/{orderId}', [CustomerPaymentController::class, 'confirmCodPayment'])->name('customer.checkout.payment.cod');
 });
-Route::post('/payments/gcash/webhook', [PaymentController::class, 'webhook'])->name('payment.gcash.webhook');
+
+// New Cart-based Checkout Routes
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')->group(function () {
+    Route::get('/cart/checkout', [CheckoutController::class, 'index'])->name('customer.cart.checkout');
+    Route::post('/cart/checkout/process', [CheckoutController::class, 'process'])->name('customer.cart.checkout.process');
+    Route::get('/checkout/payment/{orderId}/complete', [CheckoutController::class, 'paymentComplete'])->name('customer.checkout.payment.complete');
+    Route::get('/checkout/payment/{orderId}/cancel', [CheckoutController::class, 'paymentCancel'])->name('customer.checkout.payment.cancel');
+    Route::get('/order/{orderId}/success', function ($orderId) {
+        $order = \App\Models\Order::findOrFail($orderId);
+        return view('customer.checkout.success', compact('order'));
+    })->name('customer.order.success');
+});
 
 /**Customer Upload Route*/
 Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->post('/customer/upload/design', [CustomerAuthController::class, 'uploadDesign'])->name('customer.upload.design');

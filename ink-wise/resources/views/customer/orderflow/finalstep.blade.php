@@ -111,7 +111,6 @@
 			border-top-color: #e2e8f0;
 		}
 
-		/* Base Price Section Styling */
 		.base-price-section {
 			padding: 2rem 0;
 			background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
@@ -225,6 +224,7 @@
 			}
 		}
 	</style>
+	<script src="https://cdn.tailwindcss.com"></script>
 	<script src="{{ asset('js/customer/orderflow-finalstep.js') }}" defer></script>
 	<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 </head>
@@ -716,7 +716,7 @@
     // Calculate giveaway total
     $giveawayTotalCalc = $giveawayTotal;
 @endphp
-<main class="finalstep-shell" data-storage-key="inkwise-finalstep" data-envelope-url="{{ $envelopeUrl }}" data-cart-url="{{ route('order.addtocart') }}" data-save-url="{{ $finalStepSaveUrl }}" data-fallback-samples="false" data-product-id="{{ $product->id ?? '' }}" data-product-name="{{ $resolvedProductName }}" data-processing-days="{{ $processingDays }}">
+<main class="finalstep-shell" style="padding-top: 4rem;" data-storage-key="inkwise-finalstep" data-envelope-url="{{ $envelopeUrl }}" data-cart-url="{{ route('order.addtocart') }}" data-save-url="{{ $finalStepSaveUrl }}" data-fallback-samples="false" data-product-id="{{ $product->id ?? '' }}" data-product-name="{{ $resolvedProductName }}" data-processing-days="{{ $processingDays }}">
 	<header class="finalstep-header">
 		<div class="finalstep-header__content">
 			<a href="{{ $reviewUrl }}" class="finalstep-header__back" aria-label="Back to review">
@@ -730,31 +730,6 @@
 		</div>
 	</header>
 
-	<!-- Base Price Display -->
-	<section class="base-price-section">
-		<div class="base-price-card">
-			<div class="base-price-content">
-				<div class="base-price-header">
-					<h2>Base Price</h2>
-					<div class="base-price-amount">
-						<span class="price-label">Base price per piece</span>
-						<span class="price-value">{{ $formatMoney($basePricePerPiece) }}</span>
-					</div>
-				</div>
-				<div class="base-price-notice">
-					<div class="notice-icon">
-						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-							<path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-						</svg>
-					</div>
-					<div class="notice-content">
-						<p class="notice-title">Total will change based on your material selections</p>
-						<p class="notice-text">The final price includes your chosen paper stock, add-ons, envelopes, giveaways, shipping, and applicable taxes. Select your options below to see the complete breakdown.</p>
-					</div>
-				</div>
-			</div>
-		</div>
-	</section>
 
 	<div class="finalstep-layout">
 		<section class="finalstep-preview" data-product-name="{{ $resolvedProductName }}">
@@ -814,7 +789,7 @@
 									<span id="priceDisplay" class="meta-value">{{ $formatMoney($itemTotal ?? 0) }}</span>
 								</div>
 							</div>
-							<p class="text-slate-600 text-sm">Base price: {{ $formatMoney($basePricePerPiece) }} per piece</p>
+						
 							<div id="quantityError" class="error-message" style="display: none;">Quantity must be at least {{ $minQty }}</div>
 							<p class="bulk-note">{{ $quantityNote }}</p>
 						</div>
@@ -1158,15 +1133,12 @@
 	</div>
 </div>
 
-</body>
-</html>
+	<script>
+	document.addEventListener('DOMContentLoaded', function () {
+		// no DOM container required; we will replace the artwork images directly
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-	// no DOM container required; we will replace the artwork images directly
-
-	let saved = null;
-	try {
+		let saved = null;
+		try {
 		// Prefer explicit saved-template key
 		saved = JSON.parse(window.sessionStorage.getItem('inkwise-saved-template') || 'null');
 	} catch (err) {
@@ -1361,4 +1333,77 @@ document.addEventListener('DOMContentLoaded', function () {
 			});
 		});
 	});
+
+	// Navigation dropdown functionality
+	document.addEventListener('DOMContentLoaded', () => {
+		const dropdownControllers = [];
+		const navToggle = document.getElementById('navToggle');
+		const mobilePanel = document.getElementById('mobileNavPanel');
+
+		const registerDropdown = ({ triggerId, menuId }) => {
+			const trigger = document.getElementById(triggerId);
+			const menu = document.getElementById(menuId);
+			if (!trigger || !menu) return null;
+
+			const indicator = trigger.querySelector('svg');
+
+			const open = () => {
+				menu.classList.remove('hidden');
+				trigger.setAttribute('aria-expanded', 'true');
+				indicator?.classList.add('rotate-180');
+			};
+
+			const close = () => {
+				menu.classList.add('hidden');
+				trigger.setAttribute('aria-expanded', 'false');
+				indicator?.classList.remove('rotate-180');
+			};
+
+			trigger.addEventListener('click', (event) => {
+				event.stopPropagation();
+				const willOpen = menu.classList.contains('hidden');
+				closeAllDropdowns();
+				if (willOpen) open();
+			});
+
+			return { trigger, menu, close };
+		};
+
+		const closeAllDropdowns = () => dropdownControllers.forEach((controller) => controller.close());
+
+		[
+			{ triggerId: 'categoryToggle', menuId: 'categoryMenu' },
+			{ triggerId: 'mobileCategoryToggle', menuId: 'mobileCategoryMenu' },
+			{ triggerId: 'userDropdownBtn', menuId: 'userDropdownMenu' },
+		].forEach((config) => {
+			const controller = registerDropdown(config);
+			if (controller) dropdownControllers.push(controller);
+		});
+
+		document.addEventListener('click', (event) => {
+			dropdownControllers.forEach((controller) => {
+				if (controller.menu.classList.contains('hidden')) return;
+				if (controller.menu.contains(event.target) || controller.trigger.contains(event.target)) return;
+				controller.close();
+			});
+		});
+
+		document.addEventListener('keydown', (event) => {
+			if (event.key !== 'Escape') return;
+			closeAllDropdowns();
+			if (mobilePanel && !mobilePanel.classList.contains('hidden')) {
+				mobilePanel.classList.add('hidden');
+				navToggle?.setAttribute('aria-expanded', 'false');
+			}
+		});
+
+		navToggle?.addEventListener('click', () => {
+			const isOpen = navToggle.getAttribute('aria-expanded') === 'true';
+			navToggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+			mobilePanel?.classList.toggle('hidden', isOpen);
+			if (!isOpen) closeAllDropdowns();
+		});
+	});
 	</script>
+</body>
+</html>

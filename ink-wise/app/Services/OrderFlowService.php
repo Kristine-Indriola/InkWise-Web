@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class OrderFlowService
@@ -320,7 +321,7 @@ class OrderFlowService
         $userId = $user?->getAuthIdentifier();
         $customerId = $user?->customer?->customer_id;
         
-        \Log::debug('loadCustomerReview called', [
+        Log::debug('loadCustomerReview called', [
             'templateId' => $templateId,
             'userId' => $userId,
             'customerId' => $customerId,
@@ -350,7 +351,7 @@ class OrderFlowService
 
         $result = $query->latest('updated_at')->first();
         
-        \Log::debug('loadCustomerReview result', [
+        Log::debug('loadCustomerReview result', [
             'found' => $result ? 'YES' : 'NO',
             'result_id' => $result?->id,
             'result_template_id' => $result?->template_id,

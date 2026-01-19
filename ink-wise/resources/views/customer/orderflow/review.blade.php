@@ -207,32 +207,6 @@
 
 					<div class="warning-card" role="alert">
 						<strong>Empty items won't be printed</strong>
-						<span>We noticed you didn't edit the following placeholder items.</span>
-						<span class="sticky-notice">
-							<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-								<path d="M12 9V13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-								<path d="M12 17H12.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-								<path d="M10.29 3.85997L2.82002 17C2.64552 17.3028 2.55312 17.6475 2.55127 17.9986C2.54942 18.3497 2.63816 18.6953 2.8096 18.9998C2.98105 19.3044 3.2299 19.5561 3.53053 19.7307C3.83117 19.9053 4.17349 19.9965 4.52002 20H19.48C19.8265 19.9965 20.1688 19.9053 20.4695 19.7307C20.7701 19.5561 21.019 19.3044 21.1904 18.9998C21.3619 18.6953 21.4506 18.3497 21.4487 17.9986C21.4469 17.6475 21.3545 17.3028 21.18 17L13.71 3.85997C13.5318 3.56654 13.279 3.32849 12.9788 3.17099C12.6787 3.01348 12.3422 2.94223 12.0037 2.96504C11.6652 2.98785 11.3398 3.10479 11.061 3.30328C10.7822 3.50176 10.5616 3.77434 10.42 4.08997" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-							</svg>
-							<span>Warning: Any unchanged sample text or images will not be printed.</span>
-						</span>
-
-						<button type="button"
-								class="placeholder-toggle"
-								data-placeholder-toggle="#placeholderList"
-								aria-expanded="false"
-								aria-controls="placeholderList"
-								data-label-expanded="Hide placeholder items"
-								data-label-collapsed="View placeholder items">
-							<span data-placeholder-label>View placeholder items</span>
-							<span class="placeholder-count">(<span data-placeholder-count>0</span>)</span>
-						</button>
-
-						<ul id="placeholderList" class="placeholder-list" data-expanded="false">
-							@foreach($placeholderItems as $item)
-								<li>{{ $item }}</li>
-							@endforeach
-						</ul>
 					</div>
 				</div>
 
@@ -256,14 +230,7 @@
 					<div class="card-flip">
 						<div class="inner">
 							<div class="card-face front">
-								@if($customerReview && !empty($customerReview->design_svg))
-									{{-- Embed SVG directly - img src doesn't work with SVGs containing external resources --}}
-									<div class="svg-container" style="width: 100%; height: 100%; pointer-events: none;">
-										{!! $customerReview->design_svg !!}
-									</div>
-								@else
-									<img src="{{ $frontImage }}" alt="Front of your design" loading="lazy" decoding="async">
-								@endif
+								<img src="{{ $frontImage }}" alt="Front of your design" loading="lazy" decoding="async">
 							</div>
 							<div class="card-face back">
 								<img src="{{ $backImage }}" alt="Back of your design" loading="lazy" decoding="async">
