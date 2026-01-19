@@ -2,10 +2,8 @@
 
 namespace App\Models;
 
-use App\Models\Order;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Customer extends Model
 {
@@ -35,16 +33,8 @@ class Customer extends Model
         return $this->belongsTo(User::class, 'user_id', 'user_id');
     }
 
-    public function orders(): HasMany
+    public function orders()
     {
-        return $this->hasMany(Order::class, 'customer_id', 'customer_id')
-            ->orderByDesc('updated_at');
-    }
-
-    // Accessors
-    public function getNameAttribute()
-    {
-        $name = trim(($this->first_name ?? '') . ' ' . ($this->middle_name ?? '') . ' ' . ($this->last_name ?? ''));
-        return $name ?: 'Guest';
+        return $this->hasMany(CustomerOrder::class, 'customer_id', 'customer_id');
     }
 }

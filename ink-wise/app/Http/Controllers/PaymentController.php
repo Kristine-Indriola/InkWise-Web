@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\Payment;
+use App\Services\OrderFlowService;
 use Illuminate\Support\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Client\PendingRequest;
@@ -82,8 +83,27 @@ class PaymentController extends Controller
         ]);
 
         if ($summary['balance'] <= 0) {
+            Log::info('GCash create blocked: order fully paid', [
+                'order_id' => $order->id,
+                'total_paid' => $summary['total_paid'],
+                'balance' => $summary['balance'],
+            ]);
+
             return response()->json([
                 'message' => 'This order is already fully paid.',
+                'order' => [
+                    'id' => $order->id,
+                    'total_amount' => $order->total_amount,
+                    'grand_total' => $order->grandTotalAmount(),
+                    'summary_snapshot_present' => !empty($order->summary_snapshot ?? []),
+                ],
+                'summary' => [
+                    'balance' => $summary['balance'],
+                    'total_paid' => $summary['total_paid'],
+                    'payments' => $summary['payments'],
+                    // include paymongo metadata if present for debugging
+                    'paymongo' => $metadata['paymongo'] ?? null,
+                ],
             ], 409);
         }
 
@@ -621,11 +641,18 @@ class PaymentController extends Controller
         $mode = Arr::get($payload, 'mode', 'half');
         if (($summary['balance'] <= 0 || $summary['total_paid'] > 0)
             && in_array($order->status, ['processing'], true)
-            && $mode !== 'balance_payment') {
+            && $mode !== 'balance_payment'
+            && $order->status !== 'draft') {
             $attributes['status'] = 'in_production';
         }
 
         $order->forceFill($attributes)->save();
+
+        // Deduct inventory if order is now fully paid
+        if ($summary['balance'] <= 0.01) {
+            $orderFlowService = app(\App\Services\OrderFlowService::class);
+            $orderFlowService->syncMaterialUsage($order->fresh());
+        }
 
         return $order->fresh(['payments']);
     }

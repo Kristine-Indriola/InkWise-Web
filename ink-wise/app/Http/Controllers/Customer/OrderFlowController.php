@@ -579,6 +579,15 @@ class OrderFlowController extends Controller
             $designSvg = null;
         }
 
+        // Extract back design SVG if it exists in design_json
+        $designBackSvg = null;
+        if (isset($designJson['sides']['back']['svg'])) {
+            $designBackSvg = $this->normalizeDesignSvg($designJson['sides']['back']['svg']);
+            if ($designBackSvg === '') {
+                $designBackSvg = null;
+            }
+        }
+
         $user = Auth::user();
         $customerId = $user?->customer?->customer_id;
         $orderItemId = $validated['order_item_id'] ? (int) $validated['order_item_id'] : null;
@@ -640,6 +649,7 @@ class OrderFlowController extends Controller
             'template_id' => (int) $validated['template_id'],
             'order_item_id' => $orderItemId,
             'design_svg' => $designSvg,
+            'design_back_svg' => $designBackSvg,
             'design_json' => $designJson,
             'preview_image' => $previewImage,
             'canvas_width' => $validated['canvas_width'] ?? null,

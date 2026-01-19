@@ -162,6 +162,21 @@ document.addEventListener('DOMContentLoaded', () => {
     syncSelectionState(summary);
   };
 
+  const revertLocalEnvelopeSelection = (env) => {
+    // Revert a single envelope selection locally without clearing other selections
+    const summary = readSummary() ?? {};
+    if (!summary.envelopes || !Array.isArray(summary.envelopes)) return;
+    summary.envelopes = summary.envelopes.filter(e => String(e.id) !== String(env.id));
+    // Recompute envelope extras total
+    const totalEnvelopeCost = summary.envelopes.reduce((sum, e) => sum + (Number(e.total) || 0), 0);
+    summary.extras = summary.extras ?? { paper: 0, addons: 0, envelope: 0, giveaway: 0 };
+    summary.extras.envelope = totalEnvelopeCost;
+    writeSummary(summary);
+    state.selectedIds = summary.envelopes.map(e => String(e.id));
+    // Update UI parts
+    syncSelectionState(summary);
+  };
+
   const setContinueState = (disabled) => {
     if (!continueBtn) return;
     const isDisabled = Boolean(disabled);
@@ -529,8 +544,9 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    showToast('Unable to save envelope. Please try again.');
-    syncSelectionState();
+    // Revert only the envelope that failed to persist instead of clearing all selections.
+    revertLocalEnvelopeSelection(env);
+    showToast('Unable to save envelope. Selection reverted for that item.');
   };
 
   const createCard = (env) => {
@@ -695,11 +711,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const shouldShowSkeleton = !state.envelopes.length;
     if (shouldShowSkeleton) showSkeleton(state.skeletonCount);
     try {
-      const response = await fetch(envelopesUrl, { headers: { Accept: 'application/json' } });
-      if (response.ok) {
-        const data = await response.json();
-        if (Array.isArray(data) && data.length) {
-          state.envelopes = data.map((item, index) => ({
+      const response = await fetch(envelopesUrl, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+        if (response.ok) {
+          const payload = await response.json();
+          const data = Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
+          if (Array.isArray(data) && data.length) {
+            state.envelopes = data.map((item, index) => ({
             id: item.id ?? `env_${index}`,
             product_id: item.product_id,
             name: item.name ?? 'Envelope',

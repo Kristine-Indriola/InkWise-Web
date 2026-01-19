@@ -3,7 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Finalize Order — InkWise</title>
+	<title>Finalize Order — Inkwise</title>
 	<meta name="csrf-token" content="{{ csrf_token() }}">
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -111,45 +111,6 @@
 			border-top-color: #e2e8f0;
 		}
 
-		.base-price-section {
-			padding: 2rem 0;
-			background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-			border-bottom: 1px solid #e2e8f0;
-		}
-
-		.base-price-card {
-			max-width: 1200px;
-			margin: 0 auto;
-			padding: 0 1rem;
-		}
-
-		.base-price-content {
-			background: rgba(255, 255, 255, 0.95);
-			backdrop-filter: blur(10px);
-			border: 1px solid rgba(15, 23, 42, 0.08);
-			border-radius: 1rem;
-			padding: 2rem;
-			box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
-		}
-
-		.base-price-header {
-			display: flex;
-			align-items: center;
-			justify-content: space-between;
-			margin-bottom: 1.5rem;
-		}
-
-		.base-price-header h2 {
-			font-size: 1.5rem;
-			font-weight: 600;
-			color: #0f172a;
-			margin: 0;
-		}
-
-		.base-price-amount {
-			text-align: right;
-		}
-
 		.price-label {
 			display: block;
 			font-size: 0.875rem;
@@ -162,16 +123,6 @@
 			font-size: 2rem;
 			font-weight: 700;
 			color: #0f172a;
-		}
-
-		.base-price-notice {
-			display: flex;
-			align-items: flex-start;
-			gap: 1rem;
-			padding: 1.5rem;
-			background: #fef3c7;
-			border: 1px solid #f59e0b;
-			border-radius: 0.75rem;
 		}
 
 		.notice-icon {
@@ -199,326 +150,34 @@
 			line-height: 1.5;
 		}
 
-		@media (max-width: 768px) {
-			.base-price-header {
-				flex-direction: column;
-				align-items: flex-start;
-				gap: 1rem;
-			}
-
-			.base-price-amount {
-				text-align: left;
-			}
-
-			.price-value {
-				font-size: 1.75rem;
-			}
-
-			.base-price-notice {
-				flex-direction: column;
-				text-align: center;
-			}
-
-			.notice-icon {
-				align-self: center;
-			}
-		}
 	</style>
 	<script src="https://cdn.tailwindcss.com"></script>
 	<script src="{{ asset('js/customer/orderflow-finalstep.js') }}" defer></script>
 	<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 </head>
-<body class="finalstep-body bg-white" data-product-id="{{ $product->id ?? '' }}">
+<body class="finalstep-body bg-white" data-product-id="{{ $product->id ?? '' }}" style="overflow-y: auto; height: auto; padding-top: 0;">
 @php
-	$resolvedInvitationTypeNavbar = 'Wedding';
-	$eventRoutesNavbar = [
-		'wedding' => [
-			'label' => 'Wedding',
-			'invitations' => route('templates.wedding.invitations'),
-			'giveaways' => route('templates.wedding.giveaways'),
-		],
-		'corporate' => [
-			'label' => 'Corporate',
-			'invitations' => route('templates.corporate.invitations'),
-			'giveaways' => route('templates.corporate.giveaways'),
-		],
-		'baptism' => [
-			'label' => 'Baptism',
-			'invitations' => route('templates.baptism.invitations'),
-			'giveaways' => route('templates.baptism.giveaways'),
-		],
-		'birthday' => [
-			'label' => 'Birthday',
-			'invitations' => route('templates.birthday.invitations'),
-			'giveaways' => route('templates.birthday.giveaways'),
-		],
-	];
-
-	$currentEventKeyNavbar = strtolower($resolvedInvitationTypeNavbar);
-	if (! array_key_exists($currentEventKeyNavbar, $eventRoutesNavbar)) {
-		$currentEventKeyNavbar = 'wedding';
-	}
-	$currentEventRoutesNavbar = $eventRoutesNavbar[$currentEventKeyNavbar];
-
-	$navLinksNavbar = [
-		[
-			'label' => 'Home',
-			'route' => route('dashboard'),
-			'isActive' => request()->routeIs('dashboard'),
-		],
-		[
-			'label' => 'Invitations',
-			'route' => $currentEventRoutesNavbar['invitations'],
-			'isActive' => request()->routeIs('templates.' . $currentEventKeyNavbar . '.invitations'),
-		],
-		[
-			'label' => 'Giveaways',
-			'route' => $currentEventRoutesNavbar['giveaways'],
-			'isActive' => request()->routeIs('templates.' . $currentEventKeyNavbar . '.giveaways'),
-		],
-	];
-
-	$categoryLinksNavbar = [];
-	foreach ($eventRoutesNavbar as $key => $config) {
-		$categoryLinksNavbar[] = [
-			'key' => $key,
-			'label' => $config['label'],
-			'route' => $config['invitations'],
-			'isActive' => $key === $currentEventKeyNavbar,
-		];
-	}
-
-	$favoritesEnabledNavbar = \Illuminate\Support\Facades\Route::has('customer.favorites');
-	$cartRouteNavbar = \Illuminate\Support\Facades\Route::has('customer.cart')
-		? route('customer.cart')
-		: '/order/addtocart';
-	$searchValueNavbar = request('query', '');
-@endphp
-
-<header class="fixed top-0 z-40 w-full border-b border-[#c7d2fe] bg-white/95 backdrop-blur shadow-sm">
-	<div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-		<a href="{{ route('dashboard') }}" class="group flex items-center gap-2" aria-label="Inkwise home">
-			<span class="text-4xl font-bold text-[#a6b7ff] transition-transform duration-200 group-hover:-translate-y-0.5" style="font-family: Edwardian Script ITC;">I</span>
-			<span class="text-2xl font-bold text-gray-900" style="font-family: 'Playfair Display', serif;">nkwise</span>
-		</a>
-
-		<div class="flex items-center gap-3 lg:gap-6">
-			<button id="navToggle" aria-controls="mobileNavPanel" aria-expanded="false" type="button"
-			        class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#c7d2fe] text-[#4f46e5] transition hover:bg-[#eef2ff] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#a6b7ff] lg:hidden">
-				<span class="sr-only">Toggle navigation menu</span>
-				<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-					<path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round" stroke-linejoin="round" />
-				</svg>
-			</button>
-
-			<nav id="primaryNav" class="hidden lg:flex">
-				<ul class="flex items-center gap-4 text-sm font-semibold text-gray-700">
-					@foreach ($navLinksNavbar as $link)
-						<li>
-							<a href="{{ $link['route'] }}"
-							   class="inline-flex items-center gap-2 rounded-full px-4 py-2 transition {{ $link['isActive'] ? 'bg-[#eef2ff] text-[#4338ca] shadow-sm' : 'hover:text-[#4338ca]' }}"
-							   aria-current="{{ $link['isActive'] ? 'page' : 'false' }}">
-								{{ $link['label'] }}
-							</a>
-						</li>
-					@endforeach
-					<li class="relative">
-						<button id="categoryToggle" type="button" aria-haspopup="true" aria-expanded="false"
-						        class="inline-flex items-center gap-2 rounded-full px-3 py-2 text-gray-700 transition hover:border-[#c7d2fe] hover:text-[#4338ca]">
-							{{ $eventRoutesNavbar[$currentEventKeyNavbar]['label'] ?? 'Wedding' }}
-							<svg class="h-4 w-4 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-								<path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round" />
-							</svg>
-						</button>
-						<div id="categoryMenu" class="absolute left-0 right-auto mt-2 hidden w-56 rounded-2xl border border-[#dbeafe] bg-white/95 backdrop-blur shadow-2xl lg:right-0">
-							<ul>
-								@foreach ($categoryLinksNavbar as $category)
-									<li>
-										<a href="{{ $category['route'] }}"
-										   class="flex items-center justify-between px-5 py-2.5 text-sm text-gray-700 transition hover:bg-[#eef2ff] {{ $category['isActive'] ? 'font-semibold text-[#4338ca]' : '' }}">
-											<span>{{ $category['label'] }}</span>
-											@if($category['isActive'])
-												<span class="text-xs text-[#4338ca]">Current</span>
-											@endif
-										</a>
-									</li>
-								@endforeach
-							</ul>
-						</div>
-					</li>
-				</ul>
-			</nav>
-
-			<div class="flex items-center gap-3">
-				<form action="{{ url('/search') }}" method="GET" class="hidden lg:flex">
-					<label for="desktop-invitation-search" class="sr-only">Search templates</label>
-					<input id="desktop-invitation-search" type="text" name="query" value="{{ $searchValueNavbar }}" placeholder="Search templates..."
-					       class="w-52 rounded-full border border-[#dbeafe] px-4 py-2 text-sm placeholder:text-gray-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#a6b7ff]">
-				</form>
-
-				<div class="hidden items-center gap-2 lg:flex">
-					<a href="{{ $favoritesEnabledNavbar ? route('customer.favorites') : '#' }}"
-					   class="nav-icon-button"
-					   aria-label="My favorites"
-					   title="My favorites"
-					   @unless($favoritesEnabledNavbar) aria-disabled="true" @endunless>
-						<i class="fi fi-br-comment-heart" aria-hidden="true"></i>
-					</a>
-					<a href="{{ $cartRouteNavbar }}"
-					   class="nav-icon-button"
-					   aria-label="My cart"
-					   title="My cart">
-						<i class="bi bi-bag-heart-fill" aria-hidden="true"></i>
-					</a>
-				</div>
-
-				@guest
-					<a href="{{ route('customer.login') }}"
-					   class="hidden items-center rounded-full bg-gradient-to-r from-[#6366f1] via-[#7c83ff] to-[#a6b7ff] px-5 py-2 font-semibold text-white shadow focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#a6b7ff] sm:inline-flex"
-					   style="font-family: 'Seasons', serif;">
-						Sign in
-					</a>
-				@endguest
-
-				@auth
-					<div class="relative">
-						<button id="userDropdownBtn" type="button" aria-expanded="false"
-						        class="inline-flex items-center gap-2 rounded-full bg-[#4f46e5] px-3 py-2 text-sm text-white transition hover:bg-[#4338ca] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#a6b7ff]">
-							<span>{{ Auth::user()->customer?->first_name ?? Auth::user()->email }}</span>
-							<svg class="h-3.5 w-3.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-								<path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round" />
-							</svg>
-						</button>
-						<div id="userDropdownMenu" class="absolute right-0 mt-3 hidden w-48 rounded-2xl border border-[#dbeafe] bg-white shadow-xl">
-							<a href="{{ route('customer.dashboard') }}" class="block px-4 py-2.5 text-sm text-gray-700 transition hover:bg-[#eef2ff]">Profile</a>
-							<form action="{{ route('customer.logout') }}" method="POST">
-								@csrf
-								<button type="submit" class="block w-full px-4 py-2.5 text-left text-sm text-gray-700 transition hover:bg-[#eef2ff]">Logout</button>
-							</form>
-						</div>
-					</div>
-				@endauth
-			</div>
-		</div>
-	</div>
-	<div id="mobileNavPanel" class="mx-auto hidden w-full max-w-7xl border-t border-[#e0e7ff] bg-white px-4 pb-6 pt-4 shadow-inner lg:hidden">
-		<div class="space-y-5">
-			<form action="{{ url('/search') }}" method="GET">
-				<label for="mobile-invitation-search" class="sr-only">Search templates</label>
-				<input id="mobile-invitation-search" type="text" name="query" value="{{ $searchValueNavbar }}" placeholder="Search templates..."
-				       class="w-full rounded-full border border-[#dbeafe] px-4 py-2 text-sm placeholder:text-gray-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#a6b7ff]">
-			</form>
-
-			<div class="flex items-center gap-3">
-				<a href="{{ $favoritesEnabledNavbar ? route('customer.favorites') : '#' }}"
-				   class="nav-icon-button"
-				   aria-label="My favorites"
-				   title="My favorites"
-				   @unless($favoritesEnabledNavbar) aria-disabled="true" @endunless>
-					<i class="fi fi-br-comment-heart" aria-hidden="true"></i>
-				</a>
-				<a href="{{ $cartRouteNavbar }}" class="nav-icon-button" aria-label="My cart" title="My cart">
-					<i class="bi bi-bag-heart-fill" aria-hidden="true"></i>
-				</a>
-			</div>
-
-			<ul class="space-y-2 text-sm font-semibold text-gray-700">
-				@foreach ($navLinksNavbar as $link)
-					<li>
-						<a href="{{ $link['route'] }}"
-						   class="flex items-center justify-between rounded-lg px-4 py-2 {{ $link['isActive'] ? 'bg-[#eef2ff] text-[#4338ca]' : 'hover:bg-[#eef2ff] hover:text-[#4338ca]' }}"
-						   aria-current="{{ $link['isActive'] ? 'page' : 'false' }}">
-							<span>{{ $link['label'] }}</span>
-							@if($link['isActive'])
-								<i class="bi bi-dot text-2xl"></i>
-							@endif
-						</a>
-					</li>
-				@endforeach
-				<li>
-					<button id="mobileCategoryToggle" type="button" aria-expanded="false"
-					        class="flex w-full items-center justify-between rounded-lg border border-[#dbeafe] px-4 py-2 text-gray-700">
-						{{ $eventRoutesNavbar[$currentEventKeyNavbar]['label'] ?? 'Wedding' }}
-						<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-							<path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round" />
-						</svg>
-					</button>
-					<div id="mobileCategoryMenu" class="mt-2 hidden rounded-xl border border-[#dbeafe] bg-white shadow-lg">
-						@foreach ($categoryLinksNavbar as $category)
-							<a href="{{ $category['route'] }}" class="flex items-center justify-between px-4 py-2 text-sm text-gray-700 transition hover:bg-[#eef2ff] {{ $category['isActive'] ? 'font-semibold text-[#4338ca]' : '' }}">
-								<span>{{ $category['label'] }}</span>
-								@if($category['isActive'])
-									<i class="bi bi-check-lg"></i>
-								@endif
-							</a>
-						@endforeach
-					</div>
-				</li>
-			</ul>
-
-			@guest
-				<a href="{{ route('customer.login') }}" class="inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-[#6366f1] via-[#7c83ff] to-[#a6b7ff] px-5 py-2 font-semibold text-white">
-					Sign in
-				</a>
-			@endguest
-
-			@auth
-				<div class="rounded-2xl border border-[#dbeafe] px-4 py-3 text-sm text-gray-700">
-					<p class="font-semibold text-gray-900">{{ Auth::user()->customer?->first_name ?? Auth::user()->email }}</p>
-					<div class="mt-3 flex flex-col gap-2">
-						<a href="{{ route('customer.dashboard') }}" class="rounded-lg border border-transparent px-3 py-2 text-left transition hover:border-[#dbeafe]">Profile</a>
-						<form action="{{ route('customer.logout') }}" method="POST">
-							@csrf
-							<button type="submit" class="w-full rounded-lg px-3 py-2 text-left transition hover:bg-[#eef2ff]">Logout</button>
-						</form>
-					</div>
-				</div>
-			@endauth
-		</div>
-	</div>
-</header>
-@php
-	// Minimal, robust view setup for finalstep — resolve product/template if provided
+	$req = request();
 	$product = $product ?? null;
 	$proof = $proof ?? null;
-
-	try {
-		$req = request();
-		if (!$product) {
-			if ($req->has('product_id')) {
-				try {
-					$product = \App\Models\Product::with(['uploads', 'product_images', 'template', 'paperStocks', 'addons'])->find($req->get('product_id'));
-				} catch (\Throwable $_e) {
-					try {
-						$row = \Illuminate\Support\Facades\DB::table('products')->where('id', $req->get('product_id'))->first();
-						if ($row) $product = $row;
-					} catch (\Throwable $_e) {
-						// ignore
-					}
-				}
-			}
-
-			if (!$product && $req->has('template_id')) {
-				try {
-					$templateRef = \App\Models\Template::with(['preview_front', 'preview_back'])->find($req->get('template_id')) ?? ($templateRef ?? null);
-				} catch (\Throwable $_e) {
-					try {
-						$tpl = \Illuminate\Support\Facades\DB::table('templates')->where('id', $req->get('template_id'))->first();
-						if ($tpl) $templateRef = $tpl;
-					} catch (\Throwable $_e) {
-						// ignore
-					}
-				}
-			}
-		}
-	} catch (\Throwable $e) {
-		// swallow errors in view, proceed with fallbacks
-	}
-
+	$templateRef = $templateRef ?? null;
+	$order = $order ?? null;
+	$orderSummary = $orderSummary ?? [];
+	$finalArtwork = $finalArtwork ?? [];
+	$finalArtworkFront = $finalArtworkFront ?? null;
+	$finalArtworkBack = $finalArtworkBack ?? null;
+	$quantityOptions = $quantityOptions ?? [];
+	$paperStocks = $paperStocks ?? [];
+	$addonGroups = $addonGroups ?? [];
+	$estimatedDeliveryDate = $estimatedDeliveryDate ?? null;
+	$estimatedDeliveryDays = $estimatedDeliveryDays ?? null;
+	$processingDays = $processingDays ?? null;
+	$minQty = $minQty ?? 10;
+@endphp
+@php 
 	$uploads = $product->uploads ?? collect();
 	$images = $product->product_images ?? $product->images ?? optional($proof)->images ?? null;
 	$templateRef = $product->template ?? ($templateRef ?? optional($proof)->template ?? null);
-	$basePricePerPiece = $templateRef ? ($templateRef->price ?? 5.00) : 5.00;
 
 	$frontImage = $finalArtwork['front'] ?? ($finalArtworkFront ?? null);
 	$backImage = $finalArtwork['back'] ?? ($finalArtworkBack ?? null);
@@ -776,7 +435,7 @@
 			<div class="finalstep-card form-card">
 				<header class="form-card__header">
 					<h2>Order details</h2>
-					<p>Pick quantities, paper stocks, and optional finishes. We’ll calculate totals automatically.</p>
+					<p>Pick quantities, paper stocks, and optional finishes. We'll calculate totals automatically.</p>
 				</header>
 				<form id="finalOrderForm" class="finalstep-form" novalidate>
 					<div class="form-fixed-section">
@@ -789,7 +448,6 @@
 									<span id="priceDisplay" class="meta-value">{{ $formatMoney($itemTotal ?? 0) }}</span>
 								</div>
 							</div>
-						
 							<div id="quantityError" class="error-message" style="display: none;">Quantity must be at least {{ $minQty }}</div>
 							<p class="bulk-note">{{ $quantityNote }}</p>
 						</div>
@@ -876,13 +534,13 @@
 					</div>
 
 					<div class="form-fixed-section form-fixed-section--bottom">
-	
-									<div class="mt-4 flex items-center justify-between text-base font-semibold border-t border-slate-200 pt-2">
-										<dt class="text-slate-900">Total due</dt>
-										<dd class="text-slate-900" data-order-total>{{ $formatMoney($grandTotal) }}</dd>
-									</div>
-								</dl>
-							</div>
+						<div class="payment-summary">
+							<dl>
+								<div class="mt-4 flex items-center justify-between text-base font-semibold border-t border-slate-200 pt-2">
+									<dt class="text-slate-900">Total due</dt>
+									<dd class="text-slate-900" data-order-total>{{ $formatMoney($grandTotal) }}</dd>
+								</div>
+							</dl>
 						</div>
 
 						<div class="delivery-info">
@@ -917,7 +575,19 @@
 	<script>
 		document.addEventListener('DOMContentLoaded', () => {
 			const summaryData = {!! \Illuminate\Support\Js::from($orderSummary) !!};
-			window.sessionStorage.setItem('order_summary_payload', JSON.stringify(summaryData));
+			try {
+				const minSummary = {
+					productId: summaryData.productId ?? summaryData.product_id ?? null,
+					quantity: summaryData.quantity ?? null,
+					paymentMode: summaryData.paymentMode ?? summaryData.payment_mode ?? null,
+					totalAmount: summaryData.totalAmount ?? summaryData.total_amount ?? null,
+					shippingFee: summaryData.shippingFee ?? summaryData.shipping_fee ?? null,
+					order_id: summaryData.order_id ?? summaryData.orderId ?? null,
+				};
+				window.sessionStorage.setItem('order_summary_payload', JSON.stringify(minSummary));
+			} catch (e) {
+				console.warn('Failed to save minimal order_summary_payload to sessionStorage:', e);
+			}
 		});
 	</script>
 @endif
@@ -1258,7 +928,7 @@
 			const srv = json?.data ?? null;
 			if (!srv) return;
 			const srvImages = Array.isArray(srv.previewImages)
-				? srv.previewImages.filter(Boolean)
+				? srv.previewImages.filter(Boolean) 
 				: (Array.isArray(srv.preview_images) ? srv.preview_images.filter(Boolean) : []);
 			const srvPrimary = srv.previewImage || srv.preview_image || srvImages[0] || null;
 			if (!srvPrimary) return;

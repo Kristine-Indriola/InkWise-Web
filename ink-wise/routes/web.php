@@ -616,6 +616,38 @@ Route::get('/customer/my-orders/inproduction', function () {
             ->where('customer_id', $user->customer->customer_id)
             ->with(['items.product', 'items.paperStockSelection', 'payments'])
             ->latest()
+            ->paginate(20);
+        
+        $orders->getCollection()->transform(function ($order) {
+            // Compute payment totals from payments relationship
+            $paidPayments = $order->payments->filter(fn($p) => strtolower($p->status ?? '') === 'paid');
+            $totalPaid = round($paidPayments->sum('amount'), 2);
+            $grandTotal = (float) ($order->total_amount ?? 0);
+            $balanceDue = max($grandTotal - $totalPaid, 0);
+            
+            // Store computed values for easy access in view
+            $order->computed_total_paid = $totalPaid;
+            $order->computed_balance_due = $balanceDue;
+            
+            return $order;
+        });
+    }
+    
+    return view('customer.profile.purchase.inproduction', compact('orders'));
+})->name('customer.my_purchase.inproduction');
+Route::get('/customer/my-orders/toship', fn () => view('customer.profile.purchase.toship'))->name('customer.my_purchase.toship');
+Route::get('/customer/my-orders/toreceive', fn () => view('customer.profile.purchase.toreceive'))->name('customer.my_purchase.toreceive');
+Route::get('/customer/my-orders/topickup', fn () => view('customer.profile.purchase.topickup'))->name('customer.my_purchase.topickup');
+Route::get('/customer/my-orders/completed', function () {
+    $user = Auth::user();
+    $orders = collect();
+    
+    if ($user && $user->customer) {
+        $orders = \App\Models\Order::query()
+            ->where('customer_id', $user->customer->customer_id)
+            ->where('status', 'completed')
+            ->with(['items.product', 'items.paperStockSelection', 'payments'])
+            ->latest()
             ->get()
             ->map(function ($order) {
                 // Compute payment totals from payments relationship
@@ -632,12 +664,8 @@ Route::get('/customer/my-orders/inproduction', function () {
             });
     }
     
-    return view('customer.profile.purchase.inproduction', compact('orders'));
-})->name('customer.my_purchase.inproduction');
-Route::get('/customer/my-orders/toship', fn () => view('customer.profile.purchase.toship'))->name('customer.my_purchase.toship');
-Route::get('/customer/my-orders/toreceive', fn () => view('customer.profile.purchase.toreceive'))->name('customer.my_purchase.toreceive');
-Route::get('/customer/my-orders/topickup', fn () => view('customer.profile.purchase.topickup'))->name('customer.my_purchase.topickup');
-Route::get('/customer/my-orders/completed', fn () => view('customer.profile.purchase.completed'))->name('customer.my_purchase.completed');
+    return view('customer.profile.purchase.completed', compact('orders'));
+})->name('customer.my_purchase.completed');
 Route::get('/customer/my-orders/rate', [CustomerProfileController::class, 'rate'])->middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->name('customer.my_purchase.rate');
 Route::get('/customer/pay-remaining-balance/{order}', function (\App\Models\Order $order) {
     // Ensure the order belongs to the authenticated user
@@ -996,26 +1024,26 @@ Route::post('/checkout/complete', [OrderFlowController::class, 'completeCheckout
 Route::post('/checkout/cancel', [OrderFlowController::class, 'cancelCheckout'])
     ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('checkout.cancel');
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->get('/order/{order}/pay-remaining-balance', [OrderFlowController::class, 'payRemainingBalance'])->name('order.pay.remaining.balance');
 
-// Payment Routes
-Route::middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')->group(function () {
-    Route::post('/payment/gcash/create', [CustomerPaymentController::class, 'createGCashPayment'])->name('payment.gcash.create');
-    Route::get('/payment/gcash/{orderId}', [CustomerPaymentController::class, 'initiateGCashPayment'])->name('customer.checkout.payment.gcash');
-    Route::get('/payment/gcash/process/{paymentId}', [CustomerPaymentController::class, 'processGCashPayment'])->name('customer.checkout.payment.gcash.process');
-    Route::get('/payment/bank-transfer/{orderId}', [CustomerPaymentController::class, 'initiateBankTransfer'])->name('customer.checkout.payment.bank');
-    Route::get('/payment/cod/{orderId}', [CustomerPaymentController::class, 'confirmCodPayment'])->name('customer.checkout.payment.cod');
-});
+Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->group(function () {
+    Route::get('/customer/cart', [CartController::class, 'index'])->name('customer.cart');
+    Route::patch('/order/cart/items/{cartItem}', [CartController::class, 'updateItem'])->name('customer.cart.update');
+    Route::delete('/order/cart/items/{cartItem}', [CartController::class, 'removeItem'])->name('customer.cart.remove');
+    // Provide a friendly GET handler so users who accidentally navigate to the create endpoint
+    // (for example via a bad link or direct browser navigation) receive clear guidance
+    // instead of a server error about unsupported methods.
+    Route::get('/payments/gcash', function () {
+        if (request()->expectsJson()) {
+            return response()->json(['message' => 'GCash payments must be started via POST from the checkout flow.'], 405);
+        }
 
-// New Cart-based Checkout Routes
-Route::middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')->group(function () {
-    Route::get('/cart/checkout', [CheckoutController::class, 'index'])->name('customer.cart.checkout');
-    Route::post('/cart/checkout/process', [CheckoutController::class, 'process'])->name('customer.cart.checkout.process');
-    Route::get('/checkout/payment/{orderId}/complete', [CheckoutController::class, 'paymentComplete'])->name('customer.checkout.payment.complete');
-    Route::get('/checkout/payment/{orderId}/cancel', [CheckoutController::class, 'paymentCancel'])->name('customer.checkout.payment.cancel');
-    Route::get('/order/{orderId}/success', function ($orderId) {
-        $order = \App\Models\Order::findOrFail($orderId);
-        return view('customer.checkout.success', compact('order'));
-    })->name('customer.order.success');
+        return redirect()->route('customer.checkout')
+            ->with('error', 'Please start GCash payments using the Place Order button on checkout.');
+    })->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer');
+
+    Route::post('/payments/gcash', [PaymentController::class, 'createGCashPayment'])->name('payment.gcash.create');
+    Route::get('/payments/gcash/return', [PaymentController::class, 'handleGCashReturn'])->name('payment.gcash.return');
 });
 
 /**Customer Upload Route*/
