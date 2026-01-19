@@ -313,28 +313,35 @@ class OrderFlowController extends Controller
     public function autosaveDesign(Request $request): JsonResponse
     {
         try {
-            Log::info('Autosave design called', ['payload' => $request->all()]);
+            Log::info('Autosave design called', ['payload_keys' => array_keys($request->all())]);
 
-        $payload = $request->validate([
-            'design' => ['required', 'array'],
-            'design.updated_at' => ['nullable', 'string'],
-            'design.sides' => ['nullable', 'array'],
-            'design.sides.*' => ['nullable', 'array'],
-            'design.texts' => ['nullable', 'array'],
-            'design.texts.*' => ['nullable', 'array'],
-            'design.images' => ['nullable', 'array'],
-            'design.images.*' => ['nullable', 'array'],
-            'design.canvas' => ['nullable', 'array'],
-            'preview' => ['nullable', 'array'],
-            'preview.image' => ['nullable', 'string'],
-            'preview.images' => ['nullable', 'array'],
-            'preview.images.*' => ['nullable', 'string'],
-            'placeholders' => ['nullable', 'array'],
-            'placeholders.*' => ['nullable', 'string'],
-            'product_id' => ['nullable', 'integer', 'exists:products,id'],
-            'template_id' => ['nullable', 'integer'],
-        ]);
+            $payload = $request->validate([
+                'design' => ['required', 'array'],
+                'design.updated_at' => ['nullable', 'string'],
+                'design.sides' => ['nullable', 'array'],
+                'design.sides.*' => ['nullable', 'array'],
+                'design.texts' => ['nullable', 'array'],
+                'design.texts.*' => ['nullable', 'array'],
+                'design.images' => ['nullable', 'array'],
+                'design.images.*' => ['nullable', 'array'],
+                'design.canvas' => ['nullable', 'array'],
+                'preview' => ['nullable', 'array'],
+                'preview.image' => ['nullable', 'string'],
+                'preview.images' => ['nullable', 'array'],
+                'preview.images.*' => ['nullable', 'string'],
+                'placeholders' => ['nullable', 'array'],
+                'placeholders.*' => ['nullable', 'string'],
+                'product_id' => ['nullable', 'integer', 'exists:products,id'],
+                'template_id' => ['nullable', 'integer'],
+            ]);
 
+            Log::info('Autosave design validation passed', ['product_id' => $payload['product_id'] ?? null, 'template_id' => $payload['template_id'] ?? null]);
+    } catch (\Throwable $e) {
+        Log::error('Autosave design validation failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+        throw $e;
+    }
+
+    try {
         $placeholders = collect(Arr::get($payload, 'placeholders', []))
             ->filter(fn ($value) => is_string($value) && trim($value) !== '')
             ->map(fn ($value) => trim($value))
@@ -521,28 +528,42 @@ class OrderFlowController extends Controller
     {
         \Illuminate\Support\Facades\Log::info('saveReviewDesign called', ['request_all' => $request->all()]);
 
-        $validated = $request->validate([
-            'template_id' => ['required', 'integer'],
-            'design_svg' => ['nullable', 'string'],
-            'design_json' => ['nullable'],
-            'preview_image' => ['nullable', 'string'],
-            'canvas_width' => ['nullable', 'integer'],
-            'canvas_height' => ['nullable', 'integer'],
-            'background_color' => ['nullable', 'string', 'max:20'],
-            'order_item_id' => ['nullable', 'integer'],
-        ]);
+        try {
+            $validated = $request->validate([
+                'template_id' => ['required', 'integer'],
+                'design_svg' => ['nullable', 'string'],
+                'design_json' => ['nullable'],
+                'preview_image' => ['nullable', 'string'],
+                'canvas_width' => ['nullable', 'integer'],
+                'canvas_height' => ['nullable', 'integer'],
+                'background_color' => ['nullable', 'string', 'max:20'],
+                'order_item_id' => ['nullable', 'integer', 'exists:customer_order_items,id'],
+            ]);
 
-        $designJson = $validated['design_json'];
-        if (is_string($designJson)) {
-            $decoded = json_decode($designJson, true);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                return response()->json(['message' => 'Invalid design_json payload.'], 422);
+            \Illuminate\Support\Facades\Log::info('saveReviewDesign validation passed', ['validated' => $validated]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('saveReviewDesign validation failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            throw $e;
+        }
+
+        try {
+            $designJson = $validated['design_json'];
+            if (is_string($designJson)) {
+                $decoded = json_decode($designJson, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    \Illuminate\Support\Facades\Log::error('saveReviewDesign: Invalid JSON in design_json', ['json_error' => json_last_error_msg(), 'design_json' => substr($designJson, 0, 500)]);
+                    return response()->json(['message' => 'Invalid design_json payload.'], 422);
+                }
+                $designJson = $decoded;
+            } elseif ($designJson === null) {
+                $designJson = [];
+            } elseif (!is_array($designJson)) {
+                \Illuminate\Support\Facades\Log::error('saveReviewDesign: design_json is not array or string', ['design_json_type' => gettype($designJson)]);
+                return response()->json(['message' => 'design_json must be an object or array.'], 422);
             }
-            $designJson = $decoded;
-        } elseif ($designJson === null) {
-            $designJson = [];
-        } elseif (!is_array($designJson)) {
-            return response()->json(['message' => 'design_json must be an object or array.'], 422);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('saveReviewDesign: Error processing design_json', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            throw $e;
         }
 
         $designJson = $this->stripHeavyDesignFields($designJson);
@@ -556,6 +577,15 @@ class OrderFlowController extends Controller
 
         if ($designSvg === '') {
             $designSvg = null;
+        }
+
+        // Extract back design SVG if it exists in design_json
+        $designBackSvg = null;
+        if (isset($designJson['sides']['back']['svg'])) {
+            $designBackSvg = $this->normalizeDesignSvg($designJson['sides']['back']['svg']);
+            if ($designBackSvg === '') {
+                $designBackSvg = null;
+            }
         }
 
         $user = Auth::user();
@@ -601,7 +631,7 @@ class OrderFlowController extends Controller
                 Storage::disk('public')->makeDirectory($directory);
                 $svgFilePath = $directory . '/template_' . Str::uuid() . '.svg';
                 Storage::disk('public')->put($svgFilePath, $designSvg);
-                
+
                 // Use SVG file as preview_image if no other preview was provided
                 if (!$previewImage) {
                     $previewImage = $svgFilePath;
@@ -619,6 +649,7 @@ class OrderFlowController extends Controller
             'template_id' => (int) $validated['template_id'],
             'order_item_id' => $orderItemId,
             'design_svg' => $designSvg,
+            'design_back_svg' => $designBackSvg,
             'design_json' => $designJson,
             'preview_image' => $previewImage,
             'canvas_width' => $validated['canvas_width'] ?? null,
@@ -659,6 +690,8 @@ class OrderFlowController extends Controller
             'order_item_id' => $review->order_item_id,
             'preview_image' => $previewUrl,
         ]);
+
+
     }
 
     public function continueReview(Request $request): JsonResponse
@@ -893,13 +926,14 @@ class OrderFlowController extends Controller
             ]);
 
             $summaryPreviewImages = array_values(array_filter($summary['previewImages'] ?? [], fn ($value) => is_string($value) && trim($value) !== ''));
-            if (!empty($summaryPreviewImages)) {
-                $images['all'] = $summaryPreviewImages;
-                $images['front'] = $summaryPreviewImages[0];
-                if (!empty($summaryPreviewImages[1])) {
-                    $images['back'] = $summaryPreviewImages[1];
-                }
-            }
+            // Keep template previews for review to match studio thumbs
+            // if (!empty($summaryPreviewImages)) {
+            //     $images['all'] = $summaryPreviewImages;
+            //     $images['front'] = $summaryPreviewImages[0];
+            //     if (!empty($summaryPreviewImages[1])) {
+            //         $images['back'] = $summaryPreviewImages[1];
+            //     }
+            // }
 
             if (!empty($summary['previewImage']) && is_string($summary['previewImage'])) {
                 $images['front'] = $summary['previewImage'];
@@ -982,16 +1016,17 @@ class OrderFlowController extends Controller
             $designMeta = $storedDraft['design'] ?? $designMeta;
             $placeholderItems = collect($storedDraft['placeholders'] ?? $placeholderItems);
 
-            if (!empty($storedDraft['preview_images'])) {
-                $resolvedDraftImages = $this->resolvePreviewAssets($storedDraft['preview_images']);
-                if (!empty($resolvedDraftImages)) {
-                    $images['all'] = $resolvedDraftImages;
-                    $images['front'] = $resolvedDraftImages[0] ?? ($images['front'] ?? null);
-                    if (!empty($resolvedDraftImages[1])) {
-                        $images['back'] = $resolvedDraftImages[1];
-                    }
-                }
-            }
+            // Keep template previews for review to match studio thumbs
+            // if (!empty($storedDraft['preview_images'])) {
+            //     $resolvedDraftImages = $this->resolvePreviewAssets($storedDraft['preview_images']);
+            //     if (!empty($resolvedDraftImages)) {
+            //         $images['all'] = $resolvedDraftImages;
+            //         $images['front'] = $resolvedDraftImages[0] ?? ($images['front'] ?? null);
+            //         if (!empty($resolvedDraftImages[1])) {
+            //             $images['back'] = $resolvedDraftImages[1];
+            //         }
+            //     }
+            // }
 
             if (!empty($storedDraft['preview_image'])) {
                 $resolvedPreview = $this->resolvePreviewAsset($storedDraft['preview_image']);
@@ -2748,10 +2783,7 @@ class OrderFlowController extends Controller
         }
 
         $metadata = $order->metadata ?? [];
-        $payments = collect($metadata['payments'] ?? []);
-        $paidAmount = round($payments
-            ->filter(fn ($payment) => ($payment['status'] ?? null) === 'paid')
-            ->sum(fn ($payment) => (float) ($payment['amount'] ?? 0)), 2);
+        $paidAmount = $order->paymentRecords()->where('status', 'paid')->sum('amount');
 
         $balanceDue = round(max(($order->grandTotalAmount() ?? 0) - $paidAmount, 0), 2);
         $defaultDeposit = round(max($order->grandTotalAmount() / 2, 0), 2);
@@ -2771,7 +2803,7 @@ class OrderFlowController extends Controller
             'depositAmount' => $depositAmount,
             'paidAmount' => $paidAmount,
             'balanceDue' => $balanceDue,
-            'paymentRecords' => $payments->values()->all(),
+            'paymentRecords' => $order->paymentRecords()->values()->all(),
             'paymongoMeta' => $paymongoMeta,
             'orderSummary' => session(static::SESSION_SUMMARY_KEY),
         ]);
@@ -3872,7 +3904,24 @@ class OrderFlowController extends Controller
             }
         }
 
+        // Remove all data: URLs recursively to prevent large payloads
+        $design = $this->removeDataUrls($design);
+
         return $design;
+    }
+
+    private function removeDataUrls($data)
+    {
+        if (is_array($data)) {
+            foreach ($data as $key => $value) {
+                if (is_string($value) && str_starts_with($value, 'data:')) {
+                    unset($data[$key]);
+                } else {
+                    $data[$key] = $this->removeDataUrls($value);
+                }
+            }
+        }
+        return $data;
     }
 
     protected function decodeDataUrl(string $dataUrl): string

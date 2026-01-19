@@ -140,6 +140,16 @@ body {
     color: var(--brand-primary);
 }
 
+.topbar-icon-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.topbar-icon-btn:disabled:hover {
+    background: #fff;
+    color: #6b7280;
+}
+
 .topbar-actions {
     display: flex;
     align-items: center;

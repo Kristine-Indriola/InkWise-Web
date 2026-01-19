@@ -1,0 +1,257 @@
+<?php
+
+namespace App\Http\Controllers\Customer;
+
+use App\Http\Controllers\Controller;
+use App\Models\Order;
+use App\Models\Payment;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+
+class PaymentController extends Controller
+{
+    /**
+     * Handle GCash payment initiation
+     */
+    public function initiateGCashPayment($orderId)
+    {
+        $order = Order::where('id', $orderId)
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
+
+        // In a real implementation, this would integrate with GCash API
+        // For now, we'll simulate a payment gateway redirect
+
+        // Create a pending payment record
+        $payment = Payment::create([
+            'order_id' => $order->id,
+            'amount' => $order->total_amount,
+            'method' => 'gcash',
+            'status' => 'pending',
+            'raw_payload' => [
+                'gateway' => 'mock_gcash',
+                'initiated_at' => now()->toISOString(),
+            ],
+            'recorded_by' => Auth::id(),
+        ]);
+
+        // Simulate payment gateway redirect
+        // In production, this would redirect to actual GCash payment page
+        return view('customer.payment.gcash', [
+            'order' => $order,
+            'payment' => $payment,
+            'paymentUrl' => route('customer.checkout.payment.gcash.process', ['paymentId' => $payment->id]),
+        ]);
+    }
+
+    /**
+     * Process GCash payment (mock)
+     */
+    public function processGCashPayment($paymentId)
+    {
+        $payment = Payment::with('order')
+            ->where('id', $paymentId)
+            ->whereHas('order', function ($query) {
+                $query->where('user_id', Auth::id());
+            })
+            ->firstOrFail();
+
+        // Simulate payment processing
+        // In production, this would handle webhook/callback from payment gateway
+
+        // Mark payment as completed
+        $payment->update([
+            'status' => 'paid',
+            'recorded_at' => now(),
+            'raw_payload' => array_merge($payment->raw_payload ?? [], [
+                'completed_at' => now()->toISOString(),
+                'transaction_id' => 'MOCK_' . strtoupper(uniqid()),
+            ])
+        ]);
+
+        // Update order
+        $payment->order->update([
+            'payment_status' => 'paid',
+            'status' => 'confirmed'
+        ]);
+
+        return redirect()->route('customer.checkout.payment.complete', ['orderId' => $payment->order->id])
+            ->with('success', 'Payment completed successfully!');
+    }
+
+    /**
+     * Handle bank transfer payment
+     */
+    public function initiateBankTransfer($orderId)
+    {
+        $order = Order::where('id', $orderId)
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
+
+        // Create payment record for bank transfer
+        $payment = Payment::create([
+            'order_id' => $order->id,
+            'amount' => $order->total_amount,
+            'method' => 'bank_transfer',
+            'status' => 'pending',
+            'raw_payload' => [
+                'instructions' => 'Please transfer to Account: 1234567890, Bank: Sample Bank',
+                'initiated_at' => now()->toISOString(),
+            ],
+            'recorded_by' => Auth::id(),
+        ]);
+
+        return view('customer.payment.bank_transfer', [
+            'order' => $order,
+            'payment' => $payment,
+        ]);
+    }
+
+    /**
+     * Handle COD payment (no action needed, just confirm)
+     */
+    public function confirmCodPayment($orderId)
+    {
+        $order = Order::where('id', $orderId)
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
+
+        // For COD, payment is confirmed upon order creation
+        // Just redirect to success page
+        return redirect()->route('customer.order.success', $order->id);
+    }
+
+    /**
+     * Create GCash payment (POST request from checkout)
+     */
+    public function createGCashPayment(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email',
+            'phone' => 'required|string|max:20',
+            'mode' => 'required|in:full,half',
+            'amount' => 'required|numeric|min:0.01',
+        ]);
+
+        // Find the most recent pending order for the user
+        $order = Order::where('user_id', Auth::id())
+            ->where('payment_status', '!=', 'paid')
+            ->where('status', 'pending')
+            ->latest()
+            ->first();
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No active order found.'
+            ], 400);
+        }
+
+        // Check if order is already paid
+        if ($order->payment_status === 'paid') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order is already fully paid.',
+                'is_fully_paid' => true
+            ], 409);
+        }
+
+        $amount = round($request->amount, 2);
+        $mode = $request->mode;
+
+        // Validate amount based on mode
+        $outstanding = $order->grandTotalAmount() - ($order->metadata['payments'] ?? collect())->where('status', 'paid')->sum('amount');
+
+        if ($mode === 'half' && $amount > $outstanding) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Deposit amount cannot exceed outstanding balance.'
+            ], 400);
+        }
+
+        if ($mode === 'full' && abs($amount - $outstanding) > 0.01) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Full payment amount must match outstanding balance.'
+            ], 400);
+        }
+
+        // Create payment record
+        $payment = Payment::create([
+            'order_id' => $order->id,
+            'amount' => $amount,
+            'method' => 'gcash',
+            'status' => 'pending',
+            'raw_payload' => [
+                'mode' => $mode,
+                'contact' => [
+                    'name' => $request->name,
+                    'email' => $request->email,
+                    'phone' => $request->phone,
+                ],
+                'created_via' => 'checkout_ajax',
+            ],
+            'recorded_by' => Auth::id(),
+        ]);
+
+        // Update order metadata
+        $orderMetadata = $order->metadata ?? [];
+        $orderMetadata['payments'][] = [
+            'id' => $payment->id,
+            'method' => 'gcash',
+            'amount' => $amount,
+            'status' => 'pending',
+            'mode' => $mode,
+            'recorded_at' => now()->toIso8601String(),
+        ];
+        $order->update(['metadata' => $orderMetadata]);
+
+        // For demo purposes, simulate immediate payment success
+        // In production, this would redirect to actual payment gateway
+        $payment->update([
+            'status' => 'paid',
+            'recorded_at' => now(),
+            'raw_payload' => array_merge($payment->raw_payload ?? [], [
+                'completed_at' => now()->toISOString(),
+                'transaction_id' => 'DEMO_' . strtoupper(uniqid()),
+            ])
+        ]);
+
+        // Update order payment status
+        $totalPaid = collect($orderMetadata['payments'])->where('status', 'paid')->sum('amount');
+        $isFullyPaid = $totalPaid >= $order->grandTotalAmount();
+
+        $order->update([
+            'payment_status' => $isFullyPaid ? 'paid' : 'partial',
+            'status' => $isFullyPaid ? 'confirmed' : 'pending'
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'payment_id' => $payment->id,
+            'amount' => $amount,
+            'is_fully_paid' => $isFullyPaid,
+            'redirect_url' => $isFullyPaid
+                ? route('customer.order.success', $order->id)
+                : route('customer.checkout'),
+            'message' => $isFullyPaid
+                ? 'Payment completed successfully!'
+                : 'Partial payment recorded. Please complete remaining balance.'
+        ]);
+    }
+
+    /**
+     * Get current order from session
+     */
+    private function getCurrentOrder()
+    {
+        $orderId = session('current_order_id');
+        if (!$orderId) {
+            return null;
+        }
+
+        return Order::where('id', $orderId)
+            ->where('user_id', Auth::id())
+            ->first();
+    }

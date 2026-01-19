@@ -140,7 +140,7 @@ export function createAutosaveController(options = {}) {
         timerId = window.setTimeout(() => {
             timerId = null;
             void saveNow(pendingReason).catch(() => {});
-        }, Math.max(250, debounce));
+        }, debounce);
     };
 
     const flush = async (reason = 'flush') => {

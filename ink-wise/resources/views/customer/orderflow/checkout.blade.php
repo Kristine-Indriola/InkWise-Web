@@ -796,18 +796,170 @@
     $subtotal = $order?->subtotal_amount ?? 0;
     $taxAmount = $order?->tax_amount ?? 0;
     $shippingFee = $order?->shipping_fee ?? 0;
-    // Use order's grandTotalAmount for consistency across all calculations
-    $totalAmount = (float) ($order?->grandTotalAmount() ?? data_get($orderSummary, 'totalAmount', 0));
+    $totalAmount = 0;
+    $paidAmountDisplay = 0;
+    $balanceDueDisplay = 0;
+    
+    // Calculate grand total from orderSummary data (same as mycart.blade.php)
+    $grandTotal = 0;
+    if ($orderSummary) {
+        $formatMoney = static fn ($amount) => '₱' . number_format((float) ($amount ?? 0), 2);
+        $invitationSubtotal = (float) data_get($orderSummary, 'subtotalAmount', 0);
+        $extras = (array) data_get($orderSummary, 'extras', []);
+        $envelopeTotal = (float) ($extras['envelope'] ?? 0);
+        $giveawayTotal = (float) ($extras['giveaway'] ?? 0);
+        $paperExtras = (float) ($extras['paper'] ?? 0);
+        $addonsExtra = (float) ($extras['addons'] ?? 0);
+        
+        $extractQty = static function ($line) {
+            return (int) (data_get($line, 'quantity') ?? data_get($line, 'qty') ?? 0);
+        };
+        
+        $extractTotal = static function ($line) {
+            return (float) (
+                data_get($line, 'total')
+                ?? data_get($line, 'totalAmount')
+                ?? data_get($line, 'total_amount')
+                ?? data_get($line, 'total_price')
+                ?? data_get($line, 'price')
+                ?? 0
+            );
+        };
+        
+        $extractPreview = static function ($line) {
+            $candidates = [
+                data_get($line, 'preview'),
+                data_get($line, 'previewImage'),
+                data_get($line, 'invitationImage'),
+                data_get($line, 'previewImages.0'),
+                data_get($line, 'preview_images.0'),
+                data_get($line, 'preview_url'),
+                data_get($line, 'previewUrl'),
+                data_get($line, 'image'),
+                data_get($line, 'image_url'),
+                data_get($line, 'imageUrl'),
+                data_get($line, 'images.0'),
+            ];
+            foreach ($candidates as $c) {
+                if ($c) {
+                    return $c;
+                }
+            }
+            return null;
+        };
+        
+        $invitationItems = collect(data_get($orderSummary, 'items', []))->filter(fn ($item) => is_array($item));
+        if ($invitationItems->isEmpty() && !empty($orderSummary)) {
+            $invitationItems = collect([
+                [
+                    'name' => data_get($orderSummary, 'productName', 'Custom invitation'),
+                    'quantity' => data_get($orderSummary, 'quantity', 0),
+                    'unitPrice' => data_get($orderSummary, 'unitPrice') ?? data_get($orderSummary, 'unit_price') ?? data_get($orderSummary, 'paperStockPrice'),
+                    'paperStockName' => data_get($orderSummary, 'paperStockName') ?? data_get($orderSummary, 'paperStock.name'),
+                    'paperStockPrice' => data_get($orderSummary, 'paperStockPrice') ?? data_get($orderSummary, 'paperStock.price'),
+                    'paperStockId' => data_get($orderSummary, 'paperStockId') ?? data_get($orderSummary, 'paperStock.id'),
+                    'addons' => data_get($orderSummary, 'addons', []),
+                    'addonItems' => data_get($orderSummary, 'addonItems', data_get($orderSummary, 'addons', [])),
+                    'total' => $invitationSubtotal + $paperExtras + $addonsExtra,
+                    'preview' => $extractPreview($orderSummary),
+                    'previewImages' => data_get($orderSummary, 'previewImages', data_get($orderSummary, 'preview_images', [])),
+                    'estimated_date' => data_get($orderSummary, 'estimated_date') ?? data_get($orderSummary, 'dateNeeded'),
+                    'estimated_date_label' => data_get($orderSummary, 'dateNeededLabel') ?? data_get($orderSummary, 'estimated_date_label'),
+                    'is_preorder' => data_get($orderSummary, 'metadata.final_step.is_preorder') ?? false,
+                    'metadata' => data_get($orderSummary, 'metadata', []),
+                ],
+            ]);
+        }
+        
+        $envelopeItems = collect(data_get($orderSummary, 'envelopes', []))->filter(fn ($item) => is_array($item));
+        if ($envelopeItems->isEmpty()) {
+            $rawEnvelope = data_get($orderSummary, 'envelope');
+            if (is_array($rawEnvelope)) {
+                if (function_exists('array_is_list') && array_is_list($rawEnvelope) && !empty($rawEnvelope) && is_array($rawEnvelope[0])) {
+                    $envelopeItems = collect($rawEnvelope)->filter(fn ($item) => is_array($item));
+                } else {
+                    $envelopeItems = collect([$rawEnvelope]);
+                }
+            }
+        }
+        
+        $giveawayItems = collect(data_get($orderSummary, 'giveaways', []))->filter(fn ($item) => is_array($item));
+        if ($giveawayItems->isEmpty()) {
+            $rawGiveaway = data_get($orderSummary, 'giveaway');
+            if (is_array($rawGiveaway)) {
+                if (function_exists('array_is_list') && array_is_list($rawGiveaway) && !empty($rawGiveaway) && is_array($rawGiveaway[0])) {
+                    $giveawayItems = collect($rawGiveaway)->filter(fn ($item) => is_array($item));
+                } else {
+                    $giveawayItems = collect([$rawGiveaway]);
+                }
+            }
+        }
+        
+        $computeInvitationTotal = static function ($item) use ($extractTotal, $extractQty) {
+            $rawTotal = $extractTotal($item);
+            if ($rawTotal > 0) {
+                // Assume rawTotal includes base, subtract it
+                $qty = $extractQty($item);
+                $basePrice = data_get($item, 'unitPrice') ?? 0;
+                return max(0, $rawTotal - ($qty * (float) $basePrice));
+            }
+            
+            $qty = $extractQty($item);
+            $paperPrice = data_get($item, 'paperStockPrice') ?? 0;
+            
+            return max(0, $qty * (float) $paperPrice);
+        };
+        
+        $invitationTotalCalc = $invitationItems->sum(fn ($item) => $computeInvitationTotal($item));
+        if ($invitationTotalCalc <= 0) {
+            $invitationTotalCalc = $paperExtras;
+        }
+        
+        $envelopeTotalCalc = $envelopeItems->sum(fn ($item) => $extractTotal($item));
+        if ($envelopeTotalCalc <= 0) {
+            $envelopeTotalCalc = $envelopeTotal;
+        }
+        
+        $giveawayTotalCalc = $giveawayItems->sum(fn ($item) => $extractTotal($item));
+        if ($giveawayTotalCalc <= 0) {
+            $giveawayTotalCalc = $giveawayTotal;
+        }
+        
+        $grandTotal = $invitationTotalCalc + $envelopeTotalCalc + $giveawayTotalCalc;
+        
+        // Use totalAmount if available (from order summary page)
+        $totalAmountFromSummary = (float) data_get($orderSummary, 'totalAmount', 0);
+        if ($totalAmountFromSummary > 0) {
+            // Exclude the invitation base price
+            $invitationBaseTotal = $invitationItems->sum(fn ($item) => $extractQty($item) * (data_get($item, 'unitPrice') ?? 0));
+            $grandTotal = $totalAmountFromSummary - $invitationBaseTotal;
+        }
+    }
+    
+    // Always use the same calculation as mycart.blade.php for consistency
+    if ($totalAmountFromSummary > 0) {
+        $totalAmount = $grandTotal; // already includes tax and shipping
+    } else {
+        $totalAmount = $grandTotal + $taxAmount + $shippingFee;
+    }
+    
+    // Calculate paid amount consistently
+    if ($order) {
+        // Use model helper to compute total paid (includes applied payments, webhooks, etc.)
+        $paidAmountDisplay = round((float) ($order->totalPaid() ?? 0), 2);
+    } else {
+        $paymentRecordsCollection = collect($paymentRecords ?? []);
+        $calculatedPaid = $paidAmount ?? $paymentRecordsCollection
+            ->filter(fn ($payment) => ($payment['status'] ?? null) === 'paid')
+            ->sum(fn ($payment) => (float) ($payment['amount'] ?? 0));
+        $paidAmountDisplay = round($calculatedPaid, 2);
+    }
+
     // Calculate deposit and remaining amounts properly to avoid rounding issues
-    $depositAmountDisplay = round($totalAmount * 100 / 2) / 100;
-    $remainingAmountDisplay = $totalAmount - $depositAmountDisplay;
-    $paymentRecordsCollection = collect($paymentRecords ?? []);
-    $calculatedPaid = $paidAmount ?? $paymentRecordsCollection
-        ->filter(fn ($payment) => ($payment['status'] ?? null) === 'paid')
-        ->sum(fn ($payment) => (float) ($payment['amount'] ?? 0));
-    $paidAmountDisplay = round($calculatedPaid, 2);
+    $depositAmountDisplay = round($totalAmount * 0.5, 2);
+    $remainingAmountDisplay = round($totalAmount - $depositAmountDisplay, 2);
     $depositSuggested = $depositAmount ?? ($totalAmount ? round($totalAmount / 2, 2) : 0);
-    $balanceDueDisplay = $balanceDue ?? max($totalAmount - $paidAmountDisplay, 0);
+    $balanceDueDisplay = max($totalAmount - $paidAmountDisplay, 0);
     $currentUser = Auth::user();
     $authCustomer = $currentUser?->customer;
     $shippingName = $customerOrder->name ?? trim(($authCustomer?->first_name ?? '') . ' ' . ($authCustomer?->last_name ?? '')) ?: 'Sample Customer';
@@ -922,7 +1074,7 @@
                 @endif
                 <div class="summary-total">
                     <span>Total due</span>
-                    <span id="grandTotal">₱{{ number_format($totalAmount, 2) }}</span>
+                    <span id="grandTotal">₱{{ number_format($balanceDueDisplay, 2) }}</span>
                 </div>
                 @if($isFullyPaid)
                 <p class="note">Order fully paid. Recorded payments total ₱{{ number_format($paidAmountDisplay, 2) }}.</p>
@@ -1037,7 +1189,7 @@
                     <input type="radio" name="paymentMethod" value="gcash-deposit-cod">
                     <div class="option-content">
                         <h3>50% GCash Deposit + Pay on Pickup</h3>
-                        <p>Pay ₱{{ number_format($depositAmountDisplay, 2) }} deposit now via GCash, ₱{{ number_format($remainingAmountDisplay, 2) }} cash on delivery.</p>
+                        <p>Pay ₱{{ number_format($depositAmountDisplay, 2) }} deposit now via GCash, ₱{{ number_format($remainingAmountDisplay, 2) }} cash on Pickup</p>
                         <span class="option-tag">Required Deposit</span>
                     </div>
                 </label>
@@ -1054,18 +1206,19 @@
             </div>
 
             <!-- Full Payment Options (100%) -->
-            <div class="fieldset" id="fullPaymentOptions" style="display: none;">
+            <div class="fieldset" id="fullPaymentOptions">
                 <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--text-strong);">Full Payment (100%)</h3>
 
                 <!-- GCash Full Payment -->
                 <label class="option-card payment-option" data-payment-type="gcash-full">
                     <input type="radio" name="paymentMethod" value="gcash-full">
-                    <div class="option-content">
-                        <h3>Full GCash Payment</h3>
-                        <p>Pay ₱{{ number_format($totalAmount, 2) }} in full now via GCash. No remaining balance to pay later.</p>
+                    <div class="option-content"> 
+                        <h3>Full Payment</h3> 
+                        <p>Pay ₱{{ number_format($balanceDueDisplay, 2) }} now via GCash.</p>
                         <span class="option-tag" style="background: #10b981;">Pay in Full</span>
                     </div>
                 </label>
+
             </div>
 
             <!-- Payment Summary -->
@@ -1087,6 +1240,7 @@
 
             <div class="fieldset">
                 <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--text-strong);">Payment Method</h3>
+                <h3>Gcash</h3>
                 <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
                     <div id="reviewPaymentInfo" style="font-size: 14px; color: var(--text-default);">
                         <!-- Payment info will be populated by JavaScript -->
@@ -1258,11 +1412,17 @@
                     } else if (selectedPayment?.value === 'gcash-split') {
                         const remaining = (paymentConfig.balance ?? Math.max(currentTotal - (recordedPaidAmount ?? 0), 0));
                         const depositAmount = Math.round(remaining * 100 / 2) / 100;
-                        const remainingAmount = Math.max(remaining - depositAmount, 0);
+                        const remainingAmount = Math.max(remaining - depositAmount, 0); 
                         paymentDetails = `
                             <div><strong>50% GCash Deposit + GCash Balance</strong></div>
                             <div>Deposit: ₱${depositAmount.toFixed(2)} (Pay now via GCash)</div>
                             <div>Remaining: ₱${remainingAmount.toFixed(2)} (Pay later via GCash)</div>
+                        `;
+                    } else if (selectedPayment?.value === 'gcash-full') {
+                        const amountToPay = paymentConfig.balance ?? Math.max(currentTotal - (recordedPaidAmount ?? 0), 0);
+                        paymentDetails = `
+                            <div><strong>Full Payment</strong></div>
+                            <div>Amount: ₱${amountToPay.toFixed(2)} (Pay now via GCash)</div>
                         `;
                     }
 
@@ -1369,8 +1529,17 @@
                             }
                         }
                         try {
-                            window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(summary));
-                            window.orderSummary = summary;
+                            // Persist only a minimal summary to avoid writing large blobs to sessionStorage
+                            const minSummary = {
+                                productId: summary.productId ?? summary.product_id ?? null,
+                                quantity: summary.quantity ?? null,
+                                paymentMode: summary.paymentMode ?? summary.payment_mode ?? null,
+                                totalAmount: summary.totalAmount ?? summary.total_amount ?? null,
+                                shippingFee: summary.shippingFee ?? summary.shipping_fee ?? null,
+                                order_id: summary.order_id ?? summary.orderId ?? null,
+                            };
+                            window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(minSummary));
+                            window.orderSummary = Object.assign({}, window.orderSummary || {}, minSummary);
                         } catch (e) {
                             // ignore storage errors
                         }
@@ -1415,7 +1584,15 @@
                         try {
                             if (window.orderSummary) {
                                 window.orderSummary.quantity = parsed;
-                                window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(window.orderSummary));
+                                const minSummary = {
+                                    productId: window.orderSummary.productId ?? window.orderSummary.product_id ?? null,
+                                    quantity: window.orderSummary.quantity ?? null,
+                                    paymentMode: window.orderSummary.paymentMode ?? window.orderSummary.payment_mode ?? null,
+                                    totalAmount: window.orderSummary.totalAmount ?? window.orderSummary.total_amount ?? null,
+                                    shippingFee: window.orderSummary.shippingFee ?? window.orderSummary.shipping_fee ?? null,
+                                    order_id: window.orderSummary.order_id ?? window.orderSummary.orderId ?? null,
+                                };
+                                window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(minSummary));
                             }
                         } catch (err) { /* ignore */ }
                         recalcTotals();
@@ -1430,18 +1607,20 @@
             const subtotal = @json($subtotal ?? 0);
             const baseShipping = @json($shippingFee ?? 0);
             const taxRate = @json($taxRate ?? 0);
-            const orderTotalAmount = @json($totalAmount ?? 0); // Use the order's total amount
-            let recordedPaidAmount = @json($paidAmountDisplay ?? 0);
+            const orderTotalAmount = Math.round(@json($order->grandTotalAmount() ?? 0) * 100) / 100; // Use the order's total amount
+            let recordedPaidAmount = Math.round(@json($paidAmount ?? 0) * 100) / 100;
             let currentShippingCost = Number(baseShipping ?? 0);
             let currentTax = Number((subtotal ?? 0) * (taxRate ?? 0));
             let currentTotal = Number(orderTotalAmount); // Use order total instead of calculation
             const paymentConfig = {
-                createUrl: '{{ route('payment.gcash.create') }}',
+                createUrl: '{{ route("payment.gcash.create") }}',
                 resumeUrl: @json($pendingPaymentUrl ?? null),
                 hasPending: @json($hasPendingPayment ?? false),
                 depositAmount: @json($depositSuggested ?? 0),
-                balance: @json($balanceDueDisplay ?? 0),
+                balance: @json($balanceDue ?? 0),
                 isFullyPaid: @json($isFullyPaid ?? false),
+                // Ensure we carry the authoritative order id from the server into client flows.
+                orderId: @json($order->id ?? null),
             };
 
             const shippingRadios = document.querySelectorAll('input[name="shippingOption"]');
@@ -1512,7 +1691,7 @@
                 // Always base totals on the server-provided order total to avoid client-side drift.
                 // `orderTotalAmount` is injected from the server and represents the authoritative total due.
                 const total = Number(orderTotalAmount || 0);
-                const balance = Math.max(total - (recordedPaidAmount ?? 0), 0);
+                const balance = Math.round(Math.max(total - (recordedPaidAmount ?? 0), 0) * 100) / 100;
 
                 currentShippingCost = Number(baseShipping ?? 0);
                 currentTax = 0; // No tax
@@ -1588,7 +1767,7 @@
                 let breakdownHTML = '';
 
                 switch (paymentType) {
-                    case 'gcash-deposit-cod':
+                    case 'gcash-deposit-cod': {
                         const remainingForCod = (paymentConfig.balance ?? Math.max(currentTotal - (recordedPaidAmount ?? 0), 0));
                         const depositCod = Math.round(remainingForCod * 100 / 2) / 100;
                         const remainingCod = Math.max(remainingForCod - depositCod, 0);
@@ -1608,8 +1787,9 @@
                             </div>
                         `;
                         break;
+                    }
 
-                    case 'gcash-split':
+                    case 'gcash-split': {
                         const remainingForSplit = (paymentConfig.balance ?? Math.max(currentTotal - (recordedPaidAmount ?? 0), 0));
                         const depositSplit = Math.round(remainingForSplit * 100 / 2) / 100;
                         const remainingSplit = Math.max(remainingForSplit - depositSplit, 0);
@@ -1629,10 +1809,30 @@
                             </div>
                         `;
                         break;
+                    }
 
-                    default:
+                    case 'gcash-full': {
+                        // Show simple breakdown for full payment - just the amount being charged
+                        const remaining = Math.max(currentTotal - (recordedPaidAmount ?? 0), 0);
+                        const chargeNow = remaining;
+
+                        summaryDiv.style.display = 'block';
+                        breakdownHTML = `
+                            <div class="payment-breakdown-item">
+                                <span>Full Payment Amount</span>
+                                <span class="payment-amount now">₱${chargeNow.toFixed(2)}</span>
+                            </div>
+                            <div class="payment-breakdown-item">
+                                <span class="payment-timing">Pay remaining balance in full</span>
+                            </div>
+                        `;
+                        break;
+                    }
+
+                    default: {
                         summaryDiv.style.display = 'none';
                         return;
+                    }
                 }
 
                 breakdownDiv.innerHTML = breakdownHTML;
@@ -1677,6 +1877,7 @@
                 try {
                     const res = await fetch('{{ route('order.finalstep.save') }}', {
                         method: 'POST',
+                        credentials: 'same-origin',
                         headers: {
                             'Content-Type': 'application/json',
                             'Accept': 'application/json',
@@ -1693,9 +1894,34 @@
 
                     if (data.summary) {
                         try {
-                            window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(data.summary));
+                            // Persist a minimal returned summary into sessionStorage to avoid storing large blobs
+                            const minSummary = {
+                                productId: data.summary.productId ?? data.summary.product_id ?? null,
+                                quantity: data.summary.quantity ?? null,
+                                paymentMode: data.summary.paymentMode ?? data.summary.payment_mode ?? null,
+                                totalAmount: data.summary.totalAmount ?? data.summary.total_amount ?? null,
+                                shippingFee: data.summary.shippingFee ?? data.summary.shipping_fee ?? null,
+                                order_id: data.summary.order_id ?? data.summary.orderId ?? null,
+                            };
+                            window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(minSummary));
+                            window.sessionStorage.setItem('order_summary_payload', JSON.stringify(minSummary));
+
+                            // Merge the minimal summary into window.orderSummary to make order_id available
+                            window.orderSummary = window.orderSummary || {};
+                            Object.assign(window.orderSummary, minSummary);
                         } catch (storageError) {
-                            console.debug('Unable to cache order summary in session storage.', storageError);
+                            console.debug('Unable to cache minimal order summary in session storage.', storageError);
+                        }
+                    }
+
+                    // Ensure we capture and expose the order id (returned by the server)
+                    if (data.order_id) {
+                        window.orderSummary = window.orderSummary || {};
+                        window.orderSummary.order_id = data.order_id;
+                        try {
+                            window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(window.orderSummary));
+                        } catch (storageError) {
+                            // ignore storage errors
                         }
                     }
 
@@ -1752,7 +1978,8 @@
                 if (paymentMethod === 'gcash-deposit-cod' || paymentMethod === 'gcash-split') {
                     amount = Math.round(remaining * 100 / 2) / 100; // Always 50% of remaining balance
                 } else if (paymentMethod === 'gcash-full') {
-                    amount = remaining; // Full outstanding balance
+                    // Charge the remaining balance when user selects Full Payment
+                    amount = remaining;
                 } else {
                     amount = Number(paymentConfig.depositAmount > 0 ? paymentConfig.depositAmount : paymentConfig.balance);
                 }
@@ -1762,19 +1989,39 @@
                     return { success: false };
                 }
 
+                // Ensure amount is rounded down to 2 decimal places to match server expectations
+                amount = Math.floor(amount * 100) / 100;
+
                 const mode = determineGcashMode();
                 const contact = collectContactDetails();
 
                 try {
-                    console.debug('Starting GCash payment fetch', { paymentConfig, paymentMethod, amount, mode, contact, recordedPaidAmount });
+                    console.debug('Starting GCash payment fetch', {
+                        paymentConfig,
+                        paymentMethod,
+                        amount,
+                        mode,
+                        contact,
+                        recordedPaidAmount,
+                        orderId: (window.orderSummary && (window.orderSummary.order_id || window.orderSummary.id)) || paymentConfig.orderId || null,
+                        orderSummary: window.orderSummary || null,
+                        payloadPreview: {
+                            order_id: (window.orderSummary && (window.orderSummary.order_id || window.orderSummary.id)) || paymentConfig.orderId || null,
+                            amount: amount,
+                            mode: mode,
+                        },
+                    });
+
                     const response = await fetch(paymentConfig.createUrl, {
                         method: 'POST',
+                        credentials: 'same-origin',
                         headers: {
                             'Content-Type': 'application/json',
                             'Accept': 'application/json',
                             'X-CSRF-TOKEN': csrfToken,
                         },
                         body: JSON.stringify({
+                                order_id: (window.orderSummary && (window.orderSummary.order_id || window.orderSummary.id)) || undefined,
                                 name: contact.name,
                                 email: contact.email,
                                 phone: contact.phone,
@@ -1787,6 +2034,7 @@
                     const data = await response.json();
 
                     if (!response.ok) {
+                        console.debug('GCash create failed response', response.status, data);
                         // Handle conflict when server reports order already paid
                         if (response.status === 409 && data.message && /already fully paid/i.test(data.message)) {
                             // Update client-side payment state to reflect fully-paid order
@@ -1829,28 +2077,36 @@
 
             if (placeOrderBtn) {
                 placeOrderBtn.addEventListener('click', async () => {
-                    if (paymentConfig.isFullyPaid) {
-                        showPaymentMessage('info', 'This order is already fully paid.');
-                        return;
-                    }
-
                     const selectedPaymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value;
 
-                    if (!selectedPaymentMethod) {
-                        showPaymentMessage('error', 'Please select a payment method.');
+                    // Recalculate the outstanding amount on click to avoid relying on a possibly stale
+                    // `paymentConfig.isFullyPaid` value (which can be set by other flows). Use the
+                    // authoritative balance value instead and prevent payments only when the
+                    // remaining outstanding amount is essentially zero.
+                    const remainingOutstanding = (paymentConfig.balance ?? Math.max(currentTotal - (recordedPaidAmount ?? 0), 0));
+                    if (remainingOutstanding <= 0.01) {
+                        // Update client-side payment state to reflect fully-paid order
+                        paymentConfig.isFullyPaid = true;
+                        paymentConfig.balance = 0;
+                        try { recalcTotals(); } catch (e) { /* ignore if unavailable */ }
+                        console.debug('Payment blocked: order fully paid', { remainingOutstanding, paymentConfig });
+                        showPaymentMessage('info', 'This order is already fully paid.');
                         return;
                     }
 
                     let paymentAmount = 0;
                     let finalPaymentMethod = selectedPaymentMethod;
 
-                    const remainingOutstanding = (paymentConfig.balance ?? Math.max(currentTotal - (recordedPaidAmount ?? 0), 0));
+                    // Use the remainingOutstanding computed above (we already ensured it's > 0.01)
                     if (selectedPaymentMethod === 'gcash-deposit-cod') {
                         paymentAmount = Math.round(remainingOutstanding * 100 / 2) / 100; // 50% of remaining
                         finalPaymentMethod = 'gcash_deposit_cod';
                     } else if (selectedPaymentMethod === 'gcash-split') {
                         paymentAmount = Math.round(remainingOutstanding * 100 / 2) / 100; // 50% of remaining
                         finalPaymentMethod = 'gcash_split';
+                    } else if (selectedPaymentMethod === 'gcash-full') {
+                        paymentAmount = Math.round(remainingOutstanding * 100) / 100; // Full remaining amount
+                        finalPaymentMethod = 'gcash_full';
                     }
 
                     placeOrderBtn.disabled = true;
@@ -1953,7 +2209,19 @@
                 console.log('Merged paymentMode into summaryData:', summaryData.paymentMode);
             }
 
-            window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(summaryData));
+            try {
+                const minSummary = {
+                    productId: summaryData.productId ?? summaryData.product_id ?? null,
+                    quantity: summaryData.quantity ?? null,
+                    paymentMode: summaryData.paymentMode ?? summaryData.payment_mode ?? null,
+                    totalAmount: summaryData.totalAmount ?? summaryData.total_amount ?? null,
+                    shippingFee: summaryData.shippingFee ?? summaryData.shipping_fee ?? null,
+                    order_id: summaryData.order_id ?? summaryData.orderId ?? null,
+                };
+                window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(minSummary));
+            } catch (e) {
+                /* ignore */
+            }
             console.log('Saved to sessionStorage:', summaryData);
 
             // expose for other scripts to reference and update dynamically

@@ -499,6 +499,127 @@ export function initializeCustomerStudioLegacy() {
     let backgroundSelected = false;
     let activeCropSession = null;
 
+    // History management for undo/redo
+    const historyStack = [];
+    const redoStack = [];
+    const MAX_HISTORY_SIZE = 50;
+    let historyEnabled = true;
+
+    const saveHistoryState = () => {
+      if (!historyEnabled || !currentSvgRoot) return;
+      
+      const serializer = new XMLSerializer();
+      const svgContent = serializer.serializeToString(currentSvgRoot);
+      
+      // Don't save if it's the same as the last state
+      if (historyStack.length > 0 && historyStack[historyStack.length - 1] === svgContent) {
+        return;
+      }
+      
+      historyStack.push(svgContent);
+      redoStack.length = 0; // Clear redo stack when new action is performed
+      
+      // Limit history size
+      if (historyStack.length > MAX_HISTORY_SIZE) {
+        historyStack.shift();
+      }
+      
+      updateUndoRedoButtons();
+    };
+
+    const undo = () => {
+      if (historyStack.length < 2) return; // Need at least one previous state
+      
+      // Current state goes to redo stack
+      const serializer = new XMLSerializer();
+      const currentState = serializer.serializeToString(currentSvgRoot);
+      redoStack.push(currentState);
+      
+      // Restore previous state
+      const previousState = historyStack.pop();
+      restoreSvgState(previousState);
+      
+      updateUndoRedoButtons();
+    };
+
+    const redo = () => {
+      if (redoStack.length === 0) return;
+      
+      // Current state goes to history stack
+      const serializer = new XMLSerializer();
+      const currentState = serializer.serializeToString(currentSvgRoot);
+      historyStack.push(currentState);
+      
+      // Restore next state
+      const nextState = redoStack.pop();
+      restoreSvgState(nextState);
+      
+      updateUndoRedoButtons();
+    };
+
+    const restoreSvgState = (svgContent) => {
+      if (!currentSvgRoot || !svgContent) return;
+      
+      const wasHistoryEnabled = historyEnabled;
+      historyEnabled = false; // Disable history during restore
+      
+      try {
+        const parser = new DOMParser();
+        const newSvg = parser.parseFromString(svgContent, 'image/svg+xml').documentElement;
+        
+        // Replace the current SVG content
+        while (currentSvgRoot.firstChild) {
+          currentSvgRoot.removeChild(currentSvgRoot.firstChild);
+        }
+        
+        while (newSvg.firstChild) {
+          currentSvgRoot.appendChild(newSvg.firstChild.cloneNode(true));
+        }
+        
+        // Copy attributes
+        for (let attr of newSvg.attributes) {
+          currentSvgRoot.setAttribute(attr.name, attr.value);
+        }
+        
+        // Reinitialize the SVG template editor
+        if (currentSvgRoot.__inkwiseSvgTemplateEditor) {
+          currentSvgRoot.__inkwiseSvgTemplateEditor = null;
+        }
+        currentSvgRoot.setAttribute('data-svg-editor', 'true');
+        currentSvgRoot.__inkwiseSvgTemplateEditor = new SvgTemplateEditor(currentSvgRoot, {
+          onTextChange: (element, oldText, newText) => {
+            saveHistoryState();
+            if (autosave) autosave.schedule('text-change');
+          },
+          onImageChange: (element, imageUrl, file) => {
+            saveHistoryState();
+            if (autosave) autosave.schedule('image-change');
+          }
+        });
+        svgTemplateEditorInstance = currentSvgRoot.__inkwiseSvgTemplateEditor;
+        
+        // Update preview
+        updatePreview();
+        
+      } catch (error) {
+        console.error('Failed to restore SVG state:', error);
+      } finally {
+        historyEnabled = wasHistoryEnabled; // Restore history state
+      }
+    };
+
+    const updateUndoRedoButtons = () => {
+      const undoBtn = document.querySelector('button[aria-label="Undo"]');
+      const redoBtn = document.querySelector('button[aria-label="Redo"]');
+      
+      if (undoBtn) {
+        undoBtn.disabled = historyStack.length < 2;
+      }
+      if (redoBtn) {
+        redoBtn.disabled = redoStack.length === 0;
+      }
+    };
+
     const SNAP_SIZE = 8;
     const SNAP_THRESHOLD = 4;
 
@@ -1998,6 +2119,21 @@ export function initializeCustomerStudioLegacy() {
       });
     }
 
+    // Setup undo/redo button event listeners
+    const undoBtn = document.querySelector('button[aria-label="Undo"]');
+    const redoBtn = document.querySelector('button[aria-label="Redo"]');
+    
+    if (undoBtn) {
+      undoBtn.addEventListener('click', undo);
+    }
+    
+    if (redoBtn) {
+      redoBtn.addEventListener('click', redo);
+    }
+
+    // Initialize undo/redo button states
+    updateUndoRedoButtons();
+
     closeButtons.forEach((btn) => {
       btn.addEventListener('click', () => {
         const modal = btn.closest('.modal');
@@ -2150,6 +2286,9 @@ export function initializeCustomerStudioLegacy() {
 
         // Trigger preview update
         updatePreview(currentSide);
+
+        // Trigger autosave after change
+        flushAutosave('graphic-inserted');
 
         // Show success message
         console.log('[InkWise Studio] Graphic inserted successfully');
@@ -4662,9 +4801,21 @@ export function initializeCustomerStudioLegacy() {
         if (currentSvgRoot) {
           currentSvgRoot.setAttribute('data-svg-editor', 'true');
           if (!currentSvgRoot.__inkwiseSvgTemplateEditor) {
-            currentSvgRoot.__inkwiseSvgTemplateEditor = new SvgTemplateEditor(currentSvgRoot);
+            currentSvgRoot.__inkwiseSvgTemplateEditor = new SvgTemplateEditor(currentSvgRoot, {
+              onTextChange: (element, oldText, newText) => {
+                saveHistoryState();
+                if (autosave) autosave.schedule('text-change');
+              },
+              onImageChange: (element, imageUrl, file) => {
+                saveHistoryState();
+                if (autosave) autosave.schedule('image-change');
+              }
+            });
           }
           svgTemplateEditorInstance = currentSvgRoot.__inkwiseSvgTemplateEditor;
+          
+          // Save initial history state after SVG is loaded
+          setTimeout(() => saveHistoryState(), 100);
         }
 
         // Parse viewBox to adjust canvas size
@@ -5118,6 +5269,9 @@ export function initializeCustomerStudioLegacy() {
         thumb.classList.toggle('active', isActiveThumb);
         thumb.setAttribute('aria-pressed', isActiveThumb ? 'true' : 'false');
       });
+
+      // Save any pending changes when switching sides
+      flushAutosave('side-switch');
     };
 
     viewButtons.forEach((btn) => {
@@ -5376,7 +5530,37 @@ export function initializeCustomerStudioLegacy() {
         }
       }
 
-      // No image element selected - add as a new image element to the canvas
+      // No image element selected - try to replace a placeholder image first
+      if (currentSvgRoot) {
+        const svgEl = currentSvgRoot.tagName?.toLowerCase() === 'svg'
+          ? currentSvgRoot
+          : currentSvgRoot.closest('svg');
+
+        if (svgEl) {
+          // Look for changeable image placeholders
+          const changeableImages = svgEl.querySelectorAll('image[data-changeable="image"], image.changeable-image, image.svg-changeable-image, [data-editable-image]');
+          if (changeableImages.length > 0) {
+            // Replace the first changeable image
+            const targetImage = changeableImages[0];
+            targetImage.setAttribute('href', dataUrl);
+            targetImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', dataUrl);
+            targetImage.setAttribute('data-replaced-image', 'true');
+            
+            // Update the thumb preview immediately
+            const thumb = document.querySelector(`[data-card-thumb="${side}"] .thumb-preview`);
+            if (thumb) {
+              thumb.style.backgroundImage = `url('${dataUrl}')`;
+            }
+            
+            // Trigger autosave
+            flushAutosave('image-upload-replace');
+            updatePreview(currentSide);
+            return;
+          }
+        }
+      }
+
+      // No changeable image found - add as a new image element to the canvas
       if (currentSvgRoot) {
         const svgEl = currentSvgRoot.tagName?.toLowerCase() === 'svg'
           ? currentSvgRoot
@@ -5696,7 +5880,7 @@ export function initializeCustomerStudioLegacy() {
       const reader = new FileReader();
       reader.onload = (e) => {
         const dataUrl = e.target.result;
-        applyUploadedImage(dataUrl, file.name, 'front');
+        applyUploadedImage(dataUrl, file.name, currentSide);
       };
       reader.readAsDataURL(file);
     };
