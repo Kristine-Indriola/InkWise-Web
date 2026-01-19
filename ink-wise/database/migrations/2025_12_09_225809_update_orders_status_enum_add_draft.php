@@ -10,7 +10,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        DB::statement("ALTER TABLE `orders` MODIFY COLUMN `status` ENUM('draft','pending','processing','in_production','confirmed','to_receive','completed','cancelled') NOT NULL DEFAULT 'draft'");
+        // For SQLite, we don't need to modify the column since SQLite doesn't enforce ENUM constraints
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE `orders` MODIFY COLUMN `status` ENUM('draft','pending','processing','in_production','confirmed','to_receive','completed','cancelled') NOT NULL DEFAULT 'draft'");
+        }
     }
 
     /**
@@ -18,6 +21,9 @@ return new class extends Migration
      */
     public function down(): void
     {
-        DB::statement("ALTER TABLE `orders` MODIFY COLUMN `status` ENUM('pending','processing','in_production','confirmed','to_receive','completed','cancelled') NOT NULL DEFAULT 'pending'");
+        // For SQLite, we don't need to modify the column since SQLite doesn't enforce ENUM constraints
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE `orders` MODIFY COLUMN `status` ENUM('pending','processing','in_production','confirmed','to_receive','completed','cancelled') NOT NULL DEFAULT 'pending'");
+        }
     }
 };

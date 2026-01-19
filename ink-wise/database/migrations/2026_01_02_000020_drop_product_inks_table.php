@@ -9,15 +9,18 @@ return new class extends Migration
     public function up(): void
     {
         if (Schema::hasTable('product_inks')) {
-            Schema::table('product_inks', function (Blueprint $table) {
-                foreach (['product_inks_product_id_foreign', 'product_inks_ink_id_foreign'] as $fk) {
-                    try {
-                        $table->dropForeign($fk);
-                    } catch (\Throwable $e) {
-                        // ignore missing
+            // For SQLite, skip dropping foreign keys as it's not supported
+            if (Schema::getConnection()->getDriverName() !== 'sqlite') {
+                Schema::table('product_inks', function (Blueprint $table) {
+                    foreach (['product_inks_product_id_foreign', 'product_inks_ink_id_foreign'] as $fk) {
+                        try {
+                            $table->dropForeign($fk);
+                        } catch (\Throwable $e) {
+                            // ignore missing
+                        }
                     }
-                }
-            });
+                });
+            }
             Schema::dropIfExists('product_inks');
         }
     }

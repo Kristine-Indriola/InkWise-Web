@@ -16,73 +16,85 @@ class DatabaseSeeder extends Seeder
         // --------------------
         // Admin
         // --------------------
-        $admin = User::create([
-            'email'    => 'admin@example.com',
-            'password' => Hash::make('admin123'),
-            'role'     => 'admin',
-            'status'   => 'active',
-        ]);
+        $admin = User::firstOrCreate(
+            ['email' => 'admin@example.com'],
+            [
+                'password' => Hash::make('admin123'),
+                'role'     => 'admin',
+                'status'   => 'active',
+            ]
+        );
 
         // --------------------
         // Owner
         // --------------------
-        $owner = User::create([
-            'email'    => 'owner@test.com',
-            'password' => Hash::make('secret123'),
-            'role'     => 'owner',
-            'status'   => 'active',
-        ]);
+        $owner = User::firstOrCreate(
+            ['email' => 'owner@test.com'],
+            [
+                'password' => Hash::make('secret123'),
+                'role'     => 'owner',
+                'status'   => 'active',
+            ]
+        );
 
         // --------------------
         // Staff accounts (pending)
         // --------------------
-        $staff1 = User::create([
-            'email'    => 'staff@test.com',
-            'password' => Hash::make('staff123'),
-            'role'     => 'staff',
-            'status'   => 'active',
-        ]);
+        $staff1 = User::firstOrCreate(
+            ['email' => 'staff@test.com'],
+            [
+                'password' => Hash::make('staff123'),
+                'role'     => 'staff',
+                'status'   => 'active',
+            ]
+        );
 
 
         // --------------------
         // Staff & Admin details (using Eloquent so staff_id is auto-generated)
         // --------------------
-        Staff::create([
-            'user_id'        => $admin->user_id,
-            'role'           => 'admin',
-            'first_name'     => 'Super',
-            'middle_name'    => null,
-            'last_name'      => 'Admin',
-            'contact_number' => '0917-000-0000',
-            'status'         => 'approved',
-        ]);
+        Staff::firstOrCreate(
+            ['user_id' => $admin->user_id],
+            [
+                'role'           => 'admin',
+                'first_name'     => 'Super',
+                'middle_name'    => null,
+                'last_name'      => 'Admin',
+                'contact_number' => '0917-000-0000',
+                'status'         => 'approved',
+            ]
+        );
 
-        Staff::create([
-            'user_id'        => $owner->user_id,
-            'role'           => 'owner',
-            'first_name'     => 'Owner',
-            'middle_name'    => null,
-            'last_name'      => 'Test',
-            'contact_number' => '4565-456-7854',
-            'status'         => 'approved',
-        ]);
+        Staff::firstOrCreate(
+            ['user_id' => $owner->user_id],
+            [
+                'role'           => 'owner',
+                'first_name'     => 'Owner',
+                'middle_name'    => null,
+                'last_name'      => 'Test',
+                'contact_number' => '4565-456-7854',
+                'status'         => 'approved',
+            ]
+        );
 
-        Staff::create([
-            'user_id'        => $staff1->user_id,
-            'role'           => 'staff',
-            'first_name'     => 'Staff',
-            'middle_name'    => 'M.',
-            'last_name'      => 'Test',
-            'contact_number' => '0917-111-1111',
-            'status'         => 'approved',
-        ]);
+        Staff::firstOrCreate(
+            ['user_id' => $staff1->user_id],
+            [
+                'role'           => 'staff',
+                'first_name'     => 'Staff',
+                'middle_name'    => 'M.',
+                'last_name'      => 'Test',
+                'contact_number' => '0917-111-1111',
+                'status'         => 'approved',
+            ]
+        );
 
        
         // --------------------
         // Staff Addresses
         // --------------------
-        DB::table('addresses')->insert([
-            [
+        if (! DB::table('addresses')->where('user_id', $staff1->user_id)->exists()) {
+            DB::table('addresses')->insert([
                 'user_id'    => $staff1->user_id,
                 'street'     => '123 Main St',
                 'barangay'   => 'Quezon',
@@ -92,9 +104,11 @@ class DatabaseSeeder extends Seeder
                 'country'    => 'Philippines',
                 'created_at' => now(),
                 'updated_at' => now(),
-            ],
-            [
+            ]);
+        }
 
+        if (! DB::table('addresses')->where('user_id', $owner->user_id)->exists()) {
+            DB::table('addresses')->insert([
                 'user_id'    => $owner->user_id,
                 'street'     => '123 Main St',
                 'barangay'   => 'Quezon',
@@ -104,8 +118,11 @@ class DatabaseSeeder extends Seeder
                 'country'    => 'Philippines',
                 'created_at' => now(),
                 'updated_at' => now(),
-            ],
-            [
+            ]);
+        }
+
+        if (! DB::table('addresses')->where('user_id', $admin->user_id)->exists()) {
+            DB::table('addresses')->insert([
                 'user_id'    => $admin->user_id,
                 'street'     => '456 Sampaguita Ave',
                 'barangay'   => 'Quezon',
@@ -115,9 +132,8 @@ class DatabaseSeeder extends Seeder
                 'country'    => 'Philippines',
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]
-            
-        ]);
+            ]);
+        }
 
         if (! SiteSetting::query()->exists()) {
             SiteSetting::create(SiteSetting::defaults());

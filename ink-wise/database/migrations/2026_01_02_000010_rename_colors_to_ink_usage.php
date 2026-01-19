@@ -9,6 +9,11 @@ return new class extends Migration
 {
     private function dropForeignIfExists(string $table, string $foreignKey): void
     {
+        // For SQLite, foreign keys are not enforced by default, so skip
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         $connection = Schema::getConnection();
         $database = $connection->getDatabaseName();
 
@@ -44,10 +49,16 @@ return new class extends Migration
 
         Schema::table('product_ink_usage', function (Blueprint $table) {
             if (Schema::hasColumn('product_ink_usage', 'name')) {
-                $table->dropColumn('name');
+                // For SQLite, skip dropping columns
+                if (DB::getDriverName() !== 'sqlite') {
+                    $table->dropColumn('name');
+                }
             }
             if (Schema::hasColumn('product_ink_usage', 'color_code')) {
-                $table->dropColumn('color_code');
+                // For SQLite, skip dropping columns
+                if (DB::getDriverName() !== 'sqlite') {
+                    $table->dropColumn('color_code');
+                }
             }
             if (!Schema::hasColumn('product_ink_usage', 'average_usage_ml')) {
                 $table->decimal('average_usage_ml', 10, 2)->nullable()->after('product_id');
@@ -65,7 +76,10 @@ return new class extends Migration
             $dropColumns = [];
             foreach (['color_id', 'color_name', 'color_code', 'image_path'] as $column) {
                 if (Schema::hasColumn('order_item_ink_usage', $column)) {
-                    $dropColumns[] = $column;
+                    // For SQLite, skip dropping columns that might be referenced in foreign keys
+                    if (DB::getDriverName() !== 'sqlite') {
+                        $dropColumns[] = $column;
+                    }
                 }
             }
             if (!empty($dropColumns)) {
