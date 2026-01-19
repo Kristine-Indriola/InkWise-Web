@@ -493,7 +493,6 @@
                 <span class="canvas-zoom-value" id="canvas-zoom-display">100%</span>
                 <button type="button" class="canvas-control-btn icon" data-zoom-step="up" aria-label="Zoom in"><i class="fa-solid fa-plus"></i></button>
                 <button type="button" class="canvas-control-btn icon" data-zoom-reset aria-label="Reset zoom to 100%"><i class="fa-solid fa-rotate-right"></i></button>
-                <button type="button" class="canvas-control-btn icon" aria-label="Canvas settings"><i class="fa-solid fa-gear"></i></button>
                 <select class="canvas-zoom-select" id="canvas-zoom-select" aria-label="Zoom level">
                     <option value="0.25">25%</option>
                     <option value="0.5">50%</option>

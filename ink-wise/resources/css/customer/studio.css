@@ -2177,22 +2177,7 @@ body {
     background: var(--button-hover);
 }
 
-/* Floating Toolbar */
-.floating-toolbar {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    background: #fff;
-    border: 1px solid var(--panel-border);
-    border-radius: 8px;
-    padding: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    z-index: 100;
-}
-
+/* Floating Toolbar removed */
 .toolbar-btn {
     width: 40px;
     height: 40px;
