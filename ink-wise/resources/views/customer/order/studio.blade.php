@@ -374,8 +374,7 @@
     </div>
     <div class="topbar-actions">
         <button class="topbar-action-btn" type="button" onclick="window.location.href='{{ route('templates.wedding.invitations') }}'">Change Template</button>
-        <button class="topbar-action-btn" type="button">Preview</button>
-        <button class="topbar-action-btn" type="button" id="save-template-btn" data-action="save-template">Save Template</button>
+        <button class="topbar-action-btn" type="button" id="preview-btn">Preview</button>
         <button
             class="topbar-action-btn primary"
             type="button"
@@ -496,7 +495,6 @@
                 <span class="canvas-zoom-value" id="canvas-zoom-display">100%</span>
                 <button type="button" class="canvas-control-btn icon" data-zoom-step="up" aria-label="Zoom in"><i class="fa-solid fa-plus"></i></button>
                 <button type="button" class="canvas-control-btn icon" data-zoom-reset aria-label="Reset zoom to 100%"><i class="fa-solid fa-rotate-right"></i></button>
-                <button type="button" class="canvas-control-btn icon" aria-label="Canvas settings"><i class="fa-solid fa-gear"></i></button>
                 <select class="canvas-zoom-select" id="canvas-zoom-select" aria-label="Zoom level">
                     <option value="3">300%</option>
                     <option value="2">200%</option>
@@ -508,27 +506,7 @@
                 </select>
             </div>
         </div>
-        <!-- Floating Toolbar -->
-        <div class="floating-toolbar" id="floating-toolbar">
-            <button class="toolbar-btn" type="button" data-nav="text" title="Text">
-                <span class="toolbar-icon-text">T</span>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="uploads" title="Uploads">
-                <i class="fa-solid fa-cloud-arrow-up"></i>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="graphics" title="Graphics">
-                <i class="fa-solid fa-images"></i>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="background" title="Colors">
-                <i class="fa-solid fa-brush"></i>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="tables" title="Tables">
-                <i class="fa-solid fa-table"></i>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="colors" title="Colors">
-                <i class="fa-solid fa-palette"></i>
-            </button>
-        </div>
+        <!-- Floating toolbar removed -->
         <div class="preview-thumbs" role="tablist" aria-label="Card sides">
             <button type="button" class="preview-thumb active" data-card-thumb="front" aria-pressed="true">
                 <div class="thumb-preview" @if($frontImage) style="background-image: url('{{ $frontImage }}');" @endif>
@@ -565,28 +543,6 @@
         <p class="modal-helper">Edit your text below, or click on the field you'd like to edit directly on your design.</p>
         <div class="text-field-list" id="textFieldList">
             <!-- fields are generated dynamically from the SVG (or default placeholders shown only when SVG has no text nodes) -->
-        </div>
-        <div class="text-layout-controls" style="margin-top:12px; display:flex; gap:10px; align-items:center;">
-            <label style="font-weight:600; margin-right:6px">Layout</label>
-            <select id="textLayoutOrientation" aria-label="Text layout orientation">
-                <option value="horizontal">Horizontal rows</option>
-                <option value="vertical">Vertical columns</option>
-            </select>
-            <label for="textLayoutColumns" style="margin-left:6px">Columns</label>
-            <input id="textLayoutColumns" type="number" min="1" value="1" style="width:64px" aria-label="Number of columns">
-            <label for="textLayoutHAlign" style="margin-left:6px">H Align</label>
-            <select id="textLayoutHAlign" aria-label="Horizontal alignment">
-                <option value="left">Left</option>
-                <option value="center" selected>Center</option>
-                <option value="right">Right</option>
-            </select>
-            <label for="textLayoutVAlign" style="margin-left:6px">V Align</label>
-            <select id="textLayoutVAlign" aria-label="Vertical alignment">
-                <option value="top">Top</option>
-                <option value="middle" selected>Middle</option>
-                <option value="bottom">Bottom</option>
-            </select>
-            <button id="applyTextLayoutBtn" class="btn btn-primary" type="button" style="margin-left:8px">Apply</button>
         </div>
         <button class="add-field-btn" type="button" data-add-text-field>New Text Field</button>
     </div>
@@ -997,19 +953,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Floating toolbar functionality
-    const floatingToolbar = document.getElementById('floating-toolbar');
-    if (floatingToolbar) {
-        floatingToolbar.addEventListener('click', function(e) {
-            if (e.target.classList.contains('toolbar-btn') || e.target.closest('.toolbar-btn')) {
-                const btn = e.target.classList.contains('toolbar-btn') ? e.target : e.target.closest('.toolbar-btn');
-                const nav = btn.dataset.nav;
-                const modal = document.getElementById(nav + '-modal');
-                if (modal) {
-                    modal.style.display = 'flex';
-                    modal.setAttribute('aria-hidden', 'false');
-                }
-            }
+    // Floating toolbar removed
+
+    // Rotate canvas functionality (rotate entire preview canvas by 90° per click)
+    const rotateBtn = document.querySelector('.canvas-control-btn[data-zoom-reset]');
+    if (rotateBtn) {
+        rotateBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            // Rotate the whole canvas wrapper so the card, SVG and guides rotate together
+            const previewWrapper = document.querySelector('.preview-canvas-wrapper');
+            if (!previewWrapper) return;
+
+            const current = parseInt(previewWrapper.dataset.rotation || '0', 10) || 0;
+            const next = (current + 90) % 360;
+            previewWrapper.dataset.rotation = String(next);
+            previewWrapper.style.transition = 'transform 0.25s ease';
+            previewWrapper.style.transformOrigin = 'center center';
+            previewWrapper.style.transform = `rotate(${next}deg)`;
         });
     }
 
@@ -1028,7 +988,71 @@ document.addEventListener('DOMContentLoaded', function() {
     updateDisplay();
     updateButtons();
 });
+// Preview button functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const previewBtn = document.getElementById('preview-btn');
+    const previewModal = document.getElementById('studio-preview-modal');
+    const previewContent = document.getElementById('studio-preview-content');
+    const previewClose = document.getElementById('studio-preview-close');
+
+    function openPreview() {
+        const wrapper = document.querySelector('.preview-canvas-wrapper');
+        if (!wrapper || !previewModal) return;
+
+        // Clear previous
+        previewContent.innerHTML = '';
+
+        // Clone the wrapper (deep) and scale it to fit
+        const clone = wrapper.cloneNode(true);
+        clone.style.transform = 'none';
+        clone.style.maxWidth = '100%';
+        clone.style.maxHeight = '80vh';
+        clone.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
+
+        // Remove any interactive attributes that might interfere
+        clone.querySelectorAll('[data-modal-close],[data-action],[id]').forEach(el => el.removeAttribute('id'));
+
+        previewContent.appendChild(clone);
+        previewModal.style.display = 'flex';
+        previewModal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closePreview() {
+        if (!previewModal) return;
+        previewModal.style.display = 'none';
+        previewModal.setAttribute('aria-hidden', 'true');
+        previewContent.innerHTML = '';
+    }
+
+    previewBtn?.addEventListener('click', function(e) {
+        e.preventDefault();
+        openPreview();
+    });
+
+    previewClose?.addEventListener('click', function(e) {
+        e.preventDefault();
+        closePreview();
+    });
+
+    previewModal?.addEventListener('click', function(e) {
+        if (e.target === previewModal) {
+            closePreview();
+        }
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closePreview();
+    });
+});
 </script>
+
+<!-- Preview modal markup -->
+<div id="studio-preview-modal" class="studio-preview-modal" aria-hidden="true" style="display:none;position:fixed;inset:0;z-index:20000;align-items:center;justify-content:center;background:rgba(0,0,0,0.8)">
+    <div class="studio-preview-inner" style="background:#fff;padding:18px;border-radius:10px;max-width:90vw;max-height:90vh;overflow:auto;position:relative;">
+        <button id="studio-preview-close" aria-label="Close preview" style="position:absolute;top:8px;right:8px;border:none;background:transparent;font-size:20px;cursor:pointer">&times;</button>
+        <div id="studio-preview-content" style="display:flex;align-items:center;justify-content:center;padding:8px"></div>
+    </div>
+</div>
 
 </body>
 </html>
