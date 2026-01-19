@@ -238,6 +238,14 @@
                 return $candidate;
             }
 
+            // Try to return the URL directly for SVG files
+            if (str_contains($candidate, '.svg')) {
+                $url = $resolveImage($candidate, null);
+                if ($url && is_string($url) && str_starts_with($url, '/')) {
+                    return $url;
+                }
+            }
+
             $contents = $readSvgFile($candidate);
             if (is_string($contents) && $contents !== '') {
                 return 'data:image/svg+xml;base64,' . base64_encode($contents);
@@ -367,14 +375,14 @@
         </div>
         <div class="topbar-history-controls" role="group" aria-label="History controls">
             <button type="button" class="topbar-icon-btn" aria-label="View history"><i class="fa-regular fa-clock"></i></button>
-            <button type="button" class="topbar-icon-btn" aria-label="Undo"><i class="fa-solid fa-rotate-left"></i></button>
-            <button type="button" class="topbar-icon-btn" aria-label="Redo"><i class="fa-solid fa-rotate-right"></i></button>
+            <!-- Undo/Redo removed -->
         </div>
         <div id="inkwise-customer-studio-root" class="studio-react-root" aria-live="polite"></div>
     </div>
     <div class="topbar-actions">
         <button class="topbar-action-btn" type="button" onclick="window.location.href='{{ route('templates.wedding.invitations') }}'">Change Template</button>
-        <button class="topbar-action-btn" type="button" id="preview-btn">Preview</button>
+        <button class="topbar-action-btn" type="button" data-action="preview">Preview</button>
+        <button class="topbar-action-btn" type="button" id="save-template-btn" data-action="save-template">Save Template</button>
         <button
             class="topbar-action-btn primary"
             type="button"
@@ -494,7 +502,7 @@
                 <button type="button" class="canvas-control-btn icon" data-zoom-step="down" aria-label="Zoom out"><i class="fa-solid fa-minus"></i></button>
                 <span class="canvas-zoom-value" id="canvas-zoom-display">100%</span>
                 <button type="button" class="canvas-control-btn icon" data-zoom-step="up" aria-label="Zoom in"><i class="fa-solid fa-plus"></i></button>
-                <button type="button" class="canvas-control-btn icon" data-zoom-reset aria-label="Reset zoom to 100%"><i class="fa-solid fa-rotate-right"></i></button>
+                <!-- Reset zoom button removed -->
                 <select class="canvas-zoom-select" id="canvas-zoom-select" aria-label="Zoom level">
                     <option value="3">300%</option>
                     <option value="2">200%</option>
@@ -544,6 +552,7 @@
         <div class="text-field-list" id="textFieldList">
             <!-- fields are generated dynamically from the SVG (or default placeholders shown only when SVG has no text nodes) -->
         </div>
+        <!-- Text layout controls removed -->
         <button class="add-field-btn" type="button" data-add-text-field>New Text Field</button>
     </div>
 </div>
@@ -983,6 +992,77 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+
+    // Topbar action buttons functionality
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('topbar-action-btn') || e.target.closest('.topbar-action-btn')) {
+            const btn = e.target.classList.contains('topbar-action-btn') ? e.target : e.target.closest('.topbar-action-btn');
+            const action = btn.dataset.action;
+
+            if (action === 'preview') {
+                showPreview();
+            } else if (action === 'proceed-review') {
+                const destination = btn.dataset.destination;
+                if (destination) {
+                    window.location.href = destination;
+                }
+            }
+        }
+    });
+
+    // Preview functionality
+    function showPreview() {
+        // Create or show preview overlay
+        let previewOverlay = document.getElementById('preview-overlay');
+        if (!previewOverlay) {
+            const canvasWrapper = document.querySelector('.preview-canvas-wrapper');
+            const cardBg = document.querySelector('.preview-card-bg');
+            const previewSvg = document.getElementById('preview-svg');
+
+            const canvasWidth = canvasWrapper ? canvasWrapper.dataset.canvasWidth : '433';
+            const canvasHeight = canvasWrapper ? canvasWrapper.dataset.canvasHeight : '559';
+            const bgImage = cardBg ? cardBg.style.backgroundImage : '';
+            const svgContent = previewSvg ? previewSvg.innerHTML : '';
+
+            previewOverlay = document.createElement('div');
+            previewOverlay.id = 'preview-overlay';
+            previewOverlay.className = 'preview-overlay-modal';
+            previewOverlay.innerHTML = `
+                <div class="preview-overlay-header">
+                    <h2>Preview</h2>
+                    <button type="button" class="preview-close-btn" aria-label="Close preview">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="preview-overlay-content">
+                    <div class="preview-canvas-container">
+                        <div class="preview-card-preview">
+                            <div class="preview-card-bg" style="background-image: ${bgImage}; width: ${canvasWidth}px; height: ${canvasHeight}px;">
+                                <svg width="100%" height="100%" viewBox="0 0 ${canvasWidth} ${canvasHeight}" preserveAspectRatio="xMidYMid meet">
+                                    ${svgContent}
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(previewOverlay);
+
+            // Add close functionality
+            previewOverlay.querySelector('.preview-close-btn').addEventListener('click', function() {
+                previewOverlay.remove();
+            });
+
+            // Close on background click
+            previewOverlay.addEventListener('click', function(e) {
+                if (e.target === previewOverlay) {
+                    previewOverlay.remove();
+                }
+            });
+        } else {
+            previewOverlay.style.display = 'flex';
+        }
+    }
 
     // Initial setup
     updateDisplay();

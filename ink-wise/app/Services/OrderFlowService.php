@@ -1437,6 +1437,23 @@ class OrderFlowService
 
     public function buildSummarySnapshot(Order $order, OrderItem $item): array
     {
+        $metadata = $order->metadata ?? [];
+        $omitBasePrice = Arr::get($metadata, 'final_step.metadata.omit_base_price', false);
+
+        $pricing = [
+            'unit_price' => $item->unit_price,
+            'subtotal' => $order->subtotal_amount,
+            'tax' => $order->tax_amount,
+            'shipping' => $order->shipping_fee,
+            'total' => $order->total_amount,
+        ];
+
+        if ($omitBasePrice) {
+            $paymentAmount = Arr::get($metadata, 'final_step.metadata.payment_amount', 0);
+            $pricing['total'] = (float) $paymentAmount;
+            $pricing['subtotal'] = (float) $paymentAmount;
+        }
+
         return [
             'order_number' => $order->order_number,
             'status' => $order->status,
@@ -1445,13 +1462,7 @@ class OrderFlowService
                 'name' => $item->product_name,
                 'quantity' => $item->quantity,
             ],
-            'pricing' => [
-                'unit_price' => $item->unit_price,
-                'subtotal' => $order->subtotal_amount,
-                'tax' => $order->tax_amount,
-                'shipping' => $order->shipping_fee,
-                'total' => $order->total_amount,
-            ],
+            'pricing' => $pricing,
             'created_at' => $order->created_at?->toIso8601String(),
         ];
     }
@@ -3258,39 +3269,52 @@ class OrderFlowService
             return;
         }
 
-        // Include base price of the invitation in the subtotal so the order total reflects
-        // the product's unit price plus any extras (paper, addons, etc.). Previously this
-        // was set to 0 which caused orders with only the base product to end up with a
-        // zero total amount.
-        $baseSubtotal = round((float) ($invitationItem->unit_price ?? 0) * (int) $invitationItem->quantity, 2);
+        // Check if base price should be omitted
+        $metadata = $order->metadata ?? [];
+        $omitBasePrice = Arr::get($metadata, 'final_step.metadata.omit_base_price', false);
 
-        // paperStockSelection->price is stored as a per-unit price; multiply by quantity
-        $paperPerUnit = (float) ($invitationItem->paperStockSelection?->price ?? 0);
-        $paperTotal = round($paperPerUnit * $invitationItem->quantity, 2);
+        if ($omitBasePrice) {
+            // When base price is omitted, use the payment_amount as the total
+            $paymentAmount = Arr::get($metadata, 'final_step.metadata.payment_amount', 0);
+            $total = round((float) $paymentAmount, 2);
+            $subtotal = $total; // subtotal equals total in this case
+            $tax = 0.0;
+            $shipping = 0.0;
+        } else {
+            // Include base price of the invitation in the subtotal so the order total reflects
+            // the product's unit price plus any extras (paper, addons, etc.). Previously this
+            // was set to 0 which caused orders with only the base product to end up with a
+            // zero total amount.
+            $baseSubtotal = round((float) ($invitationItem->unit_price ?? 0) * (int) $invitationItem->quantity, 2);
 
-        $addonsTotal = (float) ($invitationItem->addons?->sum(fn($addon) => $addon->addon_price * $invitationItem->quantity) ?? 0);
+            // paperStockSelection->price is stored as a per-unit price; multiply by quantity
+            $paperPerUnit = (float) ($invitationItem->paperStockSelection?->price ?? 0);
+            $paperTotal = round($paperPerUnit * $invitationItem->quantity, 2);
 
-        $inkTotal = 0.0; // TODO: calculate ink costs if applicable
+            $addonsTotal = (float) ($invitationItem->addons?->sum(fn($addon) => $addon->addon_price * $invitationItem->quantity) ?? 0);
 
-        $extrasTotal = round($paperTotal + $addonsTotal + $inkTotal, 2);
+            $inkTotal = 0.0; // TODO: calculate ink costs if applicable
 
-        $additionalLineItemsTotal = $order->items
-            ->reject(fn ($item) => $item->is($invitationItem))
-            ->sum(function (OrderItem $item) {
-                $subtotal = $item->subtotal;
+            $extrasTotal = round($paperTotal + $addonsTotal + $inkTotal, 2);
 
-                if ($subtotal === null) {
-                    $subtotal = $item->unit_price * $item->quantity;
-                }
+            $additionalLineItemsTotal = $order->items
+                ->reject(fn ($item) => $item->is($invitationItem))
+                ->sum(function (OrderItem $item) {
+                    $subtotal = $item->subtotal;
 
-                return (float) $subtotal;
-            });
+                    if ($subtotal === null) {
+                        $subtotal = $item->unit_price * $item->quantity;
+                    }
 
-        // Include baseSubtotal so subtotal reflects base product + extras + other line items
-        $subtotal = round($baseSubtotal + $extrasTotal + $additionalLineItemsTotal, 2);
-        $tax = 0.0;
-        $shipping = 0.0;
-        $total = round($subtotal, 2);
+                    return (float) $subtotal;
+                });
+
+            // Include baseSubtotal so subtotal reflects base product + extras + other line items
+            $subtotal = round($baseSubtotal + $extrasTotal + $additionalLineItemsTotal, 2);
+            $tax = 0.0;
+            $shipping = 0.0;
+            $total = round($subtotal, 2);
+        }
 
         $order->update([
             'subtotal_amount' => $subtotal,

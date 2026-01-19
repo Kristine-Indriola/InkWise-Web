@@ -100,6 +100,16 @@
 	$frontImage = $resolveImage($frontImage);
 	$backImage = $resolveImage($backImage);
 
+	// Load from REVIEW2 folder if available
+	$review2Path = 'templates/REVIEW2';
+	if (Illuminate\Support\Facades\Storage::disk('public')->exists($review2Path . '/preview.png')) {
+		$backImage = Illuminate\Support\Facades\Storage::url($review2Path . '/preview.png');
+	}
+	if (Illuminate\Support\Facades\Storage::disk('public')->exists($review2Path . '/design.svg')) {
+		$svgContent = Illuminate\Support\Facades\Storage::disk('public')->get($review2Path . '/design.svg');
+		$backImage = 'data:image/svg+xml;base64,' . base64_encode($svgContent);
+	}
+
 	// DEBUG - Start
 	\Log::debug('BLADE DEBUG - customerReview check', [
 		'has_customerReview' => $customerReview ? 'YES' : 'NO',

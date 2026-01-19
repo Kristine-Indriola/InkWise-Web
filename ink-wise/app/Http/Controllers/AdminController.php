@@ -786,7 +786,7 @@ class AdminController extends Controller
             });
 
         return $orderActivities
-            ->merge($inventoryActivities)
+            ->concat($inventoryActivities)
             ->sortByDesc('timestamp')
             ->values()
             ->take(12)
