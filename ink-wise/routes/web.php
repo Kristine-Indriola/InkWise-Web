@@ -1023,6 +1023,9 @@ Route::get('/debug/giveaways-images', [OrderFlowController::class, 'debugGiveawa
     ->name('debug.giveaways.images');
 Route::get('/order/birthday', fn () => view('customer.templates.birthday'))->name('order.birthday');
 
+use App\Http\Controllers\Customer\CheckoutController;
+use App\Http\Controllers\Customer\PaymentController as CustomerPaymentController;
+
 Route::get('/checkout', [OrderFlowController::class, 'checkout'])
     ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('customer.checkout');
@@ -1053,7 +1056,6 @@ Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->group
     Route::post('/payments/gcash', [PaymentController::class, 'createGCashPayment'])->name('payment.gcash.create');
     Route::get('/payments/gcash/return', [PaymentController::class, 'handleGCashReturn'])->name('payment.gcash.return');
 });
-Route::post('/payments/gcash/webhook', [PaymentController::class, 'webhook'])->name('payment.gcash.webhook');
 
 /**Customer Upload Route*/
 Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->post('/customer/upload/design', [CustomerAuthController::class, 'uploadDesign'])->name('customer.upload.design');

@@ -1483,6 +1483,7 @@ public function uploadToProduct(Request $request, $id)
     // Upload template (create record in product_uploads table)
     public function uploadTemplate(Request $request, $id)
     {
+        Log::info("Request received: {$request->method()} {$request->path()}");
         $template = Template::findOrFail($id);
 
         $productUploadData = [

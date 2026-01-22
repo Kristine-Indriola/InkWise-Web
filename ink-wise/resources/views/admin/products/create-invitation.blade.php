@@ -294,10 +294,22 @@
             </div>
             <div class="form-section">
                 <h2>Average Usage</h2>
+                <style>
+                    /* Hide number input spinners cross-browser for the average usage field */
+                    .no-spinner::-webkit-outer-spin-button,
+                    .no-spinner::-webkit-inner-spin-button {
+                        -webkit-appearance: none;
+                        margin: 0;
+                    }
+                    .no-spinner {
+                        -moz-appearance: textfield;
+                        appearance: textfield;
+                    }
+                </style>
                 <div class="input-row">
                     <div class="field">
                         <label for="average_usage_ml">Average usage (ml)</label>
-                        <input type="number" step="0.01" id="average_usage_ml" name="average_usage_ml" value="{{ $averageUsageMl }}" placeholder="e.g. 12.5">
+                        <input type="number" step="0.01" id="average_usage_ml" name="average_usage_ml" class="no-spinner" value="{{ $averageUsageMl }}" placeholder="e.g. 12.5">
                     </div>
                 </div>
             </div>
