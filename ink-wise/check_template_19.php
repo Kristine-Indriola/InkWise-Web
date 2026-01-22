@@ -47,7 +47,7 @@ if ($template) {
         if ($generatedSvg) {
             echo "SVG generated successfully!\n";
             // Update the template
-            $template->svg_path = 'templates/svg/template_19_regenerated.svg';
+            $template->svg_path = 'templates/front/svg/template_19_regenerated.svg';
             Storage::disk('public')->put($template->svg_path, base64_decode(str_replace('data:image/svg+xml;base64,', '', $generatedSvg)));
             $template->save();
             echo "Updated template SVG path to: {$template->svg_path}\n";

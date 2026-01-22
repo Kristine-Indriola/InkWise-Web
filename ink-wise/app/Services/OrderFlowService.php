@@ -3358,6 +3358,15 @@ class OrderFlowService
         }
         $summary['envelope'] = $summary['envelopes'][0] ?? null; // legacy consumers
 
+        // Extract giveaways from metadata (support both plural and legacy single formats)
+        $summary['giveaways'] = [];
+        if (!empty($metadata['giveaways']) && is_array($metadata['giveaways'])) {
+            $summary['giveaways'] = $metadata['giveaways'];
+        } elseif (!empty($metadata['giveaway']) && is_array($metadata['giveaway'])) {
+            $summary['giveaways'] = [$metadata['giveaway']];
+        }
+        $summary['giveaway'] = $summary['giveaways'][0] ?? null; // legacy consumer compatibility
+
         return $summary;
     }
 

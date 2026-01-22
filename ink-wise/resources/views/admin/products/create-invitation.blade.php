@@ -276,57 +276,6 @@
                 </div>
             </div>
 
-            {{-- Size --}}
-            <div class="form-section">
-                <h2>Size</h2>
-                <div class="addon-rows">
-                    @foreach($addonRows as $i => $addon)
-                    <div class="addon-row" data-row-index="{{ $i }}">
-                        <input type="hidden" name="addons[{{ $i }}][id]" value="{{ $addon['id'] ?? '' }}">
-                        <div class="input-row">
-                            <input type="hidden" name="addons[{{ $i }}][addon_type]" value="size">
-                            <div class="field addon-name-field">
-                                <label for="addons_{{ $i }}_name">Size Number</label>
-                                <select class="addon-name-select" data-placeholder="Select addon material..." name="addons[{{ $i }}][material_select]" aria-label="Select addon material">
-                                    <option value="">Select material...</option>
-                                    @foreach($materials as $materialOption)
-                                        @php
-                                            $optionLabel = $materialOption->material_name . (!empty($materialOption->material_type) ? ' (' . $materialOption->material_type . ')' : '');
-                                            $isSelected = !empty($addon['material_id']) && $addon['material_id'] == $materialOption->material_id;
-                                        @endphp
-                                        <option value="{{ $materialOption->material_id }}"
-                                                data-name="{{ $materialOption->material_name }}"
-                                                data-unit-cost="{{ $materialOption->unit_cost ?? '' }}"
-                                                {{ $isSelected ? 'selected' : '' }}>
-                                            {{ $optionLabel }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <input type="text" id="addons_{{ $i }}_name" name="addons[{{ $i }}][name]" class="addon-name-input" list="addon-materials-list" placeholder="Select or type material name" value="{{ $addon['name'] ?? '' }}">
-                                <input type="hidden" name="addons[{{ $i }}][material_id]" class="addon-material-id" value="{{ $addon['material_id'] ?? '' }}">
-                            </div>
-                            <div class="field">
-                                <label for="addons_{{ $i }}_image_path">Image</label>
-                                <input type="file" id="addons_{{ $i }}_image_path" name="addons[{{ $i }}][image_path]" accept="image/*">
-                                @if(!empty($addon['image_url']))
-                                    <small class="existing-file">Current: <a href="{{ $addon['image_url'] }}" target="_blank" rel="noopener">View</a></small>
-                                @endif
-                            </div>
-                            <button class="add-row" type="button" aria-label="Add another addon row">+</button>
-                            <button class="remove-row" type="button" aria-label="Remove this addon row">−</button>
-                        </div>
-                    </div>
-                    @endforeach
-                </div>
-                @once
-                    <datalist id="addon-materials-list">
-                        @foreach($materials as $materialOption)
-                            <option value="{{ $materialOption->material_name }}">{{ $materialOption->material_name }}</option>
-                        @endforeach
-                    </datalist>
-                @endonce
-            </div>
-
             {{-- Colors moved to Production page --}}
 
             {{-- Images removed: uploads handled elsewhere; show front/back preview only --}}

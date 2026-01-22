@@ -949,6 +949,11 @@ Route::post('/design/save-to-review', [OrderFlowController::class, 'saveToReview
 Route::post('/design/upload-image', [OrderFlowController::class, 'uploadDesignImage'])
     ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('order.design.upload-image');
+
+// Upload images specifically from the review page (persist upload and audit it)
+Route::post('/order/review/upload-image', [OrderFlowController::class, 'uploadReviewImage'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.review.upload-image');
 Route::post('/design/save-template', [OrderFlowController::class, 'saveAsTemplate'])
     ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer,staff')
     ->name('order.design.save-template');

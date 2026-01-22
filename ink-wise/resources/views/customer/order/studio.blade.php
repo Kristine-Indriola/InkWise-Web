@@ -572,10 +572,11 @@
         </div>
         <p class="modal-helper">Upload photos and illustrations to personalize your invitation.</p>
         <div class="upload-section">
-            <button type="button" id="upload-button" class="upload-button">
+            <button type="button" id="upload-button" class="upload-button" aria-label="Upload image for: Front">
                 <i class="fa-solid fa-cloud-arrow-up"></i>
                 Upload Image
             </button>
+            <span id="upload-side-label" class="upload-side-label" style="margin-left:8px;font-weight:600;">Front</span>
             <input type="file" id="image-upload" accept="image/*" class="upload-input" style="display: none;">
         </div>
         <div class="recently-uploaded-section">
@@ -837,6 +838,8 @@
         'csrfToken' => csrf_token(),
         'product' => $productBootstrap,
         'template' => $templateBootstrap,
+        // Include template_id explicitly so the client always has a direct value to use
+        'template_id' => $templateBootstrap['id'] ?? $product?->template_id ?? null,
         'assets' => [
             'front_image' => $frontImage,
             'back_image' => $hasBackSide ? $backImage : null,

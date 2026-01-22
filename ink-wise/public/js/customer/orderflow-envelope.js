@@ -593,16 +593,12 @@ document.addEventListener('DOMContentLoaded', () => {
           <p class="quantity-helper summary-note">Select a quantity. Minimum order is ${minQty}${apiMaxQty ? `, max ${apiMaxQty}` : ''}</p>
         </div>
         <div class="control-buttons">
-          <button class="btn btn-secondary envelope-item__design" type="button" title="Add/Edit My Design">
-            <i class="fas fa-edit"></i> Design
-          </button>
           <button class="primary-action envelope-item__select" type="button">Select envelope</button>
         </div>
       </div>
     `;
 
     const qtyInput = card.querySelector('input[type="number"]');
-    const designBtn = card.querySelector('.envelope-item__design');
     const addBtn = card.querySelector('.envelope-item__select');
     const totalDisplay = card.querySelector('[data-total-display]');
     const errorDisplay = card.querySelector('.quantity-error');
@@ -652,10 +648,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 300));
     }
 
-    designBtn?.addEventListener('click', () => {
-      // TODO: Implement design functionality
-      showToast('Design feature coming soon!');
-    });
+    // Design button removed for envelopes.
 
     addBtn?.addEventListener('click', async () => {
       const envelopeId = String(env.id);

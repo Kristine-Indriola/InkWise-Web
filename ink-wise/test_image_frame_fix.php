@@ -36,12 +36,12 @@ if (!$svgPath) {
     // Generate the expected SVG filename from the template's file
     $svgUuid = pathinfo($template->file ?? '', PATHINFO_FILENAME);
     if ($svgUuid) {
-        $svgPath = "templates/svg/{$svgUuid}.svg";
+        $svgPath = "templates/front/svg/{$svgUuid}.svg";
     } else {
         // Use the JSON file UUID
         $jsonUuid = pathinfo($jsonPath, PATHINFO_FILENAME);
         $jsonUuid = str_replace('template_', '', $jsonUuid);
-        $svgPath = "templates/svg/template_{$jsonUuid}.svg";
+        $svgPath = "templates/front/svg/template_{$jsonUuid}.svg";
     }
     echo "Generated SVG Path: {$svgPath}\n";
 }
