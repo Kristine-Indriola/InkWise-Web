@@ -829,6 +829,82 @@
 		body.ordersummary-modal-open {
 			overflow: hidden;
 		}
+
+		/* SVG Preview Modal Styles */
+		.ordersummary-svg-preview-modal {
+			position: fixed;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			z-index: 1000;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+
+		.svg-preview-container {
+			display: flex;
+			gap: 20px;
+			max-width: 1200px;
+			width: 100%;
+			justify-content: center;
+		}
+
+		.svg-preview-front,
+		.svg-preview-back {
+			flex: 1;
+			max-width: 500px;
+		}
+
+		.svg-preview-front h4,
+		.svg-preview-back h4 {
+			margin: 0 0 12px 0;
+			font-size: 16px;
+			font-weight: 600;
+			color: #374151;
+			text-align: center;
+		}
+
+		.svg-preview-content {
+			background: white;
+			border: 1px solid #e5e7eb;
+			border-radius: 8px;
+			padding: 16px;
+			min-height: 400px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+		}
+
+		.svg-preview-content svg {
+			max-width: 100%;
+			max-height: 350px;
+			display: block;
+		}
+
+		.svg-preview-content:empty::before {
+			content: "No design available";
+			color: #9ca3af;
+			font-style: italic;
+		}
+
+		@media (max-width: 768px) {
+			.svg-preview-container {
+				flex-direction: column;
+				gap: 16px;
+			}
+
+			.svg-preview-front,
+			.svg-preview-back {
+				max-width: 100%;
+			}
+
+			.svg-preview-content {
+				min-height: 300px;
+			}
+		}
 	</style>
 @endpush
 
@@ -1087,6 +1163,7 @@
 	if ($orderGrandTotal <= 0 && $grandTotal > 0) {
 		$orderGrandTotal = (float) $grandTotal;
 	}
+	
 	$metadataRaw = data_get($order, 'metadata');
 	if (is_string($metadataRaw) && $metadataRaw !== '') {
 		$decodedMetadata = json_decode($metadataRaw, true);
@@ -1322,6 +1399,7 @@
 								<tr>
 									<th scope="col">Item</th>
 									<th scope="col">Options</th>
+									<th scope="col">Paper Stock Material</th>
 									<th scope="col" class="text-center">Qty</th>
 									<th scope="col" class="text-end">Unit price</th>
 									<th scope="col" class="text-end">Line total</th>
@@ -1331,8 +1409,36 @@
 								@foreach($items as $item)
 									@php
 										$quantity = (int) data_get($item, 'quantity', 1);
+										
+										// Check if this is an invitation (not envelope or giveaway)
+										$ptype = strtolower((string) data_get($item, 'product_type', ''));
+										$iname = strtolower((string) data_get($item, 'name', ''));
+										$ltype = strtolower((string) data_get($item, 'line_type', ''));
+										$isEnvelope = str_contains($ptype, 'envelope') || str_contains($iname, 'envelope');
+										$isGiveaway = $ltype === 'giveaway' || str_contains($ptype, 'giveaway') || str_contains($iname, 'giveaway') || str_contains($iname, 'freebie');
+										$isInvitation = !$isEnvelope && !$isGiveaway;
+										
+										// Calculate breakdown sum for this item
+										$breakdown = collect(data_get($item, 'breakdown', []));
+										$breakdownSum = $breakdown->reduce(function ($carry, $row) {
+											$rowQty = data_get($row, 'quantity');
+											$rowTotal = data_get($row, 'total', data_get($row, 'unit_price'));
+											if (is_numeric($rowTotal)) {
+												$mult = ($rowQty !== null && is_numeric($rowQty)) ? (int) $rowQty : 1;
+												return $carry + ((float) $rowTotal * $mult);
+											}
+											return $carry;
+										}, 0);
+										
 										$unitPrice = (float) data_get($item, 'unit_price', data_get($item, 'price', 0));
-										$lineTotal = (float) data_get($item, 'total', data_get($item, 'subtotal', $quantity * $unitPrice));
+										
+										// For invitations, line total is breakdown sum
+										if ($isInvitation) {
+											$lineTotal = $breakdownSum;
+										} else {
+											$lineTotal = (float) data_get($item, 'total', data_get($item, 'subtotal', $quantity * $unitPrice));
+										}
+										
 										// fallback: some giveaway items store their computed total in design_metadata or item metadata
 										if (empty($lineTotal) || $lineTotal === 0.0) {
 											$lineTotal = (float) data_get($item, 'design_metadata.total', data_get($item, 'metadata.giveaway.total', data_get($item, 'metadata.giveaway.price', data_get($item, 'metadata.total', 0))));
@@ -1374,6 +1480,12 @@
 										// normalize breakdown and sync quantities for paper stock and addons
 										$rawOptions = data_get($item, 'options', []);
 										$paperStockValue = data_get($rawOptions, 'paper_stock') ?? data_get($rawOptions, 'paper stock') ?? null;
+
+										// For invitations, use paper stock price as unit price
+										if ($isInvitation) {
+											$paperStockPrice = $extractMoney(data_get($rawOptions, 'paper_stock_price'));
+											$unitPrice = is_numeric($paperStockPrice) ? (float) $paperStockPrice : 0.0;
+										}
 										$addonValues = [];
 										foreach ($rawOptions as $optKey => $optVal) {
 											if (str_contains(strtolower((string) $optKey), 'addon')) {
@@ -1517,21 +1629,6 @@
 											return (string) $value;
 										};
 
-										$rawImages = data_get($item, 'preview_images', data_get($item, 'images', []));
-										if ($rawImages instanceof \Illuminate\Support\Collection) {
-											$rawImages = $rawImages->all();
-										}
-										if (is_string($rawImages) && trim($rawImages) !== '') {
-											$decodedGallery = json_decode($rawImages, true);
-											$rawImages = json_last_error() === JSON_ERROR_NONE ? $decodedGallery : [trim($rawImages)];
-										}
-										if (is_object($rawImages)) {
-											if (method_exists($rawImages, 'toArray')) {
-												$rawImages = $rawImages->toArray();
-											} else {
-												$rawImages = (array) $rawImages;
-											}
-										}
 										$options = collect(data_get($item, 'options', []))
 											->filter(function ($value, $key) {
 												$k = strtolower($key);
@@ -1552,12 +1649,99 @@
 											})
 											->unique(fn ($option) => \Illuminate\Support\Str::lower($option))
 											->values();
-										$images = collect($rawImages)->filter(function ($value) {
-											if (is_string($value)) {
-												return trim($value) !== '';
+										// Prefer any customer-saved draft previews (CustomerTemplateCustom)
+										$imagesSource = data_get($item, 'preview_images', data_get($item, 'images', []));
+										$customerReviewSvg = null;
+										$customerReviewBackImage = null;
+										try {
+											$customerDraft = null;
+											// Use the original Eloquent order model when available (`orderModel`)
+											if (isset($orderModel) && ($orderModel->id ?? null) && (data_get($item, 'id') || data_get($item, 'order_item_id'))) {
+												$orderItemId = data_get($item, 'id', data_get($item, 'order_item_id'));
+												$customerDraft = \App\Models\CustomerTemplateCustom::query()
+													->where('order_id', $orderModel->id)
+													->where('order_item_id', $orderItemId)
+													->latest('id')
+													->first();
 											}
-											return $value !== null;
-										});
+
+											if (!$customerDraft && isset($order) && ($order?->customer_id ?? null)) {
+												// Fallback: find by customer/product/template match
+												$customerDraft = \App\Models\CustomerTemplateCustom::query()
+													->where('customer_id', $order->customer_id)
+													->where('product_id', data_get($item, 'product_id'))
+													->latest('id')
+													->first();
+											}
+
+											if ($customerDraft) {
+												$draftImages = data_get($customerDraft, 'preview_images', data_get($customerDraft, 'preview_images', []));
+												if (!empty($draftImages)) {
+													$imagesSource = $draftImages;
+												} elseif (!empty($customerDraft->preview_image ?? null)) {
+													$imagesSource = [$customerDraft->preview_image];
+												}
+											}
+											
+											// Look for CustomerReview with design_svg (saved from design studio)
+											// template_id can come from:
+											// 1. item.template_id (from presenter via product.template_id)
+											// 2. item.metadata.template_id
+											// 3. item.design_metadata.template_id
+											// 4. customerDraft.template_id
+											$templateId = data_get($item, 'template_id') 
+												?? data_get($item, 'metadata.template_id') 
+												?? data_get($item, 'design_metadata.template_id')
+												?? ($customerDraft->template_id ?? null);
+											$customerId = $order?->customer_id ?? ($orderModel->customer_id ?? null);
+											
+											if ($templateId && $customerId) {
+												$customerReview = \App\Models\CustomerReview::query()
+													->where('template_id', $templateId)
+													->where('customer_id', $customerId)
+													->whereNotNull('design_svg')
+													->where('design_svg', '!=', '')
+													->latest('updated_at')
+													->first();
+												
+												if ($customerReview && !empty($customerReview->design_svg)) {
+													$customerReviewSvg = $customerReview->design_svg;
+													// Try to get back image from saved design_back_svg first, then fallback to gallery
+													if (!empty($customerReview->design_back_svg)) {
+														$customerReviewBackImage = $customerReview->design_back_svg;
+													} elseif (!empty($imagesSource) && count($imagesSource) > 1) {
+														$backImg = $imagesSource[1] ?? null;
+														if (is_array($backImg)) {
+															$customerReviewBackImage = $backImg['src'] ?? $backImg['url'] ?? null;
+														} else {
+															$customerReviewBackImage = $backImg;
+														}
+													}
+												}
+
+												// Get original template for back-to-back comparison
+												$originalTemplate = null;
+												$originalTemplateSvg = null;
+												$originalTemplateBackSvg = null;
+												try {
+													$originalTemplate = \App\Models\Template::find($templateId);
+													if ($originalTemplate) {
+														if ($originalTemplate->svg_path && \Storage::disk('public')->exists($originalTemplate->svg_path)) {
+															$originalTemplateSvg = \Storage::disk('public')->get($originalTemplate->svg_path);
+														}
+														if ($originalTemplate->back_svg_path && \Storage::disk('public')->exists($originalTemplate->back_svg_path)) {
+															$originalTemplateBackSvg = \Storage::disk('public')->get($originalTemplate->back_svg_path);
+														}
+													}
+												} catch (\Throwable $e) {
+													// Ignore errors when loading original template
+												}
+											}
+										} catch (\Throwable $e) {
+											// ignore and fall back to item images
+										}
+
+										$images = collect($imagesSource)->filter();
 										$itemMaterialBuckets = [
 											'paper' => [],
 											'addon' => [],
@@ -1611,9 +1795,10 @@
 										}
 
 										// accumulate grouping sums: invitations (main line only, breakdowns are separate)
-										if (!$isEnvelope && !$isGiveaway) {
-											$groupSums['invitations'] += $lineTotal;
-										}
+										// DO NOT CALCULATE THE BASE PRICE OF THE INVITATION
+										// if (!$isEnvelope && !$isGiveaway) {
+										//     $groupSums['invitations'] += $lineTotal;
+										// }
 
 										if ($isEnvelope) {
 											$groupSums['envelopes'] += $lineTotal;
@@ -1770,78 +1955,59 @@
 														$gallerySources[] = $src;
 													};
 
-													$processImageEntry = null;
-													$processImageEntry = function ($entry, $imageKey = null) use (&$processImageEntry, $detectOrientation, $pushGalleryImage) {
-														if ($entry instanceof \Illuminate\Support\Collection) {
-															$entry = $entry->all();
-														}
+													$images->each(function ($img, $imageKey) use ($detectOrientation, $pushGalleryImage) {
+														$keyOrientation = $detectOrientation($imageKey);
 
-														if ($entry instanceof \Illuminate\Contracts\Support\Arrayable) {
-															$entry = $entry->toArray();
-														}
-
-														if (is_object($entry)) {
-															if (method_exists($entry, 'toArray')) {
-																$entry = $entry->toArray();
-															} elseif ($entry instanceof \JsonSerializable) {
-																$entry = $entry->jsonSerialize();
-															} else {
-																$entry = (array) $entry;
-															}
-														}
-
-														if (is_string($entry)) {
-															$trimmed = trim($entry);
-															if ($trimmed === '') {
-																return;
-															}
-
-															$firstChar = substr($trimmed, 0, 1);
-															$lastChar = substr($trimmed, -1);
-															if (($firstChar === '{' && $lastChar === '}') || ($firstChar === '[' && $lastChar === ']')) {
-																$decoded = json_decode($trimmed, true);
-																if (json_last_error() === JSON_ERROR_NONE) {
-																	if (is_array($decoded)) {
-																		if (!\Illuminate\Support\Arr::isAssoc($decoded)) {
-																			foreach ($decoded as $decodedKey => $decodedValue) {
-																				$processImageEntry($decodedValue, is_string($decodedKey) ? $decodedKey : $imageKey);
-																			}
-																			return;
-																		}
-
-																		$entry = $decoded;
-																	} elseif (is_string($decoded)) {
-																		$trimmed = trim($decoded);
-																	}
-																}
-															}
-
-															if (!is_array($entry)) {
-																$pushGalleryImage($trimmed ?? $entry, $detectOrientation($imageKey));
-																return;
-															}
-														}
-
-														if (!is_array($entry)) {
+														if (is_string($img)) {
+															$pushGalleryImage($img, $keyOrientation);
 															return;
 														}
 
-														$primarySrc = $entry['url'] ?? $entry['src'] ?? $entry['preview'] ?? $entry['thumb'] ?? $entry['path'] ?? null;
-														$primaryOrientation = $detectOrientation($entry['orientation'] ?? $entry['side'] ?? $entry['page'] ?? $entry['label'] ?? null) ?? $detectOrientation($imageKey);
-														$primaryLabel = $entry['label'] ?? $entry['title'] ?? $entry['description'] ?? null;
+														if (is_object($img)) {
+															if (method_exists($img, 'toArray')) {
+																$img = $img->toArray();
+															} elseif (method_exists($img, '__toString')) {
+																$pushGalleryImage((string) $img, $keyOrientation);
+																return;
+															} else {
+																$img = (array) $img;
+															}
+														}
+
+														if (!is_array($img)) {
+															return;
+														}
+
+														$primarySrc = $img['url'] ?? $img['src'] ?? $img['preview'] ?? null;
+														$primaryOrientation = $detectOrientation($img['orientation'] ?? $img['side'] ?? $img['page'] ?? $img['label'] ?? null) ?? $keyOrientation;
+														$primaryLabel = $img['label'] ?? $img['title'] ?? $img['description'] ?? null;
 														$pushGalleryImage($primarySrc, $primaryOrientation, $primaryLabel);
 
-														foreach ($entry as $nestedKey => $nestedValue) {
-															if (in_array($nestedKey, ['url', 'src', 'preview', 'thumb', 'path', 'label', 'title', 'description', 'orientation', 'side', 'page'], true)) {
+														foreach ($img as $nestedKey => $nestedValue) {
+															if (in_array($nestedKey, ['url', 'src', 'preview', 'label', 'title', 'description', 'orientation', 'side', 'page'], true)) {
 																continue;
 															}
 
-															$processImageEntry($nestedValue, is_string($nestedKey) ? $nestedKey : $imageKey);
-														}
-													};
+															if (is_string($nestedValue)) {
+																$pushGalleryImage($nestedValue, $detectOrientation($nestedKey));
+																continue;
+															}
 
-													$images->each(function ($img, $imageKey) use ($processImageEntry) {
-														$processImageEntry($img, $imageKey);
+															if (is_object($nestedValue)) {
+																if (method_exists($nestedValue, 'toArray')) {
+																	$nestedValue = $nestedValue->toArray();
+																} else {
+																	$nestedValue = (array) $nestedValue;
+																}
+															}
+
+															if (is_array($nestedValue)) {
+																$nestedSrc = $nestedValue['url'] ?? $nestedValue['src'] ?? $nestedValue['preview'] ?? null;
+																$nestedOrientation = $detectOrientation($nestedValue['orientation'] ?? $nestedKey) ?? $detectOrientation($nestedKey);
+																$nestedLabel = $nestedValue['label'] ?? $nestedValue['title'] ?? null;
+																$pushGalleryImage($nestedSrc, $nestedOrientation, $nestedLabel);
+															}
+														}
 													});
 
 													if ($galleryEntries->isEmpty()) {
@@ -1852,6 +2018,31 @@
 													}
 
 													$gallery = $galleryEntries->values();
+													// Prepare a client-friendly gallery with normalized URLs so the
+													// preview JS doesn't request relative paths that 404.
+													$galleryForClient = $gallery->map(function ($entry) {
+														$src = is_array($entry) ? ($entry['src'] ?? '') : (is_string($entry) ? $entry : '');
+														$src = trim((string) $src);
+														if ($src === '') {
+															return null;
+														}
+
+														if (preg_match('/^https?:\/\//i', $src)) {
+															$url = $src;
+														} elseif (preg_match('/^\/?storage\//i', $src)) {
+															$url = asset(ltrim($src, '/'));
+														} elseif (str_starts_with($src, '/')) {
+															$url = url($src);
+														} else {
+															$url = asset('storage/' . ltrim($src, '/'));
+														}
+
+														return array_filter([
+															'src' => $url,
+															'orientation' => $entry['orientation'] ?? null,
+															'label' => $entry['label'] ?? null,
+														], function ($v) { return $v !== null && $v !== ''; });
+													})->filter()->values();
 													$itemMaterialsList = collect($itemMaterialBuckets)
 														->flatMap(function ($rows, $type) {
 															return collect($rows)->map(function ($row) use ($type) {
@@ -1872,35 +2063,26 @@
 													$primaryImageEntry = $gallery->first();
 													$primaryImage = is_array($primaryImageEntry) ? ($primaryImageEntry['src'] ?? null) : (is_string($primaryImageEntry) ? $primaryImageEntry : null);
 													$primaryImageLabel = is_array($primaryImageEntry) ? ($primaryImageEntry['label'] ?? null) : null;
-													if (!$primaryImage) {
-														$primaryImage = collect($rawImages)
-															->map(function ($img) {
-																if (is_string($img)) {
-																	return trim($img);
-																}
-																if (is_array($img)) {
-																	return $img['url'] ?? $img['src'] ?? $img['preview'] ?? null;
-																}
-																if ($img instanceof \Illuminate\Contracts\Support\Arrayable) {
-																	$img = $img->toArray();
-																	return $img['url'] ?? $img['src'] ?? $img['preview'] ?? null;
-																}
-																if (is_object($img)) {
-																	$img = (array) $img;
-																	return $img['url'] ?? $img['src'] ?? $img['preview'] ?? null;
-																}
-																return null;
-															})
-															->filter(function ($value) {
-																return is_string($value) && $value !== '';
-															})
-															->first();
-													}
-													if (!$primaryImage) {
-														$maybeImage = data_get($item, 'image');
-														$primaryImage = is_string($maybeImage) && trim($maybeImage) !== '' ? trim($maybeImage) : null;
-													}
 													$previewTitle = data_get($item, 'name', 'Custom product');
+
+													// Normalize image URL for browser consumption. Accept absolute URLs, storage paths,
+													// and relative paths. Fallback to placeholder when missing.
+													$primaryImageUrl = null;
+													if (!empty($primaryImage)) {
+														$trimmed = trim((string) $primaryImage);
+														if (preg_match('/^https?:\/\//i', $trimmed)) {
+															$primaryImageUrl = $trimmed;
+														} elseif (preg_match('/^\/?storage\//i', $trimmed)) {
+															$primaryImageUrl = asset(ltrim($trimmed, '/'));
+														} elseif (str_starts_with($trimmed, '/')) {
+															$primaryImageUrl = url($trimmed);
+														} else {
+															// Common case: stored in storage/app/public or relative path like "customerimages/..."
+															$primaryImageUrl = asset('storage/' . ltrim($trimmed, '/'));
+														}
+													} else {
+														$primaryImageUrl = asset('images/placeholder.png');
+													}
 												@endphp
 												@if($gallery->isNotEmpty())
 													<button
@@ -1908,15 +2090,59 @@
 														class="item-cell__thumb-button"
 														data-preview-trigger
 														data-preview-title="{{ $previewTitle }}"
-														data-preview-gallery='@json($gallery)'
+														data-preview-gallery='@json($galleryForClient)'
 														data-preview-materials='@json($itemMaterialsList)'
 														aria-label="View artwork preview for {{ $previewTitle }}"
 													>
-														<img src="{{ $primaryImage }}" alt="{{ $primaryImageLabel ? $previewTitle . ' ' . strtolower($primaryImageLabel) : $previewTitle . ' preview' }}" class="item-cell__thumb">
+														<img src="{{ $primaryImageUrl }}" alt="{{ $primaryImageLabel ? $previewTitle . ' ' . strtolower($primaryImageLabel) : $previewTitle . ' preview' }}" class="item-cell__thumb">
 													</button>
-												@elseif($primaryImage)
-													<div class="item-cell__thumb-fallback">
-														<img src="{{ $primaryImage }}" alt="{{ $previewTitle }} preview" class="item-cell__thumb">
+												@endif
+												@if(!empty($customerReviewSvg) || !empty($originalTemplateSvg))
+													<div class="mt-2">
+														<div class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Template Comparison</div>
+														<div class="flex gap-2">
+															@if(!empty($originalTemplateSvg))
+																<div class="flex flex-col items-center">
+																	<div class="text-xs text-gray-500 mb-1">Original</div>
+																	<button
+																		type="button"
+																		class="item-cell__svg-button js-admin-svg-preview-trigger"
+																		data-svg-content="{{ base64_encode($originalTemplateSvg) }}"
+																		data-back-image="{{ !empty($originalTemplateBackSvg) ? base64_encode($originalTemplateBackSvg) : '' }}"
+																		data-preview-title="{{ $previewTitle }} - Original Template"
+																		aria-label="View original template design for {{ $previewTitle }}"
+																		style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 4px; background: #f8fafc; cursor: pointer; display: inline-block; transition: all 0.2s;"
+																		onmouseover="this.style.boxShadow='0 0 0 2px #a6b7ff'"
+																		onmouseout="this.style.boxShadow='none'"
+																	>
+																		<div class="svg-thumb-container" style="width: 60px; height: 60px; overflow: hidden; pointer-events: none;">
+																			{!! $originalTemplateSvg !!}
+																		</div>
+																	</button>
+																</div>
+															@endif
+															@if(!empty($customerReviewSvg))
+																<div class="flex flex-col items-center">
+																	<div class="text-xs text-gray-500 mb-1">Edited</div>
+																	<button
+																		type="button"
+																		class="item-cell__svg-button js-admin-svg-preview-trigger"
+																		data-svg-content="{{ base64_encode($customerReviewSvg) }}"
+																		data-back-image="{{ !empty($customerReviewBackImage) && str_contains($customerReviewBackImage, '<svg') ? base64_encode($customerReviewBackImage) : ($customerReviewBackImage ?? '') }}"
+																		data-preview-title="{{ $previewTitle }} - Edited Design"
+																		aria-label="View edited template design for {{ $previewTitle }}"
+																		style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 4px; background: #f8fafc; cursor: pointer; display: inline-block; transition: all 0.2s;"
+																		onmouseover="this.style.boxShadow='0 0 0 2px #a6b7ff'"
+																		onmouseout="this.style.boxShadow='none'"
+																	>
+																		<div class="svg-thumb-container" style="width: 60px; height: 60px; overflow: hidden; pointer-events: none;">
+																			{!! $customerReviewSvg !!}
+																		</div>
+																	</button>
+																</div>
+															@endif
+														</div>
+														<div class="text-xs text-gray-400 mt-1">Click to view front & back designs</div>
 													</div>
 												@endif
 												<div>
@@ -1936,6 +2162,13 @@
 														<li>{{ $option }}</li>
 													@endforeach
 												</ul>
+											@endif
+										</td>
+										<td>
+											@if($paperStockValue)
+												{{ $paperStockValue }}
+											@else
+												<span class="item-option">—</span>
 											@endif
 										</td>
 										<td class="text-center">{{ $quantity }}</td>
@@ -2320,10 +2553,6 @@
 				</div>
 				<div class="payment-summary-grid">
 					<div class="payment-summary-grid__item">
-						<span class="payment-summary-grid__label">Total invoiced</span>
-						<span class="payment-summary-grid__value">{{ $formatCurrencyAmount($orderGrandTotal) }}</span>
-					</div>
-					<div class="payment-summary-grid__item">
 						<span class="payment-summary-grid__label">Total paid</span>
 						<span class="payment-summary-grid__value">{{ $formatCurrencyAmount($totalPaid) }}</span>
 					</div>
@@ -2472,6 +2701,39 @@
 			</a>
 			<button type="button" class="btn btn-secondary" data-preview-next disabled>
 				Next <i class="fi fi-rr-angle-small-right" aria-hidden="true"></i>
+			</button>
+		</div>
+	</div>
+</div>
+
+<!-- SVG Preview Modal -->
+<div class="ordersummary-svg-preview-modal" data-svg-preview-modal style="display: none;" aria-hidden="true" tabindex="-1">
+	<div class="ordersummary-preview-backdrop" data-svg-preview-close></div>
+	<div class="ordersummary-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="ordersummarySvgPreviewTitle">
+		<header class="ordersummary-preview-header">
+			<div>
+				<h2 id="ordersummarySvgPreviewTitle">Template Design Preview</h2>
+				<p class="ordersummary-preview-meta"><span data-svg-preview-title></span></p>
+			</div>
+			<button type="button" class="ordersummary-preview-close" data-svg-preview-close aria-label="Close preview">
+				<span aria-hidden="true">&times;</span>
+			</button>
+		</header>
+		<div class="ordersummary-preview-body">
+			<div class="svg-preview-container">
+				<div class="svg-preview-front">
+					<h4>Front Design</h4>
+					<div class="svg-preview-content" data-svg-preview-front></div>
+				</div>
+				<div class="svg-preview-back" data-svg-preview-back-container>
+					<h4>Back Design</h4>
+					<div class="svg-preview-content" data-svg-preview-back></div>
+				</div>
+			</div>
+		</div>
+		<div class="ordersummary-preview-actions">
+			<button type="button" class="btn btn-secondary" data-svg-preview-close>
+				Close
 			</button>
 		</div>
 	</div>
@@ -2755,6 +3017,96 @@ document.addEventListener('DOMContentLoaded', function () {
 		if (event.key === 'ArrowRight' && !modal.hasAttribute('hidden')) {
 			event.preventDefault();
 			nextBtn.click();
+		}
+	});
+});
+
+// SVG Preview Modal Functionality
+document.addEventListener('DOMContentLoaded', function () {
+	const svgModal = document.querySelector('[data-svg-preview-modal]');
+	if (!svgModal) {
+		return;
+	}
+
+	const svgTitleEl = svgModal.querySelector('[data-svg-preview-title]');
+	const svgFrontEl = svgModal.querySelector('[data-svg-preview-front]');
+	const svgBackEl = svgModal.querySelector('[data-svg-preview-back]');
+	const svgBackContainer = svgModal.querySelector('[data-svg-preview-back-container]');
+	const svgCloseEls = svgModal.querySelectorAll('[data-svg-preview-close]');
+	const body = document.body;
+
+	const closeSvgModal = function () {
+		svgModal.style.display = 'none';
+		svgModal.setAttribute('aria-hidden', 'true');
+		body.classList.remove('ordersummary-modal-open');
+		svgFrontEl.innerHTML = '';
+		svgBackEl.innerHTML = '';
+		svgBackContainer.style.display = 'none';
+	};
+
+	const openSvgModal = function (trigger) {
+		const svgContent = trigger.getAttribute('data-svg-content');
+		const backImage = trigger.getAttribute('data-back-image');
+		const title = trigger.getAttribute('data-preview-title') || 'Template Design';
+
+		if (!svgContent) {
+			return;
+		}
+
+		try {
+			// Decode and display front SVG
+			const frontSvg = atob(svgContent);
+			svgFrontEl.innerHTML = frontSvg;
+
+			// Handle back design
+			if (backImage && backImage.trim() !== '') {
+				try {
+					let backSvg = backImage;
+					// Check if it's base64 encoded
+					if (!backImage.includes('<svg') && !backImage.includes('<SVG')) {
+						backSvg = atob(backImage);
+					}
+					svgBackEl.innerHTML = backSvg;
+					svgBackContainer.style.display = 'block';
+				} catch (backError) {
+					console.warn('Failed to decode back design:', backError);
+					svgBackContainer.style.display = 'none';
+				}
+			} else {
+				svgBackContainer.style.display = 'none';
+			}
+
+			svgTitleEl.textContent = title;
+			svgModal.style.display = 'flex';
+			svgModal.setAttribute('aria-hidden', 'false');
+			body.classList.add('ordersummary-modal-open');
+			svgModal.focus();
+		} catch (error) {
+			console.error('Failed to open SVG preview:', error);
+		}
+	};
+
+	document.querySelectorAll('.js-admin-svg-preview-trigger').forEach(function (trigger) {
+		trigger.addEventListener('click', function (event) {
+			event.preventDefault();
+			openSvgModal(trigger);
+		});
+	});
+
+	svgCloseEls.forEach(function (button) {
+		button.addEventListener('click', closeSvgModal);
+	});
+
+	svgModal.addEventListener('click', function (event) {
+		if (event.target === svgModal && svgModal.style.display !== 'none') {
+			closeSvgModal();
+		}
+	});
+
+	document.addEventListener('keydown', function (event) {
+		if (event.key === 'Escape' && svgModal.style.display !== 'none') {
+			event.preventDefault();
+			closeSvgModal();
 		}
 	});
 });

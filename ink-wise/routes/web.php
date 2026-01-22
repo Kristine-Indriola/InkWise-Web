@@ -616,6 +616,38 @@ Route::get('/customer/my-orders/inproduction', function () {
             ->where('customer_id', $user->customer->customer_id)
             ->with(['items.product', 'items.paperStockSelection', 'payments'])
             ->latest()
+            ->paginate(20);
+        
+        $orders->getCollection()->transform(function ($order) {
+            // Compute payment totals from payments relationship
+            $paidPayments = $order->payments->filter(fn($p) => strtolower($p->status ?? '') === 'paid');
+            $totalPaid = round($paidPayments->sum('amount'), 2);
+            $grandTotal = (float) ($order->total_amount ?? 0);
+            $balanceDue = max($grandTotal - $totalPaid, 0);
+            
+            // Store computed values for easy access in view
+            $order->computed_total_paid = $totalPaid;
+            $order->computed_balance_due = $balanceDue;
+            
+            return $order;
+        });
+    }
+    
+    return view('customer.profile.purchase.inproduction', compact('orders'));
+})->name('customer.my_purchase.inproduction');
+Route::get('/customer/my-orders/toship', fn () => view('customer.profile.purchase.toship'))->name('customer.my_purchase.toship');
+Route::get('/customer/my-orders/toreceive', fn () => view('customer.profile.purchase.toreceive'))->name('customer.my_purchase.toreceive');
+Route::get('/customer/my-orders/topickup', fn () => view('customer.profile.purchase.topickup'))->name('customer.my_purchase.topickup');
+Route::get('/customer/my-orders/completed', function () {
+    $user = Auth::user();
+    $orders = collect();
+    
+    if ($user && $user->customer) {
+        $orders = \App\Models\Order::query()
+            ->where('customer_id', $user->customer->customer_id)
+            ->where('status', 'completed')
+            ->with(['items.product', 'items.paperStockSelection', 'payments'])
+            ->latest()
             ->get()
             ->map(function ($order) {
                 // Compute payment totals from payments relationship
@@ -632,12 +664,8 @@ Route::get('/customer/my-orders/inproduction', function () {
             });
     }
     
-    return view('customer.profile.purchase.inproduction', compact('orders'));
-})->name('customer.my_purchase.inproduction');
-Route::get('/customer/my-orders/toship', fn () => view('customer.profile.purchase.toship'))->name('customer.my_purchase.toship');
-Route::get('/customer/my-orders/toreceive', fn () => view('customer.profile.purchase.toreceive'))->name('customer.my_purchase.toreceive');
-Route::get('/customer/my-orders/topickup', fn () => view('customer.profile.purchase.topickup'))->name('customer.my_purchase.topickup');
-Route::get('/customer/my-orders/completed', fn () => view('customer.profile.purchase.completed'))->name('customer.my_purchase.completed');
+    return view('customer.profile.purchase.completed', compact('orders'));
+})->name('customer.my_purchase.completed');
 Route::get('/customer/my-orders/rate', [CustomerProfileController::class, 'rate'])->middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->name('customer.my_purchase.rate');
 Route::get('/customer/pay-remaining-balance/{order}', function (\App\Models\Order $order) {
     // Ensure the order belongs to the authenticated user
@@ -912,9 +940,20 @@ Route::post('/order/cart/items', [OrderFlowController::class, 'storeDesignSelect
 Route::any('/design/autosave', [OrderFlowController::class, 'autosaveDesign'])
     // ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('order.design.autosave');
+Route::get('/design/load-autosave', [OrderFlowController::class, 'loadAutosave'])
+    // ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.design.load-autosave');
+Route::post('/design/save-to-review', [OrderFlowController::class, 'saveToReview'])
+    // ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.design.save-to-review');
 Route::post('/design/upload-image', [OrderFlowController::class, 'uploadDesignImage'])
     ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('order.design.upload-image');
+
+// Upload images specifically from the review page (persist upload and audit it)
+Route::post('/order/review/upload-image', [OrderFlowController::class, 'uploadReviewImage'])
+    ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
+    ->name('order.review.upload-image');
 Route::post('/design/save-template', [OrderFlowController::class, 'saveAsTemplate'])
     ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer,staff')
     ->name('order.design.save-template');
@@ -984,6 +1023,9 @@ Route::get('/debug/giveaways-images', [OrderFlowController::class, 'debugGiveawa
     ->name('debug.giveaways.images');
 Route::get('/order/birthday', fn () => view('customer.templates.birthday'))->name('order.birthday');
 
+use App\Http\Controllers\Customer\CheckoutController;
+use App\Http\Controllers\Customer\PaymentController as CustomerPaymentController;
+
 Route::get('/checkout', [OrderFlowController::class, 'checkout'])
     ->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer')
     ->name('customer.checkout');
@@ -999,10 +1041,21 @@ Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->group
     Route::get('/customer/cart', [CartController::class, 'index'])->name('customer.cart');
     Route::patch('/order/cart/items/{cartItem}', [CartController::class, 'updateItem'])->name('customer.cart.update');
     Route::delete('/order/cart/items/{cartItem}', [CartController::class, 'removeItem'])->name('customer.cart.remove');
+    // Provide a friendly GET handler so users who accidentally navigate to the create endpoint
+    // (for example via a bad link or direct browser navigation) receive clear guidance
+    // instead of a server error about unsupported methods.
+    Route::get('/payments/gcash', function () {
+        if (request()->expectsJson()) {
+            return response()->json(['message' => 'GCash payments must be started via POST from the checkout flow.'], 405);
+        }
+
+        return redirect()->route('customer.checkout')
+            ->with('error', 'Please start GCash payments using the Place Order button on checkout.');
+    })->middleware(\App\Http\Middleware\RoleMiddleware::class . ':customer');
+
     Route::post('/payments/gcash', [PaymentController::class, 'createGCashPayment'])->name('payment.gcash.create');
     Route::get('/payments/gcash/return', [PaymentController::class, 'handleGCashReturn'])->name('payment.gcash.return');
 });
-Route::post('/payments/gcash/webhook', [PaymentController::class, 'webhook'])->name('payment.gcash.webhook');
 
 /**Customer Upload Route*/
 Route::middleware(\App\Http\Middleware\RoleMiddleware::class.':customer')->post('/customer/upload/design', [CustomerAuthController::class, 'uploadDesign'])->name('customer.upload.design');

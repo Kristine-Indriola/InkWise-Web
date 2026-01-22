@@ -283,8 +283,10 @@ function mountReactApp() {
       return;
     }
 
-    const root = createRoot(rootElement);
-    root.render(
+    if (!rootElement.__inkwiseRoot) {
+      rootElement.__inkwiseRoot = createRoot(rootElement);
+    }
+    rootElement.__inkwiseRoot.render(
       <React.StrictMode>
         <CustomerStudioApp />
       </React.StrictMode>,
@@ -304,8 +306,10 @@ function mountReactApp() {
       }
 
       if (toolbarHostRoot) {
-        const toolbarRoot = createRoot(toolbarHostRoot);
-        toolbarRoot.render(
+        if (!toolbarHostRoot.__inkwiseRoot) {
+          toolbarHostRoot.__inkwiseRoot = createRoot(toolbarHostRoot);
+        }
+        toolbarHostRoot.__inkwiseRoot.render(
           <React.StrictMode>
             <ToolbarHost />
           </React.StrictMode>,

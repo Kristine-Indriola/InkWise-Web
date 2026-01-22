@@ -59,29 +59,22 @@
     <div class="space-y-4">
         @forelse($ordersList as $order)
             @php
-                $productName = data_get($order, 'product_name', 'Completed order');
-                $orderNumber = data_get($order, 'order_number', data_get($order, 'id'));
-                $quantity = (int) data_get($order, 'quantity', 0);
-                $image = data_get($order, 'image', asset('images/placeholder.png'));
-                $totalAmount = data_get($order, 'total_amount', 0);
-                $completedDate = data_get($order, 'completed_date');
-                if (!$completedDate && $timestamp = data_get($order, 'updated_at')) {
-                    try {
-                        $completedDate = \Illuminate\Support\Carbon::parse($timestamp)->format('M d, Y');
-                    } catch (\Throwable $e) {
-                        $completedDate = null;
-                    }
-                }
-
-                $metadata = $normalizeMetadata(data_get($order, 'metadata', []));
+                $firstItem = $order->items->first();
+                $productName = $firstItem ? $firstItem->product_name : 'Completed order';
+                $orderNumber = $order->order_number ?: $order->id;
+                $quantity = $order->items->sum('quantity');
+                $image = $firstItem && $firstItem->design_metadata ? data_get($firstItem->design_metadata, 'image', asset('images/placeholder.png')) : asset('images/placeholder.png');
+                $totalAmount = $order->grandTotalAmount();
+                $completedDate = $order->updated_at ? $order->updated_at->format('M d, Y') : null;
+                $metadata = $order->metadata ?? [];
                 $trackingNumber = $metadata['tracking_number'] ?? null;
                 $statusNote = $metadata['status_note'] ?? null;
-                $statusKey = data_get($order, 'status', 'completed');
+                $statusKey = $order->status;
                 $statusLabel = $statusOptions[$statusKey] ?? ucfirst(str_replace('_', ' ', $statusKey));
                 $previewUrl = '#';
                 try {
-                    if ($productId = data_get($order, 'product_id')) {
-                        $previewUrl = route('product.preview', $productId);
+                    if ($firstItem && $firstItem->product_id) {
+                        $previewUrl = route('product.preview', $firstItem->product_id);
                     }
                 } catch (\Throwable $e) {
                     $previewUrl = '#';

@@ -17,10 +17,9 @@ class SelectGiveawayRequest extends FormRequest
         return [
             'product_id' => [
                 'required',
-                'integer',
-                Rule::exists('products', 'id')->where(fn ($query) => $query->where('product_type', 'Giveaway')),
+                'numeric',
             ],
-            'quantity' => ['required', 'integer', 'min:1'],
+            'quantity' => ['required', 'numeric', 'min:1'],
             'unit_price' => ['nullable', 'numeric', 'min:0'],
             'total_price' => ['nullable', 'numeric', 'min:0'],
             'metadata' => ['nullable', 'array'],

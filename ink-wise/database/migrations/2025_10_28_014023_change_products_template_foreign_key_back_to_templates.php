@@ -15,15 +15,25 @@ return new class extends Migration
         // First, set all template_id values to null to avoid constraint violations
         DB::table('products')->update(['template_id' => null]);
 
-        // Drop existing foreign key if it exists
-        try {
-            DB::statement('ALTER TABLE products DROP FOREIGN KEY products_template_id_foreign');
-        } catch (\Exception $e) {
-            // Foreign key doesn't exist, continue
+        // For SQLite compatibility, skip foreign key operations since SQLite doesn't support
+        // adding foreign key constraints via ALTER TABLE
+        if (DB::getDriverName() === 'sqlite') {
+            // SQLite doesn't enforce foreign keys by default, so we can skip the constraint changes
+            return;
         }
 
-        // Use raw SQL to add the new foreign key to templates
-        DB::statement('ALTER TABLE products ADD CONSTRAINT products_template_id_foreign FOREIGN KEY (template_id) REFERENCES templates(id) ON DELETE SET NULL');
+        // For MySQL/PostgreSQL, drop existing foreign key and add new one
+        Schema::table('products', function (Blueprint $table) {
+            // Drop existing foreign key if it exists
+            try {
+                $table->dropForeign(['template_id']);
+            } catch (\Exception $e) {
+                // Foreign key doesn't exist, continue
+            }
+
+            // Add new foreign key to templates
+            $table->foreign('template_id')->references('id')->on('templates')->onDelete('set null');
+        });
     }
 
     /**
@@ -31,6 +41,11 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            // SQLite doesn't enforce foreign keys, so skip
+            return;
+        }
+
         Schema::table('products', function (Blueprint $table) {
             // Drop the foreign key to templates
             $table->dropForeign(['template_id']);

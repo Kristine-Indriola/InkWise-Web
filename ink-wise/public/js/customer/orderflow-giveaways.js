@@ -161,7 +161,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const writeSummary = (summary) => {
+    const writeSummary = (summary, source = 'unknown') => {
+        try {
+            console.debug('[giveaways] writeSummary called', { source, summary });
+        } catch (e) {}
         window.sessionStorage.setItem(storageKey, JSON.stringify(summary));
     };
 
@@ -236,7 +239,32 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        writeSummary(summary);
+        // If server summary lacks giveaways but we have local giveaways, preserve them to avoid
+        // clobbering a transient local selection (likely due to timing/race conditions).
+        try {
+            const existing = readSummary() || {};
+            const existingGiveaways = existing.giveaways && typeof existing.giveaways === 'object' ? Object.keys(existing.giveaways).length : (existing.giveaway ? 1 : 0);
+            const serverGiveaways = summary.giveaways && typeof summary.giveaways === 'object' ? Object.keys(summary.giveaways).length : (summary.giveaway ? 1 : 0);
+
+            if (serverGiveaways === 0 && existingGiveaways > 0) {
+                console.debug('[giveaways] applyServerSummary preserving local giveaways because server returned none', { serverSummary: summary, existingSummary: existing });
+                // prefer existing.giveaways structure when available
+                if (existing.giveaways && typeof existing.giveaways === 'object') {
+                    summary.giveaways = existing.giveaways;
+                } else if (existing.giveaway) {
+                    summary.giveaways = { [existing.giveaway.product_id ?? existing.giveaway.id]: existing.giveaway };
+                }
+
+                summary.extras = summary.extras ?? {};
+                summary.extras.giveaway = summary.extras.giveaway ?? existing.extras?.giveaway ?? 0;
+            }
+        } catch (e) {
+            // swallow errors in merge logic
+            console.warn('[giveaways] applyServerSummary merge check failed', e);
+        }
+
+        writeSummary(summary, 'server');
+        console.debug('[giveaways] applyServerSummary', { summary });
         syncSelectionState(summary);
     };
 
@@ -245,6 +273,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return null;
         }
 
+        console.debug('[giveaways] fetchSummaryFromServer called');
         try {
             const response = await fetch(summaryApiUrl, {
                 headers: { Accept: 'application/json' },
@@ -257,6 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const payload = await response.json();
+            console.debug('[giveaways] fetchSummaryFromServer response', { payload });
             const summary = payload?.data ?? payload;
             if (summary && typeof summary === 'object') {
                 applyServerSummary(summary);
@@ -294,6 +324,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let data = null;
             try {
                 data = await response.json();
+                console.debug('[giveaways] persistGiveawaySelection response', { data });
             } catch (error) {
                 console.warn('Giveaway response could not be parsed', error);
             }
@@ -412,7 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
             card.classList.toggle('is-selected', isSelected);
             const button = card.querySelector('.envelope-item__select');
             if (button) {
-                button.textContent = isSelected ? 'Unselect giveaways' : 'Select giveaway';
+                button.textContent = isSelected ? 'Unselect giveaway' : 'Select giveaway';
                 button.disabled = state.isSaving;
             }
         });
@@ -653,7 +684,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             // Instant toggle
-            selectBtn.textContent = isCurrentlySelected ? 'Select giveaway' : 'Unselect giveaway';
+            selectBtn.textContent = isCurrentlySelected ? 'Unselect giveaway' : 'Select giveaway';
 
             if (isCurrentlySelected) {
                 removeLocalSelection();
@@ -684,6 +715,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 cardElement: card,
                 triggerButton: selectBtn,
             }).catch(() => {
+                state.isSaving = false;
+                highlightSelectedCard();
                 /* ignore errors; local state already applied */
             });
         });
@@ -717,25 +750,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return card;
     };
 
-    const renderCards = (items) => {
-        if (!giveawayGrid) return;
-        giveawayGrid.innerHTML = '';
-
-        if (!items.length) {
-            if (emptyState) emptyState.hidden = false;
-            return;
-        }
-
-        if (emptyState) emptyState.hidden = true;
-
-        items.forEach((item) => {
-            const card = createCard(item);
-            giveawayGrid.appendChild(card);
-        });
-
-        highlightSelectedCard();
-    };
-
     const selectGiveaway = async (item, quantity, total, options = {}) => {
         // Check stock availability
         const stockQty = item.stock_qty ?? null;
@@ -751,6 +765,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Clear any pending pre-order selection
         pendingPreOrderSelection = null;
+
+        // Set saving state
+        state.isSaving = true;
+        highlightSelectedCard();
 
         // Immediate UI update — no loading state
         const normalizedImages = normalizeImageArray(item.images);
@@ -802,7 +820,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 giveaway: giveawaysTotal,
             };
 
-            writeSummary(existingSummary);
+            writeSummary(existingSummary, 'local');
             console.log('[giveaways] Summary written to storage', existingSummary);
             syncSelectionState(existingSummary);
         };
@@ -842,6 +860,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!options.silent) {
                 showToast(`${item.name} added — ${quantity} pcs for ${formatMoney(total)}`);
             }
+            state.isSaving = false;
+            highlightSelectedCard();
             return;
         }
 
@@ -850,6 +870,8 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast('That giveaway is no longer available. Refreshing options…');
             await loadGiveaways();
             await fetchSummaryFromServer();
+            state.isSaving = false;
+            highlightSelectedCard();
             return;
         }
 
@@ -857,7 +879,30 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!options.silent) {
             showToast(`${item.name} selected — ${quantity} pcs for ${formatMoney(total)}`);
         }
+        state.isSaving = false;
+        highlightSelectedCard();
     };
+
+    const renderCards = (items) => {
+        if (!giveawayGrid) return;
+        giveawayGrid.innerHTML = '';
+
+        if (!items.length) {
+            if (emptyState) emptyState.hidden = false;
+            return;
+        }
+
+        if (emptyState) emptyState.hidden = true;
+
+        items.forEach((item) => {
+            const card = createCard(item);
+            giveawayGrid.appendChild(card);
+        });
+
+        highlightSelectedCard();
+    };
+
+
 
     const loadGiveaways = async ({ useSkeleton = true } = {}) => {
         if (useSkeleton) {
@@ -941,8 +986,20 @@ document.addEventListener('DOMContentLoaded', () => {
         // Normalize summary for downstream pages and sync to server before leaving
         const summary = readSummary() ?? {};
         try {
-            // Keep a canonical copy other pages already read
-            window.sessionStorage.setItem('order_summary_payload', JSON.stringify(summary));
+            // Keep a canonical copy other pages already read (store minimal payload)
+            try {
+                const minSummary = {
+                    productId: summary.productId ?? summary.product_id ?? null,
+                    quantity: summary.quantity ?? null,
+                    paymentMode: summary.paymentMode ?? summary.payment_mode ?? null,
+                    totalAmount: summary.totalAmount ?? summary.total_amount ?? null,
+                    shippingFee: summary.shippingFee ?? summary.shipping_fee ?? null,
+                    order_id: summary.order_id ?? summary.orderId ?? null,
+                };
+                window.sessionStorage.setItem('order_summary_payload', JSON.stringify(minSummary));
+            } catch (e) {
+                console.warn('Failed to save minimal order_summary_payload to sessionStorage:', e);
+            }
 
             const csrf = getCsrfToken();
             await fetch('/order/summary/sync', {

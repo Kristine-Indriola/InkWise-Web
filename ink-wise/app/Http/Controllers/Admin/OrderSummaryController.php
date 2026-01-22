@@ -59,6 +59,7 @@ class OrderSummaryController extends Controller
                     ->map(function ($pm) {
                         return [
                             'material_name' => $pm->material->material_name ?? 'Unknown',
+                            'product_type' => $pm->material->product_type ?? 'Unknown',
                             'quantity_used' => $pm->quantity_used,
                             'unit' => $pm->unit,
                         ];

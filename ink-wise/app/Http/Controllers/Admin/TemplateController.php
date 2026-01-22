@@ -388,7 +388,7 @@ public function saveCanvas(Request $request, $id)
         $imageData = str_replace(' ', '+', $imageData);
 
         $imageName = 'template_' . $id . '_' . time() . '.png';
-        $filePath = 'templates/previews/' . $imageName;
+        $filePath = 'templates/front/png/' . $imageName;
 
         // Save to storage/app/public/templates/previews
         Storage::disk('public')->put($filePath, base64_decode($imageData));
@@ -544,7 +544,7 @@ public function saveCanvas(Request $request, $id)
                 
                 $template->preview = $this->persistDataUrl(
                     $validated['preview_image'],
-                    'templates/preview',
+                    'templates/front/png',
                     'png',
                     $template->preview,
                     'preview_image'
@@ -564,7 +564,7 @@ public function saveCanvas(Request $request, $id)
                 $dummyPreview = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
                 $template->preview = $this->persistDataUrl(
                     $dummyPreview,
-                    'templates/preview',
+                    'templates/front/png',
                     'png',
                     $template->preview,
                     'dummy_preview'
@@ -591,24 +591,40 @@ public function saveCanvas(Request $request, $id)
         // Handle multiple preview_images
         if (!empty($validated['preview_images']) && is_array($validated['preview_images'])) {
             $previews = [];
-            foreach ($validated['preview_images'] as $key => $imageData) {
-                if (is_string($imageData) && !empty($imageData)) {
-                    try {
-                        $filename = $this->persistDataUrl(
-                            $imageData,
-                            'templates/preview',
-                            'png',
-                            null,
-                            "preview_{$key}"
-                        );
-                        if ($filename) {
-                            $previews[$key] = $filename;
+                foreach ($validated['preview_images'] as $key => $imageData) {
+                    if (is_string($imageData) && !empty($imageData)) {
+                        try {
+                            // Persist back-side PNGs to disk in templates/back/png
+                            if ($key === 'back') {
+                                $dir = 'templates/back/png';
+                                $filename = $this->persistDataUrl(
+                                    $imageData,
+                                    $dir,
+                                    'png',
+                                    null,
+                                    "preview_{$key}"
+                                );
+                                if ($filename) {
+                                    $previews[$key] = $filename;
+                                }
+                            } else {
+                                $dir = 'templates/front/png';
+                                $filename = $this->persistDataUrl(
+                                    $imageData,
+                                    $dir,
+                                    'png',
+                                    null,
+                                    "preview_{$key}"
+                                );
+                                if ($filename) {
+                                    $previews[$key] = $filename;
+                                }
+                            }
+                        } catch (ValidationException $e) {
+                            Log::warning("Preview image save failed for key {$key}", ['error' => $e->getMessage()]);
                         }
-                    } catch (ValidationException $e) {
-                        Log::warning("Preview image save failed for key {$key}", ['error' => $e->getMessage()]);
                     }
                 }
-            }
             if (!empty($previews)) {
                 $metadata['previews'] = $previews;
                 Log::info('Multiple previews saved', ['previews' => $previews]);
@@ -648,7 +664,7 @@ public function saveCanvas(Request $request, $id)
             try {
                 $template->svg_path = $this->persistDataUrl(
                     $this->normalizeSvgPayload($svgPayload),
-                    'templates/svg',
+                    'templates/front/svg',
                     'svg',
                     $template->svg_path,
                     'provided_svg'
@@ -675,7 +691,7 @@ public function saveCanvas(Request $request, $id)
                 try {
                     $template->svg_path = $this->persistDataUrl(
                         $generatedSvg,
-                        'templates/svg',
+                        'templates/front/svg',
                         'svg',
                         $template->svg_path,
                         'generated_svg'
@@ -689,25 +705,32 @@ public function saveCanvas(Request $request, $id)
         }
 
         // Generate back SVG if there's a back page in the design
-        $decodedDesign = json_decode($validated['design'], true);
+        if (is_string($validated['design'])) {
+            $decodedDesign = json_decode($validated['design'], true) ?: [];
+        } elseif (is_array($validated['design'])) {
+            $decodedDesign = $validated['design'];
+        } else {
+            $decodedDesign = [];
+        }
         $backPageIndex = is_array($decodedDesign) ? $this->findBackPageIndex($decodedDesign) : null;
         if ($backPageIndex !== null) {
             try {
                 $generatedBackSvg = $this->generateSvgFromTemplate($template->id, $designPath, $backPageIndex);
-                if ($generatedBackSvg) {
-                    $template->back_svg_path = $this->persistDataUrl(
-                        $generatedBackSvg,
-                        'templates/svg',
-                        'svg',
-                        $template->back_svg_path,
-                        'generated_back_svg'
-                    );
-                    $template->has_back_design = true;
-                    Log::info('Back SVG generated successfully', [
-                        'path' => $template->back_svg_path,
-                        'page_index' => $backPageIndex
-                    ]);
-                }
+                    if ($generatedBackSvg) {
+                        // Persist back SVG into templates/back/svg
+                        $template->back_svg_path = $this->persistDataUrl(
+                            $generatedBackSvg,
+                            'templates/back/svg',
+                            'svg',
+                            $template->back_svg_path,
+                            'generated_back_svg'
+                        );
+                        $template->has_back_design = true;
+                        Log::info('Back SVG generated successfully', [
+                            'path' => $template->back_svg_path,
+                            'page_index' => $backPageIndex
+                        ]);
+                    }
             } catch (\Exception $e) {
                 Log::warning('Back SVG generation failed', ['page_index' => $backPageIndex, 'error' => $e->getMessage()]);
             }
@@ -819,7 +842,7 @@ public function saveCanvas(Request $request, $id)
         if (!empty($validated['png'])) {
             $frontPngPath = $this->persistDataUrl(
                 $validated['png'],
-                'templates/previews',
+                'templates/front/png',
                 'png',
                 $template->preview,
                 'png'
@@ -833,13 +856,13 @@ public function saveCanvas(Request $request, $id)
         try {
             $generatedSvg = $this->generateSvgFromTemplate($template->id, $designPath, 0);
             if ($generatedSvg) {
-                $template->svg_path = $this->persistDataUrl(
-                    $generatedSvg,
-                    'templates/svg',
-                    'svg',
-                    $template->svg_path,
-                    'generated_svg'
-                );
+                    $template->svg_path = $this->persistDataUrl(
+                        $generatedSvg,
+                        'templates/front/svg',
+                        'svg',
+                        $template->svg_path,
+                        'generated_svg'
+                    );
                 Log::info('SVG regenerated during saveDesign', ['path' => $template->svg_path]);
             }
         } catch (\Exception $e) {
@@ -854,7 +877,7 @@ public function saveCanvas(Request $request, $id)
                 if ($generatedBackSvg) {
                     $template->back_svg_path = $this->persistDataUrl(
                         $generatedBackSvg,
-                        'templates/svg',
+                        'templates/back/svg',
                         'svg',
                         $template->back_svg_path,
                         'generated_back_svg'
@@ -874,17 +897,22 @@ public function saveCanvas(Request $request, $id)
             }
         }
 
-        // Optional back side support (JSON + preview only)
+        // Optional back side support (JSON + preview)
+        if (!empty($validated['png_back'])) {
+            // Persist back-side PNG to disk in templates/back/png directory
+            $backPngPath = $this->persistDataUrl(
+                $validated['png_back'],
+                'templates/back/png',
+                'png',
+                $template->preview_back,
+                'png_back'
+            );
+            $template->preview_back = $backPngPath;
+            $template->has_back_design = true; // Set flag if back PNG is provided
+            Log::info('Back PNG persisted to disk during saveDesign', ['path' => $backPngPath]);
+        }
+
         if ($template->has_back_design) {
-            if (!empty($validated['png_back'])) {
-                $template->preview_back = $this->persistDataUrl(
-                    $validated['png_back'],
-                    'templates/previews',
-                    'png',
-                    $template->preview_back,
-                    'png_back'
-                );
-            }
 
             if (!empty($validated['json_back'])) {
                 $decodedBack = json_decode($validated['json_back'], true);
@@ -1004,11 +1032,11 @@ public function saveCanvas(Request $request, $id)
         $metadata['json_path'] = $designPath;
 
         // Save dummy preview
-        $template->preview = $this->persistDataUrl($dummyPreview, 'templates/preview', 'png', $template->preview, 'test_preview');
+        $template->preview = $this->persistDataUrl($dummyPreview, 'templates/front/png', 'png', $template->preview, 'test_preview');
         $template->preview_front = $template->preview;
 
-        // Save dummy SVG
-        $template->svg_path = $this->persistDataUrl($dummySvg, 'templates/svg', 'svg', $template->svg_path, 'test_svg');
+        // Save dummy SVG (front)
+        $template->svg_path = $this->persistDataUrl($dummySvg, 'templates/front/svg', 'svg', $template->svg_path, 'test_svg');
 
         $template->metadata = $metadata;
         $this->synchronizeTemplateSideState($template, $metadata);
@@ -1037,7 +1065,7 @@ public function uploadPreview(Request $request, $id)
     $imgData = $request->input('preview_image');
 
     // Save to storage with optimization (reduces file size by 60-80%)
-    $filename = 'templates/previews/template_' . $id . '_' . time() . '.png';
+    $filename = 'templates/front/png/template_' . $id . '_' . time() . '.png';
     \App\Support\ImageOptimizer::optimizePreview($imgData, $filename, 400, 75);
 
     // Update preview column (store path)
@@ -1155,7 +1183,7 @@ public function uploadPreview(Request $request, $id)
             if ($generatedSvg) {
                 $template->svg_path = $this->persistDataUrl(
                     $generatedSvg,
-                    'templates/svg',
+                    'templates/front/svg',
                     'svg',
                     $template->svg_path,
                     'generated_svg'
@@ -1178,7 +1206,7 @@ public function uploadPreview(Request $request, $id)
                 try {
                     $template->svg_path = $this->persistDataUrl(
                         $this->normalizeSvgPayload($svgPayload),
-                        'templates/svg',
+                        'templates/front/svg',
                         'svg',
                         $template->svg_path,
                         'provided_svg'
@@ -1455,6 +1483,7 @@ public function uploadToProduct(Request $request, $id)
     // Upload template (create record in product_uploads table)
     public function uploadTemplate(Request $request, $id)
     {
+        Log::info("Request received: {$request->method()} {$request->path()}");
         $template = Template::findOrFail($id);
 
         $productUploadData = [
@@ -1801,11 +1830,16 @@ public function uploadToProduct(Request $request, $id)
     {
         $paths = [
             storage_path('app/public/templates'),
-            storage_path('app/public/templates/svg'),
-            storage_path('app/public/templates/preview'),
-            storage_path('app/public/templates/previews'),
             storage_path('app/public/templates/assets'),
-            storage_path('app/public/templates/videos'),
+            storage_path('app/public/templates/front'),
+            storage_path('app/public/templates/front/svg'),
+            storage_path('app/public/templates/front/png'),
+            storage_path('app/public/templates/back'),
+            storage_path('app/public/templates/front/svg'),
+            storage_path('app/public/templates/front/png'),
+            storage_path('app/public/templates/back'),
+            storage_path('app/public/templates/back/svg'),
+            storage_path('app/public/templates/back/png'),
         ];
 
         foreach ($paths as $dir) {
@@ -2223,42 +2257,57 @@ public function uploadToProduct(Request $request, $id)
                 return @zlib_decode($payload);
             },
             'inflate_raw' => function ($payload) {
-                if (!function_exists('inflate_init') || !defined('ZLIB_ENCODING_RAW')) {
+                if (!function_exists('inflate_init') || !defined('ZLIB_ENCODING_RAW') || !defined('ZLIB_FINISH')) {
                     return false;
                 }
-                $resource = @inflate_init(ZLIB_ENCODING_RAW);
+                $encoding = constant('ZLIB_ENCODING_RAW');
+                $finish = constant('ZLIB_FINISH');
+                if ($encoding === null || $finish === null) {
+                    return false;
+                }
+                $resource = @inflate_init($encoding);
                 if ($resource === false) {
                     return false;
                 }
-                $result = @inflate_add($resource, $payload, ZLIB_FINISH);
+                $result = @inflate_add($resource, $payload, $finish);
                 if ($result === false || $result === null || $result === '') {
                     return false;
                 }
                 return $result;
             },
             'inflate_zlib' => function ($payload) {
-                if (!function_exists('inflate_init') || !defined('ZLIB_ENCODING_ZLIB')) {
+                if (!function_exists('inflate_init') || !defined('ZLIB_ENCODING_ZLIB') || !defined('ZLIB_FINISH')) {
                     return false;
                 }
-                $resource = @inflate_init(ZLIB_ENCODING_ZLIB);
+                $encoding = constant('ZLIB_ENCODING_ZLIB');
+                $finish = constant('ZLIB_FINISH');
+                if ($encoding === null || $finish === null) {
+                    return false;
+                }
+                $resource = @inflate_init($encoding);
                 if ($resource === false) {
                     return false;
                 }
-                $result = @inflate_add($resource, $payload, ZLIB_FINISH);
+                $result = @inflate_add($resource, $payload, $finish);
                 if ($result === false || $result === null || $result === '') {
                     return false;
                 }
                 return $result;
             },
             'inflate_gzip' => function ($payload) {
-                if (!function_exists('inflate_init') || !defined('ZLIB_ENCODING_GZIP')) {
+                if (!function_exists('inflate_init') || !defined('ZLIB_ENCODING_GZIP') || !defined('ZLIB_FINISH')) {
                     return false;
                 }
-                $resource = @inflate_init(ZLIB_ENCODING_GZIP);
+                $encoding = constant('ZLIB_ENCODING_GZIP');
+                $finish = constant('ZLIB_FINISH');
+                if ($encoding === null || $finish === null) {
+                    return false;
+                }
+                $resource = @inflate_init($encoding);
                 if ($resource === false) {
                     return false;
                 }
-                $result = @inflate_add($resource, $payload, ZLIB_FINISH);
+                $result = @inflate_add($resource, $payload, $finish);
                 if ($result === false || $result === null || $result === '') {
                     return false;
                 }
@@ -2414,11 +2463,71 @@ public function uploadToProduct(Request $request, $id)
     protected function normalizeSvgPayload(string $payload): string
     {
         $trimmed = trim($payload);
+
+        // If a data URL was provided, extract and sanitize content
         if (Str::startsWith($trimmed, 'data:image/svg+xml')) {
-            return $trimmed;
+            // Split header and payload
+            $parts = explode(',', $trimmed, 2);
+            if (count($parts) === 2) {
+                $meta = $parts[0];
+                $body = $parts[1];
+                // If base64 encoded, decode, sanitize, then re-encode
+                if (str_contains($meta, ';base64')) {
+                    $decoded = base64_decode($body, true);
+                    if ($decoded !== false) {
+                        $clean = $this->optimizeSvgMarkup((string) $decoded);
+                        return 'data:image/svg+xml;base64,' . base64_encode($clean);
+                    }
+                } else {
+                    // URL-encoded payload
+                    $decoded = rawurldecode($body);
+                    $clean = $this->optimizeSvgMarkup((string) $decoded);
+                    return 'data:image/svg+xml;base64,' . base64_encode($clean);
+                }
+            }
+            // Fallback: base64 encode the trimmed payload
+            return 'data:image/svg+xml;base64,' . base64_encode($trimmed);
         }
 
-        return 'data:image/svg+xml;base64,' . base64_encode($trimmed);
+        // Plain SVG markup string — sanitize then wrap as base64 data URL
+        $clean = $this->optimizeSvgMarkup($trimmed);
+        return 'data:image/svg+xml;base64,' . base64_encode($clean);
+    }
+
+    /**
+     * Lightweight SVG optimizer that strips metadata, comments, editor-specific attributes,
+     * and minifies whitespace while preserving visual appearance.
+     */
+    protected function optimizeSvgMarkup(string $svg): string
+    {
+        // Remove XML declaration
+        $svg = preg_replace('/<\?xml[^>]*\?>/i', '', $svg);
+
+        // Remove HTML comments
+        $svg = preg_replace('/<!--([\s\S]*?)-->/', '', $svg);
+
+        // Remove <metadata> and <desc> blocks
+        $svg = preg_replace('/<metadata[\s\S]*?<\/metadata>/i', '', $svg);
+        $svg = preg_replace('/<desc[\s\S]*?<\/desc>/i', '', $svg);
+
+        // Remove common editor-specific attributes and namespaces (Inkscape, sodipodi, etc.)
+        $svg = preg_replace('/\s+(inkscape|sodipodi|rdf|dc|cc):[a-zA-Z0-9-_]+="[^"]*"/i', '', $svg);
+        $svg = preg_replace('/\s+xmlns:(inkscape|sodipodi|cc|dc|rdf)="[^"]*"/i', '', $svg);
+
+        // Remove empty id attributes
+        $svg = preg_replace('/\s+id=""/i', '', $svg);
+
+        // Collapse multiple whitespace characters between tags
+        $svg = preg_replace('/>\s+</', '><', $svg);
+
+        // Trim and remove redundant spaces
+        $svg = trim($svg);
+        $svg = preg_replace('/\s{2,}/', ' ', $svg);
+
+        // Basic path data cleanup: remove spaces before/after commas
+        $svg = preg_replace('/\s*,\s*/', ',', $svg);
+
+        return $svg;
     }
 
     protected function decodeDataUrl(string $dataUrl): string
@@ -2835,7 +2944,7 @@ public function uploadToProduct(Request $request, $id)
             $dummySvg = 'data:image/svg+xml;base64,' . base64_encode('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="white"/></svg>');
             $template->svg_path = $this->persistDataUrl(
                 $dummySvg,
-                'templates/svg',
+                'templates/front/svg',
                 'svg',
                 $template->svg_path,
                 'dummy_svg'
@@ -2844,9 +2953,5 @@ public function uploadToProduct(Request $request, $id)
         } catch (ValidationException $e) {
             Log::warning('Dummy SVG save failed', ['error' => $e->getMessage()]);
         }
-);
-        }
-
-        return $decoded;
     }
 }

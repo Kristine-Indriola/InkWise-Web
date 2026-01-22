@@ -79,7 +79,7 @@ if ($template) {
         if ($generatedSvg) {
             echo "SVG generated successfully!\n";
             // Save it to a test file
-            $testPath = 'templates/svg/test_generated.svg';
+            $testPath = 'templates/front/svg/test_generated.svg';
             Storage::disk('public')->put($testPath, base64_decode(str_replace('data:image/svg+xml;base64,', '', $generatedSvg)));
             echo "Saved to: storage/app/public/{$testPath}\n";
 
