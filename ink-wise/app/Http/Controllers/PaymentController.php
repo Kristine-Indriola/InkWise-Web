@@ -43,9 +43,11 @@ class PaymentController extends Controller
             'phone' => ['nullable', 'string', 'max:64'],
             'mode' => ['nullable', 'in:half,full,balance_payment'],
             'amount' => ['required', 'numeric', 'min:0.01'],
+            'idempotency_key' => ['nullable', 'string', 'max:255'],
         ]);
 
         if (empty($this->secretKey)) {
+            Log::error('PayMongo secret key not configured');
             return response()->json([
                 'message' => 'PayMongo secret key is not configured.',
             ], 500);
@@ -55,6 +57,7 @@ class PaymentController extends Controller
         if ($orderId) {
             $order = Order::find($orderId);
             if (!$order || $order->customer_id !== Auth::user()->customer->customer_id) {
+                Log::warning('Order access denied', ['order_id' => $orderId, 'user_id' => Auth::id()]);
                 return response()->json([
                     'message' => 'Order not found or does not belong to you.',
                 ], 404);
@@ -62,6 +65,7 @@ class PaymentController extends Controller
         } else {
             $order = $this->resolveCurrentOrder();
             if (!$order) {
+                Log::warning('No active order found for user', ['user_id' => Auth::id()]);
                 return response()->json([
                     'message' => 'We could not find an active order to charge.',
                 ], 404);
@@ -75,11 +79,24 @@ class PaymentController extends Controller
         $metadata = $order->metadata ?? [];
         $summary = $this->summarizePayments($order, $metadata);
 
-        Log::info('GCash payment request', [
+        $idempotencyKey = $validated['idempotency_key'] ?? null;
+        // If an idempotency key is provided and matches an ongoing paymongo intent, return existing redirect
+        if ($idempotencyKey && Arr::get($metadata, 'paymongo.idempotency_key') === $idempotencyKey && Arr::get($metadata, 'paymongo.status') === 'awaiting_next_action' && Arr::get($metadata, 'paymongo.next_action_url')) {
+            Log::info('Duplicate payment request detected via idempotency key, returning existing pending info', ['order_id' => $order->id, 'idempotency_key' => $idempotencyKey]);
+            return response()->json([
+                'redirect_url' => Arr::get($metadata, 'paymongo.next_action_url'),
+                'pending' => true,
+                'message' => 'You have an ongoing GCash payment. Please finish it in the opened window.',
+            ]);
+        }
+
+        Log::info('GCash payment request initiated', [
             'mode' => $mode,
             'order_id' => $order->id,
+            'user_id' => Auth::id(),
             'balance' => $summary['balance'],
             'deposit_due' => $summary['deposit_due'],
+            'amount_requested' => $validated['amount'],
         ]);
 
         if ($summary['balance'] <= 0) {
@@ -109,28 +126,44 @@ class PaymentController extends Controller
 
         $amountToCharge = $validated['amount'];
 
-        Log::info('GCash amount to charge', [
-            'amount_to_charge' => $amountToCharge,
-            'requested_amount' => $validated['amount'],
-            'balance' => $summary['balance'],
-            'mode' => $mode,
+        // If centavos was provided by the client, prefer it but validate
+        $amountInCentavos = null;
+        if (isset($validated['amount_centavos'])) {
+            $amountInCentavos = (int) $validated['amount_centavos'];
+            if ($amountInCentavos <= 0) {
+                Log::warning('Invalid centavos amount provided', ['order_id' => $order->id, 'amount_centavos' => $amountInCentavos]);
+                return response()->json(['message' => 'Invalid payment amount.'], 400);
+            }
+            // Keep a consistent PHP amount for logging
+            $amountToCharge = round($amountInCentavos / 100, 2);
+        }
+
+        // Validate amount is positive and within bounds
+        if ($amountToCharge <= 0 || $amountToCharge > $summary['balance']) {
+            Log::warning('Invalid payment amount', [
+                'order_id' => $order->id,
+                'amount_requested' => $amountToCharge,
+                'balance' => $summary['balance'],
+            ]);
+            return response()->json([
+                'message' => 'Invalid payment amount.',
+                'max_amount' => $summary['balance'],
+            ], 400);
+        }
+
+        // CRITICAL: Always convert to integer centavos to prevent PayMongo errors
+        if ($amountInCentavos === null) {
+            $amountInCentavos = (int) round($amountToCharge * 100);
+        }
+
+        Log::info('GCash payment amount validated', [
+            'amount_php' => $amountToCharge,
+            'amount_centavos' => $amountInCentavos,
+            'order_id' => $order->id,
         ]);
 
-        if ($amountToCharge <= 0) {
-            return response()->json([
-                'message' => 'Nothing to charge for the selected payment mode.',
-            ], 409);
-        }
-
-        $pendingPaymentUrl = Arr::get($metadata, 'paymongo.next_action_url');
-        if (Arr::get($metadata, 'paymongo.status') === 'awaiting_next_action' && $pendingPaymentUrl) {
-            return response()->json([
-                'redirect_url' => $pendingPaymentUrl,
-                'pending' => true,
-                'message' => 'You have an ongoing GCash payment. Please finish it in the opened window.',
-            ]);
-        }
-
+        // Always create NEW payment intent and method - never reuse existing ones
+        // This prevents conflicts with expired/consumed sources
         $intentDescription = sprintf('Inkwise order %s %s payment', $order->order_number,
             ($mode === 'full' || $mode === 'balance_payment') ? 'remaining balance' : 'deposit');
 
@@ -148,98 +181,208 @@ class PaymentController extends Controller
             ?? optional(optional(Auth::user())->customer)->contact_number
             ?? '09170000000';
 
-        $amountInCentavos = (int) round($amountToCharge * 100);
-
         $intentMetadata = $this->preparePaymongoMetadata([
             'order_id' => $order->id,
             'order_number' => $order->order_number,
             'mode' => $mode,
             'user_id' => Auth::id(),
+            'created_at' => now()->toIso8601String(),
+            'idempotency_key' => $idempotencyKey,
         ]);
 
-        $intentResponse = $this->paymongo()->post('payment_intents', [
-            'data' => [
-                'attributes' => [
-                    'amount' => $amountInCentavos,
-                    'currency' => 'PHP',
-                    'payment_method_allowed' => ['gcash'],
-                    'description' => $intentDescription,
-                    'statement_descriptor' => 'Inkwise',
-                    'metadata' => $intentMetadata,
+        try {
+            // Create NEW payment intent
+            $intentResponse = $this->paymongo()->post('payment_intents', [
+                'data' => [
+                    'attributes' => [
+                        'amount' => $amountInCentavos, // Must be integer
+                        'currency' => 'PHP',
+                        'payment_method_allowed' => ['gcash'],
+                        'description' => $intentDescription,
+                        'statement_descriptor' => 'Inkwise',
+                        'metadata' => $intentMetadata,
+                    ],
                 ],
-            ],
-        ]);
+            ]);
 
-        if ($intentResponse->failed()) {
-            return $this->handlePaymongoError($intentResponse, 'creating payment intent');
-        }
+            if ($intentResponse->failed()) {
+                return $this->handlePaymongoError($intentResponse, 'creating payment intent');
+            }
 
-        $intentData = $intentResponse->json();
-        $paymentIntentId = Arr::get($intentData, 'data.id');
-        $clientKey = Arr::get($intentData, 'data.attributes.client_key');
+            $intentData = $intentResponse->json();
+            $paymentIntentId = Arr::get($intentData, 'data.id');
+            $clientKey = Arr::get($intentData, 'data.attributes.client_key');
 
-        $paymentMethodResponse = $this->paymongo()->post('payment_methods', [
-            'data' => [
-                'attributes' => [
-                    'type' => 'gcash',
-                    'billing' => array_filter([
-                        'name' => $name,
-                        'email' => $email,
-                        'phone' => $phone,
-                    ]),
+            Log::info('Payment intent created', [
+                'intent_id' => $paymentIntentId,
+                'order_id' => $order->id,
+            ]);
+
+            // Create NEW payment method (GCash source)
+            $paymentMethodResponse = $this->paymongo()->post('payment_methods', [
+                'data' => [
+                    'attributes' => [
+                        'type' => 'gcash',
+                        'billing' => array_filter([
+                            'name' => $name,
+                            'email' => $email,
+                            'phone' => $phone,
+                        ]),
+                    ],
                 ],
-            ],
-        ]);
+            ]);
 
-        if ($paymentMethodResponse->failed()) {
-            return $this->handlePaymongoError($paymentMethodResponse, 'creating payment method');
-        }
+            if ($paymentMethodResponse->failed()) {
+                Log::error('Failed to create payment method, cancelling intent', [
+                    'intent_id' => $paymentIntentId,
+                    'order_id' => $order->id,
+                ]);
+                // Optionally cancel the intent here
+                return $this->handlePaymongoError($paymentMethodResponse, 'creating payment method');
+            }
 
-        $paymentMethodData = $paymentMethodResponse->json();
-        $paymentMethodId = Arr::get($paymentMethodData, 'data.id');
+            $paymentMethodData = $paymentMethodResponse->json();
+            $paymentMethodId = Arr::get($paymentMethodData, 'data.id');
 
-        $attachResponse = $this->paymongo()->post("payment_intents/{$paymentIntentId}/attach", [
-            'data' => [
-                'attributes' => [
-                    'payment_method' => $paymentMethodId,
-                    'return_url' => route('payment.gcash.return'),
+            Log::info('Payment method created', [
+                'method_id' => $paymentMethodId,
+                'intent_id' => $paymentIntentId,
+                'order_id' => $order->id,
+            ]);
+
+            // Attach payment method to intent. If attach fails due to an expired/consumed/duplicate
+            // source, recreate a fresh payment method and retry once. This prevents 409 conflicts
+            // caused by reusing a consumed PayMongo source.
+            $attachResponse = $this->paymongo()->post("payment_intents/{$paymentIntentId}/attach", [
+                'data' => [
+                    'attributes' => [
+                        'payment_method' => $paymentMethodId,
+                        'return_url' => route('payment.gcash.return'),
+                    ],
                 ],
-            ],
-        ]);
+            ]);
 
-        if ($attachResponse->failed()) {
-            return $this->handlePaymongoError($attachResponse, 'attaching payment method');
+            if ($attachResponse->failed()) {
+                $attachPayload = $attachResponse->json();
+                $attachStatus = $attachResponse->status();
+                $attachDetail = Arr::get($attachPayload, 'errors.0.detail', '') ?: Arr::get($attachPayload, 'errors.0.title', '');
+
+                Log::warning('Initial attach failed', [
+                    'method_id' => $paymentMethodId,
+                    'intent_id' => $paymentIntentId,
+                    'status' => $attachStatus,
+                    'detail' => $attachDetail,
+                    'order_id' => $order->id,
+                ]);
+
+                $shouldRetry = false;
+                if ($attachStatus === 409 || $attachStatus === 402 || str_contains(strtolower($attachDetail), 'expired') || str_contains(strtolower($attachDetail), 'consumed') || str_contains(strtolower($attachDetail), 'already')) {
+                    $shouldRetry = true;
+                }
+
+                if ($shouldRetry) {
+                    Log::info('Attempting to regenerate payment method and retry attach', ['order_id' => $order->id]);
+
+                    // Create a fresh payment method and retry attach once
+                    $retryMethodResponse = $this->paymongo()->post('payment_methods', [
+                        'data' => [
+                            'attributes' => [
+                                'type' => 'gcash',
+                                'billing' => array_filter([
+                                    'name' => $name,
+                                    'email' => $email,
+                                    'phone' => $phone,
+                                ]),
+                            ],
+                        ],
+                    ]);
+
+                    if (! $retryMethodResponse->failed()) {
+                        $retryMethodData = $retryMethodResponse->json();
+                        $retryMethodId = Arr::get($retryMethodData, 'data.id');
+                        Log::info('Retry payment method created', ['retry_method_id' => $retryMethodId, 'order_id' => $order->id]);
+
+                        $attachResponse = $this->paymongo()->post("payment_intents/{$paymentIntentId}/attach", [
+                            'data' => [
+                                'attributes' => [
+                                    'payment_method' => $retryMethodId,
+                                    'return_url' => route('payment.gcash.return'),
+                                ],
+                            ],
+                        ]);
+
+                        if ($attachResponse->failed()) {
+                            Log::error('Retry attach also failed', ['intent_id' => $paymentIntentId, 'order_id' => $order->id, 'payload' => $attachResponse->json()]);
+                            return $this->handlePaymongoError($attachResponse, 'attaching payment method (retry)');
+                        }
+
+                        // Use retryMethodId as the effective method id for metadata
+                        $paymentMethodId = $retryMethodId;
+                    } else {
+                        Log::error('Failed to create retry payment method', ['order_id' => $order->id, 'payload' => $retryMethodResponse->json()]);
+                        return $this->handlePaymongoError($retryMethodResponse, 'creating payment method (retry)');
+                    }
+                } else {
+                    return $this->handlePaymongoError($attachResponse, 'attaching payment method');
+                }
+            }
+
+            $attachedData = $attachResponse->json();
+            $redirectUrl = Arr::get($attachedData, 'data.attributes.next_action.redirect.url');
+            $status = Arr::get($attachedData, 'data.attributes.status');
+
+            Log::info('Payment method attached successfully', [
+                'method_id' => $paymentMethodId,
+                'intent_id' => $paymentIntentId,
+                'status' => $status,
+                'redirect_url' => $redirectUrl,
+                'order_id' => $order->id,
+            ]);
+
+            // Update order metadata with NEW payment details
+            $metadata['paymongo'] = array_merge($metadata['paymongo'] ?? [], [
+                'intent_id' => $paymentIntentId,
+                'payment_method_id' => $paymentMethodId,
+                'client_key' => $clientKey,
+                'mode' => $mode,
+                'amount' => round($amountToCharge, 2),
+                'amount_centavos' => $amountInCentavos,
+                'idempotency_key' => $idempotencyKey,
+                'status' => $status,
+                'next_action_url' => $redirectUrl,
+                'last_created_at' => now()->toIso8601String(),
+            ]);
+
+            $order->forceFill([
+                'payment_method' => 'gcash',
+                'payment_status' => in_array($order->payment_status, ['paid', 'partial']) ? $order->payment_status : 'pending',
+                'metadata' => $metadata,
+            ])->save();
+
+            Log::info('Order updated with new payment details', [
+                'order_id' => $order->id,
+                'payment_status' => $order->payment_status,
+            ]);
+
+            return response()->json([
+                'redirect_url' => $redirectUrl,
+                'status' => $status,
+                'amount' => round($amountToCharge, 2),
+                'amount_formatted' => number_format($amountToCharge, 2),
+                'intent_id' => $paymentIntentId,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Unexpected error in GCash payment creation', [
+                'order_id' => $order->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'An unexpected error occurred while processing your payment.',
+            ], 500);
         }
-
-        $attachedData = $attachResponse->json();
-        $redirectUrl = Arr::get($attachedData, 'data.attributes.next_action.redirect.url');
-        $status = Arr::get($attachedData, 'data.attributes.status');
-
-        $metadata['paymongo'] = array_merge($metadata['paymongo'] ?? [], [
-            'intent_id' => $paymentIntentId,
-            'payment_method_id' => $paymentMethodId,
-            'client_key' => $clientKey,
-            'mode' => $mode,
-            'amount' => round($amountToCharge, 2),
-            'amount_centavos' => $amountInCentavos,
-            'status' => $status,
-            'next_action_url' => $redirectUrl,
-            'last_created_at' => now()->toIso8601String(),
-        ]);
-
-        $order->forceFill([
-            'payment_method' => 'gcash',
-            // When GCash payment is created, mark payment status as pending unless already paid or partial
-            'payment_status' => in_array($order->payment_status, ['paid', 'partial']) ? $order->payment_status : 'pending',
-            'metadata' => $metadata,
-        ])->save();
-
-        return response()->json([
-            'redirect_url' => $redirectUrl,
-            'status' => $status,
-            'amount' => round($amountToCharge, 2),
-            'amount_formatted' => number_format($amountToCharge, 2),
-        ]);
     }
 
     public function handleGCashReturn(Request $request): RedirectResponse
@@ -724,19 +867,60 @@ class PaymentController extends Controller
     private function handlePaymongoError(HttpResponse $response, string $context): JsonResponse
     {
         $payload = $response->json();
-        $message = Arr::get($payload, 'errors.0.detail')
+        $statusCode = $response->status();
+
+        $errorDetail = Arr::get($payload, 'errors.0.detail')
             ?? Arr::get($payload, 'errors.0.title')
             ?? 'PayMongo request failed.';
 
-        Log::warning("PayMongo {$context} failed", [
-            'status' => $response->status(),
+        $errorCode = Arr::get($payload, 'errors.0.code') ?? 'unknown_error';
+
+        Log::error("PayMongo {$context} failed", [
+            'status' => $statusCode,
             'context' => $context,
+            'error_code' => $errorCode,
+            'error_detail' => $errorDetail,
             'payload' => $payload,
         ]);
 
+        // Handle specific PayMongo error codes
+        switch ($statusCode) {
+            case 400:
+                $message = 'Invalid payment request. Please check your information and try again.';
+                if (str_contains($errorDetail, 'amount')) {
+                    $message = 'Invalid payment amount. Amount must be a positive number.';
+                }
+                break;
+
+            case 402:
+                $message = 'Payment failed. Your payment method was declined.';
+                if (str_contains($errorDetail, 'insufficient')) {
+                    $message = 'Insufficient funds. Please check your GCash balance.';
+                } elseif (str_contains($errorDetail, 'expired')) {
+                    $message = 'Payment method expired. Please try again.';
+                }
+                break;
+
+            case 409:
+                $message = 'Payment conflict detected. This may be due to a duplicate request.';
+                if (str_contains($errorDetail, 'already')) {
+                    $message = 'This payment has already been processed.';
+                }
+                break;
+
+            case 422:
+                $message = 'Invalid payment data provided.';
+                break;
+
+            default:
+                $message = $errorDetail;
+        }
+
         return response()->json([
             'message' => $message,
-            'errors' => Arr::get($payload, 'errors', []),
-        ], $response->status() >= 400 ? $response->status() : 422);
+            'error_code' => $errorCode,
+            'context' => $context,
+            'details' => config('app.debug') ? $errorDetail : null,
+        ], $statusCode >= 400 ? $statusCode : 422);
     }
 }
