@@ -6,8 +6,8 @@ require_once 'vendor/autoload.php';
 $app = require_once 'bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
-if (\Illuminate\Support\Facades\Storage::disk('public')->exists('templates/svg/template_19_regenerated.svg')) {
-    $content = \Illuminate\Support\Facades\Storage::disk('public')->get('templates/svg/template_19_regenerated.svg');
+if (\Illuminate\Support\Facades\Storage::disk('public')->exists('templates/front/svg/template_19_regenerated.svg')) {
+    $content = \Illuminate\Support\Facades\Storage::disk('public')->get('templates/front/svg/template_19_regenerated.svg');
     echo 'SVG file exists, size: ' . strlen($content) . ' bytes' . PHP_EOL;
     if (strpos($content, 'width="100" height="100"') !== false) {
         echo 'WARNING: Contains dummy SVG dimensions' . PHP_EOL;

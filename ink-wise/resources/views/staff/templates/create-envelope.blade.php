@@ -24,7 +24,7 @@
 @endphp
 
 @push('styles')
-    @vite('resources/css/admin/template/template.css')
+    <link rel="stylesheet" href="{{ asset('css/admin-css/template/template.css') }}">
     <style>
         /* Make the create container bigger */
         .create-container{max-width:1400px;margin:0 auto;padding:20px}
@@ -50,15 +50,89 @@
             const form = document.querySelector('.create-form');
             if (!form) return;
 
+            // SVG preview handling
+            const frontFile = document.getElementById('front_image');
+            const previewContainer = document.getElementById('svg-preview-side') || document.getElementById('svg-preview');
+            function clearPreview() {
+                if (!previewContainer) return;
+                previewContainer.innerHTML = '<span class="muted">No SVG selected</span>';
+            }
+
+            function showError(msg) {
+                if (!previewContainer) return;
+                previewContainer.innerHTML = '<div class="preview-error" style="color:#b91c1c;">' + msg + '</div>';
+            }
+
+            if (frontFile && previewContainer) {
+                frontFile.addEventListener('change', function(ev) {
+                    const file = ev.target.files && ev.target.files[0];
+                    if (!file) {
+                        clearPreview();
+                        return;
+                    }
+
+                    // Basic client-side checks
+                    if (!/svg/i.test(file.type) && !file.name.toLowerCase().endsWith('.svg')) {
+                        showError('Please select an SVG file.');
+                        return;
+                    }
+
+                    // limit ~5MB
+                    if (file.size > 5 * 1024 * 1024) {
+                        showError('SVG is too large (max 5MB).');
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = function(r) {
+                        try {
+                            const text = r.target.result;
+                            // naive sanitization: remove script tags
+                            const cleaned = text.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '');
+                            // inject SVG markup into preview (wrap in a container)
+                            previewContainer.innerHTML = cleaned;
+                        } catch (err) {
+                            console.error(err);
+                            showError('Unable to render SVG preview');
+                        }
+                    };
+                    reader.onerror = function() {
+                        showError('Failed to read file');
+                    };
+                    reader.readAsText(file);
+                });
+            }
+
             // Handle form submission
             form.addEventListener('submit', function(e) {
-                // Basic validation
-                const nameField = document.getElementById('name');
+                e.preventDefault();
+                console.log('Form submission started');
+                
+                const formData = new FormData(form);
+                console.log('Form data created');
+                
+                // Log all form data for debugging
+                for (let [key, value] of formData.entries()) {
+                    console.log(`${key}: ${value}`);
+                }
 
-                if (!nameField || !nameField.value.trim()) {
-                    e.preventDefault();
-                    alert('Please provide a template name.');
-                    return false;
+                const importMethod = formData.get('import_method') || 'manual';
+                console.log('Import method:', importMethod);
+
+                // Validate based on import method
+                if (importMethod === 'figma') {
+                    if (!formData.get('name') || !formData.get('figma_url')) {
+                        console.log('Figma validation failed - missing name or figma_url');
+                        alert('Please provide a name and Figma URL.');
+                        return;
+                    }
+                } else {
+                    // For envelope we require name and front_image for manual upload
+                    if (!formData.get('name') || !formData.get('front_image')) {
+                        console.log('Manual validation failed - missing name or front_image');
+                        alert('Please provide a name and an SVG file.');
+                        return;
+                    }
                 }
 
                 // Set design data for envelope
@@ -70,10 +144,203 @@
                     });
                 }
 
-                // Let the form submit normally
-                return true;
+                console.log('About to submit form to:', form.getAttribute('action'));
+                
+                fetch(form.getAttribute('action'), {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': getCsrfToken(),
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    body: formData
+                }).then(async res => {
+                    console.log('Response received:', res.status, res.statusText);
+                    if (!res.ok) {
+                        let message = 'Upload failed';
+                        try { message = (await res.json()).message || message; } catch (err) {}
+                        throw new Error(message);
+                    }
+                    return res.json();
+                }).then(json => {
+                    if (json && json.success) {
+                        alert('Envelope template uploaded successfully');
+                        window.location = json.redirect || '{{ route('staff.templates.index') }}';
+                    }
+                }).catch(err => {
+                    console.error('Form submission error:', err);
+                    console.error('Error details:', {
+                        message: err.message,
+                        stack: err.stack,
+                        name: err.name
+                    });
+                    alert('Upload failed: ' + (err.message || 'Unknown'));
+                });
             });
         });
+
+        // Figma integration functions
+        async function analyzeFigmaUrl() {
+            const figmaUrl = document.getElementById('figma_url').value.trim();
+            const analyzeBtn = document.getElementById('analyze-figma-btn');
+            const resultsDiv = document.getElementById('figma-results');
+
+            if (!figmaUrl) {
+                alert('Please enter a Figma URL');
+                return;
+            }
+
+            // Show loading
+            analyzeBtn.disabled = true;
+            analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Analyzing...';
+            resultsDiv.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Analyzing Figma file...</div>';
+
+            try {
+                const response = await fetch('{{ route("staff.figma.analyze") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': getCsrfToken(),
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ figma_url: figmaUrl })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    figmaAnalyzedData = data;
+                    displayFigmaResults(data);
+                } else {
+                    resultsDiv.innerHTML = '<div class="alert alert-danger">' + (data.message || 'Failed to analyze Figma file') + '</div>';
+                }
+            } catch (error) {
+                console.error('Figma analysis error:', error);
+                resultsDiv.innerHTML = '<div class="alert alert-danger">Error analyzing Figma file: ' + error.message + '</div>';
+            } finally {
+                analyzeBtn.disabled = false;
+                analyzeBtn.innerHTML = '<i class="fas fa-search me-1"></i>Analyze Figma File';
+            }
+        }
+
+        function displayFigmaResults(data) {
+            const resultsDiv = document.getElementById('figma-results');
+
+            if (!data.frames || data.frames.length === 0) {
+                resultsDiv.innerHTML = `
+                    <div class="alert alert-warning">
+                        <h6>No template frames found</h6>
+                        <p>Make sure your Figma file contains frames with names that include:</p>
+                        <ul>
+                            <li><strong>Template</strong>, <strong>Invitation</strong>, <strong>Giveaway</strong>, or <strong>Envelope</strong></li>
+                            <li>Common keywords like: <em>card, design, layout, front, back, cover</em></li>
+                        </ul>
+                        <p><small>Frame names are case-insensitive. Examples: "Wedding Invitation", "Giveaway Card", "Envelope Template"</small></p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '<div class="alert alert-success">Found ' + data.frames.length + ' eligible frame(s):</div>';
+            html += '<div class="frames-list mt-3">';
+
+            data.frames.forEach(frame => {
+                const frameId = 'frame_' + frame.id;
+                html += `
+                    <div class="frame-item border rounded p-3 mb-2">
+                        <div class="form-check">
+                            <input class="form-check-input frame-checkbox" type="checkbox"
+                                   id="${frameId}" value="${frame.id}"
+                                   data-frame='${JSON.stringify(frame).replace(/'/g, "&apos;")}'>
+                            <label class="form-check-label" for="${frameId}">
+                                <strong>${frame.name}</strong> (${frame.type})
+                                <br><small class="text-muted">Size: ${frame.bounds.width}x${frame.bounds.height}</small>
+                            </label>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            html += '<button type="button" class="btn btn-primary mt-3" onclick="importSelectedFrames()">Import Selected Frames</button>';
+
+            resultsDiv.innerHTML = html;
+        }
+
+        async function importSelectedFrames() {
+            const checkedBoxes = document.querySelectorAll('.frame-checkbox:checked');
+            if (checkedBoxes.length === 0) {
+                alert('Please select at least one frame to import');
+                return;
+            }
+
+            const frames = Array.from(checkedBoxes).map(checkbox => {
+                return JSON.parse(checkbox.getAttribute('data-frame').replace(/&apos;/g, "'"));
+            });
+
+            const importBtn = document.querySelector('button[onclick="importSelectedFrames()"]');
+            importBtn.disabled = true;
+            importBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Importing...';
+
+            try {
+                const response = await fetch('{{ route("staff.figma.import") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': getCsrfToken(),
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        file_key: figmaAnalyzedData.file_key,
+                        frames: frames,
+                        figma_url: document.getElementById('figma_url').value
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('Successfully imported ' + data.imported.length + ' template(s)!');
+                    if (data.imported.length === 1) {
+                        // Redirect to edit the imported template
+                        window.location.href = '{{ route("staff.templates.edit", ":id") }}'.replace(':id', data.imported[0].id);
+                    } else {
+                        window.location.href = '{{ route("staff.templates.index") }}';
+                    }
+                } else {
+                    alert('Import failed: ' + (data.message || 'Unknown error'));
+                    console.error('Import errors:', data.errors);
+                }
+            } catch (error) {
+                console.error('Import error:', error);
+                alert('Import failed: ' + error.message);
+            } finally {
+                importBtn.disabled = false;
+                importBtn.innerHTML = 'Import Selected Frames';
+            }
+        }
+
+        // Toggle between manual upload and Figma import
+        function toggleImportMethod(method) {
+            const manualUpload = document.getElementById('manual-upload-section');
+            const figmaImport = document.getElementById('figma-import-section');
+            const figmaUrlField = document.getElementById('figma_url');
+            const frontImageField = document.getElementById('front_image');
+
+            if (method === 'figma') {
+                manualUpload.style.display = 'none';
+                figmaImport.style.display = 'block';
+                // Set figma_url as required and remove required from file inputs
+                if (figmaUrlField) figmaUrlField.required = true;
+                if (frontImageField) frontImageField.required = false;
+            } else {
+                manualUpload.style.display = 'block';
+                figmaImport.style.display = 'none';
+                // Set file inputs as required and remove required from figma_url
+                if (figmaUrlField) figmaUrlField.required = false;
+                if (frontImageField) frontImageField.required = true;
+            }
+        }
     </script>
 @endpush
 
@@ -85,19 +352,13 @@
             <p class="create-subtitle">Upload a single SVG to create an envelope template</p>
         </div>
 
-    <form action="{{ route('staff.templates.store') }}" method="POST" class="create-form" enctype="multipart/form-data">
+    <form action="{{ route('staff.templates.preview') }}" method="POST" class="create-form" enctype="multipart/form-data">
             @csrf
 
             <input type="hidden" name="design" id="design" value="{}">
             @if($editPreviewId)
                 <input type="hidden" name="edit_preview_id" value="{{ $editPreviewId }}">
             @endif
-
-            <!-- Hidden fields for Figma import data -->
-            <input type="hidden" name="figma_url" id="figma_url_hidden">
-            <input type="hidden" name="figma_file_key" id="figma_file_key_hidden">
-            <input type="hidden" name="front_svg_content" id="front_svg_content_hidden">
-            <input type="hidden" name="import_method" id="import_method_hidden" value="manual">
 
             <div class="create-row">
                 <div class="create-group flex-1">
@@ -134,6 +395,62 @@
             <div class="create-group">
                 <label for="description">Design Description</label>
                 <textarea id="description" name="description" rows="4" placeholder="Describe the design or special instructions (optional)">{{ $previewData['description'] ?? '' }}</textarea>
+            </div>
+
+            <!-- Import Method Selection -->
+            <div class="create-group">
+                <label>Import Method</label>
+                <div class="import-method-selection">
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="import_method" id="import_manual" value="manual" checked onclick="toggleImportMethod('manual')">
+                        <label class="form-check-label" for="import_manual">
+                            <i class="fas fa-upload me-1"></i>Manual Upload
+                        </label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="import_method" id="import_figma" value="figma" onclick="toggleImportMethod('figma')">
+                        <label class="form-check-label" for="import_figma">
+                            <i class="fab fa-figma me-1"></i>Import from Figma
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manual Upload Section -->
+            <div id="manual-upload-section">
+                <div class="create-row">
+                    <div class="create-group flex-1">
+                        <label for="front_image">Front SVG *</label>
+                        <input type="file" id="front_image" name="front_image" accept="image/svg+xml" required>
+                    </div>
+                    <div class="create-group flex-1">
+                        <!-- SVG Preview -->
+                        <div class="preview-box" aria-live="polite">
+                            <div class="preview-label">SVG Preview</div>
+                            <div id="svg-preview-side" class="svg-preview" style="width:100%;aspect-ratio:1/1;border:1px solid #d1d5db;padding:12px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:auto">
+                                <span class="muted">No SVG selected</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Figma Import Section -->
+            <div id="figma-import-section" style="display: none;">
+                <div class="create-group">
+                    <label for="figma_url">Figma File URL</label>
+                    <div class="input-group">
+                        <input type="url" id="figma_url" name="figma_url" placeholder="https://www.figma.com/design/... or https://www.figma.com/file/..." class="form-control">
+                        <button type="button" id="analyze-figma-btn" class="btn btn-outline-primary" onclick="analyzeFigmaUrl()">
+                            <i class="fas fa-search me-1"></i>Analyze Figma File
+                        </button>
+                    </div>
+                    <small class="form-text text-muted">Paste a Figma design URL to analyze and import frames as templates</small>
+                </div>
+
+                <div id="figma-results" class="create-group">
+                    <!-- Figma analysis results will be displayed here -->
+                </div>
             </div>
 
             <div class="create-actions">

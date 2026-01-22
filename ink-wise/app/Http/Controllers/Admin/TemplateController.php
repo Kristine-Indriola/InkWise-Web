@@ -1830,12 +1830,11 @@ public function uploadToProduct(Request $request, $id)
     {
         $paths = [
             storage_path('app/public/templates'),
-            storage_path('app/public/templates/svg'),
-            storage_path('app/public/templates/preview'),
-            storage_path('app/public/templates/previews'),
             storage_path('app/public/templates/assets'),
-            storage_path('app/public/templates/videos'),
             storage_path('app/public/templates/front'),
+            storage_path('app/public/templates/front/svg'),
+            storage_path('app/public/templates/front/png'),
+            storage_path('app/public/templates/back'),
             storage_path('app/public/templates/front/svg'),
             storage_path('app/public/templates/front/png'),
             storage_path('app/public/templates/back'),

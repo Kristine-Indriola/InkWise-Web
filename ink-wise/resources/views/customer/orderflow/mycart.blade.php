@@ -487,10 +487,10 @@
                                 <div class="flex items-start gap-4">
                                         <div class="h-24 w-24 overflow-hidden rounded-2xl bg-slate-100 shadow-inner js-preview-trigger cursor-pointer"
                                              data-preview-images='@json($invPreviewGallery->values())'
-                                             @if(isset($customerReview) && !empty($customerReview->design_svg))
+                                             @if(isset($customerReview) && !empty($customerReview->design_svg) && $currentProductType === 'invitation')
                                              data-svg-preview="true"
                                              @endif>
-                                        @if(isset($customerReview) && !empty($customerReview->design_svg))
+                                        @if(isset($customerReview) && !empty($customerReview->design_svg) && $currentProductType === 'invitation')
                                             {{-- Embed SVG directly - img src doesn't work with SVGs containing external resources --}}
                                             <div class="svg-container h-full w-full" style="pointer-events: none;">
                                                 {!! $customerReview->design_svg !!}
@@ -702,11 +702,21 @@
                                                 }
                                             @endphp
                                             <div class="flex gap-4 rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-sm">
-                                                <div class="h-20 w-20 overflow-hidden rounded-xl bg-slate-100 shadow-inner flex-shrink-0">
-                                                    <img src="{{ $givePreview ?: $placeholderImage }}"
-                                                         alt="Giveaway preview"
-                                                         class="h-full w-full object-cover js-preview-trigger"
-                                                         data-preview-images='@json($giveGallery->values())'>
+                                                <div class="h-20 w-20 overflow-hidden rounded-xl bg-slate-100 shadow-inner flex-shrink-0 js-preview-trigger"
+                                                     data-preview-images='@json($giveGallery->values())'
+                                                     @if(isset($customerReview) && !empty($customerReview->design_svg) && $currentProductType === 'giveaway')
+                                                     data-svg-preview="true"
+                                                     @endif>
+                                                    @if(isset($customerReview) && !empty($customerReview->design_svg) && $currentProductType === 'giveaway')
+                                                        {{-- Embed SVG directly - img src doesn't work with SVGs containing external resources --}}
+                                                        <div class="svg-container h-full w-full" style="pointer-events: none;">
+                                                            {!! $customerReview->design_svg !!}
+                                                        </div>
+                                                    @else
+                                                        <img src="{{ $givePreview ?: $placeholderImage }}"
+                                                             alt="Giveaway preview"
+                                                             class="h-full w-full object-cover">
+                                                    @endif
                                                 </div>
                                                 <div class="flex-1">
                                                     <div class="flex items-center gap-2 flex-wrap">

@@ -2,7 +2,7 @@
 require 'vendor/autoload.php';
 $app = require 'bootstrap/app.php';
 $app->make('Illuminate\\Contracts\\Console\\Kernel')->bootstrap();
-$svgPath = 'templates/svg/template_3e937f8b-e266-4729-b3c9-89c7417c5993.svg';
+$svgPath = 'templates/front/svg/template_3e937f8b-e266-4729-b3c9-89c7417c5993.svg';
 $template = \App\Models\Template::where('svg_path', $svgPath)->first();
 if (!$template) {
     echo "not found for svg_path {$svgPath}\n";

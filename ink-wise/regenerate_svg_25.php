@@ -32,7 +32,7 @@ if ($svgDataUrl) {
         $svgContent = base64_decode($base64);
         
         // Save to the actual public storage location
-        $svgPath = public_path('storage/templates/svg/template_25.svg');
+        $svgPath = public_path('storage/templates/front/svg/template_25.svg');
         file_put_contents($svgPath, $svgContent);
         
         echo "SVG generated successfully!" . PHP_EOL;

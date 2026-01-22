@@ -45,9 +45,9 @@ class SyncProductImages extends Command
                 // try to resolve actual file path (handles missing extension)
                 $actual = $preview;
                 if (!Storage::disk('public')->exists($preview)) {
-                    // search saved_templates/previews and templates/previews for matching base name
+                    // search saved_templates/previews and templates/reviews for matching base name
                     $base = pathinfo($preview, PATHINFO_FILENAME);
-                    $dirs = ['saved_templates/previews', 'templates/previews'];
+                    $dirs = ['saved_templates/previews', 'templates/reviews'];
                     foreach ($dirs as $dir) {
                         if (Storage::disk('public')->exists($dir)) {
                             $files = Storage::disk('public')->files($dir);

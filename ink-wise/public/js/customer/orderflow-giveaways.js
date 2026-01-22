@@ -161,7 +161,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const writeSummary = (summary) => {
+    const writeSummary = (summary, source = 'unknown') => {
+        try {
+            console.debug('[giveaways] writeSummary called', { source, summary });
+        } catch (e) {}
         window.sessionStorage.setItem(storageKey, JSON.stringify(summary));
     };
 
@@ -236,7 +239,32 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        writeSummary(summary);
+        // If server summary lacks giveaways but we have local giveaways, preserve them to avoid
+        // clobbering a transient local selection (likely due to timing/race conditions).
+        try {
+            const existing = readSummary() || {};
+            const existingGiveaways = existing.giveaways && typeof existing.giveaways === 'object' ? Object.keys(existing.giveaways).length : (existing.giveaway ? 1 : 0);
+            const serverGiveaways = summary.giveaways && typeof summary.giveaways === 'object' ? Object.keys(summary.giveaways).length : (summary.giveaway ? 1 : 0);
+
+            if (serverGiveaways === 0 && existingGiveaways > 0) {
+                console.debug('[giveaways] applyServerSummary preserving local giveaways because server returned none', { serverSummary: summary, existingSummary: existing });
+                // prefer existing.giveaways structure when available
+                if (existing.giveaways && typeof existing.giveaways === 'object') {
+                    summary.giveaways = existing.giveaways;
+                } else if (existing.giveaway) {
+                    summary.giveaways = { [existing.giveaway.product_id ?? existing.giveaway.id]: existing.giveaway };
+                }
+
+                summary.extras = summary.extras ?? {};
+                summary.extras.giveaway = summary.extras.giveaway ?? existing.extras?.giveaway ?? 0;
+            }
+        } catch (e) {
+            // swallow errors in merge logic
+            console.warn('[giveaways] applyServerSummary merge check failed', e);
+        }
+
+        writeSummary(summary, 'server');
+        console.debug('[giveaways] applyServerSummary', { summary });
         syncSelectionState(summary);
     };
 
@@ -245,6 +273,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return null;
         }
 
+        console.debug('[giveaways] fetchSummaryFromServer called');
         try {
             const response = await fetch(summaryApiUrl, {
                 headers: { Accept: 'application/json' },
@@ -257,6 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const payload = await response.json();
+            console.debug('[giveaways] fetchSummaryFromServer response', { payload });
             const summary = payload?.data ?? payload;
             if (summary && typeof summary === 'object') {
                 applyServerSummary(summary);
@@ -294,6 +324,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let data = null;
             try {
                 data = await response.json();
+                console.debug('[giveaways] persistGiveawaySelection response', { data });
             } catch (error) {
                 console.warn('Giveaway response could not be parsed', error);
             }
@@ -789,7 +820,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 giveaway: giveawaysTotal,
             };
 
-            writeSummary(existingSummary);
+            writeSummary(existingSummary, 'local');
             console.log('[giveaways] Summary written to storage', existingSummary);
             syncSelectionState(existingSummary);
         };

@@ -199,11 +199,18 @@
 		]);
 	}
 
-	$continueHref = $continueHref ?? $continueUrl ?? route('order.finalstep');
+	$isGiveaway = false;
+	if ($product) {
+		$productType = strtolower($product->product_type ?? '');
+		$productName = strtolower($product->name ?? '');
+		$isGiveaway = $productType === 'giveaway' || str_contains($productType, 'giveaway') || str_contains($productName, 'giveaway') || str_contains($productName, 'freebie');
+	}
+
+	$continueHref = $continueHref ?? $continueUrl ?? ($isGiveaway ? route('order.summary') : route('order.finalstep'));
 	$lastEditedAt = $lastEditedAt ?? null;
 	$editHref = $editHref ?? route('design.edit');
-	$customerReview = $customerReview ?? null;
-	if (!$lastEditedAt && $customerReview) {
+	$customerReview = $customerReview ?? null; 
+	if (!$lastEditedAt && $customerReview) { 
 		$lastEditedAt = optional($customerReview->updated_at ?? $customerReview->created_at)->toIso8601String();
 	}
 @endphp
@@ -244,7 +251,18 @@
 							<button type="button" class="active" data-face="front" aria-pressed="true">Front</button>
 							<button type="button" data-face="back" aria-pressed="false">Back</button>
 						</div>
-					</div>
+					<div class="upload-controls" style="margin-top:8px;display:flex;gap:8px;align-items:center;">
+						<div class="upload-side-group" role="group" aria-label="Upload target side">
+							<button type="button" id="upload-side-front" class="upload-side active" data-upload-side="front" aria-pressed="true">Front</button>
+							<button type="button" id="upload-side-back" class="upload-side" data-upload-side="back" aria-pressed="false">Back</button>
+						</div>
+						<button type="button" id="upload-button" class="upload-button" aria-label="Upload image for: Front">
+							<i class="fa-solid fa-cloud-arrow-up"></i>
+							Upload Image
+						</button>
+						<span id="upload-side-label" class="upload-side-label" style="font-weight:600;">Front</span>
+						<input type="file" id="review-image-upload" accept="image/*,image/svg+xml" class="upload-input" style="display: none;">
+					</div>					</div>
 
 					<div class="card-flip">
 						<div class="inner">
@@ -308,9 +326,9 @@
 					Continue
 				</button>
 
-				<a href="{{ $editHref }}" class="edit-link">Edit my design</a>
+				<a href="{{ $editHref }}" class="edit-link">Edit my design</a> 
 			</div>
-		</section>
+		</section> 
 	</div>
 
 	<div id="reviewToast" class="review-toast" role="status" aria-live="polite"></div>
@@ -329,9 +347,9 @@
 					if (!candidate || typeof candidate !== 'string') return '';
 					const trimmed = candidate.trim();
 					if (!trimmed) return '';
-					if (/^(data:|https?:|\/\/|\/)/i.test(trimmed)) return trimmed;
-					return '/storage/' + trimmed.replace(/^\/+/, '');
-				};
+					if (/^(data:|https?:|\/\/|\/)/i.test(trimmed)) return trimmed; 
+					return '/storage/' + trimmed.replace(/^\/+/, ''); 
+				}; 
 
 				if (saved && frontImg) {
 					const previewImages = saved.previewImages || saved.preview_images || [];
