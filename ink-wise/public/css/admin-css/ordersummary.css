@@ -270,6 +270,45 @@
     font-size: 0.85rem;
 }
 
+.item-materials {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.8rem;
+}
+
+.material-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 0;
+}
+
+.material-item--paper {
+    color: var(--admin-accent-strong);
+}
+
+.material-item--addon {
+    color: var(--admin-success);
+}
+
+.material-item--other {
+    color: var(--admin-text-secondary);
+}
+
+.material-label {
+    font-weight: 500;
+}
+
+.material-quantity {
+    color: var(--admin-text-secondary);
+    font-size: 0.75rem;
+    opacity: 0.8;
+}
+
 .ordersummary-customer {
     display: flex;
     flex-direction: column;

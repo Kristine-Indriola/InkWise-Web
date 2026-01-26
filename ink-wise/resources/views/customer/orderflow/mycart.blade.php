@@ -202,10 +202,9 @@
         }
 
         $qty = $extractQty($item);
-        $basePrice = data_get($item, 'basePricePerPiece') ?? 0;
         $paperPrice = data_get($item, 'paperStockPrice') ?? 0;
 
-        return max(0, $qty * ((float) $basePrice + (float) $paperPrice));
+        return max(0, $qty * (float) $paperPrice);
     };
 
     $invitationTotalCalc = $invitationItems->sum(fn ($item) => $computeInvitationTotal($item));

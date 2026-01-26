@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+D<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -794,8 +794,6 @@
     $customerOrder = $order?->customerOrder;
     $orderItem = $order?->items->first();
     $subtotal = $order?->subtotal_amount ?? 0;
-    $taxAmount = $order?->tax_amount ?? 0;
-    $shippingFee = $order?->shipping_fee ?? 0;
     $totalAmount = 0;
     $paidAmountDisplay = 0;
     $balanceDueDisplay = 0;
@@ -860,7 +858,7 @@
                     'paperStockId' => data_get($orderSummary, 'paperStockId') ?? data_get($orderSummary, 'paperStock.id'),
                     'addons' => data_get($orderSummary, 'addons', []),
                     'addonItems' => data_get($orderSummary, 'addonItems', data_get($orderSummary, 'addons', [])),
-                    'total' => $invitationSubtotal + $paperExtras + $addonsExtra,
+                    'total' => $paperExtras,
                     'preview' => $extractPreview($orderSummary),
                     'previewImages' => data_get($orderSummary, 'previewImages', data_get($orderSummary, 'preview_images', [])),
                     'estimated_date' => data_get($orderSummary, 'estimated_date') ?? data_get($orderSummary, 'dateNeeded'),
@@ -898,10 +896,8 @@
         $computeInvitationTotal = static function ($item) use ($extractTotal, $extractQty) {
             $rawTotal = $extractTotal($item);
             if ($rawTotal > 0) {
-                // Assume rawTotal includes base, subtract it
-                $qty = $extractQty($item);
-                $basePrice = data_get($item, 'unitPrice') ?? 0;
-                return max(0, $rawTotal - ($qty * (float) $basePrice));
+                // rawTotal should already exclude base price
+                return max(0, $rawTotal);
             }
             
             $qty = $extractQty($item);
@@ -927,21 +923,12 @@
         
         $grandTotal = $invitationTotalCalc + $envelopeTotalCalc + $giveawayTotalCalc;
         
-        // Use totalAmount if available (from order summary page)
-        $totalAmountFromSummary = (float) data_get($orderSummary, 'totalAmount', 0);
-        if ($totalAmountFromSummary > 0) {
-            // Exclude the invitation base price
-            $invitationBaseTotal = $invitationItems->sum(fn ($item) => $extractQty($item) * (data_get($item, 'unitPrice') ?? 0));
-            $grandTotal = $totalAmountFromSummary - $invitationBaseTotal;
-        }
+        // Always use the calculated total from items for accuracy
+        // Removed override with session totalAmount to ensure consistency with order summary page
     }
     
-    // Always use the same calculation as mycart.blade.php for consistency
-    if ($totalAmountFromSummary > 0) {
-        $totalAmount = $grandTotal; // already includes tax and shipping
-    } else {
-        $totalAmount = $grandTotal + $taxAmount + $shippingFee;
-    }
+    // Always use the calculated total for consistency with order summary page
+    $totalAmount = $grandTotal; // already includes tax and shipping
     
     // Calculate paid amount consistently
     if ($order) {
@@ -969,7 +956,6 @@
     $shippingAddress = $customerOrder->address ?? '';
     $shippingCity = $customerOrder->city ?? '';
     $shippingPostal = $customerOrder->postal_code ?? '';
-    $taxRate = 0; // No tax
     $hasPendingPayment = ($paymongoMeta['status'] ?? null) === 'awaiting_next_action';
     $pendingPaymentUrl = $paymongoMeta['next_action_url'] ?? null;
     $paymentMode = $paymongoMeta['mode'] ?? 'half';
@@ -982,8 +968,6 @@
             return $date;
         }
     };
-    $taxAmount = 0; // No tax
-    // $totalAmount = $subtotal + $shippingFee + $taxAmount; // Use order's total_amount instead
     $checkoutQuantity = $orderItem?->quantity
         ?? ($orderSummary['quantity'] ?? null)
         ?? null;
@@ -1057,10 +1041,6 @@
                     <span>Subtotal</span>
                     <strong id="subtotalAmount">₱{{ number_format($subtotal, 2) }}</strong>
                 </div>
-                <div class="summary-item">
-                    <span>Shipping</span>
-                    <strong id="shippingAmount">{{ $shippingFee > 0 ? '₱' . number_format($shippingFee, 2) : 'Free' }}</strong>
-                </div>
                 <hr class="summary-divider">
                 <div class="summary-item">
                     <span>Total paid via GCash</span>
@@ -1073,13 +1053,18 @@
                 </div>
                 @endif
                 <div class="summary-total">
-                    <span>Total due</span>
-                    <span id="grandTotal">₱{{ number_format($balanceDueDisplay, 2) }}</span>
+                    <span>Order Total</span>
+                    <span id="grandTotal">₱{{ number_format($totalAmount, 2) }}</span>
                 </div>
-                @if($isFullyPaid)
-                <p class="note">Order fully paid. Recorded payments total ₱{{ number_format($paidAmountDisplay, 2) }}.</p>
-                @else
-                <p class="note">Recorded payments total ₱{{ number_format($paidAmountDisplay, 2) }}. Outstanding balance: ₱{{ number_format($balanceDueDisplay, 2) }}.</p>
+                @if($paidAmountDisplay > 0)
+                <div class="summary-payment-info">
+                    <span>Amount Paid</span>
+                    <span id="paidAmount">₱{{ number_format($paidAmountDisplay, 2) }}</span>
+                </div>
+                <div class="summary-balance">
+                    <span>Amount Due</span>
+                    <span id="balanceAmount">₱{{ number_format($balanceDueDisplay, 2) }}</span>
+                </div>
                 @endif
             </hr>
 
@@ -1535,7 +1520,6 @@
                                 quantity: summary.quantity ?? null,
                                 paymentMode: summary.paymentMode ?? summary.payment_mode ?? null,
                                 totalAmount: summary.totalAmount ?? summary.total_amount ?? null,
-                                shippingFee: summary.shippingFee ?? summary.shipping_fee ?? null,
                                 order_id: summary.order_id ?? summary.orderId ?? null,
                             };
                             window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(minSummary));
@@ -1589,7 +1573,6 @@
                                     quantity: window.orderSummary.quantity ?? null,
                                     paymentMode: window.orderSummary.paymentMode ?? window.orderSummary.payment_mode ?? null,
                                     totalAmount: window.orderSummary.totalAmount ?? window.orderSummary.total_amount ?? null,
-                                    shippingFee: window.orderSummary.shippingFee ?? window.orderSummary.shipping_fee ?? null,
                                     order_id: window.orderSummary.order_id ?? window.orderSummary.orderId ?? null,
                                 };
                                 window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(minSummary));
@@ -1605,12 +1588,8 @@
 
             const priceFormatter = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' });
             const subtotal = @json($subtotal ?? 0);
-            const baseShipping = @json($shippingFee ?? 0);
-            const taxRate = @json($taxRate ?? 0);
-            const orderTotalAmount = Math.round(@json($order->grandTotalAmount() ?? 0) * 100) / 100; // Use the order's total amount
+            let orderTotalAmount = Math.round(@json(data_get($orderSummary, 'totalAmount', $order->grandTotalAmount() ?? 0)) * 100) / 100; // Use session summary total or order total
             let recordedPaidAmount = Math.round(@json($paidAmount ?? 0) * 100) / 100;
-            let currentShippingCost = Number(baseShipping ?? 0);
-            let currentTax = Number((subtotal ?? 0) * (taxRate ?? 0));
             let currentTotal = Number(orderTotalAmount); // Use order total instead of calculation
             const paymentConfig = {
                 createUrl: '{{ route("payment.gcash.create") }}',
@@ -1625,7 +1604,6 @@
 
             const shippingRadios = document.querySelectorAll('input[name="shippingOption"]');
             const paymentRadios = document.querySelectorAll('input[name="paymentMethod"]');
-            const shippingAmountEl = document.getElementById('shippingAmount');
             const grandTotalEl = document.getElementById('grandTotal');
             const paidAmountEl = document.getElementById('paidAmount');
             const balanceAmountEl = document.getElementById('balanceAmount');
@@ -1686,18 +1664,13 @@
             };
 
             const recalcTotals = () => {
-                if (!shippingAmountEl || !grandTotalEl) return;
-
                 // Always base totals on the server-provided order total to avoid client-side drift.
                 // `orderTotalAmount` is injected from the server and represents the authoritative total due.
                 const total = Number(orderTotalAmount || 0);
                 const balance = Math.round(Math.max(total - (recordedPaidAmount ?? 0), 0) * 100) / 100;
 
-                currentShippingCost = Number(baseShipping ?? 0);
-                currentTax = 0; // No tax
                 currentTotal = total;
 
-                shippingAmountEl.textContent = currentShippingCost === 0 ? 'Free' : priceFormatter.format(currentShippingCost);
                 grandTotalEl.textContent = priceFormatter.format(total);
                 if (paidAmountEl) paidAmountEl.textContent = priceFormatter.format(recordedPaidAmount ?? 0);
                 if (balanceAmountEl) balanceAmountEl.textContent = priceFormatter.format(balance);
@@ -1863,8 +1836,7 @@
                 // Build payload without any base/total price fields to ensure server uses
                 // authoritative totals and remaining balance. Also include an explicit
                 // flag so server-side handlers can ignore any base price if present.
-                const metadata = paymentAmount ? { payment_amount: paymentAmount } : {};
-                metadata.omit_base_price = true;
+                const metadata = paymentAmount ? { payment_amount: paymentAmount, omit_base_price: true } : { omit_base_price: true };
 
                 const payload = {
                     quantity: readQuantityInput(),
@@ -1900,7 +1872,6 @@
                                 quantity: data.summary.quantity ?? null,
                                 paymentMode: data.summary.paymentMode ?? data.summary.payment_mode ?? null,
                                 totalAmount: data.summary.totalAmount ?? data.summary.total_amount ?? null,
-                                shippingFee: data.summary.shippingFee ?? data.summary.shipping_fee ?? null,
                                 order_id: data.summary.order_id ?? data.summary.orderId ?? null,
                             };
                             window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(minSummary));
@@ -1923,6 +1894,15 @@
                         } catch (storageError) {
                             // ignore storage errors
                         }
+                    }
+
+                    // Update the orderTotalAmount with the new total from the server
+                    if (data.summary && data.summary.totalAmount) {
+                        orderTotalAmount = Math.round(data.summary.totalAmount * 100) / 100;
+                        currentTotal = Number(orderTotalAmount);
+                        // Update the payment balance to reflect the new total (ignore previous payments when base price is omitted)
+                        paymentConfig.balance = currentTotal;
+                        recalcTotals(); // Recalculate the UI with the new total
                     }
 
                     if (redirectOnSuccess) {
@@ -2215,7 +2195,6 @@
                     quantity: summaryData.quantity ?? null,
                     paymentMode: summaryData.paymentMode ?? summaryData.payment_mode ?? null,
                     totalAmount: summaryData.totalAmount ?? summaryData.total_amount ?? null,
-                    shippingFee: summaryData.shippingFee ?? summaryData.shipping_fee ?? null,
                     order_id: summaryData.order_id ?? summaryData.orderId ?? null,
                 };
                 window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(minSummary));

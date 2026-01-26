@@ -187,6 +187,130 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
         return view('admin.ordersummary.tables', ['orders' => $orders]);
     })->name('orders.index');
 
+    // Admin orders export
+    Route::get('/orders/export', function (\Illuminate\Http\Request $request) {
+        $query = \App\Models\Order::query()
+            ->select(['id', 'order_number', 'customer_id', 'total_amount', 'order_date', 'status', 'payment_status', 'metadata', 'created_at'])
+            ->where('archived', false)
+            ->where(function ($q) {
+                $q->where('payment_status', '!=', 'pending')
+                  ->orWhereNull('payment_status');
+            });
+
+        // Date filters (apply to order_date, fallback to created_at via COALESCE)
+        if ($request->filled('start_date')) {
+            try {
+                $start = \Carbon\Carbon::parse($request->query('start_date'))->startOfDay();
+                $query->whereRaw('COALESCE(order_date, created_at) >= ?', [$start->toDateTimeString()]);
+            } catch (\Throwable $e) {
+                // ignore invalid date
+            }
+        }
+
+        if ($request->filled('end_date')) {
+            try {
+                $end = \Carbon\Carbon::parse($request->query('end_date'))->endOfDay();
+                $query->whereRaw('COALESCE(order_date, created_at) <= ?', [$end->toDateTimeString()]);
+            } catch (\Throwable $e) {
+                // ignore invalid date
+            }
+        }
+
+        $orders = $query
+            ->with(['customer', 'payments'])
+            ->withCount('items')
+            ->latest('order_date')
+            ->latest()
+            ->get()
+            ->filter(function ($order) {
+                // Compute payment totals from payments relationship
+                $paidPayments = $order->payments->filter(fn($p) => strtolower($p->status ?? '') === 'paid');
+                $totalPaid = round($paidPayments->sum('amount'), 2);
+                $grandTotal = (float) ($order->total_amount ?? 0);
+                $balanceDue = max($grandTotal - $totalPaid, 0);
+                
+                // Include orders that have any paid payments (for testing and admin visibility)
+                return $totalPaid > 0;
+            })
+            ->map(function ($order) {
+                // Compute payment totals from payments relationship
+                $paidPayments = $order->payments->filter(fn($p) => strtolower($p->status ?? '') === 'paid');
+                $totalPaid = round($paidPayments->sum('amount'), 2);
+                $grandTotal = (float) ($order->total_amount ?? 0);
+                $balanceDue = max($grandTotal - $totalPaid, 0);
+                
+                // Append computed payment summary for the view
+                $order->payments_summary = collect([
+                    'grand_total' => $grandTotal,
+                    'total_paid' => $totalPaid,
+                    'balance_due' => $balanceDue,
+                ]);
+                $order->total_paid = $totalPaid;
+                
+                return $order;
+            });
+
+        // Generate CSV
+        $filename = 'orders_' . now()->format('Y-m-d_H-i-s') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+        ];
+
+        $callback = function() use ($orders) {
+            $file = fopen('php://output', 'w');
+
+            // CSV headers
+            fputcsv($file, [
+                'Order ID',
+                'Order Number',
+                'Customer Name',
+                'Total Amount',
+                'Total Paid',
+                'Balance Due',
+                'Status',
+                'Payment Status',
+                'Order Date',
+                'Created At',
+                'Items Count',
+            ]);
+
+            foreach ($orders as $order) {
+                // Get customer name with better fallback
+                $customerName = 'N/A';
+                if ($order->customer) {
+                    $customerName = trim(($order->customer->first_name ?? '') . ' ' . ($order->customer->last_name ?? ''));
+                    if (empty($customerName)) {
+                        $customerName = $order->customer->name ?? $order->customer->full_name ?? 'N/A';
+                    }
+                    $customerName = trim($customerName) ?: 'N/A';
+                }
+
+                fputcsv($file, [
+                    $order->id,
+                    $order->order_number,
+                    $customerName,
+                    $order->total_amount ?? 0,
+                    $order->total_paid ?? 0,
+                    $order->payments_summary['balance_due'] ?? 0,
+                    $order->status ?? 'N/A',
+                    $order->payment_status ?? 'N/A',
+                    $order->order_date ? \Carbon\Carbon::parse($order->order_date)->format('Y-m-d') : 'N/A',
+                    $order->created_at ? $order->created_at->format('Y-m-d H:i:s') : 'N/A',
+                    $order->items_count ?? 0,
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    })->name('orders.export');
+
     // Archived orders
     Route::get('/orders/archived', function () {
         $orders = \App\Models\Order::query()
@@ -1162,6 +1286,118 @@ Route::prefix('staff')->name('staff.')->middleware(\App\Http\Middleware\RoleMidd
     Route::get('/dashboard', [StaffDashboardController::class, 'index'])->name('dashboard');
     Route::get('/assigned-orders', [StaffAssignedController::class, 'index'])->name('assigned.orders');
     Route::get('/order-list', [StaffOrderController::class, 'index'])->name('order_list.index');
+    Route::get('/order-list/export', function (\Illuminate\Http\Request $request) {
+        $query = \App\Models\Order::query()
+            ->select(['id', 'order_number', 'customer_order_id', 'customer_id', 'total_amount', 'order_date', 'status', 'payment_status', 'created_at'])
+            ->where('archived', false)
+            ->where(function ($q) {
+                // Exclude orders with pending or unset payment status
+                $q->whereNotNull('payment_status')->where('payment_status', '<>', 'pending');
+            })
+            ->with(['customer', 'payments'])
+            ->withCount('items')
+            ->latest('order_date')
+            ->latest();
+
+        // Date filters (apply to order_date, fallback to created_at via COALESCE)
+        if ($request->filled('start_date')) {
+            try {
+                $start = \Carbon\Carbon::parse($request->query('start_date'))->startOfDay();
+                $query->whereRaw('COALESCE(order_date, created_at) >= ?', [$start->toDateTimeString()]);
+            } catch (\Throwable $e) {
+                // ignore invalid date
+            }
+        }
+
+        if ($request->filled('end_date')) {
+            try {
+                $end = \Carbon\Carbon::parse($request->query('end_date'))->endOfDay();
+                $query->whereRaw('COALESCE(order_date, created_at) <= ?', [$end->toDateTimeString()]);
+            } catch (\Throwable $e) {
+                // ignore invalid date
+            }
+        }
+
+        $orders = $query
+            ->get()
+            ->map(function ($order) {
+                // Compute payment totals from payments relationship
+                $paidPayments = $order->payments->filter(fn($p) => strtolower($p->status ?? '') === 'paid');
+                $totalPaid = round($paidPayments->sum('amount'), 2);
+                $grandTotal = (float) ($order->total_amount ?? 0);
+                $balanceDue = max($grandTotal - $totalPaid, 0);
+                
+                // Append computed payment summary for the view
+                $order->payments_summary = collect([
+                    'grand_total' => $grandTotal,
+                    'total_paid' => $totalPaid,
+                    'balance_due' => $balanceDue,
+                ]);
+                $order->total_paid = $totalPaid;
+                
+                return $order;
+            });
+
+        // Generate CSV
+        $filename = 'staff_orders_' . now()->format('Y-m-d_H-i-s') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+        ];
+
+        $callback = function() use ($orders) {
+            $file = fopen('php://output', 'w');
+
+            // CSV headers
+            fputcsv($file, [
+                'Order ID',
+                'Order Number',
+                'Customer Name',
+                'Total Amount',
+                'Total Paid',
+                'Balance Due',
+                'Status',
+                'Payment Status',
+                'Order Date',
+                'Created At',
+                'Items Count',
+            ]);
+
+            foreach ($orders as $order) {
+                // Get customer name with better fallback
+                $customerName = 'N/A';
+                if ($order->customer) {
+                    $customerName = trim(($order->customer->first_name ?? '') . ' ' . ($order->customer->last_name ?? ''));
+                    if (empty($customerName)) {
+                        $customerName = $order->customer->name ?? $order->customer->full_name ?? 'N/A';
+                    }
+                    $customerName = trim($customerName) ?: 'N/A';
+                }
+
+                fputcsv($file, [
+                    $order->id,
+                    $order->order_number,
+                    $customerName,
+                    $order->total_amount ?? 0,
+                    $order->total_paid ?? 0,
+                    $order->payments_summary['balance_due'] ?? 0,
+                    $order->status ?? 'N/A',
+                    $order->payment_status ?? 'N/A',
+                    $order->order_date ? \Carbon\Carbon::parse($order->order_date)->format('Y-m-d') : 'N/A',
+                    $order->created_at ? $order->created_at->format('Y-m-d H:i:s') : 'N/A',
+                    $order->items_count ?? 0,
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    })->name('order_list.export');
     Route::get('/order-list/{id}', [StaffOrderController::class, 'show'])->name('order_list.show');
     Route::put('/order-list/{id}', [StaffOrderController::class, 'update'])->name('order_list.update');
     Route::get('/orders/{id}/summary', [StaffOrderController::class, 'summary'])->name('orders.summary');

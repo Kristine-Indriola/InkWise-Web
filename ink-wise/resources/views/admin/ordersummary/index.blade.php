@@ -1181,7 +1181,7 @@
 	$ordersBackUrl = $statusManageUrl ?? $ordersIndexUrl;
 
 	$statusOptions = [
-		'draft' => 'New Order',
+		'draft' => 'NEW ORDER',
 		'pending' => 'Order Received',
 		'processing' => 'Processing',
 		'in_production' => 'In Progress',
@@ -1189,17 +1189,30 @@
 		'completed' => 'Completed',
 		'cancelled' => 'Cancelled',
 	];
+	$fulfillmentStatusOptions = [
+		'draft' => 'NEW ORDER',
+		'pending' => 'Pending',
+		'processing' => 'Processing',
+		'in_production' => 'In Production',
+		'confirmed' => 'Ready for Pickup',
+		'completed' => 'Completed',
+		'cancelled' => 'Cancelled',
+	];
+	
+	// Function to get display label for any status
+	$getStatusLabel = function($status) use ($statusOptions, $fulfillmentStatusOptions) {
+		if ($status === 'draft') {
+			return 'NEW ORDER';
+		}
+		return $statusOptions[$status] ?? $fulfillmentStatusOptions[$status] ?? 'Processing';
+	};
 	$statusFlow = ['draft', 'pending', 'pending_awaiting_materials', 'processing', 'in_production', 'confirmed', 'completed'];
 	$orderStatusRaw = data_get($order, 'status', 'draft');
-	$orderStatusRaw = $orderStatusRaw === 'draft' ? 'new_order' : $orderStatusRaw;
 	$currentStatus = strtolower((string) $orderStatusRaw);
-	if ($currentStatus === 'new_order') {
-		$currentStatus = 'draft';
-	}
 	$flowIndex = array_search($currentStatus, $statusFlow, true);
 	$currentChipModifier = str_replace('_', '-', $currentStatus);
-	$currentDisplayStatus = $currentStatus === 'draft' ? 'new_order' : $currentStatus;
-	$currentStatusLabel = $statusOptions[$currentDisplayStatus] ?? ucfirst(str_replace('_', ' ', $currentDisplayStatus));
+	$currentDisplayStatus = $currentStatus;
+	$currentStatusLabel = $getStatusLabel($currentDisplayStatus);
 	$formatDateTime = function ($value) {
 		try {
 			if ($value instanceof \Illuminate\Support\Carbon) {
@@ -1312,7 +1325,7 @@
 	$trackingNumber = $metadata['tracking_number'] ?? null;
 	$statusNote = $metadata['status_note'] ?? null;
 	$nextStatusKey = $flowIndex !== false && $flowIndex < count($statusFlow) - 1 ? $statusFlow[$flowIndex + 1] : null;
-	$nextStatusLabel = $nextStatusKey ? ($statusOptions[$nextStatusKey] ?? ucfirst(str_replace('_', ' ', $nextStatusKey))) : null;
+	$nextStatusLabel = $nextStatusKey ? $getStatusLabel($nextStatusKey) : null;
 	$lastUpdatedDisplay = $formatDateTime(data_get($order, 'updated_at'));
 @endphp
 
@@ -1330,17 +1343,11 @@
 		<div>
 			<h1 class="page-title">{{ $orderTitle }}</h1>
 			<p class="page-subtitle">
-				Placed {{ $placedAt }} · {{ $paymentStatusLabel }} payment · {{ ucfirst($fulfillmentStatus ?: 'processing') }} fulfillment
+				Placed {{ $placedAt }} · {{ $paymentStatusLabel }} payment · {{ $getStatusLabel($fulfillmentStatus) }} fulfillment
 			</p>
 		</div>
 		<div class="page-header__quick-actions">
 			<a href="{{ $ordersIndexUrl }}" class="pill-link" title="Return to order list">Back to order list</a>
-			<button type="button" class="btn btn-secondary" data-order-action="export">
-				<i class="fi fi-rr-download" aria-hidden="true"></i> Export PDF
-			</button>
-			<button type="button" class="btn btn-primary" data-order-action="print">
-				<i class="fi fi-rr-print" aria-hidden="true"></i> Print
-			</button>
 		</div>
 	</header>
 
@@ -1350,7 +1357,7 @@
 				{{ $paymentStatusLabel }} payment
 			</span>
 			<span class="status-chip status-chip--outline {{ 'status-chip--' . $fulfillmentStatus }}" data-fulfillment-indicator>
-				{{ ucfirst($fulfillmentStatus ?: 'processing') }} fulfillment
+				{{ $getStatusLabel($fulfillmentStatus)}} 
 			</span>
 		</div>
 		<div class="ordersummary-banner__meta">
@@ -1398,8 +1405,8 @@
 								? 'status-tracker__item--done'
 								: 'status-tracker__item--current';
 						}
-						$displayKey = $statusKey === 'draft' ? 'new_order' : $statusKey;
 					}
+					$displayKey = $statusKey;
 				@endphp
 				<li class="status-tracker__item {{ $stateClass }}" data-status-step="{{ $statusKey }}">
 					<div class="status-tracker__marker">
@@ -1414,7 +1421,7 @@
 					@endif
 					<div class="status-tracker__content">
 						<p class="status-tracker__title">
-							{{ $statusOptions[$displayKey] ?? ucfirst(str_replace('_', ' ', $displayKey)) }}
+							{{ $getStatusLabel($displayKey) }}
 						</p>
 						<p class="status-tracker__subtitle">
 							@switch($statusKey)
@@ -1474,7 +1481,7 @@
 								<tr>
 									<th scope="col">Item</th>
 									<th scope="col">Options</th>
-									<th scope="col">Paper Stock Material</th>
+									<th scope="col">Material</th>
 									<th scope="col" class="text-center">Qty</th>
 									<th scope="col" class="text-end">Unit price</th>
 									<th scope="col" class="text-end">Line total</th>
@@ -1507,9 +1514,9 @@
 										
 										$unitPrice = (float) data_get($item, 'unit_price', data_get($item, 'price', 0));
 										
-										// For invitations, line total is breakdown sum
+										// Calculate line total
 										if ($isInvitation) {
-											$lineTotal = $breakdownSum;
+											$lineTotal = $quantity * $unitPrice;
 										} else {
 											$lineTotal = (float) data_get($item, 'total', data_get($item, 'subtotal', $quantity * $unitPrice));
 										}
@@ -1556,11 +1563,6 @@
 										$rawOptions = data_get($item, 'options', []);
 										$paperStockValue = data_get($rawOptions, 'paper_stock') ?? data_get($rawOptions, 'paper stock') ?? null;
 
-										// For invitations, use paper stock price as unit price
-										if ($isInvitation) {
-											$paperStockPrice = $extractMoney(data_get($rawOptions, 'paper_stock_price'));
-											$unitPrice = is_numeric($paperStockPrice) ? (float) $paperStockPrice : 0.0;
-										}
 										$addonValues = [];
 										foreach ($rawOptions as $optKey => $optVal) {
 											if (str_contains(strtolower((string) $optKey), 'addon')) {
@@ -1615,6 +1617,14 @@
 												return $row;
 											})
 											->values();
+
+										// For invitations, get unit price from paper stock options since it's not in breakdown
+										if ($isInvitation) {
+											$paperStockPrice = $extractMoney(data_get($rawOptions, 'paper_stock_price'));
+											if (is_numeric($paperStockPrice)) {
+												$unitPrice = (float) $paperStockPrice;
+											}
+										}
 
 										$formatAddon = function ($addon) use ($extractMoney, $quantity) {
 											if ($addon instanceof \Illuminate\Contracts\Support\Arrayable) {
@@ -1870,10 +1880,9 @@
 										}
 
 										// accumulate grouping sums: invitations (main line only, breakdowns are separate)
-										// DO NOT CALCULATE THE BASE PRICE OF THE INVITATION
-										// if (!$isEnvelope && !$isGiveaway) {
-										//     $groupSums['invitations'] += $lineTotal;
-										// }
+										if (!$isEnvelope && !$isGiveaway) {
+											$groupSums['invitations'] += $lineTotal;
+										}
 
 										if ($isEnvelope) {
 											$groupSums['envelopes'] += $lineTotal;
@@ -1961,6 +1970,44 @@
 													$itemRegisterMaterial('addon', $addonLabel, $quantity, null, null);
 												}
 											}
+										}
+
+										// Register addons for all items, not just invitations
+										if (!empty($addonValues)) {
+											$addonFallbacks = [];
+											foreach ($rawOptions as $rawKey => $rawValue) {
+												if (!str_contains(strtolower((string) $rawKey), 'addon')) {
+													continue;
+												}
+
+												$normalizedAddons = $normalizeToArray($rawValue);
+												if (!$normalizedAddons) {
+													$normalizedAddons = $rawValue !== null ? [$rawValue] : [];
+												}
+
+												foreach ($normalizedAddons as $addonEntry) {
+													$label = trim($formatAddon($addonEntry));
+													if ($label === '' || strtolower($label) === 'none') {
+														continue;
+													}
+													$addonFallbacks[] = $label;
+												}
+											}
+
+											$addonFallbacks = array_values(array_unique($addonFallbacks));
+											foreach ($addonFallbacks as $addonLabel) {
+												$itemRegisterMaterial('addon', $addonLabel, $quantity, null, null);
+											}
+										}
+
+										// Register paper stock for all items, not just invitations
+										if ($paperStockValue) {
+											$paperLabel = is_string($paperStockValue) && trim($paperStockValue) !== ''
+												? trim((string) $paperStockValue)
+												: 'Paper Stock';
+											$paperUnitPrice = $extractMoney(data_get($rawOptions, 'paper_stock_price'));
+											$paperTotal = is_numeric($paperUnitPrice) ? (float) $paperUnitPrice * max(1, $quantity) : null;
+											$itemRegisterMaterial('paper', $paperLabel, $quantity, is_numeric($paperUnitPrice) ? (float) $paperUnitPrice : null, $paperTotal);
 										}
 									@endphp
 									<tr>
@@ -2131,7 +2178,8 @@
 															});
 														})
 														->filter(function ($row) {
-															return (($row['quantity'] ?? 0) > 0) || (($row['total'] ?? 0) > 0) || (($row['unit_price'] ?? 0) > 0);
+															// Show any material that has a non-empty label
+															return !empty(trim($row['label'] ?? ''));
 														})
 														->values();
 
@@ -2240,8 +2288,17 @@
 											@endif
 										</td>
 										<td>
-											@if($paperStockValue)
-												{{ $paperStockValue }}
+											@if($itemMaterialsList->isNotEmpty())
+												<ul class="item-materials">
+													@foreach($itemMaterialsList as $material)
+														<li class="material-item material-item--{{ $material['type'] }}">
+															<span class="material-label">{{ $material['label'] }}</span>
+															@if($material['quantity'] !== null)
+																<span class="material-quantity">x{{ $material['quantity'] }}</span>
+															@endif
+														</li>
+													@endforeach
+												</ul>
 											@else
 												<span class="item-option">—</span>
 											@endif
@@ -2603,7 +2660,7 @@
 			aria-label="Order sidebar controls"
 			data-order-sidebar
 			data-payment-status="{{ $paymentStatus }}"
-			data-fulfillment-status="{{ $fulfillmentStatus }}"
+			data-fulfillment-status="{{ $getStatusLabel($fulfillmentStatus) }}"
 			data-update-payment-url="{{ $markPaidUrl }}"
 			data-update-fulfillment-url="{{ $markFulfilledUrl }}"
 			data-send-invoice-url="{{ $sendInvoiceUrl }}"
@@ -3597,5 +3654,36 @@ function deductMaterials(orderId) {
 		button.innerHTML = originalText;
 	});
 }
+
+// Ensure fulfillment indicator always shows correct label
+document.addEventListener('DOMContentLoaded', function() {
+	const fulfillmentIndicator = document.querySelector('[data-fulfillment-indicator]');
+	if (fulfillmentIndicator) {
+		const currentText = fulfillmentIndicator.textContent.trim();
+		if (currentText === 'draft fulfillment' || currentText === 'Draft fulfillment') {
+			fulfillmentIndicator.innerHTML = 'NEW ORDER fulfillment';
+		}
+	}
+	
+	// Also watch for changes to the fulfillment indicator
+	const observer = new MutationObserver(function(mutations) {
+		mutations.forEach(function(mutation) {
+			if (mutation.type === 'childList' || mutation.type === 'characterData') {
+				const text = fulfillmentIndicator.textContent.trim();
+				if (text === 'draft fulfillment' || text === 'Draft fulfillment') {
+					fulfillmentIndicator.innerHTML = 'NEW ORDER fulfillment';
+				}
+			}
+		});
+	});
+	
+	if (fulfillmentIndicator) {
+		observer.observe(fulfillmentIndicator, {
+			childList: true,
+			subtree: true,
+			characterData: true
+		});
+	}
+});
 </script>
 @endsection

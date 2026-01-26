@@ -338,7 +338,6 @@ class OrderFlowController extends Controller
             'side' => ['nullable', 'string', 'in:front,back'],
         ]);
 
-    try {
         $placeholders = collect(Arr::get($payload, 'placeholders', []))
             ->filter(fn ($value) => is_string($value) && trim($value) !== '')
             ->map(fn ($value) => trim($value))
@@ -764,10 +763,12 @@ class OrderFlowController extends Controller
         \Illuminate\Support\Facades\Log::info('saveReviewDesign validated', ['validated' => $validated]);
 
         $designJson = $validated['design_json'];
-        if (is_string($designJson)) {
-            $decoded = json_decode($designJson, true);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                return response()->json(['message' => 'Invalid design_json payload.'], 422);
+        try {
+            if (is_string($designJson)) {
+                $decoded = json_decode($designJson, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    return response()->json(['message' => 'Invalid design_json payload.'], 422);
+                }
             }
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('saveReviewDesign: Error processing design_json', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
@@ -1768,7 +1769,7 @@ class OrderFlowController extends Controller
                     'user_id' => optional(Auth::user())->user_id,
                     'order_number' => $this->orderFlow->generateOrderNumber(),
                     'order_date' => now(),
-                    'status' => 'pending',
+                    'status' => 'draft',
                     'subtotal_amount' => $summary['subtotalAmount'] ?? 0,
                     'tax_amount' => $summary['taxAmount'] ?? 0,
                     'shipping_fee' => static::DEFAULT_SHIPPING_FEE,
@@ -2487,6 +2488,10 @@ class OrderFlowController extends Controller
         // sessionStorage (order_summary_payload) to supply the draft payload.
 
         if ($order) {
+            // Recalculate totals to ensure they are up to date with latest pricing logic
+            $this->orderFlow->recalculateOrderTotals($order);
+            $order->refresh();
+
             $this->updateSessionSummary($order);
 
             // Update summary snapshot to reflect the latest totals
@@ -3074,7 +3079,16 @@ class OrderFlowController extends Controller
         $metadata = $order->metadata ?? [];
         $paidAmount = $order->paymentRecords()->where('status', 'paid')->sum('amount');
 
-        $balanceDue = round(max(($order->grandTotalAmount() ?? 0) - $paidAmount, 0), 2);
+        $metadata = $order->metadata ?? [];
+        $paidAmount = $order->paymentRecords()->where('status', 'paid')->sum('amount');
+
+        $omitBasePrice = Arr::get($metadata, 'final_step.metadata.omit_base_price', false);
+        if ($omitBasePrice) {
+            // When base price is omitted, ignore previous payments as they were calculated with the old logic
+            $balanceDue = round(max($order->grandTotalAmount() ?? 0, 0), 2);
+        } else {
+            $balanceDue = round(max(($order->grandTotalAmount() ?? 0) - $paidAmount, 0), 2);
+        }
         $defaultDeposit = round(max($order->grandTotalAmount() / 2, 0), 2);
         $depositAmount = $balanceDue <= 0 ? 0 : min($defaultDeposit, $balanceDue);
 

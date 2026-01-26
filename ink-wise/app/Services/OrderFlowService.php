@@ -1449,9 +1449,8 @@ class OrderFlowService
         ];
 
         if ($omitBasePrice) {
-            $paymentAmount = Arr::get($metadata, 'final_step.metadata.payment_amount', 0);
-            $pricing['total'] = (float) $paymentAmount;
-            $pricing['subtotal'] = (float) $paymentAmount;
+            // When omit_base_price is true, the order total is already calculated correctly
+            // Don't override with payment_amount, which is for the current payment transaction
         }
 
         return [
@@ -3262,7 +3261,7 @@ class OrderFlowService
     public function recalculateOrderTotals(Order $order): void
     {
         // Always reload items to ensure we have the latest quantities
-        $order->load(['items.addons', 'items.paperStockSelection']);
+        $order->load(['items.addons', 'items.paperStockSelection', 'items.product.paperStocks']);
 
         $invitationItem = $this->primaryInvitationItem($order);
         if (!$invitationItem) {
@@ -3272,14 +3271,54 @@ class OrderFlowService
         // Check if base price should be omitted
         $metadata = $order->metadata ?? [];
         $omitBasePrice = Arr::get($metadata, 'final_step.metadata.omit_base_price', false);
+        
+        // For invitation items, always omit the base price
+        if ($invitationItem->line_type === 'invitation') {
+            $omitBasePrice = true;
+        }
 
         if ($omitBasePrice) {
-            // When base price is omitted, use the payment_amount as the total
-            $paymentAmount = Arr::get($metadata, 'final_step.metadata.payment_amount', 0);
-            $total = round((float) $paymentAmount, 2);
-            $subtotal = $total; // subtotal equals total in this case
+            // When base price is omitted, calculate total as paper price * quantity + envelopes + giveaways
+            $paperPerUnit = (float) ($invitationItem->paperStockSelection?->price ?? 0);
+            if ($paperPerUnit <= 0) {
+                // Use the lowest priced paper stock as default for invitations
+                $defaultPaperStock = $invitationItem->product?->paperStocks?->sortBy('price')->first();
+                $paperPerUnit = $defaultPaperStock ? (float) $defaultPaperStock->price : 0;
+            }
+            $paperTotal = round($paperPerUnit * $invitationItem->quantity, 2);
+
+            // Calculate envelope total from metadata
+            $envelopeTotal = 0.0;
+            $envelopes = Arr::get($metadata, 'envelopes', []);
+            if (empty($envelopes) && !empty(Arr::get($metadata, 'envelope'))) {
+                $envelopes = [Arr::get($metadata, 'envelope')];
+            }
+            foreach ($envelopes as $envelope) {
+                if (!empty($envelope) && is_array($envelope)) {
+                    $envQty = max(1, (int) ($envelope['qty'] ?? $envelope['quantity'] ?? 1));
+                    $envPrice = (float) ($envelope['price'] ?? $envelope['unit_price'] ?? 0);
+                    $envelopeTotal += round($envPrice * $envQty, 2);
+                }
+            }
+
+            // Calculate giveaway total from metadata
+            $giveawayTotal = 0.0;
+            $giveaways = Arr::get($metadata, 'giveaways', []);
+            if (empty($giveaways) && !empty(Arr::get($metadata, 'giveaway'))) {
+                $giveaways = [Arr::get($metadata, 'giveaway')];
+            }
+            foreach ($giveaways as $giveaway) {
+                if (!empty($giveaway) && is_array($giveaway)) {
+                    $giveQty = max(1, (int) ($giveaway['qty'] ?? $giveaway['quantity'] ?? 1));
+                    $givePrice = (float) ($giveaway['price'] ?? $giveaway['unit_price'] ?? 0);
+                    $giveawayTotal += round($givePrice * $giveQty, 2);
+                }
+            }
+
+            $subtotal = round($paperTotal + $envelopeTotal + $giveawayTotal, 2);
             $tax = 0.0;
             $shipping = 0.0;
+            $total = $subtotal;
         } else {
             // Include base price of the invitation in the subtotal so the order total reflects
             // the product's unit price plus any extras (paper, addons, etc.). Previously this
@@ -3326,21 +3365,42 @@ class OrderFlowService
 
     public function buildSummary(Order $order): array
     {
-        $order->loadMissing(['items.addons', 'items.paperStockSelection', 'items.product']);
+        $order->loadMissing(['items.addons', 'items.paperStockSelection', 'items.product.paperStocks']);
 
         $invitationItem = $this->primaryInvitationItem($order);
         if (!$invitationItem) {
             return [];
         }
 
+        // For invitations, use paper stock price as unit price
+        $unitPrice = $invitationItem->unit_price;
+        $paperStockId = $invitationItem->paperStockSelection?->paper_stock_id;
+        $paperStockName = $invitationItem->paperStockSelection?->paper_stock_name;
+        $paperStockPrice = $invitationItem->paperStockSelection?->price;
+
+        if ($invitationItem->line_type === 'invitation') {
+            if ($invitationItem->paperStockSelection && $paperStockPrice) {
+                $unitPrice = $paperStockPrice;
+            } else {
+                // Use the lowest priced paper stock as default for invitations
+                $defaultPaperStock = $invitationItem->product?->paperStocks?->sortBy('price')->first();
+                if ($defaultPaperStock) {
+                    $unitPrice = $defaultPaperStock->price;
+                    $paperStockId = $defaultPaperStock->id;
+                    $paperStockName = $defaultPaperStock->name;
+                    $paperStockPrice = $defaultPaperStock->price;
+                }
+            }
+        }
+
         $summary = [
             'productId' => $invitationItem->product_id,
             'productName' => $invitationItem->product_name ?? $invitationItem->product?->name,
             'quantity' => $invitationItem->quantity,
-            'unitPrice' => $invitationItem->unit_price,
-            'paperStockId' => $invitationItem->paperStockSelection?->paper_stock_id,
-            'paperStockName' => $invitationItem->paperStockSelection?->paper_stock_name,
-            'paperStockPrice' => $invitationItem->paperStockSelection?->price,
+            'unitPrice' => $unitPrice,
+            'paperStockId' => $paperStockId,
+            'paperStockName' => $paperStockName,
+            'paperStockPrice' => $paperStockPrice,
             'addonIds' => $invitationItem->addons?->pluck('size_id')->toArray() ?? [],
             'metadata' => $order->metadata ?? [],
             'subtotalAmount' => $order->subtotal_amount,
@@ -3361,8 +3421,12 @@ class OrderFlowService
 
         // Extract giveaways from metadata (support both plural and legacy single formats)
         $summary['giveaways'] = [];
-        if (!empty($metadata['giveaways']) && is_array($metadata['giveaways'])) {
-            $summary['giveaways'] = $metadata['giveaways'];
+        if (!empty($metadata['giveaways'])) {
+            if (is_array($metadata['giveaways'])) {
+                $summary['giveaways'] = $metadata['giveaways'];
+            } elseif (is_object($metadata['giveaways'])) {
+                $summary['giveaways'] = (array) $metadata['giveaways'];
+            }
         } elseif (!empty($metadata['giveaway']) && is_array($metadata['giveaway'])) {
             $summary['giveaways'] = [$metadata['giveaway']];
         }
@@ -4001,6 +4065,9 @@ class OrderFlowService
             $product->loadMissing(['paperStocks', 'addons']);
         }
 
+        // Check if base price should be omitted
+        $omitBasePrice = Arr::get($summary, 'metadata.final_step.metadata.omit_base_price', false);
+
         // Determine quantity and unit price defensively so we can compute an
         // invitation total even when the product lookup fails (e.g., session-only
         // summaries or in test environments).
@@ -4011,7 +4078,7 @@ class OrderFlowService
         // If we couldn't resolve the product, return totals based solely on
         // the provided unit/quantity (no paper/addons/envelope/giveaway data).
         if (!$product) {
-            $subtotal = $invitationTotal;
+            $subtotal = $omitBasePrice ? 0 : $invitationTotal;
             $total = round($subtotal + 0.0, 2);
 
             return [
@@ -4029,11 +4096,9 @@ class OrderFlowService
             ];
         }
 
-        // Include base price of the invitation (unit * quantity). Previously this was
-        // omitted which caused server-side totals to undercount the order and made
-        // outstanding balance 0 when only the invitation existed.
+        // Calculate invitation base total (may be omitted based on flag)
         $invitationTotal = round($unitPrice * $quantity, 2);
-        $baseSubtotal = $invitationTotal;
+        $baseSubtotal = $omitBasePrice ? 0 : $invitationTotal;
 
         // Calculate paper stock total
         $paperTotal = 0.0;
@@ -4078,9 +4143,12 @@ class OrderFlowService
             }
         }
 
-        // Include invitation base into subtotal so session/server totals match
-        // what the client expects (unit * qty + extras).
-        $subtotal = round($baseSubtotal + $paperTotal + $addonsTotal + $envelopeTotal + $giveawayTotal, 2);
+        // Include invitation base into subtotal if not omitted, plus extras
+        if ($omitBasePrice) {
+            $subtotal = round($paperTotal + $envelopeTotal + $giveawayTotal, 2);
+        } else {
+            $subtotal = round($baseSubtotal + $paperTotal + $addonsTotal + $envelopeTotal + $giveawayTotal, 2);
+        }
         $tax = 0.0;
         $shipping = 0.0; // Always 0 for shipping
         $total = round($subtotal + $shipping, 2);

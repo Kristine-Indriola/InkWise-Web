@@ -248,7 +248,7 @@
     </div>
     <div class="page-header__quick-actions">
       <a href="<?php echo e(route('admin.orders.archived')); ?>" class="pill-link">Archived Orders</a>
-      <a href="#" class="pill-link">Export</a>
+      <a href="<?php echo e(route('admin.orders.export', request()->query())); ?>" class="pill-link">Export</a>
       <a href="<?php echo e(route('admin.reports.pickup-calendar')); ?>" class="pill-link">
 				<i class="fi fi-rr-calendar" aria-hidden="true"></i> Pickup calendar
 			</a>

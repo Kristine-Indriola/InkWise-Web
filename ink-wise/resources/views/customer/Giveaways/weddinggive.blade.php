@@ -193,6 +193,40 @@
             text-transform: uppercase;
         }
 
+        .giveaway-card__ratings {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.88);
+            letter-spacing: 0.03em;
+        }
+
+        .giveaway-card__rating-stars {
+            display: flex;
+            gap: 0.15rem;
+        }
+
+        .giveaway-card__rating-star {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .giveaway-card__rating-star.filled {
+            color: #fcd34d;
+            text-shadow: 0 0 6px rgba(252, 211, 77, 0.6);
+        }
+
+        .giveaway-card__rating-detail {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .giveaway-card__rating-empty {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
         .favorite-toggle {
             position: absolute;
             top: 0.75rem;
@@ -264,6 +298,198 @@
                 transform: translateY(0);
                 opacity: 1;
             }
+        }
+
+        /* Rating Modal Styles */
+        .rating-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .rating-modal-overlay.is-visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .rating-modal {
+            background: #ffffff;
+            border-radius: 24px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 28px 55px rgba(79, 70, 229, 0.25);
+            transform: scale(0.9) translateY(20px);
+            transition: transform 0.3s ease;
+        }
+
+        .rating-modal-overlay.is-visible .rating-modal {
+            transform: scale(1) translateY(0);
+        }
+
+        .rating-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 24px 24px 0;
+        }
+
+        .rating-modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #111827;
+            margin: 0;
+        }
+
+        .rating-modal-close {
+            background: none;
+            border: none;
+            font-size: 2rem;
+            color: #6b7280;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 8px;
+            transition: background 0.2s ease, color 0.2s ease;
+        }
+
+        .rating-modal-close:hover {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .rating-modal-body {
+            padding: 24px;
+        }
+
+        .rating-modal-summary {
+            text-align: center;
+            margin-bottom: 24px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .rating-modal-stars {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+
+        .rating-modal-star {
+            font-size: 1.5rem;
+            color: #d1d5db;
+        }
+
+        .rating-modal-star.filled {
+            color: #fcd34d;
+        }
+
+        .rating-modal-average {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #111827;
+            margin: 0 0 4px 0;
+        }
+
+        .rating-modal-count {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin: 0;
+        }
+
+        .rating-modal-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .rating-modal-item {
+            padding: 16px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .rating-modal-item:last-child {
+            border-bottom: none;
+        }
+
+        .rating-modal-item-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .rating-modal-item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .rating-modal-item-customer {
+            font-weight: 600;
+            color: #111827;
+        }
+
+        .rating-modal-item-stars {
+            display: flex;
+            gap: 2px;
+        }
+
+        .rating-modal-item-star {
+            font-size: 0.875rem;
+            color: #d1d5db;
+        }
+
+        .rating-modal-item-star.filled {
+            color: #fcd34d;
+        }
+
+        .rating-modal-item-date {
+            font-size: 0.75rem;
+            color: #9ca3af;
+        }
+
+        .rating-modal-item-review {
+            color: #374151;
+            margin: 8px 0 0 0;
+            line-height: 1.5;
+        }
+
+        .rating-modal-item-photos {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .rating-modal-item-photo {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .rating-modal-item-photo:hover {
+            transform: scale(1.05);
+        }
+
+        .rating-modal-empty {
+            text-align: center;
+            color: #6b7280;
+            padding: 40px 20px;
         }
     </style>
 @endpush
@@ -338,6 +564,107 @@
             };
 
             animateCards();
+
+            // Rating Modal Functionality
+            const ratingModal = document.getElementById('ratingModal');
+            const ratingModalClose = document.getElementById('ratingModalClose');
+            const ratingModalTitle = document.getElementById('ratingModalTitle');
+            const ratingModalBody = document.getElementById('ratingModalBody');
+
+            // Store ratings data globally (populated from PHP)
+            window.productRatings = @json($ratingsData);
+
+            function showRatingModal(productId) {
+                const productData = window.productRatings[productId];
+                if (!productData) return;
+
+                ratingModalTitle.textContent = `Reviews for ${productData.name}`;
+
+                let modalContent = '';
+
+                if (productData.rating_count > 0) {
+                    // Summary
+                    modalContent += `
+                        <div class="rating-modal-summary">
+                            <div class="rating-modal-stars">
+                                ${Array.from({length: 5}, (_, i) =>
+                                    `<span class="rating-modal-star ${i < Math.round(productData.average_rating) ? 'filled' : ''}">★</span>`
+                                ).join('')}
+                            </div>
+                            <p class="rating-modal-average">${productData.average_rating.toFixed(1)} out of 5</p>
+                            <p class="rating-modal-count">Based on ${productData.rating_count} review${productData.rating_count > 1 ? 's' : ''}</p>
+                        </div>
+                    `;
+
+                    // Individual reviews
+                    modalContent += '<ul class="rating-modal-list">';
+                    productData.ratings.forEach(rating => {
+                        modalContent += `
+                            <li class="rating-modal-item">
+                                <div class="rating-modal-item-header">
+                                    <div class="rating-modal-item-info">
+                                        <strong class="rating-modal-item-customer">${rating.customer_name}</strong>
+                                        <div class="rating-modal-item-stars">
+                                            ${Array.from({length: 5}, (_, i) =>
+                                                `<span class="rating-modal-item-star ${i < rating.rating ? 'filled' : ''}">★</span>`
+                                            ).join('')}
+                                        </div>
+                                    </div>
+                                    <span class="rating-modal-item-date">${rating.submitted_at || 'Recent'}</span>
+                                </div>
+                                ${rating.review ? `<p class="rating-modal-item-review">${rating.review}</p>` : ''}
+                                ${rating.photos && rating.photos.length > 0 ? `
+                                    <div class="rating-modal-item-photos">
+                                        ${rating.photos.map(photo => {
+                                            const photoUrl = photo.startsWith('http') ? photo : '/storage/' + photo;
+                                            return `<img src="${photoUrl}" alt="Rating photo" class="rating-modal-item-photo" onclick="window.open('${photoUrl}', '_blank')">`;
+                                        }).join('')}
+                                    </div>
+                                ` : ''}
+                            </li>
+                        `;
+                    });
+                    modalContent += '</ul>';
+                } else {
+                    modalContent = '<div class="rating-modal-empty">No reviews yet for this product.</div>';
+                }
+
+                ratingModalBody.innerHTML = modalContent;
+                ratingModal.classList.add('is-visible');
+                ratingModal.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
+            }
+
+            function hideRatingModal() {
+                ratingModal.classList.remove('is-visible');
+                ratingModal.setAttribute('aria-hidden', 'true');
+                document.body.style.overflow = '';
+            }
+
+            // Event listeners
+            document.addEventListener('click', (e) => {
+                if (e.target.classList.contains('rating-trigger') || e.target.closest('.rating-trigger')) {
+                    const trigger = e.target.classList.contains('rating-trigger') ? e.target : e.target.closest('.rating-trigger');
+                    const productId = trigger.dataset.productId;
+                    if (productId) {
+                        showRatingModal(productId);
+                    }
+                }
+            });
+
+            ratingModalClose.addEventListener('click', hideRatingModal);
+            ratingModal.addEventListener('click', (e) => {
+                if (e.target === ratingModal) {
+                    hideRatingModal();
+                }
+            });
+
+            // Keyboard support
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && ratingModal.classList.contains('is-visible')) {
+                    hideRatingModal();
+                }
+            });
         });
     </script>
 @endpush
@@ -397,6 +724,9 @@
 
                             $priceValue = $product->base_price ?? $product->unit_price ?? optional($templateRef)->base_price ?? optional($templateRef)->unit_price;
                             $previewUrl = route('product.preview', $product->id);
+                            $ratingSummary = $ratingsData[$product->id] ?? [];
+                            $ratingCount = $ratingSummary['rating_count'] ?? 0;
+                            $averageRating = $ratingSummary['average_rating'] ?? null;
                         @endphp
                         <article class="giveaway-card" role="listitem" data-product-id="{{ $product->id }}">
                             <button type="button"
@@ -429,6 +759,27 @@
                                         Custom quote
                                     @endif
                                 </span>
+                                <div class="giveaway-card__ratings rating-trigger"
+                                     role="button"
+                                     tabindex="0"
+                                     data-product-id="{{ $product->id }}"
+                                     aria-label="{{ $ratingCount > 0 ? 'View reviews for '.$product->name : 'Be the first to review '.$product->name }}">
+                                    @if($ratingCount > 0)
+                                        @php
+                                            $roundedAverage = min(5, max(0, (int) round($averageRating ?? 0)));
+                                        @endphp
+                                        <div class="giveaway-card__rating-stars" aria-hidden="true">
+                                            @for($star = 1; $star <= 5; $star++)
+                                                <span class="giveaway-card__rating-star {{ $star <= $roundedAverage ? 'filled' : '' }}">★</span>
+                                            @endfor
+                                        </div>
+                                        <span class="giveaway-card__rating-detail">
+                                            {{ number_format($averageRating ?? 0, 1) }} · {{ $ratingCount }} review{{ $ratingCount === 1 ? '' : 's' }}
+                                        </span>
+                                    @else
+                                        <span class="giveaway-card__rating-empty">New · Be the first to review</span>
+                                    @endif
+                                </div>
                             </div>
                         </article>
                     @endforeach
@@ -451,6 +802,21 @@
         </div>
         <div class="preview-frame-body">
             <iframe id="productPreviewFrame" title="Product preview"></iframe>
+        </div>
+    </div>
+</div>
+
+<!-- Rating Modal -->
+<div id="ratingModal" class="rating-modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="rating-modal">
+        <div class="rating-modal-header">
+            <h3 class="rating-modal-title" id="ratingModalTitle">Customer Reviews</h3>
+            <button type="button" class="rating-modal-close" id="ratingModalClose" aria-label="Close reviews">
+                ×
+            </button>
+        </div>
+        <div class="rating-modal-body" id="ratingModalBody">
+            <!-- Content will be populated by JavaScript -->
         </div>
     </div>
 </div>

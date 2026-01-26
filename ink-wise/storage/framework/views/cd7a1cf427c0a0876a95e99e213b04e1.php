@@ -1,8 +1,6 @@
-@extends('layouts.admin')
+<?php $__env->startSection('title', 'Manage Payment Transaction'); ?>
 
-@section('title', 'Manage Payment Transaction')
-
-@push('styles')
+<?php $__env->startPush('styles'); ?>
 <style>
     .payment-shell {
         max-width: 1024px;
@@ -403,10 +401,10 @@
         margin-top: 6px;
     }
 </style>
-@endpush
+<?php $__env->stopPush(); ?>
 
-@section('content')
-@php
+<?php $__env->startSection('content'); ?>
+<?php
     $normalizeToArray = function ($value) {
         if ($value instanceof \Illuminate\Support\Collection) {
             $value = $value->toArray();
@@ -434,17 +432,16 @@
         'failed' => 'Failed',
         'refunded' => 'Refunded',
     ];
-    $editablePaymentStatuses = ($editablePaymentStatuses ?? ['partial', 'paid']);
-    $currentPaymentStatus = data_get($order, 'payment_status', 'pending');
+    $currentPaymentStatus = old('payment_status', data_get($order, 'payment_status', 'pending'));
     $trackingNumber = old('tracking_number', $metadata['tracking_number'] ?? '');
     $paymentNote = old('payment_note', $metadata['payment_note'] ?? '');
-    $formSelectedPaymentStatus = old('payment_status');
-    if ($formSelectedPaymentStatus === null && in_array($currentPaymentStatus, $editablePaymentStatuses, true)) {
-        $formSelectedPaymentStatus = $currentPaymentStatus;
+    $orderId = $order instanceof \Illuminate\Database\Eloquent\Model ? $order->getKey() : data_get($order, 'id');
+    if (!$orderId) {
+        $orderId = data_get($order, 'order_id');
     }
     $previousUrl = url()->previous();
     if ($previousUrl === url()->current()) {
-        $previousUrl = route('admin.orders.index');
+        $previousUrl = $orderId ? route('staff.orders.summary', ['id' => $orderId]) : route('staff.order_list.index');
     }
     $currentPaymentChipModifier = str_replace('_', '-', $currentPaymentStatus);
     $currentPaymentStatusLabel = $paymentStatusOptions[$currentPaymentStatus] ?? ucfirst(str_replace('_', ' ', $currentPaymentStatus));
@@ -461,7 +458,6 @@
         }
         return null;
     };
-    $orderId = data_get($order, 'id');
     $orderNumber = data_get($order, 'order_number', $orderId ? '#' . $orderId : 'Order');
     $customer = data_get($order, 'customer') ?: data_get($order, 'customerOrder.customer');
     $customerName = trim((string) (data_get($customer, 'full_name')
@@ -488,25 +484,36 @@
     $primaryPaymentMethod = data_get($paymentRecords->first(), 'method') ?? data_get($order, 'payment_method');
     $primaryPaymentProvider = data_get($paymentRecords->first(), 'provider');
     $paymentCount = $paymentRecords->count();
-@endphp
+?>
 
 <main class="payment-shell">
-    @if(session('success'))
-        <div class="payment-alert payment-alert--success" role="status">
-            {{ session('success') }}
-        </div>
-    @endif
-
-    @if(session('error'))
-        <div class="payment-alert payment-alert--danger" role="alert">
-            {{ session('error') }}
-        </div>
-    @endif
-
-    <a href="{{ $previousUrl }}" class="back-link">
+    <a href="<?php echo e($previousUrl); ?>" class="back-link">
         <span aria-hidden="true">&larr;</span>
         Back to order
     </a>
+
+    <?php if(session('success')): ?>
+        <div class="payment-alert payment-alert--success" role="status" aria-live="polite">
+            <strong><?php echo e(session('success')); ?></strong>
+        </div>
+    <?php endif; ?>
+
+    <?php if(session('error')): ?>
+        <div class="payment-alert payment-alert--danger" role="alert" aria-live="assertive">
+            <strong><?php echo e(session('error')); ?></strong>
+        </div>
+    <?php endif; ?>
+
+    <?php if($errors->any()): ?>
+        <div class="payment-alert payment-alert--danger" role="alert" aria-live="assertive">
+            <strong>Unable to update payment details.</strong>
+            <ul style="margin: 8px 0 0; padding-left: 18px;">
+                <?php $__currentLoopData = $errors->all(); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $error): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                    <li><?php echo e($error); ?></li>
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+            </ul>
+        </div>
+    <?php endif; ?>
 
     <section class="payment-card">
         <header class="payment-card__header">
@@ -516,55 +523,57 @@
                     View payment status and transaction history for this order
                 </p>
             </div>
-            <span class="payment-status-chip payment-status-chip--{{ $currentPaymentChipModifier }}">
-                {{ $paymentStatusOptions[$currentPaymentStatus] ?? ucfirst(str_replace('_', ' ', $currentPaymentStatus)) }}
+            <span class="payment-status-chip payment-status-chip--<?php echo e($currentPaymentChipModifier); ?>">
+                <?php echo e($paymentStatusOptions[$currentPaymentStatus] ?? ucfirst(str_replace('_', ' ', $currentPaymentStatus))); ?>
+
             </span>
         </header>
         <div class="payment-meta">
             <div class="payment-meta__item">
                 <span class="payment-meta__label">Order number</span>
-                <span class="payment-meta__value">{{ $orderNumber }}</span>
+                <span class="payment-meta__value"><?php echo e($orderNumber); ?></span>
             </div>
             <div class="payment-meta__item">
                 <span class="payment-meta__label">Customer</span>
-                <span class="payment-meta__value">{{ $customerName }}</span>
+                <span class="payment-meta__value"><?php echo e($customerName); ?></span>
             </div>
             <div class="payment-meta__item">
                 <span class="payment-meta__label">Total amount</span>
-                <span class="payment-meta__value">{{ $formatCurrencyAmount($totalAmount) }}</span>
+                <span class="payment-meta__value"><?php echo e($formatCurrencyAmount($totalAmount)); ?></span>
             </div>
             <div class="payment-meta__item">
                 <span class="payment-meta__label">Amount paid</span>
-                <span class="payment-meta__value">{{ $formatCurrencyAmount($paidAmount) }}</span>
+                <span class="payment-meta__value"><?php echo e($formatCurrencyAmount($paidAmount)); ?></span>
             </div>
             <div class="payment-meta__item">
                 <span class="payment-meta__label">Balance due</span>
-                <span class="payment-meta__value">{{ $formatCurrencyAmount($balanceDue) }}</span>
+                <span class="payment-meta__value"><?php echo e($formatCurrencyAmount($balanceDue)); ?></span>
             </div>
             <div class="payment-meta__item">
                 <span class="payment-meta__label">Payment status</span>
                 <span class="payment-meta__value">
-                    {{ $paymentStatusOptions[$currentPaymentStatus] ?? ucfirst(str_replace('_', ' ', $currentPaymentStatus)) }}
+                    <?php echo e($paymentStatusOptions[$currentPaymentStatus] ?? ucfirst(str_replace('_', ' ', $currentPaymentStatus))); ?>
+
                 </span>
             </div>
-        @if($primaryPaymentMethod)
+        <?php if($primaryPaymentMethod): ?>
             <div class="payment-meta__item">
                 <span class="payment-meta__label">Payment method</span>
-                <span class="payment-meta__value">{{ mb_strtoupper($primaryPaymentMethod) }}</span>
+                <span class="payment-meta__value"><?php echo e(mb_strtoupper($primaryPaymentMethod)); ?></span>
             </div>
-        @endif
-        @if($primaryPaymentProvider)
+        <?php endif; ?>
+        <?php if($primaryPaymentProvider): ?>
             <div class="payment-meta__item">
                 <span class="payment-meta__label">Payment provider</span>
-                <span class="payment-meta__value">{{ ucfirst($primaryPaymentProvider) }}</span>
+                <span class="payment-meta__value"><?php echo e(ucfirst($primaryPaymentProvider)); ?></span>
             </div>
-        @endif
-        @if($latestPaymentDisplay)
+        <?php endif; ?>
+        <?php if($latestPaymentDisplay): ?>
             <div class="payment-meta__item">
                 <span class="payment-meta__label">Latest payment</span>
-                <span class="payment-meta__value">{{ $latestPaymentDisplay }}</span>
+                <span class="payment-meta__value"><?php echo e($latestPaymentDisplay); ?></span>
             </div>
-        @endif
+        <?php endif; ?>
         </div>
     </section>
 
@@ -576,8 +585,8 @@
             </div>
         </header>
         <div class="transaction-list">
-            @forelse($paymentRecords as $payment)
-                @php
+            <?php $__empty_1 = true; $__currentLoopData = $paymentRecords; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $payment): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                <?php
                     $method = data_get($payment, 'method');
                     $provider = data_get($payment, 'provider');
                     $status = strtolower((string) data_get($payment, 'status', 'pending'));
@@ -594,70 +603,31 @@
                         $reference ? 'Ref: ' . $reference : null,
                         $origin === 'metadata' ? 'Imported record' : null,
                     ])->filter()->implode(' · ');
-                @endphp
+                ?>
                 <div class="transaction-item">
                     <div class="transaction-item__details">
                         <p class="transaction-item__title">
-                            {{ $method ? ucfirst($method) : 'Payment' }}@if($provider) via {{ ucfirst($provider) }}@endif
+                            <?php echo e($method ? ucfirst($method) : 'Payment'); ?><?php if($provider): ?> via <?php echo e(ucfirst($provider)); ?><?php endif; ?>
                         </p>
-                        @if($metaPieces !== '')
-                            <p class="transaction-item__meta">{{ $metaPieces }}</p>
-                        @endif
-                        @if($notes)
-                            <p class="transaction-item__meta">Note: {{ $notes }}</p>
-                        @endif
+                        <?php if($metaPieces !== ''): ?>
+                            <p class="transaction-item__meta"><?php echo e($metaPieces); ?></p>
+                        <?php endif; ?>
+                        <?php if($notes): ?>
+                            <p class="transaction-item__meta">Note: <?php echo e($notes); ?></p>
+                        <?php endif; ?>
                     </div>
                     <div class="transaction-item__amount">
-                        {{ $formatCurrencyAmount(data_get($payment, 'amount', 0)) }}
+                        <?php echo e($formatCurrencyAmount(data_get($payment, 'amount', 0))); ?>
+
                         <div>
-                            <span class="payment-status-chip payment-status-chip--{{ $statusModifier }}" style="margin-top: 6px; display: inline-flex;">{{ ucfirst($status) }}</span>
+                            <span class="payment-status-chip payment-status-chip--<?php echo e($statusModifier); ?>" style="margin-top: 6px; display: inline-flex;"><?php echo e(ucfirst($status)); ?></span>
                         </div>
                     </div>
                 </div>
-            @empty
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                 <p class="payment-info-card__empty">No payment transactions recorded yet.</p>
-            @endforelse
+            <?php endif; ?>
         </div>
-    </section>
-
-    <section class="payment-form-card">
-        <h2 class="payment-info-card__title" style="margin-bottom: 20px;">Update payment status</h2>
-        <form method="POST" action="{{ route('admin.orders.payment.update', $order) }}" class="payment-form">
-            @csrf
-            @method('PUT')
-
-            <div class="form-row">
-                <div>
-                    <label for="payment_status">Payment status</label>
-                    <select id="payment_status" name="payment_status" required>
-                        <option value="" disabled {{ $formSelectedPaymentStatus ? '' : 'selected' }}>Select payment status</option>
-                        @foreach($editablePaymentStatuses as $value)
-                            @php($label = $paymentStatusOptions[$value] ?? ucfirst(str_replace('_', ' ', $value)))
-                            <option value="{{ $value }}" {{ $formSelectedPaymentStatus === $value ? 'selected' : '' }}>
-                                {{ $label }}
-                            </option>
-                        @endforeach
-                    </select>
-                    <span class="hint">Set the payment to Partial or Paid.</span>
-                    @error('payment_status')
-                        <span class="error-text">{{ $message }}</span>
-                    @enderror
-                </div>
-            </div>
-
-            <div class="form-row">
-                <div>
-                    <label for="payment_note">Payment note (optional)</label>
-                    <textarea id="payment_note" name="payment_note" rows="4" placeholder="Add context about payment collection if needed.">{{ $paymentNote }}</textarea>
-                    <span class="hint">Customers receive this note with their payment status update.</span>
-                    @error('payment_note')
-                        <span class="error-text">{{ $message }}</span>
-                    @enderror
-                </div>
-            </div>
-
-            <button type="submit">Save payment update</button>
-        </form>
     </section>
 
     <section class="payment-info-grid">
@@ -665,64 +635,69 @@
             <h2 class="payment-info-card__title">Payment details</h2>
             <dl>
                 <dt>Order number</dt>
-                <dd>{{ $orderNumber }}</dd>
+                <dd><?php echo e($orderNumber); ?></dd>
                 <dt>Customer</dt>
-                <dd>{{ $customerName }}</dd>
+                <dd><?php echo e($customerName); ?></dd>
                 <dt>Order date</dt>
-                <dd>{{ $placedDateDisplay ?? 'Not available' }}</dd>
+                <dd><?php echo e($placedDateDisplay ?? 'Not available'); ?></dd>
                 <dt>Total amount</dt>
-				<dd>{{ $formatCurrencyAmount($totalAmount) }}</dd>
+                <dd><?php echo e($formatCurrencyAmount($totalAmount)); ?></dd>
                 <dt>Amount paid</dt>
-				<dd>{{ $formatCurrencyAmount($paidAmount) }}</dd>
+                <dd><?php echo e($formatCurrencyAmount($paidAmount)); ?></dd>
                 <dt>Balance due</dt>
-				<dd>{{ $formatCurrencyAmount($balanceDue) }}</dd>
+                <dd><?php echo e($formatCurrencyAmount($balanceDue)); ?></dd>
                 <dt>Payment status</dt>
-                <dd>{{ $paymentStatusOptions[$currentPaymentStatus] ?? ucfirst(str_replace('_', ' ', $currentPaymentStatus)) }}</dd>
+                <dd><?php echo e($paymentStatusOptions[$currentPaymentStatus] ?? ucfirst(str_replace('_', ' ', $currentPaymentStatus))); ?></dd>
                 <dt>Last updated</dt>
-                <dd>{{ $lastUpdatedDisplay ?? 'Not available' }}</dd>
-                @if($paymentNote)
+                <dd><?php echo e($lastUpdatedDisplay ?? 'Not available'); ?></dd>
+                <?php if($paymentNote): ?>
                 <dt>Payment note</dt>
-                <dd>{{ $paymentNote }}</dd>
-                @endif
+                <dd><?php echo e($paymentNote); ?></dd>
+                <?php endif; ?>
             </dl>
         </article>
 
         <article class="payment-info-card">
             <h2 class="payment-info-card__title">Payment summary</h2>
             <div class="payment-info-card__text">
-                @if($balanceDue > 0)
-                    <p>This order has an outstanding balance of <strong>{{ $formatCurrencyAmount($balanceDue) }}</strong>.</p>
-                    @if($currentPaymentStatus === 'pending')
+                <?php if($balanceDue > 0): ?>
+                    <p>This order has an outstanding balance of <strong><?php echo e($formatCurrencyAmount($balanceDue)); ?></strong>.</p>
+                    <?php if($currentPaymentStatus === 'pending'): ?>
                         <p>Payment is still pending. Update the status once payment is confirmed.</p>
-                    @endif
-                @else
+                    <?php endif; ?>
+                <?php else: ?>
                     <p>This order is fully paid. All amounts have been received.</p>
-                @endif
+                <?php endif; ?>
 
-                @if($paymentCount > 0)
-                    <p><strong>{{ $paymentCount }}</strong> payment transaction{{ $paymentCount > 1 ? 's' : '' }} recorded.</p>
-                @else
+                <?php if($paymentCount > 0): ?>
+                    <p><strong><?php echo e($paymentCount); ?></strong> payment transaction<?php echo e($paymentCount > 1 ? 's' : ''); ?> recorded.</p>
+                <?php else: ?>
                     <p>No payment transactions have been recorded yet.</p>
-                @endif
+                <?php endif; ?>
             </div>
         </article>
     </section>
+    <section class="payment-form-card">
+        <div class="payment-info-card__text">
+            <p>Payment details are read-only for staff accounts. Contact an administrator if a payment update is required.</p>
+        </div>
+    </section>
 </main>
-@endsection
+<?php $__env->stopSection(); ?>
 
-@push('scripts')
+<?php $__env->startPush('scripts'); ?>
 <script>
     (function () {
-        const shouldSync = Boolean(@json(session()->has('success')));
+        const shouldSync = Boolean(<?php echo json_encode(session()->has('success'), 15, 512) ?>);
         if (!shouldSync) {
             return;
         }
 
         const payload = {
-            orderId: @json($orderId),
-            orderNumber: @json($orderNumber),
-            paymentStatus: @json($currentPaymentStatus),
-            paymentStatusLabel: @json($currentPaymentStatusLabel),
+            orderId: <?php echo json_encode($orderId, 15, 512) ?>,
+            orderNumber: <?php echo json_encode($orderNumber, 15, 512) ?>,
+            paymentStatus: <?php echo json_encode($currentPaymentStatus, 15, 512) ?>,
+            paymentStatusLabel: <?php echo json_encode($currentPaymentStatusLabel, 15, 512) ?>,
             consumedBy: []
         };
 
@@ -735,4 +710,6 @@
         }
     })();
 </script>
-@endpush
+<?php $__env->stopPush(); ?>
+
+<?php echo $__env->make('layouts.staffapp', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\Users\leanne\xampp\htdocs\InkWise-Web\ink-wise\resources\views/staff/orders/manage-payment.blade.php ENDPATH**/ ?>
