@@ -641,11 +641,8 @@ public function saveCanvas(Request $request, $id)
                         if ($filename) {
                             $previews[$key] = $filename;
                         }
-                    } catch (ValidationException $e) {
-                        Log::warning("Preview image save failed for key {$key}", ['error' => $e->getMessage()]);
                     }
                 }
-            }
             if (!empty($previews)) {
                 $metadata['previews'] = $previews;
                 Log::info('Multiple previews saved', ['previews' => $previews]);
@@ -956,7 +953,21 @@ public function saveCanvas(Request $request, $id)
             }
         }
 
-        // Optional back side support (JSON + preview only)
+        // Optional back side support (JSON + preview)
+        if (!empty($validated['png_back'])) {
+            // Persist back-side PNG to disk in templates/back/png directory
+            $backPngPath = $this->persistDataUrl(
+                $validated['png_back'],
+                'templates/back/png',
+                'png',
+                $template->preview_back,
+                'png_back'
+            );
+            $template->preview_back = $backPngPath;
+            $template->has_back_design = true; // Set flag if back PNG is provided
+            Log::info('Back PNG persisted to disk during saveDesign', ['path' => $backPngPath]);
+        }
+
         if ($template->has_back_design) {
             if (!empty($validated['png_back'])) {
                 $template->preview_back = $this->persistDataUrl(
@@ -1555,6 +1566,7 @@ public function uploadToProduct(Request $request, $id)
     // Upload template (create record in product_uploads table)
     public function uploadTemplate(Request $request, $id)
     {
+        Log::info("Request received: {$request->method()} {$request->path()}");
         $template = Template::findOrFail($id);
 
         $productUploadData = [
@@ -2323,42 +2335,57 @@ public function uploadToProduct(Request $request, $id)
                 return @zlib_decode($payload);
             },
             'inflate_raw' => function ($payload) {
-                if (!function_exists('inflate_init') || !defined('ZLIB_ENCODING_RAW')) {
+                if (!function_exists('inflate_init') || !defined('ZLIB_ENCODING_RAW') || !defined('ZLIB_FINISH')) {
                     return false;
                 }
-                $resource = @inflate_init(ZLIB_ENCODING_RAW);
+                $encoding = constant('ZLIB_ENCODING_RAW');
+                $finish = constant('ZLIB_FINISH');
+                if ($encoding === null || $finish === null) {
+                    return false;
+                }
+                $resource = @inflate_init($encoding);
                 if ($resource === false) {
                     return false;
                 }
-                $result = @inflate_add($resource, $payload, ZLIB_FINISH);
+                $result = @inflate_add($resource, $payload, $finish);
                 if ($result === false || $result === null || $result === '') {
                     return false;
                 }
                 return $result;
             },
             'inflate_zlib' => function ($payload) {
-                if (!function_exists('inflate_init') || !defined('ZLIB_ENCODING_ZLIB')) {
+                if (!function_exists('inflate_init') || !defined('ZLIB_ENCODING_ZLIB') || !defined('ZLIB_FINISH')) {
                     return false;
                 }
-                $resource = @inflate_init(ZLIB_ENCODING_ZLIB);
+                $encoding = constant('ZLIB_ENCODING_ZLIB');
+                $finish = constant('ZLIB_FINISH');
+                if ($encoding === null || $finish === null) {
+                    return false;
+                }
+                $resource = @inflate_init($encoding);
                 if ($resource === false) {
                     return false;
                 }
-                $result = @inflate_add($resource, $payload, ZLIB_FINISH);
+                $result = @inflate_add($resource, $payload, $finish);
                 if ($result === false || $result === null || $result === '') {
                     return false;
                 }
                 return $result;
             },
             'inflate_gzip' => function ($payload) {
-                if (!function_exists('inflate_init') || !defined('ZLIB_ENCODING_GZIP')) {
+                if (!function_exists('inflate_init') || !defined('ZLIB_ENCODING_GZIP') || !defined('ZLIB_FINISH')) {
                     return false;
                 }
-                $resource = @inflate_init(ZLIB_ENCODING_GZIP);
+                $encoding = constant('ZLIB_ENCODING_GZIP');
+                $finish = constant('ZLIB_FINISH');
+                if ($encoding === null || $finish === null) {
+                    return false;
+                }
+                $resource = @inflate_init($encoding);
                 if ($resource === false) {
                     return false;
                 }
-                $result = @inflate_add($resource, $payload, ZLIB_FINISH);
+                $result = @inflate_add($resource, $payload, $finish);
                 if ($result === false || $result === null || $result === '') {
                     return false;
                 }
@@ -2514,11 +2541,71 @@ public function uploadToProduct(Request $request, $id)
     protected function normalizeSvgPayload(string $payload): string
     {
         $trimmed = trim($payload);
+
+        // If a data URL was provided, extract and sanitize content
         if (Str::startsWith($trimmed, 'data:image/svg+xml')) {
-            return $trimmed;
+            // Split header and payload
+            $parts = explode(',', $trimmed, 2);
+            if (count($parts) === 2) {
+                $meta = $parts[0];
+                $body = $parts[1];
+                // If base64 encoded, decode, sanitize, then re-encode
+                if (str_contains($meta, ';base64')) {
+                    $decoded = base64_decode($body, true);
+                    if ($decoded !== false) {
+                        $clean = $this->optimizeSvgMarkup((string) $decoded);
+                        return 'data:image/svg+xml;base64,' . base64_encode($clean);
+                    }
+                } else {
+                    // URL-encoded payload
+                    $decoded = rawurldecode($body);
+                    $clean = $this->optimizeSvgMarkup((string) $decoded);
+                    return 'data:image/svg+xml;base64,' . base64_encode($clean);
+                }
+            }
+            // Fallback: base64 encode the trimmed payload
+            return 'data:image/svg+xml;base64,' . base64_encode($trimmed);
         }
 
-        return 'data:image/svg+xml;base64,' . base64_encode($trimmed);
+        // Plain SVG markup string — sanitize then wrap as base64 data URL
+        $clean = $this->optimizeSvgMarkup($trimmed);
+        return 'data:image/svg+xml;base64,' . base64_encode($clean);
+    }
+
+    /**
+     * Lightweight SVG optimizer that strips metadata, comments, editor-specific attributes,
+     * and minifies whitespace while preserving visual appearance.
+     */
+    protected function optimizeSvgMarkup(string $svg): string
+    {
+        // Remove XML declaration
+        $svg = preg_replace('/<\?xml[^>]*\?>/i', '', $svg);
+
+        // Remove HTML comments
+        $svg = preg_replace('/<!--([\s\S]*?)-->/', '', $svg);
+
+        // Remove <metadata> and <desc> blocks
+        $svg = preg_replace('/<metadata[\s\S]*?<\/metadata>/i', '', $svg);
+        $svg = preg_replace('/<desc[\s\S]*?<\/desc>/i', '', $svg);
+
+        // Remove common editor-specific attributes and namespaces (Inkscape, sodipodi, etc.)
+        $svg = preg_replace('/\s+(inkscape|sodipodi|rdf|dc|cc):[a-zA-Z0-9-_]+="[^"]*"/i', '', $svg);
+        $svg = preg_replace('/\s+xmlns:(inkscape|sodipodi|cc|dc|rdf)="[^"]*"/i', '', $svg);
+
+        // Remove empty id attributes
+        $svg = preg_replace('/\s+id=""/i', '', $svg);
+
+        // Collapse multiple whitespace characters between tags
+        $svg = preg_replace('/>\s+</', '><', $svg);
+
+        // Trim and remove redundant spaces
+        $svg = trim($svg);
+        $svg = preg_replace('/\s{2,}/', ' ', $svg);
+
+        // Basic path data cleanup: remove spaces before/after commas
+        $svg = preg_replace('/\s*,\s*/', ',', $svg);
+
+        return $svg;
     }
 
     protected function decodeDataUrl(string $dataUrl): string

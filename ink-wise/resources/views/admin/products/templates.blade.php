@@ -129,7 +129,9 @@
                 @else
                     <div class="templates-empty">
                         <p>No {{ $showOnlyType }} templates available yet. Create a new template to get started.</p>
-                        <button type="button" class="btn-secondary" onclick="Navigation.showPage(1)">Create Custom {{ ucfirst($showOnlyType) }}</button>
+                        @if(strtolower($showOnlyType) !== 'invitation')
+                            <button type="button" class="btn-secondary" onclick="Navigation.showPage(1)">Create Custom {{ ucfirst($showOnlyType) }}</button>
+                        @endif
                     </div>
                 @endif
             </section>

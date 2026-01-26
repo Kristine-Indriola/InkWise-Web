@@ -97,6 +97,7 @@ class AdminController extends Controller
         $materialAlerts = $this->buildMaterialAlerts($materials);
         $dashboardAnnouncements = $this->resolveDashboardAnnouncements();
         $customerReviewSnapshot = $this->buildCustomerReviewSnapshot();
+        $demandAnalysis = $this->buildDemandAnalysisSection();
 
         return view('admin.dashboard', [
             'materials' => $materials,
@@ -115,6 +116,7 @@ class AdminController extends Controller
             'materialAlerts' => $materialAlerts,
             'dashboardAnnouncements' => $dashboardAnnouncements,
             'customerReviewSnapshot' => $customerReviewSnapshot,
+            'demandAnalysis' => $demandAnalysis,
         ]);
     }
 
@@ -786,7 +788,7 @@ class AdminController extends Controller
             });
 
         return $orderActivities
-            ->merge($inventoryActivities)
+            ->concat($inventoryActivities)
             ->sortByDesc('timestamp')
             ->values()
             ->take(12)
@@ -1271,5 +1273,118 @@ class AdminController extends Controller
         return view('admin.notifications.index', compact('notifications'));
     }
 
+    private function buildDemandAnalysisSection(): array
+    {
+        // Get last 6 months of stock movements for demand analysis
+        $sixMonthsAgo = Carbon::now()->subMonths(6)->startOfMonth();
+
+        $monthlyUsage = StockMovement::query()
+            ->where('created_at', '>=', $sixMonthsAgo)
+            ->whereIn('movement_type', ['usage', 'used', 'issued', 'sold'])
+            ->selectRaw('
+                DATE_FORMAT(created_at, "%Y-%m") as month,
+                SUM(ABS(quantity)) as total_usage
+            ')
+            ->groupBy('month')
+            ->orderBy('month')
+            ->pluck('total_usage', 'month')
+            ->toArray();
+
+        // Generate labels for last 6 months
+        $labels = [];
+        $actualUsage = [];
+        $predictedDemand = [];
+
+        for ($i = 5; $i >= 0; $i--) {
+            $date = Carbon::now()->subMonths($i);
+            $monthKey = $date->format('Y-m');
+            $monthLabel = $date->format('M');
+
+            $labels[] = $monthLabel;
+            $usage = (int) ($monthlyUsage[$monthKey] ?? 0);
+            $actualUsage[] = $usage;
+
+            // Simple prediction: average of last 3 months + trend
+            if ($i >= 3) {
+                $recentUsage = array_slice($actualUsage, -3);
+                $avg = count($recentUsage) > 0 ? array_sum($recentUsage) / count($recentUsage) : 0;
+                // Add slight upward trend for prediction
+                $predictedDemand[] = (int) ($avg * 1.05);
+            } else {
+                $predictedDemand[] = $usage;
+            }
+        }
+
+        $demandTrendsChart = [
+            'labels' => $labels,
+            'datasets' => [
+                [
+                    'label' => 'Material Usage',
+                    'data' => $actualUsage,
+                    'borderColor' => '#6a2ebc',
+                    'backgroundColor' => 'rgba(106, 46, 188, 0.1)',
+                    'tension' => 0.4,
+                    'fill' => true,
+                ],
+                [
+                    'label' => 'Predicted Demand',
+                    'data' => $predictedDemand,
+                    'borderColor' => '#3cd5c8',
+                    'backgroundColor' => 'rgba(60, 213, 200, 0.1)',
+                    'borderDash' => [5, 5],
+                    'tension' => 0.4,
+                    'fill' => false,
+                ]
+            ]
+        ];
+
+        // Calculate demand insights
+        $totalUsage = array_sum($actualUsage);
+        $avgUsage = count($actualUsage) > 0 ? $totalUsage / count($actualUsage) : 0;
+        $maxUsage = !empty($actualUsage) ? max($actualUsage) : 0;
+        $minUsage = !empty($actualUsage) ? min($actualUsage) : 0;
+
+        $peakMonthIndex = array_search($maxUsage, $actualUsage);
+        $lowMonthIndex = array_search($minUsage, $actualUsage);
+
+        $trend = 'stable';
+        $trendPercent = 0;
+
+        if (count($actualUsage) >= 2) {
+            $firstHalf = array_slice($actualUsage, 0, 3);
+            $secondHalf = array_slice($actualUsage, -3);
+
+            $firstAvg = count($firstHalf) > 0 ? array_sum($firstHalf) / count($firstHalf) : 0;
+            $secondAvg = count($secondHalf) > 0 ? array_sum($secondHalf) / count($secondHalf) : 0;
+
+            if ($firstAvg > 0) {
+                $trendPercent = (($secondAvg - $firstAvg) / $firstAvg) * 100;
+                if ($trendPercent > 5) {
+                    $trend = 'increasing';
+                } elseif ($trendPercent < -5) {
+                    $trend = 'decreasing';
+                }
+            }
+        }
+
+        $demandInsights = [
+            'peakPeriod' => [
+                'period' => isset($labels[$peakMonthIndex]) ? $labels[$peakMonthIndex] : 'N/A',
+                'usage' => $maxUsage
+            ],
+            'lowPeriod' => [
+                'period' => isset($labels[$lowMonthIndex]) ? $labels[$lowMonthIndex] : 'N/A',
+                'usage' => $minUsage
+            ],
+            'recommendedReorder' => (int) ($avgUsage * 1.2), // 20% buffer above average
+            'trend' => $trend,
+            'trendPercent' => abs($trendPercent)
+        ];
+
+        return [
+            'demandTrendsChart' => $demandTrendsChart,
+            'demandInsights' => $demandInsights,
+        ];
+    }
     
 }

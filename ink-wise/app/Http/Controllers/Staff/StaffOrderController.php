@@ -31,7 +31,7 @@ class StaffOrderController extends Controller
                 // Exclude orders with pending or unset payment status
                 $q->whereNotNull('payment_status')->where('payment_status', '<>', 'pending');
             })
-            ->with(['customer'])
+            ->with(['customer', 'items'])
             ->latest('order_date')
             ->latest();
         // Apply date filters to the ordersQuery if provided (use COALESCE(order_date, created_at))
@@ -172,7 +172,7 @@ class StaffOrderController extends Controller
         }
 
         // Load relationships as needed (lazy loading like admin)
-        $order->loadMissing(['customerOrder.customer', 'items.product', 'payments', 'rating']);
+        $order->loadMissing(['customerOrder.customer', 'customer', 'items.product', 'payments', 'rating']);
 
         $statusOptions = $this->statusOptions();
         $statusFlow = $this->statusFlow();
@@ -308,7 +308,7 @@ class StaffOrderController extends Controller
         $ordersQuery = Order::query()
             ->select(['id', 'order_number', 'customer_order_id', 'customer_id', 'total_amount', 'order_date', 'status', 'payment_status', 'created_at'])
             ->where('archived', true)
-            ->with(['customer', 'activities' => function ($query) {
+            ->with(['customer', 'items', 'activities' => function ($query) {
                 $query->latest()->limit(1); // Get the most recent activity
             }])
             ->latest('order_date')
@@ -388,7 +388,7 @@ class StaffOrderController extends Controller
 
     public function editPayment(Order $order)
     {
-        $order->loadMissing(['payments', 'payments.recordedBy', 'rating']);
+        $order->loadMissing(['payments', 'payments.recordedBy', 'rating', 'customer', 'customerOrder.customer']);
 
         $paymentStatusOptions = $this->paymentStatusOptions();
         $metadata = $this->normalizeMetadata($order->metadata);
@@ -499,8 +499,7 @@ class StaffOrderController extends Controller
     protected function calculateItemsCount(Order $order): int
     {
         if ($order->relationLoaded('items') && $order->items) {
-            $quantity = (int) $order->items->sum('quantity');
-            return $quantity > 0 ? $quantity : $order->items->count();
+            return $order->items->count();
         }
 
         return (int) ($order->items_count ?? 0);

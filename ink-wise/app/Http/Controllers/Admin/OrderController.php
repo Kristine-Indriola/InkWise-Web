@@ -23,7 +23,7 @@ class OrderController extends Controller
                 ->with('error', 'Cannot modify status of completed orders.');
         }
 
-        $order->loadMissing('rating');
+        $order->loadMissing('rating', 'customer', 'customerOrder.customer');
 
         $statusOptions = $this->statusOptions();
         $statusFlow = ['draft', 'pending', 'pending_awaiting_materials', 'processing', 'in_production', 'confirmed', 'completed'];
@@ -143,7 +143,7 @@ class OrderController extends Controller
 
     public function editPayment(Order $order)
     {
-        $order->loadMissing(['payments', 'payments.recordedBy', 'rating']);
+        $order->loadMissing(['payments', 'payments.recordedBy', 'rating', 'customer', 'customerOrder.customer']);
 
         $paymentStatusOptions = $this->paymentStatusOptions();
         $metadata = $this->normalizeMetadata($order->metadata);

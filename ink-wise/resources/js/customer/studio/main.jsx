@@ -517,8 +517,10 @@ function mountReactApp() {
       return;
     }
 
-    const root = createRoot(rootElement);
-    root.render(
+    if (!rootElement.__inkwiseRoot) {
+      rootElement.__inkwiseRoot = createRoot(rootElement);
+    }
+    rootElement.__inkwiseRoot.render(
       <React.StrictMode>
         <CustomerStudioApp />
       </React.StrictMode>,

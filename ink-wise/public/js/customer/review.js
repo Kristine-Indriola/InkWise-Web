@@ -5,9 +5,215 @@ document.addEventListener('DOMContentLoaded', () => {
   const frontBtn = document.querySelector('[data-face="front"]');
   const backBtn = document.querySelector('[data-face="back"]');
   const cardFaces = {
-    front: flipContainer?.querySelector('.card-face.front img') || null,
-    back: flipContainer?.querySelector('.card-face.back img') || null
+    front: flipContainer?.querySelector('.card-face.front img') || flipContainer?.querySelector('.card-face.front .svg-container') || null,
+    back: flipContainer?.querySelector('.card-face.back img') || flipContainer?.querySelector('.card-face.back .svg-container') || null
   };
+
+  // Upload controls
+  const uploadButton = document.getElementById('upload-button');
+  const uploadFileInput = document.getElementById('review-image-upload');
+  const uploadSideFrontBtn = document.getElementById('upload-side-front');
+  const uploadSideBackBtn = document.getElementById('upload-side-back');
+  const uploadSideLabel = document.getElementById('upload-side-label');
+  let uploadTarget = 'front';
+
+  const updateUploadLabel = (side) => {
+    const text = (side || 'front').charAt(0).toUpperCase() + (side || 'front').slice(1);
+    if (uploadSideLabel) uploadSideLabel.textContent = text;
+    if (uploadButton) uploadButton.setAttribute('aria-label', `Upload image for: ${text}`);
+  };
+
+  const setUploadTarget = (side) => {
+    uploadTarget = side || 'front';
+    if (uploadSideFrontBtn) uploadSideFrontBtn.classList.toggle('active', uploadTarget === 'front');
+    if (uploadSideBackBtn) uploadSideBackBtn.classList.toggle('active', uploadTarget === 'back');
+    if (uploadSideFrontBtn) uploadSideFrontBtn.setAttribute('aria-pressed', String(uploadTarget === 'front'));
+    if (uploadSideBackBtn) uploadSideBackBtn.setAttribute('aria-pressed', String(uploadTarget === 'back'));
+    updateUploadLabel(uploadTarget);
+  };
+
+  if (uploadSideFrontBtn) uploadSideFrontBtn.addEventListener('click', () => setUploadTarget('front'));
+  if (uploadSideBackBtn) uploadSideBackBtn.addEventListener('click', () => setUploadTarget('back'));
+
+  if (uploadButton) uploadButton.addEventListener('click', () => uploadFileInput && uploadFileInput.click());
+
+  const isSvgString = (text) => typeof text === 'string' && /<svg[\s>]/i.test(text.trim());
+
+  const updateSummaryImage = (side, dataUrl) => {
+    try {
+      if (!window.summaryData) window.summaryData = {};
+      if (!Array.isArray(window.summaryData.previewImages)) window.summaryData.previewImages = [];
+      if (side === 'front') {
+        window.summaryData.previewImage = dataUrl;
+        window.summaryData.previewImages[0] = dataUrl;
+      } else {
+        window.summaryData.previewImages[1] = dataUrl;
+      }
+      try { window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(window.summaryData)); } catch (e) {}
+    } catch (e) {}
+  };
+
+  const setFrontSvgMarkup = (svgText) => {
+    const frontFace = document.querySelector('.card-face.front');
+    if (!frontFace) return;
+    const svgContainer = frontFace.querySelector('.svg-container');
+    if (svgContainer) {
+      svgContainer.innerHTML = svgText;
+    } else {
+      // Replace existing img with svg container
+      const img = frontFace.querySelector('img');
+      const container = document.createElement('div');
+      container.className = 'svg-container';
+      container.style.width = '100%';
+      container.style.height = '100%';
+      container.style.pointerEvents = 'none';
+      container.innerHTML = svgText;
+      if (img) img.replaceWith(container); else frontFace.appendChild(container);
+    }
+  };
+
+  const uploadFileToServer = async (file, side) => {
+    if (!file) return null;
+    const fd = new FormData();
+    fd.append('image', file);
+    fd.append('side', side);
+
+    try {
+      const res = await fetch("/order/review/upload-image", {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'X-CSRF-TOKEN': csrfToken || '',
+          'Accept': 'application/json',
+        },
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || 'Upload failed');
+      return data;
+    } catch (err) {
+      showToast(err?.message || 'Upload to server failed');
+      return null;
+    }
+  };
+
+  const uploadSvgToServer = async (svgText, side) => {
+    if (!svgText) return null;
+    try {
+      const res = await fetch("/order/review/upload-image", {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': csrfToken || '',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ svg: svgText, side }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || 'Upload failed');
+      return data;
+    } catch (err) {
+      showToast(err?.message || 'Upload to server failed');
+      return null;
+    }
+  };
+
+  uploadFileInput?.addEventListener('change', async (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+
+    if (file.type === 'image/svg+xml' || (file.name && file.name.toLowerCase().endsWith('.svg'))) {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const svgText = e.target.result;
+        if (!svgText) return;
+
+        // Persist the SVG to server
+        const serverResult = await uploadSvgToServer(svgText, uploadTarget);
+
+        // embed SVG for chosen side
+        if (uploadTarget === 'front') {
+          setFrontSvgMarkup(svgText);
+          const dataUrl = serverResult?.url || ('data:image/svg+xml;base64,' + window.btoa(unescape(encodeURIComponent(svgText))));
+          updateSummaryImage('front', dataUrl);
+        } else {
+          const backFace = document.querySelector('.card-face.back');
+          if (!backFace) return;
+          const svgContainer = backFace.querySelector('.svg-container');
+          if (svgContainer) {
+            svgContainer.innerHTML = svgText;
+          } else {
+            const container = document.createElement('div');
+            container.className = 'svg-container';
+            container.style.width = '100%';
+            container.style.height = '100%';
+            container.style.pointerEvents = 'none';
+            container.innerHTML = svgText;
+            const img = backFace.querySelector('img');
+            if (img) img.replaceWith(container); else backFace.appendChild(container);
+          }
+          const dataUrl = serverResult?.url || ('data:image/svg+xml;base64,' + window.btoa(unescape(encodeURIComponent(svgText))));
+          updateSummaryImage('back', dataUrl);
+        }
+
+        // Switch preview to that side so user sees result
+        setActiveFace(uploadTarget);
+        showToast(serverResult ? 'Uploaded and embedded SVG successfully (saved)' : 'Uploaded and embedded SVG successfully', 3000);
+      };
+      reader.readAsText(file);
+      return;
+    }
+
+    // Raster images
+    // First persist to server so server-stored URL is used when possible
+    const serverResult = await uploadFileToServer(file, uploadTarget);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target.result;
+      if (!dataUrl) return;
+
+      const face = document.querySelector(`.card-face.${uploadTarget}`);
+      if (!face) return;
+
+      const svgContainer = face.querySelector('.svg-container');
+      const setImageSrc = (src) => {
+        if (svgContainer) {
+          // Replace svg container with an img
+          const img = document.createElement('img');
+          img.src = src;
+          img.alt = `${uploadTarget.charAt(0).toUpperCase() + uploadTarget.slice(1)} of your design`;
+          img.loading = 'lazy';
+          img.decoding = 'async';
+          svgContainer.replaceWith(img);
+        } else {
+          const img = face.querySelector('img');
+          if (img) {
+            img.src = src;
+          } else {
+            const newImg = document.createElement('img');
+            newImg.src = src;
+            newImg.alt = `${uploadTarget.charAt(0).toUpperCase() + uploadTarget.slice(1)} of your design`;
+            newImg.loading = 'lazy';
+            newImg.decoding = 'async';
+            face.appendChild(newImg);
+          }
+        }
+      };
+
+      // Prefer server URL if we got one
+      const preferredUrl = serverResult?.url || dataUrl;
+      setImageSrc(preferredUrl);
+
+      updateSummaryImage(uploadTarget, preferredUrl);
+
+      // Switch preview to that side so user sees result
+      setActiveFace(uploadTarget);
+      showToast(serverResult ? 'Uploaded image applied and saved' : 'Uploaded image applied', 2500);
+    };
+    reader.readAsDataURL(file);
+  });
   const approvalCheckbox = document.getElementById('approvalCheckbox');
   const continueBtn = document.getElementById('continueBtn');
   const unresolvedPlaceholders = document.querySelectorAll('.placeholder-list li');

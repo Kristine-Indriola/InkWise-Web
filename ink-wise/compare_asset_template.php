@@ -46,7 +46,7 @@ if ($template && Storage::disk('public')->exists($assetPath)) {
 
     if ($generatedSvg) {
         echo "SVG generated successfully from asset data!\n";
-        $testPath = 'templates/svg/test_asset_generated.svg';
+        $testPath = 'templates/front/svg/test_asset_generated.svg';
         Storage::disk('public')->put($testPath, base64_decode(str_replace('data:image/svg+xml;base64,', '', $generatedSvg)));
         echo "Saved to: storage/app/public/{$testPath}\n";
     } else {

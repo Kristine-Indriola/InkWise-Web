@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class OrderFlowService
@@ -320,7 +321,7 @@ class OrderFlowService
         $userId = $user?->getAuthIdentifier();
         $customerId = $user?->customer?->customer_id;
         
-        \Log::debug('loadCustomerReview called', [
+        Log::debug('loadCustomerReview called', [
             'templateId' => $templateId,
             'userId' => $userId,
             'customerId' => $customerId,
@@ -350,7 +351,7 @@ class OrderFlowService
 
         $result = $query->latest('updated_at')->first();
         
-        \Log::debug('loadCustomerReview result', [
+        Log::debug('loadCustomerReview result', [
             'found' => $result ? 'YES' : 'NO',
             'result_id' => $result?->id,
             'result_template_id' => $result?->template_id,
@@ -1436,6 +1437,22 @@ class OrderFlowService
 
     public function buildSummarySnapshot(Order $order, OrderItem $item): array
     {
+        $metadata = $order->metadata ?? [];
+        $omitBasePrice = Arr::get($metadata, 'final_step.metadata.omit_base_price', false);
+
+        $pricing = [
+            'unit_price' => $item->unit_price,
+            'subtotal' => $order->subtotal_amount,
+            'tax' => $order->tax_amount,
+            'shipping' => $order->shipping_fee,
+            'total' => $order->total_amount,
+        ];
+
+        if ($omitBasePrice) {
+            // When omit_base_price is true, the order total is already calculated correctly
+            // Don't override with payment_amount, which is for the current payment transaction
+        }
+
         return [
             'order_number' => $order->order_number,
             'status' => $order->status,
@@ -1444,13 +1461,7 @@ class OrderFlowService
                 'name' => $item->product_name,
                 'quantity' => $item->quantity,
             ],
-            'pricing' => [
-                'unit_price' => $item->unit_price,
-                'subtotal' => $order->subtotal_amount,
-                'tax' => $order->tax_amount,
-                'shipping' => $order->shipping_fee,
-                'total' => $order->total_amount,
-            ],
+            'pricing' => $pricing,
             'created_at' => $order->created_at?->toIso8601String(),
         ];
     }
@@ -1878,6 +1889,7 @@ class OrderFlowService
             'id' => $payload['envelope_id'] ?? $envelopeMeta['id'] ?? null,
             'product_id' => $payload['product_id'] ?? $resolvedEnvelope?->product_id,
             'name' => $envelopeMeta['name'] ?? null,
+            'unit_price' => $unitPrice,
             'price' => $unitPrice,
             'qty' => $quantity,
             'total' => (float) $total,
@@ -1890,7 +1902,28 @@ class OrderFlowService
             'updated_at' => now()->toIso8601String(),
         ], fn ($value) => $value !== null && $value !== '');
 
-        $meta['envelope'] = $envelopeMeta;
+        // Support multiple envelope selections; keep legacy single "envelope" for backward compatibility
+        $envelopes = $meta['envelopes'] ?? [];
+        if (empty($envelopes) && !empty($meta['envelope'])) {
+            $envelopes[] = $meta['envelope'];
+        }
+
+        // Replace existing entry by id or append
+        $existingIndex = null;
+        foreach ($envelopes as $idx => $envelopeRow) {
+            if (($envelopeRow['id'] ?? null) === ($envelopeMeta['id'] ?? null)) {
+                $existingIndex = $idx;
+                break;
+            }
+        }
+        if ($existingIndex !== null) {
+            $envelopes[$existingIndex] = $envelopeMeta;
+        } else {
+            $envelopes[] = $envelopeMeta;
+        }
+
+        $meta['envelopes'] = array_values($envelopes);
+        $meta['envelope'] = $meta['envelopes'][0] ?? $envelopeMeta; // legacy consumers
         $order->update(['metadata' => $meta]);
 
         $this->upsertEnvelopeOrderItem($order, $envelopeMeta);
@@ -2009,7 +2042,7 @@ class OrderFlowService
     public function clearEnvelopeSelection(Order $order): Order
     {
         $meta = $order->metadata ?? [];
-        unset($meta['envelope']);
+        unset($meta['envelope'], $meta['envelopes']);
 
         $order->update(['metadata' => $meta]);
 
@@ -2266,45 +2299,48 @@ class OrderFlowService
         foreach ($order->items as $item) {
             $productMaterialUsageFound = false;
             if ($item->product_id) {
-                $productMaterials = ProductMaterial::query()
-                    ->with(['material.inventory'])
-                    ->where('product_id', $item->product_id)
-                    ->whereNull('order_id')
-                    ->get();
+                // Skip ProductMaterial processing for invitations - they should only use selected paper stock
+                if ($item->line_type !== OrderItem::LINE_TYPE_INVITATION) {
+                    $productMaterials = ProductMaterial::query()
+                        ->with(['material.inventory'])
+                        ->where('product_id', $item->product_id)
+                        ->whereNull('order_id')
+                        ->get();
 
-                foreach ($productMaterials as $productMaterial) {
-                    $perUnitQty = (float) ($productMaterial->qty ?? 0);
-                    if ($perUnitQty <= 0) {
-                        continue;
+                    foreach ($productMaterials as $productMaterial) {
+                        $perUnitQty = (float) ($productMaterial->qty ?? 0);
+                        if ($perUnitQty <= 0) {
+                            continue;
+                        }
+
+                        $linkedMaterial = $productMaterial->material;
+
+                        if (!$linkedMaterial && $productMaterial->material_id) {
+                            $linkedMaterial = $materialCache[$productMaterial->material_id] ??=
+                                Material::query()->with('inventory')->find($productMaterial->material_id);
+                        }
+
+                        if (!$linkedMaterial && $productMaterial->item) {
+                            $linkedMaterial = $resolveMaterialByName($productMaterial->item);
+                        }
+
+                        if (!$linkedMaterial) {
+                            continue;
+                        }
+
+                        $accumulateMaterial($item, $linkedMaterial, $perUnitQty, [
+                            'product_material_id' => $productMaterial->id,
+                            'source' => 'product_material',
+                            'quantity_mode' => match ($productMaterial->quantity_mode) {
+                                'per_order' => 'per_order',
+                                default => 'per_unit',
+                            },
+                            'item' => $productMaterial->item,
+                            'type' => $productMaterial->type,
+                        ]);
+
+                        $productMaterialUsageFound = true;
                     }
-
-                    $linkedMaterial = $productMaterial->material;
-
-                    if (!$linkedMaterial && $productMaterial->material_id) {
-                        $linkedMaterial = $materialCache[$productMaterial->material_id] ??=
-                            Material::query()->with('inventory')->find($productMaterial->material_id);
-                    }
-
-                    if (!$linkedMaterial && $productMaterial->item) {
-                        $linkedMaterial = $resolveMaterialByName($productMaterial->item);
-                    }
-
-                    if (!$linkedMaterial) {
-                        continue;
-                    }
-
-                    $accumulateMaterial($item, $linkedMaterial, $perUnitQty, [
-                        'product_material_id' => $productMaterial->id,
-                        'source' => 'product_material',
-                        'quantity_mode' => match ($productMaterial->quantity_mode) {
-                            'per_order' => 'per_order',
-                            default => 'per_unit',
-                        },
-                        'item' => $productMaterial->item,
-                        'type' => $productMaterial->type,
-                    ]);
-
-                    $productMaterialUsageFound = true;
                 }
             }
 
@@ -2420,10 +2456,25 @@ class OrderFlowService
                     }
 
                     if ($paperMaterial) {
-                        $accumulateMaterial($item, $paperMaterial, 1.0, [
-                        'paper_stock_id' => $paperStock->id,
-                        'source' => 'paper_stock',
-                    ]);
+                        // Check if this material has already been processed through ProductMaterial records
+                        // to avoid double counting when fallback paper stock matches existing product materials
+                        // Skip this check for invitations since they don't use ProductMaterial records
+                        $materialAlreadyProcessed = false;
+                        if ($item->line_type !== OrderItem::LINE_TYPE_INVITATION && $item->product_id) {
+                            $existingProductMaterials = ProductMaterial::query()
+                                ->where('product_id', $item->product_id)
+                                ->whereNull('order_id')
+                                ->where('material_id', $paperMaterial->getKey())
+                                ->exists();
+                            $materialAlreadyProcessed = $existingProductMaterials;
+                        }
+
+                        if (!$materialAlreadyProcessed) {
+                            $accumulateMaterial($item, $paperMaterial, 1.0, [
+                                'paper_stock_id' => $paperStock->id,
+                                'source' => 'paper_stock',
+                            ]);
+                        }
                     }
                 }
             }
@@ -3210,42 +3261,99 @@ class OrderFlowService
     public function recalculateOrderTotals(Order $order): void
     {
         // Always reload items to ensure we have the latest quantities
-        $order->load(['items.addons', 'items.paperStockSelection']);
+        $order->load(['items.addons', 'items.paperStockSelection', 'items.product.paperStocks']);
 
         $invitationItem = $this->primaryInvitationItem($order);
         if (!$invitationItem) {
             return;
         }
 
-        // Exclude base price of invitation
-        $baseSubtotal = 0; // (float) $invitationItem->unit_price * $invitationItem->quantity;
+        // Check if base price should be omitted
+        $metadata = $order->metadata ?? [];
+        $omitBasePrice = Arr::get($metadata, 'final_step.metadata.omit_base_price', false);
+        
+        // For invitation items, always omit the base price
+        if ($invitationItem->line_type === 'invitation') {
+            $omitBasePrice = true;
+        }
 
-        // paperStockSelection->price is stored as a per-unit price; multiply by quantity
-        $paperPerUnit = (float) ($invitationItem->paperStockSelection?->price ?? 0);
-        $paperTotal = round($paperPerUnit * $invitationItem->quantity, 2);
+        if ($omitBasePrice) {
+            // When base price is omitted, calculate total as paper price * quantity + envelopes + giveaways
+            $paperPerUnit = (float) ($invitationItem->paperStockSelection?->price ?? 0);
+            if ($paperPerUnit <= 0) {
+                // Use the lowest priced paper stock as default for invitations
+                $defaultPaperStock = $invitationItem->product?->paperStocks?->sortBy('price')->first();
+                $paperPerUnit = $defaultPaperStock ? (float) $defaultPaperStock->price : 0;
+            }
+            $paperTotal = round($paperPerUnit * $invitationItem->quantity, 2);
 
-        $addonsTotal = (float) ($invitationItem->addons?->sum(fn($addon) => $addon->addon_price * $invitationItem->quantity) ?? 0);
-
-        $inkTotal = 0.0; // TODO: calculate ink costs if applicable
-
-        $extrasTotal = round($paperTotal + $addonsTotal + $inkTotal, 2);
-
-        $additionalLineItemsTotal = $order->items
-            ->reject(fn ($item) => $item->is($invitationItem))
-            ->sum(function (OrderItem $item) {
-                $subtotal = $item->subtotal;
-
-                if ($subtotal === null) {
-                    $subtotal = $item->unit_price * $item->quantity;
+            // Calculate envelope total from metadata
+            $envelopeTotal = 0.0;
+            $envelopes = Arr::get($metadata, 'envelopes', []);
+            if (empty($envelopes) && !empty(Arr::get($metadata, 'envelope'))) {
+                $envelopes = [Arr::get($metadata, 'envelope')];
+            }
+            foreach ($envelopes as $envelope) {
+                if (!empty($envelope) && is_array($envelope)) {
+                    $envQty = max(1, (int) ($envelope['qty'] ?? $envelope['quantity'] ?? 1));
+                    $envPrice = (float) ($envelope['price'] ?? $envelope['unit_price'] ?? 0);
+                    $envelopeTotal += round($envPrice * $envQty, 2);
                 }
+            }
 
-                return (float) $subtotal;
-            });
+            // Calculate giveaway total from metadata
+            $giveawayTotal = 0.0;
+            $giveaways = Arr::get($metadata, 'giveaways', []);
+            if (empty($giveaways) && !empty(Arr::get($metadata, 'giveaway'))) {
+                $giveaways = [Arr::get($metadata, 'giveaway')];
+            }
+            foreach ($giveaways as $giveaway) {
+                if (!empty($giveaway) && is_array($giveaway)) {
+                    $giveQty = max(1, (int) ($giveaway['qty'] ?? $giveaway['quantity'] ?? 1));
+                    $givePrice = (float) ($giveaway['price'] ?? $giveaway['unit_price'] ?? 0);
+                    $giveawayTotal += round($givePrice * $giveQty, 2);
+                }
+            }
 
-        $subtotal = round($extrasTotal + $additionalLineItemsTotal, 2);
-        $tax = 0.0;
-        $shipping = 0.0;
-        $total = round($subtotal, 2);
+            $subtotal = round($paperTotal + $envelopeTotal + $giveawayTotal, 2);
+            $tax = 0.0;
+            $shipping = 0.0;
+            $total = $subtotal;
+        } else {
+            // Include base price of the invitation in the subtotal so the order total reflects
+            // the product's unit price plus any extras (paper, addons, etc.). Previously this
+            // was set to 0 which caused orders with only the base product to end up with a
+            // zero total amount.
+            $baseSubtotal = round((float) ($invitationItem->unit_price ?? 0) * (int) $invitationItem->quantity, 2);
+
+            // paperStockSelection->price is stored as a per-unit price; multiply by quantity
+            $paperPerUnit = (float) ($invitationItem->paperStockSelection?->price ?? 0);
+            $paperTotal = round($paperPerUnit * $invitationItem->quantity, 2);
+
+            $addonsTotal = (float) ($invitationItem->addons?->sum(fn($addon) => $addon->addon_price * $invitationItem->quantity) ?? 0);
+
+            $inkTotal = 0.0; // TODO: calculate ink costs if applicable
+
+            $extrasTotal = round($paperTotal + $addonsTotal + $inkTotal, 2);
+
+            $additionalLineItemsTotal = $order->items
+                ->reject(fn ($item) => $item->is($invitationItem))
+                ->sum(function (OrderItem $item) {
+                    $subtotal = $item->subtotal;
+
+                    if ($subtotal === null) {
+                        $subtotal = $item->unit_price * $item->quantity;
+                    }
+
+                    return (float) $subtotal;
+                });
+
+            // Include baseSubtotal so subtotal reflects base product + extras + other line items
+            $subtotal = round($baseSubtotal + $extrasTotal + $additionalLineItemsTotal, 2);
+            $tax = 0.0;
+            $shipping = 0.0;
+            $total = round($subtotal, 2);
+        }
 
         $order->update([
             'subtotal_amount' => $subtotal,
@@ -3257,17 +3365,42 @@ class OrderFlowService
 
     public function buildSummary(Order $order): array
     {
-        $order->loadMissing(['items.addons', 'items.paperStockSelection']);
+        $order->loadMissing(['items.addons', 'items.paperStockSelection', 'items.product.paperStocks']);
 
         $invitationItem = $this->primaryInvitationItem($order);
         if (!$invitationItem) {
             return [];
         }
 
+        // For invitations, use paper stock price as unit price
+        $unitPrice = $invitationItem->unit_price;
+        $paperStockId = $invitationItem->paperStockSelection?->paper_stock_id;
+        $paperStockName = $invitationItem->paperStockSelection?->paper_stock_name;
+        $paperStockPrice = $invitationItem->paperStockSelection?->price;
+
+        if ($invitationItem->line_type === 'invitation') {
+            if ($invitationItem->paperStockSelection && $paperStockPrice) {
+                $unitPrice = $paperStockPrice;
+            } else {
+                // Use the lowest priced paper stock as default for invitations
+                $defaultPaperStock = $invitationItem->product?->paperStocks?->sortBy('price')->first();
+                if ($defaultPaperStock) {
+                    $unitPrice = $defaultPaperStock->price;
+                    $paperStockId = $defaultPaperStock->id;
+                    $paperStockName = $defaultPaperStock->name;
+                    $paperStockPrice = $defaultPaperStock->price;
+                }
+            }
+        }
+
         $summary = [
+            'productId' => $invitationItem->product_id,
+            'productName' => $invitationItem->product_name ?? $invitationItem->product?->name,
             'quantity' => $invitationItem->quantity,
-            'unitPrice' => $invitationItem->unit_price,
-            'paperStockId' => $invitationItem->paperStockSelection?->paper_stock_id,
+            'unitPrice' => $unitPrice,
+            'paperStockId' => $paperStockId,
+            'paperStockName' => $paperStockName,
+            'paperStockPrice' => $paperStockPrice,
             'addonIds' => $invitationItem->addons?->pluck('size_id')->toArray() ?? [],
             'metadata' => $order->metadata ?? [],
             'subtotalAmount' => $order->subtotal_amount,
@@ -3275,6 +3408,29 @@ class OrderFlowService
             'taxAmount' => $order->tax_amount,
             'shippingFee' => 0.0,
         ];
+
+        // Extract envelopes from metadata
+        $metadata = $order->metadata ?? [];
+        $summary['envelopes'] = [];
+        if (!empty($metadata['envelopes']) && is_array($metadata['envelopes'])) {
+            $summary['envelopes'] = $metadata['envelopes'];
+        } elseif (!empty($metadata['envelope']) && is_array($metadata['envelope'])) {
+            $summary['envelopes'] = [$metadata['envelope']];
+        }
+        $summary['envelope'] = $summary['envelopes'][0] ?? null; // legacy consumers
+
+        // Extract giveaways from metadata (support both plural and legacy single formats)
+        $summary['giveaways'] = [];
+        if (!empty($metadata['giveaways'])) {
+            if (is_array($metadata['giveaways'])) {
+                $summary['giveaways'] = $metadata['giveaways'];
+            } elseif (is_object($metadata['giveaways'])) {
+                $summary['giveaways'] = (array) $metadata['giveaways'];
+            }
+        } elseif (!empty($metadata['giveaway']) && is_array($metadata['giveaway'])) {
+            $summary['giveaways'] = [$metadata['giveaway']];
+        }
+        $summary['giveaway'] = $summary['giveaways'][0] ?? null; // legacy consumer compatibility
 
         return $summary;
     }
@@ -3976,6 +4132,9 @@ class OrderFlowService
             $product->loadMissing(['paperStocks', 'addons']);
         }
 
+        // Check if base price should be omitted
+        $omitBasePrice = Arr::get($summary, 'metadata.final_step.metadata.omit_base_price', false);
+
         // Determine quantity and unit price defensively so we can compute an
         // invitation total even when the product lookup fails (e.g., session-only
         // summaries or in test environments).
@@ -3986,7 +4145,7 @@ class OrderFlowService
         // If we couldn't resolve the product, return totals based solely on
         // the provided unit/quantity (no paper/addons/envelope/giveaway data).
         if (!$product) {
-            $subtotal = $invitationTotal;
+            $subtotal = $omitBasePrice ? 0 : $invitationTotal;
             $total = round($subtotal + 0.0, 2);
 
             return [
@@ -4004,11 +4163,9 @@ class OrderFlowService
             ];
         }
 
-        // Include base price of the invitation (unit * quantity). Previously this was
-        // omitted which caused server-side totals to undercount the order and made
-        // outstanding balance 0 when only the invitation existed.
+        // Calculate invitation base total (may be omitted based on flag)
         $invitationTotal = round($unitPrice * $quantity, 2);
-        $baseSubtotal = $invitationTotal;
+        $baseSubtotal = $omitBasePrice ? 0 : $invitationTotal;
 
         // Calculate paper stock total
         $paperTotal = 0.0;
@@ -4053,9 +4210,12 @@ class OrderFlowService
             }
         }
 
-        // Include invitation base into subtotal so session/server totals match
-        // what the client expects (unit * qty + extras).
-        $subtotal = round($baseSubtotal + $paperTotal + $addonsTotal + $envelopeTotal + $giveawayTotal, 2);
+        // Include invitation base into subtotal if not omitted, plus extras
+        if ($omitBasePrice) {
+            $subtotal = round($paperTotal + $envelopeTotal + $giveawayTotal, 2);
+        } else {
+            $subtotal = round($baseSubtotal + $paperTotal + $addonsTotal + $envelopeTotal + $giveawayTotal, 2);
+        }
         $tax = 0.0;
         $shipping = 0.0; // Always 0 for shipping
         $total = round($subtotal + $shipping, 2);

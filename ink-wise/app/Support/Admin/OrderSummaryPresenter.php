@@ -21,7 +21,7 @@ class OrderSummaryPresenter
         $order->loadMissing([
             'customerOrder.customer',
             'customer',
-            'items.product',
+            'items.product.paperStocks',
             'items.paperStockSelection',
             'items.addons',
             'items.colors',
@@ -286,18 +286,49 @@ class OrderSummaryPresenter
                     }
                 }
 
+            $unitPrice = static::toFloat($item->unit_price);
+            
+            // For invitation items, use paper stock price as unit price
+            if ($item->line_type === 'invitation') {
+                if ($item->paperStockSelection && $item->paperStockSelection->price) {
+                    $unitPrice = static::toFloat($item->paperStockSelection->price);
+                } else {
+                    // Use the lowest priced paper stock as default for invitations
+                    $defaultPaperStock = $item->product?->paperStocks?->sortBy('price')->first();
+                    if ($defaultPaperStock) {
+                        $unitPrice = static::toFloat($defaultPaperStock->price);
+                    }
+                }
+            }
+
+            $name = $item->product_name ?? $item->product?->name ?? 'Custom product';
+            
+            // For invitation items, include paper stock name in the product name
+            if ($item->line_type === 'invitation') {
+                if ($item->paperStockSelection) {
+                    $paperName = $item->paperStockSelection->paperStock?->name ?? $item->paperStockSelection->paper_stock_name ?? 'Paper stock';
+                    $name .= ' (' . $paperName . ')';
+                } else {
+                    // Use default paper stock name
+                    $defaultPaperStock = $item->product?->paperStocks?->sortBy('price')->first();
+                    if ($defaultPaperStock) {
+                        $name .= ' (' . $defaultPaperStock->name . ')';
+                    }
+                }
+            }
+
             return [
                 'id' => $item->id,
                 'order_item_id' => $item->id,
                 'product_id' => $item->product_id,
                 'template_id' => $item->product?->template_id ?? null,
-                'name' => $item->product_name ?? $item->product?->name ?? 'Custom product',
+                'name' => $name,
                 'sku' => $item->product?->sku,
                 'product_type' => $item->product?->product_type,
                 'line_type' => $item->line_type,
                 'quantity' => $item->quantity,
-                'unit_price' => static::toFloat($item->unit_price),
-                'total' => static::toFloat($item->subtotal ?: $item->unit_price * $item->quantity),
+                'unit_price' => $unitPrice,
+                'total' => static::toFloat($item->subtotal ?: $unitPrice * $item->quantity),
                 'options' => $options,
                 'breakdown' => static::buildItemBreakdown($item),
                 'preview_images' => Arr::wrap($previewImages),
@@ -310,18 +341,21 @@ class OrderSummaryPresenter
     {
         $rows = [];
 
-        $paper = $item->paperStockSelection;
-        if ($paper) {
-            $paperName = $paper->paperStock?->name ?? $paper->paper_stock_name ?? 'Paper stock';
-            $paperPrice = static::toFloat($paper->price);
+        // For invitation items, paper stock is the unit price, so don't show it in breakdown
+        if ($item->line_type !== 'invitation') {
+            $paper = $item->paperStockSelection;
+            if ($paper) {
+                $paperName = $paper->paperStock?->name ?? $paper->paper_stock_name ?? 'Paper stock';
+                $paperPrice = static::toFloat($paper->price);
 
-            $rows[] = [
-                'label' => 'Paper stock: ' . $paperName,
-                'quantity' => 1,
-                'unit_price' => $paperPrice,
-                'total' => $paperPrice,
-                'type' => 'paper_stock',
-            ];
+                $rows[] = [
+                    'label' => 'Paper stock: ' . $paperName,
+                    'quantity' => 1,
+                    'unit_price' => $paperPrice,
+                    'total' => $paperPrice,
+                    'type' => 'paper_stock',
+                ];
+            }
         }
 
         if ($item->addons->isNotEmpty()) {

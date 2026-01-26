@@ -72,6 +72,16 @@
     color: var(--admin-text-primary);
 }
 
+.reports-filter-field select {
+    border-radius: 12px;
+    border: 1px solid rgba(148, 185, 255, 0.35);
+    background: rgba(148, 185, 255, 0.12);
+    padding: 9px 12px;
+    font-weight: 600;
+    color: var(--admin-text-primary);
+    appearance: none;
+}
+
 .reports-filter-actions {
     display: flex;
     align-items: center;
