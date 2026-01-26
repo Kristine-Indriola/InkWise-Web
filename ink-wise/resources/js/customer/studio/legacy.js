@@ -2094,6 +2094,72 @@ export function initializeCustomerStudioLegacy() {
         const applyToFront = side === 'front' || side === 'both';
         const applyToBack = side === 'back' || side === 'both';
 
+        // Helper: fetch remote image and convert to data URL (falls back to original URL on failure)
+        const fetchToDataUrl = async (url) => {
+          try {
+            if (!url) return null;
+            if (url.startsWith('data:')) return url;
+            const resp = await fetch(url);
+            if (!resp.ok) return null;
+            const blob = await resp.blob();
+            return await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result);
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+          } catch (e) {
+            return null;
+          }
+        };
+
+        // Helper: embed image into SVG as a background <image> element and hide bg rects
+        const setSvgBackground = async (svgEl, imgUrl, sideId) => {
+          if (!svgEl || !imgUrl) return;
+          try {
+            const dataUrl = (imgUrl && imgUrl.startsWith('data:')) ? imgUrl : (await fetchToDataUrl(imgUrl)) || imgUrl;
+
+            const imgId = `inkwise-bg-image-${sideId}`;
+            let imgNode = svgEl.querySelector(`#${imgId}`);
+            if (!imgNode) {
+              imgNode = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+              imgNode.setAttribute('id', imgId);
+              imgNode.setAttribute('x', '0');
+              imgNode.setAttribute('y', '0');
+              imgNode.setAttribute('width', '100%');
+              imgNode.setAttribute('height', '100%');
+              imgNode.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+              imgNode.setAttribute('pointer-events', 'none');
+              try { imgNode.setAttributeNS('http://www.w3.org/1999/xlink', 'href', dataUrl); } catch (e) {}
+              try { imgNode.setAttribute('href', dataUrl); } catch (e) {}
+              svgEl.insertBefore(imgNode, svgEl.firstChild);
+            } else {
+              try { imgNode.setAttributeNS('http://www.w3.org/1999/xlink', 'href', dataUrl); } catch (e) {}
+              try { imgNode.setAttribute('href', dataUrl); } catch (e) {}
+            }
+
+            // Hide background rects that would obscure the image
+            try {
+              const rects = svgEl.querySelectorAll('rect');
+              rects.forEach(r => { try { r.style.display = 'none'; } catch (e) {} });
+            } catch (e) {}
+          } catch (e) {
+            console.debug('[InkWise Studio] setSvgBackground failed', e);
+          }
+        };
+
+        // Helper: remove embedded background image and restore rects
+        const removeSvgBackground = (svgEl, sideId) => {
+          if (!svgEl) return;
+          try {
+            const imgId = `inkwise-bg-image-${sideId}`;
+            const imgNode = svgEl.querySelector(`#${imgId}`);
+            if (imgNode) imgNode.remove();
+            const rects = svgEl.querySelectorAll('rect');
+            rects.forEach(r => { try { r.style.display = ''; } catch (e) {} });
+          } catch (e) {}
+        };
+
         // Update preview background elements (target specific IDs to avoid accidental cross-target updates)
         try {
           if (applyToFront) {
@@ -2119,9 +2185,25 @@ export function initializeCustomerStudioLegacy() {
                 editorFront.style.backgroundRepeat = 'no-repeat';
                 editorFront.style.backgroundColor = '';
                 try { editorFront.dataset.backgroundImage = image; } catch (e) {}
+
+                // Also embed image into the front SVG so it updates like colors
+                try {
+                  const frontSvg = (editorFront && editorFront.querySelector && editorFront.querySelector('svg')) || document.getElementById('preview-front-svg');
+                  if (frontSvg) {
+                    setSvgBackground(frontSvg, image, 'front');
+                  }
+                } catch (e) { /* ignore svg background errors for front */ }
               } else {
                 editorFront.style.backgroundImage = 'none';
                 editorFront.style.backgroundColor = color;
+
+                // Remove any embedded SVG background when switching to a color
+                try {
+                  const frontSvg = (editorFront && editorFront.querySelector && editorFront.querySelector('svg')) || document.getElementById('preview-front-svg');
+                  if (frontSvg) {
+                    removeSvgBackground(frontSvg, 'front');
+                  }
+                } catch (e) { /* ignore svg remove errors for front */ }
               }
             }
 
@@ -2163,9 +2245,25 @@ export function initializeCustomerStudioLegacy() {
                 editorBack.style.backgroundRepeat = 'no-repeat';
                 editorBack.style.backgroundColor = '';
                 try { editorBack.dataset.backgroundImage = image; } catch (e) {}
+
+                // Also embed image into the back SVG so it updates like colors
+                try {
+                  const backSvg = (editorBack && editorBack.querySelector && editorBack.querySelector('svg')) || document.getElementById('preview-back-svg');
+                  if (backSvg) {
+                    setSvgBackground(backSvg, image, 'back');
+                  }
+                } catch (e) { /* ignore svg background errors for back */ }
               } else {
                 editorBack.style.backgroundImage = 'none';
                 editorBack.style.backgroundColor = color;
+
+                // Remove any embedded SVG background when switching to a color
+                try {
+                  const backSvg = (editorBack && editorBack.querySelector && editorBack.querySelector('svg')) || document.getElementById('preview-back-svg');
+                  if (backSvg) {
+                    removeSvgBackground(backSvg, 'back');
+                  }
+                } catch (e) { /* ignore svg remove errors for back */ }
               }
             }
 
