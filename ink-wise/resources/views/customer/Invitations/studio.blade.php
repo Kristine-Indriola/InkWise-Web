@@ -23,7 +23,7 @@
             if ($serialized instanceof \Illuminate\Contracts\Support\Arrayable) {
                 return $serialized->toArray();
             }
--
+
             return (array) $serialized;
         }
 
@@ -250,11 +250,45 @@
         }
     }
 
-    $backSvg = $resolveSvgDataUri($backSvgPath);
-    if (!$backSvg) {
-        $backSvgUrl = $resolveImage($backSvgPath, null);
-        if (is_string($backSvgUrl) && preg_match('/\.svg($|\?)/i', $backSvgUrl)) {
-            $backSvg = $backSvgUrl;
+    // Prefer publicly served SVG files from storage/app/public/templates/front_svg
+    if (empty($frontSvg) && is_string($frontSvgPath) && trim($frontSvgPath) !== '') {
+        $candidate = ltrim(str_replace('\\', '/', (string) $frontSvgPath), '/');
+        // Normalize possible storage prefix
+        $candidate = preg_replace('#^storage/#i', '', $candidate) ?? $candidate;
+        $publicPath = storage_path('app/public/' . $candidate);
+        // Also try the common templates folder
+        $publicFrontSvg = storage_path('app/public/templates/front_svg/' . basename($candidate));
+        if (is_file($publicFrontSvg)) {
+            $frontSvg = asset('storage/templates/front_svg/' . basename($candidate));
+        } elseif (is_file($publicPath) && preg_match('/\.svg$/i', $publicPath)) {
+            $frontSvg = asset('storage/' . $candidate);
+        }
+    }
+
+
+    // Force correct back SVG for this template if ID matches
+    if ($templateModel && $templateModel->id == 132) {
+        $backSvg = asset('storage/templates/back_svg/template_24445333-2952-4a3a-a51d-487c20a0dd5e.svg');
+    } else {
+        $backSvg = $resolveSvgDataUri($backSvgPath);
+        if (!$backSvg) {
+            $backSvgUrl = $resolveImage($backSvgPath, null);
+            if (is_string($backSvgUrl) && preg_match('/\.svg($|\?)/i', $backSvgUrl)) {
+                $backSvg = $backSvgUrl;
+            }
+        }
+
+        // Prefer publicly served SVG files from storage/app/public/templates/back_svg
+        if (empty($backSvg) && is_string($backSvgPath) && trim($backSvgPath) !== '') {
+            $candidate = ltrim(str_replace('\\', '/', (string) $backSvgPath), '/');
+            $candidate = preg_replace('#^storage/#i', '', $candidate) ?? $candidate;
+            $publicPath = storage_path('app/public/' . $candidate);
+            $publicBackSvg = storage_path('app/public/templates/back_svg/' . basename($candidate));
+            if (is_file($publicBackSvg)) {
+                $backSvg = asset('storage/templates/back_svg/' . basename($candidate));
+            } elseif (is_file($publicPath) && preg_match('/\.svg$/i', $publicPath)) {
+                $backSvg = asset('storage/' . $candidate);
+            }
         }
     }
 
@@ -391,6 +425,24 @@
         ],
     ];
 @endphp
+
+<style>
+    /* Restore measurement guide lines inside the preview canvas */
+    .preview-guides:before {
+        display: block;
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        border: 2px dashed rgba(34,197,94,0.6);
+        border-radius: 0;
+        z-index: 0;
+        pointer-events: none;
+    }
+</style>
+
 <body class="studio-page">
 <header class="studio-topbar">
     <div class="topbar-left">
@@ -433,8 +485,116 @@
                         Fit all essential elements, like text and logos, inside this area to ensure content prints completely.
                     </div>
                 </div>
+                @if($hasBackSide)
+                <div class="pill-with-tooltip">
+                    <button type="button" class="canvas-pill" data-card-view="front" aria-pressed="true">
+                        Front
+                    </button>
+                </div>
+                <div class="pill-with-tooltip">
+                    <button type="button" class="canvas-pill" data-card-view="back" aria-pressed="false">
+                        Back
+                    </button>
+                </div>
+                @endif
             </div>
             <div class="canvas-container">
+                @if($hasBackSide)
+                <div class="canvas-views-grid">
+                    <!-- Front Canvas -->
+                    <div class="canvas-view-wrapper">
+                        <div class="canvas-view-label">Front</div>
+                        <div
+                            class="preview-canvas-wrapper preview-guides front-canvas"
+                            @if($canvasWidthAttr !== null) data-canvas-width="{{ $canvasWidthAttr }}" @endif
+                            @if($canvasHeightAttr !== null) data-canvas-height="{{ $canvasHeightAttr }}" @endif
+                            @if($canvasShapeAttr) data-canvas-shape="{{ $canvasShapeAttr }}" @endif
+                            @if($canvasUnitAttr) data-canvas-unit="{{ $canvasUnitAttr }}" @endif
+                        >
+                            <div
+                                class="preview-card-bg"
+                                data-side="front"
+                                data-has-back="{{ $hasBackSide ? 'true' : 'false' }}"
+                                data-front-image="{{ $frontImage }}"
+                                @if($hasBackSide && $backImage)
+                                data-back-image="{{ $backImage }}"
+                                @endif
+                                @if($frontSvg)
+                                data-front-svg="{{ $frontSvg }}"
+                                @endif
+                                @if($hasBackSide && $backSvg)
+                                data-back-svg="{{ $backSvg }}"
+                                @endif
+                                style="background-image: url('{{ $frontImage }}');"
+                                @if($canvasWidthAttr !== null) data-canvas-width="{{ $canvasWidthAttr }}" @endif
+                                @if($canvasHeightAttr !== null) data-canvas-height="{{ $canvasHeightAttr }}" @endif
+                                @if($canvasShapeAttr) data-canvas-shape="{{ $canvasShapeAttr }}" @endif
+                                @if($canvasUnitAttr) data-canvas-unit="{{ $canvasUnitAttr }}" @endif
+                            >
+                                <svg
+                                    id="preview-svg-front"
+                                    class="preview-svg"
+                                    width="100%"
+                                    height="100%"
+                                    @if($canvasWidthAttr && $canvasHeightAttr)
+                                        viewBox="0 0 {{ $canvasWidthAttr }} {{ $canvasHeightAttr }}"
+                                    @else
+                                        viewBox="0 0 433 559"
+                                    @endif
+                                    preserveAspectRatio="xMidYMid meet"
+                                ></svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Back Canvas -->
+                    <div class="canvas-view-wrapper">
+                        <div class="canvas-view-label">Back</div>
+                        <div
+                            class="preview-canvas-wrapper preview-guides back-canvas"
+                            @if($canvasWidthAttr !== null) data-canvas-width="{{ $canvasWidthAttr }}" @endif
+                            @if($canvasHeightAttr !== null) data-canvas-height="{{ $canvasHeightAttr }}" @endif
+                            @if($canvasShapeAttr) data-canvas-shape="{{ $canvasShapeAttr }}" @endif
+                            @if($canvasUnitAttr) data-canvas-unit="{{ $canvasUnitAttr }}" @endif
+                        >
+                            <div
+                                class="preview-card-bg"
+                                data-side="back"
+                                data-has-back="{{ $hasBackSide ? 'true' : 'false' }}"
+                                data-front-image="{{ $frontImage }}"
+                                @if($hasBackSide && $backImage)
+                                data-back-image="{{ $backImage }}"
+                                @endif
+                                @if($frontSvg)
+                                data-front-svg="{{ $frontSvg }}"
+                                @endif
+                                @if($hasBackSide && $backSvg)
+                                data-back-svg="{{ $backSvg }}"
+                                @endif
+                                style="background-image: url('{{ $backImage }}');"
+                                @if($canvasWidthAttr !== null) data-canvas-width="{{ $canvasWidthAttr }}" @endif
+                                @if($canvasHeightAttr !== null) data-canvas-height="{{ $canvasHeightAttr }}" @endif
+                                @if($canvasShapeAttr) data-canvas-shape="{{ $canvasShapeAttr }}" @endif
+                                @if($canvasUnitAttr) data-canvas-unit="{{ $canvasUnitAttr }}" @endif
+                            >
+                                <svg
+                                    id="preview-svg-back"
+                                    class="preview-svg"
+                                    width="100%"
+                                    height="100%"
+                                    @if($canvasWidthAttr && $canvasHeightAttr)
+                                        viewBox="0 0 {{ $canvasWidthAttr }} {{ $canvasHeightAttr }}"
+                                    @else
+                                        viewBox="0 0 433 559"
+                                    @endif
+                                    preserveAspectRatio="xMidYMid meet"
+                                ></svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                @else
+                <!-- Single Canvas for templates without back side -->
                 <div
                     class="preview-canvas-wrapper preview-guides"
                     @if($canvasWidthAttr !== null) data-canvas-width="{{ $canvasWidthAttr }}" @endif
@@ -474,6 +634,7 @@
                         ></svg>
                     </div>
                 </div>
+                @endif
                 <div id="mini-toolbar" class="mini-toolbar" style="display: none;">
                     <button class="toolbar-btn" data-action="edit" title="Edit"><i class="fa-solid fa-edit"></i></button>
                     <button class="toolbar-btn" data-action="delete" title="Delete"><i class="fa-solid fa-trash"></i></button>
@@ -492,8 +653,7 @@
                 <button type="button" class="canvas-control-btn icon" data-zoom-step="down" aria-label="Zoom out"><i class="fa-solid fa-minus"></i></button>
                 <span class="canvas-zoom-value" id="canvas-zoom-display">100%</span>
                 <button type="button" class="canvas-control-btn icon" data-zoom-step="up" aria-label="Zoom in"><i class="fa-solid fa-plus"></i></button>
-                <button type="button" class="canvas-control-btn icon" data-zoom-reset aria-label="Reset zoom to 100%"><i class="fa-solid fa-rotate-right"></i></button>
-                <button type="button" class="canvas-control-btn icon" aria-label="Canvas settings"><i class="fa-solid fa-gear"></i></button>
+                
                 <select class="canvas-zoom-select" id="canvas-zoom-select" aria-label="Zoom level">
                     <option value="0.25">25%</option>
                     <option value="0.5">50%</option>

@@ -1,5 +1,6 @@
 import SvgTemplateEditor from './svg-template-editor.jsx';
-import { createAutosaveController } from './autosave';
+import { createAutosaveController } from './Autosave';
+import { uploadSnapshotDataUrls } from './imageUploadHelpers';
 
 export function initializeCustomerStudioLegacy() {
   if (typeof window !== 'undefined') {
@@ -8,7 +9,7 @@ export function initializeCustomerStudioLegacy() {
     }
     window.__inkwiseCustomerStudioInitialized = true;
   }
-  const init = () => {
+  const init = async () => {
     const inputs = document.querySelectorAll('[data-preview-target]');
     const cardBg = document.querySelector('.preview-card-bg');
     const previewSvg = document.getElementById('preview-svg');
@@ -24,6 +25,116 @@ export function initializeCustomerStudioLegacy() {
     const measureHeightEl = document.querySelector('.canvas-measure-vertical .measure-value');
     const canvasWrapper = document.querySelector('.preview-canvas-wrapper');
     let customIndex = 1;
+    let frontSvgEl, backSvgEl;
+
+    // Load front and back SVGs for grid view (Invitations)
+    frontSvgEl = document.getElementById('preview-svg-front');
+    backSvgEl = document.getElementById('preview-svg-back');
+    let frontPopulatePromise = Promise.resolve();
+    let backPopulatePromise = Promise.resolve();
+    if (frontSvgEl && backSvgEl && cardBg) {
+      const frontSvgUrl = cardBg.dataset.frontSvg;
+      const backSvgUrl = cardBg.dataset.backSvg;
+      if (frontSvgUrl) {
+        frontPopulatePromise = populateSvgElement(frontSvgEl, frontSvgUrl);
+      }
+      if (backSvgUrl) {
+        backPopulatePromise = populateSvgElement(backSvgEl, backSvgUrl);
+      }
+    }
+
+    // Helper function to get SVG root element for a side
+    const getSvgRoot = (side) => {
+      const cardId = side === 'front' ? 'cardFront' : 'cardBack';
+      const card = document.getElementById(cardId);
+      if (!card) return null;
+      return card.querySelector('svg');
+    };
+
+      // Helper to copy current canvas SVG into the preview modal for a given side
+      const updatePreviewFromCanvas = (side) => {
+        try {
+          const source = document.querySelector(`#template-editor-container-${side} svg`);
+          const target = document.getElementById(`preview-${side}-svg`);
+          const card = document.getElementById(`preview-${side}-card`) || document.getElementById(`preview-${side}-card`);
+          if (!source || !target) return false;
+
+          // Clone SVG node to preserve eventless markup
+          const cloned = source.cloneNode(true);
+          // Clear existing
+          while (target.firstChild) target.removeChild(target.firstChild);
+          // Copy attributes like viewBox/width/height
+          try {
+            for (let i = 0; i < cloned.attributes.length; i++) {
+              const a = cloned.attributes[i];
+              if (a && a.name && a.value) target.setAttribute(a.name, a.value);
+            }
+          } catch (e) {}
+          // Append child nodes
+          Array.from(cloned.childNodes).forEach((n) => target.appendChild(n.cloneNode(true)));
+
+          // mark card active if requested
+          try {
+            const frontCard = document.getElementById('preview-front-card');
+            const backCard = document.getElementById('preview-back-card');
+            if (frontCard && backCard) {
+              if (side === 'front') {
+                frontCard.classList.add('active');
+                backCard.classList.remove('active');
+              } else {
+                backCard.classList.add('active');
+                frontCard.classList.remove('active');
+              }
+            }
+          } catch (e) {}
+
+          return true;
+        } catch (err) {
+          console.warn('[Preview] failed to update preview from canvas for', side, err);
+          return false;
+        }
+      };
+
+      // Wire the preview header buttons to refresh the preview from the live canvas
+      const frontBtn = document.getElementById('preview-show-front');
+      const backBtn = document.getElementById('preview-show-back');
+      if (frontBtn) {
+        frontBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          updatePreviewFromCanvas('front');
+          frontBtn.setAttribute('aria-pressed', 'true');
+          if (backBtn) backBtn.setAttribute('aria-pressed', 'false');
+          // open modal if closed
+          const modal = document.getElementById('preview-modal');
+          if (modal && modal.getAttribute('aria-hidden') === 'true') {
+            modal.setAttribute('aria-hidden', 'false');
+          }
+        });
+      }
+      if (backBtn) {
+        backBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          updatePreviewFromCanvas('back');
+          backBtn.setAttribute('aria-pressed', 'true');
+          if (frontBtn) frontBtn.setAttribute('aria-pressed', 'false');
+          const modal = document.getElementById('preview-modal');
+          if (modal && modal.getAttribute('aria-hidden') === 'true') {
+            modal.setAttribute('aria-hidden', 'false');
+          }
+        });
+      }
+
+      // When the canvas changes, refresh the preview for that side if the preview modal is open
+      window.addEventListener('inkwise:canvas-changed', (ev) => {
+        try {
+          const side = ev?.detail?.side;
+          const modal = document.getElementById('preview-modal');
+          if (!side) return;
+          if (modal && modal.getAttribute('aria-hidden') === 'false') {
+            updatePreviewFromCanvas(side);
+          }
+        } catch (e) { /* ignore */ }
+      });
 
     const imageClassTokens = new Set([
       'canvas-layer__image',
@@ -258,6 +369,35 @@ export function initializeCustomerStudioLegacy() {
       }
     };
 
+    const svgToPngDataUri = async (svgMarkup, width = 1080, height = 1527) => {
+      if (!svgMarkup || typeof svgMarkup !== 'string') {
+        return null;
+      }
+      try {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`;
+
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+
+        return canvas.toDataURL('image/png', 1.0);
+      } catch (error) {
+        console.warn('[InkWise Studio] Failed to convert SVG to PNG preview.', error);
+        return null;
+      }
+    };
+
     const extractBackgroundUrl = (side) => {
       if (!cardBg) {
         return null;
@@ -482,6 +622,8 @@ export function initializeCustomerStudioLegacy() {
     const rasterDimensionCache = new Map();
 
     let overlayLayer = null;
+    // Support multiple overlay layers when using grid view (one per preview card)
+    const overlayLayerByCard = new Map();
     const overlayDataByNode = new Map();
     const overlayDataByElement = new Map();
     let overlaySyncFrame = null;
@@ -749,15 +891,20 @@ export function initializeCustomerStudioLegacy() {
       const activeSide = currentSide || 'front';
       const svgNode = currentSvgRoot;
 
+      // Serialize both front/back if available, but prefer current active side for `svg_markup`
       let serializedSvg = null;
-      if (svgNode) {
-        try {
-          // Clone the SVG to manipulate it before serialization without affecting the UI
-          const clone = svgNode.cloneNode(true);
+      const sides = {};
+      const previewImages = [];
 
-          // Restore intrinsic dimensions if available from data attributes
-          const canvasWidth = cardBg?.dataset?.canvasWidth;
-          const canvasHeight = cardBg?.dataset?.canvasHeight;
+      const serializeSvgNode = async (svgEl, side) => {
+        if (!svgEl) return { svg: null, preview: extractBackgroundUrl(side) };
+        try {
+          const clone = svgEl.cloneNode(true);
+
+          // Use dataset from the corresponding card element if present
+          const cardEl = (side === 'front') ? cardFront : cardBack;
+          const canvasWidth = cardEl?.dataset?.canvasWidth || cardBg?.dataset?.canvasWidth;
+          const canvasHeight = cardEl?.dataset?.canvasHeight || cardBg?.dataset?.canvasHeight;
           if (canvasWidth && canvasHeight) {
             clone.setAttribute('width', canvasWidth);
             clone.setAttribute('height', canvasHeight);
@@ -766,33 +913,57 @@ export function initializeCustomerStudioLegacy() {
           }
           clone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 
-          // Clean up the SVG for export: remove UI elements and embed images as base64
+          // Clean up and embed images
           await cleanSvgForExport(clone);
 
-          // Inject font styles and basic SVG resets to ensure fidelity outside the studio
+          // Inject stable export styles
           let styleEl = clone.querySelector('style#inkwise-export-styles');
           if (!styleEl) {
             styleEl = document.createElementNS(SVG_NS, 'style');
             styleEl.id = 'inkwise-export-styles';
             clone.insertBefore(styleEl, clone.firstChild);
           }
-          styleEl.textContent = `
-            @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
-            text { white-space: pre; }
-          `;
+          styleEl.textContent = `@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap'); text { white-space: pre; }`;
 
           const serializer = new XMLSerializer();
-          serializedSvg = serializer.serializeToString(clone);
-          if (serializedSvg && !/xmlns=/i.test(serializedSvg)) {
-            serializedSvg = serializedSvg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+          let svgText = serializer.serializeToString(clone);
+          if (svgText && !/xmlns=/i.test(svgText)) {
+            svgText = svgText.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
           }
-        } catch (error) {
-          console.warn('[InkWise Studio] Unable to serialize current SVG.', error);
-          serializedSvg = null;
+
+          // Generate PNG preview for the review page
+          const pngPreview = await svgToPngDataUri(svgText, canvasWidth || 1080, canvasHeight || 1527);
+
+          return { svg: svgText, preview: pngPreview || svgToDataUri(svgText) || extractBackgroundUrl(side) };
+        } catch (err) {
+          console.warn('[InkWise Studio] Unable to serialize ' + side + ' SVG.', err);
+          return { svg: null, preview: extractBackgroundUrl(side) };
         }
+      };
+
+      // Attempt to get both sides (front and back)
+      const frontEl = getSvgRoot('front');
+      const backEl = getSvgRoot('back');
+
+      const frontResult = await serializeSvgNode(frontEl, 'front');
+      const backResult = await serializeSvgNode(backEl, 'back');
+
+      if (frontResult.svg) {
+        sides.front = { svg: frontResult.svg, preview: frontResult.preview };
+        previewImages.push(frontResult.preview);
+        // prefer front as the main serialized svg_markup
+        serializedSvg = serializedSvg || frontResult.svg;
+      } else if (activeSide === 'front') {
+        serializedSvg = serializedSvg || null;
       }
 
-      const previewImage = serializedSvg ? svgToDataUri(serializedSvg) : extractBackgroundUrl(activeSide);
+      if (backResult.svg) {
+        sides.back = { svg: backResult.svg, preview: backResult.preview };
+        previewImages.push(backResult.preview);
+        if (!serializedSvg && activeSide === 'back') serializedSvg = backResult.svg;
+      }
+
+      const previewImage = previewImages.length ? previewImages[0] : extractBackgroundUrl(activeSide);
 
       const texts = collectTextEntries();
       const placeholderLabels = texts
@@ -812,9 +983,10 @@ export function initializeCustomerStudioLegacy() {
         .filter((label, index, array) => label !== '' && array.indexOf(label) === index);
 
       const imageEntries = [];
-      if (svgNode) {
-        const seen = new Set();
-        svgNode.querySelectorAll('image,img,[data-changeable="image"]').forEach((node) => {
+      const seen = new Set();
+      [frontEl, backEl].forEach((root) => {
+        if (!root) return;
+        root.querySelectorAll('image,img,[data-changeable="image"]').forEach((node) => {
           const href = node.getAttribute('href')
             || node.getAttribute('xlink:href')
             || node.getAttributeNS('http://www.w3.org/1999/xlink', 'href')
@@ -836,7 +1008,7 @@ export function initializeCustomerStudioLegacy() {
             height: node.getAttribute('height') || null,
           });
         });
-      }
+      });
 
       const canvasMeta = cardBg ? {
         width: parseNullableNumber(cardBg.dataset.canvasWidth),
@@ -845,15 +1017,17 @@ export function initializeCustomerStudioLegacy() {
         shape: cardBg.dataset.canvasShape || null,
       } : null;
 
-      const previewImages = previewImage ? [previewImage] : [];
+      // Ensure previewImages (front -> back order) and primary preview
+      const finalPreviewImages = previewImages.filter(Boolean);
+      const primaryPreview = finalPreviewImages[0] || extractBackgroundUrl(activeSide);
 
       return {
         design: {
           updated_at: timestamp.toISOString(),
-          sides: {
+          sides: Object.keys(sides).length ? sides : {
             [activeSide]: {
               svg: serializedSvg,
-              preview: previewImage,
+              preview: primaryPreview,
             },
           },
           texts,
@@ -862,8 +1036,8 @@ export function initializeCustomerStudioLegacy() {
           placeholders: placeholderLabels,
         },
         preview: {
-          image: previewImage,
-          images: previewImages,
+          image: primaryPreview,
+          images: finalPreviewImages,
         },
         svg_markup: serializedSvg,
         placeholders: placeholderLabels,
@@ -985,23 +1159,17 @@ export function initializeCustomerStudioLegacy() {
 
       const design = snapshot?.design || {};
       const sides = design.sides || {};
-      const firstSideKey = Object.keys(sides)[0];
-      const sideData = firstSideKey ? sides[firstSideKey] : null;
-
       const safeDesignJson = JSON.parse(JSON.stringify(design || {}));
 
-      // Get the SVG markup from the snapshot
-      const svgMarkup = sideData?.svg || snapshot?.svg_markup || null;
+      // Get the front SVG markup for legacy design_svg field
+      const frontSvg = sides.front?.svg || snapshot?.svg_markup || null;
 
-      const previewImage = sideData?.preview
+      const previewImage = sides.front?.preview
         || snapshot?.preview?.image
-        || extractBackgroundUrl(firstSideKey || 'front')
+        || extractBackgroundUrl('front')
         || null;
       const previewImages = (Array.isArray(snapshot?.preview?.images) ? snapshot.preview.images : [])
         .filter((val) => typeof val === 'string' && val.trim() !== '');
-      if (previewImage && !previewImages.length) {
-        previewImages.push(previewImage);
-      }
 
       const canvasMeta = safeDesignJson.canvas || {};
       const canvasWidth = canvasMeta.width ?? (cardBg ? parseNullableNumber(cardBg.dataset.canvasWidth) : null);
@@ -1017,8 +1185,8 @@ export function initializeCustomerStudioLegacy() {
       })();
 
       return {
-        design_svg: svgMarkup, // Include the SVG for proper preview rendering
-        design_json: safeDesignJson,
+        design_svg: frontSvg, // Front SVG for legacy compatibility
+        design_json: safeDesignJson, // Contains both front and back SVGs in sides
         preview_image: previewImage,
         preview_images: previewImages,
         canvas_width: canvasWidth,
@@ -1064,7 +1232,18 @@ export function initializeCustomerStudioLegacy() {
             await autosave.flush('navigate');
           }
 
-          const payload = await buildReviewSavePayload();
+          let payload = await buildReviewSavePayload();
+
+          // Replace large inline images with uploaded URLs before final save to avoid oversized payloads
+          try {
+            const processed = await uploadSnapshotDataUrls(payload, { routes, csrfToken });
+            if (processed) {
+              payload = processed;
+            }
+          } catch (uploadErr) {
+            console.warn('[InkWise Studio] Pre-save image upload failed; proceeding with original payload', uploadErr);
+          }
+
           if (!payload.template_id) {
             throw new Error('Missing template identifier.');
           }
@@ -1150,6 +1329,15 @@ export function initializeCustomerStudioLegacy() {
             svg_markup: snapshot.svg_markup,
           };
 
+          // Replace large inline images with uploaded URLs before saving template
+          let sendBody = requestBody;
+          try {
+            const processed = await uploadSnapshotDataUrls(requestBody, { routes, csrfToken });
+            if (processed) sendBody = processed;
+          } catch (uploadErr) {
+            console.warn('[InkWise Studio] Pre-save image upload failed for template save; proceeding with original payload', uploadErr);
+          }
+
           const headers = {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -1164,7 +1352,7 @@ export function initializeCustomerStudioLegacy() {
             method: 'POST',
             headers,
             credentials: 'same-origin',
-            body: JSON.stringify(requestBody),
+            body: JSON.stringify(sendBody),
           });
 
           if (!response.ok) {
@@ -1214,6 +1402,17 @@ export function initializeCustomerStudioLegacy() {
       input.click();
     };
 
+    // Listen for image-click events from the React editor and invoke replacement flow
+    window.addEventListener('inkwise-image-clicked', (ev) => {
+      try {
+        const node = ev?.detail?.node;
+        if (!node) return;
+        requestImageReplacement(node);
+      } catch (e) {
+        console.warn('[Preview] image click handler failed', e);
+      }
+    });
+
     const ensureOverlayLayer = () => {
       if (!cardBg) {
         return null;
@@ -1239,6 +1438,13 @@ export function initializeCustomerStudioLegacy() {
       if (overlayLayer) {
         overlayLayer.innerHTML = '';
       }
+      // clear any per-card overlay layers
+      overlayLayerByCard.forEach((layer) => {
+        if (layer && layer.isConnected) {
+          layer.innerHTML = '';
+        }
+      });
+      overlayLayerByCard.clear();
       activeTextKey = null;
       activeImageKey = null;
       updateOverlaySelectionState();
@@ -1267,7 +1473,8 @@ export function initializeCustomerStudioLegacy() {
         return;
       }
       const overlay = data.overlay;
-      const canvasRect = cardBg.getBoundingClientRect();
+      const canvasParent = node && typeof node.closest === 'function' ? node.closest('.preview-card-bg') : null;
+      const canvasRect = (canvasParent || cardBg)?.getBoundingClientRect();
       const nodeRect = node.getBoundingClientRect();
 
       if (canvasRect.width === 0 || canvasRect.height === 0) {
@@ -1596,7 +1803,20 @@ export function initializeCustomerStudioLegacy() {
     };
 
     const createOverlayForNode = (node) => {
-      const layer = ensureOverlayLayer();
+      // Prefer a per-card overlay layer when available (grid view)
+      const parentCard = node && typeof node.closest === 'function' ? node.closest('.preview-card-bg') : null;
+      let layer = null;
+      if (parentCard) {
+        layer = overlayLayerByCard.get(parentCard);
+        if (!layer || !layer.isConnected) {
+          layer = document.createElement('div');
+          layer.className = 'canvas-overlay-layer';
+          parentCard.appendChild(layer);
+          overlayLayerByCard.set(parentCard, layer);
+        }
+      } else {
+        layer = ensureOverlayLayer();
+      }
       if (!layer) {
         return null;
       }
@@ -1861,6 +2081,161 @@ export function initializeCustomerStudioLegacy() {
       product: document.getElementById('product-modal'),
       tables: document.getElementById('tables-modal'),
     };
+
+    // Listen for background apply events from React color panel
+    window.addEventListener('inkwise:apply-background', (ev) => {
+      try {
+        const detail = ev && ev.detail ? ev.detail : {};
+        const side = detail.side || 'selection';
+        const color = detail.color || null;
+        const image = detail.image || null;
+        if (!color && !image) return;
+
+        const applyToFront = side === 'front' || side === 'both';
+        const applyToBack = side === 'back' || side === 'both';
+
+        // Update preview background elements (target specific IDs to avoid accidental cross-target updates)
+        try {
+          if (applyToFront) {
+            const frontPreview = document.getElementById('preview-front-bg') || document.querySelector('.preview-card-bg');
+            if (frontPreview) {
+              if (image) {
+                frontPreview.style.backgroundImage = `url('${image}')`;
+                frontPreview.style.backgroundSize = 'cover';
+                frontPreview.style.backgroundPosition = 'center';
+                frontPreview.style.backgroundRepeat = 'no-repeat';
+                frontPreview.style.backgroundColor = '';
+              } else {
+                frontPreview.style.backgroundImage = 'none';
+                frontPreview.style.backgroundColor = color;
+              }
+            }
+            const editorFront = document.getElementById('template-editor-container-front');
+            if (editorFront) {
+              if (image) {
+                editorFront.style.backgroundImage = `url('${image}')`;
+                editorFront.style.backgroundSize = 'cover';
+                editorFront.style.backgroundPosition = 'center';
+                editorFront.style.backgroundRepeat = 'no-repeat';
+                editorFront.style.backgroundColor = '';
+                try { editorFront.dataset.backgroundImage = image; } catch (e) {}
+              } else {
+                editorFront.style.backgroundImage = 'none';
+                editorFront.style.backgroundColor = color;
+              }
+            }
+
+            // Update gradient stops inside the front SVG only (if present) — only relevant for color
+            if (!image) {
+              try {
+                const frontSvg = (editorFront && editorFront.querySelector && editorFront.querySelector('svg')) || document.getElementById('preview-front-svg');
+                if (frontSvg) {
+                  const gradient = frontSvg.querySelector('radialGradient#inkwise-grad-1, linearGradient#inkwise-grad-1, #inkwise-grad-1');
+                  if (gradient) {
+                    const stops = gradient.querySelectorAll('stop');
+                    stops.forEach(stop => stop.setAttribute('stop-color', color));
+                  }
+                }
+              } catch (e) { /* ignore gradient update errors for front */ }
+            }
+          }
+
+          if (applyToBack) {
+            const backPreview = document.getElementById('preview-back-bg') || document.querySelectorAll('.preview-card-bg')[1] || document.querySelector('.preview-card-bg');
+            if (backPreview) {
+              if (image) {
+                backPreview.style.backgroundImage = `url('${image}')`;
+                backPreview.style.backgroundSize = 'cover';
+                backPreview.style.backgroundPosition = 'center';
+                backPreview.style.backgroundRepeat = 'no-repeat';
+                backPreview.style.backgroundColor = '';
+              } else {
+                backPreview.style.backgroundImage = 'none';
+                backPreview.style.backgroundColor = color;
+              }
+            }
+            const editorBack = document.getElementById('template-editor-container-back');
+            if (editorBack) {
+              if (image) {
+                editorBack.style.backgroundImage = `url('${image}')`;
+                editorBack.style.backgroundSize = 'cover';
+                editorBack.style.backgroundPosition = 'center';
+                editorBack.style.backgroundRepeat = 'no-repeat';
+                editorBack.style.backgroundColor = '';
+                try { editorBack.dataset.backgroundImage = image; } catch (e) {}
+              } else {
+                editorBack.style.backgroundImage = 'none';
+                editorBack.style.backgroundColor = color;
+              }
+            }
+
+            // Update gradients and background shapes inside the back SVG only (if present)
+            if (!image) {
+              try {
+                const backSvg = (editorBack && editorBack.querySelector && editorBack.querySelector('svg')) || document.getElementById('preview-back-svg');
+                if (backSvg) {
+                  // Update all gradient stops (radial and linear)
+                  const gradients = backSvg.querySelectorAll('radialGradient, linearGradient');
+                  gradients.forEach(g => {
+                    try {
+                      const stops = g.querySelectorAll('stop');
+                      stops.forEach(s => s.setAttribute('stop-color', color));
+                    } catch (eg) {}
+                  });
+
+                  // If there's a background rect that fills the whole SVG, set its fill to the color
+                  try {
+                    const vb = backSvg.getAttribute('viewBox');
+                    let vbW = null, vbH = null;
+                    if (vb) {
+                      const parts = vb.split(/\s+/).map(Number);
+                      if (parts && parts.length === 4) {
+                        vbW = parts[2];
+                        vbH = parts[3];
+                      }
+                    }
+
+                    let bgRect = null;
+                    const rects = backSvg.querySelectorAll('rect');
+                    for (let i = 0; i < rects.length; i++) {
+                      const r = rects[i];
+                      const rw = r.getAttribute('width');
+                      const rh = r.getAttribute('height');
+                      const rx = r.getAttribute('x') || '0';
+                      const ry = r.getAttribute('y') || '0';
+
+                      if ((rw === '100%' || rh === '100%') || (vbW && vbH && parseFloat(rw) === vbW && parseFloat(rh) === vbH && (rx === '0' || rx === 0) && (ry === '0' || ry === 0))) {
+                        bgRect = r;
+                        break;
+                      }
+                    }
+
+                    if (!bgRect && rects.length > 0) {
+                      // fallback to first rect
+                      bgRect = rects[0];
+                    }
+
+                    if (bgRect) {
+                      bgRect.setAttribute('fill', color);
+                      try { bgRect.style && (bgRect.style.fill = color); } catch (e2) {}
+                    }
+                  } catch (er) { /* ignore rect update errors */ }
+                }
+              } catch (e) { /* ignore gradient update errors for back */ }
+            }
+          }
+        } catch (err) {
+          console.debug('[InkWise Studio] apply-background DOM update failed', err);
+        }
+
+        // Dispatch a generic event for other subsystems (fabric canvases, etc.) to handle
+        try {
+          window.dispatchEvent(new CustomEvent('inkwise:background-changed', { detail: { side, color, image } }));
+        } catch (err) {}
+      } catch (e) {
+        console.debug('[InkWise Studio] error handling inkwise:apply-background', e);
+      }
+    });
 
     const closeButtons = document.querySelectorAll('[data-modal-close]');
 
@@ -4988,12 +5363,104 @@ export function initializeCustomerStudioLegacy() {
       }
     };
 
+    // Populate an SVG element with SVG data without binding (for grid view front/back)
+    const populateSvgElement = async (svgElement, svgUrl) => {
+      if (!svgElement || !svgUrl) {
+        return false;
+      }
+
+      try {
+        let svgText = '';
+        if (svgUrl.startsWith('data:image/svg+xml')) {
+          const commaIndex = svgUrl.indexOf(',');
+          const meta = commaIndex >= 0 ? svgUrl.slice(0, commaIndex) : svgUrl;
+          const dataPart = commaIndex >= 0 ? svgUrl.slice(commaIndex + 1) : '';
+          const isBase64 = /;base64/i.test(meta);
+
+          if (isBase64) {
+            try {
+              const normalized = dataPart.replace(/\s+/g, '');
+              svgText = typeof window !== 'undefined' && typeof window.atob === 'function'
+                ? window.atob(normalized)
+                : atob(normalized);
+            } catch (base64Error) {
+              try {
+                svgText = decodeURIComponent(dataPart);
+              } catch (decodeError) {
+                console.warn('[InkWise Studio] Failed to decode inline SVG data URI.', base64Error, decodeError);
+                svgText = '';
+              }
+            }
+          } else {
+            try {
+              svgText = decodeURIComponent(dataPart);
+            } catch (decodeError) {
+              svgText = dataPart;
+            }
+          }
+        } else {
+          const res = await fetch(svgUrl, { cache: 'no-store' });
+          if (!res.ok) {
+            console.warn('Failed to fetch SVG:', res.status);
+            return false;
+          }
+          svgText = await res.text();
+        }
+
+        if (!svgText) {
+          return false;
+        }
+
+        // Clear existing content
+        svgElement.innerHTML = '';
+
+        // Parse the SVG
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(svgText, 'image/svg+xml');
+        const svgRoot = doc.documentElement;
+
+        if (svgRoot && svgRoot.tagName.toLowerCase() === 'svg') {
+          // Copy viewBox if present
+          const viewBox = svgRoot.getAttribute('viewBox');
+          if (viewBox) {
+            svgElement.setAttribute('viewBox', viewBox);
+          }
+
+          // Copy all child nodes to the target element
+          while (svgRoot.firstChild) {
+            svgElement.appendChild(svgRoot.firstChild);
+          }
+
+          // Ensure the element has proper attributes
+          svgElement.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+          svgElement.setAttribute('width', '100%');
+          svgElement.setAttribute('height', '100%');
+          svgElement.style.width = '100%';
+          svgElement.style.height = '100%';
+          svgElement.style.maxWidth = '100%';
+          svgElement.style.maxHeight = '100%';
+
+          // Normalize text visibility
+          normalizeSvgTextVisibility(svgElement);
+
+          return true;
+        }
+
+        return false;
+      } catch (e) {
+        console.warn('Could not populate SVG element:', e);
+        return false;
+      }
+    };
+
     const exportCurrentCanvasAsPng = async (options = {}) => {
       const {
         scale = 3,
         filename = 'inkwise-template.png',
         download = true,
       } = options;
+
+
 
       const root = currentSvgRoot || previewSvg;
       if (!root) {
@@ -5144,6 +5611,37 @@ export function initializeCustomerStudioLegacy() {
         return;
       }
 
+      // Handle grid view (Invitations)
+      if (!previewSvg && frontSvgEl && backSvgEl) {
+        const activeSvgEl = side === 'front' ? frontSvgEl : backSvgEl;
+        if (activeSvgEl) {
+          currentSvgRoot = activeSvgEl;
+          if (!currentSvgRoot.__inkwiseSvgTemplateEditor) {
+            currentSvgRoot.__inkwiseSvgTemplateEditor = new SvgTemplateEditor(currentSvgRoot);
+          }
+          svgTemplateEditorInstance = currentSvgRoot.__inkwiseSvgTemplateEditor;
+          clearOverlays();
+          // Add overlays for the active SVG
+          const nodes = resolvePreviewNodes(currentSvgRoot);
+          nodes.forEach((node) => {
+            const overlayData = createOverlayForNode(node);
+            if (overlayData) {
+              syncOverlayForNode(node);
+            }
+          });
+          // Update button states
+          viewButtons.forEach((btn) => {
+            btn.classList.toggle('active', btn.dataset.cardView === side);
+          });
+          thumbButtons.forEach((thumb) => {
+            const isActiveThumb = thumb.dataset.cardThumb === side;
+            thumb.classList.toggle('active', isActiveThumb);
+            thumb.setAttribute('aria-pressed', isActiveThumb ? 'true' : 'false');
+          });
+        }
+        return Promise.resolve();
+      }
+
       let image = '';
       let svgCandidate = '';
       let isUploaded = false;
@@ -5210,6 +5708,14 @@ export function initializeCustomerStudioLegacy() {
         void setActiveCard(thumb.dataset.cardThumb);
       });
     });
+
+    // Ensure grid front/back SVG population completes before activating initial card
+    try {
+      await Promise.all([frontPopulatePromise, backPopulatePromise]);
+    } catch (e) {
+      // Non-fatal - proceed even if population failed for one side
+      console.warn('[InkWise Studio] One or more grid SVGs failed to populate:', e);
+    }
 
     const initialActivation = setActiveCard('front');
     if (initialActivation && typeof initialActivation.then === 'function') {

@@ -258,6 +258,11 @@
     $frontSvg = $resolveSvgDataUri($templateModel?->svg_path ?? null);
     $backSvg = $resolveSvgDataUri($templateModel?->back_svg_path ?? null);
 
+    // Force correct back SVG for this template if ID matches
+    if ($templateModel && $templateModel->id == 132) {
+        $backSvg = asset('storage/templates/back_svg/template_24445333-2952-4a3a-a51d-487c20a0dd5e.svg');
+    }
+
     $hasBackSide = false;
     if ($templateModel) {
         $hasBackSide = (bool) (
@@ -265,6 +270,7 @@
             || !empty($templateBack)
             || !empty($templateModel->back_image)
             || !empty($backSvg)
+            || ($templateModel->id == 132) // Special case for template 132
         );
     }
 
@@ -374,8 +380,7 @@
     </div>
     <div class="topbar-actions">
         <button class="topbar-action-btn" type="button" onclick="window.location.href='{{ route('templates.wedding.invitations') }}'">Change Template</button>
-        <button class="topbar-action-btn" type="button">Preview</button>
-        <button class="topbar-action-btn" type="button" id="save-template-btn" data-action="save-template">Save Template</button>
+        <button class="topbar-action-btn" type="button" id="preview-btn">Preview</button>
         <button
             class="topbar-action-btn primary"
             type="button"
@@ -394,157 +399,28 @@
             <i class="fa-solid fa-cloud-arrow-up"></i>
             <span>Uploads</span>
         </button>
+        <button class="sidenav-btn" type="button" data-nav="colors">
+            <i class="fa-solid fa-palette"></i>
+            <span>Colors</span>
+        </button>
         <button class="sidenav-btn" type="button" data-nav="graphics">
             <i class="fa-solid fa-images"></i>
             <span>Graphics</span>
         </button>
-        <button class="sidenav-btn" type="button" data-nav="background">
-            <i class="fa-solid fa-brush"></i>
-            <span>Colors</span>
-        </button>
+        
     </nav>
     <section class="studio-canvas-area">
-        <div class="canvas-workspace">
-            <div class="canvas-pill-group">
-                <div class="pill-with-tooltip">
-                    <button type="button" class="canvas-pill safety" id="safety-pill" aria-describedby="safety-tooltip" aria-expanded="false">
-                        Safety Area
-                    </button>
-                    <div id="safety-tooltip" class="tooltip" role="tooltip" aria-hidden="true">
-                        Fit all essential elements, like text and logos, inside this area to ensure content prints completely.
-                    </div>
-                </div>
-                <div class="pill-with-tooltip">
-                    <button type="button" class="canvas-pill bleed" id="bleed-pill" aria-describedby="bleed-tooltip" aria-expanded="false">
-                        Bleed
-                    </button>
-                    <div id="bleed-tooltip" class="tooltip" role="tooltip" aria-hidden="true">
-                        Extend background to this edge to
-                        ensure full coverage and avoid blank
-                        borders during printing.
-                    </div>
-                </div>
-            </div>
-            <div class="canvas-stage">
-                <!-- Loading state -->
-                <div id="canvas-loading" class="canvas-loading">
-                    <div class="loading-spinner"></div>
-                    <p>Loading template...</p>
-                </div>
-                <div class="canvas-measure canvas-measure-vertical" aria-hidden="true">
-                    <span class="measure-cap"></span>
-                    <span class="measure-line"></span>
-                    <span class="measure-value">5.59in</span>
-                    <span class="measure-line"></span>
-                    <span class="measure-cap"></span>
-                </div>
-                <div
-                    class="preview-canvas-wrapper preview-guides"
-                    @if($canvasWidthAttr !== null) data-canvas-width="{{ $canvasWidthAttr }}" @endif
-                    @if($canvasHeightAttr !== null) data-canvas-height="{{ $canvasHeightAttr }}" @endif
-                    @if($canvasShapeAttr) data-canvas-shape="{{ $canvasShapeAttr }}" @endif
-                    @if($canvasUnitAttr) data-canvas-unit="{{ $canvasUnitAttr }}" @endif
-                >
-                    <div
-                        class="preview-card-bg"
-                        data-has-back="{{ $hasBackSide ? 'true' : 'false' }}"
-                        data-front-image="{{ $frontImage }}"
-                        @if($hasBackSide && $backImage)
-                        data-back-image="{{ $backImage }}"
-                        @endif
-                        @if($frontSvg)
-                        data-front-svg="{{ $frontSvg }}"
-                        @endif
-                        @if($hasBackSide && $backSvg)
-                        data-back-svg="{{ $backSvg }}"
-                        @endif
-                        style="background-image: url('{{ $frontImage }}');"
-                        @if($canvasWidthAttr !== null) data-canvas-width="{{ $canvasWidthAttr }}" @endif
-                        @if($canvasHeightAttr !== null) data-canvas-height="{{ $canvasHeightAttr }}" @endif
-                        @if($canvasShapeAttr) data-canvas-shape="{{ $canvasShapeAttr }}" @endif
-                        @if($canvasUnitAttr) data-canvas-unit="{{ $canvasUnitAttr }}" @endif
-                    >
-                        <svg
-                            id="preview-svg"
-                            width="100%"
-                            height="100%"
-                            @if($canvasWidthAttr && $canvasHeightAttr)
-                                viewBox="0 0 {{ $canvasWidthAttr }} {{ $canvasHeightAttr }}"
-                            @else
-                                viewBox="0 0 433 559"
-                            @endif
-                            preserveAspectRatio="xMidYMid meet"
-                        ></svg>
-                    </div>
-                </div>
-                <div id="mini-toolbar" class="mini-toolbar" style="display: none;">
-                    <button class="toolbar-btn" data-action="edit" title="Edit"><i class="fa-solid fa-edit"></i></button>
-                    <button class="toolbar-btn" data-action="delete" title="Delete"><i class="fa-solid fa-trash"></i></button>
-                    <button class="toolbar-btn" data-action="duplicate" title="Duplicate"><i class="fa-solid fa-copy"></i></button>
-                    <button class="toolbar-btn" data-action="move" title="Move"><i class="fa-solid fa-arrows-alt"></i></button>
-                </div>
-                <div class="canvas-measure canvas-measure-horizontal" aria-hidden="true">
-                    <span class="measure-cap"></span>
-                    <span class="measure-line"></span>
-                    <span class="measure-value">4.33in</span>
-                    <span class="measure-line"></span>
-                    <span class="measure-cap"></span>
-                </div>
-            </div>
-            <div class="canvas-controls" role="group" aria-label="Canvas zoom controls">
-                <button type="button" class="canvas-control-btn icon" data-zoom-step="down" aria-label="Zoom out"><i class="fa-solid fa-minus"></i></button>
-                <span class="canvas-zoom-value" id="canvas-zoom-display">100%</span>
-                <button type="button" class="canvas-control-btn icon" data-zoom-step="up" aria-label="Zoom in"><i class="fa-solid fa-plus"></i></button>
-                <button type="button" class="canvas-control-btn icon" data-zoom-reset aria-label="Reset zoom to 100%"><i class="fa-solid fa-rotate-right"></i></button>
-                <button type="button" class="canvas-control-btn icon" aria-label="Canvas settings"><i class="fa-solid fa-gear"></i></button>
-                <select class="canvas-zoom-select" id="canvas-zoom-select" aria-label="Zoom level">
-                    <option value="3">300%</option>
-                    <option value="2">200%</option>
-                    <option value="1.5">150%</option>
-                    <option value="1" selected>100%</option>
-                    <option value="0.75">75%</option>
-                    <option value="0.5">50%</option>
-                    <option value="0.25">25%</option>
-                </select>
-            </div>
-        </div>
-        <!-- Floating Toolbar -->
-        <div class="floating-toolbar" id="floating-toolbar">
-            <button class="toolbar-btn" type="button" data-nav="text" title="Text">
-                <span class="toolbar-icon-text">T</span>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="uploads" title="Uploads">
-                <i class="fa-solid fa-cloud-arrow-up"></i>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="graphics" title="Graphics">
-                <i class="fa-solid fa-images"></i>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="background" title="Colors">
-                <i class="fa-solid fa-brush"></i>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="tables" title="Tables">
-                <i class="fa-solid fa-table"></i>
-            </button>
-            <button class="toolbar-btn" type="button" data-nav="colors" title="Colors">
-                <i class="fa-solid fa-palette"></i>
-            </button>
-        </div>
-        <div class="preview-thumbs" role="tablist" aria-label="Card sides">
-            <button type="button" class="preview-thumb active" data-card-thumb="front" aria-pressed="true">
-                <div class="thumb-preview" @if($frontImage) style="background-image: url('{{ $frontImage }}');" @endif>
-                    <span class="thumb-placeholder">Front</span>
-                </div>
-                <span class="thumb-label">Front</span>
-            </button>
-            @if($hasBackSide)
-            <button type="button" class="preview-thumb" data-card-thumb="back" aria-pressed="false">
-                <div class="thumb-preview" @if($backImage) style="background-image: url('{{ $backImage }}');" @endif>
-                    <span class="thumb-placeholder">Back</span>
-                </div>
-                <span class="thumb-label">Back</span>
-            </button>
-            @endif
-        </div>
+        <!-- React-based TemplateEditor mount point (renders Front and Back canvases) -->
+        <div
+            id="template-editor-root"
+            data-has-back="{{ $hasBackSide ? 'true' : 'false' }}"
+            data-front-canvas-width="{{ $canvasWidthAttr ?? '' }}"
+            data-front-canvas-height="{{ $canvasHeightAttr ?? '' }}"
+            data-front-canvas-unit="{{ $canvasUnitAttr ?? '' }}"
+            data-back-canvas-width="{{ $canvasWidthAttr ?? '' }}"
+            data-back-canvas-height="{{ $canvasHeightAttr ?? '' }}"
+            data-back-canvas-unit="{{ $canvasUnitAttr ?? '' }}"
+        ></div>
     </section>
 </main>
 
@@ -563,32 +439,7 @@
             </div>
         </div>
         <p class="modal-helper">Edit your text below, or click on the field you'd like to edit directly on your design.</p>
-        <div class="text-field-list" id="textFieldList">
-            <!-- fields are generated dynamically from the SVG (or default placeholders shown only when SVG has no text nodes) -->
-        </div>
-        <div class="text-layout-controls" style="margin-top:12px; display:flex; gap:10px; align-items:center;">
-            <label style="font-weight:600; margin-right:6px">Layout</label>
-            <select id="textLayoutOrientation" aria-label="Text layout orientation">
-                <option value="horizontal">Horizontal rows</option>
-                <option value="vertical">Vertical columns</option>
-            </select>
-            <label for="textLayoutColumns" style="margin-left:6px">Columns</label>
-            <input id="textLayoutColumns" type="number" min="1" value="1" style="width:64px" aria-label="Number of columns">
-            <label for="textLayoutHAlign" style="margin-left:6px">H Align</label>
-            <select id="textLayoutHAlign" aria-label="Horizontal alignment">
-                <option value="left">Left</option>
-                <option value="center" selected>Center</option>
-                <option value="right">Right</option>
-            </select>
-            <label for="textLayoutVAlign" style="margin-left:6px">V Align</label>
-            <select id="textLayoutVAlign" aria-label="Vertical alignment">
-                <option value="top">Top</option>
-                <option value="middle" selected>Middle</option>
-                <option value="bottom">Bottom</option>
-            </select>
-            <button id="applyTextLayoutBtn" class="btn btn-primary" type="button" style="margin-left:8px">Apply</button>
-        </div>
-        <button class="add-field-btn" type="button" data-add-text-field>New Text Field</button>
+        <!-- Text fields content will be rendered by React -->
     </div>
 </div>
 
@@ -607,11 +458,27 @@
         </div>
         <p class="modal-helper">Upload photos and illustrations to personalize your invitation.</p>
         <div class="upload-section">
-            <button type="button" id="upload-button" class="upload-button">
-                <i class="fa-solid fa-cloud-arrow-up"></i>
-                Upload Image
-            </button>
-            <input type="file" id="image-upload" accept="image/*" class="upload-input" style="display: none;">
+            <div class="upload-controls">
+                <div class="side-toggle" role="tablist" aria-label="Upload side" style="margin-right:8px;display:inline-flex;gap:6px;">
+                    <button type="button" id="upload-side-front" class="side-toggle-btn active" aria-pressed="true" data-side="front">Front</button>
+                    <button type="button" id="upload-side-back" class="side-toggle-btn" aria-pressed="false" data-side="back">Back</button>
+                </div>
+                <label for="upload-side-select" class="sr-only">(legacy) Upload side</label>
+                <select id="upload-side-select" aria-label="Upload side" style="display:none;">
+                    <option value="front" selected>Front</option>
+                    <option value="back">Back</option>
+                </select>
+
+                <button type="button" id="upload-button" class="upload-button">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    Upload Image
+                </button>
+                <input type="file" id="image-upload" accept="image/*" class="upload-input" style="display: none;" multiple>
+            </div>
+
+            <div id="uploadsDropZone" tabindex="0" aria-label="Upload drop zone" class="uploads-dropzone" style="border:2px dashed var(--accent);padding:12px;text-align:center;cursor:default;margin-top:12px;min-height:38px;">
+                <!-- Drag & drop images here. Click has been disabled to avoid confusion. -->
+            </div>
         </div>
         <div class="recently-uploaded-section">
             <h3 class="section-title">Recently Uploaded</h3>
@@ -620,58 +487,6 @@
                 <div class="no-recent-uploads">
                     <p>No recent uploads found. Upload some images above to see them here.</p>
                 </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div id="graphics-modal" class="modal" data-section="graphics" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="graphics-modal-title">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2 id="graphics-modal-title">Graphics</h2>
-            <div class="modal-header-actions">
-                <button type="button" aria-label="Dock panel" disabled aria-disabled="true">
-                    <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
-                </button>
-                <button type="button" class="modal-close" data-modal-close aria-label="Close panel">
-                    <i class="fa-solid fa-xmark modal-close-icon"></i>
-                </button>
-            </div>
-        </div>
-        <p class="modal-helper">Decorate your card with curated illustrations and icons.</p>
-        <div class="graphics-panel">
-            <div class="graphics-categories-labels">
-                <div class="category-row" data-category-row="shapes">
-                    <span class="category-label">Shapes</span>
-                    <button type="button" class="graphics-category-button" data-category="shapes" aria-expanded="false"><i class="fi fi-br-angle-small-right"></i></button>
-                </div>
-                <div class="category-row" data-category-row="image">
-                    <span class="category-label">Image</span>
-                    <button type="button" class="graphics-category-button" data-category="image" aria-expanded="false"><i class="fi fi-br-angle-small-right"></i></button>
-                </div>
-                <div class="category-row" data-category-row="icons">
-                    <span class="category-label">Icons</span>
-                    <button type="button" class="graphics-category-button" data-category="icons" aria-expanded="false"><i class="fi fi-br-angle-small-right"></i></button>
-                </div>
-                <div class="category-row" data-category-row="illustrations">
-                    <span class="category-label">Illustrations</span>
-                    <button type="button" class="graphics-category-button" data-category="illustrations" aria-expanded="false"><i class="fi fi-br-angle-small-right"></i></button>
-                </div>
-                <div class="category-row" data-category-row="patterns">
-                    <span class="category-label">Patterns</span>
-                    <button type="button" class="graphics-category-button" data-category="patterns" aria-expanded="false"><i class="fi fi-br-angle-small-right"></i></button>
-                </div>
-            </div>
-            <div class="graphics-browser" id="graphics-browser">
-                <form class="graphics-search is-hidden" id="graphics-search-form" role="search">
-                    <label for="graphics-search-input" class="visually-hidden">Search graphics</label>
-                    <div class="graphics-search-field">
-                        <i class="fi fi-rr-search graphics-search-icon" aria-hidden="true"></i>
-                        <input type="search" id="graphics-search-input" name="graphics-search" autocomplete="off" placeholder="Search graphics" />
-                    </div>
-                    <button type="submit" id="graphics-search-submit">Search</button>
-                </form>
-                <div class="graphics-samples" id="graphics-browser-samples" aria-live="polite"></div>
             </div>
         </div>
     </div>
@@ -697,81 +512,7 @@
     </div>
 </div>
 
-<div id="background-modal" class="modal" data-section="background" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="background-modal-title">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2 id="background-modal-title">Colors</h2>
-            <div class="modal-header-actions">
-                <button type="button" aria-label="Dock panel" disabled aria-disabled="true">
-                    <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
-                </button>
-                <button type="button" class="modal-close" data-modal-close aria-label="Close panel">
-                    <i class="fa-solid fa-xmark modal-close-icon"></i>
-                </button>
-            </div>
-        </div>
-        <p class="modal-helper">Choose colors, textures, or patterns for your design.</p>
-        <div class="color-palette">
-            <button class="color-btn" style="background-color: #ff0000;" data-color="#ff0000" title="Red"></button>
-            <button class="color-btn" style="background-color: #ff7f00;" data-color="#ff7f00" title="Orange"></button>
-            <button class="color-btn" style="background-color: #ffff00;" data-color="#ffff00" title="Yellow"></button>
-            <button class="color-btn" style="background-color: #00ff00;" data-color="#00ff00" title="Green"></button>
-            <button class="color-btn" style="background-color: #0000ff;" data-color="#0000ff" title="Blue"></button>
-            <button class="color-btn" style="background-color: #4b0082;" data-color="#4b0082" title="Indigo"></button>
-            <button class="color-btn" style="background-color: #9400d3;" data-color="#9400d3" title="Violet"></button>
-            <button class="color-btn" style="background-color: #ff69b4;" data-color="#ff69b4" title="Pink"></button>
-            <button class="color-btn" style="background-color: #a52a2a;" data-color="#a52a2a" title="Brown"></button>
-            <button class="color-btn" style="background-color: #808080;" data-color="#808080" title="Gray"></button>
-            <button class="color-btn" style="background-color: #FFFFFF;" data-color="#FFFFFF" title="White"></button>
-            <button class="color-btn" style="background-color: #000000;" data-color="#000000" title="Black"></button>
-            <button class="color-btn" style="background-color: #FFF6E5;" data-color="#FFF6E5" title="Cream"></button>
-            <button class="color-btn" style="background-color: #F5EFE8;" data-color="#F5EFE8" title="Beige"></button>
-            <button class="color-btn" style="background-color: #FFFFF0;" data-color="#FFFFF0" title="Ivory"></button>
-            <button class="color-btn" style="background-color: #D3D3D3;" data-color="#D3D3D3" title="Light Gray"></button>
-            <button class="color-btn" style="background-color: #36454F;" data-color="#36454F" title="Charcoal"></button>
-            <button class="color-btn" style="background-color: #001F3F;" data-color="#001F3F" title="Navy"></button>
-            <button class="color-btn" style="background-color: #008080;" data-color="#008080" title="Teal"></button>
-            <button class="color-btn" style="background-color: #40E0D0;" data-color="#40E0D0" title="Turquoise"></button>
-            <button class="color-btn" style="background-color: #CDEFEA;" data-color="#CDEFEA" title="Mint"></button>
-            <button class="color-btn" style="background-color: #9DC183;" data-color="#9DC183" title="Sage Green"></button>
-            <button class="color-btn" style="background-color: #228B22;" data-color="#228B22" title="Forest Green"></button>
-            <button class="color-btn" style="background-color: #800000;" data-color="#800000" title="Maroon"></button>
-            <button class="color-btn" style="background-color: #800020;" data-color="#800020" title="Burgundy"></button>
-            <button class="color-btn" style="background-color: #D4AF37;" data-color="#D4AF37" title="Gold"></button>
-            <button class="color-btn" style="background-color: #F7E7CE;" data-color="#F7E7CE" title="Champagne"></button>
-            <button class="color-btn" style="background-color: #FFDAB9;" data-color="#FFDAB9" title="Peach"></button>
-            <button class="color-btn" style="background-color: #E6E6FA;" data-color="#E6E6FA" title="Lavender"></button>
-            <button class="color-btn" style="background-color: #87CEEB;" data-color="#87CEEB" title="Sky Blue"></button>
-            <button class="color-btn" style="background-color: #FF6F61;" data-color="#FF6F61" title="Coral"></button>
-            <button class="color-btn" style="background-color: #FA8072;" data-color="#FA8072" title="Salmon"></button>
-            <button class="color-btn" style="background-color: #E63946;" data-color="#E63946" title="Rose"></button>
-            <button class="color-btn" style="background-color: #C97C8A;" data-color="#C97C8A" title="Dusty Rose"></button>
-            <button class="color-btn" style="background-color: #B784A7;" data-color="#B784A7" title="Mauve"></button>
-            <button class="color-btn" style="background-color: #8E4585;" data-color="#8E4585" title="Plum"></button>
-            <button class="color-btn" style="background-color: #614051;" data-color="#614051" title="Eggplant"></button>
-            <button class="color-btn" style="background-color: #CCCCFF;" data-color="#CCCCFF" title="Periwinkle"></button>
-            <button class="color-btn" style="background-color: #B0E0E6;" data-color="#B0E0E6" title="Powder Blue"></button>
-            <button class="color-btn" style="background-color: #4682B4;" data-color="#4682B4" title="Steel Blue"></button>
-            <button class="color-btn" style="background-color: #1560BD;" data-color="#1560BD" title="Denim"></button>
-            <button class="color-btn" style="background-color: #191970;" data-color="#191970" title="Midnight Blue"></button>
-            <button class="color-btn" style="background-color: #808000;" data-color="#808000" title="Olive"></button>
-            <button class="color-btn" style="background-color: #8A9A5B;" data-color="#8A9A5B" title="Moss Green"></button>
-            <button class="color-btn" style="background-color: #9FE2BF;" data-color="#9FE2BF" title="Seafoam"></button>
-            <button class="color-btn" style="background-color: #C2B280;" data-color="#C2B280" title="Sand"></button>
-            <button class="color-btn" style="background-color: #483C32;" data-color="#483C32" title="Taupe"></button>
-            <button class="color-btn" style="background-color: #6F4E37;" data-color="#6F4E37" title="Mocha"></button>
-            <button class="color-btn" style="background-color: #708090;" data-color="#708090" title="Slate Gray"></button>
-            <button class="color-btn" style="background-color: #BEBEBE;" data-color="#BEBEBE" title="Smoke"></button>
-        </div>
-        <div class="custom-color-section">
-            <label for="custom-color-picker">Custom Color:</label>
-            <input type="color" id="custom-color-picker" class="custom-color-input" value="#ffffff">
-            <label for="opacity-slider">Opacity:</label>
-            <input type="range" id="opacity-slider" class="opacity-slider" min="0" max="1" step="0.01" value="1">
-            <span id="opacity-value">100%</span>
-        </div>
-    </div>
-</div>
+
 <div id="qr-modal" class="modal" data-section="qr" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="qr-modal-title">
     <div class="modal-content">
         <div class="modal-header">
@@ -788,6 +529,45 @@
         <p class="modal-helper">Add scannable codes to link guests to RSVP forms or schedules.</p>
         <div class="modal-placeholder">
             <p>QR tools are coming soon.</p>
+        </div>
+    </div>
+</div>
+
+<div id="preview-modal" class="modal preview-modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="preview-modal-title">
+    <div class="modal-overlay" data-modal-close></div>
+    <div class="modal-content preview-modal-content">
+        <div class="modal-header">
+            <h2 id="preview-modal-title">Preview Your Design</h2>
+            <div class="modal-header-actions">
+                <div class="preview-toggle-group" style="display:flex;gap:8px;align-items:center;margin-right:8px;">
+                    <button type="button" id="preview-show-front" class="btn btn-sm" aria-pressed="true">Front</button>
+                    @if($hasBackSide)
+                    <button type="button" id="preview-show-back" class="btn btn-sm" aria-pressed="false">Back</button>
+                    @endif
+                </div>
+                <button type="button" class="modal-close" data-modal-close aria-label="Close preview">
+                    <i class="fa-solid fa-xmark modal-close-icon"></i>
+                </button>
+            </div>
+        </div>
+        <div class="preview-container">
+            <div class="preview-card-wrapper">
+                <div class="preview-card front-card active" id="preview-front-card">
+                    <div class="preview-card-inner">
+                        <div class="preview-card-bg" id="preview-front-bg"></div>
+                        <svg id="preview-front-svg" class="preview-svg"></svg>
+                    </div>
+                </div>
+                @if($hasBackSide)
+                <div class="preview-card back-card" id="preview-back-card">
+                    <div class="preview-card-inner">
+                        <div class="preview-card-bg" id="preview-back-bg"></div>
+                        <svg id="preview-back-svg" class="preview-svg"></svg>
+                    </div>
+                </div>
+                @endif
+            </div>
+            {{-- Preview navigation removed: front/back toggle intentionally omitted --}}
         </div>
     </div>
 </div>
@@ -861,6 +641,57 @@
     </div>
 </div>
 
+<div id="graphics-modal" class="modal" data-section="graphics" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="graphics-modal-title">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="graphics-modal-title">Graphics Library</h2>
+            <div class="modal-header-actions">
+                <button type="button" aria-label="Dock panel" disabled aria-disabled="true">
+                    <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
+                </button>
+                <button type="button" class="modal-close" data-modal-close aria-label="Close panel">
+                    <i class="fa-solid fa-xmark modal-close-icon"></i>
+                </button>
+            </div>
+        </div>
+        <p class="modal-helper">Browse and add graphics to your design.</p>
+        <div class="graphics-panel">
+            <div class="graphics-categories">
+                <div class="graphics-categories-labels">
+                    <button class="graphics-category-button" data-category="image" aria-expanded="false">
+                        <i class="fa-solid fa-image"></i>
+                        <span>Images</span>
+                    </button>
+                    <button class="graphics-category-button" data-category="icon" aria-expanded="false">
+                        <i class="fa-solid fa-icons"></i>
+                        <span>Icons</span>
+                    </button>
+                    <button class="graphics-category-button" data-category="shape" aria-expanded="false">
+                        <i class="fa-solid fa-shapes"></i>
+                        <span>Shapes</span>
+                    </button>
+                </div>
+            </div>
+            <div class="graphics-browser">
+                <div class="graphics-search">
+                    <form id="graphics-search-form">
+                        <input type="search" id="graphics-search-input" placeholder="Search graphics..." aria-label="Search graphics">
+                        <button type="submit" aria-label="Search">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                        </button>
+                    </form>
+                </div>
+                <div id="graphics-browser-samples" class="graphics-samples">
+                    <div class="graphics-placeholder">
+                        <i class="fa-solid fa-images"></i>
+                        <p>Select a category to browse graphics</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 @php
     $selectedSize = request()->query('size')
         ?? $product?->size
@@ -895,6 +726,7 @@
         ],
         'routes' => [
             'autosave' => route('order.design.autosave'),
+            'uploadImage' => route('order.design.upload-image'),
             'saveTemplate' => route('order.design.save-template'),
             'review' => route('order.review'),
             'saveReview' => route('order.review.design'),
@@ -911,8 +743,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const columnsCount = document.getElementById('columns-count');
     const rowsCount = document.getElementById('rows-count');
     const addTableBtn = document.getElementById('add-table-btn');
-    const miniToolbar = document.getElementById('mini-toolbar');
-    const previewSvg = document.getElementById('preview-svg');
 
     let columns = 3;
     let rows = 3;
@@ -970,33 +800,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Mini toolbar functionality
-    if (previewSvg) {
-        previewSvg.addEventListener('click', function(e) {
-            // Check if clicked on text or image element
-            const target = e.target;
-            if (target.tagName === 'text' || target.tagName === 'image' || target.closest('text') || target.closest('image')) {
-                // Position the toolbar near the click
-                const rect = previewSvg.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                
-                miniToolbar.style.left = (x + 10) + 'px';
-                miniToolbar.style.top = (y + 10) + 'px';
-                miniToolbar.style.display = 'flex';
-            } else {
-                miniToolbar.style.display = 'none';
-            }
-        });
-    }
-
-    // Hide toolbar when clicking outside
-    document.addEventListener('click', function(e) {
-        if (!previewSvg.contains(e.target) && !miniToolbar.contains(e.target)) {
-            miniToolbar.style.display = 'none';
-        }
-    });
-
     // Floating toolbar functionality
     const floatingToolbar = document.getElementById('floating-toolbar');
     if (floatingToolbar) {
@@ -1013,16 +816,278 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Modal close functionality
+    // Modal and navigation functionality
     document.addEventListener('click', function(e) {
+        // Handle sidenav buttons
+        if (e.target.classList.contains('sidenav-btn') || e.target.closest('.sidenav-btn')) {
+            const btn = e.target.classList.contains('sidenav-btn') ? e.target : e.target.closest('.sidenav-btn');
+            const nav = btn.dataset.nav;
+            const modal = document.getElementById(nav + '-modal');
+            if (modal) {
+                const isOpen = modal.style.display === 'flex' || modal.getAttribute('aria-hidden') === 'false';
+                // Hide all modals
+                document.querySelectorAll('.modal').forEach(m => {
+                    m.style.display = 'none';
+                    m.setAttribute('aria-hidden', 'true');
+                });
+                // Remove active from all nav buttons
+                document.querySelectorAll('.sidenav-btn').forEach(b => b.classList.remove('active'));
+                if (!isOpen) {
+                    modal.style.display = 'flex';
+                    modal.setAttribute('aria-hidden', 'false');
+                    btn.classList.add('active');
+                }
+            }
+        }
+
+        // Handle modal close
         if (e.target.classList.contains('modal-close') || e.target.classList.contains('modal-close-icon') || e.target.hasAttribute('data-modal-close')) {
             const modal = e.target.closest('.modal');
             if (modal) {
                 modal.style.display = 'none';
                 modal.setAttribute('aria-hidden', 'true');
+                // Remove active from nav button
+                const section = modal.dataset.section;
+                if (section) {
+                    const navBtn = document.querySelector(`.sidenav-btn[data-nav="${section}"]`);
+                    if (navBtn) navBtn.classList.remove('active');
+                }
             }
         }
     });
+
+    // Preview functionality
+    const previewBtn = document.getElementById('preview-btn');
+    const previewModal = document.getElementById('preview-modal');
+    const previewFrontCard = document.getElementById('preview-front-card');
+    const previewBackCard = document.getElementById('preview-back-card');
+    const previewFrontBg = document.getElementById('preview-front-bg');
+    const previewBackBg = document.getElementById('preview-back-bg');
+    const previewFrontSvg = document.getElementById('preview-front-svg');
+    const previewBackSvg = document.getElementById('preview-back-svg');
+    const previewNavBtns = document.querySelectorAll('.preview-nav-btn');
+
+    if (previewBtn && previewModal) {
+        previewBtn.addEventListener('click', function() {
+            showPreview();
+        });
+    }
+
+    function showPreview() {
+        if (!previewModal) return;
+
+        // If the React TemplateEditor is mounted, prefer copying the live editor SVGs
+        try {
+            const editorFront = document.querySelector('#template-editor-container-front svg');
+            const editorBack = document.querySelector('#template-editor-container-back svg');
+            if (editorFront) {
+                // Clear and copy
+                previewFrontSvg.innerHTML = '';
+                Array.from(editorFront.childNodes).forEach(n => previewFrontSvg.appendChild(n.cloneNode(true)));
+                // copy attributes
+                Array.from(editorFront.attributes || []).forEach(attr => {
+                    if (attr && attr.name !== 'id') previewFrontSvg.setAttribute(attr.name, attr.value);
+                });
+            }
+            if (editorBack && previewBackSvg) {
+                previewBackSvg.innerHTML = '';
+                Array.from(editorBack.childNodes).forEach(n => previewBackSvg.appendChild(n.cloneNode(true)));
+                Array.from(editorBack.attributes || []).forEach(attr => {
+                    if (attr && attr.name !== 'id') previewBackSvg.setAttribute(attr.name, attr.value);
+                });
+            }
+        } catch (e) {
+            // fall back to existing canvas-based preview
+        }
+
+        // Get current canvas dimensions and content
+        const canvasWrapper = document.querySelector('.preview-canvas-wrapper');
+        const canvasBg = document.querySelector('.preview-card-bg');
+        const canvasSvg = document.getElementById('preview-svg');
+
+        if (canvasWrapper && canvasBg && canvasSvg) {
+            // Copy dimensions
+            const canvasWidth = canvasWrapper.dataset.canvasWidth;
+            const canvasHeight = canvasWrapper.dataset.canvasHeight;
+            const canvasShape = canvasWrapper.dataset.canvasShape;
+            const canvasUnit = canvasWrapper.dataset.canvasUnit || 'px';
+
+            // Set preview card dimensions
+            if (canvasWidth && canvasHeight) {
+                const width = parseFloat(canvasWidth);
+                const height = parseFloat(canvasHeight);
+                const aspectRatio = height / width;
+
+                // Calculate display size (max 600px width, maintain aspect ratio)
+                const maxWidth = 600;
+                const displayWidth = Math.min(width, maxWidth);
+                const displayHeight = displayWidth * aspectRatio;
+
+                previewFrontCard.style.width = displayWidth + 'px';
+                previewFrontCard.style.height = displayHeight + 'px';
+                if (previewBackCard) {
+                    previewBackCard.style.width = displayWidth + 'px';
+                    previewBackCard.style.height = displayHeight + 'px';
+                }
+
+                // Set SVG viewBox
+                previewFrontSvg.setAttribute('viewBox', `0 0 ${canvasWidth} ${canvasHeight}`);
+                if (previewBackSvg) {
+                    previewBackSvg.setAttribute('viewBox', `0 0 ${canvasWidth} ${canvasHeight}`);
+                }
+            }
+
+            // Copy background images
+            const frontImage = canvasBg.dataset.frontImage;
+            const backImage = canvasBg.dataset.backImage;
+
+            if (frontImage) {
+                previewFrontBg.style.backgroundImage = `url('${frontImage}')`;
+            }
+
+            if (backImage && previewBackBg) {
+                previewBackBg.style.backgroundImage = `url('${backImage}')`;
+            }
+
+            // Copy SVG content
+            if (canvasSvg) {
+                const frontSvgContent = canvasSvg.outerHTML;
+                previewFrontSvg.innerHTML = canvasSvg.innerHTML;
+
+                // Copy SVG attributes
+                Array.from(canvasSvg.attributes).forEach(attr => {
+                    if (attr.name !== 'id') {
+                        previewFrontSvg.setAttribute(attr.name, attr.value);
+                    }
+                });
+            }
+
+            // Handle back side if exists
+            const hasBack = canvasBg.dataset.hasBack === 'true';
+            if (hasBack && previewBackCard && previewBackSvg) {
+                const backSvgData = canvasBg.dataset.backSvg;
+                if (backSvgData) {
+                    if (backSvgData.startsWith('data:image/svg+xml;base64,')) {
+                        // Handle data URI
+                        try {
+                            const base64Data = backSvgData.split(',')[1];
+                            const svgContent = atob(base64Data);
+
+                            // Parse the SVG content
+                            const parser = new DOMParser();
+                            const svgDoc = parser.parseFromString(svgContent, 'image/svg+xml');
+                            const svgElement = svgDoc.querySelector('svg');
+
+                            if (svgElement) {
+                                // Copy the inner content of the SVG
+                                previewBackSvg.innerHTML = svgElement.innerHTML;
+
+                                // Set the viewBox to match the canvas dimensions
+                                if (canvasWidth && canvasHeight) {
+                                    previewBackSvg.setAttribute('viewBox', `0 0 ${canvasWidth} ${canvasHeight}`);
+                                }
+
+                                // Copy other important attributes, but don't override viewBox
+                                ['width', 'height', 'preserveAspectRatio'].forEach(attr => {
+                                    const value = svgElement.getAttribute(attr);
+                                    if (value && attr !== 'viewBox') {
+                                        previewBackSvg.setAttribute(attr, value);
+                                    }
+                                });
+                            } else {
+                                console.warn('Invalid SVG content for back side');
+                                previewBackSvg.innerHTML = '';
+                            }
+                        } catch (error) {
+                            console.error('Error decoding back SVG data URI:', error);
+                            previewBackSvg.innerHTML = '';
+                        }
+                    } else if (backSvgData.startsWith('http') || backSvgData.startsWith('/')) {
+                        // Handle URL - fetch the SVG content
+                        fetch(backSvgData)
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error('Failed to load back SVG');
+                                }
+                                return response.text();
+                            })
+                            .then(svgContent => {
+                                // Extract the SVG content
+                                const parser = new DOMParser();
+                                const svgDoc = parser.parseFromString(svgContent, 'image/svg+xml');
+                                const svgElement = svgDoc.querySelector('svg');
+
+                                if (svgElement) {
+                                    // Copy the inner content of the SVG
+                                    previewBackSvg.innerHTML = svgElement.innerHTML;
+
+                                    // Set the viewBox to match the canvas dimensions
+                                    if (canvasWidth && canvasHeight) {
+                                        previewBackSvg.setAttribute('viewBox', `0 0 ${canvasWidth} ${canvasHeight}`);
+                                    }
+
+                                    // Copy other important attributes, but don't override viewBox
+                                    ['width', 'height', 'preserveAspectRatio'].forEach(attr => {
+                                        const value = svgElement.getAttribute(attr);
+                                        if (value && attr !== 'viewBox') {
+                                            previewBackSvg.setAttribute(attr, value);
+                                        }
+                                    });
+                                } else {
+                                    console.warn('Invalid SVG content for back side');
+                                    previewBackSvg.innerHTML = '';
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error loading back SVG:', error);
+                                previewBackSvg.innerHTML = '';
+                            });
+                    } else {
+                        console.warn('Unsupported back SVG format:', backSvgData);
+                        previewBackSvg.innerHTML = '';
+                    }
+                } else {
+                    previewBackSvg.innerHTML = '';
+                }
+            }
+        }
+
+        // Show modal
+        previewModal.style.display = 'flex';
+        previewModal.setAttribute('aria-hidden', 'false');
+
+        // Default to front side
+        showPreviewSide('front');
+    }
+
+    function showPreviewSide(side) {
+        if (side === 'front') {
+            previewFrontCard.classList.add('active');
+            if (previewBackCard) previewBackCard.classList.remove('active');
+        } else if (side === 'back' && previewBackCard) {
+            previewBackCard.classList.add('active');
+            previewFrontCard.classList.remove('active');
+        }
+
+        // Update nav buttons
+        previewNavBtns.forEach(btn => {
+            if (btn.dataset.side === side) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+
+    // Preview navigation
+    if (previewNavBtns.length > 0) {
+        previewNavBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const side = this.dataset.side;
+                showPreviewSide(side);
+            });
+        });
+    }
 
     // Initial setup
     updateDisplay();

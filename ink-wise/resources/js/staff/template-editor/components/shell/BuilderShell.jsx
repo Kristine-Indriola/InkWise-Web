@@ -874,8 +874,17 @@ export function BuilderShell() {
 
       setAutosaveStatus('saving');
 
+      // Save only the current side's design
+      const currentSideDesign = state.currentSide === 'front' ? state.frontDesign : state.backDesign;
+      const updatedDesign = {
+        ...currentSideDesign,
+        pages: designSnapshot.pages,
+        activePageId: state.activePageId,
+      };
+
       let autosavePayload = {
-        design: designSnapshot,
+        design: updatedDesign,
+        side: state.currentSide, // Indicate which side this is
         canvas: designSnapshot.canvas,
         template_name: state.template?.name ?? null,
         template: {
@@ -1255,8 +1264,26 @@ export function BuilderShell() {
 
       const shouldIncludePreview = !!finalPreviewImage;
 
+      // Create separate designs for front and back
+      const frontPages = designSnapshot.pages.filter(page =>
+        page.pageType === 'front' || page.metadata?.side === 'front'
+      );
+      const backPages = designSnapshot.pages.filter(page =>
+        page.pageType === 'back' || page.metadata?.side === 'back'
+      );
+
+      const frontDesign = {
+        ...designSnapshot,
+        pages: frontPages.length > 0 ? frontPages : (state.currentSide === 'front' ? designSnapshot.pages : []),
+      };
+      const backDesign = {
+        ...designSnapshot,
+        pages: backPages.length > 0 ? backPages : (state.currentSide === 'back' ? designSnapshot.pages : []),
+      };
+
       const payload = {
-        design: designSnapshot,
+        design: frontDesign,
+        design_back: backDesign,
         template_name: state.template?.name ?? null,
         template: {
           width_inch: state.template?.width_inch ?? null,

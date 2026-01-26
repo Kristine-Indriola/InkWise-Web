@@ -24,6 +24,8 @@ export default defineConfig({
         'resources/js/customer/studio/main.jsx',
         'resources/js/customer/studio/svg-template-editor.jsx',
         'resources/js/staff/template-editor/main.jsx',
+        // Review component
+        'resources/js/customer/components/Review.jsx',
       ],
       refresh: true,
     }),

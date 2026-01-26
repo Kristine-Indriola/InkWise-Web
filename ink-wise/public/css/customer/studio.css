@@ -9,6 +9,7 @@
     --studio-header-height: 72px;
 }
 
+
 * {
     box-sizing: border-box;
 }
@@ -707,7 +708,7 @@ body {
     border-style: dashed;
 }
 
-#preview-svg {
+.preview-svg {
     position: absolute;
     inset: 0;
     width: 100%;
