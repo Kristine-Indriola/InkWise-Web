@@ -196,13 +196,40 @@ export function TextMiniToolbar({
       try {
         const hex = cmykToHex(cVal, mVal, yVal, kVal);
         setColor(hex);
-        onColorChange(hex);
       } catch (e) {
         // ignore
       }
     }
     // only care when CMYK values or activeTab change
   }, [cVal, mVal, yVal, kVal, activeTab]);
+
+  
+  // Notify parent and normalize hex whenever `color` changes.
+  useEffect(() => {
+    if (!color) return;
+    try {
+      let next = String(color).trim().toUpperCase();
+      if (!next.startsWith('#')) next = `#${next}`;
+      // accept 3 or 6 hex digits
+      if (!/^#([0-9A-F]{3}|[0-9A-F]{6})$/.test(next)) {
+        // invalid input: don't notify parent until it's valid
+        return;
+      }
+      if (next !== color) {
+        // update to normalized form; the subsequent effect run will notify
+        setColor(next);
+        return;
+      }
+      // valid normalized color — inform parent so canvas updates
+      try {
+        onColorChange(next);
+      } catch (e) {
+        // ignore errors from parent handler
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [color, onColorChange]);
 
   // Convert hex to HSL and HSL to hex helpers
   function hexToRgb(hex) {
@@ -297,7 +324,6 @@ export function TextMiniToolbar({
           (isAlignModalOpen && alignModalRef.current && !alignModalRef.current.contains(event.target)) ||
         (isListModalOpen && listModalRef.current && !listModalRef.current.contains(event.target)) ||
         (isNumberModalOpen && numberModalRef.current && !numberModalRef.current.contains(event.target))
-        || (isOpacityModalOpen && opacityModalRef.current && !opacityModalRef.current.contains(event.target))
       ) {
         setIsFontModalOpen(false);
         setIsColorModalOpen(false);
@@ -306,7 +332,6 @@ export function TextMiniToolbar({
         setIsAlignModalOpen(false);
         setIsListModalOpen(false);
         setIsNumberModalOpen(false);
-        setIsOpacityModalOpen(false);
       }
     };
 
@@ -327,7 +352,7 @@ export function TextMiniToolbar({
       }
     };
 
-    if (isFontModalOpen || isColorModalOpen || isFormatModalOpen || isCaseModalOpen || isAlignModalOpen || isListModalOpen || isNumberModalOpen || isEffectsModalOpen || isOpacityModalOpen || isRotationModalOpen || isLayersModalOpen || isMoreModalOpen) {
+    if (isFontModalOpen || isColorModalOpen || isFormatModalOpen || isCaseModalOpen || isAlignModalOpen || isListModalOpen || isNumberModalOpen || isEffectsModalOpen || isRotationModalOpen || isLayersModalOpen || isMoreModalOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('keydown', handleEsc);
     }
@@ -395,11 +420,6 @@ export function TextMiniToolbar({
   const [lineSpacing, setLineSpacing] = useState(1.4);
   const [letterSpacing, setLetterSpacing] = useState(0.12);
 
-  // Opacity modal state and ref
-  const [isOpacityModalOpen, setIsOpacityModalOpen] = useState(false);
-  const [opacityValue, setOpacityValue] = useState(100); // percent 0-100
-  const opacityModalRef = useRef(null);
-
   // Rotation modal state and ref
   const [isRotationModalOpen, setIsRotationModalOpen] = useState(false);
   const [rotationValue, setRotationValue] = useState(0); // degrees -180..180
@@ -430,7 +450,6 @@ export function TextMiniToolbar({
       return;
     }
     setIsColorModalOpen(false);
-    setIsOpacityModalOpen(false);
     setIsRotationModalOpen(false);
     setIsLayersModalOpen(false);
     setIsMoreModalOpen(false);
@@ -504,11 +523,50 @@ export function TextMiniToolbar({
           <i className="fa-solid fa-minus" aria-hidden="true" />
         </button>
         <label className="sr-only" htmlFor="mini-toolbar-size">{isImageSelection ? 'Image scale' : 'Font size'}</label>
-        <select id="mini-toolbar-size" className="size-select" value={fontSize} onChange={handleSelectSize} disabled={!hasSelection}>
-          {SIZE_OPTIONS.map((size) => (
-            <option key={size} value={size}>{size}</option>
-          ))}
-        </select>
+        <div className="size-input-wrapper">
+          <input
+            id="mini-toolbar-size"
+            className="size-input"
+            type="number"
+            min="8"
+            max="96"
+            step="1"
+            value={fontSize}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (Number.isFinite(v)) {
+                // update local UI immediately but don't dispatch until commit
+                setFontSize(v);
+              }
+            }}
+            onBlur={() => applySize(Number(fontSize))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                applySize(Number(fontSize));
+              } else if (e.key === 'Escape') {
+                // revert to previously committed size from the bridge if available
+                try {
+                  const bridge = typeof window !== 'undefined' ? window.inkwiseToolbar : null;
+                  if (bridge && typeof bridge.getSelection === 'function') {
+                    const sel = bridge.getSelection();
+                    if (sel && Number.isFinite(Number(sel.fontSize))) {
+                      setFontSize(Number(sel.fontSize));
+                    }
+                  }
+                } catch (err) {
+                  // ignore
+                }
+              }
+            }}
+            disabled={!hasSelection}
+            aria-label={isImageSelection ? 'Image scale' : 'Font size'}
+            list="mini-toolbar-size-options"
+          />
+          <datalist id="mini-toolbar-size-options">
+            {SIZE_OPTIONS.map((s) => <option key={s} value={s} />)}
+          </datalist>
+        </div>
         <button type="button" className="ghost-button" aria-label={isImageSelection ? 'Increase image scale' : 'Increase font size'} onClick={() => changeSizeBy(2)} disabled={!hasSelection}>
           <i className="fa-solid fa-plus" aria-hidden="true" />
         </button>
@@ -580,7 +638,7 @@ export function TextMiniToolbar({
                       <input
                         type="text"
                         className="hex-input"
-                        value={hslToHex(h, s, l)}
+                        value={color}
                         onChange={(e) => setColor(e.target.value)}
                         aria-label="Hex color value"
                       />
@@ -986,72 +1044,6 @@ export function TextMiniToolbar({
           <button
             type="button"
             className="ghost-button"
-            aria-label="Spacing"
-            onClick={() => {
-              if (!hasSelection) {
-                return;
-              }
-              // open opacity modal instead of default spacing action
-              setIsOpacityModalOpen((v) => !v);
-              // close other modals
-              setIsEffectsModalOpen(false);
-              setIsCaseModalOpen(false);
-              setIsListModalOpen(false);
-              setIsAlignModalOpen(false);
-              setIsFormatModalOpen(false);
-              setIsColorModalOpen(false);
-              setIsFontModalOpen(false);
-              setIsNumberModalOpen(false);
-            }}
-            disabled={!hasSelection}
-          >
-            <i className="fi fi-rr-chess-board" aria-hidden="true" />
-          </button>
-
-          {isOpacityModalOpen && (
-            <div className="opacity-modal" ref={opacityModalRef} role="dialog" aria-label="Opacity" style={{ position: 'absolute', right: 0, top: '42px', zIndex: 1200 }}>
-              <div className="opacity-modal-content">
-                <div className="opacity-row">
-                  <label className="opacity-label">Opacity</label>
-                  <input
-                    className="opacity-input"
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={opacityValue}
-                    onChange={(e) => {
-                      const v = clamp(Number(e.target.value) || 0, 0, 100);
-                      setOpacityValue(v);
-                      onAction('opacity')(v);
-                    }}
-                    aria-label="Opacity percent"
-                  />
-                </div>
-
-                <div className="opacity-slider-row">
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={opacityValue}
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      setOpacityValue(v);
-                      onAction('opacity')(v);
-                    }}
-                    className="opacity-slider"
-                    aria-label="Opacity slider"
-                    style={{ background: 'linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,1))' }}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-        <div style={{ display: 'inline-block', position: 'relative' }}>
-          <button
-            type="button"
-            className="ghost-button"
             aria-label="Layers"
             onClick={() => {
               if (!hasSelection) {
@@ -1059,7 +1051,6 @@ export function TextMiniToolbar({
               }
               setIsLayersModalOpen((v) => !v);
               setIsRotationModalOpen(false);
-              setIsOpacityModalOpen(false);
               setIsEffectsModalOpen(false);
               setIsCaseModalOpen(false);
               setIsListModalOpen(false);
@@ -1107,7 +1098,6 @@ export function TextMiniToolbar({
                 return;
               }
               setIsRotationModalOpen((v) => !v);
-              setIsOpacityModalOpen(false);
               setIsEffectsModalOpen(false);
               setIsCaseModalOpen(false);
               setIsListModalOpen(false);
@@ -1174,7 +1164,6 @@ export function TextMiniToolbar({
               setIsMoreModalOpen((v) => !v);
               setIsLayersModalOpen(false);
               setIsRotationModalOpen(false);
-              setIsOpacityModalOpen(false);
               setIsEffectsModalOpen(false);
               setIsCaseModalOpen(false);
               setIsListModalOpen(false);

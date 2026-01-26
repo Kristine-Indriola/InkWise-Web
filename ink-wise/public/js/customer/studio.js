@@ -158,9 +158,12 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Load an SVG file and bind any text/image elements (with data-preview-node) into the UI and make them editable
-    const loadSVGAndBind = async (url) => {
+    const loadSVGAndBind = async (url, side = 'front') => {
+        const svgId = side === 'back' ? 'preview-svg-back' : 'preview-svg-front';
+        const svgElement = document.getElementById(svgId);
+        
         if (!url) {
-            document.getElementById('preview-svg').innerHTML = '';
+            if (svgElement) svgElement.innerHTML = '';
             return;
         }
 
@@ -177,31 +180,38 @@ document.addEventListener('DOMContentLoaded', () => {
                 svgText = await res.text();
             }
 
-            const svgElement = document.getElementById('preview-svg');
-            svgElement.innerHTML = svgText;
+            if (svgElement) {
+                svgElement.innerHTML = svgText;
 
-            // Parse viewBox to adjust canvas size
-            const tempSvg = new DOMParser().parseFromString(svgText, 'image/svg+xml').documentElement;
-            const viewBox = tempSvg.getAttribute('viewBox');
-            if (viewBox) {
-                const [, , vbWidth, vbHeight] = viewBox.split(' ').map(Number);
-                const scale = 1.5; // Scale factor to match desired pixel sizes
-                const pixelWidth = Math.round(vbWidth * scale);
-                const pixelHeight = Math.round(vbHeight * scale);
+                // Parse viewBox to adjust canvas size
+                const tempSvg = new DOMParser().parseFromString(svgText, 'image/svg+xml').documentElement;
+                const viewBox = tempSvg.getAttribute('viewBox');
+                if (viewBox) {
+                    const [, , vbWidth, vbHeight] = viewBox.split(' ').map(Number);
+                    const scale = 1.5; // Scale factor to match desired pixel sizes
+                    const pixelWidth = Math.round(vbWidth * scale);
+                    const pixelHeight = Math.round(vbHeight * scale);
 
-                const wrapper = document.querySelector('.preview-canvas-wrapper');
-                wrapper.style.width = pixelWidth + 'px';
-                wrapper.style.height = pixelHeight + 'px';
+                    const wrapper = svgElement.closest('.preview-canvas-wrapper');
+                    if (wrapper) {
+                        wrapper.style.width = pixelWidth + 'px';
+                        wrapper.style.height = pixelHeight + 'px';
 
-                // Update measure values
-                const widthIn = (vbWidth / 100).toFixed(2);
-                const heightIn = (vbHeight / 100).toFixed(2);
-                document.querySelector('.canvas-measure-vertical .measure-value').textContent = heightIn + 'in';
-                document.querySelector('.canvas-measure-horizontal .measure-value').textContent = widthIn + 'in';
+                        // Update measure values (only for the first canvas to avoid conflicts)
+                        if (side === 'front') {
+                            const widthIn = (vbWidth / 100).toFixed(2);
+                            const heightIn = (vbHeight / 100).toFixed(2);
+                            document.querySelector('.canvas-measure-vertical .measure-value').textContent = heightIn + 'in';
+                            document.querySelector('.canvas-measure-horizontal .measure-value').textContent = widthIn + 'in';
+                        }
+                    }
 
-                // Adjust stage width
-                const stage = document.querySelector('.canvas-stage');
-                stage.style.width = (pixelWidth + 112) + 'px';
+                    // Adjust stage width
+                    const stage = document.querySelector('.canvas-stage');
+                    if (stage && side === 'front') {
+                        stage.style.width = (pixelWidth + 112) + 'px';
+                    }
+                }
             }
 
             // Find all elements with data-preview-node
@@ -209,7 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Rebuild the form controls for text fields based on SVG nodes.
             // If there are no text nodes, show the default placeholder fields.
-            if (textFieldList) {
+            if (textFieldList && side === 'front') { // Only rebuild form controls for front side
                 textFieldList.innerHTML = '';
 
                 const createFieldItem = (previewKey, value = '', labelText = '') => {
@@ -391,37 +401,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const setActiveCard = (side) => {
         currentSide = side;
-        if (!cardBg) {
+        
+        // Find the appropriate card background for this side
+        const cardBgElement = document.querySelector(`.preview-card-bg[data-side="${side}"]`);
+        if (!cardBgElement) {
             return;
         }
+        
         let image = '';
         let isUploaded = false;
+        let svgCandidate = '';
         if (side === 'front' && uploadedFrontImage) {
             image = uploadedFrontImage;
+            svgCandidate = uploadedFrontImage;
             isUploaded = true;
         } else if (side === 'back' && uploadedBackImage) {
             image = uploadedBackImage;
+            svgCandidate = uploadedBackImage;
             isUploaded = true;
         } else {
-            image = cardBg.dataset[`${side}Image`] || '';
+            image = cardBgElement.dataset[`${side}Image`] || '';
+            svgCandidate = cardBgElement.dataset[`${side}Svg`] || '';
             isUploaded = false;
         }
 
-        // Check if it's SVG
-        const isSVG = image.includes('svg') || image.startsWith('data:image/svg+xml');
+        // Prefer explicit SVG dataset when present, otherwise fall back to image
+        const isSvgSourceCandidate = (val) => typeof val === 'string' && (val.startsWith('data:image/svg+xml') || /\.svg($|\?)/i.test(val));
 
-        if (isSVG) {
-            // Load SVG inline
-            loadSVGAndBind(image);
-            cardBg.style.backgroundImage = 'none';
-            document.getElementById('preview-svg').style.display = 'block';
+        if (svgCandidate && isSvgSourceCandidate(svgCandidate)) {
+            loadSVGAndBind(svgCandidate, side);
+            cardBgElement.style.backgroundImage = 'none';
+            const svgElement = document.getElementById(side === 'back' ? 'preview-svg-back' : 'preview-svg-front');
+            if (svgElement) svgElement.style.display = 'block';
+        } else if (image && isSvgSourceCandidate(image)) {
+            loadSVGAndBind(image, side);
+            cardBgElement.style.backgroundImage = 'none';
+            const svgElement = document.getElementById(side === 'back' ? 'preview-svg-back' : 'preview-svg-front');
+            if (svgElement) svgElement.style.display = 'block';
         } else {
             // Show as background image
-            cardBg.style.backgroundImage = image ? `url('${image}')` : '';
-            document.getElementById('preview-svg').innerHTML = '';
-            document.getElementById('preview-svg').style.display = 'none';
+            cardBgElement.style.backgroundImage = image ? `url('${image}')` : '';
+            const svgElement = document.getElementById(side === 'back' ? 'preview-svg-back' : 'preview-svg-front');
+            if (svgElement) {
+                svgElement.innerHTML = '';
+                svgElement.style.display = 'none';
+            }
         }
-        cardBg.style.backgroundSize = isUploaded && !isSVG ? 'auto' : 'cover';
+        cardBgElement.style.backgroundSize = isUploaded && !isSVG ? 'auto' : 'cover';
 
         viewButtons.forEach((btn) => {
             btn.classList.toggle('active', btn.dataset.cardView === side);
@@ -445,8 +471,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Initialize both front and back canvases
     setActiveCard('front');
-
+    setActiveCard('back');
+  
+    
     // Delegate clicks inside the preview area: clicking any element with
     // data-preview-node will open the Text modal and focus the corresponding field.
     const previewArea = document.querySelector('.preview-overlay');

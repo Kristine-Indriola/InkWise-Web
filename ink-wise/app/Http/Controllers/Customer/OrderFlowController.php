@@ -81,7 +81,7 @@ class OrderFlowController extends Controller
         ]);
     }
 
-    public function storeDesignSelection(Request $request): RedirectResponse
+    public function storeDesignSelection(Request $request): RedirectResponse|JsonResponse
     {
         $data = $request->validate([
             'product_id' => ['required', 'integer', 'exists:products,id'],
@@ -737,30 +737,17 @@ class OrderFlowController extends Controller
     {
         \Illuminate\Support\Facades\Log::info('saveReviewDesign called', ['request_all' => $request->all()]);
 
-        try {
-            $validated = $request->validate([
-                'template_id' => ['required', 'integer'],
-                'design_svg' => ['nullable', 'string'],
-                'design_json' => ['nullable'],
-                'preview_image' => ['nullable', 'string'],
-                'canvas_width' => ['nullable', 'integer'],
-                'canvas_height' => ['nullable', 'integer'],
-                'background_color' => ['nullable', 'string', 'max:20'],
-                'order_item_id' => ['nullable', 'integer', 'exists:customer_order_items,id'],
-            ]);
-
-            \Illuminate\Support\Facades\Log::info('saveReviewDesign validation passed', ['validated' => $validated]);
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('saveReviewDesign validation failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
-            throw $e;
-        }
-
-        $summary = session(static::SESSION_SUMMARY_KEY);
-        $productId = $summary['productId'] ?? null;
-        $product = $productId ? $this->orderFlow->resolveProduct(null, $productId) : null;
-        $isGiveaway = $product && strtolower($product->product_type ?? '') === 'giveaway';
-
-        \Illuminate\Support\Facades\Log::info('saveReviewDesign validated', ['validated' => $validated]);
+        $validated = $request->validate([
+            'template_id' => ['required', 'integer'],
+            'design_svg' => ['nullable', 'string'],
+            'design_json' => ['nullable'],
+            'preview_image' => ['nullable', 'string'],
+            'preview_images' => ['nullable', 'array'],
+            'canvas_width' => ['nullable', 'integer'],
+            'canvas_height' => ['nullable', 'integer'],
+            'background_color' => ['nullable', 'string', 'max:20'],
+            'order_item_id' => ['nullable', 'integer'],
+        ]);
 
         $designJson = $validated['design_json'];
         try {
@@ -821,35 +808,90 @@ class OrderFlowController extends Controller
             $previewImage = $review->preview_image ?? null;
         }
 
-        // If we have an SVG design, save it as a file to templates/reviews/ directory
-        $svgFilePath = null;
-        if ($designSvg && trim($designSvg) !== '') {
-            try {
-                // Delete old SVG file if it exists
-                $existingSvgPath = $review->preview_image ?? null;
-                if ($existingSvgPath && str_ends_with($existingSvgPath, '.svg')) {
-                    $normalizedPath = ltrim(str_replace('\\', '/', $existingSvgPath), '/');
-                    $normalizedPath = preg_replace('#^/?storage/#i', '', $normalizedPath) ?? $normalizedPath;
-                    if (Storage::disk('public')->exists($normalizedPath)) {
-                        Storage::disk('public')->delete($normalizedPath);
+        // Handle multiple preview images (front/back) if provided - these should now be PNG data URLs from frontend
+        $incomingPreviewImages = $validated['preview_images'] ?? [];
+        if (is_array($incomingPreviewImages) && count($incomingPreviewImages)) {
+            $processedImages = [];
+            foreach ($incomingPreviewImages as $key => $imageData) {
+                if (!empty($imageData)) {
+                    try {
+                        $processedImages[$key] = $this->persistDataUrl(
+                            $imageData,
+                            $key === 0 ? 'templates/review_front_png' : 'templates/review_back_png',
+                            'png',
+                            null,
+                            'preview_images.' . $key
+                        );
+                    } catch (\Throwable $e) {
+                        report($e);
                     }
                 }
+            }
+            if (!empty($processedImages)) {
+                $review->preview_images = $processedImages;
+            }
+        }
 
-                // Save new SVG file
-                $directory = $isGiveaway ? 'templates/reviews/front' : 'templates/reviews';
-                Storage::disk('public')->makeDirectory($directory);
-                $svgFilePath = $directory . '/template_' . Str::uuid() . '.svg';
-                Storage::disk('public')->put($svgFilePath, $designSvg);
+        // Note: Server-side PNG generation from SVG is disabled since frontend now sends PNG previews
+        // The following code block is kept for reference but should not execute
+        $generatedPreviewImages = [];
+        /*
+        try {
+            $sides = $designJson['sides'] ?? [];
 
-                // Use SVG file as preview_image if no other preview was provided
-                if (!$previewImage) {
-                    $previewImage = $svgFilePath;
+            // Front side
+            $frontSvg = null;
+            if (!empty($sides['front']['svg']) && is_string($sides['front']['svg'])) {
+                $frontSvg = $sides['front']['svg'];
+            } elseif ($designSvg && trim($designSvg) !== '') {
+                // legacy fallback: use single designSvg as front
+                $frontSvg = $designSvg;
+            }
+
+            if ($frontSvg) {
+                try {
+                    // Decode if data URL
+                    if (Str::startsWith(trim($frontSvg), 'data:')) {
+                        $frontSvg = $this->decodeDataUrl($frontSvg);
+                    }
+
+                    $frontPngPath = $this->orderFlow->persistSvgAsPng($frontSvg, 'templates/review_front_png', $review->preview_images[0] ?? null, 'front_preview');
+                    if ($frontPngPath) {
+                        $generatedPreviewImages[0] = $frontPngPath;
+                        $previewImage = $frontPngPath;
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Failed to persist front SVG as PNG', ['error' => $e->getMessage()]);
                 }
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::error('Failed to save SVG file', [
-                    'error' => $e->getMessage(),
-                ]);
-                report($e);
+            }
+
+            // Back side
+            if (!empty($sides['back']['svg']) && is_string($sides['back']['svg'])) {
+                $backSvg = $sides['back']['svg'];
+                try {
+                    if (Str::startsWith(trim($backSvg), 'data:')) {
+                        $backSvg = $this->decodeDataUrl($backSvg);
+                    }
+                    $backPngPath = $this->orderFlow->persistSvgAsPng($backSvg, 'templates/review_back_png', $review->preview_images[1] ?? null, 'back_preview');
+                    if ($backPngPath) {
+                        $generatedPreviewImages[1] = $backPngPath;
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Failed to persist back SVG as PNG', ['error' => $e->getMessage()]);
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed to generate PNG previews from SVG design', ['error' => $e->getMessage()]);
+        }
+        */
+
+        // If we successfully generated PNG previews, use them as the review previews
+        if (!empty($generatedPreviewImages)) {
+            // Ensure ordering: front at index 0, back at index 1
+            ksort($generatedPreviewImages);
+            $review->preview_images = $generatedPreviewImages;
+            if (!empty($generatedPreviewImages[0])) {
+                $review->preview_image = $generatedPreviewImages[0];
             }
         }
 
@@ -889,6 +931,81 @@ class OrderFlowController extends Controller
             return response()->json([
                 'message' => 'Unable to save your design. Please try again.',
             ], 500);
+        }
+
+        // Generate and save SVG files for front and back
+        try {
+            $template = Template::find($validated['template_id']);
+            $sides = $designJson['sides'] ?? [];
+            
+            \Log::debug('SVG Save Debug', [
+                'has_front_svg' => !empty($sides['front']['svg']),
+                'has_back_svg' => !empty($sides['back']['svg']),
+                'front_svg_length' => isset($sides['front']['svg']) ? strlen($sides['front']['svg']) : 0,
+                'back_svg_length' => isset($sides['back']['svg']) ? strlen($sides['back']['svg']) : 0,
+                'template_has_back' => $template && $template->back_svg_path ? true : false,
+            ]);
+            
+            // Save front SVG - prioritize design_svg (latest changes), then sides, then template
+            $frontSvg = null;
+            if (!empty($designSvg)) {
+                $frontSvg = $designSvg;
+            } elseif (!empty($sides['front']['svg']) && is_string($sides['front']['svg'])) {
+                $frontSvg = $sides['front']['svg'];
+            } elseif ($template && $template->svg_path) {
+                // Fallback to template's front SVG
+                try {
+                    $frontSvg = \Illuminate\Support\Facades\Storage::disk('public')->get($template->svg_path);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Failed to load template front SVG', ['path' => $template->svg_path, 'error' => $e->getMessage()]);
+                }
+            }
+            
+            if ($frontSvg) {
+                if (Str::startsWith($frontSvg, 'data:image/svg+xml')) {
+                    $frontSvg = $this->decodeDataUrl($frontSvg);
+                }
+                $frontSvgPath = 'templates/review_front_SVG/template_' . Str::uuid() . '.svg';
+                \Illuminate\Support\Facades\Storage::disk('public')->put($frontSvgPath, $frontSvg);
+                $review->front_svg_path = $frontSvgPath;
+            }
+            
+            // Save back SVG
+            $backSvg = null;
+            if (!empty($sides['back']['svg']) && is_string($sides['back']['svg'])) {
+                $backSvg = $sides['back']['svg'];
+            } elseif ($template && $template->back_svg_path) {
+                // Fallback to template's back SVG
+                try {
+                    $backSvg = \Illuminate\Support\Facades\Storage::disk('public')->get($template->back_svg_path);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Failed to load template back SVG', ['path' => $template->back_svg_path, 'error' => $e->getMessage()]);
+                }
+            }
+            
+            if ($backSvg) {
+                if (Str::startsWith($backSvg, 'data:image/svg+xml')) {
+                    $backSvg = $this->decodeDataUrl($backSvg);
+                }
+                $backSvgPath = 'templates/review_back_SVG/template_' . Str::uuid() . '.svg';
+                \Illuminate\Support\Facades\Storage::disk('public')->put($backSvgPath, $backSvg);
+                $review->back_svg_path = $backSvgPath;
+            }
+            
+            // Save the updated paths
+            $review->save();
+            
+            \Log::debug('SVG Paths Saved', [
+                'review_id' => $review->id,
+                'front_svg_path' => $review->front_svg_path,
+                'back_svg_path' => $review->back_svg_path,
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed to save SVG files for review', [
+                'error' => $e->getMessage(),
+                'review_id' => $review->id,
+            ]);
+            // Don't fail the request if SVG saving fails
         }
 
         $previewUrl = $this->resolvePreviewAsset($previewImage);
@@ -1099,7 +1216,7 @@ class OrderFlowController extends Controller
 
     public function review(): RedirectResponse|ViewContract
     {
-        \Log::debug('Review method called');
+        Log::debug('Review method called');
         
         $order = $this->currentOrder();
 
@@ -1166,7 +1283,7 @@ class OrderFlowController extends Controller
 
             // Debug: Log user info before loading
             $user = Auth::user();
-            \Log::debug('Review page - User info', [
+            Log::debug('Review page - User info', [
                 'user_id' => $user?->id,
                 'customer_id' => $user?->customer?->customer_id ?? 'NO CUSTOMER',
                 'template_id' => $product->template_id ?? null,
@@ -1175,12 +1292,25 @@ class OrderFlowController extends Controller
             $customerReview = $this->orderFlow->loadCustomerReview($product->template_id, Auth::user(), $summary['order_item_id'] ?? null);
 
             // Debug: Log what we're loading
-            \Log::debug('Review page loading', [
+            Log::debug('Review page loading', [
                 'template_id' => $product->template_id ?? null,
                 'customerReview_exists' => $customerReview ? 'YES' : 'NO',
                 'customerReview_id' => $customerReview?->id,
                 'design_svg_length' => $customerReview ? strlen($customerReview->design_svg ?? '') : 0,
             ]);
+
+            // If the customer review contains multiple preview images use them (front/back)
+            if ($customerReview && !empty($customerReview->preview_images) && is_array($customerReview->preview_images)) {
+                $resolved = $this->resolvePreviewAssets($customerReview->preview_images);
+                if (!empty($resolved)) {
+                    $images['all'] = $resolved;
+                    $images['front'] = $resolved[0] ?? null;
+                    $images['back'] = $resolved[1] ?? null;
+                    // Also promote to summary so view-level session fallback works
+                    $summary['preview_images'] = $resolved;
+                    $summary['previewImages'] = $resolved;
+                }
+            }
 
             $summaryPreviewImages = array_values(array_filter($summary['previewImages'] ?? [], fn ($value) => is_string($value) && trim($value) !== ''));
             // Keep template previews for review to match studio thumbs
@@ -1221,11 +1351,44 @@ class OrderFlowController extends Controller
                 $reviewSummary['preview_image'] = $reviewSummary['preview_image'] ?? $reviewSummary['previewImage'] ?? $normalizedPreviewImages[0] ?? null;
             }
 
-            $isGiveaway = false;
-            if ($product) {
-                $productType = strtolower($product->product_type ?? '');
-                $productName = strtolower($product->name ?? '');
-                $isGiveaway = $productType === 'giveaway' || str_contains($productType, 'giveaway') || str_contains($productName, 'giveaway') || str_contains($productName, 'freebie');
+            // Load SVGs from customerReview for display
+            $frontSvg = null;
+            $backSvg = null;
+            if ($customerReview && !empty($customerReview->front_svg_path)) {
+                try {
+                    $frontSvgContent = \Illuminate\Support\Facades\Storage::disk('public')->get($customerReview->front_svg_path);
+                    if (!empty($frontSvgContent)) {
+                        $frontSvg = 'data:image/svg+xml;base64,' . base64_encode($frontSvgContent);
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Failed to load front SVG from path', ['path' => $customerReview->front_svg_path, 'error' => $e->getMessage()]);
+                }
+            }
+            if ($customerReview && !empty($customerReview->back_svg_path)) {
+                try {
+                    $backSvgContent = \Illuminate\Support\Facades\Storage::disk('public')->get($customerReview->back_svg_path);
+                    if (!empty($backSvgContent)) {
+                        $backSvg = 'data:image/svg+xml;base64,' . base64_encode($backSvgContent);
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Failed to load back SVG from path', ['path' => $customerReview->back_svg_path, 'error' => $e->getMessage()]);
+                }
+            }
+            
+            \Log::debug('Review SVG Loading', [
+                'customerReview_id' => $customerReview?->id,
+                'front_svg_path' => $customerReview?->front_svg_path,
+                'back_svg_path' => $customerReview?->back_svg_path,
+                'frontSvg_loaded' => $frontSvg ? 'YES' : 'NO',
+                'backSvg_loaded' => $backSvg ? 'YES' : 'NO',
+            ]);
+
+            // Override images with SVGs if available
+            if ($frontSvg) {
+                $images['front'] = $frontSvg;
+            }
+            if ($backSvg) {
+                $images['back'] = $backSvg;
             }
 
             return view('customer.orderflow.review', [
@@ -1245,6 +1408,8 @@ class OrderFlowController extends Controller
                 'orderSummary' => $reviewSummary,
                 'customerReview' => $customerReview,
                 'lastEditedAt' => $storedDraft['last_edited_at'] ?? null,
+                'frontSvg' => $frontSvg,
+                'backSvg' => $backSvg,
             ]);
         }
 
@@ -1324,11 +1489,36 @@ class OrderFlowController extends Controller
             $orderSummary['preview_image'] = $orderSummary['preview_image'] ?? $orderSummary['previewImage'] ?? $normalizedPreviewImages[0] ?? null;
         }
 
-        $isGiveaway = false;
-        if ($product) {
-            $productType = strtolower($product->product_type ?? '');
-            $productName = strtolower($product->name ?? '');
-            $isGiveaway = $productType === 'giveaway' || str_contains($productType, 'giveaway') || str_contains($productName, 'giveaway') || str_contains($productName, 'freebie');
+        // Load SVGs from customerReview for display
+        $frontSvg = null;
+        $backSvg = null;
+        if ($customerReview && !empty($customerReview->front_svg_path)) {
+            try {
+                $frontSvgContent = \Illuminate\Support\Facades\Storage::disk('public')->get($customerReview->front_svg_path);
+                if (!empty($frontSvgContent)) {
+                    $frontSvg = 'data:image/svg+xml;base64,' . base64_encode($frontSvgContent);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed to load front SVG from path', ['path' => $customerReview->front_svg_path, 'error' => $e->getMessage()]);
+            }
+        }
+        if ($customerReview && !empty($customerReview->back_svg_path)) {
+            try {
+                $backSvgContent = \Illuminate\Support\Facades\Storage::disk('public')->get($customerReview->back_svg_path);
+                if (!empty($backSvgContent)) {
+                    $backSvg = 'data:image/svg+xml;base64,' . base64_encode($backSvgContent);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed to load back SVG from path', ['path' => $customerReview->back_svg_path, 'error' => $e->getMessage()]);
+            }
+        }
+
+        // Override images with SVGs if available
+        if ($frontSvg) {
+            $images['front'] = $frontSvg;
+        }
+        if ($backSvg) {
+            $images['back'] = $backSvg;
         }
 
         return view('customer.orderflow.review', [
@@ -1348,6 +1538,8 @@ class OrderFlowController extends Controller
             'orderSummary' => $orderSummary,
             'customerReview' => $customerReview,
             'lastEditedAt' => $storedDraft['last_edited_at'] ?? null,
+            'frontSvg' => $frontSvg,
+            'backSvg' => $backSvg,
         ]);
     }
 

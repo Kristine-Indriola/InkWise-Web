@@ -4047,7 +4047,7 @@ class OrderFlowService
             Storage::disk('public')->makeDirectory($directory);
         }
 
-        $filename = ($directory ? $directory . '/' : '') . 'design_' . Str::uuid() . '.' . $extension;
+        $filename = ($directory ? $directory . '/' : '') . 'design_' . \Illuminate\Support\Str::uuid() . '.' . $extension;
 
         $stored = Storage::disk('public')->put($filename, $contents);
 
@@ -4056,6 +4056,73 @@ class OrderFlowService
         }
 
         return $filename;
+    }
+
+    /**
+     * Convert an SVG string into a PNG and persist it to the given directory.
+     * Returns the stored path (relative to storage/app/public) on success.
+     */
+    public function persistSvgAsPng(string $svgContent, string $directory, ?string $existingPath = null, string $field = 'preview_image'): string
+    {
+        if (trim($svgContent) === '') {
+            throw new \InvalidArgumentException('SVG content is empty.');
+        }
+
+        $normalizedExistingPath = null;
+        if ($existingPath) {
+            $normalizedExistingPath = ltrim(str_replace('\\', '/', (string) $existingPath), '/');
+            $normalizedExistingPath = preg_replace('#^/?storage/#i', '', $normalizedExistingPath) ?? $normalizedExistingPath;
+        }
+
+        if ($normalizedExistingPath && Storage::disk('public')->exists($normalizedExistingPath)) {
+            Storage::disk('public')->delete($normalizedExistingPath);
+        }
+
+        // Ensure directory exists
+        $directory = trim($directory, '/');
+        if ($directory !== '') {
+            Storage::disk('public')->makeDirectory($directory);
+        }
+
+        $filename = ($directory ? $directory . '/' : '') . 'template_' . \Illuminate\Support\Str::uuid() . '.png';
+
+        try {
+            if (!class_exists('\Imagick')) {
+                throw new \RuntimeException('Imagick extension not available.');
+            }
+
+            $im = new \Imagick();
+            // Set a reasonable density so the rendered PNG is high enough quality for preview
+            try {
+                $im->setBackgroundColor(new \ImagickPixel('transparent'));
+            } catch (\Throwable $e) {
+                // ignore
+            }
+
+            // Some Imagick versions require setting density before reading svg blob
+            try {
+                $im->setResolution(300, 300);
+            } catch (\Throwable $e) {
+                // ignore if unsupported
+            }
+
+            $im->readImageBlob($svgContent);
+            $im->setImageFormat('png32');
+            $pngData = $im->getImageBlob();
+            $im->clear();
+            $im->destroy();
+
+            $stored = Storage::disk('public')->put($filename, $pngData);
+            if (!$stored) {
+                throw new \RuntimeException('Failed to persist PNG file.');
+            }
+
+            return $filename;
+        } catch (\Throwable $e) {
+            // Log the failure but don't fall back to storing SVG - we want PNGs only
+            \Illuminate\Support\Facades\Log::warning('persistSvgAsPng failed; no image processing library available.', ['error' => $e->getMessage()]);
+            return null;
+        }
     }
 
     public function calculateTotalsFromSummary(array $summary): array

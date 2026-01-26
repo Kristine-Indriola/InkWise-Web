@@ -15,6 +15,16 @@ function normalizePages(template) {
   return [createPage(null, 0, 1, template)];
 }
 
+function normalizePagesFromDesign(design, template, side) {
+  const rawPages = design?.pages;
+
+  if (Array.isArray(rawPages) && rawPages.length > 0) {
+    return rawPages.map((page, index) => createPage(page, index, rawPages.length, template));
+  }
+
+  return [createPage(null, 0, 1, template)];
+}
+
 const initialState = ({ template }) => {
   const normalizedTemplate = {
     ...template,
@@ -25,14 +35,23 @@ const initialState = ({ template }) => {
     sizes: template?.sizes ?? [],
   };
 
-  const pages = applyPageStructure(normalizePages(normalizedTemplate), normalizedTemplate);
+  // Separate front and back designs
+  const frontDesign = template?.design?.front || template?.design || { pages: [] };
+  const backDesign = template?.design?.back || { pages: [] };
+
+  // Create pages for current active side
+  const currentDesign = frontDesign; // Start with front
+  const pages = applyPageStructure(normalizePagesFromDesign(currentDesign, normalizedTemplate, 'front'), normalizedTemplate);
   const fallbackPageId = pages[0]?.id ?? 'page-0';
-  const configuredActiveId = template?.design?.activePageId;
+  const configuredActiveId = currentDesign?.activePageId;
   const activePageExists = pages.some((page) => page.id === configuredActiveId);
   const activePageId = activePageExists ? configuredActiveId : fallbackPageId;
 
   return {
     template: normalizedTemplate,
+    frontDesign,
+    backDesign,
+    currentSide: 'front', // Track which side we're editing
     pages,
     activePageId,
     selectedLayerId: getFirstLayerId(pages, activePageId),
@@ -61,6 +80,28 @@ function reducer(state, action) {
         activePageId: action.pageId,
         selectedLayerId: getFirstLayerId(state.pages, action.pageId),
       };
+    case 'SWITCH_SIDE': {
+      const newSide = action.side;
+      const currentDesign = newSide === 'front' ? state.frontDesign : state.backDesign;
+      const pages = applyPageStructure(normalizePagesFromDesign(currentDesign, state.template, newSide), state.template);
+      const fallbackPageId = pages[0]?.id ?? 'page-0';
+      const configuredActiveId = currentDesign?.activePageId;
+      const activePageExists = pages.some((page) => page.id === configuredActiveId);
+      const activePageId = activePageExists ? configuredActiveId : fallbackPageId;
+
+      return {
+        ...state,
+        currentSide: newSide,
+        pages,
+        activePageId,
+        selectedLayerId: getFirstLayerId(pages, activePageId),
+        history: {
+          undoStack: [],
+          redoStack: [],
+        },
+        imageHistory: {},
+      };
+    }
     case 'ADD_PAGE': {
       const nextTotal = state.pages.length + 1;
       const newPage = createPage(action.page, state.pages.length, nextTotal, state.template);

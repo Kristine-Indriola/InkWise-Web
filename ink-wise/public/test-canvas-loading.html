@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas Loading Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .canvas-workspace {
+            position: relative;
+            width: 400px;
+            height: 600px;
+            border: 2px solid #ccc;
+            margin: 20px 0;
+            background: #f9f9f9;
+        }
+        .canvas-loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            color: #666;
+            font-size: 16px;
+            z-index: 10;
+        }
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #ccc;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .preview-svg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            cursor: pointer;
+            user-select: none;
+        }
+        .preview-card-bg {
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <h1>Canvas Loading Test</h1>
+    <p>This test simulates the canvas initialization process to verify loading states work correctly.</p>
+
+    <div class="canvas-workspace">
+        <div id="front-canvas-loading" class="canvas-loading">
+            <div class="loading-spinner"></div>
+            <span>Loading canvas...</span>
+        </div>
+        <svg id="front-preview-svg" class="preview-svg">
+            <!-- SVG content will be loaded here -->
+        </svg>
+        <div class="preview-card-bg front-preview-card-bg" data-front-svg="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjYwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZmZmZmZmIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNCIgZmlsbD0iIzMzMzMzMyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkZyb250IENhbnZhcyBUZXN0PC90ZXh0Pjwvc3ZnPg=="></div>
+    </div>
+
+    <button onclick="testCanvasLoading()">Test Canvas Loading</button>
+    <button onclick="resetCanvas()">Reset Canvas</button>
+
+    <div id="status">Ready to test</div>
+
+    <script>
+        const frontCanvasLoading = document.getElementById('front-canvas-loading');
+        const frontCanvasSvg = document.getElementById('front-preview-svg');
+
+        function initializeCanvases() {
+            // Load SVG content from data attributes
+            loadCanvasContent();
+
+            // Hide loading states and show canvas content
+            if (frontCanvasLoading) {
+                frontCanvasLoading.style.display = 'none';
+            }
+
+            // Ensure SVG elements are visible
+            if (frontCanvasSvg) {
+                frontCanvasSvg.style.display = 'block';
+            }
+
+            document.getElementById('status').textContent = 'Canvas initialized and ready for editing';
+            console.log('Canvas initialized and ready for editing');
+        }
+
+        function loadCanvasContent() {
+            // Load front canvas content
+            const frontCanvasBg = document.querySelector('.front-preview-card-bg');
+            if (frontCanvasBg && frontCanvasSvg) {
+                const frontSvgData = frontCanvasBg.dataset.frontSvg;
+                if (frontSvgData) {
+                    if (frontSvgData.startsWith('data:image/svg+xml;base64,')) {
+                        // Handle data URI
+                        try {
+                            const base64Data = frontSvgData.split(',')[1];
+                            const svgContent = atob(base64Data);
+                            const parser = new DOMParser();
+                            const svgDoc = parser.parseFromString(svgContent, 'image/svg+xml');
+                            const svgElement = svgDoc.querySelector('svg');
+
+                            if (svgElement) {
+                                frontCanvasSvg.innerHTML = svgElement.innerHTML;
+                                document.getElementById('status').textContent = 'SVG content loaded successfully';
+                            }
+                        } catch (error) {
+                            console.error('Error loading front SVG:', error);
+                            document.getElementById('status').textContent = 'Error loading SVG: ' + error.message;
+                        }
+                    }
+                }
+            }
+        }
+
+        function setupCanvasInteractivity() {
+            // Make SVG elements interactive
+            if (frontCanvasSvg) {
+                frontCanvasSvg.style.cursor = 'pointer';
+                frontCanvasSvg.style.userSelect = 'none';
+            }
+
+            // Add click handlers for canvas elements
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('#front-preview-svg')) {
+                    const svgElement = e.target.closest('svg');
+                    if (svgElement) {
+                        console.log('Canvas clicked:', svgElement.id);
+                        document.getElementById('status').textContent = 'Canvas clicked - interactivity working';
+                    }
+                }
+            });
+        }
+
+        function testCanvasLoading() {
+            document.getElementById('status').textContent = 'Testing canvas loading...';
+            setTimeout(() => {
+                initializeCanvases();
+                setTimeout(setupCanvasInteractivity, 100);
+            }, 500);
+        }
+
+        function resetCanvas() {
+            if (frontCanvasLoading) {
+                frontCanvasLoading.style.display = 'flex';
+            }
+            if (frontCanvasSvg) {
+                frontCanvasSvg.style.display = 'none';
+                frontCanvasSvg.innerHTML = '';
+            }
+            document.getElementById('status').textContent = 'Canvas reset - ready to test again';
+        }
+
+        // Auto-test on load
+        setTimeout(testCanvasLoading, 1000);
+    </script>
+</body>
+</html>

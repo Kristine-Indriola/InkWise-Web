@@ -1,21 +1,22 @@
 @import url('https://fonts.googleapis.com/css2?family=Lobster&family=Fredoka+One&family=Pacifico&family=Baloo+2&family=Poppins:wght@400;500;700&family=Anton&family=Gochi+Hand&family=Bangers&family=Chewy&family=Rubik:wght@800&family=Comic+Neue:wght@700&family=Amatic+SC:wght@700&family=Luckiest+Guy&family=Kalam:wght@700&family=Bubblegum+Sans&family=Shrikhand&family=Jua&family=DynaPuff&family=Cabin+Sketch&family=Titan+One&family=Montserrat:wght@300;600&family=Lato:wght@700&family=Source+Sans+Pro&family=Roboto+Condensed&family=Open+Sans&family=Oswald&family=Nunito+Sans&family=Inter:wght@600&family=Work+Sans:wght@500&family=IBM+Plex+Sans&family=Barlow+Semi+Condensed&family=Sora&family=Metropolis&family=Urbanist&family=Manrope&family=Quicksand:wght@300&family=Great+Vibes&family=Parisienne&family=Nunito:wght@300&family=Cormorant+Garamond&family=Playfair+Display&family=Allura&family=DM+Sans&family=Satisfy&family=Karla&family=Josefin+Sans:wght@300&family=Merriweather:wght@300&family=Sacramento&family=Dancing+Script&family=Marcellus&family=Crimson+Pro&family=ABeeZee&family=GFS+Didot&family=Overlock:wght@300&family=Hind:wght@400&family=Cinzel&family=Cormorant+Infant&family=Alex+Brush&family=Bodoni+Moda&family=Cormorant+Upright&family=Libre+Baskerville&family=Tangerine&family=Cinzel+Decorative&family=Forum&family=Cardo&family=Unna&family=Prata&family=Gilda+Display&family=Cormorant+SC&family=Quattrocento&family=Marcellus+SC&display=swap');
 
 .studio-react-widgets {
-  display: none;
+  display: none !important;
   align-items: center;
   gap: 1rem;
 }
 
-/* Show toolbar when text is selected */
+/* Mini toolbar disabled */
 body.text-toolbar-visible .studio-react-widgets {
-  display: flex;
+  display: none !important;
 }
+
 
 /* Allow the toolbar to float in the canvas area, centered */
 .studio-react-widgets {
-  position: fixed;
-  /* moved further up to sit much closer to the preview; overlap header significantly */
-  top: -48px;
+  position: absolute;
+  /* positioned further down in the canvas area */
+  top: 50px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 50;
@@ -37,7 +38,7 @@ body.text-toolbar-visible .studio-react-widgets {
 .text-mini-toolbar.floating {
   position: absolute;
   /* lifted much closer so floating state sits nearer the preview */
-  top: -40px;
+  top: 10px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;

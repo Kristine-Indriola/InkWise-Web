@@ -38,7 +38,7 @@
     "isEntry": true
   },
   "resources/css/customer/studio.css": {
-    "file": "assets/studio-CpafKoVw.css",
+    "file": "assets/studio-C3Wy-bKG.css",
     "src": "resources/css/customer/studio.css",
     "isEntry": true
   },
@@ -63,6 +63,15 @@
     "src": "resources/js/app.js",
     "isEntry": true
   },
+  "resources/js/customer/components/Review.jsx": {
+    "file": "assets/Review-ddcrIrrV.js",
+    "name": "Review",
+    "src": "resources/js/customer/components/Review.jsx",
+    "isEntry": true,
+    "imports": [
+      "_client-Cv0X-2PX.js"
+    ]
+  },
   "resources/js/customer/customer.jsx": {
     "file": "assets/customer-CiJ7TFlK.js",
     "name": "customer",
@@ -83,7 +92,7 @@
     ]
   },
   "resources/js/customer/studio/main.jsx": {
-    "file": "assets/main-C27rxVRH.js",
+    "file": "assets/main-uncZGLjC.js",
     "name": "main",
     "src": "resources/js/customer/studio/main.jsx",
     "isEntry": true,
@@ -92,11 +101,11 @@
       "_vendor-CRB3T2We.js"
     ],
     "css": [
-      "assets/main-CTswQoHW.css"
+      "assets/main-RWtF9XW9.css"
     ]
   },
   "resources/js/customer/studio/svg-template-editor.jsx": {
-    "file": "assets/svg-template-editor-B9JqxbqK.js",
+    "file": "assets/svg-template-editor-B5ysJgtq.js",
     "name": "svg-template-editor",
     "src": "resources/js/customer/studio/svg-template-editor.jsx",
     "isEntry": true,
@@ -107,7 +116,7 @@
     ]
   },
   "resources/js/staff/template-editor/main.jsx": {
-    "file": "assets/main-BROPGJko.js",
+    "file": "assets/main-BbodhBgA.js",
     "name": "main",
     "src": "resources/js/staff/template-editor/main.jsx",
     "isEntry": true,

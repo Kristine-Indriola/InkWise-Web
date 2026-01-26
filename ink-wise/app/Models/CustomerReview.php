@@ -19,6 +19,7 @@ class CustomerReview extends Model
         'design_json' => 'array',
         'canvas_width' => 'integer',
         'canvas_height' => 'integer',
+        'preview_images' => 'array',
     ];
 
     public function customer()

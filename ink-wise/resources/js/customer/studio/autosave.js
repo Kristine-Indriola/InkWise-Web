@@ -12,6 +12,7 @@ export function createAutosaveController(options = {}) {
     if (typeof collectSnapshot !== 'function') {
         throw new Error('createAutosaveController requires a collectSnapshot function');
     }
+    
 
     let timerId = null;
     let pendingReason = null;

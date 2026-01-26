@@ -1,0 +1,364 @@
+#template-editor-root {
+  display: flex;
+  justify-content: center;
+  padding: 20px 16px;
+  box-sizing: border-box;
+}
+
+/* Ensure the editor mount point is centered within the Blade layout */
+.studio-canvas-area {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  position: relative;
+}
+
+.studio-canvas-area #template-editor-root {
+  width: 100%;
+  max-width: 1200px;
+}
+
+.template-editor.two-column {
+  display: flex;
+  gap: 24px;
+  max-width: 1200px;
+  width: 100%;
+  justify-content: center;
+  align-items: stretch; /* make columns align evenly */
+}
+
+.template-canvas-column {
+  flex: 1 1 540px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+  margin-top: 100px;
+}
+
+.canvas-header {
+  font-weight: 600;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.canvas-stage {
+  width: 100%;
+  max-width: 560px;
+  background: #fff;
+  border: 1px solid #e6e6e6;
+  padding: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 420px; /* keep canvases visually even */
+  box-sizing: border-box;
+  position: relative;
+  border-radius: 10px;
+  /* subtle floating card */
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06), 0 2px 6px rgba(15,23,42,0.04);
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.canvas-with-ruler {
+  display: flex;
+  align-items: flex-start;
+  position: relative;
+}
+
+/* Vertical guide placed outside the canvas (left side) */
+.canvas-with-ruler .guide-vertical {
+  position: absolute;
+  left: calc(44px - 20px); /* moved further left (ruler width (44) minus larger offset) */
+  top: 12px;
+  bottom: 56px; /* leave room for horizontal ruler */
+  width: 2px;
+  background: linear-gradient(#6b7280, #6b7280);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.02);
+  z-index: 2;
+}
+
+.canvas-with-ruler .guide-vertical .guide-label {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%) rotate(-90deg);
+  transform-origin: center;
+  background: rgba(255,255,255,0.95);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #111827;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
+/* Centered label for horizontal guide */
+.ruler-horizontal .guide-center-label {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 6px;
+  font-size: 12px;
+  background: rgba(255,255,255,0.95);
+  padding: 2px 8px;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
+@media (max-width: 900px) {
+  .canvas-with-ruler .guide-vertical { display: none; }
+}
+
+.ruler-vertical {
+  width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  position: relative;
+}
+
+.ruler-vertical .ruler-line {
+  width: 2px;
+  background: linear-gradient(#9ca3af, #9ca3af);
+  height: 100%;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+}
+
+.ruler-vertical .ruler-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  transform-origin: center center;
+  z-index: 3;
+  pointer-events: none;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #374151;
+  background: rgba(255,255,255,0.9);
+  padding: 2px 6px;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.canvas-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.ruler-horizontal {
+  height: 40px;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  position: relative;
+}
+
+.ruler-horizontal .ruler-line-horizontal {
+  height: 2px;
+  background: linear-gradient(#9ca3af, #9ca3af);
+  width: 100%;
+  border-radius: 2px;
+}
+
+.ruler-label-horizontal {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 6px;
+  font-size: 12px;
+  color: #374151;
+  background: rgba(255,255,255,0.9);
+  padding: 2px 6px;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.canvas-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.canvas-actions .btn {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.canvas-actions .status {
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 900px) {
+  .template-editor.two-column {
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+  }
+  .template-canvas-column {
+    width: 100%;
+    max-width: 760px;
+  }
+}
+
+/* Hover / focus lift to emphasize floating */
+.template-canvas-column:hover .canvas-stage,
+.template-canvas-column:focus-within .canvas-stage {
+  transform: translateY(-8px);
+  box-shadow: 0 18px 40px rgba(15,23,42,0.12), 0 6px 18px rgba(15,23,42,0.08);
+}
+
+/* Small visual inset for the svg content so it reads as floating paper */
+.canvas-stage svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 6px;
+}
+
+/* Text field list styles */
+.text-field-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* Recent uploads grid */
+.recent-uploads-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.recent-upload-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 8px;
+  background: transparent;
+}
+
+.recent-upload-item img {
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(15,23,42,0.06);
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.recent-upload-item img:focus,
+.recent-upload-item img:hover {
+  transform: scale(1.06);
+  box-shadow: 0 12px 30px rgba(2,6,23,0.12);
+}
+
+.recent-upload-remove {
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* Hover preview */
+#upload-preview {
+  pointer-events: none;
+  z-index: 5000;
+}
+
+#upload-preview img {
+  display: block;
+  max-width: 320px;
+  max-height: 320px;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+}
+
+.uploads-dropzone--active {
+  background: #eef2ff !important;
+  border-color: #6366f1 !important;
+  box-shadow: 0 6px 20px rgba(99,102,241,0.12);
+}
+
+/* Confirmation toast */
+.upload-confirmation {
+  animation: slideIn 220ms ease;
+}
+
+/* Side toggle */
+.side-toggle-btn {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: #f8fafc;
+  cursor: pointer;
+  font-weight: 600;
+}
+.side-toggle-btn.active,
+.side-toggle-btn[aria-pressed="true"] {
+  background: #eef2ff;
+  border-color: #6366f1;
+  color: #111827;
+}
+.side-toggle-btn:focus {
+  outline: 3px solid rgba(99,102,241,0.14);
+}
+
+/* Canvas highlight when selected for upload */
+.template-canvas-column.upload-selected .canvas-stage {
+  outline: 3px dashed rgba(99,102,241,0.4);
+  outline-offset: 4px;
+}
+@keyframes slideIn {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.text-section {
+  margin-bottom: 20px;
+}
+
+.text-section h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+  margin-top: 0;
+}
+
+.text-field-item {
+  margin-bottom: 12px;
+}
+
+.text-field-item label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+.text-field-item input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 14px;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.text-field-item input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}

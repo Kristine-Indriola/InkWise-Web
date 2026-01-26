@@ -37,6 +37,18 @@ class TemplateController extends Controller
 
         $templates = $query->paginate(12); // Show 12 per page
 
+        // Ensure template side state is synchronized for proper preview display
+        foreach ($templates as $template) {
+            $this->synchronizeTemplateSideState($template);
+            
+            // Add URL attributes for the view
+            $template->preview_url = $template->preview ? \App\Support\ImageResolver::url($template->preview) : null;
+            $template->preview_front_url = $template->preview_front ? \App\Support\ImageResolver::url($template->preview_front) : null;
+            $template->preview_back_url = $template->preview_back ? \App\Support\ImageResolver::url($template->preview_back) : null;
+            $template->front_image_url = $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : null;
+            $template->back_image_url = $template->back_image ? \App\Support\ImageResolver::url($template->back_image) : null;
+        }
+
         // Determine if this is admin or staff route
         $prefix = request()->route()->getPrefix();
         $isStaff = str_contains($prefix, 'staff');
@@ -297,16 +309,16 @@ class TemplateController extends Controller
         $templateBootstrap = [
             'id' => $template->id,
             'name' => $template->name,
-            'has_back_design' => false,
+            'has_back_design' => $template->has_back_design,
             'svg_path' => $template->svg_path ? \App\Support\ImageResolver::url($template->svg_path) : null,
-            'back_svg_path' => null,
+            'back_svg_path' => $template->back_svg_path ? \App\Support\ImageResolver::url($template->back_svg_path) : null,
             'svg_source' => $template->svg_path,
-            'back_svg_source' => null,
+            'back_svg_source' => $template->back_svg_path,
             'preview' => $template->preview ? \App\Support\ImageResolver::url($template->preview) : null,
             'preview_front' => $template->preview_front ? \App\Support\ImageResolver::url($template->preview_front) : null,
-            'preview_back' => null,
+            'preview_back' => $template->preview_back ? \App\Support\ImageResolver::url($template->preview_back) : null,
             'front_image' => $template->front_image ? \App\Support\ImageResolver::url($template->front_image) : null,
-            'back_image' => null,
+            'back_image' => $template->back_image ? \App\Support\ImageResolver::url($template->back_image) : null,
             'width_inch' => $template->width_inch,
             'height_inch' => $template->height_inch,
             'fold_type' => $template->fold_type,
@@ -323,11 +335,19 @@ class TemplateController extends Controller
     public function loadDesign($id)
     {
         $template = Template::findOrFail($id);
+        $side = request('side', 'front'); // Default to front if not specified
 
         $metadata = $this->normalizeTemplateMetadata($template->metadata ?? []);
 
+        // Choose the appropriate design path based on side
+        $jsonPath = null;
+        if ($side === 'back') {
+            $jsonPath = $metadata['back_json_path'] ?? null;
+        } else {
+            $jsonPath = $metadata['json_path'] ?? null;
+        }
+
         // Prefer persisted design JSON file if present
-        $jsonPath = $metadata['json_path'] ?? null;
         if ($jsonPath && Storage::disk('public')->exists($jsonPath)) {
             try {
                 $contents = Storage::disk('public')->get($jsonPath);
@@ -337,10 +357,11 @@ class TemplateController extends Controller
                         'success' => true,
                         'design' => $decoded,
                         'source' => 'json_file',
+                        'side' => $side,
                     ]);
                 }
             } catch (\Throwable $e) {
-                Log::warning('Failed to read persisted design JSON', ['template_id' => $id, 'error' => $e->getMessage()]);
+                Log::warning('Failed to read persisted design JSON', ['template_id' => $id, 'side' => $side, 'error' => $e->getMessage()]);
             }
         }
 
@@ -350,10 +371,10 @@ class TemplateController extends Controller
             if (is_string($design)) {
                 $decoded = json_decode($design, true);
                 if (is_array($decoded)) {
-                    return response()->json(['success' => true, 'design' => $decoded, 'source' => 'db_string']);
+                    return response()->json(['success' => true, 'design' => $decoded, 'source' => 'db_string', 'side' => $side]);
                 }
             } elseif (is_array($design)) {
-                return response()->json(['success' => true, 'design' => $design, 'source' => 'db_array']);
+                return response()->json(['success' => true, 'design' => $design, 'source' => 'db_array', 'side' => $side]);
             }
         }
 
@@ -388,9 +409,9 @@ public function saveCanvas(Request $request, $id)
         $imageData = str_replace(' ', '+', $imageData);
 
         $imageName = 'template_' . $id . '_' . time() . '.png';
-        $filePath = 'templates/front/png/' . $imageName;
+        $filePath = 'templates/front_png/' . $imageName;
 
-        // Save to storage/app/public/templates/previews
+        // Save to storage/app/public/templates/front_png
         Storage::disk('public')->put($filePath, base64_decode($imageData));
 
         // Update DB preview column
@@ -442,7 +463,9 @@ public function saveCanvas(Request $request, $id)
 
         $validated = $request->validate([
             'design' => 'required|array',
+            'design_back' => 'nullable|array',
             'svg_markup' => 'nullable|string',
+            'svg_markup_back' => 'nullable|string',
             'preview_image' => 'nullable|string',
             'preview_images' => 'nullable|array',
             'preview_images_meta' => 'nullable|array',
@@ -457,6 +480,11 @@ public function saveCanvas(Request $request, $id)
 
         // Ensure the incoming design is structured (reject flattened/unsupported templates)
         $validated['design'] = $this->validateDesignStructure($validated['design']);
+        
+        // Validate back design if provided
+        if (!empty($validated['design_back'])) {
+            $validated['design_back'] = $this->validateDesignStructure($validated['design_back']);
+        }
 
         Log::info('=== saveTemplate validation complete ===', [
             'id' => $id,
@@ -530,8 +558,14 @@ public function saveCanvas(Request $request, $id)
             $metadata['assets'] = $validated['assets'];
         }
 
-        if (isset($validated['design']['canvas']) && is_array($validated['design']['canvas'])) {
-            $metadata['builder_canvas'] = $validated['design']['canvas'];
+        if (!empty($validated['design_back'])) {
+            $metadata['back_design_json'] = $validated['design_back'];
+            $metadata['back_json_path'] = $this->persistDesignJson(
+                $validated['design_back'],
+                'templates/assets',
+                $metadata['back_json_path'] ?? null
+            );
+            $template->has_back_design = true;
         }
 
         // Handle single preview_image for backward compatibility
@@ -544,7 +578,7 @@ public function saveCanvas(Request $request, $id)
                 
                 $template->preview = $this->persistDataUrl(
                     $validated['preview_image'],
-                    'templates/front/png',
+                    'templates/front_png',
                     'png',
                     $template->preview,
                     'preview_image'
@@ -564,7 +598,7 @@ public function saveCanvas(Request $request, $id)
                 $dummyPreview = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
                 $template->preview = $this->persistDataUrl(
                     $dummyPreview,
-                    'templates/front/png',
+                    'templates/front_png',
                     'png',
                     $template->preview,
                     'dummy_preview'
@@ -591,37 +625,21 @@ public function saveCanvas(Request $request, $id)
         // Handle multiple preview_images
         if (!empty($validated['preview_images']) && is_array($validated['preview_images'])) {
             $previews = [];
-                foreach ($validated['preview_images'] as $key => $imageData) {
-                    if (is_string($imageData) && !empty($imageData)) {
-                        try {
-                            // Persist back-side PNGs to disk in templates/back/png
-                            if ($key === 'back') {
-                                $dir = 'templates/back/png';
-                                $filename = $this->persistDataUrl(
-                                    $imageData,
-                                    $dir,
-                                    'png',
-                                    null,
-                                    "preview_{$key}"
-                                );
-                                if ($filename) {
-                                    $previews[$key] = $filename;
-                                }
-                            } else {
-                                $dir = 'templates/front/png';
-                                $filename = $this->persistDataUrl(
-                                    $imageData,
-                                    $dir,
-                                    'png',
-                                    null,
-                                    "preview_{$key}"
-                                );
-                                if ($filename) {
-                                    $previews[$key] = $filename;
-                                }
-                            }
-                        } catch (ValidationException $e) {
-                            Log::warning("Preview image save failed for key {$key}", ['error' => $e->getMessage()]);
+            foreach ($validated['preview_images'] as $key => $imageData) {
+                if (is_string($imageData) && !empty($imageData)) {
+                    try {
+                        // Determine the correct directory based on whether this is a back preview
+                        $directory = $this->isBackDescriptor((string) $key) ? 'templates/back_png' : 'templates/front_png';
+
+                        $filename = $this->persistDataUrl(
+                            $imageData,
+                            $directory,
+                            'png',
+                            null,
+                            "preview_{$key}"
+                        );
+                        if ($filename) {
+                            $previews[$key] = $filename;
                         }
                     }
                 }
@@ -659,12 +677,17 @@ public function saveCanvas(Request $request, $id)
             $svgPayload = $this->extractSvgFromDesign($validated['design']);
         }
 
+        $svgBackPayload = $validated['svg_markup_back'] ?? null;
+        if (!$svgBackPayload && !empty($validated['design_back'])) {
+            $svgBackPayload = $this->extractSvgFromDesign($validated['design_back']);
+        }
+
         $savedSvg = false;
         if ($svgPayload) {
             try {
                 $template->svg_path = $this->persistDataUrl(
                     $this->normalizeSvgPayload($svgPayload),
-                    'templates/front/svg',
+                    'templates/front_svg',
                     'svg',
                     $template->svg_path,
                     'provided_svg'
@@ -691,7 +714,7 @@ public function saveCanvas(Request $request, $id)
                 try {
                     $template->svg_path = $this->persistDataUrl(
                         $generatedSvg,
-                        'templates/front/svg',
+                        'templates/front_svg',
                         'svg',
                         $template->svg_path,
                         'generated_svg'
@@ -704,35 +727,64 @@ public function saveCanvas(Request $request, $id)
             }
         }
 
-        // Generate back SVG if there's a back page in the design
-        if (is_string($validated['design'])) {
-            $decodedDesign = json_decode($validated['design'], true) ?: [];
-        } elseif (is_array($validated['design'])) {
-            $decodedDesign = $validated['design'];
-        } else {
-            $decodedDesign = [];
-        }
+        // Generate back SVG if there's a back page in the design or back design provided
+        $decodedDesign = json_decode($validated['design'], true);
         $backPageIndex = is_array($decodedDesign) ? $this->findBackPageIndex($decodedDesign) : null;
-        if ($backPageIndex !== null) {
+        
+        if ($svgBackPayload) {
+            // Save provided back SVG
+            try {
+                $template->back_svg_path = $this->persistDataUrl(
+                    $this->normalizeSvgPayload($svgBackPayload),
+                    'templates/back_svg',
+                    'svg',
+                    $template->back_svg_path,
+                    'provided_back_svg'
+                );
+                $template->has_back_design = true;
+                Log::info('Back SVG saved from provided payload', ['path' => $template->back_svg_path]);
+            } catch (ValidationException $e) {
+                Log::warning('Provided back SVG save failed', ['error' => $e->getMessage()]);
+            }
+        } elseif ($backPageIndex !== null) {
+            // Generate back SVG from design
             try {
                 $generatedBackSvg = $this->generateSvgFromTemplate($template->id, $designPath, $backPageIndex);
-                    if ($generatedBackSvg) {
-                        // Persist back SVG into templates/back/svg
-                        $template->back_svg_path = $this->persistDataUrl(
-                            $generatedBackSvg,
-                            'templates/back/svg',
-                            'svg',
-                            $template->back_svg_path,
-                            'generated_back_svg'
-                        );
-                        $template->has_back_design = true;
-                        Log::info('Back SVG generated successfully', [
-                            'path' => $template->back_svg_path,
-                            'page_index' => $backPageIndex
-                        ]);
-                    }
+                if ($generatedBackSvg) {
+                    $template->back_svg_path = $this->persistDataUrl(
+                        $generatedBackSvg,
+                        'templates/back_svg',
+                        'svg',
+                        $template->back_svg_path,
+                        'generated_back_svg'
+                    );
+                    $template->has_back_design = true;
+                    Log::info('Back SVG generated successfully', [
+                        'path' => $template->back_svg_path,
+                        'page_index' => $backPageIndex
+                    ]);
+                }
             } catch (\Exception $e) {
                 Log::warning('Back SVG generation failed', ['page_index' => $backPageIndex, 'error' => $e->getMessage()]);
+            }
+        } elseif (!empty($validated['design_back'])) {
+            // Generate back SVG from back design JSON
+            try {
+                $backDesignPath = $metadata['back_json_path'] ?? null;
+                $generatedBackSvg = $this->generateSvgFromTemplate($template->id, $backDesignPath, 0);
+                if ($generatedBackSvg) {
+                    $template->back_svg_path = $this->persistDataUrl(
+                        $generatedBackSvg,
+                        'templates/back_svg',
+                        'svg',
+                        $template->back_svg_path,
+                        'generated_back_svg_from_design'
+                    );
+                    $template->has_back_design = true;
+                    Log::info('Back SVG generated from back design successfully', ['path' => $template->back_svg_path]);
+                }
+            } catch (\Exception $e) {
+                Log::warning('Back SVG generation from back design failed', ['error' => $e->getMessage()]);
             }
         }
 
@@ -767,8 +819,12 @@ public function saveCanvas(Request $request, $id)
             'id' => $template->id,
             'name' => $template->name,
             'preview' => $template->preview,
+            'preview_front' => $template->preview_front,
+            'preview_back' => $template->preview_back,
             'svg_path' => $template->svg_path,
+            'back_svg_path' => $template->back_svg_path,
             'json_path' => $metadata['json_path'] ?? null,
+            'back_json_path' => $metadata['back_json_path'] ?? null,
             'updated_at' => $template->updated_at,
         ]);
 
@@ -842,7 +898,7 @@ public function saveCanvas(Request $request, $id)
         if (!empty($validated['png'])) {
             $frontPngPath = $this->persistDataUrl(
                 $validated['png'],
-                'templates/front/png',
+                'templates/front_png',
                 'png',
                 $template->preview,
                 'png'
@@ -856,13 +912,13 @@ public function saveCanvas(Request $request, $id)
         try {
             $generatedSvg = $this->generateSvgFromTemplate($template->id, $designPath, 0);
             if ($generatedSvg) {
-                    $template->svg_path = $this->persistDataUrl(
-                        $generatedSvg,
-                        'templates/front/svg',
-                        'svg',
-                        $template->svg_path,
-                        'generated_svg'
-                    );
+                $template->svg_path = $this->persistDataUrl(
+                    $generatedSvg,
+                    'templates/front_svg',
+                    'svg',
+                    $template->svg_path,
+                    'generated_svg'
+                );
                 Log::info('SVG regenerated during saveDesign', ['path' => $template->svg_path]);
             }
         } catch (\Exception $e) {
@@ -877,7 +933,7 @@ public function saveCanvas(Request $request, $id)
                 if ($generatedBackSvg) {
                     $template->back_svg_path = $this->persistDataUrl(
                         $generatedBackSvg,
-                        'templates/back/svg',
+                        'templates/back_svg',
                         'svg',
                         $template->back_svg_path,
                         'generated_back_svg'
@@ -913,6 +969,15 @@ public function saveCanvas(Request $request, $id)
         }
 
         if ($template->has_back_design) {
+            if (!empty($validated['png_back'])) {
+                $template->preview_back = $this->persistDataUrl(
+                    $validated['png_back'],
+                    'templates/back_png',
+                    'png',
+                    $template->preview_back,
+                    'png_back'
+                );
+            }
 
             if (!empty($validated['json_back'])) {
                 $decodedBack = json_decode($validated['json_back'], true);
@@ -963,8 +1028,8 @@ public function saveCanvas(Request $request, $id)
         $this->ensureTemplateStorageDirectories();
 
         $relativePath = $side === 'back'
-            ? "templates/svg/template_{$id}_back.svg"
-            : "templates/svg/template_{$id}.svg";
+            ? "templates/back_svg/template_{$id}_back.svg"
+            : "templates/front_svg/template_{$id}.svg";
 
         try {
             $storedPath = $this->storeSvgPayload($validated['svg_content'], $relativePath, 'svg_content');
@@ -1032,11 +1097,11 @@ public function saveCanvas(Request $request, $id)
         $metadata['json_path'] = $designPath;
 
         // Save dummy preview
-        $template->preview = $this->persistDataUrl($dummyPreview, 'templates/front/png', 'png', $template->preview, 'test_preview');
+        $template->preview = $this->persistDataUrl($dummyPreview, 'templates/front_png', 'png', $template->preview, 'test_preview');
         $template->preview_front = $template->preview;
 
-        // Save dummy SVG (front)
-        $template->svg_path = $this->persistDataUrl($dummySvg, 'templates/front/svg', 'svg', $template->svg_path, 'test_svg');
+        // Save dummy SVG
+        $template->svg_path = $this->persistDataUrl($dummySvg, 'templates/front_svg', 'svg', $template->svg_path, 'test_svg');
 
         $template->metadata = $metadata;
         $this->synchronizeTemplateSideState($template, $metadata);
@@ -1065,7 +1130,7 @@ public function uploadPreview(Request $request, $id)
     $imgData = $request->input('preview_image');
 
     // Save to storage with optimization (reduces file size by 60-80%)
-    $filename = 'templates/front/png/template_' . $id . '_' . time() . '.png';
+    $filename = 'templates/front_png/template_' . $id . '_' . time() . '.png';
     \App\Support\ImageOptimizer::optimizePreview($imgData, $filename, 400, 75);
 
     // Update preview column (store path)
@@ -1106,14 +1171,18 @@ public function uploadPreview(Request $request, $id)
 
         $validated = $request->validate([
             'design' => 'required|array',
+            'side' => 'nullable|in:front,back',
             'canvas' => 'nullable|array',
             'template_name' => 'nullable|string|max:255',
             'template' => 'nullable|array',
             'svg_markup' => 'nullable|string',
         ]);
 
+        $side = $validated['side'] ?? 'front';
+
         Log::info('Template autosave request received', [
             'template_id' => $template->id,
+            'side' => $side,
             'user_id' => optional($request->user())->id,
             'design_pages' => is_array($validated['design']['pages'] ?? null)
                 ? count($validated['design']['pages'])
@@ -1126,23 +1195,37 @@ public function uploadPreview(Request $request, $id)
         // Persist JSON design file to disk reliably
         $this->ensureTemplateStorageDirectories();
         $metadata = $this->normalizeTemplateMetadata($template->metadata ?? []);
-        
-        $designPath = $this->persistDesignJson(
-            $designPayload,
-            'templates/assets',
-            $metadata['json_path'] ?? null
-        );
-        $metadata['json_path'] = $designPath;
 
-        // Save to DB only if within packet limits (approx 1MB safely)
-        $designJson = json_encode($designPayload, JSON_UNESCAPED_UNICODE);
-        if (strlen($designJson) < 900000) {
-            $template->design = $designJson;
+        // Save design to appropriate side-specific field
+        if ($side === 'back') {
+            $designPath = $this->persistDesignJson(
+                $designPayload,
+                'templates/assets',
+                $metadata['back_json_path'] ?? null
+            );
+            $metadata['back_json_path'] = $designPath;
+            $metadata['back_design_json'] = $designPayload;
         } else {
-            Log::info('Design payload too large for DB column update, relied on JSON file', [
-                'template_id' => $template->id,
-                'length' => strlen($designJson)
-            ]);
+            $designPath = $this->persistDesignJson(
+                $designPayload,
+                'templates/assets',
+                $metadata['json_path'] ?? null
+            );
+            $metadata['json_path'] = $designPath;
+        }
+
+        // For backward compatibility, still save to main design field for front side
+        if ($side === 'front') {
+            // Save to DB only if within packet limits (approx 1MB safely)
+            $designJson = json_encode($designPayload, JSON_UNESCAPED_UNICODE);
+            if (strlen($designJson) < 900000) {
+                $template->design = $designJson;
+            } else {
+                Log::info('Design payload too large for DB column update, relied on JSON file', [
+                    'template_id' => $template->id,
+                    'length' => strlen($designJson)
+                ]);
+            }
         }
 
         if (!empty($validated['template_name'])) {
@@ -1183,7 +1266,7 @@ public function uploadPreview(Request $request, $id)
             if ($generatedSvg) {
                 $template->svg_path = $this->persistDataUrl(
                     $generatedSvg,
-                    'templates/front/svg',
+                    'templates/front_svg',
                     'svg',
                     $template->svg_path,
                     'generated_svg'
@@ -1206,7 +1289,7 @@ public function uploadPreview(Request $request, $id)
                 try {
                     $template->svg_path = $this->persistDataUrl(
                         $this->normalizeSvgPayload($svgPayload),
-                        'templates/front/svg',
+                        'templates/front_svg',
                         'svg',
                         $template->svg_path,
                         'provided_svg'
@@ -1830,16 +1913,11 @@ public function uploadToProduct(Request $request, $id)
     {
         $paths = [
             storage_path('app/public/templates'),
+            storage_path('app/public/templates/front_svg'),
+            storage_path('app/public/templates/front_png'),
+            storage_path('app/public/templates/back_svg'),
+            storage_path('app/public/templates/back_png'),
             storage_path('app/public/templates/assets'),
-            storage_path('app/public/templates/front'),
-            storage_path('app/public/templates/front/svg'),
-            storage_path('app/public/templates/front/png'),
-            storage_path('app/public/templates/back'),
-            storage_path('app/public/templates/front/svg'),
-            storage_path('app/public/templates/front/png'),
-            storage_path('app/public/templates/back'),
-            storage_path('app/public/templates/back/svg'),
-            storage_path('app/public/templates/back/png'),
         ];
 
         foreach ($paths as $dir) {
@@ -2944,7 +3022,7 @@ public function uploadToProduct(Request $request, $id)
             $dummySvg = 'data:image/svg+xml;base64,' . base64_encode('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="white"/></svg>');
             $template->svg_path = $this->persistDataUrl(
                 $dummySvg,
-                'templates/front/svg',
+                'templates/front_svg',
                 'svg',
                 $template->svg_path,
                 'dummy_svg'
@@ -2954,4 +3032,5 @@ public function uploadToProduct(Request $request, $id)
             Log::warning('Dummy SVG save failed', ['error' => $e->getMessage()]);
         }
     }
+
 }

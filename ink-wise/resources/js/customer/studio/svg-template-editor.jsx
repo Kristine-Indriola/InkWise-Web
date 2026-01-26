@@ -1,3 +1,4 @@
+
 // SVG Template Editor (Vite module version)
 // Provides interactive editing capabilities for SVG templates
 
@@ -14,6 +15,11 @@ class SvgTemplateEditor {
             ...options,
         };
         const bodyDataset = document && document.body && document.body.dataset ? document.body.dataset : {};
+        /**
+         * The raw image replacement mode, converted to lowercase for case-insensitive comparison.
+         * Defaults to an empty string if no mode is provided.
+         * @type {string}
+         */
         const modeRaw = (bodyDataset.imageReplacementMode || '').toLowerCase();
         let mode = 'full';
         if (modeRaw === 'panel-only' || modeRaw === 'disabled') {
@@ -41,6 +47,103 @@ class SvgTemplateEditor {
         this.setupImageHandlers();
         this.setupTextHandlers();
         this.addCssStyles();
+
+        // Listen for text style changes from the toolbar
+        if (typeof window !== 'undefined') {
+            window.addEventListener('inkwise:text-style-changed', (event) => {
+                try {
+                    const detail = event && event.detail ? event.detail : {};
+                    const { attribute, value, key } = detail;
+                    if (!attribute) return;
+
+                    // If an inline editor is open, prefer updating it for immediate visual feedback
+                    const editor = this._currentInlineEditor || null;
+                    if (editor && editor.element) {
+                        const elementKey = editor.element.getAttribute('data-preview-node') || editor.element.id || null;
+                        if (key && elementKey && key !== elementKey) return;
+
+                        const editable = editor.editable;
+                        if (!editable) return;
+
+                        if (attribute === 'font-family') {
+                            editor.element.setAttribute('font-family', String(value));
+                            // also update style to ensure font is used in SVG rendering
+                            editor.element.style && (editor.element.style.fontFamily = String(value));
+                            editable.style.fontFamily = String(value) || editable.style.fontFamily;
+                        } else if (attribute === 'font-size') {
+                            const size = Number(value);
+                            if (Number.isFinite(size)) {
+                                editor.element.setAttribute('font-size', String(size));
+                                editor.element.style && (editor.element.style.fontSize = `${size}px`);
+                                editable.style.fontSize = `${size}px`;
+                            }
+                        } else if (attribute === 'fill' || attribute === 'color') {
+                            editor.element.setAttribute('fill', String(value));
+                            editor.element.style && (editor.element.style.fill = String(value));
+                            editable.style.color = String(value) || editable.style.color;
+                        }
+
+                        // Ensure bounding box remains visible
+                        if (editor.element._boundingBox) {
+                            editor.element._boundingBox.classList.add('svg-bounding-box--active');
+                        }
+
+                        return;
+                    }
+
+                    // Fallback: no inline editor open — apply style directly to matching SVG <text> nodes in this SVG
+                    let targets = [];
+                    if (key && typeof key === 'string') {
+                        try {
+                            const esc = typeof CSS !== 'undefined' && typeof CSS.escape === 'function' ? CSS.escape(key) : key;
+                            targets = Array.from(this.svg.querySelectorAll(`[data-preview-node="${esc}"]`));
+                        } catch (e) {
+                            targets = Array.from(this.svg.querySelectorAll(`[data-preview-node="${key}"]`));
+                        }
+                    }
+
+                    // If no targets found by key, try the currently focused text element in this SVG
+                    if (!targets.length) {
+                        const focused = this.svg.querySelector('.svg-text-focus');
+                        if (focused) targets.push(focused);
+                    }
+
+                    // Apply attribute to each target and refresh bounding boxes
+                    targets.forEach((node) => {
+                        if (!node) return;
+                        if (attribute === 'font-family') {
+                            node.setAttribute('font-family', String(value));
+                            node.style && (node.style.fontFamily = String(value));
+                            // also set inline style attribute to ensure legacy code sees it
+                            try {
+                                const existing = node.getAttribute('style') || '';
+                                node.setAttribute('style', `font-family: '${String(value)}', system-ui, sans-serif; ${existing}`);
+                            } catch (e) {}
+                        } else if (attribute === 'font-size') {
+                            const size = Number(value);
+                            if (Number.isFinite(size)) {
+                                node.setAttribute('font-size', String(size));
+                                node.style && (node.style.fontSize = `${size}px`);
+                            }
+                        } else if (attribute === 'fill' || attribute === 'color') {
+                            node.setAttribute('fill', String(value));
+                            node.style && (node.style.fill = String(value));
+                        }
+
+                        // Update bounding box if present
+                        try {
+                            this.updateBoundingBox(node);
+                        } catch (e) {}
+                        try {
+                            if (node._boundingBox) node._boundingBox.classList.add('svg-bounding-box--active');
+                        } catch (e) {}
+                    });
+                } catch (error) {
+                    console.warn('SvgTemplateEditor: failed to apply toolbar style change to inline editor or SVG nodes', error);
+                }
+            });
+        }
+
         console.log('SvgTemplateEditor: Initialization complete');
     }
 
@@ -51,10 +154,61 @@ class SvgTemplateEditor {
                 const data = JSON.parse(svgData);
                 this.changeableImages = data.changeable_images || [];
                 this.textElements = data.text_elements || [];
+                // Set data-editable on text elements
+                this.textElements.forEach((textEl) => {
+                    const element = this.svg.querySelector(`[data-element-id="${textEl.id}"]`) || this.svg.querySelector(`#${textEl.id}`);
+                    if (element) {
+                        element.setAttribute('data-editable', 'true');
+                    }
+                });
             } catch (error) {
                 console.warn('SvgTemplateEditor: Failed to parse data-svg-data payload', error);
+                this.fallbackParseSvg();
             }
+        } else {
+            this.fallbackParseSvg();
         }
+    }
+
+    fallbackParseSvg() {
+        console.log('SvgTemplateEditor: Using fallback SVG parsing');
+        this.changeableImages = [];
+        this.textElements = [];
+
+        // Find all text elements in the SVG
+        const textNodes = this.svg.querySelectorAll('text');
+        textNodes.forEach((textNode, index) => {
+            const id = `fallback-text-${index}`;
+            textNode.setAttribute('data-element-id', id);
+            textNode.setAttribute('data-editable', 'true');
+            this.textElements.push({
+                id: id,
+                text: textNode.textContent || '',
+                fontFamily: textNode.getAttribute('font-family') || 'Arial',
+                fontSize: parseFloat(textNode.getAttribute('font-size')) || 16,
+                fill: textNode.getAttribute('fill') || '#000000',
+                x: parseFloat(textNode.getAttribute('x')) || 0,
+                y: parseFloat(textNode.getAttribute('y')) || 0,
+            });
+        });
+
+        // Find all image elements
+        const imageNodes = this.svg.querySelectorAll('image, img');
+        imageNodes.forEach((imageNode, index) => {
+            const id = `fallback-image-${index}`;
+            imageNode.setAttribute('data-element-id', id);
+            imageNode.setAttribute('data-changeable', 'image');
+            this.changeableImages.push({
+                id: id,
+                src: imageNode.getAttribute('href') || imageNode.getAttribute('src') || '',
+                x: parseFloat(imageNode.getAttribute('x')) || 0,
+                y: parseFloat(imageNode.getAttribute('y')) || 0,
+                width: parseFloat(imageNode.getAttribute('width')) || 100,
+                height: parseFloat(imageNode.getAttribute('height')) || 100,
+            });
+        });
+
+        console.log('SvgTemplateEditor: Fallback parsed', this.textElements.length, 'text elements,', this.changeableImages.length, 'images');
     }
 
     readDatasetTokens(node) {
@@ -354,16 +508,35 @@ class SvgTemplateEditor {
 
         const rect = document.createElementNS(SVG_NS, 'rect');
         rect.classList.add('svg-bounding-box__rect');
-        rect.setAttribute('fill', 'none');
+        rect.setAttribute('fill', 'transparent');
         rect.setAttribute('stroke', '#007cba');
         rect.setAttribute('stroke-width', '2');
         rect.setAttribute('stroke-dasharray', '5,5');
         rect.setAttribute('rx', '3');
-        rect.style.pointerEvents = 'none';
+        rect.style.pointerEvents = 'all';
         group.appendChild(rect);
 
         const handles = this.createResizeHandles();
         handles.forEach((handle) => group.appendChild(handle));
+
+        // Make bounding group interactive and show pointer
+        group.style.pointerEvents = 'all';
+        group.style.cursor = 'pointer';
+
+        // Attach click handler so clicking the bbox focuses the associated element (text/image)
+        group.addEventListener('click', (e) => {
+            try {
+                e.preventDefault();
+                e.stopPropagation();
+                const target = group._targetElement || element;
+                // If the clicked element is an image handle, resolve to interaction node
+                const resolved = this.resolveImageHandleNodes(target) || { interactionNode: target };
+                const focusNode = resolved.interactionNode || target;
+                this.focusElement(focusNode);
+            } catch (err) {
+                console.warn('SvgTemplateEditor: bbox click handler error', err);
+            }
+        });
 
         this.svg.appendChild(group);
         this.positionBoundingElements(group, bbox);
@@ -471,11 +644,28 @@ class SvgTemplateEditor {
         if (!target) {
             return false;
         }
-        const resolved = this.resolveImageHandleNodes(target) || { interactionNode: target };
-        const focusNode = resolved.interactionNode || target;
+        return this.focusElement(target);
+    }
+
+    focusElement(element) {
+        const resolved = this.resolveImageHandleNodes(element) || { interactionNode: element };
+        const focusNode = resolved.interactionNode || element;
         const bbox = this.getBBoxSafe(focusNode);
         if (!bbox) {
             return false;
+        }
+
+        // Create bounding box if not exists
+        if (!focusNode._boundingBox) {
+            focusNode._boundingBox = this.createBoundingBox(focusNode);
+            if (focusNode._boundingBox) {
+                focusNode._boundingBox._targetElement = focusNode;
+                // Make handles resizable
+                const handles = focusNode._boundingBox.querySelectorAll('.resize-handle');
+                handles.forEach(handle => this.makeResizable(focusNode, handle));
+                // Make draggable
+                this.makeDraggable(focusNode._boundingBox);
+            }
         }
 
         this.updateBoundingBox(focusNode);
@@ -493,6 +683,24 @@ class SvgTemplateEditor {
         }
         focusNode.classList.add('changeable-image-active');
         setTimeout(() => focusNode.classList.remove('changeable-image-active'), 1200);
+
+        // If it's a text element, show the text edit input and notify toolbar
+        if (focusNode.tagName && focusNode.tagName.toLowerCase() === 'text') {
+            // Dispatch global event so toolbar can show the text controls
+            const key = focusNode.getAttribute('data-preview-node') || focusNode.id || null;
+            try {
+                window.dispatchEvent(new CustomEvent('inkwise:active-element', { detail: { type: 'text', key } }));
+            } catch (e) {
+                if (typeof document !== 'undefined' && document.createEvent) {
+                    const legacyEvent = document.createEvent('CustomEvent');
+                    legacyEvent.initCustomEvent('inkwise:active-element', true, true, { type: 'text', key });
+                    window.dispatchEvent(legacyEvent);
+                }
+            }
+
+            this.showTextEditDialog(focusNode);
+        }
+
         return true;
     }
 
@@ -505,6 +713,9 @@ class SvgTemplateEditor {
         let currentX = 0;
         let currentY = 0;
 
+        // If element is a bounding box, drag the target element instead
+        const targetElement = element._targetElement || element;
+
         const startDrag = (e) => {
             if (e.target.closest('.resize-handle')) {
                 return;
@@ -515,27 +726,27 @@ class SvgTemplateEditor {
                 return;
             }
 
-            const bbox = this.getBBoxSafe(element);
+            const bbox = this.getBBoxSafe(targetElement);
             if (!bbox) {
                 return;
             }
 
-            const canReadAttribute = typeof element.getAttribute === 'function';
-            const canMutateAttribute = typeof element.setAttribute === 'function';
-            originalX = canReadAttribute ? parseFloat(element.getAttribute('x')) : bbox.x;
-            originalY = canReadAttribute ? parseFloat(element.getAttribute('y')) : bbox.y;
+            const canReadAttribute = typeof targetElement.getAttribute === 'function';
+            const canMutateAttribute = typeof targetElement.setAttribute === 'function';
+            originalX = canReadAttribute ? parseFloat(targetElement.getAttribute('x')) : bbox.x;
+            originalY = canReadAttribute ? parseFloat(targetElement.getAttribute('y')) : bbox.y;
 
             if (Number.isNaN(originalX)) {
                 originalX = bbox.x;
                 if (canMutateAttribute) {
-                    element.setAttribute('x', originalX);
+                    targetElement.setAttribute('x', originalX);
                 }
             }
 
             if (Number.isNaN(originalY)) {
                 originalY = bbox.y;
                 if (canMutateAttribute) {
-                    element.setAttribute('y', originalY);
+                    targetElement.setAttribute('y', originalY);
                 }
             }
 
@@ -565,15 +776,15 @@ class SvgTemplateEditor {
             currentX = point.x - grabOffsetX;
             currentY = point.y - grabOffsetY;
 
-            if (typeof element.removeAttribute === 'function') {
-                element.removeAttribute('transform');
+            if (typeof targetElement.removeAttribute === 'function') {
+                targetElement.removeAttribute('transform');
             }
-            if (typeof element.setAttribute === 'function') {
-                element.setAttribute('x', currentX);
-                element.setAttribute('y', currentY);
+            if (typeof targetElement.setAttribute === 'function') {
+                targetElement.setAttribute('x', currentX);
+                targetElement.setAttribute('y', currentY);
             }
 
-            this.updateBoundingBox(element);
+            this.updateBoundingBox(targetElement);
 
             e.preventDefault();
         };
@@ -588,11 +799,11 @@ class SvgTemplateEditor {
             this.svg.style.cursor = 'default';
             document.body.style.userSelect = '';
 
-            this.updateBoundingBox(element);
+            this.updateBoundingBox(targetElement);
 
             const event = new CustomEvent('svgImageMoved', {
                 detail: {
-                    element,
+                    element: targetElement,
                     x: currentX,
                     y: currentY,
                 },
@@ -781,7 +992,7 @@ class SvgTemplateEditor {
 
             element.addEventListener('click', function(e) {
                 e.preventDefault();
-                self.showTextEditDialog(element);
+                self.focusElement(element);
             });
 
             element.addEventListener('mouseenter', function() {
@@ -884,70 +1095,211 @@ class SvgTemplateEditor {
         const self = this;
         const currentText = element.textContent || '';
 
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = currentText;
-        input.className = 'svg-text-editor';
+        // Use an SVG foreignObject with an XHTML editable div so editing occurs inline inside the canvas
+        const bbox = this.getBBoxSafe(element);
+        if (!bbox) {
+            return;
+        }
 
-        const rect = element.getBoundingClientRect();
-        const svgRect = self.svg.getBoundingClientRect();
+        const offset = 2;
+        const fo = document.createElementNS(SVG_NS, 'foreignObject');
+        fo.setAttribute('x', bbox.x - offset);
+        fo.setAttribute('y', bbox.y - offset);
+        fo.setAttribute('width', Math.max(bbox.width + offset * 2, 40));
+        fo.setAttribute('height', Math.max(bbox.height + offset * 2, 20));
+        fo.classList.add('svg-text-foreignobject');
+        fo.style.pointerEvents = 'all';
 
-        input.style.position = 'absolute';
-        input.style.left = (rect.left - svgRect.left) + 'px';
-        input.style.top = (rect.top - svgRect.top) + 'px';
-        input.style.width = Math.max(rect.width, 100) + 'px';
-        input.style.fontSize = window.getComputedStyle(element).fontSize;
-        input.style.fontFamily = window.getComputedStyle(element).fontFamily;
-        input.style.border = '1px solid #007cba';
-        input.style.padding = '2px';
-        input.style.background = 'white';
-        input.style.zIndex = '1000';
+        const xhtmlNs = 'http://www.w3.org/1999/xhtml';
+        const editable = document.createElementNS(xhtmlNs, 'div');
+        editable.setAttribute('xmlns', xhtmlNs);
+        editable.contentEditable = 'true';
+        editable.className = 'svg-text-editor-fo';
 
+        // Copy computed font properties to the editable area for a seamless inline feel
+        const cs = window.getComputedStyle(element);
+        editable.style.fontSize = cs.fontSize || '16px';
+        editable.style.fontFamily = cs.fontFamily || 'sans-serif';
+        editable.style.lineHeight = cs.lineHeight || '1';
+        // Use the SVG text fill color if available
+        const fillColor = element.getAttribute('fill') || cs.color || '#000';
+        editable.style.color = fillColor;
+        editable.style.width = '100%';
+        editable.style.height = '100%';
+        editable.style.background = 'transparent';
+        editable.style.padding = '2px';
+        editable.style.outline = 'none';
+        editable.style.overflow = 'hidden';
+        editable.style.resize = 'none';
+        editable.style.whiteSpace = 'pre';
+        editable.style.textAlign = element.getAttribute('text-anchor') === 'middle' ? 'center' : 'left';
+        editable.style.caretColor = '#007cba';
+
+        // Initialize the editable content
+        editable.textContent = currentText;
+
+        // Hide the original SVG text while editing so it doesn't double-render
         element.style.visibility = 'hidden';
 
-        self.svg.parentNode.appendChild(input);
-        input.focus();
-        input.select();
+        // Attach handlers
+        const finishEdit = function(commit = true) {
+            // cleanup toolbar listeners if attached
+            try {
+                if (toolbarHost) {
+                    if (toolbarMouseDown) toolbarHost.removeEventListener('mousedown', toolbarMouseDown);
+                    if (toolbarMouseUp) toolbarHost.removeEventListener('mouseup', toolbarMouseUp);
+                }
+            } catch (err) {}
 
-        const finishEdit = function() {
-            const newText = input.value;
+            const newText = editable.textContent || '';
 
-            while (element.firstChild) {
-                element.removeChild(element.firstChild);
-            }
-
-            element.appendChild(document.createTextNode(newText));
+            // Restore visibility
             element.style.visibility = 'visible';
 
-            if (input.parentNode) {
-                input.parentNode.removeChild(input);
+            if (fo.parentNode) {
+                fo.parentNode.removeChild(fo);
             }
 
-            const event = new CustomEvent('svgTextChanged', {
-                detail: {
-                    element,
-                    oldText: currentText,
-                    newText,
-                },
-            });
-            self.svg.dispatchEvent(event);
+            if (commit) {
+                while (element.firstChild) {
+                    element.removeChild(element.firstChild);
+                }
+                element.appendChild(document.createTextNode(newText));
 
-            if (self.options.onTextChange) {
-                self.options.onTextChange(element, currentText, newText);
+                const event = new CustomEvent('svgTextChanged', {
+                    detail: {
+                        element,
+                        oldText: currentText,
+                        newText,
+                    },
+                });
+                self.svg.dispatchEvent(event);
+
+                if (self.options.onTextChange) {
+                    self.options.onTextChange(element, currentText, newText);
+                }
+            }
+
+            // Remove active editing state from bounding box
+            if (element._boundingBox) {
+                element._boundingBox.classList.remove('svg-bounding-box--active');
+            }
+
+            // Notify toolbar to hide selection
+            try {
+                window.dispatchEvent(new CustomEvent('inkwise:active-element', { detail: { type: null } }));
+            } catch (err) {
+                if (typeof document !== 'undefined' && document.createEvent) {
+                    const legacyEvent = document.createEvent('CustomEvent');
+                    legacyEvent.initCustomEvent('inkwise:active-element', true, true, { type: null });
+                    window.dispatchEvent(legacyEvent);
+                }
             }
         };
 
-        input.addEventListener('blur', finishEdit);
-        input.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                finishEdit();
-            } else if (e.key === 'Escape') {
-                element.style.visibility = 'visible';
-                if (input.parentNode) {
-                    input.parentNode.removeChild(input);
+        const cancelEdit = function() {
+            // cleanup toolbar listeners if attached
+            try {
+                if (toolbarHost) {
+                    if (toolbarMouseDown) toolbarHost.removeEventListener('mousedown', toolbarMouseDown);
+                    if (toolbarMouseUp) toolbarHost.removeEventListener('mouseup', toolbarMouseUp);
+                }
+            } catch (err) {}
+
+            // Discard changes
+            element.style.visibility = 'visible';
+            if (fo.parentNode) {
+                fo.parentNode.removeChild(fo);
+            }
+
+            // Remove active editing state from bounding box
+            if (element._boundingBox) {
+                element._boundingBox.classList.remove('svg-bounding-box--active');
+            }
+
+            try {
+                window.dispatchEvent(new CustomEvent('inkwise:active-element', { detail: { type: null } }));
+            } catch (err) {
+                if (typeof document !== 'undefined' && document.createEvent) {
+                    const legacyEvent = document.createEvent('CustomEvent');
+                    legacyEvent.initCustomEvent('inkwise:active-element', true, true, { type: null });
+                    window.dispatchEvent(legacyEvent);
+                }
+            }
+        };
+
+        // Keep toolbar visible when interacting with it: attach listeners to the toolbar host
+        const toolbarHost = (typeof document !== 'undefined') ? document.querySelector('.studio-react-widgets') : null;
+        let toolbarMouseDown = null;
+        let toolbarMouseUp = null;
+        let suppressFinishOnBlur = false;
+
+        if (toolbarHost) {
+            toolbarMouseDown = function() { suppressFinishOnBlur = true; };
+            toolbarMouseUp = function() {
+                // allow blur to commit after a short delay and re-focus the editable
+                setTimeout(() => {
+                    suppressFinishOnBlur = false;
+                    try { editable.focus(); } catch (e) {}
+                }, 0);
+            };
+            toolbarHost.addEventListener('mousedown', toolbarMouseDown);
+            toolbarHost.addEventListener('mouseup', toolbarMouseUp);
+        }
+
+        editable.addEventListener('focus', function() {
+            try {
+                window.dispatchEvent(new CustomEvent('inkwise:active-element', { detail: { type: 'text' } }));
+            } catch (err) {
+                if (typeof document !== 'undefined' && document.createEvent) {
+                    const legacyEvent = document.createEvent('CustomEvent');
+                    legacyEvent.initCustomEvent('inkwise:active-element', true, true, { type: 'text' });
+                    window.dispatchEvent(legacyEvent);
                 }
             }
         });
+
+        editable.addEventListener('blur', function() {
+            // If the toolbar is being interacted with, do not commit/hide the editor
+            if (suppressFinishOnBlur) {
+                // keep editing; focus will be restored by toolbarMouseUp
+                return;
+            }
+            // Commit on blur
+            finishEdit(true);
+        });
+
+
+
+        editable.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                finishEdit(true);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelEdit();
+            }
+        });
+
+        fo.appendChild(editable);
+        this.svg.appendChild(fo);
+
+        // Position bounding box and ensure it's visible while editing
+        if (element._boundingBox) {
+            element._boundingBox.classList.add('svg-bounding-box--active');
+        }
+
+        // Focus and select
+        editable.focus();
+        const sel = window.getSelection();
+        try {
+            const range = document.createRange();
+            range.selectNodeContents(editable);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        } catch (err) {
+            // ignore selection errors
+        }
     }
 
     addCssStyles() {
@@ -1012,6 +1364,25 @@ class SvgTemplateEditor {
 
             .svg-text-editor:focus {
                 box-shadow: 0 0 5px rgba(0, 124, 186, 0.5);
+            }
+
+            /* foreignObject inline editor styles */
+            .svg-text-foreignobject { pointer-events: all; }
+            .svg-text-editor-fo {
+                width: 100%;
+                height: 100%;
+                box-sizing: border-box;
+                -webkit-tap-highlight-color: rgba(0,0,0,0);
+                padding: 2px;
+                white-space: pre;
+                overflow: hidden;
+                outline: none;
+            }
+
+            .svg-bounding-box--active .svg-bounding-box__rect {
+                stroke: #007cba;
+                stroke-width: 3;
+                opacity: 1;
             }
                 .svg-bounding-box--pulse .svg-bounding-box__rect {
                     animation: svgBoundingBoxPulse 1s ease-out;
