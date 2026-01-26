@@ -1,5 +1,4 @@
-﻿<?php
-
+﻿
 namespace App\Http\Controllers\Customer;
 
 use App\Http\Controllers\Controller;
@@ -134,28 +133,3 @@ class CartController extends Controller
     public function clearCart(): JsonResponse
     {
         $userId = Auth::id();
-        $sessionId = session()->getId();
-
-        CartItem::where(function ($query) use ($userId, $sessionId) {
-            $query->where('customer_id', $userId)
-                  ->orWhere('session_id', $sessionId);
-        })->delete();
-
-        return response()->json(['success' => true, 'message' => 'Cart cleared']);
-    }
-
-    public function getCartCount(): JsonResponse
-    {
-        $userId = Auth::id();
-        $sessionId = session()->getId();
-
-        $count = CartItem::where(function ($query) use ($userId, $sessionId) {
-            $query->where('customer_id', $userId)
-                  ->orWhere('session_id', $sessionId);
-        })
-        ->where('status', 'active')
-        ->sum('quantity');
-
-        return response()->json(['count' => $count]);
-    }
-}

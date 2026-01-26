@@ -23,7 +23,7 @@
     "isEntry": true
   },
   "resources/css/app.css": {
-    "file": "assets/app-Cif_IFTU.css",
+    "file": "assets/app-DzXeLRGX.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -38,7 +38,7 @@
     "isEntry": true
   },
   "resources/css/customer/studio.css": {
-    "file": "assets/studio-Ck3L3zfi.css",
+    "file": "assets/studio-CpafKoVw.css",
     "src": "resources/css/customer/studio.css",
     "isEntry": true
   },
@@ -83,7 +83,7 @@
     ]
   },
   "resources/js/customer/studio/main.jsx": {
-    "file": "assets/main-3vUBYQ19.js",
+    "file": "assets/main-C27rxVRH.js",
     "name": "main",
     "src": "resources/js/customer/studio/main.jsx",
     "isEntry": true,
@@ -96,7 +96,7 @@
     ]
   },
   "resources/js/customer/studio/svg-template-editor.jsx": {
-    "file": "assets/svg-template-editor-DRdIcUOd.js",
+    "file": "assets/svg-template-editor-B9JqxbqK.js",
     "name": "svg-template-editor",
     "src": "resources/js/customer/studio/svg-template-editor.jsx",
     "isEntry": true,

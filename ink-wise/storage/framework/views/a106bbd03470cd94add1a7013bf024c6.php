@@ -224,7 +224,7 @@
       <?php else: ?>
         <a href="<?php echo e(route('staff.orders.archived')); ?>" class="pill-link">Archived Orders</a>
         <a href="<?php echo e(route('staff.reports.pickup-calendar')); ?>" class="pill-link">Pickup Calendar</a>
-        <a href="#" class="pill-link">Export</a>
+        <a href="<?php echo e(route('staff.order_list.export', request()->query())); ?>" class="pill-link">Export</a>
       <?php endif; ?>
     </div>
   </header>

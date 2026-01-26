@@ -293,7 +293,7 @@ class CheckoutController extends Controller
             'customer_id' => $customerOrder->customer_id,
             'user_id' => Auth::id(),
             'order_number' => $this->orderFlow->generateOrderNumber(),
-            'status' => 'pending',
+            'status' => 'draft',
             'subtotal_amount' => $checkoutData['subtotal'],
             'tax_amount' => $checkoutData['tax_amount'],
             'shipping_fee' => $checkoutData['shipping_fee'],

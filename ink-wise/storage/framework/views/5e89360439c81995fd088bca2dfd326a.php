@@ -1620,42 +1620,18 @@
     ];
     $materialStockHasData = collect($materialStockChart['values'])->sum() > 0;
 
-    // Demand Analysis Data - Mock data for demonstration
-    $demandTrendsChart = [
-        'labels' => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-        'datasets' => [
-            [
-                'label' => 'Material Usage',
-                'data' => [120, 150, 180, 140, 200, 170],
-                'borderColor' => '#6a2ebc',
-                'backgroundColor' => 'rgba(106, 46, 188, 0.1)',
-                'tension' => 0.4,
-                'fill' => true,
-            ],
-            [
-                'label' => 'Predicted Demand',
-                'data' => [130, 160, 175, 155, 190, 185],
-                'borderColor' => '#3cd5c8',
-                'backgroundColor' => 'rgba(60, 213, 200, 0.1)',
-                'borderDash' => [5, 5],
-                'tension' => 0.4,
-                'fill' => false,
-            ]
-        ]
+    // Demand Analysis Data - Real data from stock movements
+    $demandAnalysisData = $demandAnalysis ?? ['demandTrendsChart' => [], 'demandInsights' => []];
+    $demandTrendsChart = $demandAnalysisData['demandTrendsChart'] ?? [
+        'labels' => [],
+        'datasets' => []
     ];
-
-    $demandInsights = [
-        'peakPeriod' => [
-            'period' => 'March',
-            'usage' => 180
-        ],
-        'lowPeriod' => [
-            'period' => 'April',
-            'usage' => 140
-        ],
-        'recommendedReorder' => 160,
-        'trend' => 'increasing',
-        'trendPercent' => 8.3
+    $demandInsights = $demandAnalysisData['demandInsights'] ?? [
+        'peakPeriod' => ['period' => 'N/A', 'usage' => 0],
+        'lowPeriod' => ['period' => 'N/A', 'usage' => 0],
+        'recommendedReorder' => 0,
+        'trend' => 'stable',
+        'trendPercent' => 0
     ];
 ?>
 <main class="admin-page-shell dashboard-page" role="main">
@@ -1737,9 +1713,21 @@
         ];
         $paymentStatusHasData = $paymentStatusValues->sum() > 0;
 
+        $outOfStockMaterials = collect($inventoryMonitorData['outOfStockMaterials'] ?? []);
+        $healthyMaterials = collect($materials ?? [])->filter(function ($material) {
+            $stock = (int) (optional($material->inventory)->stock_level ?? $material->stock_qty ?? 0);
+            $reorder = (int) (optional($material->inventory)->reorder_level ?? $material->reorder_point ?? 0);
+            return $stock > $reorder;
+        });
+
         $inventoryChart = [
             'labels' => ['Healthy Stock', 'Low Stock', 'Out of Stock'],
             'values' => [$healthySkus, $lowStockCount, $outStockCount],
+            'tooltips' => [
+                $healthyMaterials->take(5)->pluck('material_name')->implode(', ') ?: 'No materials',
+                collect($inventoryMonitorData['lowStockMaterials'] ?? [])->take(5)->pluck('material_name')->implode(', ') ?: 'No materials',
+                $outOfStockMaterials->take(5)->pluck('material_name')->implode(', ') ?: 'No materials',
+            ],
         ];
         $inventoryHasData = array_sum($inventoryChart['values']) > 0;
 
@@ -2039,19 +2027,19 @@
         </article>
         <article class="dashboard-card">
             <header class="dashboard-card__header">
-                <h2 class="dashboard-card__title">Ordering cadence by time</h2>
+                <h2 class="dashboard-card__title">Customer Reviews</h2>
             </header>
             <div class="behavior-chart">
                 <div class="insight-chart insight-chart--compact insight-chart--slim" style="margin:0;">
-                    <span class="insight-meta-label">Ordering cadence by time</span>
-                    <canvas id="timeOfDayOrdersChart" data-chart='<?php echo json_encode($timeOfDayChart, 15, 512) ?>'></canvas>
-                    <p id="timeOfDayOrdersEmpty" class="chart-card__empty" <?php if($timeOfDayHasData): ?> hidden <?php endif; ?>>Time-of-day data will appear once orders are recorded.</p>
+                    <span class="insight-meta-label">Review ratings distribution</span>
+                    <canvas id="ratingDistributionChart" data-chart='<?php echo json_encode($ratingDistributionChart, 15, 512) ?>'></canvas>
+                    <p id="ratingDistributionEmpty" class="chart-card__empty" <?php if($ratingDistributionHasData): ?> hidden <?php endif; ?>>Review data will appear once customers submit ratings.</p>
                 </div>
                 <span class="insight-meta-caption" style="display:block; margin-top:0.4rem;">
-                    <?php if($timeOfDayTop): ?>
-                        Peak ordering window: <?php echo e($timeOfDayTop); ?>.
+                    <?php if($customerReviewSnapshot['average']): ?>
+                        Average rating: <?php echo e($customerReviewSnapshot['average']); ?>★ (<?php echo e(number_format($customerReviewSnapshot['count'])); ?> reviews).
                     <?php else: ?>
-                        Time-of-day breakdown unavailable.
+                        No reviews yet.
                     <?php endif; ?>
                 </span>
             </div>
@@ -2592,6 +2580,7 @@
             const payload = readChartPayload(canvas);
             const labels = Array.isArray(payload?.labels) ? payload.labels : [];
             const values = Array.isArray(payload?.values) ? payload.values.map((value) => Number(value) || 0) : [];
+            const tooltips = Array.isArray(payload?.tooltips) ? payload.tooltips : [];
             const hasData = values.some((value) => value > 0);
 
             if (!hasData) {
@@ -2623,6 +2612,28 @@
                     plugins: {
                         legend: {
                             position: 'bottom',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => {
+                                    const label = labels[context.dataIndex] || '';
+                                    const value = values[context.dataIndex] || 0;
+                                    const tooltipText = tooltips[context.dataIndex] || '';
+                                    
+                                    if (tooltipText === 'No materials') {
+                                        return [`${label}: ${value} SKUs`, tooltipText];
+                                    }
+                                    
+                                    const materials = tooltipText.split(', ');
+                                    const result = [`${label}: ${value} SKUs`];
+                                    materials.forEach(material => {
+                                        if (material.trim()) {
+                                            result.push(material.trim());
+                                        }
+                                    });
+                                    return result;
+                                },
+                            },
                         },
                     },
                 },
@@ -2734,9 +2745,9 @@
             });
         };
 
-        const initialiseTimeOfDayOrdersChart = () => {
-            const canvas = document.getElementById('timeOfDayOrdersChart');
-            const emptyState = document.getElementById('timeOfDayOrdersEmpty');
+        const initialiseRatingDistributionChart = () => {
+            const canvas = document.getElementById('ratingDistributionChart');
+            const emptyState = document.getElementById('ratingDistributionEmpty');
             if (!canvas) {
                 return;
             }
@@ -2765,9 +2776,9 @@
                     labels,
                     datasets: [
                         {
-                            label: 'Orders',
+                            label: 'Reviews',
                             data: values,
-                            backgroundColor: ['#5C7CFA', '#4AD991', '#F49D37', '#FF6B6B'],
+                            backgroundColor: ['#FFD700', '#FFD700', '#FFD700', '#FFD700', '#FFD700'], // Gold color for stars
                             borderRadius: 6,
                         },
                     ],
@@ -2951,62 +2962,6 @@
                     },
                     scales: {
                         y: {
-                            beginAtZero: true,
-                            ticks: {
-                                precision: 0,
-                            },
-                        },
-                    },
-                },
-            });
-        };
-
-        const initialiseRatingDistributionChart = () => {
-            const canvas = document.getElementById('ratingDistributionChart');
-            const emptyState = document.getElementById('ratingDistributionChartEmpty');
-            if (!canvas) {
-                return;
-            }
-
-            const payload = readChartPayload(canvas);
-            const labels = Array.isArray(payload?.labels) ? payload.labels : [];
-            const values = Array.isArray(payload?.values) ? payload.values.map((value) => Number(value) || 0) : [];
-
-            if (!hasPositiveValues(values)) {
-                if (emptyState) {
-                    emptyState.hidden = false;
-                }
-                return;
-            }
-
-            if (emptyState) {
-                emptyState.hidden = true;
-            }
-
-            destroyIfExists(canvas);
-
-            new window.Chart(canvas, {
-                type: 'bar',
-                data: {
-                    labels,
-                    datasets: [
-                        {
-                            label: 'Reviews',
-                            data: values,
-                            backgroundColor: getPalette(values.length),
-                            borderRadius: 6,
-                        },
-                    ],
-                },
-                options: {
-                    indexAxis: 'y',
-                    plugins: {
-                        legend: {
-                            display: false,
-                        },
-                    },
-                    scales: {
-                        x: {
                             beginAtZero: true,
                             ticks: {
                                 precision: 0,
@@ -3440,11 +3395,10 @@
             initialiseTopCustomersChart();
             initialiseRepeatCustomersSplitChart();
             initialisePopularDesignsMiniChart();
-            initialiseTimeOfDayOrdersChart();
+            initialiseRatingDistributionChart();
             initialiseDayOfWeekOrdersChart();
             initialisePeakOrderDaysMiniChart();
             initialisePopularDesignsPrimaryChart();
-            initialiseRatingDistributionChart();
             initialiseReviewResponseChart();
             initialiseStockLevelsChart();
             initialiseCriticalMaterialsChart();

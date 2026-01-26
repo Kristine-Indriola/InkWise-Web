@@ -35,7 +35,7 @@ class NewOrderPlaced extends Notification
 
         return [
             'message' => sprintf(
-                'New order %s placed by %s (Total: PHP %s)',
+                'New order %s placed by %s (Total: ₱%s)',
                 $displayNumber,
                 $this->customerName,
                 number_format($this->totalAmount, 2)

@@ -297,6 +297,31 @@
 			border-color: #f87171;
 			color: #b91c1c;
 		}
+
+		.material-highlight {
+			background: #fef3c7;
+			border: 1px solid #f59e0b;
+			border-radius: 6px;
+			padding: 4px 8px;
+			font-weight: 600;
+			color: #92400e;
+			display: inline-block;
+			margin: 2px 0;
+		}
+
+		.material-highlight strong {
+			color: #78350f;
+		}
+
+		.item-options .material-highlight {
+			background: #dbeafe;
+			border-color: #3b82f6;
+			color: #1e40af;
+			margin: 2px 0;
+			padding: 2px 6px;
+			border-radius: 4px;
+			font-size: 13px;
+		}
 	</style>
 	<style>
 		.ordersummary-card__header {
@@ -1107,7 +1132,7 @@
 	$ordersBackUrl = $statusManageUrl ?? $ordersIndexUrl;
 
 	$statusOptions = [
-		'draft' => 'New Order',
+		'draft' => 'NEW ORDER',
 		'pending' => 'Order Received',
 		'processing' => 'Processing',
 		'in_production' => 'In Progress',
@@ -1115,17 +1140,30 @@
 		'completed' => 'Completed',
 		'cancelled' => 'Cancelled',
 	];
+	$fulfillmentStatusOptions = [
+		'draft' => 'NEW ORDER',
+		'pending' => 'Pending',
+		'processing' => 'Processing',
+		'in_production' => 'In Production',
+		'confirmed' => 'Ready for Pickup',
+		'completed' => 'Completed',
+		'cancelled' => 'Cancelled',
+	];
+	
+	// Function to get display label for any status
+	$getStatusLabel = function($status) use ($statusOptions, $fulfillmentStatusOptions) {
+		if ($status === 'draft') {
+			return 'NEW ORDER';
+		}
+		return $statusOptions[$status] ?? $fulfillmentStatusOptions[$status] ?? 'Processing';
+	};
 	$statusFlow = ['draft', 'pending', 'pending_awaiting_materials', 'processing', 'in_production', 'confirmed', 'completed'];
 	$orderStatusRaw = data_get($order, 'status', 'draft');
-	$orderStatusRaw = $orderStatusRaw === 'draft' ? 'new_order' : $orderStatusRaw;
 	$currentStatus = strtolower((string) $orderStatusRaw);
-	if ($currentStatus === 'new_order') {
-		$currentStatus = 'draft';
-	}
 	$flowIndex = array_search($currentStatus, $statusFlow, true);
 	$currentChipModifier = str_replace('_', '-', $currentStatus);
-	$currentDisplayStatus = $currentStatus === 'draft' ? 'new_order' : $currentStatus;
-	$currentStatusLabel = $statusOptions[$currentDisplayStatus] ?? ucfirst(str_replace('_', ' ', $currentDisplayStatus));
+	$currentDisplayStatus = $currentStatus;
+	$currentStatusLabel = $getStatusLabel($currentDisplayStatus);
 	$formatDateTime = function ($value) {
 		try {
 			if ($value instanceof \Illuminate\Support\Carbon) {
@@ -1225,17 +1263,11 @@
 		<div>
 			<h1 class="page-title"><?php echo e($orderTitle); ?></h1>
 			<p class="page-subtitle">
-				Placed <?php echo e($placedAt); ?> · <?php echo e(ucfirst($paymentStatus ?: 'pending')); ?> payment · <?php echo e(ucfirst($fulfillmentStatus ?: 'processing')); ?> fulfillment
+				Placed <?php echo e($placedAt); ?> · <?php echo e(ucfirst($paymentStatus ?: 'pending')); ?> payment · <?php echo e($getStatusLabel($fulfillmentStatus)); ?> fulfillment
 			</p>
 		</div>
 		<div class="page-header__quick-actions">
 			<a href="<?php echo e($ordersIndexUrl); ?>" class="pill-link" title="Return to order list">Back to order list</a>
-			<button type="button" class="btn btn-secondary" data-order-action="export">
-				<i class="fi fi-rr-download" aria-hidden="true"></i> Export PDF
-			</button>
-			<button type="button" class="btn btn-primary" data-order-action="print">
-				<i class="fi fi-rr-print" aria-hidden="true"></i> Print
-			</button>
 		</div>
 	</header>
 
@@ -1245,7 +1277,7 @@
 				<?php echo e(ucfirst($paymentStatus ?: 'pending')); ?> payment
 			</span>
 			<span class="status-chip status-chip--outline <?php echo e('status-chip--' . $fulfillmentStatus); ?>" data-fulfillment-indicator>
-				<?php echo e(ucfirst($fulfillmentStatus ?: 'processing')); ?> fulfillment
+				<?php echo e($getStatusLabel($fulfillmentStatus)); ?> fulfillment
 			</span>
 		</div>
 		<div class="ordersummary-banner__meta">
@@ -1325,7 +1357,7 @@
 								: 'status-tracker__item--current';
 						}
 					}
-					$displayKey = $statusKey === 'draft' ? 'new_order' : $statusKey;
+					$displayKey = $statusKey;
 				?>
 				<li class="status-tracker__item <?php echo e($stateClass); ?>" data-status-step="<?php echo e($statusKey); ?>">
 					<div class="status-tracker__marker">
@@ -1340,7 +1372,7 @@
 					<?php endif; ?>
 					<div class="status-tracker__content">
 						<p class="status-tracker__title">
-							<?php echo e($statusOptions[$displayKey] ?? ucfirst(str_replace('_', ' ', $displayKey))); ?>
+							<?php echo e($getStatusLabel($displayKey)); ?>
 
 						</p>
 						<p class="status-tracker__subtitle">
@@ -1401,8 +1433,8 @@
 							<thead>
 								<tr>
 									<th scope="col">Item</th>
-									<th scope="col">Options</th>
-									<th scope="col">Paper Stock Material</th>
+									<th scope="col">Options & Materials</th>
+									<th scope="col"> Material</th>
 									<th scope="col" class="text-center">Qty</th>
 									<th scope="col" class="text-end">Unit price</th>
 									<th scope="col" class="text-end">Line total</th>
@@ -1435,9 +1467,9 @@
 										
 										$unitPrice = (float) data_get($item, 'unit_price', data_get($item, 'price', 0));
 										
-										// For invitations, line total is breakdown sum
+										// Calculate line total
 										if ($isInvitation) {
-											$lineTotal = $breakdownSum;
+											$lineTotal = $quantity * $unitPrice;
 										} else {
 											$lineTotal = (float) data_get($item, 'total', data_get($item, 'subtotal', $quantity * $unitPrice));
 										}
@@ -1484,11 +1516,6 @@
 										$rawOptions = data_get($item, 'options', []);
 										$paperStockValue = data_get($rawOptions, 'paper_stock') ?? data_get($rawOptions, 'paper stock') ?? null;
 
-										// For invitations, use paper stock price as unit price
-										if ($isInvitation) {
-											$paperStockPrice = $extractMoney(data_get($rawOptions, 'paper_stock_price'));
-											$unitPrice = is_numeric($paperStockPrice) ? (float) $paperStockPrice : 0.0;
-										}
 										$addonValues = [];
 										foreach ($rawOptions as $optKey => $optVal) {
 											if (str_contains(strtolower((string) $optKey), 'addon')) {
@@ -1543,6 +1570,14 @@
 												return $row;
 											})
 											->values();
+
+										// For invitations, get unit price from paper stock options since it's not in breakdown
+										if ($isInvitation) {
+											$paperStockPrice = $extractMoney(data_get($rawOptions, 'paper_stock_price'));
+											if (is_numeric($paperStockPrice)) {
+												$unitPrice = (float) $paperStockPrice;
+											}
+										}
 
 										$formatAddon = function ($addon) use ($extractMoney, $quantity) {
 											if ($addon instanceof \Illuminate\Contracts\Support\Arrayable) {
@@ -1798,10 +1833,9 @@
 										}
 
 										// accumulate grouping sums: invitations (main line only, breakdowns are separate)
-										// DO NOT CALCULATE THE BASE PRICE OF THE INVITATION
-										// if (!$isEnvelope && !$isGiveaway) {
-										//     $groupSums['invitations'] += $lineTotal;
-										// }
+										if (!$isEnvelope && !$isGiveaway) {
+											$groupSums['invitations'] += $lineTotal;
+										}
 
 										if ($isEnvelope) {
 											$groupSums['envelopes'] += $lineTotal;
@@ -2162,17 +2196,101 @@
 											<?php if($options->isEmpty()): ?>
 												<span class="item-option">—</span>
 											<?php else: ?>
+												<?php
+													$isKeychain = $isGiveaway && (str_contains(strtolower($iname), 'keychain') || str_contains(strtolower($ptype), 'keychain'));
+													
+													// Debug output
+													if ($isGiveaway) {
+														echo "<!-- DEBUG: Giveaway item detected - Name: {$iname}, Type: {$ptype}, Line Type: {$ltype} -->";
+													}
+													if ($isKeychain) {
+														echo "<!-- DEBUG: Keychain detected - Name: {$iname}, Type: {$ptype} -->";
+													}
+													
+													// Check for material options in both options and breakdown
+													$materialOptions = collect();
+													$breakdownMaterials = collect(data_get($item, 'breakdown', []))->filter(function($row) {
+														$label = strtolower((string) data_get($row, 'label', ''));
+														$type = strtolower((string) data_get($row, 'type', ''));
+														// For keychains (giveaways), include all addon and material breakdown items
+														if ($isGiveaway) {
+															return $type === 'addon' || str_contains($label, 'size') || str_contains($label, 'color') || str_contains($label, 'type') || str_contains($label, 'material');
+														}
+														// For other items, be more specific
+														return str_contains($label, 'size') || str_contains($label, 'color') || str_contains($label, 'type') || str_contains($label, 'material');
+													})->map(function($row) {
+														return data_get($row, 'label');
+													});
+													
+													$optionMaterials = $options->filter(function($option) {
+														$optionLower = strtolower($option);
+														return str_contains($optionLower, 'material') || 
+															   str_contains($optionLower, 'addon') || 
+															   str_contains($optionLower, 'size') || 
+															   str_contains($optionLower, 'color') || 
+															   str_contains($optionLower, 'type');
+													});
+													
+													$hasMaterialOptions = $optionMaterials->isNotEmpty() || $breakdownMaterials->isNotEmpty();
+													
+													// Debug output for materials
+													if ($hasMaterialOptions) {
+														echo "<!-- DEBUG: Materials found - Options: " . $optionMaterials->count() . ", Breakdown: " . $breakdownMaterials->count() . " -->";
+														if ($breakdownMaterials->isNotEmpty()) {
+															echo "<!-- DEBUG: Breakdown materials: " . $breakdownMaterials->join(', ') . " -->";
+														}
+														if ($optionMaterials->isNotEmpty()) {
+															echo "<!-- DEBUG: Option materials: " . $optionMaterials->join(', ') . " -->";
+														}
+													}
+												?>
+												<?php if($isKeychain && $hasMaterialOptions): ?>
+													<div class="mb-2">
+														<strong class="text-sm text-gray-600">Keychain Materials:</strong>
+													</div>
+												<?php elseif($hasMaterialOptions): ?>
+													<div class="mb-2">
+														<strong class="text-sm text-gray-600">Materials:</strong>
+													</div>
+												<?php endif; ?>
 												<ul class="item-options">
 													<?php $__currentLoopData = $options; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $option): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-														<li><?php echo e($option); ?></li>
+														<?php
+															$optionLower = strtolower($option);
+															$isMaterialOption = str_contains($optionLower, 'material') || 
+																			   str_contains($optionLower, 'addon') || 
+																			   str_contains($optionLower, 'size') || 
+																			   str_contains($optionLower, 'color') || 
+																			   str_contains($optionLower, 'type');
+														?>
+														<?php if($isMaterialOption): ?>
+															<li class="material-highlight"><?php echo e($option); ?></li>
+														<?php else: ?>
+															<li><?php echo e($option); ?></li>
+														<?php endif; ?>
 													<?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+													<?php if($breakdownMaterials->isNotEmpty() && $optionMaterials->isEmpty()): ?>
+														<?php $__currentLoopData = $breakdownMaterials; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $material): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+															<li class="material-highlight"><?php echo e($material); ?></li>
+														<?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+													<?php elseif($isKeychain && $breakdownMaterials->isNotEmpty()): ?>
+														<?php $__currentLoopData = $breakdownMaterials; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $material): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+															<li class="material-highlight"><?php echo e($material); ?></li>
+														<?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+													<?php endif; ?>
 												</ul>
 											<?php endif; ?>
 										</td>
 										<td>
 											<?php if($paperStockValue): ?>
-												<?php echo e($paperStockValue); ?>
-
+												<?php if($isInvitation): ?>
+													<div class="mb-1">
+														<strong class="text-sm text-gray-600">Invitation Paper:</strong>
+													</div>
+												<?php endif; ?>
+												<div class="material-highlight">
+													<strong><?php echo e($paperStockValue); ?></strong>
+												</div>
 											<?php else: ?>
 												<span class="item-option">—</span>
 											<?php endif; ?>
@@ -2539,7 +2657,7 @@
 			aria-label="Order sidebar controls"
 			data-order-sidebar
 			data-payment-status="<?php echo e($paymentStatus); ?>"
-			data-fulfillment-status="<?php echo e($fulfillmentStatus); ?>"
+			data-fulfillment-status="<?php echo e($getStatusLabel($fulfillmentStatus)); ?>"
 			data-update-payment-url="<?php echo e($markPaidUrl); ?>"
 			data-update-fulfillment-url="<?php echo e($markFulfilledUrl); ?>"
 			data-send-invoice-url="<?php echo e($sendInvoiceUrl); ?>"
@@ -3118,6 +3236,37 @@ document.addEventListener('DOMContentLoaded', function () {
 			closeSvgModal();
 		}
 	});
+});
+
+// Ensure fulfillment indicator always shows correct label
+document.addEventListener('DOMContentLoaded', function() {
+	const fulfillmentIndicator = document.querySelector('[data-fulfillment-indicator]');
+	if (fulfillmentIndicator) {
+		const currentText = fulfillmentIndicator.textContent.trim();
+		if (currentText === 'draft fulfillment' || currentText === 'Draft fulfillment') {
+			fulfillmentIndicator.innerHTML = 'NEW ORDER fulfillment';
+		}
+	}
+	
+	// Also watch for changes to the fulfillment indicator
+	const observer = new MutationObserver(function(mutations) {
+		mutations.forEach(function(mutation) {
+			if (mutation.type === 'childList' || mutation.type === 'characterData') {
+				const text = fulfillmentIndicator.textContent.trim();
+				if (text === 'draft fulfillment' || text === 'Draft fulfillment') {
+					fulfillmentIndicator.innerHTML = 'NEW ORDER fulfillment';
+				}
+			}
+		});
+	});
+	
+	if (fulfillmentIndicator) {
+		observer.observe(fulfillmentIndicator, {
+			childList: true,
+			subtree: true,
+			characterData: true
+		});
+	}
 });
 </script>
 <?php $__env->stopSection(); ?>

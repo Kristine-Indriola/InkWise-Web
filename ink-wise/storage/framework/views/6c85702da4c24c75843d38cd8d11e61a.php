@@ -20,7 +20,10 @@
 		$defaultInterval = $availableIntervals[0] ?? 'daily';
 	}
 
-	$activeIntervalData = $salesIntervals[$defaultInterval] ?? [
+	$currentFilters = $filters ?? ['startDate' => null, 'endDate' => null, 'interval' => $defaultInterval];
+	$selectedInterval = $currentFilters['interval'] ?? $defaultInterval;
+
+	$activeIntervalData = $salesIntervals[$selectedInterval] ?? [
 		'labels' => [],
 		'totals' => [],
 		'summary' => ['orders' => 0, 'revenue' => 0, 'averageOrder' => 0],
@@ -29,8 +32,6 @@
 
 	$salesSummary = $salesSummaryTotals ?? ($activeIntervalData['summary'] ?? ['orders' => 0, 'revenue' => 0, 'averageOrder' => 0]);
 	$salesRangeLabel = $salesSummaryLabel ?? ($activeIntervalData['range_label'] ?? null);
-
-	$currentFilters = $filters ?? ['startDate' => null, 'endDate' => null, 'interval' => $defaultInterval];
 	$paymentSummary = $paymentSummary ?? [
 		'totalPaid' => 0,
 		'full' => ['count' => 0, 'amount' => 0],
@@ -317,31 +318,6 @@
 					<p class="reports-subtext" data-sales-range>Showing the most recent activity.</p>
 				<?php endif; ?>
 			</div>
-			<div class="reports-toolbar">
-				<div class="reports-interval-group" role="tablist" aria-label="Sales interval selection">
-					<?php $__currentLoopData = $intervalLabels; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $intervalKey => $intervalLabel): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-						<?php if(array_key_exists($intervalKey, $salesIntervals)): ?>
-							<button
-								type="button"
-								class="reports-interval <?php echo e($intervalKey === $defaultInterval ? 'is-active' : ''); ?>"
-								data-sales-interval="<?php echo e($intervalKey); ?>"
-								aria-pressed="<?php echo e($intervalKey === $defaultInterval ? 'true' : 'false'); ?>"
-							>
-								<?php echo e($intervalLabel); ?>
-
-							</button>
-						<?php endif; ?>
-					<?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-				</div>
-				<div class="reports-toolbar-actions">
-					<button type="button" class="pill-link" data-export="sales" data-format="csv">
-						<i class="fi fi-rr-download"></i> Export CSV
-					</button>
-					<button type="button" class="pill-link" data-print="sales">
-						<i class="fi fi-rr-print"></i> Print
-					</button>
-				</div>
-			</div>
 		</header>
 		<canvas data-chart="sales"></canvas>
 	</section>
@@ -369,6 +345,39 @@
 						</tr>
 					</thead>
 					<tbody>
+					<?php
+						$startDate = $currentFilters['startDate'];
+						$endDate = $currentFilters['endDate'];
+						if (!$startDate && !$endDate) {
+							$now = \Carbon\Carbon::now();
+							switch ($selectedInterval) {
+								case 'daily':
+									$startDate = $now->format('Y-m-d');
+									$endDate = $now->format('Y-m-d');
+									break;
+								case 'weekly':
+									$startDate = $now->copy()->subDays(6)->format('Y-m-d');
+									$endDate = $now->format('Y-m-d');
+									break;
+								case 'monthly':
+									$startDate = $now->copy()->subDays(29)->format('Y-m-d');
+									$endDate = $now->format('Y-m-d');
+									break;
+								case 'yearly':
+									$startDate = $now->copy()->subDays(364)->format('Y-m-d');
+									$endDate = $now->format('Y-m-d');
+									break;
+							}
+						}
+						if ($startDate && $endDate) {
+							$start = \Carbon\Carbon::parse($startDate)->startOfDay();
+							$end = \Carbon\Carbon::parse($endDate)->endOfDay();
+							$sales = $sales->filter(function ($sale) use ($start, $end) {
+								$date = $sale->order_date_value;
+								return $date && $date->between($start, $end);
+							});
+						}
+					?>
 					<?php $__empty_1 = true; $__currentLoopData = $sales; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $sale): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
 						<tr>
 							<td><?php echo e($sale->order_number ?? $sale->id); ?></td>

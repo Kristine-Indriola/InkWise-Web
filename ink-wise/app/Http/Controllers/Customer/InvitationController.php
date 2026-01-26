@@ -16,30 +16,30 @@ class InvitationController extends Controller
 
     public function weddingGiveaways()
     {
-        $products = $this->giveawayProductsForEvent('Wedding');
+        [$products, $ratingsData] = $this->giveawayDataForEvent('Wedding');
 
-        return view('customer.Giveaways.weddinggive', compact('products'));
+        return view('customer.Giveaways.weddinggive', compact('products', 'ratingsData'));
     }
 
     public function birthdayGiveaways()
     {
-        $products = $this->giveawayProductsForEvent('Birthday');
+        [$products, $ratingsData] = $this->giveawayDataForEvent('Birthday');
 
-        return view('customer.Giveaways.birthdaygive', compact('products'));
+        return view('customer.Giveaways.birthdaygive', compact('products', 'ratingsData'));
     }
 
     public function corporateGiveaways()
     {
-        $products = $this->giveawayProductsForEvent('Corporate');
+        [$products, $ratingsData] = $this->giveawayDataForEvent('Corporate');
 
-        return view('customer.Giveaways.corporategive', compact('products'));
+        return view('customer.Giveaways.corporategive', compact('products', 'ratingsData'));
     }
 
     public function baptismGiveaways()
     {
-        $products = $this->giveawayProductsForEvent('Baptism');
+        [$products, $ratingsData] = $this->giveawayDataForEvent('Baptism');
 
-        return view('customer.Giveaways.baptismgive', compact('products'));
+        return view('customer.Giveaways.baptismgive', compact('products', 'ratingsData'));
     }
 
     public function corporateInvitations()
@@ -99,9 +99,9 @@ class InvitationController extends Controller
         return [$products, $ratingsData];
     }
 
-    protected function giveawayProductsForEvent(string $eventType)
+    protected function giveawayDataForEvent(string $eventType): array
     {
-        return Product::query()
+        $products = Product::query()
             ->with(['template', 'uploads', 'images', 'materials'])
             ->where('product_type', 'Giveaway')
             ->whereHas('uploads')
@@ -115,5 +115,31 @@ class InvitationController extends Controller
             ->each(function (Product $product) {
                 $product->setRelation('bulkOrders', collect());
             });
+
+        $ratingsData = [];
+        foreach ($products as $product) {
+            $ratings = \App\Models\OrderRating::whereHas('order.items', function ($query) use ($product) {
+                $query->where('product_id', $product->id);
+            })->with('customer')->get();
+
+            $product->setRelation('ratings', $ratings);
+
+            $ratingsData[$product->id] = [
+                'name' => $product->name,
+                'ratings' => $ratings->map(function ($rating) {
+                    return [
+                        'rating' => $rating->rating,
+                        'review' => $rating->review,
+                        'submitted_at' => $rating->submitted_at?->format('M d, Y'),
+                        'customer_name' => $rating->customer->name ?? 'Customer',
+                        'photos' => $rating->photos ?? [],
+                    ];
+                })->toArray(),
+                'average_rating' => $ratings->avg('rating'),
+                'rating_count' => $ratings->count(),
+            ];
+        }
+
+        return [$products, $ratingsData];
     }
 }

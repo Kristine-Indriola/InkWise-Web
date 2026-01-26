@@ -644,9 +644,10 @@
     };
     $orderId = data_get($order, 'id');
     $orderNumber = data_get($order, 'order_number', $orderId ? '#' . $orderId : 'Order');
-    $customerName = data_get($order, 'customer.full_name')
-        ?? data_get($order, 'customer.name')
-        ?? 'Guest customer';
+    $customer = data_get($order, 'customer') ?: data_get($order, 'customerOrder.customer');
+    $customerName = trim((string) (data_get($customer, 'full_name')
+        ?? trim((data_get($customer, 'first_name') ?? '') . ' ' . (data_get($customer, 'last_name') ?? ''))))
+        ?: (data_get($customer, 'name') ?? 'Guest customer');
     $placedDateDisplay = $formatDateTime(data_get($order, 'order_date'));
     $lastUpdatedDisplay = $formatDateTime(data_get($order, 'updated_at'));
     $ratingRecord = data_get($order, 'rating');
