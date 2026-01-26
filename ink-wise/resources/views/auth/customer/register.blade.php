@@ -443,116 +443,87 @@
                         </div>
                     @endif
 
-                    <div id="registerSteps" class="space-y-6">
-                        <div class="register-step" data-step="1">
-                            <div class="flex flex-col md:flex-row gap-3">
-                                <div class="flex-1">
-                                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">First Name</label>
+                    <div id="registerForm" class="space-y-6">
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">First Name <span style="color: #dc2626; font-weight: bold;">*</span></label>
                                     <input type="text" name="first_name" value="{{ old('first_name') }}" required
                                            class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-teal-400 focus:border-teal-500 transition">
                                 </div>
-                                <div class="flex-1">
+                                <div>
                                     <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Middle Name</label>
                                     <input type="text" name="middle_name" value="{{ old('middle_name') }}"
                                            class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-teal-400 focus:border-teal-500 transition">
                                 </div>
-                                <div class="flex-1">
-                                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Last Name</label>
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Last Name <span style="color: #dc2626; font-weight: bold;">*</span></label>
                                     <input type="text" name="last_name" value="{{ old('last_name') }}" required
                                            class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-teal-400 focus:border-teal-500 transition">
                                 </div>
                             </div>
-                            <div class="mt-4">
-                                <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Birthdate</label>
-                                <input type="date" name="birthdate" value="{{ old('birthdate') }}" required
-                                       class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-teal-400 focus:border-teal-500 transition">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Birthdate <span style="color: #dc2626; font-weight: bold;">*</span></label>
+                                    <input type="date" name="birthdate" value="{{ old('birthdate') }}" required
+                                           class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-teal-400 focus:border-teal-500 transition">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Contact Number</label>
+                                    <input type="text" name="contact_number" value="{{ old('contact_number') }}"
+                                           class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-teal-400 focus:border-teal-500 transition">
+                                </div>
                             </div>
-                            <div class="flex items-center justify-end mt-6">
-                                <button type="button" class="step-link" data-next-step>Next</button>
-                            </div>
-                            <p class="support-text">
-                                Already have an account?
-                                <a href="{{ route('dashboard', ['modal' => 'login']) }}" class="link-primary">Sign In</a>
-                            </p>
-                        </div>
-
-                        <div class="register-step hidden" data-step="2">
                             <div>
-                                <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Contact Number</label>
-                                <input type="text" name="contact_number" value="{{ old('contact_number') }}"
-                                       class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-teal-400 focus:border-teal-500 transition">
-                            </div>
-                            <div class="flex items-center justify-between mt-6">
-                                <button type="button" class="step-link" data-prev-step>Back</button>
-                                <button type="button" class="step-link" data-next-step>Next</button>
-                            </div>
-                            <p class="support-text">
-                                Already have an account?
-                                <a href="{{ route('dashboard', ['modal' => 'login']) }}" class="link-primary">Sign In</a>
-                            </p>
-                        </div>
-
-                        <div class="register-step hidden" data-step="3">
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Email</label>
-                                    <div class="mt-1 flex gap-2">
-                                        <input type="email" name="email" id="registerEmail" value="{{ old('email') }}" required
-                                               class="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-teal-400 focus:border-teal-500 transition">
-                                        <button type="button"
-                                                class="btn-inkwise btn-inkwise--small"
-                                                id="sendVerificationCode">
-                                            Send Code
-                                        </button>
-                                    </div>
+                                <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Email <span style="color: #dc2626; font-weight: bold;">*</span></label>
+                                <div class="mt-1 flex gap-2">
+                                    <input type="email" name="email" id="registerEmail" value="{{ old('email') }}" required
+                                           class="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-teal-400 focus:border-teal-500 transition">
+                                    <button type="button"
+                                            class="btn-inkwise btn-inkwise--small"
+                                            id="sendVerificationCode">
+                                        Send Code
+                                    </button>
                                 </div>
-                                <div>
-                                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Verification Code</label>
-                                    <input type="text" name="verification_code" id="verificationCode" value="{{ old('verification_code') }}" required maxlength="6"
-                                           class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-teal-400 focus:border-teal-500 transition uppercase tracking-widest">
-                                </div>
-                                <p id="verificationStatus" class="text-xs text-gray-500"></p>
                             </div>
-                            <div class="flex items-center justify-between mt-6">
-                                <button type="button" class="step-link" data-prev-step>Back</button>
-                                <button type="button" class="step-link" data-next-step>Next</button>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Verification Code <span style="color: #dc2626; font-weight: bold;">*</span></label>
+                                <input type="text" name="verification_code" id="verificationCode" value="{{ old('verification_code') }}" required maxlength="6"
+                                       class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-teal-400 focus:border-teal-500 transition uppercase tracking-widest">
                             </div>
-                            <p class="support-text">
-                                Already have an account?
-                                <a href="{{ route('dashboard', ['modal' => 'login']) }}" class="link-primary">Sign In</a>
-                            </p>
-                        </div>
-
-                        <div class="register-step hidden" data-step="4">
-                            <div class="space-y-4">
+                            <p id="verificationStatus" class="text-xs text-gray-500"></p>
+                            <div class="grid grid-cols-2 gap-3 mt-4">
                                 <div>
-                                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Password</label>
+                                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Password <span style="color: #dc2626; font-weight: bold;">*</span></label>
                                     <input type="password" name="password" required
                                            class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-teal-400 focus:border-teal-500 transition">
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Confirm Password</label>
+                                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Confirm Password <span style="color: #dc2626; font-weight: bold;">*</span></label>
                                     <input type="password" name="password_confirmation" required
                                            class="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-teal-400 focus:border-teal-500 transition">
                                 </div>
                             </div>
-                            <div class="flex items-center justify-between mt-6">
-                                <button type="button" class="step-link" data-prev-step>Back</button>
-                                <button type="button" id="submitRegister"
-                                        class="btn-inkwise">
-                                    Sign Up
-                                </button>
-                            </div>
-                            <label for="terms" class="mt-3 flex items-start gap-2 text-[11px] text-gray-500 leading-tight text-center justify-center">
-                                <input type="checkbox" name="terms" id="terms" {{ old('terms') ? 'checked' : '' }} required
-                                       class="mt-0.5 h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500">
-                                <span>By signing up, you agree to InkWise's <a href="#" class="link-inline">Terms of Service</a> and <a href="#" class="link-inline">Privacy Policy</a>.</span>
-                            </label>
-                            <p class="support-text">
-                                Already have an account?
-                                <a href="{{ route('dashboard', ['modal' => 'login']) }}" class="link-primary">Sign In</a>
-                            </p>
                         </div>
+
+                        <div class="mt-8">
+                        <label for="terms" class="mt-4 flex items-start gap-2 text-[11px] text-gray-500 leading-tight text-center justify-center">
+                            <input type="checkbox" name="terms" id="terms" {{ old('terms') ? 'checked' : '' }} required
+                                   class="mt-0.5 h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500">
+                            <span>By signing up, you agree to InkWise's <a href="#" class="link-inline">Terms of Service</a> and <a href="#" class="link-inline">Privacy Policy</a>.</span>
+                        </label>
+                        </div>
+
+                        <div class="flex items-center justify-center mt-6">
+                            <button type="submit" id="submitRegister" class="btn-inkwise">
+                                Sign Up
+                            </button>
+                        </div>
+
+                        <p class="support-text">
+                            Already have an account?
+                            <a href="{{ route('dashboard', ['modal' => 'login']) }}" class="link-primary">Sign In</a>
+                        </p>
                     </div>
                 </form>
             </div>
@@ -564,114 +535,8 @@
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const registerForm = document.getElementById('customerRegisterForm');
-            const steps = Array.from(document.querySelectorAll('#registerSteps .register-step'));
-            if (!steps.length || !registerForm) {
+            if (!registerForm) {
                 return;
-            }
-
-            const readSession = (key) => {
-                try {
-                    return window.sessionStorage.getItem(key);
-                } catch (error) {
-                    return null;
-                }
-            };
-
-            const writeSession = (key, value) => {
-                try {
-                    window.sessionStorage.setItem(key, value);
-                } catch (error) {
-                    /* ignore session storage failures */
-                }
-            };
-
-            const removeSession = (key) => {
-                try {
-                    window.sessionStorage.removeItem(key);
-                } catch (error) {
-                    /* ignore session storage failures */
-                }
-            };
-
-            const STEP_STORAGE_KEY = 'inkwise.customer.register.step';
-            const FIELD_STORAGE_KEY = 'inkwise.customer.register.data';
-            const fieldsToPersist = ['first_name', 'middle_name', 'last_name', 'birthdate', 'contact_number', 'email'];
-
-            const serializedFields = readSession(FIELD_STORAGE_KEY);
-            const persistedValues = (() => {
-                if (!serializedFields) {
-                    return {};
-                }
-                try {
-                    const parsed = JSON.parse(serializedFields);
-                    return parsed && typeof parsed === 'object' ? parsed : {};
-                } catch (error) {
-                    return {};
-                }
-            })();
-
-            const savePersistedValues = () => {
-                if (Object.keys(persistedValues).length) {
-                    writeSession(FIELD_STORAGE_KEY, JSON.stringify(persistedValues));
-                } else {
-                    removeSession(FIELD_STORAGE_KEY);
-                }
-            };
-
-            const registerFieldForPersistence = (input, fieldName) => {
-                if (!input || typeof input.addEventListener !== 'function' || !('value' in input)) {
-                    return;
-                }
-
-                const persistedValue = persistedValues[fieldName];
-                if (typeof persistedValue === 'string' && !input.value) {
-                    input.value = persistedValue;
-                }
-
-                const persistHandler = (event) => {
-                    const value = event.target.value ?? '';
-                    if (value) {
-                        persistedValues[fieldName] = value;
-                    } else {
-                        delete persistedValues[fieldName];
-                    }
-                    savePersistedValues();
-                };
-
-                input.addEventListener('input', persistHandler);
-                input.addEventListener('change', persistHandler);
-
-                if (input.value) {
-                    persistedValues[fieldName] = input.value;
-                }
-            };
-
-            fieldsToPersist.forEach((name) => {
-                const field = registerForm.elements.namedItem(name);
-                if (!field) {
-                    return;
-                }
-
-                if (typeof field.length === 'number' && !field.tagName) {
-                    Array.from(field).forEach((input) => registerFieldForPersistence(input, name));
-                    return;
-                }
-
-                registerFieldForPersistence(field, name);
-            });
-
-            savePersistedValues();
-
-            const storedStepRaw = readSession(STEP_STORAGE_KEY);
-            const storedStep = storedStepRaw !== null ? Number.parseInt(storedStepRaw, 10) : NaN;
-
-            let activeIndex = steps.findIndex((step) => !step.classList.contains('hidden'));
-            if (activeIndex < 0) {
-                activeIndex = 0;
-            }
-
-            if (!Number.isNaN(storedStep) && storedStep >= 0 && storedStep < steps.length) {
-                activeIndex = storedStep;
             }
 
             let cooldownTime = 60;
@@ -689,30 +554,6 @@
             if (verificationCodeInput && verificationCodeInput.value.trim().length === 6) {
                 verificationSent = true;
             }
-
-            const goToStep = (index) => {
-                if (typeof index !== 'number' || Number.isNaN(index) || index < 0 || index >= steps.length) {
-                    return;
-                }
-                steps.forEach((step, idx) => {
-                    step.classList.toggle('hidden', idx !== index);
-                });
-                activeIndex = index;
-                writeSession(STEP_STORAGE_KEY, String(index));
-            };
-
-            const validateRequiredFields = (step) => {
-                const fields = Array.from(step.querySelectorAll('input, select, textarea'));
-                for (const field of fields) {
-                    field.setCustomValidity('');
-                    if (!field.checkValidity()) {
-                        field.reportValidity();
-                        return false;
-                    }
-                }
-
-                return true;
-            };
 
             const clearStatus = () => {
                 if (!statusElement) {
@@ -755,52 +596,6 @@
                 return fallback;
             };
 
-            const validateStep = (index) => {
-                const step = steps[index];
-                if (!step) {
-                    return true;
-                }
-
-                if (!validateRequiredFields(step)) {
-                    return false;
-                }
-
-                if (index === 2) {
-                    if (!verificationSent) {
-                        setStatus('Please send your verification code before continuing.', 'error');
-                        return false;
-                    }
-
-                    // Validate verification code format before proceeding
-                    const code = verificationCodeInput ? verificationCodeInput.value.trim() : '';
-                    
-                    if (!code || code.length !== 6) {
-                        setStatus('Please enter a valid 6-digit verification code.', 'error');
-                        return false;
-                    }
-
-                    clearStatus();
-                }
-
-                return true;
-            };
-
-            document.querySelectorAll('[data-next-step]').forEach((btn) => {
-                btn.addEventListener('click', () => {
-                    if (activeIndex < steps.length - 1 && validateStep(activeIndex)) {
-                        goToStep(activeIndex + 1);
-                    }
-                });
-            });
-
-            document.querySelectorAll('[data-prev-step]').forEach((btn) => {
-                btn.addEventListener('click', () => {
-                    if (activeIndex > 0) {
-                        goToStep(activeIndex - 1);
-                    }
-                });
-            });
-
             const startCooldown = () => {
                 if (cooldownInterval) {
                     clearInterval(cooldownInterval);
@@ -842,7 +637,7 @@
                     try {
                         const response = await fetch(sendCodeUrl, {
                             method: 'POST',
-                            headers: {
+                            headers: { 
                                 'Content-Type': 'application/json',
                                 'X-CSRF-TOKEN': csrfToken,
                                 'Accept': 'application/json'
@@ -887,41 +682,17 @@
                     return;
                 }
 
-                removeSession(STEP_STORAGE_KEY);
-                removeSession(FIELD_STORAGE_KEY);
-            });
-
-            const submitButton = document.getElementById('submitRegister');
-            if (submitButton) {
-                submitButton.addEventListener('click', () => {
-                    if (validateStep(activeIndex)) {
-                        if (registerForm.checkValidity()) {
-                            if (typeof registerForm.requestSubmit === 'function') {
-                                registerForm.requestSubmit();
-                            } else {
-                                registerForm.submit();
-                            }
-                        } else {
-                            registerForm.reportValidity();
-                        }
-                    }
-                });
-            }
-
-            goToStep(activeIndex);
-
-            const errorFields = @json(array_keys($errors->toArray()));
-            if (errorFields.length) {
-                const fieldName = errorFields.find((name) => registerForm.elements[name]);
-                if (fieldName) {
-                    const field = registerForm.elements[fieldName];
-                    const fieldStep = field ? field.closest('.register-step') : null;
-                    const stepIndex = steps.indexOf(fieldStep);
-                    if (stepIndex >= 0) {
-                        goToStep(stepIndex);
+                // Validate verification code if email verification is required
+                if (verificationCodeInput && verificationCodeInput.hasAttribute('required')) {
+                    const code = verificationCodeInput.value.trim();
+                    if (!code || code.length !== 6) {
+                        event.preventDefault();
+                        setStatus('Please enter a valid 6-digit verification code.', 'error');
+                        verificationCodeInput.focus();
+                        return;
                     }
                 }
-            }
+            });
         });
     </script>
 </body>

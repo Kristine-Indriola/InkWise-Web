@@ -232,7 +232,7 @@
     'draft' => 'New Order',
     'pending' => 'Order Received',
     'processing' => 'Processing',
-    'in_production' => 'In Progress',
+    'in_production' => 'In Production',
     'confirmed' => 'Ready for Pickup',
     'completed' => 'Completed',
     'cancelled' => 'Cancelled',
@@ -250,7 +250,7 @@
     </div>
     <div class="page-header__quick-actions">
       <a href="{{ route('admin.orders.archived') }}" class="pill-link">Archived Orders</a>
-      <a href="#" class="pill-link">Export</a>
+      <a href="{{ route('admin.orders.export', request()->query()) }}" class="pill-link">Export</a>
       <a href="{{ route('admin.reports.pickup-calendar') }}" class="pill-link">
 				<i class="fi fi-rr-calendar" aria-hidden="true"></i> Pickup calendar
 			</a>
@@ -376,7 +376,13 @@
                 @endphp
                 <tr data-order-id="{{ $order->id }}" data-status="{{ $rowStatus }}" data-order-url="{{ route('admin.ordersummary.show', ['order' => $order->id]) }}" style="cursor: pointer;">
                   <td>{{ $order->order_number ?? ('#' . $order->id) }}</td>
-                  <td>{{ optional($order->customer)->name ?? 'Guest' }}</td>
+                  @php
+                    $cust = data_get($order, 'customer') ?? data_get($order, 'effective_customer') ?? null;
+                    $customerName = trim((string) (data_get($cust, 'full_name')
+                      ?? trim((data_get($cust, 'first_name') ?? '') . ' ' . (data_get($cust, 'last_name') ?? ''))))
+                      ?: (data_get($cust, 'name') ?? 'Guest');
+                  @endphp
+                  <td>{{ $customerName }}</td>
                   <td class="text-center">{{ (int) data_get($order, 'items_count', 0) }}</td>
                   <td class="text-end">{{ number_format((float) data_get($order, 'total_amount', 0), 2) }}</td>
                   <td>

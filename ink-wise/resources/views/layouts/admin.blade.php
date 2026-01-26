@@ -862,21 +862,10 @@ body.dark-mode .btn-warning {
           <span class="label">Order Summaries</span>
           @php
               $newOrdersCount = \App\Models\Order::query()
-                  ->select(['id', 'total_amount', 'payment_status', 'created_at'])
                   ->where('archived', false)
-                  ->where('created_at', '>=', now()->subDays(1)) // Only orders from the last 24 hours
-                  ->where(function ($query) {
-                      $query->where('payment_status', '!=', 'pending')
-                            ->orWhereNull('payment_status');
-                  })
-                  ->with(['payments:order_id,amount,status'])
-                  ->get()
-                  ->filter(function ($order) {
-                      $paidPayments = $order->payments->filter(fn($p) => strtolower($p->status ?? '') === 'paid');
-                      $totalPaid = round($paidPayments->sum('amount'), 2);
-                      $grandTotal = (float) ($order->total_amount ?? 0);
-                      $balanceDue = max($grandTotal - $totalPaid, 0);
-                      return $balanceDue <= 0;
+                  ->where('status', 'draft')
+                  ->whereHas('payments', function($q) {
+                      $q->where('status', 'paid');
                   })
                   ->count();
           @endphp

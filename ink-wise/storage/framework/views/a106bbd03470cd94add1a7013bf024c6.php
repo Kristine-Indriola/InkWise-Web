@@ -1,0 +1,734 @@
+<?php $__env->startSection('title', 'Orders'); ?>
+
+<?php $__env->startPush('styles'); ?>
+<link rel="stylesheet" href="<?php echo e(asset('css/admin-css/materials.css')); ?>">
+<link rel="stylesheet" href="<?php echo e(asset('css/admin-css/ordersummary.css')); ?>">
+<link rel="stylesheet" href="<?php echo e(asset('css/admin-css/orders.css')); ?>">
+<link rel="stylesheet" href="<?php echo e(asset('css/admin-css/orders-table.css')); ?>">
+<style>
+  .orders-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: stretch;
+    margin-bottom: 16px;
+  }
+
+  .summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    flex: 1 1 100%;
+  }
+
+  .summary-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 96px;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  }
+
+  .summary-card:focus-visible {
+    outline: 3px solid #4f46e5;
+    outline-offset: 2px;
+  }
+
+  .summary-card.is-active {
+    border-color: #4f46e5;
+    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.15);
+    transform: translateY(-2px);
+  }
+
+  .summary-card__label {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6b7280;
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+
+  .summary-card__value {
+    font-size: 26px;
+    font-weight: 700;
+    color: #1f2937;
+    line-height: 1.1;
+  }
+
+  .summary-cards__info {
+    flex: 1 1 100%;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    font-size: 14px;
+    color: #374151;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  }
+
+  .summary-cards__info strong {
+    color: #111827;
+  }
+
+  @media (max-width: 640px) {
+    .summary-card {
+      min-height: 72px;
+      padding: 14px;
+    }
+
+    .summary-card__value {
+      font-size: 22px;
+    }
+  }
+
+  .summary-card-button {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .summary-card-button:focus-visible .summary-card {
+    outline: 3px solid #4f46e5;
+    outline-offset: 2px;
+  }
+
+  .summary-card-button:hover .summary-card:not(.is-active) {
+    border-color: #c7d2fe;
+    box-shadow: 0 4px 16px rgba(79, 70, 229, 0.12);
+  }
+
+  .table-row--hidden {
+    display: none;
+  }
+
+  .admin-orders-table tbody tr[data-order-url] {
+    transition: background-color 0.2s ease;
+  }
+
+  .admin-orders-table tbody tr[data-order-url]:hover {
+    background-color: #f8fafc;
+  }
+
+  .admin-orders-table tbody tr[data-order-url]:focus {
+    outline: 2px solid #4f46e5;
+    outline-offset: -2px;
+  }
+
+  
+  .status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .status-badge.status-pending {
+    background: #fef3c7;
+    color: #d97706;
+    border: 1px solid #f59e0b;
+  }
+
+  .status-badge.status-draft {
+    background: #e0e7ff;
+    color: #5b21b6;
+    border: 1px solid #8b5cf6;
+  }
+
+  .status-badge.status-processing,
+  .status-badge.status-in_production {
+    background: #dbeafe;
+    color: #2563eb;
+    border: 1px solid #3b82f6;
+  }
+
+  .status-badge.status-confirmed,
+  .status-badge.status-to_ship {
+    background: #fef3c7;
+    color: #d97706;
+    border: 1px solid #f59e0b;
+  }
+
+  .status-badge.status-completed {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #10b981;
+  }
+
+  .status-badge.status-cancelled {
+    background: #fee2e2;
+    color: #dc2626;
+    border: 1px solid #ef4444;
+  }
+
+  .payment-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .payment-badge.payment-pending {
+    background: #fef3c7;
+    color: #d97706;
+    border: 1px solid #f59e0b;
+  }
+
+  .payment-badge.payment-paid {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #10b981;
+  }
+
+  .payment-badge.payment-pending {
+    background: #fee2e2;
+    color: #dc2626;
+    border: 1px solid #ef4444;
+  }
+
+  .payment-badge.payment-partial {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+  }
+</style>
+<?php $__env->stopPush(); ?>
+
+<?php $__env->startSection('content'); ?>
+<main class="admin-page-shell">
+  <header class="page-header">
+    <div>
+      <h1 class="page-title"><?php echo e(isset($isArchived) && $isArchived ? 'Archived Orders' : 'Orders'); ?></h1>
+      <p class="page-subtitle"><?php echo e(isset($isArchived) && $isArchived ? 'Archived cancelled and completed orders.' : 'All orders in the system. Use the table to inspect and navigate to individual order summaries.'); ?></p>
+    </div>
+    <div class="page-header__quick-actions">
+      <?php if(isset($isArchived) && $isArchived): ?>
+        <a href="<?php echo e(route('staff.order_list.index')); ?>" class="pill-link">Active Orders</a>
+      <?php else: ?>
+        <a href="<?php echo e(route('staff.orders.archived')); ?>" class="pill-link">Archived Orders</a>
+        <a href="<?php echo e(route('staff.reports.pickup-calendar')); ?>" class="pill-link">Pickup Calendar</a>
+        <a href="<?php echo e(route('staff.order_list.export', request()->query())); ?>" class="pill-link">Export</a>
+      <?php endif; ?>
+    </div>
+  </header>
+
+  <?php if(!isset($isArchived) || !$isArchived): ?>
+  <!-- Summary cards + controls -->
+  <section class="orders-controls">
+    <div class="summary-cards">
+      <?php
+        // Use overall counts for summary cards when available, otherwise fallback to filtered counts
+        $totalOrders = $overallTotalOrders ?? $orders->total();
+        $countsSource = isset($overallStatusCounts) ? $overallStatusCounts : $statusCounts;
+        $draftCount = $countsSource->get('draft', 0);
+        $pendingCount = $countsSource->get('pending', 0);
+        $processingCount = $countsSource->get('processing', 0);
+        $inProductionCount = $countsSource->get('in_production', 0);
+        $toShipRawCount = $countsSource->get('to_ship', 0);
+        $confirmedCount = $countsSource->get('confirmed', 0);
+        $completedCount = $countsSource->get('completed', 0);
+        $inProgressCount = $processingCount + $inProductionCount;
+        $toShipCount = $confirmedCount + $toShipRawCount;
+      ?>
+      <button type="button" class="summary-card-button" data-summary-filter="all" data-summary-label="All orders" data-summary-description="Includes every order regardless of status.">
+        <div class="summary-card" data-summary-count="<?php echo e($totalOrders); ?>">
+          <div class="summary-card__label">Total orders</div>
+          <div class="summary-card__value"><?php echo e($totalOrders); ?></div>
+        </div>
+      </button>
+      <button type="button" class="summary-card-button" data-summary-filter="draft" data-summary-label="New Orders" data-summary-description="Fresh orders that need attention.">
+        <div class="summary-card" data-summary-count="<?php echo e($draftCount); ?>">
+          <div class="summary-card__label">New Orders</div>
+          <div class="summary-card__value"><?php echo e($draftCount); ?></div>
+        </div>
+      </button>
+      <button type="button" class="summary-card-button" data-summary-filter="pending" data-summary-label="Pending" data-summary-description="Orders awaiting confirmation or updates.">
+        <div class="summary-card" data-summary-count="<?php echo e($pendingCount); ?>">
+          <div class="summary-card__label">Pending</div>
+          <div class="summary-card__value"><?php echo e($pendingCount); ?></div>
+        </div>
+      </button>
+      <button type="button" class="summary-card-button" data-summary-filter="in_progress" data-summary-label="In progress" data-summary-description="Orders currently being produced or processed.">
+        <div class="summary-card" data-summary-count="<?php echo e($inProgressCount); ?>">
+          <div class="summary-card__label">In progress</div>
+          <div class="summary-card__value"><?php echo e($inProgressCount); ?></div>
+        </div>
+      </button>
+      <button type="button" class="summary-card-button" data-summary-filter="ready_pickup" data-summary-label="Ready for Pickup" data-summary-description="Orders packed and ready for customer pickup at store.">
+        <div class="summary-card" data-summary-count="<?php echo e($toShipCount); ?>">
+          <div class="summary-card__label">Ready for Pickup</div>
+          <div class="summary-card__value"><?php echo e($toShipCount); ?></div>
+        </div>
+      </button>
+      <button type="button" class="summary-card-button" data-summary-filter="completed" data-summary-label="Completed" data-summary-description="Orders successfully fulfilled and closed.">
+        <div class="summary-card" data-summary-count="<?php echo e($completedCount); ?>">
+          <div class="summary-card__label">Completed</div>
+          <div class="summary-card__value"><?php echo e($completedCount); ?></div>
+        </div>
+      </button>
+    </div>
+
+    <div class="summary-cards__info" id="summaryCardDetails" role="status" aria-live="polite">
+      <strong>All orders</strong>: Showing every order in the table.
+    </div>
+
+    
+  </section>
+  <?php endif; ?>
+
+  <section class="card">
+    <div class="card-body">
+      <?php if($orders->isEmpty()): ?>
+        <p>No orders found.</p>
+      <?php else: ?>
+          <div class="table-controls" style="display:flex; gap:12px; align-items:center; justify-content:space-between; margin-bottom:10px;">
+          <div style="display:flex; gap:8px; align-items:center;">
+            <div class="search-wrap">
+              <input id="ordersSearch" type="search" placeholder="Search orders, customer or #" aria-label="Search orders" style="padding:8px 12px; border-radius:8px; border:1px solid #e5e7eb; min-width:240px;">
+            </div>
+
+            <div class="filters" role="toolbar" aria-label="Order filters" style="display:flex; gap:8px;">
+              <button type="button" class="filter-btn" data-filter="all" aria-pressed="true" title="All">All</button>
+              <button type="button" class="filter-btn" data-filter="pending" title="Pending">
+                <i class="fi fi-rr-clock"></i>
+              </button>
+            </div>
+          </div>
+          
+          <div style="display:flex; gap:8px; align-items:center;">
+            <form method="GET" action="<?php echo e(url()->current()); ?>" style="display:flex; gap:8px; align-items:center;">
+              <?php $__currentLoopData = request()->except(['start_date','end_date','page']); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $k => $v): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                <?php if(is_array($v)): ?>
+                  <?php $__currentLoopData = $v; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $sub): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                    <input type="hidden" name="<?php echo e($k); ?>[]" value="<?php echo e($sub); ?>">
+                  <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                <?php else: ?>
+                  <input type="hidden" name="<?php echo e($k); ?>" value="<?php echo e($v); ?>">
+                <?php endif; ?>
+              <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+
+              <label for="startDateInput" style="font-size:13px; color:#374151;">From</label>
+              <input id="startDateInput" name="start_date" type="date" value="<?php echo e(request()->get('start_date')); ?>" style="padding:6px 8px; border-radius:6px; border:1px solid #e5e7eb;">
+              <label for="endDateInput" style="font-size:13px; color:#374151;">To</label>
+              <input id="endDateInput" name="end_date" type="date" value="<?php echo e(request()->get('end_date')); ?>" style="padding:6px 8px; border-radius:6px; border:1px solid #e5e7eb;">
+              <button type="submit" class="btn btn-primary" style="padding:6px 10px; border-radius:6px;">Apply</button>
+              <a href="<?php echo e(url()->current() . (count(request()->except(['start_date','end_date','page'])) ? ('?' . http_build_query(request()->except(['start_date','end_date','page']))) : '')); ?>" class="btn btn-outline" style="padding:6px 10px; border-radius:6px;">Clear</a>
+            </form>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table admin-orders-table" role="grid">
+            <thead>
+              <tr>
+                <th scope="col">Order #</th>
+                <th scope="col">Customer</th>
+                <th scope="col" class="text-center">Items</th>
+                <th scope="col" class="text-end">Total</th>
+                <th scope="col">Payment</th>
+                <th scope="col">Status</th>
+                <th scope="col">Placed</th>
+                <?php if(isset($isArchived) && $isArchived): ?>
+                  <th scope="col">Archived By</th>
+                <?php endif; ?>
+                <th scope="col">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php $__currentLoopData = $orders; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $order): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                <?php
+                  $rowStatus = strtolower($order->status ?? 'processing');
+                ?>
+                <tr data-order-id="<?php echo e($order->id); ?>" data-status="<?php echo e($rowStatus); ?>" data-order-url="<?php echo e(route('staff.orders.summary', ['id' => $order->id])); ?>" style="cursor: pointer;">
+                  <td><?php echo e($order->order_number ?? ('#' . $order->id)); ?></td>
+                  <td><?php echo e($order->display_customer_name ?? 'Guest'); ?></td>
+                  <td class="text-center"><?php echo e($order->display_items_count ?? 0); ?></td>
+                  <td class="text-end"><?php echo e(number_format((float) data_get($order, 'total_amount', 0), 2)); ?></td>
+                  <td>
+                    <?php
+                      $paymentStatusRaw = data_get($order, 'payment_status', 'pending');
+                      $paymentStatus = strtolower((string) ($paymentStatusRaw ?: 'pending'));
+                      $metadataRaw = data_get($order, 'metadata');
+                      if (is_string($metadataRaw) && $metadataRaw !== '') {
+                        $decodedMetadata = json_decode($metadataRaw, true);
+                        $metadata = json_last_error() === JSON_ERROR_NONE && is_array($decodedMetadata) ? $decodedMetadata : [];
+                      } elseif (is_array($metadataRaw)) {
+                        $metadata = $metadataRaw;
+                      } else {
+                        $metadata = [];
+                      }
+                      $financialMetadata = data_get($metadata, 'financial', []);
+                      $paymentsSummary = collect(data_get($order, 'payments_summary', []));
+                      $grandTotal = (float) ($paymentsSummary->get('grand_total') ?? data_get($order, 'total_amount', 0));
+                      $paidOverrideRaw = data_get($financialMetadata, 'total_paid_override');
+                      $balanceOverrideRaw = data_get($financialMetadata, 'balance_due_override');
+                      $paidOverride = is_numeric($paidOverrideRaw) ? (float) $paidOverrideRaw : null;
+                      $balanceOverride = is_numeric($balanceOverrideRaw) ? (float) $balanceOverrideRaw : null;
+                      $totalPaid = $paidOverride ?? (float) ($paymentsSummary->get('total_paid') ?? data_get($order, 'total_paid', 0));
+                      $balanceDue = $balanceOverride ?? (float) ($paymentsSummary->get('balance_due') ?? max($grandTotal - $totalPaid, 0));
+                      if ($paymentStatus !== 'paid') {
+                        if ($grandTotal > 0 && $balanceDue <= 0.01 && $totalPaid >= max($grandTotal - 0.01, 0)) {
+                          $paymentStatus = 'paid';
+                        } elseif ($totalPaid > 0 && $balanceDue > 0.01) {
+                          $paymentStatus = 'partial';
+                        }
+                      }
+                      $paymentClass = 'payment-' . $paymentStatus;
+                    ?>
+                    <span class="payment-badge <?php echo e($paymentClass); ?>">
+                      <?php echo e(ucfirst(str_replace('_', ' ', $paymentStatus))); ?>
+
+                    </span>
+                  </td>
+                  <td>
+                    <?php
+                      $orderStatus = strtolower($order->status ?? 'processing');
+                      $statusClass = 'status-' . $orderStatus;
+                      $statusLabel = $statusOptions[$orderStatus] ?? ucfirst(str_replace('_', ' ', $orderStatus));
+                    ?>
+                    <span class="status-badge <?php echo e($statusClass); ?>">
+                      <?php echo e($statusLabel); ?>
+
+                    </span>
+                  </td>
+                  <td><?php echo e(optional($order->order_date)->format('M j, Y') ?? optional($order->created_at)->format('M j, Y')); ?></td>
+                  <?php if(isset($isArchived) && $isArchived): ?>
+                    <td>
+                      <?php
+                        $latestActivity = $order->activities->first();
+                        $archivedBy = $latestActivity ? ($latestActivity->user_name ?? 'System') : 'Unknown';
+                      ?>
+                      <?php echo e($archivedBy); ?>
+
+                    </td>
+                  <?php endif; ?>
+                  <td class="actions-cell">
+                    <a href="<?php echo e(route('staff.orders.summary', ['id' => $order->id])); ?>" class="btn btn-outline btn-sm btn-icon" aria-label="View order <?php echo e($order->order_number ?? $order->id); ?>">
+                      <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                    </a>
+                    <?php if(in_array(strtolower($order->status ?? ''), ['cancelled', 'completed'])): ?>
+                      <button type="button" class="btn btn-outline btn-sm btn-icon btn-archive" data-order-id="<?php echo e($order->id); ?>" aria-label="Archive order <?php echo e($order->order_number ?? $order->id); ?>" title="Archive order">
+                        <i class="fa-solid fa-archive" aria-hidden="true"></i>
+                      </button>
+                    <?php endif; ?>
+                  </td>
+                </tr>
+              <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="table-footer" style="display:flex; align-items:center; justify-content:center; margin-top:16px;">
+          <div class="pagination-links">Showing <?php echo e($orders->count()); ?> orders</div>
+        </div>
+      <?php endif; ?>
+    </div>
+  </section>
+
+<?php $__env->stopSection(); ?>
+
+<?php $__env->startPush('scripts'); ?>
+<script src="<?php echo e(asset('js/admin/ordersummary.js')); ?>"></script>
+<script src="<?php echo e(asset('js/admin/orders-table.js')); ?>"></script>
+<script>
+  (function(){
+    // Avoid double-init
+    if (window.__orders_per_init) return; window.__orders_per_init = true;
+    const allowed = [10,20,25,50,100];
+    const per = document.getElementById('perPageInput');
+    if (!per) return;
+    function snap(n){ n = Number(n) || 20; if (allowed.includes(n)) return n; let closest = allowed[0]; let minDiff = Math.abs(n - closest); allowed.forEach(a => { const d = Math.abs(n - a); if (d < minDiff) { minDiff = d; closest = a; }}); return closest; }
+    per.addEventListener('change', function(){ const v = snap(this.value); this.value = v; const url = new URL(window.location.href); url.searchParams.set('per_page', v); url.searchParams.delete('page'); window.location.href = url.toString(); });
+    per.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); this.dispatchEvent(new Event('change')); } });
+  })();
+
+  (function(){
+  const summaryButtons = Array.from(document.querySelectorAll('[data-summary-filter]'));
+  const tableRows = Array.from(document.querySelectorAll('.admin-orders-table tbody tr'));
+    const STATUS_STORAGE_KEY = 'inkwiseOrderStatusUpdate';
+    const STATUS_CONSUMER_ID = 'orders-table';
+    const KNOWN_STATUS_CONSUMERS = ['orders-table', 'order-summary'];
+    const hasLocalStorage = (() => {
+      try {
+        const testKey = '__inkwise_status_probe__';
+        window.localStorage.setItem(testKey, '1');
+        window.localStorage.removeItem(testKey);
+        return true;
+      } catch (error) {
+        return false;
+      }
+    })();
+    const detailsEl = document.getElementById('summaryCardDetails');
+    if (!summaryButtons.length || !detailsEl) return;
+
+    const statusMap = {
+      all: null,
+      draft: ['draft'],
+      pending: ['pending'],
+      in_progress: ['processing', 'in_production'],
+      ready_pickup: ['confirmed'],
+      completed: ['completed']
+    };
+
+    let activeButton = null;
+
+    function formatStatusLabel(status, fallback) {
+      if (!status) return fallback || '';
+      return status.replace(/_/g, ' ').replace(/\b[a-z]/g, chr => chr.toUpperCase());
+    }
+
+    function computeCounts() {
+      const counts = {
+        total: 0,
+        draft: 0,
+        pending: 0,
+        in_progress: 0,
+        ready_pickup: 0,
+        completed: 0
+      };
+
+      const inProgressStatuses = statusMap.in_progress;
+      const readyPickupStatuses = statusMap.ready_pickup;
+
+      tableRows.forEach(row => {
+        if (!row.isConnected) {
+          return;
+        }
+        const status = row.dataset.status || 'processing';
+        counts.total += 1;
+        if (status === 'draft') counts.draft += 1;
+        if (status === 'pending') counts.pending += 1;
+        if (inProgressStatuses.includes(status)) counts.in_progress += 1;
+        if (readyPickupStatuses.includes(status)) counts.ready_pickup += 1;
+        if (status === 'completed') counts.completed += 1;
+      });
+
+      return counts;
+    }
+
+    function getCountForFilter(filterKey, counts) {
+      switch (filterKey) {
+        case 'draft': return counts.draft;
+        case 'pending': return counts.pending;
+        case 'in_progress': return counts.in_progress;
+        case 'ready_pickup': return counts.ready_pickup;
+        case 'completed': return counts.completed;
+        case 'all':
+        default:
+          return counts.total;
+      }
+    }
+
+    function updateSummaryCards() {
+      const counts = computeCounts();
+      summaryButtons.forEach(button => {
+        const card = button.querySelector('.summary-card');
+        const valueEl = button.querySelector('.summary-card__value');
+        if (!card || !valueEl) return;
+        const filterKey = button.getAttribute('data-summary-filter');
+        const count = getCountForFilter(filterKey, counts);
+        card.setAttribute('data-summary-count', count);
+        valueEl.textContent = count;
+      });
+      return counts;
+    }
+
+    function setActiveCard(button) {
+      summaryButtons.forEach(btn => {
+        const card = btn.querySelector('.summary-card');
+        if (!card) return;
+        const isActive = btn === button;
+        card.classList.toggle('is-active', isActive);
+      });
+      activeButton = button;
+    }
+
+    function filterRows(filterKey) {
+      const allowedStatuses = statusMap[filterKey] ?? null;
+      let visibleCount = 0;
+      tableRows.forEach(row => {
+        const rowStatus = row.dataset.status || 'processing';
+        const shouldShow = !allowedStatuses || allowedStatuses.includes(rowStatus);
+        row.classList.toggle('table-row--hidden', !shouldShow);
+        if (shouldShow) {
+          visibleCount += 1;
+        }
+      });
+      return visibleCount;
+    }
+
+    function renderDetails(button, visibleCount) {
+      const label = button.getAttribute('data-summary-label') || 'Orders';
+      const description = button.getAttribute('data-summary-description') || '';
+      const plural = visibleCount === 1 ? 'order' : 'orders';
+      detailsEl.innerHTML = `<strong>${label}</strong>: Showing ${visibleCount} ${plural}. ${description}`;
+    }
+
+    function handleCardClick(button) {
+      updateSummaryCards();
+      const filterKey = button.getAttribute('data-summary-filter');
+      const visibleCount = filterRows(filterKey);
+      setActiveCard(button);
+      renderDetails(button, visibleCount);
+    }
+
+    function applyStatusUpdateFromStorage(reapplyFilter = true) {
+  if (!hasLocalStorage) return;
+  const raw = localStorage.getItem(STATUS_STORAGE_KEY);
+      if (!raw) return;
+
+      let payload = null;
+      try {
+        payload = JSON.parse(raw);
+      } catch (error) {
+        localStorage.removeItem(STATUS_STORAGE_KEY);
+        return;
+      }
+
+      if (!payload || !payload.orderId || !payload.status) {
+        localStorage.removeItem(STATUS_STORAGE_KEY);
+        return;
+      }
+
+      const maxAgeMs = 10 * 60 * 1000; // 10 minutes
+      if (payload.timestamp && (Date.now() - payload.timestamp) > maxAgeMs) {
+        localStorage.removeItem(STATUS_STORAGE_KEY);
+        return;
+      }
+
+      const consumedBy = Array.isArray(payload.consumedBy) ? payload.consumedBy.slice() : [];
+      if (consumedBy.includes(STATUS_CONSUMER_ID)) {
+        if (reapplyFilter && activeButton) {
+          handleCardClick(activeButton);
+        }
+        return;
+      }
+
+      const targetRow = tableRows.find(row => row.dataset.orderId === String(payload.orderId));
+      if (targetRow) {
+        targetRow.dataset.status = String(payload.status).toLowerCase();
+        const statusCell = targetRow.cells[5];
+        if (statusCell) {
+          const label = payload.statusLabel || formatStatusLabel(payload.status, statusCell.textContent.trim());
+          statusCell.textContent = label;
+        }
+      }
+
+      consumedBy.push(STATUS_CONSUMER_ID);
+      payload.consumedBy = Array.from(new Set(consumedBy));
+
+      const allConsumed = KNOWN_STATUS_CONSUMERS.every(id => payload.consumedBy.includes(id));
+      if (allConsumed) {
+        localStorage.removeItem(STATUS_STORAGE_KEY);
+      } else {
+        try {
+          localStorage.setItem(STATUS_STORAGE_KEY, JSON.stringify(payload));
+        } catch (error) {
+          console.warn('Unable to persist status sync payload for orders table.', error);
+        }
+      }
+
+      updateSummaryCards();
+
+      if (reapplyFilter && activeButton) {
+        handleCardClick(activeButton);
+      }
+    }
+
+    summaryButtons.forEach(button => {
+      button.addEventListener('click', () => handleCardClick(button));
+      button.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          handleCardClick(button);
+        }
+      });
+    });
+
+    const defaultButton = summaryButtons.find(btn => btn.getAttribute('data-summary-filter') === 'all') || summaryButtons[0];
+    if (defaultButton) {
+      handleCardClick(defaultButton);
+    }
+
+    updateSummaryCards();
+    applyStatusUpdateFromStorage(true);
+
+    window.addEventListener('pageshow', () => {
+      applyStatusUpdateFromStorage(true);
+    });
+
+    if (hasLocalStorage) {
+      window.addEventListener('storage', (event) => {
+        if (event.key === STATUS_STORAGE_KEY) {
+          applyStatusUpdateFromStorage(true);
+        }
+      });
+    }
+  })();
+
+  // Make table rows clickable
+  (function(){
+    const tableBody = document.querySelector('.admin-orders-table tbody');
+
+    if (tableBody) {
+      tableBody.addEventListener('click', function(event) {
+        const row = event.target.closest('tr[data-order-url]');
+        if (!row) return;
+
+        // Don't navigate if clicking on action buttons or other interactive elements
+        if (event.target.closest('.actions-cell') ||
+            event.target.closest('button') ||
+            event.target.closest('a')) {
+          return;
+        }
+
+        const url = row.getAttribute('data-order-url');
+        if (url) {
+          window.location.href = url;
+        }
+      });
+
+      // Add keyboard support for accessibility
+      tableBody.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          const row = event.target.closest('tr[data-order-url]');
+          if (!row) return;
+
+          event.preventDefault();
+          const url = row.getAttribute('data-order-url');
+          if (url) {
+            window.location.href = url;
+          }
+        }
+      });
+
+      // Make all rows focusable for keyboard navigation
+      const tableRows = tableBody.querySelectorAll('tr[data-order-url]');
+      tableRows.forEach(row => {
+        row.setAttribute('tabindex', '0');
+        row.setAttribute('role', 'button');
+        row.setAttribute('aria-label', `View order ${row.querySelector('td:first-child').textContent.trim()}`);
+      });
+    }
+  })();
+</script>
+<?php $__env->stopPush(); ?>
+
+<?php echo $__env->make('layouts.staffapp', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\Users\leanne\xampp\htdocs\InkWise-Web\ink-wise\resources\views/staff/order_list.blade.php ENDPATH**/ ?>

@@ -5,7 +5,7 @@ $app = require __DIR__ . '/bootstrap/app.php';
 $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
 $kernel->bootstrap();
 
-$svgPath = 'templates/svg/template_1e5d4799-1e0c-410f-b04b-f7e4dc0e4f5e.svg';
+$svgPath = 'templates/front/svg/template_1e5d4799-1e0c-410f-b04b-f7e4dc0e4f5e.svg';
 $template = \App\Models\Template::where('svg_path', 'like', '%1e5d4799%')->first();
 
 if (!$template) {

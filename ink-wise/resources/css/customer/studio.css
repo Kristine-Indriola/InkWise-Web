@@ -107,6 +107,15 @@ body {
     color: #f59e0b;
 }
 
+.topbar-status--dirty .topbar-status-dot {
+    background: #f59e0b;
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.12);
+}
+
+.topbar-status--dirty .topbar-status-label {
+    color: #f59e0b;
+}
+
 .topbar-status--error .topbar-status-dot {
     background: #ef4444;
     box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.12);
@@ -139,6 +148,16 @@ body {
 .topbar-icon-btn:hover {
     background: rgba(37, 99, 235, 0.1);
     color: var(--brand-primary);
+}
+
+.topbar-icon-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.topbar-icon-btn:disabled:hover {
+    background: #fff;
+    color: #6b7280;
 }
 
 .topbar-actions {
@@ -2218,22 +2237,7 @@ body {
     background: var(--button-hover);
 }
 
-/* Floating Toolbar */
-.floating-toolbar {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    background: #fff;
-    border: 1px solid var(--panel-border);
-    border-radius: 8px;
-    padding: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    z-index: 100;
-}
-
+/* Floating Toolbar removed */
 .toolbar-btn {
     width: 40px;
     height: 40px;

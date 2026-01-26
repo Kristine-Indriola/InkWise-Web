@@ -202,10 +202,9 @@
         }
 
         $qty = $extractQty($item);
-        $basePrice = data_get($item, 'basePricePerPiece') ?? 0;
         $paperPrice = data_get($item, 'paperStockPrice') ?? 0;
 
-        return max(0, $qty * ((float) $basePrice + (float) $paperPrice));
+        return max(0, $qty * (float) $paperPrice);
     };
 
     $invitationTotalCalc = $invitationItems->sum(fn ($item) => $computeInvitationTotal($item));
@@ -225,16 +224,12 @@
 
     $grandTotal = $invitationTotalCalc + $envelopeTotalCalc + $giveawayTotalCalc;
 
-    // Use the totalAmount from session summary if available (should be the authoritative source from database)
-    $sessionTotalAmount = (float) data_get($orderSummary, 'totalAmount', 0);
-    if ($sessionTotalAmount > 0) {
-        $grandTotal = $sessionTotalAmount;
-    }
+    // Always use the calculated total from items for accuracy
+    // Removed overrides with sessionTotalAmount and order->grandTotalAmount() to ensure consistency
 
-    // For persisted orders, use the order's grandTotalAmount to ensure consistency with payment calculations
-    if ($order) {
-        $grandTotal = $order->grandTotalAmount();
-    }
+    // Calculate the amount to be paid (remaining balance)
+    $paidAmount = $order ? round($order->totalPaid(), 2) : 0;
+    $amountToPay = max($grandTotal - $paidAmount, 0);
 @endphp
 
     @include('partials.topbar')
@@ -354,9 +349,7 @@
             </div>
             <div class="flex gap-3">
                      <a href="{{ $finalStepUrl }}" class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-300">Edit design</a>
-                     <a id="checkout-top"
-                         href="{{ $checkoutPaymentUrl }}"
-                         class="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 hover:bg-slate-800">Proceed to checkout</a>
+
             </div>
         </header>
 
@@ -493,10 +486,10 @@
                                 <div class="flex items-start gap-4">
                                         <div class="h-24 w-24 overflow-hidden rounded-2xl bg-slate-100 shadow-inner js-preview-trigger cursor-pointer"
                                              data-preview-images='@json($invPreviewGallery->values())'
-                                             @if(isset($customerReview) && !empty($customerReview->design_svg))
+                                             @if(isset($customerReview) && !empty($customerReview->design_svg) && $currentProductType === 'invitation')
                                              data-svg-preview="true"
                                              @endif>
-                                        @if(isset($customerReview) && !empty($customerReview->design_svg))
+                                        @if(isset($customerReview) && !empty($customerReview->design_svg) && $currentProductType === 'invitation')
                                             {{-- Embed SVG directly - img src doesn't work with SVGs containing external resources --}}
                                             <div class="svg-container h-full w-full" style="pointer-events: none;">
                                                 {!! $customerReview->design_svg !!}
@@ -708,11 +701,21 @@
                                                 }
                                             @endphp
                                             <div class="flex gap-4 rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-sm">
-                                                <div class="h-20 w-20 overflow-hidden rounded-xl bg-slate-100 shadow-inner flex-shrink-0">
-                                                    <img src="{{ $givePreview ?: $placeholderImage }}"
-                                                         alt="Giveaway preview"
-                                                         class="h-full w-full object-cover js-preview-trigger"
-                                                         data-preview-images='@json($giveGallery->values())'>
+                                                <div class="h-20 w-20 overflow-hidden rounded-xl bg-slate-100 shadow-inner flex-shrink-0 js-preview-trigger"
+                                                     data-preview-images='@json($giveGallery->values())'
+                                                     @if(isset($customerReview) && !empty($customerReview->design_svg) && $currentProductType === 'giveaway')
+                                                     data-svg-preview="true"
+                                                     @endif>
+                                                    @if(isset($customerReview) && !empty($customerReview->design_svg) && $currentProductType === 'giveaway')
+                                                        {{-- Embed SVG directly - img src doesn't work with SVGs containing external resources --}}
+                                                        <div class="svg-container h-full w-full" style="pointer-events: none;">
+                                                            {!! $customerReview->design_svg !!}
+                                                        </div>
+                                                    @else
+                                                        <img src="{{ $givePreview ?: $placeholderImage }}"
+                                                             alt="Giveaway preview"
+                                                             class="h-full w-full object-cover">
+                                                    @endif
                                                 </div>
                                                 <div class="flex-1">
                                                     <div class="flex items-center gap-2 flex-wrap">
@@ -804,25 +807,27 @@
                                     <dd class="font-medium text-slate-900">{{ $formatMoney($addonsExtra) }}</dd>
                                 </div>
                             @endif
+                            @if($paidAmount > 0)
+                                <div class="flex items-center justify-between">
+                                    <dt class="text-slate-600">Amount Paid</dt>
+                                    <dd class="font-medium text-slate-900">{{ $formatMoney($paidAmount) }}</dd>
+                                </div>
+                            @endif
                             <div class="mt-4 flex items-center justify-between text-base font-semibold">
-                                <dt class="text-slate-900">Total amount</dt>
-                                <dd class="text-slate-900" id="summary-grand-total">{{ $formatMoney($grandTotal) }}</dd>
+                                <dt class="text-slate-900">Total amount</dt> 
+                                <dd class="text-slate-900" id="summary-grand-total" data-paid-amount="{{ $paidAmount }}">{{ $formatMoney($grandTotal) }}</dd>
                             </div>
+                            @if($paidAmount > 0)
+                                <div class="flex items-center justify-between text-sm">
+                                    <dt class="text-slate-600">Amount Due</dt>
+                                    <dd class="font-medium text-slate-900" data-amount-due>{{ $formatMoney($amountToPay) }}</dd>
+                                </div>
+                            @endif
                         </dl>
                                 <a id="checkout-summary"
                                     href="{{ $checkoutPaymentUrl }}"
                                     class="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 hover:bg-slate-800">Checkout now</a>
                                 <p id="qty-warning" class="mt-3 text-sm text-rose-600 hidden">Minimum quantity per item is 10.</p>
-                    </div>
-
-                    <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-                        <p class="font-semibold text-slate-900">Need to start over?</p>
-                        <p class="mt-1">Clearing your order removes every selection from this summary.</p>
-                        <form method="POST" action="{{ $summaryClearUrl }}" class="mt-3">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="text-rose-600 hover:text-rose-700 font-medium">Clear entire order</button>
-                        </form>
                     </div>
                 </aside>
             </div>
@@ -1099,8 +1104,16 @@
                     if (summaryGive) summaryGive.textContent = formatMoney(giveawayTotal);
 
                     const grand = invitationTotal + envelopeTotal + giveawayTotal + shipping + tax;
+                    const paidAmount = parseFloat(summaryGrand?.dataset?.paidAmount || 0);
+                    const adjustedGrand = grand - paidAmount;
                     if (summaryGrand) {
-                        summaryGrand.textContent = formatMoney(grand);
+                        summaryGrand.textContent = formatMoney(grand); // Show full total
+                    }
+
+                    // Update Amount Due if it exists
+                    const amountDueEl = document.querySelector('dd[data-amount-due]');
+                    if (amountDueEl) {
+                        amountDueEl.textContent = formatMoney(adjustedGrand);
                     }
 
                     setCheckoutEnabled(!hasInvalidQty);
@@ -1163,8 +1176,20 @@
                         // Update session storage with new summary
                         if (result.summary) {
                             try {
-                                window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(result.summary));
-                                window.sessionStorage.setItem('order_summary_payload', JSON.stringify(result.summary));
+                                try {
+                                    const minSummary = {
+                                        productId: result.summary.productId ?? result.summary.product_id ?? null,
+                                        quantity: result.summary.quantity ?? null,
+                                        paymentMode: result.summary.paymentMode ?? result.summary.payment_mode ?? null,
+                                        totalAmount: result.summary.totalAmount ?? result.summary.total_amount ?? null,
+                                        shippingFee: result.summary.shippingFee ?? result.summary.shipping_fee ?? null,
+                                        order_id: result.summary.order_id ?? result.summary.orderId ?? null,
+                                    };
+                                    window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(minSummary));
+                                    window.sessionStorage.setItem('order_summary_payload', JSON.stringify(minSummary));
+                                } catch (e) {
+                                    console.warn('Failed to update session storage:', e);
+                                }
                             } catch (e) {
                                 console.warn('Failed to update session storage:', e);
                             }

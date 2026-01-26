@@ -18,29 +18,25 @@ class Template extends Model
         'front_image',
         'back_image',
         'status',
-        'status_note',
-        'status_updated_at',
+        'fold_type',
+        'sizes',
         'metadata',
-        'design',
         'svg_path',
         'back_svg_path',
         'preview',
         'preview_front',
         'preview_back',
         'has_back_design',
-        'processed_at',
-        'user_id',
-        'width_inch',
-        'height_inch',
-        'fold_type',
+        'design',
     ];
 
     protected $casts = [
         'metadata' => 'array',
-        'design' => 'array',
-        'processed_at' => 'datetime',
-        'status_updated_at' => 'datetime',
+        'sizes' => 'array',
         'has_back_design' => 'boolean',
+        'figma_metadata' => 'array',
+        'processed_at' => 'datetime',
+        'figma_synced_at' => 'datetime',
     ];
 
     public function products()

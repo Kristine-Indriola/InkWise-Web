@@ -238,6 +238,14 @@
                 return $candidate;
             }
 
+            // Try to return the URL directly for SVG files
+            if (str_contains($candidate, '.svg')) {
+                $url = $resolveImage($candidate, null);
+                if ($url && is_string($url) && str_starts_with($url, '/')) {
+                    return $url;
+                }
+            }
+
             $contents = $readSvgFile($candidate);
             if (is_string($contents) && $contents !== '') {
                 return 'data:image/svg+xml;base64,' . base64_encode($contents);
@@ -373,8 +381,7 @@
         </div>
         <div class="topbar-history-controls" role="group" aria-label="History controls">
             <button type="button" class="topbar-icon-btn" aria-label="View history"><i class="fa-regular fa-clock"></i></button>
-            <button type="button" class="topbar-icon-btn" aria-label="Undo"><i class="fa-solid fa-rotate-left"></i></button>
-            <button type="button" class="topbar-icon-btn" aria-label="Redo"><i class="fa-solid fa-rotate-right"></i></button>
+            <!-- Undo/Redo removed -->
         </div>
         <div id="inkwise-customer-studio-root" class="studio-react-root" aria-live="polite"></div>
     </div>
@@ -703,6 +710,8 @@
         'csrfToken' => csrf_token(),
         'product' => $productBootstrap,
         'template' => $templateBootstrap,
+        // Include template_id explicitly so the client always has a direct value to use
+        'template_id' => $templateBootstrap['id'] ?? $product?->template_id ?? null,
         'assets' => [
             'front_image' => $frontImage,
             'back_image' => $hasBackSide ? $backImage : null,
@@ -1093,7 +1102,71 @@ document.addEventListener('DOMContentLoaded', function() {
     updateDisplay();
     updateButtons();
 });
+// Preview button functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const previewBtn = document.getElementById('preview-btn');
+    const previewModal = document.getElementById('studio-preview-modal');
+    const previewContent = document.getElementById('studio-preview-content');
+    const previewClose = document.getElementById('studio-preview-close');
+
+    function openPreview() {
+        const wrapper = document.querySelector('.preview-canvas-wrapper');
+        if (!wrapper || !previewModal) return;
+
+        // Clear previous
+        previewContent.innerHTML = '';
+
+        // Clone the wrapper (deep) and scale it to fit
+        const clone = wrapper.cloneNode(true);
+        clone.style.transform = 'none';
+        clone.style.maxWidth = '100%';
+        clone.style.maxHeight = '80vh';
+        clone.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
+
+        // Remove any interactive attributes that might interfere
+        clone.querySelectorAll('[data-modal-close],[data-action],[id]').forEach(el => el.removeAttribute('id'));
+
+        previewContent.appendChild(clone);
+        previewModal.style.display = 'flex';
+        previewModal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closePreview() {
+        if (!previewModal) return;
+        previewModal.style.display = 'none';
+        previewModal.setAttribute('aria-hidden', 'true');
+        previewContent.innerHTML = '';
+    }
+
+    previewBtn?.addEventListener('click', function(e) {
+        e.preventDefault();
+        openPreview();
+    });
+
+    previewClose?.addEventListener('click', function(e) {
+        e.preventDefault();
+        closePreview();
+    });
+
+    previewModal?.addEventListener('click', function(e) {
+        if (e.target === previewModal) {
+            closePreview();
+        }
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closePreview();
+    });
+});
 </script>
+
+<!-- Preview modal markup -->
+<div id="studio-preview-modal" class="studio-preview-modal" aria-hidden="true" style="display:none;position:fixed;inset:0;z-index:20000;align-items:center;justify-content:center;background:rgba(0,0,0,0.8)">
+    <div class="studio-preview-inner" style="background:#fff;padding:18px;border-radius:10px;max-width:90vw;max-height:90vh;overflow:auto;position:relative;">
+        <button id="studio-preview-close" aria-label="Close preview" style="position:absolute;top:8px;right:8px;border:none;background:transparent;font-size:20px;cursor:pointer">&times;</button>
+        <div id="studio-preview-content" style="display:flex;align-items:center;justify-content:center;padding:8px"></div>
+    </div>
+</div>
 
 </body>
 </html>

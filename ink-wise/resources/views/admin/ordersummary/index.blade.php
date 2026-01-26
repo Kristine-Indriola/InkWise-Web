@@ -831,6 +831,20 @@
 	$customerCompany = data_get($customer, 'company');
 	$customerTags = collect(data_get($customer, 'tags', []))->filter()->values();
 
+	$currencyCode = data_get($order, 'currency', 'PHP');
+	$currencySymbol = $currencyCode === 'PHP' ? '₱' : ($currencyCode . ' ');
+	$customerLifetimePaid = 0.0;
+	if (!empty($customerId)) {
+		try {
+			$customerLifetimePaid = (float) \App\Models\Payment::query()
+				->where('customer_id', $customerId)
+				->whereRaw("LOWER(COALESCE(status, '')) = 'paid'")
+				->sum('amount');
+		} catch (\Throwable $_e) {
+			$customerLifetimePaid = 0.0;
+		}
+	}
+
 	$shippingAddress = data_get($order, 'shipping.formatted')
 		?? data_get($order, 'shipping.address')
 		?? data_get($order, 'shipping_address');
@@ -856,12 +870,30 @@
 			return $bcarry;
 		}, 0);
 
+		// Check if this is an invitation (not envelope or giveaway)
+		$ptype = strtolower((string) data_get($it, 'product_type', ''));
+		$iname = strtolower((string) data_get($it, 'name', ''));
+		$ltype = strtolower((string) data_get($it, 'line_type', ''));
+		$isEnvelope = str_contains($ptype, 'envelope') || str_contains($iname, 'envelope');
+		$isGiveaway = $ltype === 'giveaway' || str_contains($ptype, 'giveaway') || str_contains($iname, 'giveaway') || str_contains($iname, 'freebie');
+		$isInvitation = !$isEnvelope && !$isGiveaway;
+
 		if ($breakSum > 0) {
 			// If breakdown provides totals, use that as this item's subtotal
 			return $carry + $breakSum;
 		}
 
-		// fallback to explicit item total or computed quantity * unit price
+		// For invitations, do not include the template price (unit_price)
+		if ($isInvitation) {
+			// Only use explicit item total if present, otherwise 0
+			$itemTotal = data_get($it, 'total');
+			if (is_numeric($itemTotal)) {
+				return $carry + (float) $itemTotal;
+			}
+			return $carry; // Exclude template price
+		}
+
+		// fallback to explicit item total or computed quantity * unit price for non-invitations
 		$itemTotal = data_get($it, 'total');
 		if (is_numeric($itemTotal)) {
 			return $carry + (float) $itemTotal;
@@ -1149,7 +1181,7 @@
 	$ordersBackUrl = $statusManageUrl ?? $ordersIndexUrl;
 
 	$statusOptions = [
-		'draft' => 'New Order',
+		'draft' => 'NEW ORDER',
 		'pending' => 'Order Received',
 		'processing' => 'Processing',
 		'in_production' => 'In Progress',
@@ -1157,17 +1189,30 @@
 		'completed' => 'Completed',
 		'cancelled' => 'Cancelled',
 	];
+	$fulfillmentStatusOptions = [
+		'draft' => 'NEW ORDER',
+		'pending' => 'Pending',
+		'processing' => 'Processing',
+		'in_production' => 'In Production',
+		'confirmed' => 'Ready for Pickup',
+		'completed' => 'Completed',
+		'cancelled' => 'Cancelled',
+	];
+	
+	// Function to get display label for any status
+	$getStatusLabel = function($status) use ($statusOptions, $fulfillmentStatusOptions) {
+		if ($status === 'draft') {
+			return 'NEW ORDER';
+		}
+		return $statusOptions[$status] ?? $fulfillmentStatusOptions[$status] ?? 'Processing';
+	};
 	$statusFlow = ['draft', 'pending', 'pending_awaiting_materials', 'processing', 'in_production', 'confirmed', 'completed'];
 	$orderStatusRaw = data_get($order, 'status', 'draft');
-	$orderStatusRaw = $orderStatusRaw === 'draft' ? 'new_order' : $orderStatusRaw;
 	$currentStatus = strtolower((string) $orderStatusRaw);
-	if ($currentStatus === 'new_order') {
-		$currentStatus = 'draft';
-	}
 	$flowIndex = array_search($currentStatus, $statusFlow, true);
 	$currentChipModifier = str_replace('_', '-', $currentStatus);
-	$currentDisplayStatus = $currentStatus === 'draft' ? 'new_order' : $currentStatus;
-	$currentStatusLabel = $statusOptions[$currentDisplayStatus] ?? ucfirst(str_replace('_', ' ', $currentDisplayStatus));
+	$currentDisplayStatus = $currentStatus;
+	$currentStatusLabel = $getStatusLabel($currentDisplayStatus);
 	$formatDateTime = function ($value) {
 		try {
 			if ($value instanceof \Illuminate\Support\Carbon) {
@@ -1199,7 +1244,17 @@
 	$balanceOverrideRaw = data_get($financialMetadata, 'balance_due_override');
 	$paidOverrideAmount = is_numeric($paidOverrideRaw) ? (float) $paidOverrideRaw : null;
 	$balanceOverrideAmount = is_numeric($balanceOverrideRaw) ? (float) $balanceOverrideRaw : null;
-	$totalPaidAmount = $paidOverrideAmount ?? (float) ($paymentsSummary->get('total_paid') ?? data_get($order, 'total_paid', 0));
+	// Prefer authoritative model-calculated total paid when available
+	if (isset($orderModel) && $orderModel) {
+		try {
+			$calculatedPaid = (float) $orderModel->totalPaid();
+		} catch (\Throwable $_e) {
+			$calculatedPaid = null;
+		}
+	} else {
+		$calculatedPaid = null;
+	}
+	$totalPaidAmount = $paidOverrideAmount ?? ($calculatedPaid !== null ? $calculatedPaid : (float) ($paymentsSummary->get('total_paid') ?? data_get($order, 'total_paid', 0)));
 	$balanceDueAmount = $balanceOverrideAmount ?? (float) ($paymentsSummary->get('balance_due') ?? max($orderGrandTotalAmount - $totalPaidAmount, 0));
 	if ($paymentStatus !== 'paid') {
 		if ($orderGrandTotalAmount > 0 && $balanceDueAmount <= 0.01 && $totalPaidAmount >= max($orderGrandTotalAmount - 0.01, 0)) {
@@ -1270,7 +1325,7 @@
 	$trackingNumber = $metadata['tracking_number'] ?? null;
 	$statusNote = $metadata['status_note'] ?? null;
 	$nextStatusKey = $flowIndex !== false && $flowIndex < count($statusFlow) - 1 ? $statusFlow[$flowIndex + 1] : null;
-	$nextStatusLabel = $nextStatusKey ? ($statusOptions[$nextStatusKey] ?? ucfirst(str_replace('_', ' ', $nextStatusKey))) : null;
+	$nextStatusLabel = $nextStatusKey ? $getStatusLabel($nextStatusKey) : null;
 	$lastUpdatedDisplay = $formatDateTime(data_get($order, 'updated_at'));
 @endphp
 
@@ -1288,17 +1343,11 @@
 		<div>
 			<h1 class="page-title">{{ $orderTitle }}</h1>
 			<p class="page-subtitle">
-				Placed {{ $placedAt }} · {{ $paymentStatusLabel }} payment · {{ ucfirst($fulfillmentStatus ?: 'processing') }} fulfillment
+				Placed {{ $placedAt }} · {{ $paymentStatusLabel }} payment · {{ $getStatusLabel($fulfillmentStatus) }} fulfillment
 			</p>
 		</div>
 		<div class="page-header__quick-actions">
 			<a href="{{ $ordersIndexUrl }}" class="pill-link" title="Return to order list">Back to order list</a>
-			<button type="button" class="btn btn-secondary" data-order-action="export">
-				<i class="fi fi-rr-download" aria-hidden="true"></i> Export PDF
-			</button>
-			<button type="button" class="btn btn-primary" data-order-action="print">
-				<i class="fi fi-rr-print" aria-hidden="true"></i> Print
-			</button>
 		</div>
 	</header>
 
@@ -1308,7 +1357,7 @@
 				{{ $paymentStatusLabel }} payment
 			</span>
 			<span class="status-chip status-chip--outline {{ 'status-chip--' . $fulfillmentStatus }}" data-fulfillment-indicator>
-				{{ ucfirst($fulfillmentStatus ?: 'processing') }} fulfillment
+				{{ $getStatusLabel($fulfillmentStatus)}} 
 			</span>
 		</div>
 		<div class="ordersummary-banner__meta">
@@ -1356,8 +1405,8 @@
 								? 'status-tracker__item--done'
 								: 'status-tracker__item--current';
 						}
-						$displayKey = $statusKey === 'draft' ? 'new_order' : $statusKey;
 					}
+					$displayKey = $statusKey;
 				@endphp
 				<li class="status-tracker__item {{ $stateClass }}" data-status-step="{{ $statusKey }}">
 					<div class="status-tracker__marker">
@@ -1372,7 +1421,7 @@
 					@endif
 					<div class="status-tracker__content">
 						<p class="status-tracker__title">
-							{{ $statusOptions[$displayKey] ?? ucfirst(str_replace('_', ' ', $displayKey)) }}
+							{{ $getStatusLabel($displayKey) }}
 						</p>
 						<p class="status-tracker__subtitle">
 							@switch($statusKey)
@@ -1432,6 +1481,7 @@
 								<tr>
 									<th scope="col">Item</th>
 									<th scope="col">Options</th>
+									<th scope="col">Material</th>
 									<th scope="col" class="text-center">Qty</th>
 									<th scope="col" class="text-end">Unit price</th>
 									<th scope="col" class="text-end">Line total</th>
@@ -1441,8 +1491,36 @@
 								@foreach($items as $item)
 									@php
 										$quantity = (int) data_get($item, 'quantity', 1);
+										
+										// Check if this is an invitation (not envelope or giveaway)
+										$ptype = strtolower((string) data_get($item, 'product_type', ''));
+										$iname = strtolower((string) data_get($item, 'name', ''));
+										$ltype = strtolower((string) data_get($item, 'line_type', ''));
+										$isEnvelope = str_contains($ptype, 'envelope') || str_contains($iname, 'envelope');
+										$isGiveaway = $ltype === 'giveaway' || str_contains($ptype, 'giveaway') || str_contains($iname, 'giveaway') || str_contains($iname, 'freebie');
+										$isInvitation = !$isEnvelope && !$isGiveaway;
+										
+										// Calculate breakdown sum for this item
+										$breakdown = collect(data_get($item, 'breakdown', []));
+										$breakdownSum = $breakdown->reduce(function ($carry, $row) {
+											$rowQty = data_get($row, 'quantity');
+											$rowTotal = data_get($row, 'total', data_get($row, 'unit_price'));
+											if (is_numeric($rowTotal)) {
+												$mult = ($rowQty !== null && is_numeric($rowQty)) ? (int) $rowQty : 1;
+												return $carry + ((float) $rowTotal * $mult);
+											}
+											return $carry;
+										}, 0);
+										
 										$unitPrice = (float) data_get($item, 'unit_price', data_get($item, 'price', 0));
-										$lineTotal = (float) data_get($item, 'total', data_get($item, 'subtotal', $quantity * $unitPrice));
+										
+										// Calculate line total
+										if ($isInvitation) {
+											$lineTotal = $quantity * $unitPrice;
+										} else {
+											$lineTotal = (float) data_get($item, 'total', data_get($item, 'subtotal', $quantity * $unitPrice));
+										}
+										
 										// fallback: some giveaway items store their computed total in design_metadata or item metadata
 										if (empty($lineTotal) || $lineTotal === 0.0) {
 											$lineTotal = (float) data_get($item, 'design_metadata.total', data_get($item, 'metadata.giveaway.total', data_get($item, 'metadata.giveaway.price', data_get($item, 'metadata.total', 0))));
@@ -1484,6 +1562,7 @@
 										// normalize breakdown and sync quantities for paper stock and addons
 										$rawOptions = data_get($item, 'options', []);
 										$paperStockValue = data_get($rawOptions, 'paper_stock') ?? data_get($rawOptions, 'paper stock') ?? null;
+
 										$addonValues = [];
 										foreach ($rawOptions as $optKey => $optVal) {
 											if (str_contains(strtolower((string) $optKey), 'addon')) {
@@ -1538,6 +1617,14 @@
 												return $row;
 											})
 											->values();
+
+										// For invitations, get unit price from paper stock options since it's not in breakdown
+										if ($isInvitation) {
+											$paperStockPrice = $extractMoney(data_get($rawOptions, 'paper_stock_price'));
+											if (is_numeric($paperStockPrice)) {
+												$unitPrice = (float) $paperStockPrice;
+											}
+										}
 
 										$formatAddon = function ($addon) use ($extractMoney, $quantity) {
 											if ($addon instanceof \Illuminate\Contracts\Support\Arrayable) {
@@ -1704,8 +1791,10 @@
 												
 												if ($customerReview && !empty($customerReview->design_svg)) {
 													$customerReviewSvg = $customerReview->design_svg;
-													// Try to get back image from gallery
-													if (!empty($imagesSource) && count($imagesSource) > 1) {
+													// Try to get back image from saved design_back_svg first, then fallback to gallery
+													if (!empty($customerReview->design_back_svg)) {
+														$customerReviewBackImage = $customerReview->design_back_svg;
+													} elseif (!empty($imagesSource) && count($imagesSource) > 1) {
 														$backImg = $imagesSource[1] ?? null;
 														if (is_array($backImg)) {
 															$customerReviewBackImage = $backImg['src'] ?? $backImg['url'] ?? null;
@@ -1713,6 +1802,24 @@
 															$customerReviewBackImage = $backImg;
 														}
 													}
+												}
+
+												// Get original template for back-to-back comparison
+												$originalTemplate = null;
+												$originalTemplateSvg = null;
+												$originalTemplateBackSvg = null;
+												try {
+													$originalTemplate = \App\Models\Template::find($templateId);
+													if ($originalTemplate) {
+														if ($originalTemplate->svg_path && \Storage::disk('public')->exists($originalTemplate->svg_path)) {
+															$originalTemplateSvg = \Storage::disk('public')->get($originalTemplate->svg_path);
+														}
+														if ($originalTemplate->back_svg_path && \Storage::disk('public')->exists($originalTemplate->back_svg_path)) {
+															$originalTemplateBackSvg = \Storage::disk('public')->get($originalTemplate->back_svg_path);
+														}
+													}
+												} catch (\Throwable $e) {
+													// Ignore errors when loading original template
 												}
 											}
 										} catch (\Throwable $e) {
@@ -1773,10 +1880,9 @@
 										}
 
 										// accumulate grouping sums: invitations (main line only, breakdowns are separate)
-										// DO NOT CALCULATE THE BASE PRICE OF THE INVITATION
-										// if (!$isEnvelope && !$isGiveaway) {
-										//     $groupSums['invitations'] += $lineTotal;
-										// }
+										if (!$isEnvelope && !$isGiveaway) {
+											$groupSums['invitations'] += $lineTotal;
+										}
 
 										if ($isEnvelope) {
 											$groupSums['envelopes'] += $lineTotal;
@@ -1864,6 +1970,44 @@
 													$itemRegisterMaterial('addon', $addonLabel, $quantity, null, null);
 												}
 											}
+										}
+
+										// Register addons for all items, not just invitations
+										if (!empty($addonValues)) {
+											$addonFallbacks = [];
+											foreach ($rawOptions as $rawKey => $rawValue) {
+												if (!str_contains(strtolower((string) $rawKey), 'addon')) {
+													continue;
+												}
+
+												$normalizedAddons = $normalizeToArray($rawValue);
+												if (!$normalizedAddons) {
+													$normalizedAddons = $rawValue !== null ? [$rawValue] : [];
+												}
+
+												foreach ($normalizedAddons as $addonEntry) {
+													$label = trim($formatAddon($addonEntry));
+													if ($label === '' || strtolower($label) === 'none') {
+														continue;
+													}
+													$addonFallbacks[] = $label;
+												}
+											}
+
+											$addonFallbacks = array_values(array_unique($addonFallbacks));
+											foreach ($addonFallbacks as $addonLabel) {
+												$itemRegisterMaterial('addon', $addonLabel, $quantity, null, null);
+											}
+										}
+
+										// Register paper stock for all items, not just invitations
+										if ($paperStockValue) {
+											$paperLabel = is_string($paperStockValue) && trim($paperStockValue) !== ''
+												? trim((string) $paperStockValue)
+												: 'Paper Stock';
+											$paperUnitPrice = $extractMoney(data_get($rawOptions, 'paper_stock_price'));
+											$paperTotal = is_numeric($paperUnitPrice) ? (float) $paperUnitPrice * max(1, $quantity) : null;
+											$itemRegisterMaterial('paper', $paperLabel, $quantity, is_numeric($paperUnitPrice) ? (float) $paperUnitPrice : null, $paperTotal);
 										}
 									@endphp
 									<tr>
@@ -2034,7 +2178,8 @@
 															});
 														})
 														->filter(function ($row) {
-															return (($row['quantity'] ?? 0) > 0) || (($row['total'] ?? 0) > 0) || (($row['unit_price'] ?? 0) > 0);
+															// Show any material that has a non-empty label
+															return !empty(trim($row['label'] ?? ''));
 														})
 														->values();
 
@@ -2075,25 +2220,52 @@
 														<img src="{{ $primaryImageUrl }}" alt="{{ $primaryImageLabel ? $previewTitle . ' ' . strtolower($primaryImageLabel) : $previewTitle . ' preview' }}" class="item-cell__thumb">
 													</button>
 												@endif
-												@if(!empty($customerReviewSvg))
+												@if(!empty($customerReviewSvg) || !empty($originalTemplateSvg))
 													<div class="mt-2">
-														<div class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Edited Template</div>
-														<button
-															type="button"
-															class="item-cell__svg-button js-admin-svg-preview-trigger"
-															data-svg-content="{{ base64_encode($customerReviewSvg) }}"
-															data-back-image="{{ $customerReviewBackImage ?? '' }}"
-															data-preview-title="{{ $previewTitle }} - Edited Design"
-															aria-label="View edited template design for {{ $previewTitle }}"
-															style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 4px; background: #f8fafc; cursor: pointer; display: inline-block; transition: all 0.2s;"
-															onmouseover="this.style.boxShadow='0 0 0 2px #a6b7ff'"
-															onmouseout="this.style.boxShadow='none'"
-														>
-															<div class="svg-thumb-container" style="width: 60px; height: 60px; overflow: hidden; pointer-events: none;">
-																{!! $customerReviewSvg !!}
-															</div>
-														</button>
-														<div class="text-xs text-gray-400 mt-1">Click to view front & back</div>
+														<div class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Template Comparison</div>
+														<div class="flex gap-2">
+															@if(!empty($originalTemplateSvg))
+																<div class="flex flex-col items-center">
+																	<div class="text-xs text-gray-500 mb-1">Original</div>
+																	<button
+																		type="button"
+																		class="item-cell__svg-button js-admin-svg-preview-trigger"
+																		data-svg-content="{{ base64_encode($originalTemplateSvg) }}"
+																		data-back-image="{{ !empty($originalTemplateBackSvg) ? base64_encode($originalTemplateBackSvg) : '' }}"
+																		data-preview-title="{{ $previewTitle }} - Original Template"
+																		aria-label="View original template design for {{ $previewTitle }}"
+																		style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 4px; background: #f8fafc; cursor: pointer; display: inline-block; transition: all 0.2s;"
+																		onmouseover="this.style.boxShadow='0 0 0 2px #a6b7ff'"
+																		onmouseout="this.style.boxShadow='none'"
+																	>
+																		<div class="svg-thumb-container" style="width: 60px; height: 60px; overflow: hidden; pointer-events: none;">
+																			{!! $originalTemplateSvg !!}
+																		</div>
+																	</button>
+																</div>
+															@endif
+															@if(!empty($customerReviewSvg))
+																<div class="flex flex-col items-center">
+																	<div class="text-xs text-gray-500 mb-1">Edited</div>
+																	<button
+																		type="button"
+																		class="item-cell__svg-button js-admin-svg-preview-trigger"
+																		data-svg-content="{{ base64_encode($customerReviewSvg) }}"
+																		data-back-image="{{ !empty($customerReviewBackImage) && str_contains($customerReviewBackImage, '<svg') ? base64_encode($customerReviewBackImage) : ($customerReviewBackImage ?? '') }}"
+																		data-preview-title="{{ $previewTitle }} - Edited Design"
+																		aria-label="View edited template design for {{ $previewTitle }}"
+																		style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 4px; background: #f8fafc; cursor: pointer; display: inline-block; transition: all 0.2s;"
+																		onmouseover="this.style.boxShadow='0 0 0 2px #a6b7ff'"
+																		onmouseout="this.style.boxShadow='none'"
+																	>
+																		<div class="svg-thumb-container" style="width: 60px; height: 60px; overflow: hidden; pointer-events: none;">
+																			{!! $customerReviewSvg !!}
+																		</div>
+																	</button>
+																</div>
+															@endif
+														</div>
+														<div class="text-xs text-gray-400 mt-1">Click to view front & back designs</div>
 													</div>
 												@endif
 												<div>
@@ -2113,6 +2285,22 @@
 														<li>{{ $option }}</li>
 													@endforeach
 												</ul>
+											@endif
+										</td>
+										<td>
+											@if($itemMaterialsList->isNotEmpty())
+												<ul class="item-materials">
+													@foreach($itemMaterialsList as $material)
+														<li class="material-item material-item--{{ $material['type'] }}">
+															<span class="material-label">{{ $material['label'] }}</span>
+															@if($material['quantity'] !== null)
+																<span class="material-quantity">x{{ $material['quantity'] }}</span>
+															@endif
+														</li>
+													@endforeach
+												</ul>
+											@else
+												<span class="item-option">—</span>
 											@endif
 										</td>
 										<td class="text-center">{{ $quantity }}</td>
@@ -2276,21 +2464,24 @@
 								@endif
 							</dd>
 						</div>
+						<div>
+							<dt>Total paid (customer lifetime)</dt>
+							<dd>
+								@if(!empty($customerLifetimePaid) && $customerLifetimePaid > 0)
+									{{ $currencySymbol . number_format($customerLifetimePaid, 2) }}
+								@else
+									<span>—</span>
+								@endif
+							</dd>
+						</div>
 					</dl>
 
 					<div class="ordersummary-address-grid">
 						<div>
-							<span class="ordersummary-address-label">Shipping address</span>
+							<span class="ordersummary-address-label">Address</span>
 							<p>{{ $shippingAddress ?? '—' }}</p>
 							@if($shippingAddress)
 								<button type="button" class="chip-action" data-copy="{{ $shippingAddress }}">Copy</button>
-							@endif
-						</div>
-						<div>
-							<span class="ordersummary-address-label">Billing address</span>
-							<p>{{ $billingAddress ?? '—' }}</p>
-							@if($billingAddress)
-								<button type="button" class="chip-action" data-copy="{{ $billingAddress }}">Copy</button>
 							@endif
 						</div>
 					</div>
@@ -2420,6 +2611,7 @@
 					->map(function ($pm) {
 						return [
 							'material_name' => $pm->material->material_name ?? 'Unknown Material',
+							'material_type' => $pm->material->material_type ?? 'Unknown',
 							'quantity_used' => $pm->quantity_used,
 							'unit' => $pm->unit,
 							'material_id' => $pm->material_id,
@@ -2432,17 +2624,13 @@
 					<header class="ordersummary-card__header">
 						<h2>Materials Used & Deducted</h2>
 						<p class="ordersummary-card__meta">{{ $deductedMaterials->count() }} {{ \Illuminate\Support\Str::plural('material', $deductedMaterials->count()) }} deducted from inventory</p>
-						<div class="ordersummary-card__actions">
-							<button type="button" class="btn btn-primary btn-sm" onclick="deductMaterials({{ $orderModel->id }})">
-								<i class="fi fi-rr-minus-circle" aria-hidden="true"></i> Deduct Materials Again
-							</button>
-						</div>
 					</header>
 					<div class="materials-grid">
 						@foreach($deductedMaterials as $material)
 							<div class="material-card material-card--deducted">
 								<span class="material-card__type">Deducted</span>
 								<h3 class="material-card__title">{{ $material['material_name'] }}</h3>
+								<h3 class="material-card__title">{{ $material['material_type'] }}</h3>
 								<p class="material-card__quantity"><strong>{{ number_format($material['quantity_used'], 2) }}</strong> {{ $material['unit'] }} used</p>
 							</div>
 						@endforeach
@@ -2472,7 +2660,7 @@
 			aria-label="Order sidebar controls"
 			data-order-sidebar
 			data-payment-status="{{ $paymentStatus }}"
-			data-fulfillment-status="{{ $fulfillmentStatus }}"
+			data-fulfillment-status="{{ $getStatusLabel($fulfillmentStatus) }}"
 			data-update-payment-url="{{ $markPaidUrl }}"
 			data-update-fulfillment-url="{{ $markFulfilledUrl }}"
 			data-send-invoice-url="{{ $sendInvoiceUrl }}"
@@ -2503,13 +2691,18 @@
 						return $currencySymbol . number_format($numeric, 2);
 					};
 					$orderGrandTotal = isset($orderGrandTotalAmount) ? $orderGrandTotalAmount : (float) ($paymentsSummary->get('grand_total') ?? ($grandTotal ?? 0));
-					$totalPaid = isset($totalPaidAmount) ? $totalPaidAmount : (float) ($paymentsSummary->get('total_paid') ?? $payments->reduce(function ($carry, $paymentRow) {
-						$status = strtolower((string) data_get($paymentRow, 'status', 'pending'));
-						if ($status === 'paid') {
-							return $carry + (float) data_get($paymentRow, 'amount', 0);
-						}
-						return $carry;
-					}, 0.0));
+					
+					// Final paid amount decision: prefer earlier computed $totalPaidAmount (which already prefers model),
+					// otherwise fall back to summing payments collection.
+					$totalPaid = isset($totalPaidAmount)
+						? $totalPaidAmount
+						: (float) ($paymentsSummary->get('total_paid') ?? $payments->reduce(function ($carry, $paymentRow) {
+							$status = strtolower((string) data_get($paymentRow, 'status', 'pending'));
+							if ($status === 'paid') {
+								return $carry + (float) data_get($paymentRow, 'amount', 0);
+							}
+							return $carry;
+						}, 0.0));
 					$balanceDue = isset($balanceDueAmount) ? $balanceDueAmount : (float) ($paymentsSummary->get('balance_due') ?? max($orderGrandTotal - $totalPaid, 0));
 					$latestPaymentAtRaw = $paymentsSummary->get('latest_payment_at');
 					$latestPaymentAt = null;
@@ -2525,10 +2718,6 @@
 					$primaryProvider = $payments->isNotEmpty() ? data_get($payments->first(), 'provider') : null;
 				@endphp
 				<div class="payment-summary-grid">
-					<div class="payment-summary-grid__item">
-						<span class="payment-summary-grid__label">Total invoiced</span>
-						<span class="payment-summary-grid__value" data-payment-total="grand">{{ $formatCurrency($orderGrandTotal) }}</span>
-					</div>
 					<div class="payment-summary-grid__item">
 						<span class="payment-summary-grid__label">Total paid</span>
 						<span class="payment-summary-grid__value" data-payment-total="paid">{{ $formatCurrency($totalPaid) }}</span>
@@ -3465,5 +3654,36 @@ function deductMaterials(orderId) {
 		button.innerHTML = originalText;
 	});
 }
+
+// Ensure fulfillment indicator always shows correct label
+document.addEventListener('DOMContentLoaded', function() {
+	const fulfillmentIndicator = document.querySelector('[data-fulfillment-indicator]');
+	if (fulfillmentIndicator) {
+		const currentText = fulfillmentIndicator.textContent.trim();
+		if (currentText === 'draft fulfillment' || currentText === 'Draft fulfillment') {
+			fulfillmentIndicator.innerHTML = 'NEW ORDER fulfillment';
+		}
+	}
+	
+	// Also watch for changes to the fulfillment indicator
+	const observer = new MutationObserver(function(mutations) {
+		mutations.forEach(function(mutation) {
+			if (mutation.type === 'childList' || mutation.type === 'characterData') {
+				const text = fulfillmentIndicator.textContent.trim();
+				if (text === 'draft fulfillment' || text === 'Draft fulfillment') {
+					fulfillmentIndicator.innerHTML = 'NEW ORDER fulfillment';
+				}
+			}
+		});
+	});
+	
+	if (fulfillmentIndicator) {
+		observer.observe(fulfillmentIndicator, {
+			childList: true,
+			subtree: true,
+			characterData: true
+		});
+	}
+});
 </script>
 @endsection

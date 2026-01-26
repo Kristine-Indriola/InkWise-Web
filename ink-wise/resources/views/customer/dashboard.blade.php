@@ -1294,6 +1294,26 @@
                 </div>
             </form>
 
+            <div class="flex items-center gap-2">
+                <a href="{{ route('customer.notifications') }}" class="nav-icon-button" aria-label="Notifications" title="Notifications">
+                    <i class="fa-regular fa-bell" style="color: black;" aria-hidden="true"></i>
+                    @auth
+                        @php
+                            $unreadCount = auth()->user()->unreadNotifications()->count();
+                        @endphp
+                        @if($unreadCount > 0)
+                            <span class="notification-badge">{{ $unreadCount }}</span>
+                        @endif
+                    @endauth
+                </a>
+                <a href="{{ route('customer.favorites') }}" class="nav-icon-button" aria-label="My favorites" title="My favorites">
+                    <i class="fa-regular fa-heart" style="color: black;" aria-hidden="true"></i>
+                </a>
+                <a href="/order/addtocart" class="nav-icon-button" aria-label="My cart" title="My cart">
+                    <i class="fa-solid fa-bag-shopping" style="color: black;" aria-hidden="true"></i>
+                </a>
+            </div>
+
             @guest
                 <a href="{{ route('dashboard', ['modal' => 'login']) }}" id="openLogin"
                    class="px-4 py-1.5 text-xs font-semibold text-white rounded-full hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[#a6b7ff]"
@@ -1351,8 +1371,10 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     // inject icons into header right-side (only on desktop)
+    // Icons are now static in HTML
+    /*
     try {
-        const headerRight = document.querySelector('header .hidden.md\\:flex.items-center.gap-3');
+        const headerRight = document.querySelector('header .hidden.md:flex.items-center.gap-3');
         // check if icons already present anywhere
         if (!document.querySelector('.nav-icon-button')) {
             const notifications = document.createElement('a');
@@ -1411,6 +1433,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
     } catch (e) { console.error('Icon injection error:', e); }
+    */
 
     // Attach behavior: check server order, create from sessionStorage if missing, then redirect to /order/addtocart
     const storageKey = 'inkwise-finalstep';

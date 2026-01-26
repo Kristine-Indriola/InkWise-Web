@@ -88,6 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const nameHidden = newRow.querySelector('.paper-stock-name-hidden');
                     if (nameHidden) nameHidden.value = '';
                     syncPaperStockRow(newRow);
+                    updateBasePriceFromPaperStocks();
                 }
 
                 if (container.classList.contains('addon-rows')) {
@@ -107,7 +108,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const rows = container.querySelectorAll(rowClass);
                 if (rows.length <= 1) return;
                 const row = event.target.closest(rowClass);
-                if (row) row.remove();
+                if (row) {
+                    row.remove();
+                    if (container.classList.contains('paper-stock-rows')) {
+                        updateBasePriceFromPaperStocks();
+                    }
+                }
             }
         });
     });
@@ -406,6 +412,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (material.unitCost != null) {
                     priceInput.value = material.unitCost;
                     priceInput.dataset.autofill = 'true';
+                    updateBasePriceFromPaperStocks();
                 }
             }
         } else if (!selectedOption || !selectedOption.value) {
@@ -488,6 +495,9 @@ document.addEventListener('DOMContentLoaded', () => {
         syncAddonRow(row);
     });
 
+    // Calculate initial base price from paper stocks
+    updateBasePriceFromPaperStocks();
+
     document.addEventListener('change', event => {
         if (event.target.matches('.paper-stock-name-select')) {
             const select = event.target;
@@ -554,9 +564,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (event.target.matches('.paper-stock-row input[name$="[price]"]')) {
             event.target.dataset.autofill = 'false';
+            updateBasePriceFromPaperStocks();
         }
     });
 });
+
+// Function to calculate base price from paper stock prices
+function updateBasePriceFromPaperStocks() {
+    const paperStockPrices = document.querySelectorAll('.paper-stock-row input[name$="[price]"]');
+    let total = 0;
+    paperStockPrices.forEach(input => {
+        const value = parseFloat(input.value) || 0;
+        total += value;
+    });
+    const basePriceInput = document.getElementById('basePrice');
+    if (basePriceInput) {
+        basePriceInput.value = total.toFixed(2);
+    }
+}
 
 // Global functions for template auto-population
 window.addPaperStockEntry = function(data = null, index = null) {
@@ -623,6 +648,7 @@ window.addPaperStockEntry = function(data = null, index = null) {
 
     container.appendChild(newRow);
     syncPaperStockRow(newRow);
+    updateBasePriceFromPaperStocks();
 };
 
 window.addAddonEntry = function(data = null, index = null) {

@@ -26,12 +26,6 @@ const TEMPLATE_SIZES = [
   { label: 'Square Large Envelope (7" × 7")', width: 7, height: 7 },
 ];
 
-const FOLD_TYPES = [
-  { value: 'bifold', label: 'Bi-Fold' },
-  { value: 'gatefold', label: 'Gate-Fold' },
-  { value: 'zfold', label: 'Z-Fold' },
-];
-
 export function CanvasToolbar() {
   const { state, dispatch } = useBuilderStore();
   const zoomPercent = Math.round(state.zoom * 100);
@@ -76,11 +70,6 @@ export function CanvasToolbar() {
     }
   };
 
-  const handleFoldTypeChange = (event) => {
-    const foldType = event.target.value;
-    dispatch({ type: 'UPDATE_TEMPLATE_PROPS', props: { fold_type: foldType || null } });
-  };
-
   const alignSelection = (mode) => {
     if (!hasSelection) {
       return;
@@ -91,17 +80,6 @@ export function CanvasToolbar() {
   return (
     <div className="canvas-toolbar" role="toolbar" aria-label="Canvas controls">
       <div className="canvas-toolbar__group">
-        <div className="canvas-toolbar__page-size">
-          <label className="canvas-toolbar__label">Fold Type</label>
-          <select className="canvas-toolbar__select" onChange={handleFoldTypeChange} value={state.template?.fold_type || ''} aria-label="Fold type">
-            <option value="">No Fold</option>
-            {FOLD_TYPES.map((fold) => (
-              <option key={fold.value} value={fold.value}>
-                {fold.label}
-              </option>
-            ))}
-          </select>
-        </div>
         <div className="canvas-toolbar__page-size">
           <label className="canvas-toolbar__label">Size</label>
           <select className="canvas-toolbar__select" onChange={handleSizeChange} aria-label="Template size">

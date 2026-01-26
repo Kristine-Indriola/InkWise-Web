@@ -196,6 +196,40 @@
             text-transform: uppercase;
         }
 
+        .invitation-card__ratings {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.88);
+            letter-spacing: 0.03em;
+        }
+
+        .invitation-card__rating-stars {
+            display: flex;
+            gap: 0.15rem;
+        }
+
+        .invitation-card__rating-star {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .invitation-card__rating-star.filled {
+            color: #fcd34d;
+            text-shadow: 0 0 6px rgba(252, 211, 77, 0.6);
+        }
+
+        .invitation-card__rating-detail {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .invitation-card__rating-empty {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
         .favorite-toggle {
             position: absolute;
             top: 0.75rem;
@@ -706,6 +740,9 @@
                             ?? $product->unit_price
                             ?? optional($templateRef)->base_price
                             ?? optional($templateRef)->unit_price;
+                        $ratingSummary = $ratingsData[$product->id] ?? [];
+                        $ratingCount = $ratingSummary['rating_count'] ?? 0;
+                        $averageRating = $ratingSummary['average_rating'] ?? null;
                     @endphp
                     <article class="invitation-card" role="listitem" data-product-id="{{ $product->id }}">
                         <button type="button"
@@ -739,6 +776,27 @@
                                     Custom quote
                                 @endif
                             </span>
+                            <div class="invitation-card__ratings rating-trigger"
+                                 role="button"
+                                 tabindex="0"
+                                 data-product-id="{{ $product->id }}"
+                                 aria-label="{{ $ratingCount > 0 ? 'View reviews for '.$product->name : 'Be the first to review '.$product->name }}">
+                                @if($ratingCount > 0)
+                                    @php
+                                        $roundedAverage = min(5, max(0, (int) round($averageRating ?? 0)));
+                                    @endphp
+                                    <div class="invitation-card__rating-stars" aria-hidden="true">
+                                        @for($star = 1; $star <= 5; $star++)
+                                            <span class="invitation-card__rating-star {{ $star <= $roundedAverage ? 'filled' : '' }}">★</span>
+                                        @endfor
+                                    </div>
+                                    <span class="invitation-card__rating-detail">
+                                        {{ number_format($averageRating ?? 0, 1) }} · {{ $ratingCount }} review{{ $ratingCount === 1 ? '' : 's' }}
+                                    </span>
+                                @else
+                                    <span class="invitation-card__rating-empty">New · Be the first to review</span>
+                                @endif
+                            </div>
                         </div>
                     </article>
                 @empty

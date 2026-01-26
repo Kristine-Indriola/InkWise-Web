@@ -45,7 +45,7 @@ class GenerateTemplatePreview implements ShouldQueue
             // For now, create a simple placeholder PNG so the template has a usable preview.
             $width = 1200;
             $height = 1200;
-            $filename = 'templates/preview/' . 'template_' . Str::uuid() . '.png';
+            $filename = 'templates/front/png/' . 'template_' . Str::uuid() . '.png';
 
             // Create a simple white PNG with GD if available
             if (function_exists('imagecreatetruecolor')) {

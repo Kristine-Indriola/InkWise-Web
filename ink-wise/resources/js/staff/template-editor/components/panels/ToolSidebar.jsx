@@ -4059,11 +4059,53 @@ export function ToolSidebar({ isSidebarHidden, onToggleSidebar }) {
   const handleUseRecentFromSidebar = (image) => {
     if (!activePage) return;
     try {
-      dispatch({ type: 'SET_PANEL_IMAGE', panelId: state.activePanelId, imageData: { dataUrl: image.dataUrl, fileName: image.fileName } });
-      console.log('Recent image set to active panel');
+      // Load the image so we can measure its natural size and create a reasonably
+      // sized frame on the canvas (centered and constrained to the page safe area).
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const naturalW = img.naturalWidth || img.width || 1;
+          const naturalH = img.naturalHeight || img.height || 1;
+          const maxW = Math.round(activePage.width * 0.85);
+          const maxH = Math.round(activePage.height * 0.85);
+          const scale = Math.min(1, maxW / naturalW, maxH / naturalH);
+          const width = Math.max(1, Math.round(naturalW * scale));
+          const height = Math.max(1, Math.round(naturalH * scale));
+          const x = Math.round((activePage.width - width) / 2);
+          const y = Math.round((activePage.height - height) / 2);
+
+          const layer = createLayer('image', activePage, {
+            name: image.fileName || 'Uploaded image',
+            content: image.dataUrl,
+            metadata: { objectFit: 'cover', imageScale: 1, imageOffsetX: 0, imageOffsetY: 0 },
+          });
+
+          layer.frame = { x, y, width, height, rotation: 0 };
+          if (layer.frame) {
+            layer.frame = constrainFrameToSafeZone(layer.frame, activePage, safeInsets);
+          }
+
+          dispatch({ type: 'ADD_LAYER', pageId: activePage.id, panelId: state.activePanelId, layer });
+
+          // Keep the panel preview in sync with the placed image
+          try {
+            dispatch({ type: 'SET_PANEL_IMAGE', panelId: state.activePanelId, imageData: { dataUrl: image.dataUrl, fileName: image.fileName } });
+          } catch (err) {
+            console.warn('Failed to set panel image after placing recent upload:', err);
+          }
+        } catch (err) {
+          console.error('Error while placing recent image onto canvas:', err);
+          alert('Could not place image on the canvas. See console for details.');
+        }
+      };
+      img.onerror = () => {
+        console.error('Failed to load recent image data');
+        alert('Could not load the selected image. Try uploading again.');
+      };
+      img.src = image.dataUrl;
     } catch (err) {
-      console.error('Failed to set recent image to panel:', err);
-      alert('Could not add image to panel. Check console for details.');
+      console.error('Failed to use recent image from sidebar:', err);
+      alert('Could not add image to canvas. Check console for details.');
     }
   };
 

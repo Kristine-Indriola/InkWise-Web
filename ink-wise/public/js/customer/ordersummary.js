@@ -487,7 +487,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const current = getSummary();
     if (!current) return;
     if (current.envelope) delete current.envelope;
-    window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(current));
+    try {
+      const minSummary = {
+        productId: current.productId ?? current.product_id ?? null,
+        quantity: current.quantity ?? null,
+        paymentMode: current.paymentMode ?? current.payment_mode ?? null,
+        totalAmount: current.totalAmount ?? current.total_amount ?? null,
+        shippingFee: current.shippingFee ?? current.shipping_fee ?? null,
+        order_id: current.order_id ?? current.orderId ?? null,
+      };
+      window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(minSummary));
+    } catch (e) {
+      console.warn('Failed to save minimal inkwise-finalstep to sessionStorage:', e);
+    }
     renderSummary(current);
     showToast('Envelope removed from your order.');
   });
@@ -497,7 +509,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const current = getSummary();
     if (!current) return;
     if (current.giveaways) delete current.giveaways;
-    window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(current));
+    try {
+      const minSummary = {
+        productId: current.productId ?? current.product_id ?? null,
+        quantity: current.quantity ?? null,
+        paymentMode: current.paymentMode ?? current.payment_mode ?? null,
+        totalAmount: current.totalAmount ?? current.total_amount ?? null,
+        shippingFee: current.shippingFee ?? current.shipping_fee ?? null,
+        order_id: current.order_id ?? current.orderId ?? null,
+      };
+      window.sessionStorage.setItem('inkwise-finalstep', JSON.stringify(minSummary));
+    } catch (e) {
+      console.warn('Failed to save minimal inkwise-finalstep to sessionStorage:', e);
+    }
     renderSummary(current);
     showToast('Giveaways removed from your order.');
   });
